@@ -199,3 +199,40 @@ describe('DawKeyboardShortcutsElement', () => {
     });
   });
 });
+
+describe('remap property cache invalidation (audit wave 4)', () => {
+  it('assigning any remap property after the cache is warm invalidates it', () => {
+    const editor = document.createElement('daw-editor') as any;
+    const s = document.createElement('daw-keyboard-shortcuts') as any;
+    editor.appendChild(s);
+    document.body.appendChild(editor);
+
+    for (const prop of [
+      'playbackShortcuts',
+      'splittingShortcuts',
+      'undoShortcuts',
+      'customShortcuts',
+    ]) {
+      void s.shortcuts; // warm the cache
+      expect(s._cachedShortcuts).not.toBeNull();
+      s[prop] = prop === 'customShortcuts' ? [] : {};
+      expect(s._cachedShortcuts).toBeNull();
+    }
+    document.body.removeChild(editor);
+  });
+
+  it('customShortcuts assigned after a keydown has warmed the cache take effect', () => {
+    const editor = document.createElement('daw-editor') as any;
+    const s = document.createElement('daw-keyboard-shortcuts') as any;
+    editor.appendChild(s);
+    document.body.appendChild(editor);
+
+    void s.shortcuts; // warmed (as any keydown would)
+    const handler = vi.fn();
+    s.customShortcuts = [{ key: 'd', handler }];
+
+    const active = s.shortcuts as Array<{ key?: string }>;
+    expect(active.some((sc) => sc.key === 'd')).toBe(true);
+    document.body.removeChild(editor);
+  });
+});

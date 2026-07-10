@@ -35,19 +35,49 @@ export class DawPauseButtonElement extends DawTransportButton {
     super.connectedCallback();
     // Defer so <daw-transport for="..."> and the target editor are resolved
     requestAnimationFrame(() => {
-      const target = this.target;
-      if (!target) return;
-      this._targetRef = target;
-      target.addEventListener('daw-recording-start', this._onRecStart);
-      target.addEventListener('daw-recording-complete', this._onRecEnd);
-      target.addEventListener('daw-recording-error', this._onRecEnd);
-      target.addEventListener('daw-recording-pause', this._onRecPause);
-      target.addEventListener('daw-recording-resume', this._onRecResume);
+      if (!this.isConnected) return;
+      this._ensureTargetListeners();
     });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this._cleanupListeners();
+  }
+
+  protected override updated() {
+    // Re-resolve on every render (pointerenter triggers one via the base
+    // class) — a target that upgrades/appears after the one-shot
+    // connectedCallback rAF (or a swapped <daw-transport for>) would
+    // otherwise never get the recording-state listeners: mid-recording,
+    // Pause would pause only the transport while the worklet keeps
+    // capturing (#573, same fix as daw-record-button).
+    this._ensureTargetListeners();
+  }
+
+  private _ensureTargetListeners() {
+    const target = this.target;
+    if (target === this._targetRef) return;
+    if (this._targetRef) {
+      // Swapping away from a live target: recording/pause state observed
+      // there is stale — a replaced editor never fires the events that
+      // would clear it, wedging the button into togglePauseRecording
+      // routing. (A reconnect of the BUTTON has a null _targetRef and
+      // keeps its state.)
+      this._isRecording = false;
+      this._isPaused = false;
+    }
+    this._cleanupListeners();
+    if (!target) return;
+    this._targetRef = target;
+    target.addEventListener('daw-recording-start', this._onRecStart);
+    target.addEventListener('daw-recording-complete', this._onRecEnd);
+    target.addEventListener('daw-recording-error', this._onRecEnd);
+    target.addEventListener('daw-recording-pause', this._onRecPause);
+    target.addEventListener('daw-recording-resume', this._onRecResume);
+  }
+
+  private _cleanupListeners() {
     if (this._targetRef) {
       this._targetRef.removeEventListener('daw-recording-start', this._onRecStart);
       this._targetRef.removeEventListener('daw-recording-complete', this._onRecEnd);

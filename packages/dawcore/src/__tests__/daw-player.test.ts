@@ -552,3 +552,101 @@ describe('DawPlayerElement — waveform', () => {
     });
   });
 });
+
+describe('DawPlayerElement — audit wave 4', () => {
+  let OriginalAudio: typeof Audio;
+  beforeAll(() => {
+    OriginalAudio = globalThis.Audio;
+    // @ts-expect-error test double
+    globalThis.Audio = MockAudio;
+  });
+  afterAll(() => {
+    globalThis.Audio = OriginalAudio;
+  });
+
+  it('survives a DOM reparent with a working track', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    await el.updateComplete;
+    expect(el.audioElement).toBeTruthy();
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    other.appendChild(el); // synchronous disconnect → reconnect
+    await el.updateComplete;
+
+    // disconnectedCallback disposed the engine — reconnect must rebuild the
+    // track or the player is dead forever (play() warns, duration 0).
+    expect(el.audioElement).toBeTruthy();
+    el.play();
+    expect(el.isPlaying).toBe(true);
+    other.remove();
+  });
+
+  it('a stale peaks-src rejection does not settle readiness for the newer load', async () => {
+    let rejectA!: (e: Error) => void;
+    vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl')
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectA = reject;
+          })
+      )
+      .mockImplementationOnce(() => new Promise(() => {})); // B stays in flight
+    const el = makePlayer();
+    el.src = 'a.mp3';
+    el.peaksSrc = '/a.dat';
+    await el.updateComplete;
+    el.peaksSrc = '/b.dat';
+    await el.updateComplete;
+
+    rejectA(new Error('404'));
+    await new Promise((r) => setTimeout(r, 10));
+
+    // B is still loading — A's late failure must not mark peaks settled
+    // (it would fire daw-ready on stale state, violating the re-arm rule).
+    expect((el as any)._peaksSettled).toBe(false);
+  });
+
+  it('seekTo while paused notifies consumers via daw-timeupdate', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    await el.updateComplete;
+    const times: number[] = [];
+    el.addEventListener('daw-timeupdate', ((e: CustomEvent) => {
+      times.push(e.detail.time);
+    }) as EventListener);
+
+    el.seekTo(30);
+
+    // The rAF loop only runs while playing — without an explicit update, the
+    // playhead and any <daw-time-display> stay stale until the next play.
+    expect(times).toEqual([30]);
+  });
+});
+
+describe('DawPlayerElement — wave 4 review hardening', () => {
+  let OriginalAudio: typeof Audio;
+  beforeAll(() => {
+    OriginalAudio = globalThis.Audio;
+    // @ts-expect-error test double
+    globalThis.Audio = MockAudio;
+  });
+  afterAll(() => {
+    globalThis.Audio = OriginalAudio;
+  });
+
+  it('the currentTime SETTER routes through seekTo (playhead + daw-timeupdate while paused)', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    await el.updateComplete;
+    const times: number[] = [];
+    el.addEventListener('daw-timeupdate', ((e: CustomEvent) => {
+      times.push(e.detail.time);
+    }) as EventListener);
+
+    el.currentTime = 42;
+
+    expect(times).toEqual([42]);
+  });
+});

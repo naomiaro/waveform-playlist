@@ -95,7 +95,7 @@ describe('seekTo', () => {
     spy.mockRestore();
   });
 
-  it('stops and restarts playback when playing (Tone.js reschedule)', () => {
+  it('stops and restarts playback when playing (Tone.js reschedule) via direct engine calls', () => {
     const el = document.createElement('daw-editor') as any;
     el._engine = {
       seek: vi.fn(),
@@ -106,13 +106,18 @@ describe('seekTo', () => {
       getCurrentTime: vi.fn().mockReturnValue(0),
     };
     el._isPlaying = true;
-    const stopSpy = vi.spyOn(el, 'stop');
-    const playSpy = vi.spyOn(el, 'play');
+    // The reschedule uses DIRECT engine calls — the public stop()/play()
+    // would dispatch spurious daw-stop/daw-play for a seek, and the async
+    // play() opens a pause-override race (audit wave 4).
+    const publicStopSpy = vi.spyOn(el, 'stop');
+    const publicPlaySpy = vi.spyOn(el, 'play');
     el.seekTo(3.0);
-    expect(stopSpy).toHaveBeenCalled();
-    expect(playSpy).toHaveBeenCalledWith(3.0);
-    stopSpy.mockRestore();
-    playSpy.mockRestore();
+    expect(el._engine.stop).toHaveBeenCalled();
+    expect(el._engine.play).toHaveBeenCalledWith(3.0);
+    expect(publicStopSpy).not.toHaveBeenCalled();
+    expect(publicPlaySpy).not.toHaveBeenCalled();
+    publicStopSpy.mockRestore();
+    publicPlaySpy.mockRestore();
   });
 });
 
