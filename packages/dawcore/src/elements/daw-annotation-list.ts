@@ -30,6 +30,10 @@ export class DawAnnotationListElement extends LitElement {
   private _observer: MutationObserver | null = null;
   private _observedTrack: DawAnnotationTrackElement | null = null;
   private _warnedMissing = false;
+  /** Set around `_cancelEdit`'s `span.blur()` so the resulting synchronous
+   *  blur event doesn't re-enter `_commitEdit` (cancel already restores the
+   *  text and clears `_editingId` itself). */
+  private _cancelling = false;
 
   static styles = css`
     :host {
@@ -72,17 +76,24 @@ export class DawAnnotationListElement extends LitElement {
     if (!this.for) return null;
     const el = document.getElementById(this.for);
     if (!el || el.tagName !== 'DAW-ANNOTATION-TRACK') {
-      if (el && !this._warnedMissing) {
+      if (!this._warnedMissing) {
         console.warn(
-          '[dawcore] <daw-annotation-list for="' +
-            this.for +
-            '"> target is not a <daw-annotation-track>'
+          el
+            ? '[dawcore] <daw-annotation-list for="' +
+                this.for +
+                '"> target is not a <daw-annotation-track>'
+            : '[dawcore] <daw-annotation-list for="' + this.for + '"> target not found'
         );
         this._warnedMissing = true;
       }
       return null;
     }
     return el as DawAnnotationTrackElement;
+  }
+
+  protected willUpdate(changed: Map<string, unknown>): void {
+    // Allow a retargeted list to warn again for its new `for` value.
+    if (changed.has('for')) this._warnedMissing = false;
   }
 
   connectedCallback() {
@@ -171,6 +182,9 @@ export class DawAnnotationListElement extends LitElement {
   }
 
   private _commitEdit(a: AnnotationData, span: HTMLElement): void {
+    // A cancel-triggered blur (span.blur() in _cancelEdit) must not commit —
+    // cancel already restored the text and cleared _editingId itself.
+    if (this._cancelling) return;
     this._editingId = null;
     const el = this._annotationElement(a.id);
     if (el) el.textContent = span.textContent?.trim() ?? '';
@@ -180,7 +194,12 @@ export class DawAnnotationListElement extends LitElement {
   private _cancelEdit(a: AnnotationData, span: HTMLElement): void {
     this._editingId = null;
     span.textContent = a.lines.join('\n');
-    span.blur();
+    this._cancelling = true;
+    try {
+      span.blur();
+    } finally {
+      this._cancelling = false;
+    }
     this.requestUpdate();
   }
 

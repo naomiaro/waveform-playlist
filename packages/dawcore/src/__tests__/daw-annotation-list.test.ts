@@ -115,7 +115,24 @@ describe('<daw-annotation-list>', () => {
     await flush();
     await orphan.updateComplete;
     expect(orphan.shadowRoot!.querySelectorAll('.annotation-row')).toHaveLength(0);
+    expect(warn).toHaveBeenCalled();
     orphan.remove();
     warn.mockRestore();
+  });
+
+  it('cancelling an edit with Escape restores the original text and does not commit on the resulting blur', async () => {
+    track.editable = true;
+    await track.updateComplete;
+    await flush();
+    await list.updateComplete;
+    const span = list.shadowRoot!.querySelector('.annotation-row-text') as HTMLElement;
+    span.dispatchEvent(new FocusEvent('focus'));
+    span.textContent = 'draft text';
+    span.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(span.textContent).toBe('First line');
+    expect(track.querySelector('#a')!.textContent).toBe('First line');
+    // A subsequent blur (e.g. focus moving elsewhere) must not commit 'draft text'.
+    span.dispatchEvent(new FocusEvent('blur'));
+    expect(track.querySelector('#a')!.textContent).toBe('First line');
   });
 });
