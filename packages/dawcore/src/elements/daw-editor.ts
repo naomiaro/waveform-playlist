@@ -440,6 +440,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Adapter AudioContext is already closed. Ignoring.');
       return;
     }
+    // A fresh adapter re-arms engine building after a disconnect consumed
+    // the previous one (see _adapterConsumedByDispose).
+    this._adapterConsumedByDispose = false;
     if (this._engine) {
       console.warn(
         '[dawcore] adapter set after engine is built. ' +
@@ -463,6 +466,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._externalAdapter;
   }
   private _externalAdapter: PlayoutAdapter | null = null;
+  /** True after a disconnect disposed the consumer's adapter via the engine
+   * — rebuild attempts fail loudly until a fresh adapter is set. */
+  private _adapterConsumedByDispose = false;
 
   // --- Effects (master chain; per-track chains delegated from <daw-track>) ---
 
@@ -1002,18 +1008,27 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._spectrogramController?.dispose();
     this._spectrogramController = null;
     this._lastSpectrogramViewport = null;
+    const hadEngine = this._engine !== null;
     try {
       this._disposeEngine();
     } catch (err) {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
+    // engine.dispose() disposed the CONSUMER's adapter. Some adapters
+    // (NativePlayoutAdapter) leave the AudioContext open, so a reconnect
+    // would decode successfully and wire tracks into a dead transport graph
+    // — waveforms render, play() runs, no audio. Refuse to rebuild on it;
+    // the adapter setter clears the flag when a fresh one arrives.
+    if (hadEngine) {
+      this._adapterConsumedByDispose = true;
+    }
     // Symmetric teardown: the caches above are gone and the engine (and the
     // consumer's adapter through it) disposed — retaining the render state
     // would make a reconnected editor show ghost waveforms that can never
-    // play. Element-backed tracks re-register on reconnect via their own
-    // deferred connect events (failing LOUDLY via daw-track-error if the
-    // disposed adapter can't decode); element-less (dropped/programmatic)
-    // content does not survive a reparent.
+    // play. Declarative AND programmatic (addTrack) tracks are element-backed
+    // and re-register on reconnect (failing LOUDLY via the disposed-adapter
+    // guard in _buildEngine until a fresh adapter is set); file-dropped
+    // element-less content does not survive a reparent.
     this._tracks = new Map();
     this._engineTracks = new Map();
     this._peaksData = new Map();
@@ -1261,11 +1276,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
   }
 
-  /** Synthesize `_tracks` descriptors for engine tracks that have none —
-   * engine.undo() restores removed tracks in ENGINE state only, and without
-   * a descriptor the track plays and renders but shows "Untitled" controls
-   * and is missing from `editor.tracks` (per-track APIs unaddressable). */
-  _ensureDescriptorsForEngineTracks(tracks: ClipTrack[]): void {
+  /** Reconcile `_tracks` descriptors with the engine's track list.
+   *
+   * ADD: engine.undo() restores removed tracks in ENGINE state only —
+   * without a synthesized descriptor the track plays and renders but shows
+   * "Untitled" controls and is missing from `editor.tracks`.
+   * PRUNE (the symmetric half): redo removes the track from engine state
+   * again — without pruning, the synthesized descriptor is a permanent
+   * ghost that even removeTrack() can't clean (no element, no engine
+   * entry). Never prunes tracks that are mid-load or element-backed —
+   * their descriptors legitimately precede their engine entries. */
+  _reconcileDescriptorsWithEngineTracks(tracks: ClipTrack[]): void {
+    const engineIds = new Set(tracks.map((t) => t.id));
     let next: Map<string, TrackDescriptor> | null = null;
     for (const track of tracks) {
       if (this._tracks.has(track.id)) continue;
@@ -1282,6 +1304,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           : 'waveform',
         clips: [],
       });
+    }
+    for (const trackId of this._tracks.keys()) {
+      if (
+        engineIds.has(trackId) ||
+        this._loadingTracks.has(trackId) ||
+        this._trackElements.has(trackId)
+      ) {
+        continue;
+      }
+      next ??= new Map(this._tracks);
+      next.delete(trackId);
     }
     if (next) {
       this._tracks = next;
@@ -2196,6 +2229,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (!this._externalAdapter) {
       throw new Error(NO_ADAPTER_ERROR);
     }
+    if (this._adapterConsumedByDispose) {
+      // The previous disconnect disposed this adapter through the engine.
+      // Some adapters (NativePlayoutAdapter) leave the AudioContext open, so
+      // building on it would decode fine but wire tracks into a dead
+      // transport graph — waveforms without audio. Fail loudly instead.
+      throw new Error(
+        '[dawcore] editor.adapter was disposed by a previous disconnect — ' +
+          'set a fresh PlayoutAdapter after reparenting <daw-editor>.'
+      );
+    }
 
     const { PlaylistEngine } = await import('@waveform-playlist/engine');
     const adapter = this._externalAdapter;
@@ -2254,7 +2297,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         // removal — synthesize one so the track shows real name/controls
         // and appears in editor.tracks (the effects chain does not survive;
         // it was disposed at removal).
-        this._ensureDescriptorsForEngineTracks(engineState.tracks);
+        this._reconcileDescriptorsWithEngineTracks(engineState.tracks);
       }
       // Sync clip positions when tracks change structurally (moveClip, trimClip,
       // splitClip, setTracks, addTrack, removeTrack).

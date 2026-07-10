@@ -1175,7 +1175,7 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
   it('synthesizes descriptors for engine tracks restored by undo', () => {
     const editor = setupEditor();
 
-    editor._ensureDescriptorsForEngineTracks([
+    editor._reconcileDescriptorsWithEngineTracks([
       {
         id: 'ghost',
         name: 'Guitar',
@@ -1194,6 +1194,75 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
     expect(t?.name).toBe('Guitar');
     expect(t?.volume).toBe(0.7);
     editor.remove();
+  });
+
+  it('prunes a synthesized descriptor when redo removes the track again', () => {
+    const editor = setupEditor();
+    const ghost = {
+      id: 'ghost',
+      name: 'Guitar',
+      volume: 0.7,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      clips: [],
+    };
+    editor._reconcileDescriptorsWithEngineTracks([ghost]); // undo restored it
+
+    editor._reconcileDescriptorsWithEngineTracks([]); // redo removed it again
+
+    // Without the prune, editor.tracks forever lists a track the engine no
+    // longer has — and removeTrack() can't clean it (no element, no engine
+    // entry → warns "no track found").
+    expect(editor.tracks).toHaveLength(0);
+    editor.remove();
+  });
+
+  it('does not prune descriptors for tracks that are still loading or element-backed', async () => {
+    const editor = setupEditor();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+    const promise = editor.addTrack({ name: 'Loading', clips: [{ src: '/a.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+
+    // A statechange arriving mid-load doesn't contain the loading track —
+    // its descriptor must survive (it is loading, not removed).
+    editor._reconcileDescriptorsWithEngineTracks([]);
+    expect(editor.tracks).toHaveLength(1);
+
+    releaseDecode(makeAudioBuffer());
+    await promise;
+    editor.remove();
+  });
+
+  it('refuses to rebuild an engine on an adapter its own teardown disposed', async () => {
+    const editor = setupEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    other.appendChild(editor); // teardown disposed the consumer's adapter
+
+    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so decode
+    // SUCCEEDS on reconnect and tracks wire into a dead transport graph —
+    // waveforms render, play() runs, no audio. The rebuild must fail loudly
+    // instead.
+    const err = await editor.addTrack({ name: 'U', clips: [{ src: '/b.opus' }] }).then(
+      () => null,
+      (e: Error) => e
+    );
+    expect(err?.message).toMatch(/adapter.*disposed|fresh/i);
+
+    // Setting a fresh adapter restores service
+    editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+    stubAudioPipeline(editor);
+    await expect(editor.addTrack({ name: 'V', clips: [{ src: '/c.opus' }] })).resolves.toBeTruthy();
+    other.remove();
   });
 
   it('toggling mono re-extracts peaks immediately', async () => {
