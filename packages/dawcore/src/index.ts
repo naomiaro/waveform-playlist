@@ -1,5 +1,6 @@
 import './elements/daw-annotation';
 import './elements/daw-annotation-track';
+import './elements/daw-annotation-list';
 import './elements/daw-clip';
 import './elements/daw-track';
 import './elements/daw-waveform';
@@ -23,6 +24,7 @@ import './elements/daw-player';
 
 export { DawAnnotationElement } from './elements/daw-annotation';
 export { DawAnnotationTrackElement } from './elements/daw-annotation-track';
+export { DawAnnotationListElement } from './elements/daw-annotation-list';
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
