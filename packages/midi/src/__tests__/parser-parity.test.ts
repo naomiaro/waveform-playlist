@@ -13,6 +13,19 @@ import { parseMidiFile as parseFromDawcorePkg } from '@dawcore/midi';
  * explicit GM program, empty, flatten) so a regression in any one branch
  * fails this test instead of slipping through to runtime.
  */
+
+/**
+ * Serialize to a fresh ArrayBuffer: .buffer on a Uint8Array is typed
+ * ArrayBufferLike (could be a SharedArrayBuffer), which TS rejects where
+ * ArrayBuffer is required.
+ */
+function toBuffer(midi: Midi): ArrayBuffer {
+  const bytes = midi.toArray();
+  const buffer = new ArrayBuffer(bytes.length);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 describe('parser parity', () => {
   it('matches on a basic single-track input', () => {
     const midi = new Midi();
@@ -23,7 +36,7 @@ describe('parser parity', () => {
     track.channel = 0;
     track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });
     track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.7 });
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer)).toEqual(parseFromDawcorePkg(buffer));
   });
@@ -38,7 +51,7 @@ describe('parser parity', () => {
     t2.name = 'Bass';
     t2.channel = 1;
     t2.addNote({ midi: 36, time: 0, duration: 2.0 });
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer)).toEqual(parseFromDawcorePkg(buffer));
   });
@@ -49,7 +62,7 @@ describe('parser parity', () => {
     track.name = 'Percussion';
     track.channel = 9;
     track.addNote({ midi: 42, time: 0, duration: 0.1 });
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer)).toEqual(parseFromDawcorePkg(buffer));
   });
@@ -61,7 +74,7 @@ describe('parser parity', () => {
     track.channel = 0;
     track.instrument.name = 'electric bass (finger)';
     track.addNote({ midi: 36, time: 0, duration: 1.0 });
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer)).toEqual(parseFromDawcorePkg(buffer));
   });
@@ -69,7 +82,7 @@ describe('parser parity', () => {
   it('matches on a MIDI file with no note-bearing tracks (empty)', () => {
     const midi = new Midi();
     midi.addTrack();
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer)).toEqual(parseFromDawcorePkg(buffer));
   });
@@ -84,7 +97,7 @@ describe('parser parity', () => {
     t2.name = 'Track2';
     t2.channel = 1;
     t2.addNote({ midi: 72, time: 0.25, duration: 0.5 });
-    const buffer = midi.toArray().buffer;
+    const buffer = toBuffer(midi);
 
     expect(parseFromReactPkg(buffer, { flatten: true })).toEqual(
       parseFromDawcorePkg(buffer, { flatten: true })

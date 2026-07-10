@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Midi } from '@tonejs/midi';
-import { parseMidiFile } from '../src/parseMidiFile';
+import type { MidiNoteData } from '@waveform-playlist/core';
+import { parseMidiFile, parseMidiUrl, getTrackDuration } from '../src/parseMidiFile';
 
 /**
  * Helper: create a minimal MIDI ArrayBuffer using @tonejs/midi's Midi constructor.
@@ -57,7 +58,13 @@ function createTestMidi(options?: {
     }
   }
 
-  return midi.toArray().buffer;
+  // Copy into a fresh ArrayBuffer: .buffer on a Uint8Array is typed
+  // ArrayBufferLike (could be a SharedArrayBuffer), which TS rejects where
+  // ArrayBuffer is required.
+  const bytes = midi.toArray();
+  const buffer = new ArrayBuffer(bytes.length);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 describe('parseMidiFile', () => {
@@ -264,5 +271,101 @@ describe('parseMidiFile', () => {
 
     const result = parseMidiFile(buffer);
     expect(result.duration).toBe(8.0); // 5.0 + 3.0
+  });
+
+  it('returns zero tracks when flatten is set and the file has no note-bearing tracks', () => {
+    const buffer = createTestMidi({
+      tracks: [{ name: 'Empty', channel: 0, notes: [] }],
+    });
+
+    const result = parseMidiFile(buffer, { flatten: true });
+
+    expect(result.tracks).toHaveLength(0);
+    expect(result.duration).toBe(0);
+  });
+
+  it('throws a contextual error for non-MIDI data', () => {
+    const garbage = new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08]).buffer;
+
+    expect(() => parseMidiFile(garbage)).toThrowError(/parseMidiFile: invalid or corrupt/);
+  });
+
+  it('throws a contextual error for an empty buffer', () => {
+    expect(() => parseMidiFile(new ArrayBuffer(0))).toThrowError(
+      /parseMidiFile: invalid or corrupt/
+    );
+  });
+});
+
+describe('getTrackDuration', () => {
+  it('returns 0 for an empty note array', () => {
+    expect(getTrackDuration([])).toBe(0);
+  });
+
+  it('computes the max end time without crashing on very large note arrays', () => {
+    // Spreading an array into Math.max() puts every element on the call
+    // stack; ~130k arguments overflows it (RangeError). Dense MIDI files
+    // (black MIDI, long captures) genuinely reach this size.
+    const count = 200_000;
+    const notes: MidiNoteData[] = Array.from({ length: count }, (_, i) => ({
+      midi: 60,
+      name: 'C4',
+      time: i * 0.01,
+      duration: 0.05,
+      velocity: 0.8,
+      channel: 0,
+    }));
+
+    const expected = (count - 1) * 0.01 + 0.05;
+    expect(getTrackDuration(notes)).toBeCloseTo(expected, 6);
+  });
+});
+
+describe('parseMidiUrl', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches and parses a MIDI file, forwarding the abort signal', async () => {
+    const buffer = createTestMidi({
+      name: 'Fetched Song',
+      tracks: [{ name: 'Piano', channel: 0, notes: [{ midi: 60, time: 0, duration: 1.0 }] }],
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      arrayBuffer: () => Promise.resolve(buffer),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const controller = new AbortController();
+    const result = await parseMidiUrl('https://example.com/song.mid', undefined, controller.signal);
+
+    expect(result.name).toBe('Fetched Song');
+    expect(result.tracks).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/song.mid', {
+      signal: controller.signal,
+    });
+  });
+
+  it('includes the HTTP status code in the error for non-ok responses', async () => {
+    // statusText is frequently empty on HTTP/2 — the status code must
+    // appear in the message so failures stay diagnosable.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, statusText: '' })
+    );
+
+    await expect(parseMidiUrl('https://example.com/missing.mid')).rejects.toThrowError(/404/);
+  });
+
+  it('propagates fetch abort rejections unchanged', async () => {
+    const abortError = new DOMException('The operation was aborted.', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(abortError));
+
+    await expect(parseMidiUrl('https://example.com/song.mid')).rejects.toMatchObject({
+      name: 'AbortError',
+    });
   });
 });
