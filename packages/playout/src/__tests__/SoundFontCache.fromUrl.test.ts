@@ -41,14 +41,20 @@ describe('SoundFontCache.fromUrl', () => {
     expect(fetchMock.mock.calls[0][0]).toBe('/media/soundfont/A320U.sf2');
   });
 
-  it('rejects when the fetch fails (no half-loaded cache escapes)', async () => {
+  it('rejects when the fetch fails, with the status code in the message', async () => {
+    // statusText is frequently empty on HTTP/2 — the numeric status must
+    // always appear so failures stay diagnosable.
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: false, statusText: 'Not Found' } as unknown as Response)
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      } as unknown as Response)
     );
 
     await expect(SoundFontCache.fromUrl('/missing.sf2')).rejects.toThrow(
-      'Failed to fetch SoundFont /missing.sf2: Not Found'
+      'Failed to fetch SoundFont /missing.sf2: 404 Not Found'
     );
   });
 

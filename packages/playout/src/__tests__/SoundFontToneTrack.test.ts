@@ -94,4 +94,55 @@ describe('SoundFontToneTrack Part callback', () => {
 
     warnSpy.mockRestore();
   });
+
+  it('warns about missing samples once per track instance, not once per page', () => {
+    // A missing sample (getAudioBuffer returns null) drops the note. The
+    // warning is rate-limited — but per INSTANCE: after a SoundFont swap, a
+    // different track with different missing samples must still diagnose.
+    const nullCache = {
+      isLoaded: true,
+      getAudioBuffer: vi.fn(() => null),
+    } as unknown as SoundFontCache;
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const clip = {
+      notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }],
+      startTime: 0,
+      duration: 1,
+      offset: 0,
+    };
+
+    new SoundFontToneTrack({ clips: [clip], track: makeTrack('sf-a'), soundFontCache: nullCache });
+    const p1 = mockPartInstances[0];
+    p1.callback(0.1, p1.events[0]);
+    const warnsAfterFirst = warnSpy.mock.calls.length;
+    expect(warnsAfterFirst).toBeGreaterThan(0);
+
+    new SoundFontToneTrack({ clips: [clip], track: makeTrack('sf-b'), soundFontCache: nullCache });
+    const p2 = mockPartInstances[1];
+    p2.callback(0.1, p2.events[0]);
+
+    expect(warnSpy.mock.calls.length).toBeGreaterThan(warnsAfterFirst);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('SoundFontToneTrack duration', () => {
+  it('returns the max clip end time regardless of array order', () => {
+    const cache = {
+      isLoaded: true,
+      getAudioBuffer: vi.fn(() => null),
+    } as unknown as SoundFontCache;
+    const note = { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 };
+
+    const track = new SoundFontToneTrack({
+      clips: [
+        { notes: [note], startTime: 0, duration: 10, offset: 0 },
+        { notes: [note], startTime: 2, duration: 2, offset: 0 }, // array-last ends at 4
+      ],
+      track: makeTrack(),
+      soundFontCache: cache,
+    });
+
+    expect(track.duration).toBe(10);
+  });
 });

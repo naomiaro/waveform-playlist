@@ -60,9 +60,15 @@ vi.mock('tone', () => ({
   ToneAudioNode: class {},
 }));
 
-vi.mock('../fades', () => ({
+// ToneTrack imports the pure fade appliers from core directly; keep the rest
+// of core real (gainToDb, types) via importOriginal.
+vi.mock('@waveform-playlist/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
   applyFadeIn: vi.fn(),
   applyFadeOut: vi.fn(),
+}));
+
+vi.mock('../fades', () => ({
   getUnderlyingAudioParam: vi.fn(() => ({
     setValueAtTime: vi.fn(),
   })),
@@ -70,6 +76,7 @@ vi.mock('../fades', () => ({
 
 import { ToneTrack } from '../ToneTrack';
 import type { ClipInfo } from '../ToneTrack';
+import { applyFadeIn } from '@waveform-playlist/core'; // mocked above
 import type { Track } from '@waveform-playlist/core';
 
 function makeBuffer(length = 48000): AudioBuffer {
@@ -451,6 +458,40 @@ describe('ToneTrack', () => {
       track.connectEffects(b);
       expect(mockMuteGain.disconnect).toHaveBeenCalledWith(a);
       expect(mockMuteGain.connect).toHaveBeenCalledWith(b);
+    });
+  });
+
+  describe('duration', () => {
+    it('returns the max clip end time regardless of array order', () => {
+      const track = new ToneTrack({
+        clips: [
+          makeClipInfo({ startTime: 0, duration: 10 }),
+          makeClipInfo({ startTime: 2, duration: 2 }), // array-last ends at 4
+        ],
+        track: makeTrack(),
+      });
+
+      expect(track.duration).toBe(10);
+    });
+  });
+
+  describe('mid-playback fades', () => {
+    it('schedules fade envelopes for a clip added during playback', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      mockTransport.state = 'started';
+      mockTransport.seconds = 1.0;
+
+      track.replaceClips([
+        makeClipInfo({
+          startTime: 0,
+          duration: 4,
+          fadeIn: { duration: 1, type: 'linear' },
+        }),
+      ]);
+
+      // The new clip is started mid-clip inside its fade-in window — without
+      // scheduling the envelope it plays at full gain until the next play().
+      expect(applyFadeIn).toHaveBeenCalled();
     });
   });
 });

@@ -243,8 +243,9 @@ export class MidiToneTrack implements PlayableTrack {
             this.snareSynth.triggerAttackRelease(duration, time, velocity);
           } catch (err) {
             console.warn(
-              '[waveform-playlist] Snare overlap — previous hit still decaying, skipped:',
-              err
+              '[waveform-playlist] Snare overlap — previous hit still decaying, skipped:' +
+                ' ' +
+                String(err)
             );
           }
           break;
@@ -313,8 +314,9 @@ export class MidiToneTrack implements PlayableTrack {
               );
             } catch (err) {
               console.warn(
-                `[waveform-playlist] Failed to start mid-clip MIDI note "${note.name}" on track "${this.id}":`,
-                err
+                `[waveform-playlist] Failed to start mid-clip MIDI note "${note.name}" on track "${this.id}":` +
+                  ' ' +
+                  String(err)
               );
             }
           }
@@ -328,15 +330,23 @@ export class MidiToneTrack implements PlayableTrack {
    */
   stopAllSources(): void {
     const now = getContext().rawContext.currentTime;
-    try {
-      this.synth.releaseAll(now);
-      this.kickSynth.releaseAll(now);
-      this.cymbalSynth.releaseAll(now);
-      this.tomSynth.releaseAll(now);
-      // NoiseSynth has no releaseAll — it decays naturally via short envelope
-    } catch (err) {
-      console.warn(`[waveform-playlist] Error releasing synth on track "${this.id}":`, err);
-    }
+    // Per-synth guard: one failing releaseAll must not skip the others —
+    // this runs on every stop() and loop boundary, and a skipped percussion
+    // release leaves voices ringing/stuck.
+    const release = (label: string, fn: () => void): void => {
+      try {
+        fn();
+      } catch (err) {
+        console.warn(
+          `[waveform-playlist] Error releasing ${label} synth on track "${this.id}": ` + String(err)
+        );
+      }
+    };
+    release('melodic', () => this.synth.releaseAll(now));
+    release('kick', () => this.kickSynth.releaseAll(now));
+    release('cymbal', () => this.cymbalSynth.releaseAll(now));
+    release('tom', () => this.tomSynth.releaseAll(now));
+    // NoiseSynth has no releaseAll — it decays naturally via short envelope
   }
 
   /**
@@ -381,8 +391,9 @@ export class MidiToneTrack implements PlayableTrack {
         this.effectsCleanup();
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error during MIDI track "${this.id}" effects cleanup:`,
-          err
+          `[waveform-playlist] Error during MIDI track "${this.id}" effects cleanup:` +
+            ' ' +
+            String(err)
         );
       }
     }
@@ -395,8 +406,9 @@ export class MidiToneTrack implements PlayableTrack {
         part.dispose();
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error disposing Part ${index} on MIDI track "${this.id}":`,
-          err
+          `[waveform-playlist] Error disposing Part ${index} on MIDI track "${this.id}":` +
+            ' ' +
+            String(err)
         );
       }
     });
@@ -413,26 +425,39 @@ export class MidiToneTrack implements PlayableTrack {
       try {
         s?.dispose();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error disposing synth on MIDI track "${this.id}":`, err);
+        console.warn(
+          `[waveform-playlist] Error disposing synth on MIDI track "${this.id}":` +
+            ' ' +
+            String(err)
+        );
       }
     }
     try {
       this.volumeNode.dispose();
     } catch (err) {
       console.warn(
-        `[waveform-playlist] Error disposing volumeNode on MIDI track "${this.id}":`,
-        err
+        `[waveform-playlist] Error disposing volumeNode on MIDI track "${this.id}":` +
+          ' ' +
+          String(err)
       );
     }
     try {
       this.panNode.dispose();
     } catch (err) {
-      console.warn(`[waveform-playlist] Error disposing panNode on MIDI track "${this.id}":`, err);
+      console.warn(
+        `[waveform-playlist] Error disposing panNode on MIDI track "${this.id}":` +
+          ' ' +
+          String(err)
+      );
     }
     try {
       this.muteGain.dispose();
     } catch (err) {
-      console.warn(`[waveform-playlist] Error disposing muteGain on MIDI track "${this.id}":`, err);
+      console.warn(
+        `[waveform-playlist] Error disposing muteGain on MIDI track "${this.id}":` +
+          ' ' +
+          String(err)
+      );
     }
   }
 
@@ -441,9 +466,14 @@ export class MidiToneTrack implements PlayableTrack {
   }
 
   get duration(): number {
-    if (this.scheduledClips.length === 0) return 0;
-    const lastClip = this.scheduledClips[this.scheduledClips.length - 1];
-    return lastClip.clipInfo.startTime + lastClip.clipInfo.duration;
+    // Max end across clips — the array is NOT sorted by startTime
+    // (replaceClips/edits append), so array-last is not the latest-ending.
+    let max = 0;
+    for (const { clipInfo } of this.scheduledClips) {
+      const end = clipInfo.startTime + clipInfo.duration;
+      if (end > max) max = end;
+    }
+    return max;
   }
 
   get muted(): boolean {

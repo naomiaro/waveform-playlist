@@ -233,7 +233,12 @@ export class SoundFontCache {
   async load(url: string, signal?: AbortSignal): Promise<void> {
     const response = await fetch(url, { signal });
     if (!response.ok) {
-      throw new Error(`Failed to fetch SoundFont ${url}: ${response.statusText}`);
+      // statusText is frequently empty on HTTP/2 — always include the code.
+      throw new Error(
+        `Failed to fetch SoundFont ${url}: ${response.status}${
+          response.statusText ? ` ${response.statusText}` : ''
+        }`
+      );
     }
     const arrayBuffer = await response.arrayBuffer();
     try {

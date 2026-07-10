@@ -33,6 +33,7 @@ vi.mock('tone', () => {
 
 // Must import AFTER vi.mock
 import {
+  configureGlobalContext,
   getGlobalContext,
   getGlobalAudioContext,
   getGlobalAudioContextState,
@@ -177,6 +178,21 @@ describe('audioContext singleton', () => {
       getGlobalContext();
       expect(contextCreateCount).toBe(2);
       expect(Context).toHaveBeenCalledTimes(2);
+    });
+
+    it('passes latencyHint to the Context in the default path', async () => {
+      // The interface JSDoc promises latencyHint is "passed to the
+      // AudioContext constructor" — the default (standardized) path must
+      // honor it, not just the native path.
+      configureGlobalContext({ latencyHint: 'playback' });
+
+      expect(Context).toHaveBeenCalledWith({ latencyHint: 'playback' });
+    });
+
+    it('creates the Context with no options when none are given', () => {
+      configureGlobalContext({});
+
+      expect(Context).toHaveBeenCalledWith();
     });
 
     it('resets the singleton even when the raw context is already closed', async () => {

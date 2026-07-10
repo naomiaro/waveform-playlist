@@ -7,8 +7,8 @@ import {
   getTransport,
   getContext,
 } from 'tone';
-import { Track, gainToDb, type Fade } from '@waveform-playlist/core';
-import { applyFadeIn, applyFadeOut, getUnderlyingAudioParam } from './fades';
+import { Track, gainToDb, applyFadeIn, applyFadeOut, type Fade } from '@waveform-playlist/core';
+import { getUnderlyingAudioParam } from './fades';
 
 export type TrackEffectsFunction = (
   graphEnd: Gain,
@@ -163,8 +163,9 @@ export class ToneTrack {
     } catch (err) {
       console.warn(
         `[waveform-playlist] Failed to start source on track "${this.id}" ` +
-          `(time=${audioContextTime}, offset=${offset}, duration=${duration}):`,
-        err
+          `(time=${audioContextTime}, offset=${offset}, duration=${duration}):` +
+          ' ' +
+          String(err)
       );
       source.disconnect();
       return;
@@ -370,6 +371,15 @@ export class ToneTrack {
             clipInfo.offset + Math.max(0, elapsed),
             clipInfo.duration - Math.max(0, elapsed)
           );
+          // Schedule the clip's fade envelope for this play cycle — without
+          // it the clip plays at flat gain until the next play().
+          this.scheduleFades(scheduled, audioContextTime, clipInfo.offset + Math.max(0, elapsed));
+        } else if (absClipStart >= transportOffset) {
+          // Clip starts later this cycle: its schedule callback will create
+          // the source, but fades were prepared at play() — before this clip
+          // existed. Schedule them now at the clip's future start time.
+          const delay = absClipStart - transportOffset;
+          this.scheduleFades(scheduled, audioContextTime + delay, clipInfo.offset);
         }
       }
     }
@@ -400,7 +410,9 @@ export class ToneTrack {
       try {
         source.stop();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error stopping source on track "${this.id}":`, err);
+        console.warn(
+          `[waveform-playlist] Error stopping source on track "${this.id}":` + ' ' + String(err)
+        );
       }
     });
     this.activeSources.clear();
@@ -563,10 +575,21 @@ export class ToneTrack {
           'closure effects are mutually exclusive.'
       );
     }
-    if (this._effectsChainNode) {
-      this.muteGain.disconnect(this._effectsChainNode);
-    } else {
-      this.muteGain.disconnect(this._destination);
+    // Guard the disconnect (as disconnectEffects does) — a consumer may have
+    // disposed the old chain node externally; the rewire must proceed.
+    try {
+      if (this._effectsChainNode) {
+        this.muteGain.disconnect(this._effectsChainNode);
+      } else {
+        this.muteGain.disconnect(this._destination);
+      }
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] connectEffects disconnect on track "' +
+          this.track.id +
+          '": ' +
+          String(err)
+      );
     }
     this.muteGain.connect(node);
     this._effectsChainNode = node;
@@ -594,7 +617,9 @@ export class ToneTrack {
       try {
         this.effectsCleanup();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error during track "${this.id}" effects cleanup:`, err);
+        console.warn(
+          `[waveform-playlist] Error during track "${this.id}" effects cleanup:` + ' ' + String(err)
+        );
       }
     }
 
@@ -606,16 +631,18 @@ export class ToneTrack {
         transport.clear(scheduled.scheduleId);
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error clearing schedule ${index} on track "${this.id}":`,
-          err
+          `[waveform-playlist] Error clearing schedule ${index} on track "${this.id}":` +
+            ' ' +
+            String(err)
         );
       }
       try {
         scheduled.fadeGainNode.disconnect();
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error disconnecting fadeGain ${index} on track "${this.id}":`,
-          err
+          `[waveform-playlist] Error disconnecting fadeGain ${index} on track "${this.id}":` +
+            ' ' +
+            String(err)
         );
       }
     });
@@ -623,17 +650,23 @@ export class ToneTrack {
     try {
       this.volumeNode.dispose();
     } catch (err) {
-      console.warn(`[waveform-playlist] Error disposing volumeNode on track "${this.id}":`, err);
+      console.warn(
+        `[waveform-playlist] Error disposing volumeNode on track "${this.id}":` + ' ' + String(err)
+      );
     }
     try {
       this.panNode.dispose();
     } catch (err) {
-      console.warn(`[waveform-playlist] Error disposing panNode on track "${this.id}":`, err);
+      console.warn(
+        `[waveform-playlist] Error disposing panNode on track "${this.id}":` + ' ' + String(err)
+      );
     }
     try {
       this.muteGain.dispose();
     } catch (err) {
-      console.warn(`[waveform-playlist] Error disposing muteGain on track "${this.id}":`, err);
+      console.warn(
+        `[waveform-playlist] Error disposing muteGain on track "${this.id}":` + ' ' + String(err)
+      );
     }
   }
 
@@ -642,9 +675,14 @@ export class ToneTrack {
   }
 
   get duration(): number {
-    if (this.scheduledClips.length === 0) return 0;
-    const lastClip = this.scheduledClips[this.scheduledClips.length - 1];
-    return lastClip.clipInfo.startTime + lastClip.clipInfo.duration;
+    // Max end across clips — the array is NOT sorted by startTime
+    // (replaceClips/addClip append), so array-last is not the latest-ending.
+    let max = 0;
+    for (const { clipInfo } of this.scheduledClips) {
+      const end = clipInfo.startTime + clipInfo.duration;
+      if (end > max) max = end;
+    }
+    return max;
   }
 
   get buffer(): AudioBuffer {

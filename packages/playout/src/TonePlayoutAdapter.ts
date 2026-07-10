@@ -202,7 +202,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       try {
         playout.dispose();
       } catch (err) {
-        console.warn('[waveform-playlist] Error disposing previous playout:', err);
+        console.warn('[waveform-playlist] Error disposing previous playout:' + ' ' + String(err));
       }
       playout = null;
     }
@@ -220,8 +220,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       _pendingInit = playout.init().catch((err) => {
         console.warn(
           '[waveform-playlist] Failed to initialize playout. ' +
-            'Audio playback will require another user gesture.',
-          err
+            'Audio playback will require another user gesture.' +
+            ' ' +
+            String(err)
         );
         _audioInitialized = false;
       });
