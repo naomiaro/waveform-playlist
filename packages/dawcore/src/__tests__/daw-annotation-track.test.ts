@@ -32,6 +32,13 @@ describe('<daw-annotation-track>', () => {
     expect(track.annotations.map((a) => a.id)).toEqual(['a', 'b', 'c']);
   });
 
+  it('hides itself and its <daw-annotation> children on connect so light-DOM text does not leak through a host <slot>', () => {
+    expect(track.style.display).toBe('none');
+    track.annotationElements.forEach((el) => {
+      expect(el.style.display).toBe('none');
+    });
+  });
+
   it('boolean attributes map to properties', () => {
     track.setAttribute('editable', '');
     track.setAttribute('link-endpoints', '');

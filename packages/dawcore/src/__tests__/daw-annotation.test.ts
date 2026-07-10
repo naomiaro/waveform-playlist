@@ -29,6 +29,12 @@ describe('<daw-annotation>', () => {
     });
   });
 
+  it('hides itself on connect so light-DOM text does not leak through a host <slot>', async () => {
+    document.body.appendChild(el);
+    await flush();
+    expect(el.style.display).toBe('none');
+  });
+
   it('uses the id attribute as annotationId when present', () => {
     el.id = 'a1';
     expect(el.annotationId).toBe('a1');

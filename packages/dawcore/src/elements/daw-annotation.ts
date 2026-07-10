@@ -66,6 +66,11 @@ export class DawAnnotationElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Data element — its light-DOM text must not render through a host's
+    // bare <slot> (e.g. <daw-editor>'s, or a bare <daw-annotation> used
+    // outside a track). Views (editor lane, <daw-annotation-list>) present
+    // it instead.
+    this.style.display = 'none';
     // Deferred so ancestor listeners (editor / annotation track) register first
     // when parsed all-at-once — same pattern as <daw-clip>.
     setTimeout(() => {

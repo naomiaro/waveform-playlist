@@ -437,6 +437,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _selectionStartTime = 0;
   _selectionEndTime = 0;
   _currentTime = 0;
+  // Bounded-playback watermark for the current play(start, end) call
+  // (selection/annotation playback). The adapter's own auto-stop at
+  // endTime (e.g. native Transport's internal timer) tears down audio but
+  // never notifies isPlaying/daw-stop back up — the _startPlayhead rAF
+  // loop below is the sole place that detects reaching it, same pattern
+  // as the whole-track _duration check.
+  _activePlayEndTime: number | null = null;
   @property({ attribute: false })
   set adapter(value: PlayoutAdapter | null) {
     if (value && value.audioContext.state === 'closed') {
@@ -2762,8 +2769,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const engine = await this._ensureEngine();
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
-      engine.play(startTime, endTime);
+      // Register the editor's rAF loop BEFORE starting the low-level engine
+      // playback. requestAnimationFrame callbacks fire in registration
+      // order — this guarantees _startPlayhead's per-frame check (below)
+      // runs BEFORE the native Transport's own endTime-triggered auto-stop
+      // timer each frame. Without this ordering, a bounded play(start, end)
+      // (selection/annotation playback) races: the Transport's internal
+      // timer silently resets its own clock to 0 before this loop's
+      // getCurrentTime() check ever observes time >= endTime, leaving
+      // isPlaying stuck true forever with no daw-stop.
+      this._activePlayEndTime = endTime ?? null;
       this._startPlayhead();
+      engine.play(startTime, endTime);
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
       console.warn('[dawcore] Playback failed: ' + String(err));
@@ -2784,6 +2801,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   stop() {
     if (!this._engine) return;
+    this._activePlayEndTime = null;
     this._engine.stop();
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
@@ -2849,6 +2867,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         );
         return;
       }
+      // Seeking past a bounded (selection/annotation) play reschedules via
+      // the engine directly (no endTime) — clear the stale watermark so
+      // the rAF loop doesn't stop the resumed playback prematurely at the
+      // old bound. Mirrors Transport.seek()'s own _endTime clearing.
+      this._activePlayEndTime = null;
       this._currentTime = target;
       this._startPlayhead();
     } else {
@@ -3121,6 +3144,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Runs even when the playhead element isn't rendered (empty/indefinite
     // editors) so daw-timeupdate consumers still get frames.
     this._playbackAnimation.start(() => {
+      // Bounded playback (selection/annotation via play(start, end)): the
+      // adapter's own endTime auto-stop tears down audio internally but
+      // never reaches back up to isPlaying/daw-stop, so this rAF loop must
+      // detect it too. Checked before the whole-track duration bound below.
+      if (
+        this._activePlayEndTime !== null &&
+        !this.isRecording &&
+        engine.getCurrentTime() >= this._activePlayEndTime
+      ) {
+        this.stop();
+        const t = this._currentTime;
+        return Number.isFinite(t) ? Math.max(0, t) : 0;
+      }
       // Auto-stop at the end of the timeline (player-style default — parity
       // with the React provider's animation loop). `indefinite-playback`
       // opts out (DAW-style: roll until explicit stop), and an active

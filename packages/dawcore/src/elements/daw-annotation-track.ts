@@ -315,6 +315,10 @@ export class DawAnnotationTrackElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Data element — its light-DOM text must not render through a host's
+    // bare <slot> (e.g. <daw-editor>'s). Views (editor lane,
+    // <daw-annotation-list>) present it instead.
+    this.style.display = 'none';
     // Upgrade-property dance: a remap assigned before element definition
     // created an own property shadowing the accessor — re-route it.
     if (Object.prototype.hasOwnProperty.call(this, 'annotationShortcuts')) {
