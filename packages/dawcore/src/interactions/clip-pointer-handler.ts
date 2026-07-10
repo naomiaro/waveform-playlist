@@ -451,7 +451,11 @@ export class ClipPointerHandler {
     return true;
   }
 
-  /** Restore clip container CSS to original values after trim visual preview. */
+  /** Restore clip container CSS AND waveform peaks to original values after
+   * a trim visual preview. Peaks matter: the drag wrote re-extracted peak
+   * arrays imperatively onto the <daw-waveform> elements (bypassing Lit), and
+   * a cancelled/zero-delta trim makes no engine mutation — so no statechange
+   * re-render will ever repair them. */
   private _restoreTrimVisual(): void {
     if (this._clipContainer) {
       this._clipContainer.style.left = this._originalLeft + 'px';
@@ -461,6 +465,9 @@ export class ClipPointerHandler {
       for (const wf of waveforms) {
         (wf as HTMLElement).style.left = '0px';
       }
+      // Re-extract at the original bounds (no-op when the peak cache is
+      // unavailable — in that case the drag never overwrote peaks either).
+      this._updateWaveformPeaks(this._originalOffsetSamples, this._originalDurationSamples);
     }
   }
 

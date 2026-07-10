@@ -820,6 +820,42 @@ describe('ClipPointerHandler', () => {
       expect(localHandler.isActive).toBe(false);
     });
 
+    it('trim cancel restores the original waveform peaks, not just the container CSS', () => {
+      // During a trim drag, peaks are written imperatively onto the
+      // <daw-waveform> elements (bypassing Lit); a cancel makes no engine
+      // mutation, so no statechange re-render will repair them — the restore
+      // must re-extract at the ORIGINAL bounds.
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = document.createElement('div');
+      container.classList.add('clip-container');
+      container.dataset.clipId = 'clip-1';
+      container.style.left = '200px';
+      container.style.width = '400px';
+      const waveform = document.createElement('daw-waveform');
+      container.appendChild(waveform);
+      shadow.appendChild(container);
+
+      const slice = { data: [new Int16Array(10)], length: 10 };
+      const reextract = vi.fn().mockReturnValue(slice);
+      const localHost = createMockHost(engine, {
+        shadowRoot: shadow,
+        reextractClipPeaks: reextract,
+      });
+      const localHandler = new ClipPointerHandler(localHost);
+      const boundary = makeBoundaryEl('clip-1', 'track-1', 'right');
+      localHandler.tryHandle(boundary, pointerEvent('pointerdown', { clientX: 100 }));
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 150 }));
+      // Drag preview re-extracted at the NEW duration (48000 + 50*1024)
+      expect(reextract).toHaveBeenCalledWith('clip-1', 0, 48000 + 50 * 1024);
+
+      reextract.mockClear();
+      localHandler.onPointerCancel(pointerEvent('pointercancel', { clientX: 150 }));
+
+      // Restore re-extracts at the original bounds from the mock getClipBounds
+      expect(reextract).toHaveBeenCalledWith('clip-1', 0, 48000);
+    });
+
     it('cancel with no active drag is a no-op', () => {
       handler.onPointerCancel(pointerEvent('pointercancel', { clientX: 100 }));
       expect(engine.abortTransaction).not.toHaveBeenCalled();

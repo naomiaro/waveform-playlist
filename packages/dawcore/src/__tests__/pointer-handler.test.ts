@@ -450,6 +450,71 @@ describe('PointerHandler', () => {
       expect(host.events.find((e) => e.type === 'daw-seek')).toBeUndefined();
     });
 
+    it('cancel restores a previously committed selection instead of destroying it', () => {
+      const engine = createMockEngine();
+      const host = createMockHost({
+        _engine: engine,
+        _selectionStartTime: 2,
+        _selectionEndTime: 5,
+      });
+      const handler = new PointerHandler(host);
+      const timeline = host.shadowRoot!.querySelector('.timeline')! as HTMLElement;
+
+      handler.onPointerDown(pointerEvent('pointerdown', { clientX: 100 }));
+      timeline.dispatchEvent(pointerEvent('pointermove', { clientX: 200 }));
+      // Drag preview has overwritten the committed values
+      expect(host._selectionStartTime).not.toBe(2);
+
+      timeline.dispatchEvent(pointerEvent('pointercancel', { clientX: 200 }));
+
+      // Cancel = as if the drag never happened: the committed selection
+      // (still held by the engine) is restored, not zeroed.
+      expect(host._selectionStartTime).toBe(2);
+      expect(host._selectionEndTime).toBe(5);
+      expect(engine.setSelection).not.toHaveBeenCalled();
+    });
+
+    it('a pointercancel from a different pointer (palm rejection) does not kill the active selection drag', () => {
+      const host = createMockHost();
+      const handler = new PointerHandler(host);
+      const timeline = host.shadowRoot!.querySelector('.timeline')! as HTMLElement;
+
+      handler.onPointerDown(pointerEvent('pointerdown', { clientX: 100, pointerId: 1 }));
+      timeline.dispatchEvent(pointerEvent('pointermove', { clientX: 200, pointerId: 1 }));
+      // A second (palm) pointer touches the timeline and the OS cancels it
+      timeline.dispatchEvent(pointerEvent('pointercancel', { clientX: 0, pointerId: 2 }));
+      // The original drag continues and finalizes normally
+      timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 200, pointerId: 1 }));
+
+      expect(host.events.find((e) => e.type === 'daw-selection')).toBeDefined();
+    });
+
+    it('a pointercancel from a different pointer does not detach a delegated clip drag', () => {
+      const mockClipHandler = {
+        tryHandle: vi.fn().mockReturnValue(true),
+        onPointerMove: vi.fn(),
+        onPointerUp: vi.fn(),
+        onPointerCancel: vi.fn(),
+        isActive: true,
+      };
+      const host = createMockHost({ _clipHandler: mockClipHandler });
+      const handler = new PointerHandler(host);
+      const timeline = host.shadowRoot!.querySelector('.timeline')! as HTMLElement;
+      const clipHeader = document.createElement('div');
+      clipHeader.classList.add('clip-header');
+      timeline.appendChild(clipHeader);
+
+      timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
+      clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150, pointerId: 1 }));
+
+      timeline.dispatchEvent(pointerEvent('pointercancel', { clientX: 0, pointerId: 2 }));
+
+      expect(mockClipHandler.onPointerCancel).not.toHaveBeenCalled();
+      // Drag wiring intact — moves still forwarded
+      timeline.dispatchEvent(pointerEvent('pointermove', { clientX: 200, pointerId: 1 }));
+      expect(mockClipHandler.onPointerMove).toHaveBeenCalled();
+    });
+
     it('cancel is forwarded to the clip handler during a delegated drag', () => {
       const mockClipHandler = {
         tryHandle: vi.fn().mockReturnValue(true),
