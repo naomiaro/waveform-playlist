@@ -243,6 +243,11 @@ export class SoundFontCache {
         `Failed to parse SoundFont ${url}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+    // Cache keys are numeric sample indices — stale entries from a previous
+    // font would pair the OLD font's buffer with the NEW font's pitch/loop/
+    // envelope (mispitched audio). Clear only on successful parse: a failed
+    // reload keeps the old font, whose cache entries are still valid.
+    this.audioBufferCache.clear();
   }
 
   /**
@@ -256,6 +261,8 @@ export class SoundFontCache {
         `Failed to parse SoundFont from buffer: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+    // Invalidate buffers from the previous font (see load() for rationale).
+    this.audioBufferCache.clear();
   }
 
   get isLoaded(): boolean {

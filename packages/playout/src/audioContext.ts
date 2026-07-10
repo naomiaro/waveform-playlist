@@ -188,9 +188,13 @@ export function getGlobalAudioContextState(): AudioContextState {
  * Should only be called when the application is shutting down
  */
 export async function closeGlobalAudioContext(): Promise<void> {
-  if (globalToneContext && globalToneContext.rawContext.state !== 'closed') {
+  if (!globalToneContext) return;
+  // Skip close() when the raw context is already closed (a consumer can close
+  // it directly via getGlobalAudioContext()), but ALWAYS reset the singleton —
+  // otherwise every future getGlobalContext() returns the dead context forever.
+  if (globalToneContext.rawContext.state !== 'closed') {
     await globalToneContext.close();
-    globalToneContext = null;
-    _nativeMode = false;
   }
+  globalToneContext = null;
+  _nativeMode = false;
 }

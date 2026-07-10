@@ -178,5 +178,21 @@ describe('audioContext singleton', () => {
       expect(contextCreateCount).toBe(2);
       expect(Context).toHaveBeenCalledTimes(2);
     });
+
+    it('resets the singleton even when the raw context is already closed', async () => {
+      getGlobalContext();
+      expect(contextCreateCount).toBe(1);
+
+      // getGlobalAudioContext() hands out the live raw AudioContext, so a
+      // consumer can close it directly. The singleton must still reset —
+      // otherwise every future getGlobalContext() returns a dead context
+      // forever and resumeGlobalAudioContext() rejects with InvalidStateError.
+      mockRawContext.state = 'closed';
+      await closeGlobalAudioContext();
+
+      expect(mockClose).not.toHaveBeenCalled(); // nothing left to close
+      getGlobalContext();
+      expect(contextCreateCount).toBe(2);
+    });
   });
 });
