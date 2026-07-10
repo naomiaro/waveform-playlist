@@ -432,6 +432,59 @@ describe('createToneAdapter', () => {
       const mockTrack = mockInstance.getTrack.mock.results[0].value;
       expect(mockTrack.setPan).toHaveBeenCalledWith(-0.5);
     });
+
+    // A mixed audio+MIDI track becomes TWO playout tracks (t1 + t1:midi).
+    // Every runtime control must reach both halves — otherwise muting a mixed
+    // track leaves its MIDI playing, and soloing it silences its own MIDI half
+    // (the companion isn't in soloedTracks, so updateSoloMuting mutes it).
+    describe('mixed-track :midi companion', () => {
+      function mixedTrack(): ClipTrack {
+        return makeTrack('t1', [
+          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+        ]);
+      }
+
+      it('setTrackMute also mutes the :midi companion', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([mixedTrack()]);
+        adapter.setTrackMute('t1', true);
+
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        expect(instance.setMute).toHaveBeenCalledWith('t1', true);
+        expect(instance.setMute).toHaveBeenCalledWith('t1:midi', true);
+      });
+
+      it('setTrackSolo also soloes the :midi companion', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([mixedTrack()]);
+        adapter.setTrackSolo('t1', true);
+
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        expect(instance.setSolo).toHaveBeenCalledWith('t1', true);
+        expect(instance.setSolo).toHaveBeenCalledWith('t1:midi', true);
+      });
+
+      it('setTrackVolume also reaches the :midi companion', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([mixedTrack()]);
+        adapter.setTrackVolume('t1', 0.5);
+
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        expect(instance.getTrack).toHaveBeenCalledWith('t1');
+        expect(instance.getTrack).toHaveBeenCalledWith('t1:midi');
+      });
+
+      it('setTrackPan also reaches the :midi companion', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([mixedTrack()]);
+        adapter.setTrackPan('t1', 0.25);
+
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        expect(instance.getTrack).toHaveBeenCalledWith('t1');
+        expect(instance.getTrack).toHaveBeenCalledWith('t1:midi');
+      });
+    });
   });
 
   describe('setLoop', () => {
@@ -619,6 +672,31 @@ describe('createToneAdapter', () => {
       // MIDI half removed and re-added
       expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
       expect(instance.addMidiTrack).toHaveBeenCalledTimes(2);
+    });
+
+    it('removes the stale :midi companion when the last MIDI clip is deleted', () => {
+      const adapter = createToneAdapter();
+      const mixedTrack = makeTrack('t1', [
+        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+        makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+      ]);
+      adapter.setTracks([mixedTrack]);
+
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
+      instance.replaceTrackClips.mockReturnValue(true);
+
+      // User deletes the MIDI clip — audio-only update. Without companion
+      // cleanup, the t1:midi MidiToneTrack keeps its Part scheduled and the
+      // deleted MIDI keeps playing (ghost playback).
+      const audioOnly = makeTrack('t1', [
+        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+      ]);
+      adapter.updateTrack!('t1', audioOnly);
+
+      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
+      // No MIDI clips remain — nothing re-added
+      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
     });
   });
 

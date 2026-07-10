@@ -434,7 +434,10 @@ export class TonePlayout {
     const track = this.tracks.get(trackId);
     if (track) {
       this.manualMuteState.set(trackId, muted);
-      track.setMute(muted);
+      // Route through solo-aware muting: while any track is soloed, a
+      // non-soloed track must stay silent regardless of its manual mute —
+      // the manual state is remembered and applies when solo clears.
+      this.updateSoloMuting();
     }
   }
 

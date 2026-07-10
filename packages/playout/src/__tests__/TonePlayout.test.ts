@@ -378,4 +378,47 @@ describe('TonePlayout', () => {
       expect(playout.masterBusInputNode).toBe(mockVolume.input.input);
     });
   });
+
+  describe('setMute during active solo', () => {
+    it('keeps a non-soloed track silent when its manual mute is toggled off during solo', () => {
+      const playout = new TonePlayout();
+      playout.addTrack({ clips: [], track: makeTrack('a') });
+      const trackB = playout.addTrack({ clips: [], track: makeTrack('b') });
+
+      playout.setSolo('a', true); // B muted by updateSoloMuting
+      (trackB.setMute as ReturnType<typeof vi.fn>).mockClear();
+
+      // User toggles B's mute button off while A is still soloed.
+      // Solo takes precedence: B must remain effectively muted.
+      playout.setMute('b', false);
+
+      expect(trackB.setMute).toHaveBeenCalledWith(true);
+      expect(trackB.setMute).not.toHaveBeenCalledWith(false);
+    });
+
+    it('remembers the manual mute for when solo clears', () => {
+      const playout = new TonePlayout();
+      playout.addTrack({ clips: [], track: makeTrack('a') });
+      const trackB = playout.addTrack({ clips: [], track: makeTrack('b') });
+
+      playout.setSolo('a', true);
+      playout.setMute('b', false); // stored, not audible yet
+      (trackB.setMute as ReturnType<typeof vi.fn>).mockClear();
+
+      playout.setSolo('a', false); // solo cleared — manual state applies
+
+      expect(trackB.setMute).toHaveBeenCalledWith(false);
+    });
+
+    it('applies manual mute directly when no track is soloed', () => {
+      const playout = new TonePlayout();
+      const trackA = playout.addTrack({ clips: [], track: makeTrack('a') });
+
+      playout.setMute('a', true);
+      expect(trackA.setMute).toHaveBeenCalledWith(true);
+
+      playout.setMute('a', false);
+      expect(trackA.setMute).toHaveBeenCalledWith(false);
+    });
+  });
 });

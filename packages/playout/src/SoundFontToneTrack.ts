@@ -103,7 +103,18 @@ export class SoundFontToneTrack implements PlayableTrack {
 
       const part = new Part((time, event) => {
         if (event.duration > 0) {
-          this.triggerNote(event.midi, event.duration, time, event.velocity, event.channel);
+          // Contain failures: nothing in Tone.js catches a throw from a Part
+          // callback (ToneEvent._tick → Transport._processTick → Clock._loop
+          // are all unguarded) — an escape aborts every other same-tick event
+          // across ALL tracks. Same guard as startMidClipSources below.
+          try {
+            this.triggerNote(event.midi, event.duration, time, event.velocity, event.channel);
+          } catch (err) {
+            console.warn(
+              `[waveform-playlist] Failed to trigger SoundFont note on track "${this.id}": ` +
+                String(err)
+            );
+          }
         }
       }, partEvents);
 

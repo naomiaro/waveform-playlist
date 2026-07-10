@@ -344,13 +344,18 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
         // above, and TonePlayout.addTrack has no idempotency guard (a second
         // add leaks the old ToneTrack and duplicates its Transport events).
         const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
+        const midiTrackId = trackId + ':midi';
         if (midiClips.length > 0) {
-          const midiTrackId = trackId + ':midi';
           playout.removeTrack(midiTrackId);
           addMidiTrackToPlayout(playout, track);
           if (_isPlaying) {
             playout.resumeTrackMidPlayback(midiTrackId);
           }
+        } else {
+          // Last MIDI clip deleted — without this, the stale companion keeps
+          // its scheduled Part and the deleted MIDI plays as a ghost.
+          playout.removeTrack(midiTrackId);
+          _midiTrackBuild.delete(midiTrackId);
         }
 
         if (audioUpdated) {
@@ -441,28 +446,37 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       playout?.setMasterGain(volume);
     },
 
+    // Runtime controls must reach BOTH playout halves of a mixed audio+MIDI
+    // track (trackId + trackId:midi) — otherwise muting a mixed track leaves
+    // its MIDI playing and soloing it silences its own MIDI half. The :midi
+    // calls no-op for audio-only and MIDI-only tracks (unknown playout id),
+    // same blind-forwarding pattern as removeTrack.
     setTrackVolume(trackId: string, volume: number): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, volume });
       playout?.getTrack(trackId)?.setVolume(volume);
+      playout?.getTrack(trackId + ':midi')?.setVolume(volume);
     },
 
     setTrackMute(trackId: string, muted: boolean): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, muted });
       playout?.setMute(trackId, muted);
+      playout?.setMute(trackId + ':midi', muted);
     },
 
     setTrackSolo(trackId: string, soloed: boolean): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, soloed });
       playout?.setSolo(trackId, soloed);
+      playout?.setSolo(trackId + ':midi', soloed);
     },
 
     setTrackPan(trackId: string, pan: number): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, pan });
       playout?.getTrack(trackId)?.setPan(pan);
+      playout?.getTrack(trackId + ':midi')?.setPan(pan);
     },
 
     setLoop(enabled: boolean, start: number, end: number): void {
