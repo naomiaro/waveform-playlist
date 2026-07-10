@@ -55,6 +55,8 @@ export class DawKeyboardShortcutsElement extends LitElement {
   // Accessors, not plain fields: assigning a remap after any keydown has
   // warmed _cachedShortcuts must invalidate it, or the documented remapping
   // API is silently ignored until an unrelated boolean attribute toggles.
+  // (connectedCallback runs the standard upgrade-property dance so values
+  // assigned BEFORE the element was defined don't shadow these accessors.)
   private _playbackShortcuts: PlaybackShortcutMap | null = null;
   get playbackShortcuts(): PlaybackShortcutMap | null {
     return this._playbackShortcuts;
@@ -112,6 +114,22 @@ export class DawKeyboardShortcutsElement extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    // Upgrade-property dance: a remap assigned BEFORE this element was
+    // defined created an own property that shadows the accessors above —
+    // delete it and re-assign through the setter so cache invalidation works.
+    for (const prop of [
+      'playbackShortcuts',
+      'splittingShortcuts',
+      'undoShortcuts',
+      'customShortcuts',
+    ] as const) {
+      if (Object.prototype.hasOwnProperty.call(this, prop)) {
+        const value = this[prop];
+        delete (this as Record<string, unknown>)[prop];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this as any)[prop] = value;
+      }
+    }
     this._editor = this.closest('daw-editor') as DawEditorElement | null;
     if (!this._editor) {
       console.warn(

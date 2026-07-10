@@ -2612,8 +2612,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // and the async play() opens a window where a user pause is overridden
       // by the deferred play. The engine is already initialized while
       // playing. Mirrors the pointer-handler seek path.
-      this._withSeekSuppression(() => this._engine!.stop());
-      this._engine.play(target);
+      try {
+        this._withSeekSuppression(() => this._engine!.stop());
+        this._engine.play(target);
+      } catch (err) {
+        // The engine rethrows adapter failures — surface via daw-error like
+        // the public play() path does, instead of an unheralded throw.
+        console.warn('[dawcore] seekTo: engine reschedule failed: ' + String(err));
+        this.dispatchEvent(
+          new CustomEvent('daw-error', {
+            bubbles: true,
+            composed: true,
+            detail: { operation: 'seek', error: err },
+          })
+        );
+        return;
+      }
       this._currentTime = target;
       this._startPlayhead();
     } else {

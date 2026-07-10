@@ -1051,3 +1051,25 @@ describe('seekTo semantics (audit wave 4)', () => {
     editor.remove();
   });
 });
+
+describe('seekTo error surfacing (audit wave 4)', () => {
+  it('an engine reschedule failure dispatches daw-error instead of throwing', () => {
+    const editor = setupEditor();
+    editor._isPlaying = true;
+    editor._engine.play = vi.fn(() => {
+      throw new Error('adapter wedged');
+    });
+    const events: CustomEvent[] = [];
+    for (const t of ['daw-error', 'daw-seek']) {
+      editor.addEventListener(t, ((e: Event) => {
+        events.push(e as CustomEvent);
+      }) as EventListener);
+    }
+
+    expect(() => editor.seekTo(45)).not.toThrow();
+
+    expect(events.map((e) => e.type)).toEqual(['daw-error']);
+    expect(events[0].detail.operation).toBe('seek');
+    editor.remove();
+  });
+});

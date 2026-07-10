@@ -58,6 +58,15 @@ export class DawPauseButtonElement extends DawTransportButton {
   private _ensureTargetListeners() {
     const target = this.target;
     if (target === this._targetRef) return;
+    if (this._targetRef) {
+      // Swapping away from a live target: recording/pause state observed
+      // there is stale — a replaced editor never fires the events that
+      // would clear it, wedging the button into togglePauseRecording
+      // routing. (A reconnect of the BUTTON has a null _targetRef and
+      // keeps its state.)
+      this._isRecording = false;
+      this._isPaused = false;
+    }
     this._cleanupListeners();
     if (!target) return;
     this._targetRef = target;

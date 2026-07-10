@@ -624,3 +624,29 @@ describe('DawPlayerElement — audit wave 4', () => {
     expect(times).toEqual([30]);
   });
 });
+
+describe('DawPlayerElement — wave 4 review hardening', () => {
+  let OriginalAudio: typeof Audio;
+  beforeAll(() => {
+    OriginalAudio = globalThis.Audio;
+    // @ts-expect-error test double
+    globalThis.Audio = MockAudio;
+  });
+  afterAll(() => {
+    globalThis.Audio = OriginalAudio;
+  });
+
+  it('the currentTime SETTER routes through seekTo (playhead + daw-timeupdate while paused)', async () => {
+    const el = makePlayer();
+    el.src = 'episode.mp3';
+    await el.updateComplete;
+    const times: number[] = [];
+    el.addEventListener('daw-timeupdate', ((e: CustomEvent) => {
+      times.push(e.detail.time);
+    }) as EventListener);
+
+    el.currentTime = 42;
+
+    expect(times).toEqual([42]);
+  });
+});

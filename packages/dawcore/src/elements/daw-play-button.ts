@@ -39,6 +39,14 @@ export class DawPlayButtonElement extends DawTransportButton {
   private _ensureTargetListeners() {
     const target = this.target;
     if (target === this._targetRef) return;
+    if (this._targetRef) {
+      // Swapping away from a live target: recording state observed there is
+      // stale — a replaced editor (framework remount reusing the id) never
+      // fires the complete/error event that would clear it, wedging the
+      // button. (A reconnect of the BUTTON has a null _targetRef and keeps
+      // its state — the same editor may still be recording.)
+      this._isRecording = false;
+    }
     this._cleanupListeners();
     if (!target) return;
     this._targetRef = target;

@@ -113,6 +113,11 @@ export class DawPlayerElement extends LitElement {
     });
     if (rebuilt && this.src) {
       this._loadSource();
+      // The fresh engine is at 0 but the playhead kept its imperatively-set
+      // px from before the reparent — snap it back so they agree. NOTE:
+      // _loadSource re-arms daw-ready, so consumers see a second daw-ready
+      // after a reparent (it IS a new load cycle; position/metadata reset).
+      this._playhead?.setPosition(0);
     }
   }
 
@@ -280,7 +285,10 @@ export class DawPlayerElement extends LitElement {
     return this._engine.getCurrentTime();
   }
   set currentTime(time: number) {
-    this._engine.seekTo(time);
+    // Route through seekTo so paused assignments update the playhead and
+    // dispatch daw-timeupdate — the property API must not be staler than
+    // the method API.
+    this.seekTo(time);
   }
   get volume(): number {
     return this._engine.masterVolume;
