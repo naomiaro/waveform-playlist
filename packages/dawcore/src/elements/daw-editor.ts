@@ -55,6 +55,7 @@ import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import { SpectrogramController } from '../controllers/spectrogram-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import { ClipPointerHandler } from '../interactions/clip-pointer-handler';
+import { AnnotationDragHandler } from '../interactions/annotation-drag';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
@@ -429,7 +430,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @state() _engineTracks: Map<string, ClipTrack> = new Map();
   @state() _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
-  @state() private _duration = 0;
+  @state() _duration = 0;
   @state() _selectedTrackId: string | null = null;
   @state() _dragOver = false;
   // Not @state — updated directly to avoid 60fps Lit re-renders
@@ -716,6 +717,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _inSeekTransition = false;
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
+  private _annotationDrag = new AnnotationDragHandler(this);
   get _clipHandler() {
     return this.interactiveClips ? this._clipPointer : null;
   }
@@ -908,7 +910,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * In beats mode, derive samplesPerPixel from ticksPerPixel so that
    * clip positions, waveforms, and the tick-space grid all align.
    */
-  private get _renderSpp(): number {
+  get _renderSpp(): number {
     if (this.scaleMode === 'beats') {
       // Round to integer — WaveformData.resample() uses integer scale math.
       const spp = Math.ceil(
@@ -3288,7 +3290,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             @dragleave=${this._onDragLeave}
             @drop=${this._onDrop}
           >
-            ${this._annotations.renderLanes(spp, this.effectiveSampleRate)}
+            ${this._annotations.renderLanes(
+              spp,
+              this.effectiveSampleRate,
+              this._annotationDrag.onPointerDown
+            )}
             ${this.scaleMode === 'beats'
               ? html`<daw-grid
                   style="top: ${this._annotations.totalLaneHeight}px;"
