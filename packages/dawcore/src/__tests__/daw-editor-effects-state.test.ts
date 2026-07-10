@@ -328,3 +328,20 @@ describe('setEffectsState native failures (audit wave 3)', () => {
     });
   });
 });
+
+describe('setEffectsState placeholder validation (audit wave 3)', () => {
+  it('rejects a malformed placeholder flag', async () => {
+    await expect(
+      editor.setEffectsState([
+        {
+          kind: 'native',
+          type: 'native-gain',
+          params: {},
+          bypassed: false,
+          placeholder: 'yes',
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any)
+    ).rejects.toThrow(/placeholder must be true/);
+  });
+});

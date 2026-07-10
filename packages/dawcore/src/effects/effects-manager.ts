@@ -307,14 +307,12 @@ export class EffectsManager {
       container.appendChild(cached.element);
       return cached.element;
     }
-    if (cached) {
-      // Generic parameter panels bake their slider values at build time —
-      // an API-side setEffectParams while the panel was closed would show
-      // stale values (and the first drag would snap the audio back to the
-      // stale position). Rebuild from the current entry state instead.
-      this._guis.delete(effectId);
-      cached.element.remove();
-    }
+    // A cached FALLBACK panel is rebuilt instead of reused: generic panels
+    // bake their slider values at build time, so an API-side setEffectParams
+    // while the panel was closed would show stale values (and the first drag
+    // would snap the audio back to the stale position). The old panel is kept
+    // until the rebuild succeeds — a transient failure (dynamic-import blip)
+    // must not destroy a working panel.
 
     let pending = this._guiPending.get(effectId);
     if (!pending) {
@@ -323,7 +321,26 @@ export class EffectsManager {
       });
       this._guiPending.set(effectId, pending);
     }
-    const record = await pending;
+    let record: GuiRecord;
+    try {
+      record = await pending;
+    } catch (err) {
+      if (cached) {
+        console.warn(
+          PREFIX +
+            'openEffectGui: rebuilding the parameter panel for "' +
+            effectId +
+            '" failed — serving the cached panel (values may be stale): ' +
+            String(err)
+        );
+        container.appendChild(cached.element);
+        return cached.element;
+      }
+      throw err;
+    }
+    if (cached && cached !== record) {
+      cached.element.remove();
+    }
 
     // The effect (or its whole chain) may have been removed while the GUI
     // was building — a late mount would leak a GUI for a destroyed plugin.
@@ -711,7 +728,7 @@ export class EffectsManager {
           // error event + continue. (Reachable via an unregistered custom
           // type — the consumer saved state with registerEffect()'d types
           // that aren't re-registered on this page.)
-          if (superseded()) return;
+          if (superseded() || chain.disposed) return;
           const message = err instanceof Error ? err.message : String(err);
           console.warn(
             PREFIX +
@@ -749,7 +766,11 @@ export class EffectsManager {
           this._runOp(chain, target, 'setBypassed', id, true);
         }
       } catch (err) {
-        if (superseded()) return;
+        // chain.disposed guard: the chain can be torn down mid-restore (track
+        // removed while a plugin loaded) — the placeholder add would itself
+        // throw on the disposed chain, escaping setEffectsState with an error
+        // about internal chain lifecycle instead of the plugin failure.
+        if (superseded() || chain.disposed) return;
         const message = err instanceof Error ? err.message : String(err);
         const sourceLabel = entry.url ?? entry.faustName ?? 'Faust effect';
         console.warn(
@@ -915,6 +936,12 @@ function validateSerializedEntries(entries: unknown): asserts entries is Seriali
     }
     if (typeof e.bypassed !== 'boolean') {
       throw new Error(PREFIX + 'setEffectsState: entry requires a boolean bypassed flag' + at);
+    }
+    if (e.placeholder !== undefined && e.placeholder !== true) {
+      // A malformed truthy value (e.g. "false", 1, {}) would restore as a
+      // working live effect but be silently SKIPPED by exportAudio — an
+      // export missing an effect the user hears, with zero warning.
+      throw new Error(PREFIX + 'setEffectsState: placeholder must be true when present' + at);
     }
   });
 }

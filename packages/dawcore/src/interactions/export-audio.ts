@@ -91,11 +91,14 @@ export async function exportAudioImpl(
   try {
     const masterChain = await buildOfflineChain(ctx, await host.getMasterEffectsState());
     cleanups.push(masterChain.dispose);
-    // Master volume stage — parity with live playback's MasterNode gain.
+    // Master volume stage BEFORE the master chain — parity with live
+    // playback, where MasterNode's gain feeds connectMasterOutput → chain.
+    // Order matters for nonlinear master effects (compressor, distortion):
+    // volume→chain and chain→volume compress differently.
     const masterVolume = ctx.createGain();
     masterVolume.gain.value = host.masterVolume ?? 1;
-    masterChain.output.connect(masterVolume);
-    masterVolume.connect(ctx.destination);
+    masterVolume.connect(masterChain.input);
+    masterChain.output.connect(ctx.destination);
 
     const anySoloed = host.tracks.some((t) => t.soloed);
     for (const track of host.tracks) {
@@ -111,7 +114,7 @@ export async function exportAudioImpl(
       panner.pan.value = track.pan;
       volume.connect(panner);
       panner.connect(chain.input);
-      chain.output.connect(masterChain.input);
+      chain.output.connect(masterVolume);
 
       for (const clip of track.clips) {
         scheduleClip(ctx, clip, startTime, duration, volume);
@@ -214,8 +217,16 @@ async function buildOfflineChain(
       // Failed-plugin placeholders (any kind) are silent passthroughs live —
       // skip them here too, regardless of their SAVED bypassed flag.
       // Instantiating would either fail the export (dead URL / unregistered
-      // type) or render an effect absent from live playback.
+      // type) or render an effect absent from live playback. Warn: the only
+      // other evidence the effect is missing is a daw-effect-error that
+      // fired back at restore time.
       if (entry.placeholder) {
+        console.warn(
+          PREFIX +
+            'exportAudio: skipping failed-plugin placeholder "' +
+            (entry.kind === 'native' ? entry.type : (entry.url ?? 'Faust effect')) +
+            '"'
+        );
         continue;
       }
       if (entry.kind === 'native') {

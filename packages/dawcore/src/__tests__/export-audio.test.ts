@@ -422,7 +422,7 @@ describe('exportAudioImpl — audit wave 3', () => {
     await expect(exportAudioImpl(host)).resolves.toBeTruthy();
   });
 
-  it('applies the host master volume between the master chain and the destination', async () => {
+  it('applies the host master volume BEFORE the master chain (live MasterNode order)', async () => {
     const host = makeHost({ masterVolume: 0.5 });
 
     await exportAudioImpl(host);
@@ -430,6 +430,15 @@ describe('exportAudioImpl — audit wave 3', () => {
     const ctx = offlineInstances[0];
     const masterGain = ctx.gains.find((g) => g.gain.value === 0.5);
     expect(masterGain).toBeTruthy();
-    expect(masterGain!.connect).toHaveBeenCalledWith(ctx.destination);
+    // Volume feeds the master chain input, never the destination directly —
+    // volume→chain vs chain→volume changes what nonlinear master effects
+    // (compressor) see, so the order must match live playback.
+    expect(masterGain!.connect).toHaveBeenCalled();
+    expect(masterGain!.connect).not.toHaveBeenCalledWith(ctx.destination);
+    // The track chain routes into the volume stage
+    const feedsMasterVolume = ctx.gains.some((g) =>
+      g.connect.mock.calls.some((call) => call[0] === masterGain)
+    );
+    expect(feedsMasterVolume).toBe(true);
   });
 });
