@@ -288,3 +288,43 @@ describe('effects chain persistence', () => {
     expect(other.effects[0].params.gain).toBe(0.7);
   });
 });
+
+describe('setEffectsState native failures (audit wave 3)', () => {
+  it('an unregistered native type becomes a placeholder and the restore continues', async () => {
+    const errors: CustomEvent[] = [];
+    editor.addEventListener('daw-effect-error', ((e: CustomEvent) => {
+      errors.push(e);
+    }) as EventListener);
+
+    // Pre-fix: the middle entry throws OUT of setEffectsState after the old
+    // chain was already destroyed — half-built chain, no error event, the
+    // trailing compressor lost.
+    await expect(
+      editor.setEffectsState([
+        { kind: 'native', type: 'native-gain', params: { gain: 0.5 }, bypassed: false },
+        { kind: 'native', type: 'my-custom-eq', params: { freq: 1000 }, bypassed: false },
+        { kind: 'native', type: 'native-delay', params: {}, bypassed: true },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ] as any)
+    ).resolves.toBeUndefined();
+
+    const effects = editor.effects;
+    expect(effects).toHaveLength(3);
+    expect(effects[0].type).toBe('native-gain');
+    expect(effects[1].type).toBe('my-custom-eq');
+    expect(effects[1].error).toBeTruthy();
+    expect(effects[2].type).toBe('native-delay');
+    expect(effects[2].bypassed).toBe(true);
+    expect(errors).toHaveLength(1);
+
+    // Round-trip: the failed entry re-serializes with its saved data
+    const state = await editor.getEffectsState();
+    expect(state[1]).toMatchObject({
+      kind: 'native',
+      type: 'my-custom-eq',
+      params: { freq: 1000 },
+      bypassed: false,
+      placeholder: true,
+    });
+  });
+});

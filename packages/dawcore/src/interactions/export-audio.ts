@@ -39,6 +39,9 @@ export interface ExportAudioHost {
   /** Natural session duration in seconds. */
   duration: number;
   tracks: ExportTrack[];
+  /** Master output gain (engine setMasterVolume). Default 1. Without it the
+   *  export renders louder/quieter than what the user mixed against. */
+  masterVolume?: number;
   getMasterEffectsState(): Promise<SerializedEffectEntry[]>;
   getTrackEffectsState(trackId: string): Promise<SerializedEffectEntry[]>;
 }
@@ -88,7 +91,11 @@ export async function exportAudioImpl(
   try {
     const masterChain = await buildOfflineChain(ctx, await host.getMasterEffectsState());
     cleanups.push(masterChain.dispose);
-    masterChain.output.connect(ctx.destination);
+    // Master volume stage — parity with live playback's MasterNode gain.
+    const masterVolume = ctx.createGain();
+    masterVolume.gain.value = host.masterVolume ?? 1;
+    masterChain.output.connect(masterVolume);
+    masterVolume.connect(ctx.destination);
 
     const anySoloed = host.tracks.some((t) => t.soloed);
     for (const track of host.tracks) {
@@ -204,6 +211,13 @@ async function buildOfflineChain(
 
   async function wireEntries(): Promise<void> {
     for (const entry of entries) {
+      // Failed-plugin placeholders (any kind) are silent passthroughs live —
+      // skip them here too, regardless of their SAVED bypassed flag.
+      // Instantiating would either fail the export (dead URL / unregistered
+      // type) or render an effect absent from live playback.
+      if (entry.placeholder) {
+        continue;
+      }
       if (entry.kind === 'native') {
         const created = createEffectInstance(entry.type, ctx, entry.params);
         if (entry.bypassed) {
@@ -223,7 +237,7 @@ async function buildOfflineChain(
 
       // kind 'wam'
       if (entry.bypassed) {
-        continue; // disconnection bypass — also covers restore placeholders
+        continue; // disconnection bypass
       }
       const wamModule = await loadWamModule('exportAudio() with WAM effects');
       const { hostGroupId } = await wamModule.ensureWamHost(ctx);

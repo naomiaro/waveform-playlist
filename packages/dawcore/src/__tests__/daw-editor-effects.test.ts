@@ -264,3 +264,22 @@ describe('<daw-track> effects API', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('effect'));
   });
 });
+
+describe('reorder event index (audit wave 3)', () => {
+  it('daw-effect-reorder reports the clamped toIndex the chain actually used', () => {
+    const a = editor.addEffect('native-gain');
+    const b = editor.addEffect('native-compressor');
+    const events: CustomEvent[] = [];
+    editor.addEventListener('daw-effect-reorder', ((e: CustomEvent) => {
+      events.push(e);
+    }) as EventListener);
+
+    editor.moveEffect(a, 99);
+
+    // The chain clamps to the last slot; the event must report what actually
+    // happened — a consumer mirroring order from detail.toIndex=99 crashes
+    // or mis-sorts.
+    expect(editor.effects.map((e) => e.id)).toEqual([b, a]);
+    expect(events[0].detail.toIndex).toBe(1);
+  });
+});

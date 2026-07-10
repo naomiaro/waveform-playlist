@@ -23,12 +23,21 @@ interface AdapterLike {
 interface GuiRecord {
   element: HTMLElement;
   destroy: () => void;
+  /** True for manager-built generic parameter panels — they bake values at
+   *  build time, so reopen rebuilds them instead of reusing the cache
+   *  (plugin-provided GUIs manage their own state and stay cached). */
+  isFallback: boolean;
 }
 
-function makeGuiRecord(element: HTMLElement, destroyImpl: () => void): GuiRecord {
+function makeGuiRecord(
+  element: HTMLElement,
+  destroyImpl: () => void,
+  isFallback = false
+): GuiRecord {
   let destroyed = false;
   return {
     element,
+    isFallback,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
@@ -294,9 +303,17 @@ export class EffectsManager {
     }
 
     const cached = this._guis.get(effectId);
-    if (cached) {
+    if (cached && !cached.isFallback) {
       container.appendChild(cached.element);
       return cached.element;
+    }
+    if (cached) {
+      // Generic parameter panels bake their slider values at build time —
+      // an API-side setEffectParams while the panel was closed would show
+      // stale values (and the first drag would snap the audio back to the
+      // stale position). Rebuild from the current entry state instead.
+      this._guis.delete(effectId);
+      cached.element.remove();
     }
 
     let pending = this._guiPending.get(effectId);
@@ -363,7 +380,7 @@ export class EffectsManager {
     const element = await this._createFallbackPanel(chain, target, entry, effectId);
     // The generic panel is plain DOM owned by this manager — removal from the
     // document (done by _destroyGui) is its entire teardown.
-    return makeGuiRecord(element, () => {});
+    return makeGuiRecord(element, () => {}, true);
   }
 
   /** The generic parameter panel — one code path for "no custom GUI":
@@ -682,9 +699,33 @@ export class EffectsManager {
     for (const entry of entries) {
       if (superseded()) return;
       if (entry.kind === 'native') {
-        const id = this._addToChain(chain, target, entry.type, entry.params);
-        if (entry.bypassed) {
-          this._runOp(chain, target, 'setBypassed', id, true);
+        try {
+          const id = this._addToChain(chain, target, entry.type, entry.params);
+          if (entry.bypassed) {
+            this._runOp(chain, target, 'setBypassed', id, true);
+          }
+        } catch (err) {
+          // Same policy as failed WAM loads below: the old chain is already
+          // destroyed at this point, so a throw here would strand a
+          // half-built chain and lose every remaining entry. Placeholder +
+          // error event + continue. (Reachable via an unregistered custom
+          // type — the consumer saved state with registerEffect()'d types
+          // that aren't re-registered on this page.)
+          if (superseded()) return;
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(
+            PREFIX +
+              'setEffectsState: native effect "' +
+              entry.type +
+              '" failed to restore: ' +
+              message
+          );
+          const effectId = this._addNativePlaceholder(chain, entry, message);
+          this._dispatch(target, 'daw-effect-error', {
+            effectId,
+            type: entry.type,
+            message,
+          });
         }
         continue;
       }
@@ -723,6 +764,30 @@ export class EffectsManager {
         });
       }
     }
+  }
+
+  /** A silent passthrough occupying a failed NATIVE entry's chain position.
+   *  Carries the saved params/bypassed so the snapshot round-trips (serialize
+   *  re-emits them with `placeholder: true`). */
+  private _addNativePlaceholder(
+    chain: EffectsChainController,
+    entry: { type: string; params: Record<string, number>; bypassed: boolean },
+    message: string
+  ): string {
+    const { audioContext } = this._requireWiring();
+    const node = audioContext.createGain();
+    const effectId = chain.add({
+      kind: 'native',
+      type: entry.type,
+      label: entry.type,
+      error: message,
+      placeholder: { bypassed: entry.bypassed },
+      instance: { input: node, output: node, applyParams: () => {} },
+      params: { ...entry.params },
+    });
+    // Placeholders pass audio through, bypassed-style (no wet param).
+    chain.setBypassed(effectId, true);
+    return effectId;
   }
 
   /** A silent passthrough occupying the failed plugin's chain position. */
@@ -798,10 +863,14 @@ export class EffectsManager {
         chain.setBypassed(effectId, arg);
         this._dispatch(target, 'daw-effect-bypass', { effectId, bypassed: arg });
         break;
-      case 'move':
-        chain.move(effectId, arg);
-        this._dispatch(target, 'daw-effect-reorder', { effectId, fromIndex, toIndex: arg });
+      case 'move': {
+        // Report the index the chain ACTUALLY used — it clamps out-of-range
+        // requests, and a consumer mirroring order from the event detail
+        // would mis-sort (or crash indexing) on the raw request.
+        const toIndex = chain.move(effectId, arg);
+        this._dispatch(target, 'daw-effect-reorder', { effectId, fromIndex, toIndex });
         break;
+      }
     }
   }
 

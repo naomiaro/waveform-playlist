@@ -386,3 +386,21 @@ describe('error handling', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('[waveform-playlist]'));
   });
 });
+
+describe('generic panel reopen (audit wave 3)', () => {
+  it('rebuilds the fallback panel on reopen so API-side param edits are reflected', async () => {
+    const id = editor.addEffect('native-gain');
+    await editor.openEffectGui(id, container);
+    editor.closeEffectGui(id);
+
+    // API-side edit while the panel is closed — audio updates, and the
+    // cached panel's baked-in slider values are now stale.
+    editor.setEffectParams(id, { gain: 0.25 });
+
+    await editor.openEffectGui(id, container);
+
+    expect(createParameterPanel).toHaveBeenCalledTimes(2);
+    const params = createParameterPanel.mock.calls[1][0] as Array<{ id: string; value: number }>;
+    expect(params.find((p) => p.id === 'gain')?.value).toBe(0.25);
+  });
+});

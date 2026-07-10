@@ -187,6 +187,9 @@ export interface DawEffectErrorDetail {
   url?: string;
   /** Faust DSP source of the failed entry, when applicable. */
   source?: { faust: string };
+  /** Native effect type of the failed entry (restore of an unregistered
+   *  custom type), when applicable. */
+  type?: string;
   message: string;
 }
 

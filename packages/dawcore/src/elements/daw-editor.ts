@@ -522,6 +522,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         effectiveSampleRate: this.effectiveSampleRate,
         duration: this._duration,
         tracks: [...this._engineTracks.values()],
+        masterVolume: this._engine?.getState().masterVolume ?? 1,
         getMasterEffectsState: () => this.getEffectsState(),
         getTrackEffectsState: (trackId) => this.getTrackEffectsState(trackId),
       },

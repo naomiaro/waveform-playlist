@@ -383,3 +383,53 @@ describe('exportAudioImpl', () => {
     expect(createWamInstanceFromFactory).not.toHaveBeenCalled();
   });
 });
+
+describe('exportAudioImpl — audit wave 3', () => {
+  it('skips failed-plugin placeholder entries even when their saved state was not bypassed', async () => {
+    createWamInstance.mockRejectedValue(new Error('unreachable'));
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(
+        async () =>
+          [
+            { kind: 'wam', url: 'https://x/dead.js', bypassed: false, placeholder: true },
+          ] as SerializedEffectEntry[]
+      ),
+    });
+
+    // Live playback silently skips placeholders — export must match, not
+    // retry the dead URL (which would reject the whole export) or render an
+    // effect that is absent from what the user hears.
+    await expect(exportAudioImpl(host)).resolves.toBeTruthy();
+    expect(createWamInstance).not.toHaveBeenCalled();
+  });
+
+  it('skips native placeholder entries without instantiating them', async () => {
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(
+        async () =>
+          [
+            {
+              kind: 'native',
+              type: 'not-registered-anywhere',
+              params: {},
+              bypassed: false,
+              placeholder: true,
+            },
+          ] as SerializedEffectEntry[]
+      ),
+    });
+
+    await expect(exportAudioImpl(host)).resolves.toBeTruthy();
+  });
+
+  it('applies the host master volume between the master chain and the destination', async () => {
+    const host = makeHost({ masterVolume: 0.5 });
+
+    await exportAudioImpl(host);
+
+    const ctx = offlineInstances[0];
+    const masterGain = ctx.gains.find((g) => g.gain.value === 0.5);
+    expect(masterGain).toBeTruthy();
+    expect(masterGain!.connect).toHaveBeenCalledWith(ctx.destination);
+  });
+});
