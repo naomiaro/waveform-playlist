@@ -2675,12 +2675,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return clipEl;
   }
   // --- Playback ---
-  async play(startTime?: number) {
+  /**
+   * Start playback, optionally seeking to `startTime` first. When `endTime`
+   * is provided, playback stops at that time (selection/annotation playback).
+   */
+  async play(startTime?: number, endTime?: number) {
     try {
       const engine = await this._ensureEngine();
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
-      engine.play(startTime);
+      engine.play(startTime, endTime);
       this._startPlayhead();
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
