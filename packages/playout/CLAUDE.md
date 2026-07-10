@@ -18,6 +18,13 @@
 
 `TonePlayoutAdapter` implements `setTempo`, `setMeter`, `ticksToSeconds`, `secondsToTicks` with single-tempo/meter semantics. Throws `Error('Multiple tempo changes not supported by TonePlayoutAdapter')` if `atTick` is provided. `ppqn` configurable via `ToneAdapterOptions` (default 192, Tone.js native). `audioContext` getter returns `getGlobalAudioContext()`.
 
+## Correctness Invariants (audit 2026-07-09, PRs #598/#599)
+
+- **Mixed audio+MIDI tracks are TWO playout tracks** (`id` + `id:midi`). EVERY per-track adapter operation must address both halves — the control setters blind-forward to `trackId + ':midi'` (no-op for unknown ids, same pattern as removeTrack), and `updateTrack` removes the stale companion when MIDI clips drop to zero. New per-track adapter surface MUST handle the companion or mixed tracks silently break (e.g. soloing a mixed track used to mute its own MIDI half).
+- **TonePlayout owns solo-aware muting** — manual mute changes store `manualMuteState` and route through `updateSoloMuting()`; never call `track.setMute()` directly for a manual toggle, or a non-soloed track becomes audible during an active solo.
+- **Tone.js catches NOTHING in the tick chain** — `ToneEvent._tick → Transport._processTick → Clock._loop` are all unguarded (verified in 15.1.22 source). Every `Part`/`Transport.schedule` callback must contain its own failures in try/catch, or one throw aborts every other same-tick event across ALL tracks.
+- **MediaStream has no `ended`/`inactive` events** — `ended` is track-level and fires only on remote end/device removal; a local `track.stop()` fires NO event (per spec). `getMediaStreamSource` auto-cleanup covers remote ends only; local teardown requires `releaseMediaStreamSource()`.
+
 ## Cross-Context Worklet Bridge
 
 `TonePlayoutAdapter` implements `createAudioWorkletNode` and `createMediaStreamSource` for dawcore recording compatibility. These use `getGlobalContext()` (Tone.js Context wrapper) which works with standardized-audio-context. `addWorkletModule` is NOT needed — `rawContext.audioWorklet.addModule()` works identically for both native and standardized contexts.
@@ -94,6 +101,8 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
 
 **`Gain.input` is already `GainNode`** — Unlike `Volume.input`, plain `Gain.input` is typed as `GainNode` directly. No cast needed (e.g., `_masterTap.input` returns `GainNode`).
 
+**`ContextOptions.latencyHint` is typed category-only** — Tone 15's runtime forwards numeric seconds to the native AudioContext constructor unchanged; cast `as AudioContextLatencyCategory` when passing a number.
+
 ## Global AudioContext Pattern
 
 **Implementation:** Recording and playback use a global shared AudioContext (same as Tone.js).
@@ -161,7 +170,7 @@ AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
 
 **SF2 Non-Looping Sample Duration:** For `loopMode === 0` (percussion, piano, one-shots), use `buffer.duration / playbackRate` as effective note duration instead of MIDI note duration. MIDI percussion hits are often 0.06s but the sample needs to ring out fully. Looping samples (`loopMode === 1 or 3`) use MIDI note duration for note-off timing.
 
-**Web Audio Automation Ordering:** `setValueAtTime` at note-off correctly cancels incomplete `linearRampToValueAtTime` ramps — do NOT use `Math.max(noteOff, envEnd)` to "fix" ordering. That extends every note to the full AHD phase length, breaking instruments with long decay (piano, strings). The original `time + duration` approach is correct.
+**Web Audio Automation Ordering:** `setValueAtTime` at note-off correctly cancels incomplete `linearRampToValueAtTime` ramps — do NOT use `Math.max(noteOff, envEnd)` to "fix" ordering. That extends every note to the full AHD phase length, breaking instruments with long decay (piano, strings). The original `time + duration` approach is correct. Open question (audit 2026-07-09): short staccato notes on long-decay patches may hold at peak then jump to sustain at note-off (possible click) — verify with a live-browser gain-curve capture BEFORE changing this automation.
 
 **stopAllSources Pattern:** Only call `source.stop()`, never `source.disconnect()` before `stop()`. If `disconnect()` throws in a shared try-catch, `stop()` is skipped — leaving live sources running. The `onended` callback handles gainNode cleanup.
 
