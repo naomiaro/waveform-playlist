@@ -1,8 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  DEFAULT_ANNOTATION_SHORTCUTS,
-  resolveAnnotationShortcuts,
-} from '../annotations/shortcuts';
+import { DEFAULT_ANNOTATION_SHORTCUTS, resolveAnnotationShortcuts } from '../annotations/shortcuts';
 
 describe('annotation shortcuts', () => {
   it('defaults match the spec table', () => {
