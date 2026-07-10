@@ -1,7 +1,16 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { updateAnnotationBoundaries } from '@waveform-playlist/core';
-import type { AnnotationData } from '@waveform-playlist/core';
+import {
+  updateAnnotationBoundaries,
+  resolveAnnotationShortcuts,
+  matchesKeyBinding,
+} from '@waveform-playlist/core';
+import type {
+  AnnotationData,
+  AnnotationShortcutMap,
+  AnnotationShortcutAction,
+  KeyBinding,
+} from '@waveform-playlist/core';
 import type { DawAnnotationElement } from './daw-annotation';
 
 /** Structural view of the host editor — only what this element touches. */
@@ -183,6 +192,98 @@ export class DawAnnotationTrackElement extends LitElement {
     return this.closest('daw-editor') as AnnotationHostEditor | null;
   }
 
+  // --- Keyboard remapping (accessor pair: cache invalidation on set) ---
+
+  private _annotationShortcuts: AnnotationShortcutMap | null = null;
+  private _resolvedShortcuts: Array<{
+    action: AnnotationShortcutAction;
+    binding: KeyBinding;
+  }> | null = null;
+
+  get annotationShortcuts(): AnnotationShortcutMap | null {
+    return this._annotationShortcuts;
+  }
+  set annotationShortcuts(value: AnnotationShortcutMap | null) {
+    this._annotationShortcuts = value;
+    this._resolvedShortcuts = null;
+  }
+
+  private _shortcutEntries(): Array<{ action: AnnotationShortcutAction; binding: KeyBinding }> {
+    if (!this._resolvedShortcuts) {
+      this._resolvedShortcuts = resolveAnnotationShortcuts(this._annotationShortcuts);
+    }
+    return this._resolvedShortcuts;
+  }
+
+  private static readonly _boundaryActions: ReadonlySet<AnnotationShortcutAction> = new Set([
+    'moveStartEarlier',
+    'moveStartLater',
+    'moveEndEarlier',
+    'moveEndLater',
+  ]);
+
+  // Capture phase: runs before <daw-keyboard-shortcuts>' bubble-phase listener,
+  // giving annotation shortcuts deterministic priority (spec rule).
+  private _onKeyDownCapture = (e: KeyboardEvent): void => {
+    if (!this.keyboardControls) return;
+    if (e.repeat) return;
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+    const match = this._shortcutEntries().find((entry) => matchesKeyBinding(e, entry.binding));
+    if (!match) return;
+
+    const hasSelection = this._activeAnnotationId !== null;
+    // Escape with no selection falls through so a second press reaches the
+    // editor's stop shortcut (spec two-press rule).
+    if (match.action === 'clearSelection' && !hasSelection) return;
+    // Boundary editing requires editable + a selection; don't eat keys otherwise.
+    if (DawAnnotationTrackElement._boundaryActions.has(match.action)) {
+      if (!this.editable || !hasSelection) return;
+    }
+    if (match.action === 'playActive' && !hasSelection) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    this._runShortcutAction(match.action);
+  };
+
+  private _runShortcutAction(action: AnnotationShortcutAction): void {
+    switch (action) {
+      case 'selectPrevious':
+        this.selectPrevious();
+        break;
+      case 'selectNext':
+        this.selectNext();
+        break;
+      case 'selectFirst':
+        this.selectFirst();
+        break;
+      case 'selectLast':
+        this.selectLast();
+        break;
+      case 'clearSelection':
+        this.clearSelection();
+        break;
+      case 'moveStartEarlier':
+        this.moveStartBoundary(-10);
+        break;
+      case 'moveStartLater':
+        this.moveStartBoundary(10);
+        break;
+      case 'moveEndEarlier':
+        this.moveEndBoundary(-10);
+        break;
+      case 'moveEndLater':
+        this.moveEndBoundary(10);
+        break;
+      case 'playActive':
+        this.playActive();
+        break;
+    }
+  }
+
   // --- Lifecycle ---
 
   private _childObserver: MutationObserver | null = null;
@@ -193,6 +294,14 @@ export class DawAnnotationTrackElement extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Upgrade-property dance: a remap assigned before element definition
+    // created an own property shadowing the accessor — re-route it.
+    if (Object.prototype.hasOwnProperty.call(this, 'annotationShortcuts')) {
+      const value = (this as Record<string, unknown>)['annotationShortcuts'];
+      delete (this as Record<string, unknown>)['annotationShortcuts'];
+      this.annotationShortcuts = value as AnnotationShortcutMap | null;
+    }
+    document.addEventListener('keydown', this._onKeyDownCapture, true); // capture phase
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-annotation-track-connected', {
@@ -216,6 +325,7 @@ export class DawAnnotationTrackElement extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    document.removeEventListener('keydown', this._onKeyDownCapture, true);
     this._childObserver?.disconnect();
     this._childObserver = null;
   }
