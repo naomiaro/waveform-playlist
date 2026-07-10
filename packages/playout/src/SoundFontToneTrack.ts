@@ -24,6 +24,36 @@ interface ScheduledMidiClip {
 }
 
 /**
+ * Analytic value of the scheduled AHD envelope at `tRel` seconds after
+ * note-on. Mirrors the automation emitted by triggerNote exactly, including
+ * the hold-event threshold: hold <= 0.001 emits no hold event, so the decay
+ * ramp spans [attack, attack + hold + decay].
+ *
+ * Exported for direct unit testing; NOT part of the public API — do not
+ * re-export from index.ts.
+ */
+export function envelopeValueAt(
+  tRel: number,
+  attack: number,
+  hold: number,
+  decay: number,
+  peakGain: number,
+  sustainGain: number
+): number {
+  if (tRel <= 0) return 0;
+  if (tRel < attack) return peakGain * (tRel / attack);
+  const rampStart = hold > 0.001 ? attack + hold : attack;
+  const rampEnd = attack + hold + decay;
+  if (tRel <= rampStart || rampEnd <= rampStart) {
+    return tRel >= rampEnd ? sustainGain : peakGain;
+  }
+  if (tRel < rampEnd) {
+    return peakGain + (sustainGain - peakGain) * ((tRel - rampStart) / (rampEnd - rampStart));
+  }
+  return sustainGain;
+}
+
+/**
  * MIDI track that uses SoundFont samples for playback.
  *
  * Instead of PolySynth synthesis, each note triggers the correct instrument
@@ -180,21 +210,47 @@ export class SoundFontToneTrack implements PlayableTrack {
     const { attackVolEnv, holdVolEnv, decayVolEnv, sustainVolEnv, releaseVolEnv } = sfSample;
     const sustainGain = peakGain * sustainVolEnv;
 
-    // Attack: start silent, ramp to peak
-    gainNode.gain.setValueAtTime(0, time);
-    gainNode.gain.linearRampToValueAtTime(peakGain, time + attackVolEnv);
-    // Hold at peak
-    if (holdVolEnv > 0.001) {
-      gainNode.gain.setValueAtTime(peakGain, time + attackVolEnv + holdVolEnv);
-    }
-    // Decay to sustain level
+    // AHD envelope TRUNCATED at note-off. The duration is known up-front, so
+    // schedule only the envelope that actually plays. Scheduling the full AHD
+    // and stepping to sustain at note-off is a CONFIRMED click for staccato
+    // notes on long-decay patches: the decay ramp's endpoint sorts after
+    // note-off, so it never governs — the gain holds at PEAK for the whole
+    // note, then steps peak→sustain in one sample (Chromium gain-curve
+    // capture, 2026-07-09). A truncated partial ramp lies on the same decay
+    // line, so notes that outlive the decay are scheduled identically to
+    // before.
+    const noteOff = time + effectiveDuration;
+    const attackEnd = time + attackVolEnv;
     const decayStart = time + attackVolEnv + holdVolEnv;
-    gainNode.gain.linearRampToValueAtTime(sustainGain, decayStart + decayVolEnv);
-    // Sustain holds until note-off, then release ramps to silence.
-    // For short notes (duration < AHD), setValueAtTime at note-off cancels the
-    // incomplete decay ramp — Web Audio handles this correctly.
-    gainNode.gain.setValueAtTime(sustainGain, time + effectiveDuration);
-    gainNode.gain.linearRampToValueAtTime(0, time + effectiveDuration + releaseVolEnv);
+    const decayEnd = decayStart + decayVolEnv;
+    const heldAtNoteOff = envelopeValueAt(
+      effectiveDuration,
+      attackVolEnv,
+      holdVolEnv,
+      decayVolEnv,
+      peakGain,
+      sustainGain
+    );
+
+    gainNode.gain.setValueAtTime(0, time);
+    if (noteOff < attackEnd) {
+      // Note-off mid-attack: partial attack ramp
+      gainNode.gain.linearRampToValueAtTime(heldAtNoteOff, noteOff);
+    } else {
+      gainNode.gain.linearRampToValueAtTime(peakGain, attackEnd);
+      if (holdVolEnv > 0.001 && decayStart < noteOff) {
+        gainNode.gain.setValueAtTime(peakGain, decayStart);
+      }
+      if (noteOff < decayEnd) {
+        // Note-off mid-hold/mid-decay: partial ramp to the analytic value
+        gainNode.gain.linearRampToValueAtTime(heldAtNoteOff, noteOff);
+      } else {
+        gainNode.gain.linearRampToValueAtTime(sustainGain, decayEnd);
+        gainNode.gain.setValueAtTime(sustainGain, noteOff);
+      }
+    }
+    // Release from wherever the envelope was at note-off
+    gainNode.gain.linearRampToValueAtTime(0, noteOff + releaseVolEnv);
 
     // Connect: source → gainNode → Volume.input (Tone.js)
     source.connect(gainNode);
