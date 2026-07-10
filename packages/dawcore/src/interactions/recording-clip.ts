@@ -11,6 +11,10 @@ import type { TrackDescriptor, ClipDescriptor } from '../types';
 
 export interface RecordingClipHost {
   readonly samplesPerPixel: number;
+  /** Render-space samples-per-pixel — tick-derived in beats mode. Finalized
+   * peaks MUST be generated at this scale (containers are laid out in render
+   * space); the temporal samplesPerPixel draws the wrong width. */
+  readonly renderSamplesPerPixel: number;
   readonly mono: boolean;
   readonly isConnected: boolean;
   readonly effectiveSampleRate: number;
@@ -18,6 +22,10 @@ export interface RecordingClipHost {
   _engineTracks: Map<string, ClipTrack>;
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
+  _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
+  /** Raise the editor zoom floor (recording worker-caches peaks at the
+   * pipeline base scale like any other load — the floor must cover them). */
+  _raiseZoomFloor(scale: number): void;
   _peakPipeline: PeakPipeline;
   _engine: {
     setTracks(tracks: ClipTrack[]): void;
@@ -60,8 +68,12 @@ export function addRecordedClip(
     name: clipName ?? 'Recording',
   });
   host._clipBuffers = new Map(host._clipBuffers).set(clip.id, trimmedBuf);
+  // Record the offsets like every other clip-insertion path — without this
+  // entry the statechange peak-sync treats the clip as uncached and re-runs
+  // the worker after EVERY recording.
+  host._clipOffsets.set(clip.id, { offsetSamples: 0, durationSamples: durSamples });
   host._peakPipeline
-    .generatePeaks(trimmedBuf, host.samplesPerPixel, host.mono)
+    .generatePeaks(trimmedBuf, host.renderSamplesPerPixel, host.mono)
     .then((pd) => {
       const t = host._engineTracks.get(trackId);
       if (!t) {
@@ -71,9 +83,14 @@ export function addRecordedClip(
         const next = new Map(host._clipBuffers);
         next.delete(clip.id);
         host._clipBuffers = next;
+        host._clipOffsets.delete(clip.id);
         return;
       }
       host._peaksData = new Map(host._peaksData).set(clip.id, pd);
+      // Same floor policy as _finalizeAudioClip: the worker cached this
+      // buffer's WaveformData at the base scale — zooming finer than it
+      // would render the recorded waveform squeezed in its container.
+      host._raiseZoomFloor(host._peakPipeline.getCachedScale(trimmedBuf));
       host._engineTracks = new Map(host._engineTracks).set(trackId, {
         ...t,
         // Punch-in replace (#579): the recorded clip owns [startSample,
@@ -119,6 +136,7 @@ export function addRecordedClip(
       const next = new Map(host._clipBuffers);
       next.delete(clip.id);
       host._clipBuffers = next;
+      host._clipOffsets.delete(clip.id);
       if (host.isConnected) {
         host.dispatchEvent(
           new CustomEvent<DawErrorDetail>('daw-error', {

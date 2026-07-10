@@ -30,6 +30,7 @@ function stubAudioPipeline(editor: any) {
     generatePeaks: vi.fn().mockResolvedValue(makePeakData()),
     cacheWaveformData: vi.fn(),
     getMaxCachedScale: vi.fn().mockReturnValue(0),
+    getCachedScale: vi.fn().mockReturnValue(0),
     reextractPeaks: vi.fn().mockReturnValue(new Map()),
     terminate: vi.fn(),
   };
@@ -1070,6 +1071,83 @@ describe('seekTo error surfacing (audit wave 4)', () => {
 
     expect(events.map((e) => e.type)).toEqual(['daw-error']);
     expect(events[0].detail.operation).toBe('seek');
+    editor.remove();
+  });
+});
+
+describe('zoom floor (audit wave 5)', () => {
+  it('worker-generated peaks raise the zoom floor to the cached base scale', async () => {
+    const editor = setupEditor();
+    editor._peakPipeline.getCachedScale = vi.fn().mockReturnValue(128);
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+
+    // Worker peaks can only be extracted at >= their cached scale (128) —
+    // a finer zoom draws the waveform at a fraction of its clip container.
+    editor.samplesPerPixel = 32;
+    expect(editor.samplesPerPixel).toBe(128);
+    editor.remove();
+  });
+
+  it('a floor raised above the current samplesPerPixel re-clamps the live zoom', async () => {
+    const editor = setupEditor();
+    editor.samplesPerPixel = 64;
+    editor._peakPipeline.getCachedScale = vi.fn().mockReturnValue(256);
+
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+
+    // The setter only clamps FUTURE sets — without re-clamping, layout keeps
+    // spp 64 while peaks clamp to 256: waveform at a quarter width,
+    // misaligned against ruler and playhead.
+    expect(editor.samplesPerPixel).toBe(256);
+    editor.remove();
+  });
+});
+
+describe('recording preview position parity (audit wave 5)', () => {
+  it('beats mode positions the preview with the same tick math as finalized clips', async () => {
+    const editor = setupEditor();
+    editor.scaleMode = 'beats';
+    editor.ticksPerPixel = 10;
+    editor.bpm = 127;
+    editor.ppqn = 960;
+    await editor.updateComplete;
+
+    // bpm 127 / tpp 10 / ppqn 960 / sr 48000: exact spp = 236.22, ceil'd
+    // renderSpp = 237. sample-path left = floor(2646000/237) = 11164 px;
+    // tick-path left = round(secondsToTicks(55.125)/10) = 11201 px — the
+    // preview take would jump ~37px sideways the moment recording stops.
+    const { left } = editor._previewPosition(2646000, 480000);
+    const startTick = editor._secondsToTicks(2646000 / 48000);
+    expect(left).toBe(Math.round(startTick / 10));
+    expect(left).not.toBe(Math.floor(2646000 / editor._renderSpp));
+    editor.remove();
+  });
+
+  it('temporal mode keeps the sample-based preview position', async () => {
+    const editor = setupEditor();
+    const { left, width } = editor._previewPosition(48000, 96000);
+    expect(left).toBe(Math.floor(48000 / editor._renderSpp));
+    expect(width).toBe(Math.floor(96000 / editor._renderSpp));
+    editor.remove();
+  });
+});
+
+describe('zoom floor recompute (audit wave 5 review)', () => {
+  it('a floor recompute on track removal re-clamps the live zoom', async () => {
+    const editor = setupEditor();
+    editor.samplesPerPixel = 64;
+    editor._peakPipeline.getMaxCachedScale = vi.fn().mockReturnValue(128);
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    const trackId = editor.tracks[0].trackId;
+
+    editor.removeTrack(trackId);
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+
+    // The recompute raised the floor above the live spp — without a
+    // re-clamp, layout stays at 64 while peaks clamp to 128: the exact
+    // half-width mismatch _raiseZoomFloor makes unrepresentable, reachable
+    // through the one floor-mutation path that bypassed it.
+    expect(editor.samplesPerPixel).toBe(128);
     editor.remove();
   });
 });

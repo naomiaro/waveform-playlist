@@ -36,6 +36,7 @@ function setupEditor(): any {
     generatePeaks: vi.fn().mockResolvedValue({ data: [new Int16Array(0)], length: 0, bits: 16 }),
     cacheWaveformData: vi.fn(),
     getMaxCachedScale: vi.fn().mockReturnValue(0),
+    getCachedScale: vi.fn().mockReturnValue(0),
     reextractPeaks: vi.fn().mockReturnValue(new Map()),
     terminate: vi.fn(),
   };
@@ -132,6 +133,54 @@ describe('peaks-first load cancellation (audit wave 2)', () => {
 
     releaseDecode(makeAudioBuffer());
     await trackPromise;
+    editor.remove();
+  });
+});
+
+describe('cancelled load zoom restore (audit wave 5 review)', () => {
+  it('a cancelled load restores the zoom its own floor re-clamp coarsened', async () => {
+    const editor = setupEditor();
+    editor.samplesPerPixel = 64;
+    let releasePeaks!: (wd: unknown) => void;
+    editor._resolvePeaks = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          releasePeaks = resolve;
+        })
+    );
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+
+    const promise = editor.addTrack({
+      name: 'P',
+      clips: [{ src: '/a.opus', peaksSrc: '/a.dat', start: 0, duration: 2 }],
+    });
+    promise.catch(() => {});
+    await vi.waitFor(() => expect(editor._resolvePeaks).toHaveBeenCalled());
+    const trackId = (editor.querySelector('daw-track') as any).trackId;
+
+    releasePeaks(makeWaveformData(256));
+    // The .dat raise re-clamped the live zoom 64 → 256
+    await vi.waitFor(() => expect(editor.samplesPerPixel).toBe(256));
+
+    editor.removeTrack(trackId);
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+    releaseDecode({
+      length: 96000,
+      duration: 2,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array(96000),
+    } as unknown as AudioBuffer);
+
+    // Cancellation undoes the load's writes — including the coarsened zoom
+    // (the load that forced it no longer exists).
+    await vi.waitFor(() => expect(editor.samplesPerPixel).toBe(64));
     editor.remove();
   });
 });
