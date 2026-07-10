@@ -177,7 +177,9 @@ export class PeakPipeline {
     const inflight = this._inflight.get(audioBuffer);
     if (inflight) return inflight;
 
-    if (!this._worker) {
+    // Also replace a crashed worker (onerror marks it terminated) — reusing
+    // it would reject every later generatePeaks for the editor's lifetime.
+    if (!this._worker || this._worker.isTerminated()) {
       this._worker = createPeaksWorker();
     }
 

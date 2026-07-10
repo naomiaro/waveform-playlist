@@ -1097,6 +1097,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
     this._disposeSpectrogramControllerIfEmpty();
     if (nextEngine.size === 0) {
+      if (this._engine) {
+        // The editor rewinds to 0 when the last track goes away — the engine
+        // must follow (engine.removeTrack never touches time), or the next
+        // play() resumes from the stale position while the display shows 0.
+        // Stop first if rolling: an empty timeline has nothing to play, and
+        // without it isPlaying stays true with a dead playhead RAF. Suppress
+        // the stop settle — the final resting position is 0, dispatched by
+        // _stopPlayhead below.
+        if (this._isPlaying) {
+          this._inSeekTransition = true;
+          try {
+            this._engine.stop();
+          } finally {
+            this._inSeekTransition = false;
+          }
+        }
+        this._engine.seek(0);
+      }
       this._currentTime = 0;
       this._stopPlayhead();
     }
@@ -1235,12 +1253,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // missed; warn for those.
       const desc = this._tracks.get(trackId);
       if (desc && !desc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
-        console.warn(
-          '[dawcore] daw-clip-connected fired while parent track "' +
-            trackId +
-            '" is still loading — late-appended clip may be missed. ' +
-            'Wait for daw-track-ready before appending more <daw-clip> children, ' +
-            'or use editor.addClip(trackId, config) after the track finishes loading.'
+        const message =
+          'daw-clip-connected fired while parent track "' +
+          trackId +
+          '" is still loading — the clip will not be loaded. ' +
+          'Wait for daw-track-ready before appending more <daw-clip> children, ' +
+          'or use editor.addClip(trackId, config) after the track finishes loading.';
+        console.warn('[dawcore] ' + message);
+        // Settle the addClip() promise: _readTrackDescriptor snapshotted the
+        // clip list at connect time, so nothing will ever load this clip —
+        // without an error event the returned promise hangs forever.
+        this.dispatchEvent(
+          new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+            bubbles: true,
+            composed: true,
+            detail: { trackId, clipId: clipEl.clipId, error: new Error(message) },
+          })
         );
       }
       return;
@@ -1886,6 +1914,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           }
         }
       }
+      // Track removed while its clips were loading (removeTrack / element
+      // removal during fetch/decode) — committing now would resurrect it in
+      // the engine and UI. _onTrackRemoved already ran its cleanup for
+      // whatever existed at removal time; undo this load's own writes (clip
+      // caches, a peaks-first preview insert) and settle any addTrack()
+      // awaiter via the outer catch's daw-track-error.
+      if (!this._tracks.has(trackId)) {
+        for (const clip of clips) {
+          this._purgeClipCaches(clip.id);
+        }
+        if (this._engineTracks.has(trackId)) {
+          const nextEngine = new Map(this._engineTracks);
+          nextEngine.delete(trackId);
+          this._engineTracks = nextEngine;
+          this._recomputeDuration();
+        }
+        throw new Error('track "' + trackId + '" was removed while loading');
+      }
       const track = createTrack({
         name: descriptor.name,
         clips,
@@ -1922,9 +1968,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         })
       );
     } catch (err) {
-      // Guard against dispatching on a disconnected element (CLAUDE.md pattern #36)
-      if (!this.isConnected) return;
       console.warn('[dawcore] Failed to load track "' + trackId + '": ' + String(err));
+      // Dispatch even when detached: a bubbling event can't reach ancestors
+      // (CLAUDE.md pattern #36), but the _awaitId listeners registered on
+      // `this` for addTrack()/loadMidi() still fire on a detached element —
+      // skipping the dispatch leaves those promises unsettled forever
+      // (mirrors _loadAndAppendClip's error path).
       this.dispatchEvent(
         new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
           bubbles: true,
@@ -2523,8 +2572,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       engine: this._engine,
       dispatchEvent: (e: Event) => this.dispatchEvent(e),
       stop: () => {
-        this._engine?.stop();
-        this._stopPlayhead();
+        // Same suppression as seekTo and the pointer seek path: engine.stop()
+        // rewinds to play-start, and the settle would leak a backward-jumping
+        // daw-timeupdate (30→0→30 on every split during playback) before
+        // play(time) resumes (CLAUDE.md seek-while-playing invariant).
+        this._inSeekTransition = true;
+        try {
+          this._engine?.stop();
+          this._stopPlayhead();
+        } finally {
+          this._inSeekTransition = false;
+        }
       },
       // Call engine.play directly (synchronous) — not the async editor play()
       // which yields to microtask queue via await engine.init(). Engine is

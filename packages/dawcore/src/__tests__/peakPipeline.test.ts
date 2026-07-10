@@ -48,6 +48,7 @@ vi.mock('../workers/peaksWorker', () => ({
         }),
       })
     ),
+    isTerminated: vi.fn(() => false),
     terminate: vi.fn(),
   })),
 }));
@@ -279,5 +280,26 @@ describe('PeakPipeline', () => {
     await pipeline.generatePeaks(buf, 1024, false); // Creates worker
     pipeline.terminate();
     expect((pipeline as any)._worker).toBeNull();
+  });
+
+  it('recreates the worker after a crash instead of rejecting forever', async () => {
+    // A crashed worker (onerror) marks itself terminated; the pipeline must
+    // not keep reusing it — that poisons every later generatePeaks for the
+    // lifetime of the editor.
+    const { createPeaksWorker } = await import('../workers/peaksWorker');
+    const crashedWorker = {
+      generate: vi.fn(() => Promise.reject(new Error('Worker terminated'))),
+      isTerminated: vi.fn(() => true),
+      terminate: vi.fn(),
+    };
+    vi.mocked(createPeaksWorker).mockImplementationOnce(() => crashedWorker as any);
+    const pipeline = new PeakPipeline();
+
+    await expect(pipeline.generatePeaks(makeBuffer(), 512, true)).rejects.toThrow();
+
+    // Next call gets a FRESH worker (the default mock) and succeeds
+    const peaks = await pipeline.generatePeaks(makeBuffer(), 512, true);
+    expect(peaks.length).toBeGreaterThan(0);
+    expect(crashedWorker.generate).toHaveBeenCalledTimes(1);
   });
 });

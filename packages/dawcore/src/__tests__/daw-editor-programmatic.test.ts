@@ -790,3 +790,137 @@ describe('engine clip-id alignment', () => {
     editor.remove();
   });
 });
+
+describe('load races (audit wave 2)', () => {
+  it('a track removed while its clips are loading is not resurrected into the engine', async () => {
+    const editor = setupEditor();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+
+    const promise = editor.addTrack({
+      name: 'Doomed',
+      clips: [{ src: '/a.opus', start: 0, duration: 2 }],
+    });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+    const trackEl = editor.querySelector('daw-track') as any;
+    const trackId = trackEl.trackId;
+
+    editor.removeTrack(trackId);
+    // Element removal is observed via MutationObserver (async)
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+
+    releaseDecode(makeAudioBuffer());
+
+    // The addTrack promise must settle (rejected — the track was removed)
+    const outcome = await Promise.race([
+      promise.then(
+        () => 'resolved',
+        () => 'rejected'
+      ),
+      new Promise((r) => setTimeout(() => r('hung'), 500)),
+    ]);
+    expect(outcome).toBe('rejected');
+
+    // ...and the removed track must NOT reappear in engine/UI state
+    expect(editor._engineTracks.has(trackId)).toBe(false);
+    expect(editor.tracks.find((t: any) => t.trackId === trackId)).toBeUndefined();
+    editor.remove();
+  });
+
+  it('addTrack rejects instead of hanging when the load fails after the editor is detached', async () => {
+    const editor = setupEditor();
+    let rejectDecode!: (e: Error) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((_resolve, reject) => {
+          rejectDecode = reject;
+        })
+    );
+
+    const promise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+
+    editor.remove(); // page transition / framework re-render mid-load
+    rejectDecode(new Error('network error'));
+
+    const outcome = await Promise.race([
+      promise.then(
+        () => 'resolved',
+        () => 'rejected'
+      ),
+      new Promise((r) => setTimeout(() => r('hung'), 500)),
+    ]);
+    expect(outcome).toBe('rejected');
+  });
+
+  it('addClip during the parent track load rejects instead of hanging forever', async () => {
+    const editor = setupEditor();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<AudioBuffer>((resolve) => {
+            releaseDecode = resolve;
+          })
+      )
+      .mockResolvedValue(makeAudioBuffer());
+
+    const trackPromise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+    const trackId = (editor.querySelector('daw-track') as any).trackId;
+
+    const clipPromise = editor.addClip(trackId, { src: '/b.opus', start: 2 });
+    const outcome = await Promise.race([
+      clipPromise.then(
+        () => 'resolved',
+        () => 'rejected'
+      ),
+      new Promise((r) => setTimeout(() => r('hung'), 500)),
+    ]);
+    expect(outcome).toBe('rejected');
+
+    releaseDecode(makeAudioBuffer());
+    await trackPromise;
+    editor.remove();
+  });
+});
+
+describe('removeTrack timeline sync (audit wave 2)', () => {
+  it('removing the last track rewinds the engine to 0, matching the UI', async () => {
+    const editor = setupEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    const trackId = editor.tracks[0].trackId;
+    editor._currentTime = 30; // prior seek — engine holds 30 too
+
+    editor.removeTrack(trackId);
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+
+    // Without engine.seek(0), the display shows 0 but the next play()
+    // resumes from the engine's stale position (engine.removeTrack never
+    // touches time).
+    expect(editor._engine.seek).toHaveBeenCalledWith(0);
+    expect(editor.currentTime).toBe(0);
+    editor.remove();
+  });
+
+  it('removing the last track during playback stops the engine (isPlaying not stranded)', async () => {
+    const editor = setupEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    const trackId = editor.tracks[0].trackId;
+    editor._isPlaying = true;
+
+    editor.removeTrack(trackId);
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+
+    // An empty timeline has nothing to play — leaving the transport rolling
+    // strands isPlaying=true with a dead playhead RAF.
+    expect(editor._engine.stop).toHaveBeenCalled();
+    editor.remove();
+  });
+});
