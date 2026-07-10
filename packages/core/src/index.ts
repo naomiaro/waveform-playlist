@@ -7,3 +7,4 @@ export * from './fades';
 export * from './keyboard';
 export * from './probeRangeSupport';
 export * from './enumerateMicrophones';
+export * from './annotations/boundaries';
