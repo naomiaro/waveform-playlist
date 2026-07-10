@@ -75,7 +75,9 @@ export class TonePlayout {
       try {
         getTransport().clear(this._completionEventId);
       } catch (err) {
-        console.warn('[waveform-playlist] Error clearing Transport completion event:', err);
+        console.warn(
+          '[waveform-playlist] Error clearing Transport completion event:' + ' ' + String(err)
+        );
       }
       this._completionEventId = null;
     }
@@ -184,6 +186,10 @@ export class TonePlayout {
     const lookAhead = context.lookAhead ?? 0;
     const audibleOffset = Math.max(0, transport.seconds - lookAhead);
     track.startMidClipSources(audibleOffset, context.currentTime);
+    // Fades were last prepared at play(), before this track was added or
+    // swapped in — schedule its envelopes for the current cycle (no-op for
+    // MIDI tracks, whose prepareFades is empty).
+    track.prepareFades(context.currentTime, audibleOffset);
   }
 
   play(when?: number, offset?: number, duration?: number): void {
@@ -209,7 +215,9 @@ export class TonePlayout {
         try {
           this.onPlaybackCompleteCallback?.();
         } catch (err) {
-          console.warn('[waveform-playlist] Error in playback completion callback:', err);
+          console.warn(
+            '[waveform-playlist] Error in playback completion callback:' + ' ' + String(err)
+          );
         }
       }, transportOffset + duration);
     }
@@ -267,8 +275,9 @@ export class TonePlayout {
       this.clearCompletionEvent();
       this.tracks.forEach((track) => track.cancelFades());
       console.warn(
-        '[waveform-playlist] Transport.start() failed. Audio playback could not begin.',
-        err
+        '[waveform-playlist] Transport.start() failed. Audio playback could not begin.' +
+          ' ' +
+          String(err)
       );
       throw err;
     }
@@ -279,7 +288,7 @@ export class TonePlayout {
     try {
       transport.pause();
     } catch (err) {
-      console.warn('[waveform-playlist] Transport.pause() failed:', err);
+      console.warn('[waveform-playlist] Transport.pause() failed:' + ' ' + String(err));
     }
     // Native AudioBufferSourceNodes ignore Transport state changes —
     // they must be explicitly stopped.
@@ -293,7 +302,7 @@ export class TonePlayout {
     try {
       transport.stop();
     } catch (err) {
-      console.warn('[waveform-playlist] Transport.stop() failed:', err);
+      console.warn('[waveform-playlist] Transport.stop() failed:' + ' ' + String(err));
     }
     // Remove loop handler before stopping sources. Prevents any deferred
     // loop event from creating new sources via startMidClipSources() after
@@ -303,7 +312,7 @@ export class TonePlayout {
       try {
         transport.off('loop', this._loopHandler);
       } catch (err) {
-        console.warn('[waveform-playlist] Error removing loop handler:', err);
+        console.warn('[waveform-playlist] Error removing loop handler:' + ' ' + String(err));
       }
       this._loopHandler = null;
     }
@@ -312,14 +321,18 @@ export class TonePlayout {
       try {
         track.stopAllSources();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error stopping sources for track "${track.id}":`, err);
+        console.warn(
+          `[waveform-playlist] Error stopping sources for track "${track.id}":` + ' ' + String(err)
+        );
       }
     });
     this.tracks.forEach((track) => {
       try {
         track.cancelFades();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error canceling fades for track "${track.id}":`, err);
+        console.warn(
+          `[waveform-playlist] Error canceling fades for track "${track.id}":` + ' ' + String(err)
+        );
       }
     });
     this.clearCompletionEvent();
@@ -375,10 +388,16 @@ export class TonePlayout {
    * effects] → tap → node (caller wires node.output → ctx.destination).
    */
   connectMasterOutput(node: AudioNode): void {
-    if (this._masterChainNode) {
-      this._masterTap.disconnect(this._masterChainNode);
-    } else {
-      this._masterTap.disconnect(getDestination());
+    // Guard the disconnect (as disconnectMasterOutput does) — a consumer may
+    // have disposed the old chain node externally; the rewire must proceed.
+    try {
+      if (this._masterChainNode) {
+        this._masterTap.disconnect(this._masterChainNode);
+      } else {
+        this._masterTap.disconnect(getDestination());
+      }
+    } catch (err) {
+      console.warn('[waveform-playlist] connectMasterOutput disconnect: ' + String(err));
     }
     this._masterTap.connect(node);
     this._masterChainNode = node;
@@ -459,7 +478,7 @@ export class TonePlayout {
       transport.loopEnd = loopEnd;
       transport.loop = enabled;
     } catch (err) {
-      console.warn('[waveform-playlist] Error configuring Transport loop:', err);
+      console.warn('[waveform-playlist] Error configuring Transport loop:' + ' ' + String(err));
       return;
     }
 
@@ -483,8 +502,9 @@ export class TonePlayout {
             track.prepareFades(currentTime, this._loopStart);
           } catch (err) {
             console.warn(
-              `[waveform-playlist] Error re-scheduling track "${track.id}" on loop:`,
-              err
+              `[waveform-playlist] Error re-scheduling track "${track.id}" on loop:` +
+                ' ' +
+                String(err)
             );
           }
         });
@@ -512,14 +532,18 @@ export class TonePlayout {
     try {
       this.stop();
     } catch (err) {
-      console.warn('[waveform-playlist] Error stopping Transport during dispose:', err);
+      console.warn(
+        '[waveform-playlist] Error stopping Transport during dispose:' + ' ' + String(err)
+      );
     }
 
     this.tracks.forEach((track) => {
       try {
         track.dispose();
       } catch (err) {
-        console.warn(`[waveform-playlist] Error disposing track "${track.id}":`, err);
+        console.warn(
+          `[waveform-playlist] Error disposing track "${track.id}":` + ' ' + String(err)
+        );
       }
     });
     this.tracks.clear();
@@ -528,7 +552,9 @@ export class TonePlayout {
       try {
         this.effectsCleanup();
       } catch (err) {
-        console.warn('[waveform-playlist] Error during master effects cleanup:', err);
+        console.warn(
+          '[waveform-playlist] Error during master effects cleanup:' + ' ' + String(err)
+        );
       }
     }
 

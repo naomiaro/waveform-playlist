@@ -1,11 +1,26 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   linearCurve,
   exponentialCurve,
   sCurveCurve,
   logarithmicCurve,
   generateCurve,
-} from '../fades';
+} from '@waveform-playlist/core';
+import { getUnderlyingAudioParam } from '../fades';
+
+describe('getUnderlyingAudioParam', () => {
+  it('returns undefined for null/undefined input instead of throwing', () => {
+    // Signature is (signal: unknown) => AudioParam | undefined — a public
+    // export must handle any input gracefully.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => getUnderlyingAudioParam(null)).not.toThrow();
+    expect(getUnderlyingAudioParam(null)).toBeUndefined();
+    expect(getUnderlyingAudioParam(undefined)).toBeUndefined();
+
+    warnSpy.mockRestore();
+  });
+});
 
 describe('linearCurve', () => {
   it('produces correct length', () => {

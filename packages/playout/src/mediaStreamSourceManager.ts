@@ -15,7 +15,7 @@
  * directly, which handles cross-browser compatibility internally.
  */
 
-import { getContext } from 'tone';
+import { getGlobalContext } from './audioContext';
 
 // Map of MediaStream -> MediaStreamAudioSourceNode
 const streamSources = new Map<MediaStream, MediaStreamAudioSourceNode>();
@@ -26,17 +26,13 @@ const streamCleanupHandlers = new Map<MediaStream, () => void>();
 /**
  * Get or create a MediaStreamAudioSourceNode for the given stream
  *
+ * Automatic cleanup fires when the stream's tracks end remotely (device
+ * unplugged, remote peer stopped). NOTE: a LOCAL `track.stop()` does NOT
+ * fire the track-level 'ended' event (per spec) — call
+ * releaseMediaStreamSource() when tearing a stream down yourself.
+ *
  * @param stream - The MediaStream to create a source for
  * @returns MediaStreamAudioSourceNode that can be connected to multiple nodes
- *
- * @example
- * ```typescript
- * const source = getMediaStreamSource(stream);
- *
- * // Multiple consumers can connect to the same source
- * source.connect(analyserNode);  // For VU meter
- * source.connect(workletNode);   // For recording
- * ```
  */
 export function getMediaStreamSource(stream: MediaStream): MediaStreamAudioSourceNode {
   // Return existing source if we have one for this stream
@@ -44,27 +40,34 @@ export function getMediaStreamSource(stream: MediaStream): MediaStreamAudioSourc
     return streamSources.get(stream)!;
   }
 
-  // Create new source using Tone.js's shared context for cross-browser compatibility
-  const context = getContext();
+  // Create on the package's global playout context — Tone's raw getContext()
+  // would lazily create an orphaned default context when called before
+  // configureGlobalContext()/getGlobalContext(), stranding this source on a
+  // dead graph once the real global context is created.
+  const context = getGlobalContext();
   const source = context.createMediaStreamSource(stream);
   streamSources.set(stream, source);
 
-  // Set up cleanup when stream ends
+  // MediaStream itself has no 'ended'/'inactive' events ('ended' is
+  // track-level; active/inactive were removed from the spec) — hook each
+  // track and clean up once the stream reports inactive.
+  const tracks = stream.getTracks();
+
+  const onTrackEnded = () => {
+    if (!stream.active) {
+      cleanup();
+    }
+  };
+
   const cleanup = () => {
     source.disconnect();
     streamSources.delete(stream);
     streamCleanupHandlers.delete(stream);
-
-    // Remove event listener
-    stream.removeEventListener('ended', cleanup);
-    stream.removeEventListener('inactive', cleanup);
+    tracks.forEach((track) => track.removeEventListener('ended', onTrackEnded));
   };
 
   streamCleanupHandlers.set(stream, cleanup);
-
-  // Clean up when stream ends or becomes inactive
-  stream.addEventListener('ended', cleanup);
-  stream.addEventListener('inactive', cleanup);
+  tracks.forEach((track) => track.addEventListener('ended', onTrackEnded));
 
   return source;
 }
@@ -72,8 +75,8 @@ export function getMediaStreamSource(stream: MediaStream): MediaStreamAudioSourc
 /**
  * Manually release a MediaStreamSource
  *
- * Normally you don't need to call this - cleanup happens automatically
- * when the stream ends. Only call this if you need to force cleanup.
+ * Required after a local `track.stop()` (which fires no 'ended' event);
+ * remote-ended streams clean up automatically.
  *
  * @param stream - The MediaStream to release the source for
  */

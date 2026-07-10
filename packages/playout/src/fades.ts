@@ -1,20 +1,8 @@
 /**
- * Fade utilities — re-exports from @waveform-playlist/core
- * plus Tone.js-specific helpers
+ * Tone.js-specific fade helpers. Pure fade utilities (curves, applyFadeIn/
+ * applyFadeOut) live in @waveform-playlist/core — import them from there
+ * directly (repo rule: no cross-package re-exports).
  */
-
-// Re-export all pure fade utilities from core
-export {
-  linearCurve,
-  exponentialCurve,
-  sCurveCurve,
-  logarithmicCurve,
-  generateCurve,
-  applyFadeIn,
-  applyFadeOut,
-} from '@waveform-playlist/core';
-
-export type { FadeType, FadeConfig } from '@waveform-playlist/core';
 
 /**
  * Access the underlying Web Audio AudioParam from a Tone.js Signal/Param wrapper.
@@ -32,7 +20,7 @@ export type { FadeType, FadeConfig } from '@waveform-playlist/core';
 let hasWarned = false;
 
 export function getUnderlyingAudioParam(signal: unknown): AudioParam | undefined {
-  const param = (signal as { _param?: AudioParam })._param;
+  const param = (signal as { _param?: AudioParam } | null | undefined)?._param;
   if (!param && !hasWarned) {
     hasWarned = true;
     console.warn(

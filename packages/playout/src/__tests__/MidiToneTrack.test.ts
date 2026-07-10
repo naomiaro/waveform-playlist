@@ -475,4 +475,34 @@ describe('MidiToneTrack', () => {
       expect(mockTriggerAttackRelease).not.toHaveBeenCalled();
     });
   });
+
+  describe('stopAllSources resilience', () => {
+    it('releases percussion synths even when the melodic releaseAll throws', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const track = createTrack();
+      mockReleaseAll.mockImplementationOnce(() => {
+        throw new Error('already disposed');
+      });
+
+      track.stopAllSources();
+
+      // A melodic failure must not leave percussion voices stuck —
+      // stopAllSources runs on every stop() and loop boundary.
+      expect(mockPercReleaseAll).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('duration', () => {
+    it('returns the max clip end time regardless of array order', () => {
+      const track = createTrack({
+        clips: [
+          makeMidiClip({ startTime: 0, duration: 10 }),
+          makeMidiClip({ startTime: 2, duration: 2 }), // array-last ends at 4
+        ],
+      });
+
+      expect(track.duration).toBe(10);
+    });
+  });
 });

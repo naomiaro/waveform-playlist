@@ -36,8 +36,10 @@ interface ScheduledMidiClip {
  *     → Panner → muteGain → effects/destination
  */
 export class SoundFontToneTrack implements PlayableTrack {
-  /** Rate-limit missing sample warnings — one per class lifetime */
-  private static _missingSampleWarned = false;
+  /** Rate-limit missing sample warnings — one per track instance (a page-
+   *  lifetime static would silence diagnostics for unrelated later tracks
+   *  and soundfont swaps). */
+  private _missingSampleWarned = false;
   private scheduledClips: ScheduledMidiClip[];
   private activeSources: Set<AudioBufferSourceNode> = new Set();
   private soundFontCache: SoundFontCache;
@@ -141,12 +143,12 @@ export class SoundFontToneTrack implements PlayableTrack {
 
     const sfSample = this.soundFontCache.getAudioBuffer(midiNote, bank, preset);
     if (!sfSample) {
-      if (!SoundFontToneTrack._missingSampleWarned) {
+      if (!this._missingSampleWarned) {
         console.warn(
-          `[waveform-playlist] SoundFont sample not found for MIDI note ${midiNote} (bank ${bank}, preset ${preset}). ` +
-            'Subsequent missing samples will be silent.'
+          `[waveform-playlist] SoundFont sample not found for MIDI note ${midiNote} (bank ${bank}, preset ${preset}) on track "${this.id}". ` +
+            'Subsequent missing samples on this track will be silent.'
         );
-        SoundFontToneTrack._missingSampleWarned = true;
+        this._missingSampleWarned = true;
       }
       return;
     }
@@ -205,7 +207,7 @@ export class SoundFontToneTrack implements PlayableTrack {
       try {
         gainNode.disconnect();
       } catch (err) {
-        console.warn('[waveform-playlist] GainNode already disconnected:', err);
+        console.warn('[waveform-playlist] GainNode already disconnected:' + ' ' + String(err));
       }
     };
 
@@ -246,8 +248,9 @@ export class SoundFontToneTrack implements PlayableTrack {
               );
             } catch (err) {
               console.warn(
-                `[waveform-playlist] Failed to start mid-clip SoundFont note on track "${this.id}":`,
-                err
+                `[waveform-playlist] Failed to start mid-clip SoundFont note on track "${this.id}":` +
+                  ' ' +
+                  String(err)
               );
             }
           }
@@ -264,7 +267,9 @@ export class SoundFontToneTrack implements PlayableTrack {
       try {
         source.stop();
       } catch (err) {
-        console.warn('[waveform-playlist] Error stopping AudioBufferSourceNode:', err);
+        console.warn(
+          '[waveform-playlist] Error stopping AudioBufferSourceNode:' + ' ' + String(err)
+        );
       }
     }
     this.activeSources.clear();
@@ -304,8 +309,9 @@ export class SoundFontToneTrack implements PlayableTrack {
         this.effectsCleanup();
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error during SoundFont track "${this.id}" effects cleanup:`,
-          err
+          `[waveform-playlist] Error during SoundFont track "${this.id}" effects cleanup:` +
+            ' ' +
+            String(err)
         );
       }
     }
@@ -318,8 +324,9 @@ export class SoundFontToneTrack implements PlayableTrack {
         part.dispose();
       } catch (err) {
         console.warn(
-          `[waveform-playlist] Error disposing Part ${index} on SoundFont track "${this.id}":`,
-          err
+          `[waveform-playlist] Error disposing Part ${index} on SoundFont track "${this.id}":` +
+            ' ' +
+            String(err)
         );
       }
     });
@@ -328,24 +335,27 @@ export class SoundFontToneTrack implements PlayableTrack {
       this.volumeNode.dispose();
     } catch (err) {
       console.warn(
-        `[waveform-playlist] Error disposing volumeNode on SoundFont track "${this.id}":`,
-        err
+        `[waveform-playlist] Error disposing volumeNode on SoundFont track "${this.id}":` +
+          ' ' +
+          String(err)
       );
     }
     try {
       this.panNode.dispose();
     } catch (err) {
       console.warn(
-        `[waveform-playlist] Error disposing panNode on SoundFont track "${this.id}":`,
-        err
+        `[waveform-playlist] Error disposing panNode on SoundFont track "${this.id}":` +
+          ' ' +
+          String(err)
       );
     }
     try {
       this.muteGain.dispose();
     } catch (err) {
       console.warn(
-        `[waveform-playlist] Error disposing muteGain on SoundFont track "${this.id}":`,
-        err
+        `[waveform-playlist] Error disposing muteGain on SoundFont track "${this.id}":` +
+          ' ' +
+          String(err)
       );
     }
   }
@@ -355,9 +365,13 @@ export class SoundFontToneTrack implements PlayableTrack {
   }
 
   get duration(): number {
-    if (this.scheduledClips.length === 0) return 0;
-    const lastClip = this.scheduledClips[this.scheduledClips.length - 1];
-    return lastClip.clipInfo.startTime + lastClip.clipInfo.duration;
+    // Max end across clips — the array is NOT sorted by startTime.
+    let max = 0;
+    for (const { clipInfo } of this.scheduledClips) {
+      const end = clipInfo.startTime + clipInfo.duration;
+      if (end > max) max = end;
+    }
+    return max;
   }
 
   get muted(): boolean {

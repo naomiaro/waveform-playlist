@@ -62,6 +62,9 @@ vi.mock('../ToneTrack', () => {
     this.disconnectEffects = vi.fn();
     this.stopAllSources = vi.fn();
     this.cancelFades = vi.fn();
+    this.prepareFades = vi.fn();
+    this.startMidClipSources = vi.fn();
+    this.setScheduleGuardOffset = vi.fn();
     this.dispose = vi.fn();
     this.setMute = vi.fn();
     this.setSolo = vi.fn();
@@ -79,6 +82,9 @@ vi.mock('../MidiToneTrack', () => {
     this.muted = options.track.muted ?? false;
     this.stopAllSources = vi.fn();
     this.cancelFades = vi.fn();
+    this.prepareFades = vi.fn();
+    this.startMidClipSources = vi.fn();
+    this.setScheduleGuardOffset = vi.fn();
     this.dispose = vi.fn();
     this.setMute = vi.fn();
     this.setSolo = vi.fn();
@@ -213,10 +219,9 @@ describe('TonePlayout', () => {
       // Track should still be disposed despite Transport.stop() throwing
       expect(track.dispose).toHaveBeenCalled();
       expect(mockVolume.dispose).toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Transport.stop() failed'),
-        expect.any(Error)
-      );
+      // Single string arg — project rule: never pass objects to console.warn
+      // (Chrome lazily evaluates logged objects).
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Transport.stop() failed'));
       warnSpy.mockRestore();
     });
 
@@ -376,6 +381,33 @@ describe('TonePlayout', () => {
 
       // mockVolume.input.input is the native GainNode stand-in in this file's mocks
       expect(playout.masterBusInputNode).toBe(mockVolume.input.input);
+    });
+  });
+
+  describe('resumeTrackMidPlayback', () => {
+    it('starts mid-clip sources AND prepares fades at the audible offset', () => {
+      const playout = new TonePlayout();
+      const track = playout.addTrack({ clips: [], track: makeTrack('t1') });
+
+      mockTransport.state = 'started';
+      mockTransport.seconds = 2.0;
+
+      playout.resumeTrackMidPlayback('t1');
+
+      expect(track.startMidClipSources).toHaveBeenCalled();
+      // Without fade preparation, a track added/swapped during playback
+      // plays its clips at full gain until the next play().
+      expect(track.prepareFades).toHaveBeenCalled();
+    });
+
+    it('does nothing when the Transport is stopped', () => {
+      const playout = new TonePlayout();
+      const track = playout.addTrack({ clips: [], track: makeTrack('t1') });
+
+      mockTransport.state = 'stopped';
+      playout.resumeTrackMidPlayback('t1');
+
+      expect(track.startMidClipSources).not.toHaveBeenCalled();
     });
   });
 

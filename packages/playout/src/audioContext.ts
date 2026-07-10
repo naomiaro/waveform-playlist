@@ -113,8 +113,14 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     );
   }
 
-  // Default (standardized-audio-context) path — unchanged behavior.
-  globalToneContext = new Context();
+  // Default (standardized-audio-context) path. latencyHint IS supported by
+  // Tone's Context constructor (unlike sampleRate, which Tone 15.1.22 drops).
+  // Tone's ContextOptions types it category-only, but runtime forwards numeric
+  // seconds to the underlying AudioContext constructor unchanged — cast.
+  globalToneContext =
+    options.latencyHint !== undefined
+      ? new Context({ latencyHint: options.latencyHint as AudioContextLatencyCategory })
+      : new Context();
   setContext(globalToneContext);
   const actualRate = (globalToneContext.rawContext as AudioContext).sampleRate;
   if (options.sampleRate !== undefined && options.sampleRate !== actualRate) {
