@@ -1,6 +1,7 @@
 import type { DawTrackElement } from './elements/daw-track';
 import type { DawClipElement } from './elements/daw-clip';
 import type { TimeDisplayFormat } from './utils/time-display-format';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 // ---------------------------------------------------------------------------
 // Event detail types
@@ -193,6 +194,23 @@ export interface DawEffectErrorDetail {
   message: string;
 }
 
+export interface DawAnnotationConnectedDetail {
+  annotationId: string;
+  element: HTMLElement;
+}
+
+export interface DawAnnotationUpdateDetail {
+  annotationId: string;
+}
+
+export interface DawAnnotationSelectDetail {
+  annotation: AnnotationData | null;
+}
+
+export interface DawAnnotationTrackConnectedDetail {
+  element: HTMLElement;
+}
+
 // ---------------------------------------------------------------------------
 // Event map — augments HTMLElementEventMap for typed addEventListener
 // ---------------------------------------------------------------------------
@@ -237,6 +255,10 @@ export interface DawEventMap {
   'daw-effect-bypass': CustomEvent<DawEffectBypassDetail>;
   'daw-effect-reorder': CustomEvent<DawEffectReorderDetail>;
   'daw-effect-error': CustomEvent<DawEffectErrorDetail>;
+  'daw-annotation-connected': CustomEvent<DawAnnotationConnectedDetail>;
+  'daw-annotation-update': CustomEvent<DawAnnotationUpdateDetail>;
+  'daw-annotation-select': CustomEvent<DawAnnotationSelectDetail>;
+  'daw-annotation-track-connected': CustomEvent<DawAnnotationTrackConnectedDetail>;
 }
 
 // Helper type for creating typed custom events

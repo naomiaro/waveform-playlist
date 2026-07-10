@@ -1,3 +1,4 @@
+import './elements/daw-annotation';
 import './elements/daw-clip';
 import './elements/daw-track';
 import './elements/daw-waveform';
@@ -19,6 +20,7 @@ import './elements/daw-time-display';
 import './elements/daw-time-format';
 import './elements/daw-player';
 
+export { DawAnnotationElement } from './elements/daw-annotation';
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
@@ -117,6 +119,10 @@ export type {
   DawEffectBypassDetail,
   DawEffectReorderDetail,
   DawEffectErrorDetail,
+  DawAnnotationConnectedDetail,
+  DawAnnotationUpdateDetail,
+  DawAnnotationSelectDetail,
+  DawAnnotationTrackConnectedDetail,
   DawTimeUpdateDetail,
   DawTimeFormatChangeDetail,
   LoadFilesResult,
