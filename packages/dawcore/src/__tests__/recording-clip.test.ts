@@ -16,7 +16,9 @@ function makeHost(overrides: Partial<RecordingClipHost> = {}): RecordingClipHost
     _clipOffsets: new Map(),
     _peakPipeline: {
       generatePeaks: vi.fn(async () => ({ data: [], length: 0, bits: 16 }) as unknown as PeakData),
+      getCachedScale: vi.fn(() => 0),
     } as unknown as RecordingClipHost['_peakPipeline'],
+    _raiseZoomFloor: vi.fn(),
     _engine: null,
     _recomputeDuration: vi.fn(),
     dispatchEvent: vi.fn(() => true),
@@ -112,5 +114,27 @@ describe('addRecordedClip peak scale (audit wave 5)', () => {
     const [clipId] = [...host._clipBuffers.keys()];
     expect(host._clipOffsets.get(clipId)).toEqual({ offsetSamples: 0, durationSamples: 96000 });
     await new Promise((r) => setTimeout(r, 0));
+  });
+});
+
+describe('addRecordedClip zoom floor (audit wave 5 review)', () => {
+  it('raises the zoom floor from the worker-cached scale', async () => {
+    // The recording path worker-caches peaks at the base scale like any
+    // other load — skipping the floor raise lets the finalized recorded
+    // waveform render squeezed when the editor is zoomed finer than 128.
+    const host = makeHost({
+      _engineTracks: new Map([
+        ['t1', { id: 't1', name: 't1', clips: [] } as unknown as never],
+      ]) as RecordingClipHost['_engineTracks'],
+    });
+    (host._peakPipeline.getCachedScale as ReturnType<typeof vi.fn>).mockReturnValue(128);
+
+    addRecordedClip(host, 't1', makeBuffer(96000), 0, 96000, 0);
+    await vi.waitFor(() => {
+      expect(host._peakPipeline.generatePeaks).toHaveBeenCalled();
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(host._raiseZoomFloor).toHaveBeenCalledWith(128);
   });
 });

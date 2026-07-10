@@ -134,9 +134,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn(
         '[dawcore] Zoom ' +
           value +
-          ' spp rejected — pre-computed peaks limit is ' +
+          ' spp clamped to the peak floor (' +
           this._minSamplesPerPixel +
-          ' spp'
+          ' spp) — peaks for the loaded audio (worker-generated or pre-computed) ' +
+          'can only render at or above that scale'
       );
     }
     this._samplesPerPixel = clamped;
@@ -150,13 +151,25 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * already-finer spp keeps sizing clip containers while the waveforms
    * render at the coarser scale: half/quarter width, misaligned against the
    * ruler and playhead. */
-  private _raiseZoomFloor(scale: number): void {
+  _raiseZoomFloor(scale: number): void {
     if (!Number.isFinite(scale) || scale <= 0) return;
     if (scale > this._minSamplesPerPixel) {
       this._minSamplesPerPixel = scale;
     }
     if (this._samplesPerPixel < this._minSamplesPerPixel) {
       this.samplesPerPixel = this._minSamplesPerPixel; // setter warns + requestUpdate
+    }
+  }
+
+  /** Recompute the floor from the surviving cached scales (track removal /
+   * load cancellation / preview cleanup). Usually LOWERS the floor, freeing
+   * finer zoom — but a buffer whose scale never raised the floor (or a mix
+   * of scales) can raise it above the live spp, so re-clamp like
+   * _raiseZoomFloor. Never mutate _minSamplesPerPixel directly. */
+  private _recomputeZoomFloor(): void {
+    this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+    if (this._minSamplesPerPixel > 0 && this._samplesPerPixel < this._minSamplesPerPixel) {
+      this.samplesPerPixel = this._minSamplesPerPixel;
     }
   }
 
@@ -1131,7 +1144,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._engine.removeTrack(trackId);
     }
     // Recompute zoom floor from remaining cached WaveformData scales
-    this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+    this._recomputeZoomFloor();
     this._disposeSpectrogramControllerIfEmpty();
     // `existed` gate: the MutationObserver fires this for never-registered
     // <daw-track> churn too (element added+removed before its deferred
@@ -1840,6 +1853,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // otherwise make _onClipConnected treat a load-in-progress track as
     // fully loaded (late-appended clips silently discarded on final commit).
     this._loadingTracks.add(trackId);
+    // Snapshot for the cancellation bail: this load's floor raises may
+    // re-clamp (coarsen) the live zoom; a cancelled load restores it.
+    const sppAtLoadStart = this._samplesPerPixel;
     try {
       const clips = [];
       for (const clipDesc of descriptor.clips) {
@@ -1932,7 +1948,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
               const nextEngine = new Map(this._engineTracks);
               nextEngine.delete(trackId);
               this._engineTracks = nextEngine;
-              this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+              this._recomputeZoomFloor();
               this._recomputeDuration();
               throw audioErr; // Propagate to outer catch for daw-track-error event
             }
@@ -1994,7 +2010,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           this._engineTracks = nextEngine;
           this._recomputeDuration();
         }
-        this._minSamplesPerPixel = this._peakPipeline.getMaxCachedScale(this._clipBuffers);
+        this._recomputeZoomFloor();
+        // Undo the coarsening this load's own floor re-clamp forced on the
+        // live zoom — the load that required it no longer exists. Restore
+        // only when the recomputed floor allows it.
+        if (
+          this._samplesPerPixel !== sppAtLoadStart &&
+          sppAtLoadStart >= this._minSamplesPerPixel
+        ) {
+          this.samplesPerPixel = sppAtLoadStart;
+        }
         throw new TrackLoadCancelledError(
           trackWasRemoved
             ? 'track "' + trackId + '" was removed while loading'

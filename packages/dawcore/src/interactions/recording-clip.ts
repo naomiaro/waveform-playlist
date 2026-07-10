@@ -23,6 +23,9 @@ export interface RecordingClipHost {
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
   _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
+  /** Raise the editor zoom floor (recording worker-caches peaks at the
+   * pipeline base scale like any other load — the floor must cover them). */
+  _raiseZoomFloor(scale: number): void;
   _peakPipeline: PeakPipeline;
   _engine: {
     setTracks(tracks: ClipTrack[]): void;
@@ -84,6 +87,10 @@ export function addRecordedClip(
         return;
       }
       host._peaksData = new Map(host._peaksData).set(clip.id, pd);
+      // Same floor policy as _finalizeAudioClip: the worker cached this
+      // buffer's WaveformData at the base scale — zooming finer than it
+      // would render the recorded waveform squeezed in its container.
+      host._raiseZoomFloor(host._peakPipeline.getCachedScale(trimmedBuf));
       host._engineTracks = new Map(host._engineTracks).set(trackId, {
         ...t,
         // Punch-in replace (#579): the recorded clip owns [startSample,

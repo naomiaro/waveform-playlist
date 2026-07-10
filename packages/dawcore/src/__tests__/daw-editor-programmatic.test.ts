@@ -1131,3 +1131,23 @@ describe('recording preview position parity (audit wave 5)', () => {
     editor.remove();
   });
 });
+
+describe('zoom floor recompute (audit wave 5 review)', () => {
+  it('a floor recompute on track removal re-clamps the live zoom', async () => {
+    const editor = setupEditor();
+    editor.samplesPerPixel = 64;
+    editor._peakPipeline.getMaxCachedScale = vi.fn().mockReturnValue(128);
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    const trackId = editor.tracks[0].trackId;
+
+    editor.removeTrack(trackId);
+    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+
+    // The recompute raised the floor above the live spp — without a
+    // re-clamp, layout stays at 64 while peaks clamp to 128: the exact
+    // half-width mismatch _raiseZoomFloor makes unrepresentable, reachable
+    // through the one floor-mutation path that bypassed it.
+    expect(editor.samplesPerPixel).toBe(128);
+    editor.remove();
+  });
+});
