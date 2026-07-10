@@ -38,7 +38,15 @@ export interface ParsedMidi {
 }
 
 export interface ParseMidiOptions {
-  /** When true, merges all MIDI tracks into a single ParsedMidiTrack */
+  /**
+   * When true, merges all note-bearing MIDI tracks into a single
+   * ParsedMidiTrack (notes sorted by time, per-note `channel` preserved for
+   * downstream routing). The result has at most one track — and ZERO tracks
+   * when the file has no note-bearing tracks, so don't index `tracks[0]`
+   * unconditionally. The merged track's track-level `channel`, `instrument`,
+   * and `programNumber` are taken from the first parsed track and are
+   * labeling metadata only — rely on each note's own `channel` for playback.
+   */
   flatten?: boolean;
 }
 
@@ -62,9 +70,20 @@ function mapNotes(track: Midi['tracks'][number]): MidiNoteData[] {
   }));
 }
 
-function getTrackDuration(notes: MidiNoteData[]): number {
-  if (notes.length === 0) return 0;
-  return Math.max(...notes.map((n) => n.time + n.duration));
+/**
+ * End time (seconds) of the last-ending note. Exported for direct unit
+ * testing (large-array regression); NOT part of the public API — do not
+ * re-export from index.ts.
+ */
+export function getTrackDuration(notes: MidiNoteData[]): number {
+  // No spread into Math.max — dense files (black MIDI, long captures) have
+  // enough notes to overflow the argument stack (RangeError at ~130k args).
+  let max = 0;
+  for (const n of notes) {
+    const end = n.time + n.duration;
+    if (end > max) max = end;
+  }
+  return max;
 }
 
 /**
@@ -74,7 +93,17 @@ function getTrackDuration(notes: MidiNoteData[]): number {
  * Notes are already in seconds (tempo-adjusted by @tonejs/midi).
  */
 export function parseMidiFile(data: ArrayBuffer, options: ParseMidiOptions = {}): ParsedMidi {
-  const midi = new Midi(data);
+  // @tonejs/midi throws raw internal errors ("Bad MIDI file. Expected
+  // 'MHdr'...") on invalid input; wrap so callers can tell WHICH boundary
+  // rejected the data. String concat, not Error.cause — target is ES2020.
+  let midi: Midi;
+  try {
+    midi = new Midi(data);
+  } catch (err) {
+    throw new Error(
+      'parseMidiFile: invalid or corrupt MIDI data (' + data.byteLength + ' bytes): ' + String(err)
+    );
+  }
 
   const bpm = midi.header.tempos.length > 0 ? midi.header.tempos[0].bpm : 120;
 
@@ -106,7 +135,7 @@ export function parseMidiFile(data: ArrayBuffer, options: ParseMidiOptions = {})
         duration: getTrackDuration(notes),
         channel: track.channel,
         instrument,
-        programNumber: track.instrument.number,
+        programNumber,
       };
     });
 
@@ -133,7 +162,7 @@ export function parseMidiFile(data: ArrayBuffer, options: ParseMidiOptions = {})
     };
   }
 
-  const duration = parsedTracks.length > 0 ? Math.max(...parsedTracks.map((t) => t.duration)) : 0;
+  const duration = parsedTracks.reduce((max, t) => (t.duration > max ? t.duration : max), 0);
 
   return {
     tracks: parsedTracks,
@@ -156,7 +185,12 @@ export async function parseMidiUrl(
 ): Promise<ParsedMidi> {
   const response = await fetch(url, { signal });
   if (!response.ok) {
-    throw new Error(`Failed to fetch MIDI file ${url}: ${response.statusText}`);
+    // statusText is frequently empty on HTTP/2 — always include the code.
+    throw new Error(
+      `Failed to fetch MIDI file ${url}: ${response.status}${
+        response.statusText ? ` ${response.statusText}` : ''
+      }`
+    );
   }
   const buffer = await response.arrayBuffer();
   return parseMidiFile(buffer, options);

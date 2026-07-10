@@ -36,7 +36,13 @@ function createTestMidiBuffer(
     }
   }
 
-  return midi.toArray().buffer;
+  // Copy into a fresh ArrayBuffer: .buffer on a Uint8Array is typed
+  // ArrayBufferLike (could be a SharedArrayBuffer), which TS rejects where
+  // ArrayBuffer is required.
+  const bytes = midi.toArray();
+  const buffer = new ArrayBuffer(bytes.length);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 // Mock fetch globally
