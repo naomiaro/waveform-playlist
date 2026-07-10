@@ -2598,15 +2598,36 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] seekTo: engine not ready, call ignored');
       return;
     }
+    if (!Number.isFinite(time)) {
+      // NaN would reach the adapter clock and wedge playback until a valid seek.
+      console.warn('[dawcore] seekTo: ignoring non-finite time ' + String(time));
+      return;
+    }
+    const target = Math.max(0, time);
     if (this._isPlaying) {
-      // Transport needs stop+play to reschedule audio sources at new position.
-      this._withSeekSuppression(() => this.stop());
-      this.play(time);
+      // Transport needs stop+play to reschedule audio sources at the new
+      // position — but via DIRECT engine calls (synchronous), not the public
+      // stop()/play(): those dispatch daw-stop/daw-play (spurious for a
+      // seek — consumers keyed on them misfire on every programmatic seek)
+      // and the async play() opens a window where a user pause is overridden
+      // by the deferred play. The engine is already initialized while
+      // playing. Mirrors the pointer-handler seek path.
+      this._withSeekSuppression(() => this._engine!.stop());
+      this._engine.play(target);
+      this._currentTime = target;
+      this._startPlayhead();
     } else {
-      this._engine.seek(time);
-      this._currentTime = time;
+      this._engine.seek(target);
+      this._currentTime = target;
       this._stopPlayhead();
     }
+    this.dispatchEvent(
+      new CustomEvent('daw-seek', {
+        bubbles: true,
+        composed: true,
+        detail: { time: target },
+      })
+    );
   }
 
   /** Undo the last structural edit. */

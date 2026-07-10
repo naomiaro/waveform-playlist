@@ -52,12 +52,45 @@ export class DawKeyboardShortcutsElement extends LitElement {
   @property({ type: Boolean }) undo = false;
 
   // --- JS properties for remapping ---
-  playbackShortcuts: PlaybackShortcutMap | null = null;
-  splittingShortcuts: SplittingShortcutMap | null = null;
-  undoShortcuts: UndoShortcutMap | null = null;
+  // Accessors, not plain fields: assigning a remap after any keydown has
+  // warmed _cachedShortcuts must invalidate it, or the documented remapping
+  // API is silently ignored until an unrelated boolean attribute toggles.
+  private _playbackShortcuts: PlaybackShortcutMap | null = null;
+  get playbackShortcuts(): PlaybackShortcutMap | null {
+    return this._playbackShortcuts;
+  }
+  set playbackShortcuts(value: PlaybackShortcutMap | null) {
+    this._playbackShortcuts = value;
+    this._cachedShortcuts = null;
+  }
+
+  private _splittingShortcuts: SplittingShortcutMap | null = null;
+  get splittingShortcuts(): SplittingShortcutMap | null {
+    return this._splittingShortcuts;
+  }
+  set splittingShortcuts(value: SplittingShortcutMap | null) {
+    this._splittingShortcuts = value;
+    this._cachedShortcuts = null;
+  }
+
+  private _undoShortcuts: UndoShortcutMap | null = null;
+  get undoShortcuts(): UndoShortcutMap | null {
+    return this._undoShortcuts;
+  }
+  set undoShortcuts(value: UndoShortcutMap | null) {
+    this._undoShortcuts = value;
+    this._cachedShortcuts = null;
+  }
 
   /** Additional custom shortcuts. */
-  customShortcuts: KeyboardShortcut[] = [];
+  private _customShortcuts: KeyboardShortcut[] = [];
+  get customShortcuts(): KeyboardShortcut[] {
+    return this._customShortcuts;
+  }
+  set customShortcuts(value: KeyboardShortcut[]) {
+    this._customShortcuts = value;
+    this._cachedShortcuts = null;
+  }
 
   private _editor: DawEditorElement | null = null;
   private _cachedShortcuts: KeyboardShortcut[] | null = null;

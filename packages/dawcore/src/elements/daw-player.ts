@@ -58,6 +58,9 @@ export class DawPlayerElement extends LitElement {
   private _playbackRate = 1;
 
   private _engine: MediaElementPlayout = new MediaElementPlayout();
+  /** Set by disconnectedCallback — a reconnect (DOM reparent, framework
+   * re-render) must rebuild the engine + track or the player is dead. */
+  private _engineDisposed = false;
   private _trackId: string | null = null;
   private _anim = new AnimationController(this);
   private _metadataLoaded = false;
@@ -84,6 +87,19 @@ export class DawPlayerElement extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    let rebuilt = false;
+    if (this._engineDisposed) {
+      // A removed player must not keep audio alive, so disconnect disposes
+      // the engine — but reparenting (appendChild of a connected element)
+      // disconnects and reconnects synchronously, and updated() only reloads
+      // on a src CHANGE. Rebuild here or the player never plays again.
+      const volume = this._engine.masterVolume;
+      this._engine = new MediaElementPlayout();
+      this._engine.setMasterVolume(volume);
+      this._engineDisposed = false;
+      this._trackId = null;
+      rebuilt = true;
+    }
     this._engine.on('loadedmetadata', this._onLoadedMetadata);
     this._engine.on('play', this._onPlay);
     this._engine.on('pause', this._onPause);
@@ -95,6 +111,9 @@ export class DawPlayerElement extends LitElement {
       const area = this.shadowRoot?.querySelector('.waveform-area');
       if (area) this._resizeObserver?.observe(area);
     });
+    if (rebuilt && this.src) {
+      this._loadSource();
+    }
   }
 
   render() {
@@ -164,6 +183,10 @@ export class DawPlayerElement extends LitElement {
       this._renderWaveform();
       this._maybeDispatchReady();
     } catch (err) {
+      // Same stale guard as the success path: a superseded load's late
+      // rejection must not settle readiness (daw-ready would fire while the
+      // NEWER peaks-src is still in flight) or clobber its waveform.
+      if (this.peaksSrc !== requested) return;
       console.warn('[dawcore] <daw-player> failed to load peaks-src: ' + String(err));
       // A failed waveform must not permanently block daw-ready — the player IS ready to play.
       this._peaksSettled = true;
@@ -231,6 +254,13 @@ export class DawPlayerElement extends LitElement {
   }
   seekTo(time: number): void {
     this._engine.seekTo(time);
+    if (!this._engine.isPlaying) {
+      // The rAF loop only runs while playing — without this, the playhead
+      // and daw-timeupdate consumers (<daw-time-display>) stay stale until
+      // the next play.
+      this._updatePlayhead();
+      this._dispatch('daw-timeupdate', { time: this._engine.getCurrentTime() });
+    }
   }
   setPlaybackRate(rate: number): void {
     this.playbackRate = rate; // setter clamps + requestUpdate triggers engine forward
@@ -271,8 +301,7 @@ export class DawPlayerElement extends LitElement {
     // covers the pre-metadata/NaN case — no separate NaN check needed.
     if (width <= 0 || d <= 0) return;
     const ratio = Math.max(0, Math.min(1, e.offsetX / width));
-    this.seekTo(ratio * d);
-    this._updatePlayhead();
+    this.seekTo(ratio * d); // seekTo updates the playhead when paused; rAF covers playing
   };
 
   disconnectedCallback(): void {
@@ -286,6 +315,7 @@ export class DawPlayerElement extends LitElement {
     this._engine.off('ended', this._onEnded);
     this._engine.off('error', this._onError);
     this._engine.dispose();
+    this._engineDisposed = true;
   }
 
   // --- Private event handlers (arrow fields for stable identity) ---

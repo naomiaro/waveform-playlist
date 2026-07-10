@@ -54,6 +54,7 @@ function stubAudioPipeline(editor: any) {
     stop: vi.fn(),
     seek: vi.fn(),
     getCurrentTime: vi.fn().mockReturnValue(0),
+    getAudibleTime: vi.fn().mockReturnValue(0),
     getState: vi.fn().mockReturnValue({ tracks: [] }),
   };
 }
@@ -998,6 +999,55 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
 
     expect(editor._engine.seek).not.toHaveBeenCalled();
     expect(editor._currentTime).toBe(30);
+    editor.remove();
+  });
+});
+
+describe('seekTo semantics (audit wave 4)', () => {
+  it('seekTo while playing dispatches daw-seek — not daw-stop/daw-play — and updates currentTime synchronously', () => {
+    const editor = setupEditor();
+    editor._isPlaying = true;
+    const events: string[] = [];
+    for (const t of ['daw-seek', 'daw-stop', 'daw-play']) {
+      editor.addEventListener(t, ((e: Event) => {
+        events.push(e.type);
+      }) as EventListener);
+    }
+
+    editor.seekTo(45);
+
+    // Consumers keyed on daw-stop (state persistence, transport UI) must not
+    // misfire on every programmatic seek; the pointer-handler seek path
+    // already has these semantics.
+    expect(events).toEqual(['daw-seek']);
+    expect(editor._engine.stop).toHaveBeenCalled();
+    expect(editor._engine.play).toHaveBeenCalledWith(45);
+    expect(editor._currentTime).toBe(45);
+    editor.remove();
+  });
+
+  it('seekTo while stopped dispatches daw-seek', () => {
+    const editor = setupEditor();
+    const events: string[] = [];
+    editor.addEventListener('daw-seek', ((e: Event) => {
+      events.push(e.type);
+    }) as EventListener);
+
+    editor.seekTo(10);
+
+    expect(editor._engine.seek).toHaveBeenCalledWith(10);
+    expect(events).toEqual(['daw-seek']);
+    editor.remove();
+  });
+
+  it('seekTo ignores non-finite and clamps negative times', () => {
+    const editor = setupEditor();
+    editor.seekTo(NaN);
+    expect(editor._engine.seek).not.toHaveBeenCalled();
+
+    editor.seekTo(-5);
+    expect(editor._engine.seek).toHaveBeenCalledWith(0);
+    expect(editor._currentTime).toBe(0);
     editor.remove();
   });
 });

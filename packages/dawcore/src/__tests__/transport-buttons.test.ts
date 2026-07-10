@@ -336,3 +336,60 @@ describe('Stop button', () => {
     cleanup(editor, transport);
   });
 });
+
+describe('late-upgrading target wiring (audit wave 4)', () => {
+  it('play button disables during recording even when the editor appears after the button', async () => {
+    // Buttons first — no editor exists yet, so the connect-time rAF resolves
+    // a null target (the exact scenario #573 fixed for the record button).
+    const transport = document.createElement('daw-transport') as any;
+    transport.setAttribute('for', 'late-editor');
+    document.body.appendChild(transport);
+    const playBtn = document.createElement('daw-play-button') as any;
+    transport.appendChild(playBtn);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const editor = document.createElement('div') as any;
+    editor.id = 'late-editor';
+    editor.play = vi.fn();
+    document.body.appendChild(editor);
+
+    // A render (pointerenter in real usage) must re-resolve the target
+    playBtn.requestUpdate();
+    await playBtn.updateComplete;
+
+    editor.dispatchEvent(new CustomEvent('daw-recording-start', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(playBtn.shadowRoot?.querySelector('button')?.disabled).toBe(true);
+    cleanup(editor, transport);
+  });
+
+  it('pause button routes to togglePauseRecording for a late-appearing editor', async () => {
+    const transport = document.createElement('daw-transport') as any;
+    transport.setAttribute('for', 'late-editor-2');
+    document.body.appendChild(transport);
+    const pauseBtn = document.createElement('daw-pause-button') as any;
+    transport.appendChild(pauseBtn);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const editor = document.createElement('div') as any;
+    editor.id = 'late-editor-2';
+    editor.pause = vi.fn();
+    editor.togglePauseRecording = vi.fn();
+    document.body.appendChild(editor);
+
+    pauseBtn.requestUpdate();
+    await pauseBtn.updateComplete;
+
+    editor.dispatchEvent(new CustomEvent('daw-recording-start', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    pauseBtn.shadowRoot?.querySelector('button')?.click();
+
+    // Mid-recording, Pause must pause the RECORDING — pausing only the
+    // transport leaves the worklet capturing.
+    expect(editor.togglePauseRecording).toHaveBeenCalled();
+    expect(editor.pause).not.toHaveBeenCalled();
+    cleanup(editor, transport);
+  });
+});
