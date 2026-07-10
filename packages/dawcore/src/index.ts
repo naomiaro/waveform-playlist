@@ -54,6 +54,7 @@ export type {
 } from './elements/daw-keyboard-shortcuts';
 
 export { AudioResumeController } from './controllers/audio-resume-controller';
+export { ANNOTATION_LANE_HEIGHT } from './controllers/annotation-controller';
 export { RecordingController } from './controllers/recording-controller';
 export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
 export { PlaybackAnimationController } from './controllers/playback-animation-controller';

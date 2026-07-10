@@ -50,6 +50,8 @@ import { ViewportController } from '../controllers/viewport-controller';
 import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { RecordingController } from '../controllers/recording-controller';
 import type { RecordingOptions } from '../controllers/recording-controller';
+import { AnnotationController, ANNOTATION_LANE_HEIGHT } from '../controllers/annotation-controller';
+import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import { SpectrogramController } from '../controllers/spectrogram-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import { ClipPointerHandler } from '../interactions/clip-pointer-handler';
@@ -697,6 +699,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
+  private _annotations = new AnnotationController(this);
   // Closures (not direct references) — _timeToPixels/_getPlayhead are
   // declared later in the class body; class-field init order would read
   // `undefined` for a direct reference here.
@@ -841,6 +844,56 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
         outline-offset: -2px;
       }
+      .annotation-lane {
+        position: relative;
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+        background: var(--daw-annotation-lane-background, rgba(0, 0, 0, 0.15));
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+      .annotation-lane-spacer {
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+      }
+      .annotation-box {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        border: 1px solid var(--daw-annotation-box-border, #c49a6c);
+        border-radius: 3px;
+        background: var(--daw-annotation-box-background, rgba(196, 154, 108, 0.2));
+        color: var(--daw-annotation-text-color, #e0d4c8);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .annotation-box.active {
+        background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.45));
+      }
+      .annotation-box-text {
+        padding: 0 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      }
+      .annotation-boundary {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        cursor: ew-resize;
+        flex-shrink: 0;
+      }
+      .annotation-boundary[data-edge='start'] {
+        left: 0;
+      }
+      .annotation-boundary[data-edge='end'] {
+        right: 0;
+      }
     `,
     clipStyles,
   ];
@@ -958,6 +1011,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
     this.addEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    this.addEventListener(
+      'daw-annotation-track-connected',
+      this._onAnnotationTrackConnected as EventListener
+    );
+    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     // Detect track + clip removal via MutationObserver (detached elements can't bubble events).
     this._childObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -996,6 +1054,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
     this.removeEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    this.removeEventListener(
+      'daw-annotation-track-connected',
+      this._onAnnotationTrackConnected as EventListener
+    );
+    this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -1132,6 +1195,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
     }
   }
+
+  // --- Annotation Events ---
+  private _onAnnotationTrackConnected = (e: CustomEvent<{ element: HTMLElement }>) => {
+    this._annotations.handleTrackConnected(e.detail.element as DawAnnotationTrackElement);
+  };
+  private _onAnnotationSelect = (e: CustomEvent<{ annotation: { start: number } | null }>) => {
+    const annotation = e.detail.annotation;
+    if (!annotation) return;
+    const scrollArea = this.shadowRoot?.querySelector('.scroll-area') as HTMLElement | null;
+    if (!scrollArea) return;
+    const px = Math.floor((annotation.start * this.effectiveSampleRate) / this._renderSpp);
+    scrollArea.scrollLeft = Math.max(0, px - scrollArea.clientWidth / 2);
+  };
 
   // --- Track Events ---
   private _onTrackConnected = (e: CustomEvent) => {
@@ -3179,6 +3255,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         ${showControls
           ? html`<div class="controls-viewport">
               <div class="controls-column">
+                ${this._annotations.tracks.map(
+                  () =>
+                    html`<div
+                      class="annotation-lane-spacer"
+                      style="height: ${ANNOTATION_LANE_HEIGHT}px;"
+                    ></div>`
+                )}
                 ${orderedTracks.map(
                   (t) => html`
                     <daw-track-controls
@@ -3205,9 +3288,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             @dragleave=${this._onDragLeave}
             @drop=${this._onDrop}
           >
+            ${this._annotations.renderLanes(spp, this.effectiveSampleRate)}
             ${this.scaleMode === 'beats'
               ? html`<daw-grid
-                  style="top: 0px;"
+                  style="top: ${this._annotations.totalLaneHeight}px;"
                   .ticksPerPixel=${this.ticksPerPixel}
                   .meterEntries=${this._meterEntries}
                   .ppqn=${this.ppqn}
