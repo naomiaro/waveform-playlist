@@ -152,6 +152,13 @@ export class PeakPipeline {
     };
   }
 
+  /** Scale of the cached WaveformData for this buffer — 0 when not cached.
+   *  Worker generation caches at baseScale; injected .dat data at its own
+   *  scale. This is the finest zoom the buffer's peaks can render at. */
+  getCachedScale(audioBuffer: AudioBuffer): number {
+    return this._cache.get(audioBuffer)?.scale ?? 0;
+  }
+
   /**
    * Return the coarsest (largest) scale among cached WaveformData entries
    * that correspond to the given clip buffers. Returns 0 if none are cached.

@@ -36,6 +36,7 @@ function setupEditor(): any {
     generatePeaks: vi.fn().mockResolvedValue({ data: [new Int16Array(0)], length: 0, bits: 16 }),
     cacheWaveformData: vi.fn(),
     getMaxCachedScale: vi.fn().mockReturnValue(0),
+    getCachedScale: vi.fn().mockReturnValue(0),
     reextractPeaks: vi.fn().mockReturnValue(new Map()),
     terminate: vi.fn(),
   };

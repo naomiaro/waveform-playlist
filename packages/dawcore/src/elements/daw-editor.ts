@@ -144,6 +144,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   private _samplesPerPixel = 1024;
 
+  /** Raise the zoom floor and re-clamp the LIVE samplesPerPixel when it's
+   * now below the floor. Peaks can only be extracted at >= the floor scale —
+   * the setter alone clamps only FUTURE sets, so without the re-clamp an
+   * already-finer spp keeps sizing clip containers while the waveforms
+   * render at the coarser scale: half/quarter width, misaligned against the
+   * ruler and playhead. */
+  private _raiseZoomFloor(scale: number): void {
+    if (!Number.isFinite(scale) || scale <= 0) return;
+    if (scale > this._minSamplesPerPixel) {
+      this._minSamplesPerPixel = scale;
+    }
+    if (this._samplesPerPixel < this._minSamplesPerPixel) {
+      this.samplesPerPixel = this._minSamplesPerPixel; // setter warns + requestUpdate
+    }
+  }
+
   private _timeFormat: TimeDisplayFormat = 'hh:mm:ss.sss';
 
   /**
@@ -1530,9 +1546,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Raise the zoom-floor only after generatePeaks succeeds — without this,
     // a generatePeaks failure would strand _minSamplesPerPixel at a value
     // backed by no actual peaks (CLAUDE.md `samplesPerPixel` Zoom Floor rule).
-    if (waveformData) {
-      this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
-    }
+    // Worker-generated peaks count too (cached at the pipeline base scale):
+    // extractPeaks clamps to the cached scale, so a floor that ignores them
+    // lets the zoom go finer than the peaks can render — squeezed waveforms.
+    const cachedScale = waveformData?.scale ?? this._peakPipeline.getCachedScale(audioBuffer);
+    this._raiseZoomFloor(cachedScale);
     return clip;
   }
   /**
@@ -1879,7 +1897,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
               durationSamples: clip.durationSamples,
             });
             this._peaksData = new Map(this._peaksData).set(clip.id, peakData);
-            this._minSamplesPerPixel = Math.max(this._minSamplesPerPixel, waveformData.scale);
+            this._raiseZoomFloor(waveformData.scale);
 
             // Render preview track immediately with peaks (render-only until audio
             // completes and engine.setTracks() runs at end of _loadTrack).
@@ -2808,6 +2826,29 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     await this._recordingController.startRecording(s, options);
   }
 
+  /** Live-recording preview left/width. Beats mode uses the same tick-space
+   * math as finalized clips — the sample÷renderSpp path is ceil-quantized,
+   * so the take would visibly jump sideways on finalization (drift grows
+   * with distance from t=0; CLAUDE.md live-preview parity invariant). */
+  private _previewPosition(
+    startSample: number,
+    audibleSamples: number
+  ): { left: number; width: number } {
+    if (this.scaleMode === 'beats') {
+      const sr = this.effectiveSampleRate;
+      const startSec = startSample / sr;
+      const startTick = this._secondsToTicks(startSec);
+      const endTick = this._secondsToTicks(startSec + audibleSamples / sr);
+      const left = Math.round(startTick / this.ticksPerPixel);
+      return { left, width: Math.round(endTick / this.ticksPerPixel) - left };
+    }
+    const renderSpp = this._renderSpp;
+    return {
+      left: Math.floor(startSample / renderSpp),
+      width: Math.floor(audibleSamples / renderSpp),
+    };
+  }
+
   private _renderRecordingPreview(trackId: string, chH: number) {
     const rs = this._recordingController.getSession(trackId);
     if (!rs) return '';
@@ -2817,8 +2858,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (audibleSamples === 0) return '';
     const renderSpp = this._renderSpp;
     const latencyPixels = Math.floor(rs.latencySamples / renderSpp);
-    const left = Math.floor(rs.startSample / renderSpp);
-    const w = Math.floor(audibleSamples / renderSpp);
+    const { left, width: w } = this._previewPosition(rs.startSample, audibleSamples);
     // Same container + header chrome as finalized clips so the take reads as
     // a clip WHILE it's being captured, and the waveforms sit at the same
     // vertical offset they'll have after finalization. The container's width
