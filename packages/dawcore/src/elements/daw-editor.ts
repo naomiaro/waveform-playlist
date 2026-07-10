@@ -1001,11 +1001,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._minSamplesPerPixel = 0;
     this._spectrogramController?.dispose();
     this._spectrogramController = null;
+    this._lastSpectrogramViewport = null;
     try {
       this._disposeEngine();
     } catch (err) {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
+    // Symmetric teardown: the caches above are gone and the engine (and the
+    // consumer's adapter through it) disposed — retaining the render state
+    // would make a reconnected editor show ghost waveforms that can never
+    // play. Element-backed tracks re-register on reconnect via their own
+    // deferred connect events (failing LOUDLY via daw-track-error if the
+    // disposed adapter can't decode); element-less (dropped/programmatic)
+    // content does not survive a reparent.
+    this._tracks = new Map();
+    this._engineTracks = new Map();
+    this._peaksData = new Map();
+    this._loadingTracks.clear();
+    this._recomputeDuration();
   }
   willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has('eagerResume')) {
@@ -1025,13 +1038,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // For worker-generated peaks, baseScale (128) is finest; for pre-computed .dat
     // peaks (only cached when rates match), the file's scale is the limit.
     // In beats mode, _renderSpp changes when ticksPerPixel or bpm changes.
-    const zoomChanged =
+    // `mono` changes the derived peak data too (per-channel vs merged) —
+    // without it here, toggling mono keeps the stale channel layout until
+    // the next zoom change, then snaps mid-session.
+    const peaksInputChanged =
       changedProperties.has('samplesPerPixel') ||
       changedProperties.has('ticksPerPixel') ||
       changedProperties.has('bpm') ||
       changedProperties.has('scaleMode') ||
-      changedProperties.has('secondsToTicks');
-    if (zoomChanged && this._clipBuffers.size > 0) {
+      changedProperties.has('secondsToTicks') ||
+      changedProperties.has('mono');
+    if (peaksInputChanged && this._clipBuffers.size > 0) {
       const re = this._peakPipeline.reextractPeaks(
         this._clipBuffers,
         this._renderSpp,
@@ -1237,6 +1254,37 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (!stillNeeded) {
       this._spectrogramController.dispose();
       this._spectrogramController = null;
+      // A recreated controller diffs new viewports against this cache — a
+      // stale entry suppresses the fresh orchestrator's initial setViewport
+      // and every canvas stays black until a >=100px scroll or zoom change.
+      this._lastSpectrogramViewport = null;
+    }
+  }
+
+  /** Synthesize `_tracks` descriptors for engine tracks that have none —
+   * engine.undo() restores removed tracks in ENGINE state only, and without
+   * a descriptor the track plays and renders but shows "Untitled" controls
+   * and is missing from `editor.tracks` (per-track APIs unaddressable). */
+  _ensureDescriptorsForEngineTracks(tracks: ClipTrack[]): void {
+    let next: Map<string, TrackDescriptor> | null = null;
+    for (const track of tracks) {
+      if (this._tracks.has(track.id)) continue;
+      next ??= new Map(this._tracks);
+      next.set(track.id, {
+        name: track.name ?? '',
+        src: '',
+        volume: track.volume ?? 1,
+        pan: track.pan ?? 0,
+        muted: track.muted ?? false,
+        soloed: track.soloed ?? false,
+        renderMode: track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0)
+          ? 'piano-roll'
+          : 'waveform',
+        clips: [],
+      });
+    }
+    if (next) {
+      this._tracks = next;
     }
   }
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
@@ -2202,6 +2250,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
+        // Undo can resurrect a track whose editor descriptor was purged at
+        // removal — synthesize one so the track shows real name/controls
+        // and appears in editor.tracks (the effects chain does not survive;
+        // it was disposed at removal).
+        this._ensureDescriptorsForEngineTracks(engineState.tracks);
       }
       // Sync clip positions when tracks change structurally (moveClip, trimClip,
       // splitClip, setTracks, addTrack, removeTrack).

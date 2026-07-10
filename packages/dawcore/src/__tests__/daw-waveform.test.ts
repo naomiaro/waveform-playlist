@@ -260,3 +260,46 @@ describe('DawWaveformElement', () => {
     document.body.removeChild(el);
   });
 });
+
+describe('chunk-boundary bars (audit wave 6)', () => {
+  it('draws the straddling bar on the NEXT chunk canvas too (no gap at the 1000px boundary)', async () => {
+    const el = document.createElement('daw-waveform') as any;
+    el.length = 2000;
+    el.barWidth = 2;
+    el.barGap = 1; // step 3 → the bar at global 999 covers 999–1000
+    el.visibleStart = 0;
+    el.visibleEnd = 2000;
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 50));
+
+    const canvases = [...el.shadowRoot.querySelectorAll('canvas')];
+    expect(canvases.length).toBe(2);
+    const ctxs = canvases.map((c: HTMLCanvasElement) => {
+      const mockCtx = {
+        clearRect: vi.fn(),
+        resetTransform: vi.fn(),
+        scale: vi.fn(),
+        fillRect: vi.fn(),
+        fillStyle: '',
+      };
+      vi.spyOn(c, 'getContext').mockReturnValue(mockCtx as any);
+      return mockCtx;
+    });
+
+    const peaks = new Int16Array(4000);
+    for (let i = 0; i < peaks.length; i += 2) {
+      peaks[i] = -100;
+      peaks[i + 1] = 100;
+    }
+    el.peaks = peaks;
+    flushRaf();
+
+    // The straddling bar's second pixel lives at chunk 1's local x=0; chunk
+    // 0's canvas clips it, so chunk 1 must draw the bar at local x=-1 or a
+    // 1px gap appears at every chunk boundary.
+    const chunk1BarXs = ctxs[1].fillRect.mock.calls.map((call: number[]) => call[0]);
+    expect(chunk1BarXs).toContain(-1);
+
+    document.body.removeChild(el);
+  });
+});

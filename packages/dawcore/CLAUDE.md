@@ -48,7 +48,7 @@
 
 **Visual elements (Shadow DOM):**
 
-- `<daw-waveform>` — Chunked canvas rendering (1000px chunks). Receives peaks as JS properties. Uses dirty pixel tracking for incremental rendering — `updatePeaks(startIndex, endIndex)` marks a range dirty without full redraw. Bits derived from typed array (Int8Array→8, Int16Array→16). Drawing batched via `requestAnimationFrame`.
+- `<daw-waveform>` — Chunked canvas rendering (1000px chunks; bars straddling a chunk boundary are marked dirty on BOTH chunks and drawn by the next chunk at a negative local x — `barWidth+barGap` rarely divides 1000). Receives peaks as JS properties. Uses dirty pixel tracking for incremental rendering — `updatePeaks(startIndex, endIndex)` marks a range dirty without full redraw. Bits derived from typed array (Int8Array→8, Int16Array→16). Drawing batched via `requestAnimationFrame`.
 - `<daw-playhead>` — Pure visual element; exposes `setPosition(px)`. The editor's `PlaybackAnimationController` drives it each frame (single RAF loop that also dispatches `daw-timeupdate`).
 - `<daw-ruler>` — Temporal time scale with tick marks. Ported from `SmartScale` (temporal mode only, beats & bars deferred). Computes ticks once in `willUpdate()`, reused by both `render()` and `updated()`.
 
@@ -122,6 +122,8 @@
 
 ## Key Patterns
 
+- **Reparenting `<daw-editor>` is a teardown + fresh start** — `disconnectedCallback` disposes the engine (and the consumer's adapter through it) and clears ALL track/render state symmetrically. On reconnect, element-backed `<daw-track>`s re-register and reload (failing loudly via `daw-track-error` when the disposed adapter can't decode — set a fresh `editor.adapter` before/after moving the element); element-less (file-dropped / programmatic) content does NOT survive a reparent.
+- **Undo-restored tracks get synthesized descriptors** — `engine.undo()` restores removed tracks in ENGINE state only; the statechange handler synthesizes a `_tracks` descriptor (name/volume/pan/mute/solo from the engine track, `renderMode` inferred from midiNotes) so `editor.tracks` and `<daw-track-controls>` work. The effects chain does NOT survive (disposed at removal).
 - **Event-driven track loading** — `<daw-track>` dispatches `daw-track-connected` (bubbling, composed); `<daw-editor>` listens and loads audio for that track individually. Track removal uses MutationObserver (events from `disconnectedCallback` can't bubble since element is already detached).
 - **Eager audio decode** — Audio fetches and decodes on track connect using `this.audioContext.decodeAudioData()` (works while suspended, pre-gesture). Waveforms render immediately without waiting for play.
 - **Engine built lazily on first track load** — `PlaylistEngine` + `NativePlayoutAdapter` created when the first `_loadTrack` resolves (uses correct `sampleRate` from decoded audio). `engine.setTracks()` called as tracks load. `engine.init()` deferred to first `play()` (resumes AudioContext, requires user gesture).
