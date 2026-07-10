@@ -245,8 +245,29 @@ export class DawAnnotationTrackElement extends LitElement {
     if (match.action === 'playActive' && !hasSelection) return;
 
     e.preventDefault();
-    e.stopPropagation();
-    this._runShortcutAction(match.action);
+    // stopImmediatePropagation (not stopPropagation): multiple
+    // <daw-annotation-track keyboard-controls> elements each register their
+    // own capture listener on `document`, and stopPropagation does NOT stop
+    // sibling listeners on the same node — only stopImmediatePropagation
+    // does (it also implies stopPropagation). Without it, one keypress would
+    // act on every annotation track at once. This makes a consumed key act
+    // on exactly the first-registered track (DOM order) and also prevents
+    // bubble-phase editor shortcuts from firing. Unconsumed keys (Escape
+    // with no selection, gated boundary keys) still fall through everywhere
+    // via the early returns above.
+    e.stopImmediatePropagation();
+    try {
+      this._runShortcutAction(match.action);
+    } catch (err) {
+      console.warn('[dawcore] Annotation shortcut failed (key=' + e.key + '): ' + String(err));
+      this.dispatchEvent(
+        new CustomEvent('daw-error', {
+          bubbles: true,
+          composed: true,
+          detail: { operation: 'annotation-shortcut', key: e.key, error: err },
+        })
+      );
+    }
   };
 
   private _runShortcutAction(action: AnnotationShortcutAction): void {

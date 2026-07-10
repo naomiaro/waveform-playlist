@@ -118,4 +118,41 @@ describe('<daw-annotation-track> keyboard controls', () => {
     document.body.dispatchEvent(key('ArrowDown'));
     expect(track.activeAnnotationId).toBe('a');
   });
+
+  it('a throwing shortcut action is caught, warned, and reported via daw-error', () => {
+    track.activeAnnotationId = 'a';
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.fn();
+    document.addEventListener('daw-error', errorSpy);
+    track.selectNext = () => {
+      throw new Error('boom');
+    };
+    expect(() => document.body.dispatchEvent(key('ArrowDown'))).not.toThrow();
+    expect(warnSpy).toHaveBeenCalled();
+    expect(warnSpy.mock.calls[0][0]).toContain('Annotation shortcut failed');
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const detail = (errorSpy.mock.calls[0][0] as CustomEvent).detail;
+    expect(detail.operation).toBe('annotation-shortcut');
+    expect(detail.key).toBe('ArrowDown');
+    expect(detail.error).toBeInstanceOf(Error);
+    document.removeEventListener('daw-error', errorSpy);
+    warnSpy.mockRestore();
+  });
+
+  it('multi-track determinism: a consumed key acts on exactly the first-registered track', async () => {
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.keyboardControls = true;
+    track2.innerHTML =
+      '<daw-annotation id="c" start="0" end="2">C</daw-annotation>' +
+      '<daw-annotation id="d" start="2" end="4">D</daw-annotation>';
+    document.body.appendChild(track2);
+    await flush();
+
+    document.body.dispatchEvent(key('ArrowDown'));
+
+    expect(track.activeAnnotationId).toBe('a');
+    expect(track2.activeAnnotationId).toBeNull();
+
+    track2.remove();
+  });
 });
