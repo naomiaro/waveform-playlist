@@ -182,6 +182,10 @@ export interface PeaksWorkerApi {
     bits: 8 | 16;
     splitChannels: boolean;
   }): Promise<WaveformData>;
+  /** True once the worker has crashed (onerror) or been terminated — every
+   * generate() will reject. Callers should discard this instance and create
+   * a fresh worker. */
+  isTerminated(): boolean;
   terminate(): void;
 }
 
@@ -206,6 +210,12 @@ export function createPeaksWorker(): PeaksWorkerApi {
     return {
       generate() {
         return Promise.reject(new Error('Worker creation failed'));
+      },
+      // Reports NOT terminated: CSP blocking is permanent for the page, so
+      // recreating on every call would just re-attempt (and re-warn about)
+      // Worker construction each time.
+      isTerminated() {
+        return false;
       },
       terminate() {
         /* no-op */
@@ -244,6 +254,10 @@ export function createPeaksWorker(): PeaksWorkerApi {
   };
 
   return {
+    isTerminated() {
+      return terminated;
+    },
+
     generate(params) {
       if (terminated) return Promise.reject(new Error('Worker terminated'));
       const messageId = String(++idCounter);
