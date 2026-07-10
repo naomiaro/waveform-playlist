@@ -180,6 +180,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Example: dawcore-tone**: `pnpm example:dawcore-tone` — Vite dev server at localhost:5174 (same fallback behavior — log shows the actual port)
 - **Example: dawcore-wam**: `pnpm example:dawcore-wam` — Vite dev server at localhost:5175. WAM plugins load from webaudiomodules.com (network required)
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
+- **vitest `-t` is a REGEX, not a substring** — `-t 'play() after'` matches nothing (the `()` is an empty group). Filter on a paren-free fragment of the test name.
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
 - **Vitest cleanup:** `npx vitest run` in pnpm monorepos can leave orphaned Node processes at ~100% CPU. After running tests across multiple packages, verify with `pgrep -f vitest` and kill strays with `pkill -f vitest` if needed.
 - **Stray NUL byte in a source file = silent `Bin` diff** — a 0x00 that sneaks into a `.ts` file (e.g. from a tool edit) makes `git diff --stat` report the file as binary while tsc, prettier, AND vitest all pass silently. Detect with `perl -ne 'print "line $.\n" if /\x00/' <file>` — bash `$'\x00'` CANNOT pass a NUL to grep (it degrades to `grep ""`, matching every line). Fix with `perl -i -pe 's/\x00/ /'`.
@@ -188,6 +189,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **CI Validation:** `.github/workflows/ci.yml` runs on PRs to `main`: build and lint (includes prettier check). Fix formatting with `pnpm format` before pushing.
 
 **GitHub closing keywords don't distribute over comma lists** — `fixes #589, #590, #593` in a squash-merge commit closes ONLY #589; each reference needs its own keyword (`fixes #589, fixes #590, fixes #593`). A `closes #N` in the PR body works independently. After merging a multi-issue PR, verify each issue actually closed (`gh issue view N --json state`).
+
+**Commit messages with backticks:** never inline them in a double-quoted `git commit -m "…"` — the shell command-substitutes them (one release-arc commit shipped with a word silently deleted). Use `git commit -F - << 'EOF'` (quoted delimiter).
 
 **GitHub Release Notes:** use `gh release create --notes-file <path>` (or `gh release edit --notes-file <path>`), NOT `--notes "$(cat <<'EOF')"`. Shell escapes in HEREDOCs mangle inline backticks and quotes inside code spans, leaving visible `\"` and `` \` `` in the rendered release body.
 
