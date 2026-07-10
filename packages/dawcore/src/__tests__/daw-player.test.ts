@@ -123,6 +123,35 @@ describe('DawPlayerElement — playback wiring', () => {
     expect(el.audioElement!.currentTime).toBe(0);
   });
 
+  it('play() after pause resumes from the paused position, not 0', async () => {
+    const el = loaded();
+    await el.updateComplete;
+    el.play();
+    el.audioElement!.currentTime = 30; // simulate playback progress
+    el.pause();
+    el.play();
+    expect(el.isPlaying).toBe(true);
+    expect(el.audioElement!.currentTime).toBe(30);
+  });
+
+  it('play() after a paused seek starts from the seeked position', async () => {
+    const el = loaded();
+    await el.updateComplete;
+    el.seekTo(45);
+    el.play();
+    expect(el.audioElement!.currentTime).toBe(45);
+  });
+
+  it('play() after stop() starts from 0', async () => {
+    const el = loaded();
+    await el.updateComplete;
+    el.play();
+    el.audioElement!.currentTime = 30;
+    el.stop();
+    el.play();
+    expect(el.audioElement!.currentTime).toBe(0);
+  });
+
   it('seekTo() and currentTime setter move the element', async () => {
     const el = loaded();
     await el.updateComplete;

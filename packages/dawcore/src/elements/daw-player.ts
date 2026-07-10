@@ -215,7 +215,10 @@ export class DawPlayerElement extends LitElement {
 
   // --- Transport methods ---
   play(): void {
-    this._engine.play();
+    // resume() keeps the current position (pause→play, paused seek→play);
+    // play() with no offset would reset to 0. After stop() the element's
+    // currentTime is already 0, so play-after-stop still starts at the top.
+    this._engine.resume();
   }
   pause(): void {
     this._engine.pause();

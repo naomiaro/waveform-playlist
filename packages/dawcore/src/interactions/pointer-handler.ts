@@ -33,6 +33,7 @@ export interface PointerHandlerHost {
     tryHandle(target: Element, e: PointerEvent): boolean;
     onPointerMove(e: PointerEvent): void;
     onPointerUp(e: PointerEvent): void;
+    onPointerCancel(e: PointerEvent): void;
     isActive: boolean;
   } | null;
   readonly scaleMode: 'temporal' | 'beats';
@@ -53,6 +54,14 @@ export class PointerHandler {
   private _timeline: HTMLElement | null = null;
   // Cached from onPointerDown to avoid forced layout reflows at 60fps during drag
   private _timelineRect: DOMRect | null = null;
+  /** Pointer that started the current interaction — a pointercancel from any
+   * OTHER pointer (palm rejection on touch) must not kill the active drag. */
+  private _activePointerId: number | null = null;
+  // Selection values at pointerdown — restored on cancel so an interrupted
+  // drag doesn't destroy a previously committed selection (which the engine
+  // still holds; zeroing only the host would desync the two).
+  private _preDragSelectionStart = 0;
+  private _preDragSelectionEnd = 0;
 
   constructor(host: PointerHandlerHost) {
     this._host = host;
@@ -105,12 +114,12 @@ export class PointerHandler {
             console.warn('[dawcore] setPointerCapture failed: ' + String(err));
           }
           const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
-          const onUp = (ue: Event) => {
-            clipHandler.onPointerUp(ue as PointerEvent);
+          const detach = (pe: PointerEvent) => {
             this._timeline?.removeEventListener('pointermove', onMove);
             this._timeline?.removeEventListener('pointerup', onUp);
+            this._timeline?.removeEventListener('pointercancel', onCancel);
             try {
-              this._timeline?.releasePointerCapture((ue as PointerEvent).pointerId);
+              this._timeline?.releasePointerCapture(pe.pointerId);
             } catch (err) {
               console.warn(
                 '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
@@ -118,8 +127,24 @@ export class PointerHandler {
             }
             this._timeline = null;
           };
+          const onUp = (ue: Event) => {
+            clipHandler.onPointerUp(ue as PointerEvent);
+            detach(ue as PointerEvent);
+          };
+          // pointercancel fires INSTEAD of pointerup on touch interruption /
+          // pen leaving range / OS gestures — the clip drag must be reverted
+          // or it stays armed and its transaction stays open. Only the
+          // initiating pointer's cancel counts (palm rejection cancels the
+          // palm's pointer, not the drag).
+          const downPointerId = e.pointerId;
+          const onCancel = (ce: Event) => {
+            if ((ce as PointerEvent).pointerId !== downPointerId) return;
+            clipHandler.onPointerCancel(ce as PointerEvent);
+            detach(ce as PointerEvent);
+          };
           this._timeline.addEventListener('pointermove', onMove);
           this._timeline.addEventListener('pointerup', onUp);
+          this._timeline.addEventListener('pointercancel', onCancel);
         }
         return;
       }
@@ -136,6 +161,9 @@ export class PointerHandler {
     this._timelineRect = this._timeline.getBoundingClientRect();
     this._dragStartPx = this._pxFromPointer(e);
     this._isDragging = false;
+    this._activePointerId = e.pointerId;
+    this._preDragSelectionStart = this._host._selectionStartTime;
+    this._preDragSelectionEnd = this._host._selectionEndTime;
 
     try {
       this._timeline.setPointerCapture(e.pointerId);
@@ -144,6 +172,7 @@ export class PointerHandler {
     }
     this._timeline.addEventListener('pointermove', this._onPointerMove);
     this._timeline.addEventListener('pointerup', this._onPointerUp);
+    this._timeline.addEventListener('pointercancel', this._onPointerCancel);
   };
 
   private _onPointerMove = (e: PointerEvent) => {
@@ -175,9 +204,11 @@ export class PointerHandler {
     }
   };
 
-  private _onPointerUp = (e: PointerEvent) => {
+  /** Detach the drag listeners and release capture — shared by the up and
+   * cancel terminals so a new listener added to onPointerDown can't be
+   * missed on one of them. */
+  private _detachTimeline(e: PointerEvent) {
     if (!this._timeline) return;
-
     try {
       this._timeline.releasePointerCapture(e.pointerId);
     } catch (err) {
@@ -187,6 +218,20 @@ export class PointerHandler {
     }
     this._timeline.removeEventListener('pointermove', this._onPointerMove);
     this._timeline.removeEventListener('pointerup', this._onPointerUp);
+    this._timeline.removeEventListener('pointercancel', this._onPointerCancel);
+  }
+
+  private _resetInteractionState() {
+    this._isDragging = false;
+    this._timeline = null;
+    this._timelineRect = null;
+    this._activePointerId = null;
+  }
+
+  private _onPointerUp = (e: PointerEvent) => {
+    if (!this._timeline) return;
+
+    this._detachTimeline(e);
 
     try {
       if (this._isDragging) {
@@ -197,10 +242,40 @@ export class PointerHandler {
     } catch (err) {
       console.warn('[dawcore] Pointer interaction failed: ' + String(err));
     } finally {
-      this._isDragging = false;
-      this._timeline = null;
-      this._timelineRect = null;
+      this._resetInteractionState();
     }
+  };
+
+  /** pointercancel fires INSTEAD of pointerup on touch interruption / pen
+   * leaving range / OS gestures — discard the interaction (no seek, no
+   * selection finalize) and detach the drag listeners, or the still-attached
+   * move handler keeps mutating the selection on hover with a stale rect. */
+  private _onPointerCancel = (e: PointerEvent) => {
+    if (!this._timeline) return;
+    // Only the initiating pointer's cancel ends the interaction — a palm
+    // touch that the OS rejects fires pointercancel for the PALM's pointer.
+    if (e.pointerId !== this._activePointerId) return;
+
+    this._detachTimeline(e);
+
+    if (this._isDragging) {
+      // Cancel = as if the drag never happened: restore the pre-drag
+      // selection (the engine still holds it — zeroing only the host would
+      // desync the two and destroy a committed selection).
+      const h = this._host;
+      h._selectionStartTime = this._preDragSelectionStart;
+      h._selectionEndTime = this._preDragSelectionEnd;
+      const sel = h.shadowRoot?.querySelector('daw-selection') as
+        | { startPx: number; endPx: number }
+        | undefined;
+      if (sel) {
+        sel.startPx = this._timeToPx(this._preDragSelectionStart);
+        sel.endPx = this._timeToPx(this._preDragSelectionEnd);
+      }
+      h.requestUpdate();
+    }
+
+    this._resetInteractionState();
   };
 
   private _finalizeSelection() {

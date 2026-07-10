@@ -411,6 +411,27 @@ export class ClipPointerHandler {
     }
   }
 
+  /** Processes pointercancel — reverts the in-progress drag.
+   *
+   * pointercancel fires INSTEAD of pointerup on touch interruption, pen
+   * leaving hover range, or OS gestures. Without this handler the drag stays
+   * armed (hover keeps moving the clip), the engine transaction stays open
+   * (every later edit becomes un-undoable until some drag commits), and the
+   * per-frame skipAdapter moveClip mutations are never synced or rolled back
+   * (waveform and audio permanently disagree). */
+  onPointerCancel(_e: PointerEvent): void {
+    if (this._mode === null) return;
+    try {
+      // Undo the trim CSS preview; move mutations are rolled back by
+      // abortTransaction below (restores the pre-drag snapshot and rebuilds
+      // the adapter when mutations occurred).
+      this._restoreTrimVisual();
+    } finally {
+      this._host.engine?.abortTransaction();
+      this._reset();
+    }
+  }
+
   /** Re-extract peaks from cache and set on waveform elements during trim drag.
    *  Returns true if peaks were successfully updated. */
   private _updateWaveformPeaks(offsetSamples: number, durationSamples: number): boolean {
@@ -430,7 +451,11 @@ export class ClipPointerHandler {
     return true;
   }
 
-  /** Restore clip container CSS to original values after trim visual preview. */
+  /** Restore clip container CSS AND waveform peaks to original values after
+   * a trim visual preview. Peaks matter: the drag wrote re-extracted peak
+   * arrays imperatively onto the <daw-waveform> elements (bypassing Lit), and
+   * a cancelled/zero-delta trim makes no engine mutation — so no statechange
+   * re-render will ever repair them. */
   private _restoreTrimVisual(): void {
     if (this._clipContainer) {
       this._clipContainer.style.left = this._originalLeft + 'px';
@@ -440,6 +465,9 @@ export class ClipPointerHandler {
       for (const wf of waveforms) {
         (wf as HTMLElement).style.left = '0px';
       }
+      // Re-extract at the original bounds (no-op when the peak cache is
+      // unavailable — in that case the drag never overwrote peaks either).
+      this._updateWaveformPeaks(this._originalOffsetSamples, this._originalDurationSamples);
     }
   }
 
