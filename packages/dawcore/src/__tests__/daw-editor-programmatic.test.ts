@@ -814,21 +814,78 @@ describe('load races (audit wave 2)', () => {
     // Element removal is observed via MutationObserver (async)
     await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
 
+    const errorEvents: CustomEvent[] = [];
+    editor.addEventListener('daw-track-error', (e: Event) => errorEvents.push(e as CustomEvent));
+    editor._peakPipeline.getMaxCachedScale.mockClear();
     releaseDecode(makeAudioBuffer());
 
-    // The addTrack promise must settle (rejected — the track was removed)
-    const outcome = await Promise.race([
+    // The addTrack promise must settle (rejected — the track was removed),
+    // and the rejection must be discriminable from a real load failure so
+    // consumer error UIs can filter intentional removals.
+    const err = await Promise.race([
       promise.then(
-        () => 'resolved',
-        () => 'rejected'
+        () => new Error('unexpectedly resolved'),
+        (e: Error) => e
       ),
-      new Promise((r) => setTimeout(() => r('hung'), 500)),
+      new Promise<Error>((r) => setTimeout(() => r(new Error('hung')), 500)),
     ]);
-    expect(outcome).toBe('rejected');
+    expect(err.name).toBe('TrackLoadCancelledError');
+    expect(errorEvents[0]?.detail.reason).toBe('removed');
 
-    // ...and the removed track must NOT reappear in engine/UI state
+    // ...the removed track must NOT reappear in engine/UI state, and the
+    // zoom floor raised during the load must be recomputed away
     expect(editor._engineTracks.has(trackId)).toBe(false);
     expect(editor.tracks.find((t: any) => t.trackId === trackId)).toBeUndefined();
+    expect(editor._peakPipeline.getMaxCachedScale).toHaveBeenCalled();
+    editor.remove();
+  });
+
+  it('a load that completes after the editor was detached is cancelled, not committed to a dead engine', async () => {
+    const editor = setupEditor();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+
+    const promise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+
+    const engineStub = editor._engine; // disconnectedCallback nulls the field
+    editor.remove(); // detach — disconnectedCallback disposed the engine
+    releaseDecode(makeAudioBuffer()); // decode SUCCEEDS on the dead editor
+
+    const err = await Promise.race([
+      promise.then(
+        () => new Error('unexpectedly resolved'),
+        (e: Error) => e
+      ),
+      new Promise<Error>((r) => setTimeout(() => r(new Error('hung')), 500)),
+    ]);
+    // Committing would rebuild an engine (and adapter graph) on a detached
+    // element that nothing will ever dispose.
+    expect(err.name).toBe('TrackLoadCancelledError');
+    expect(engineStub.setTracks).not.toHaveBeenCalled();
+  });
+
+  it('a clip connect event arriving before its parent registers a descriptor is silently skipped', () => {
+    const editor = setupEditor();
+    // The clip's deferred connect can fire before the parent track's own
+    // deferred connect registers the descriptor — this must NOT dispatch a
+    // daw-clip-error (the descriptor read will capture the clip right after).
+    const trackEl = document.createElement('daw-track') as any;
+    const clipEl = document.createElement('daw-clip') as any;
+    trackEl.appendChild(clipEl);
+    trackEl.trackId = 'not-yet-registered';
+
+    const errorEvents: CustomEvent[] = [];
+    editor.addEventListener('daw-clip-error', (e: Event) => errorEvents.push(e as CustomEvent));
+
+    editor._onClipConnected({ detail: { clipId: clipEl.clipId, element: clipEl } } as CustomEvent);
+
+    expect(errorEvents.length).toBe(0);
     editor.remove();
   });
 
@@ -915,12 +972,32 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
     const trackId = editor.tracks[0].trackId;
     editor._isPlaying = true;
 
+    const events: string[] = [];
+    editor.addEventListener('daw-stop', (e: Event) => events.push(e.type));
+
     editor.removeTrack(trackId);
     await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
 
     // An empty timeline has nothing to play — leaving the transport rolling
-    // strands isPlaying=true with a dead playhead RAF.
+    // strands isPlaying=true with a dead playhead RAF. Transport UIs key on
+    // daw-play/daw-stop, so this stop must be announced like every other
+    // stop path (editor.stop() is otherwise the only daw-stop dispatcher).
     expect(editor._engine.stop).toHaveBeenCalled();
+    expect(events).toContain('daw-stop');
+    editor.remove();
+  });
+
+  it('removal of a never-registered track does not rewind the cursor', async () => {
+    const editor = setupEditor();
+    editor._currentTime = 30; // user's cursor position on an empty timeline
+
+    // MutationObserver fires _onTrackRemoved even for a <daw-track> removed
+    // before its deferred daw-track-connected ran (framework churn) — the
+    // `existed` gate must cover the rewind/stop block too.
+    editor._onTrackRemoved('never-registered');
+
+    expect(editor._engine.seek).not.toHaveBeenCalled();
+    expect(editor._currentTime).toBe(30);
     editor.remove();
   });
 });

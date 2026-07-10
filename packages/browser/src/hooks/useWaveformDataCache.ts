@@ -36,9 +36,11 @@ export function useWaveformDataCache(
   const subscribersByBufferRef = useRef<WeakMap<AudioBuffer, Set<string>>>(new WeakMap());
   const pendingCountRef = useRef(0);
 
-  // Stable callback to get or create the worker
+  // Stable callback to get or create the worker.
+  // Also replaces a crashed worker (onerror marks it terminated) — reusing
+  // it would reject every later generation until the component remounts.
   const getWorker = useCallback(() => {
-    if (!workerRef.current) {
+    if (!workerRef.current || workerRef.current.isTerminated()) {
       workerRef.current = createPeaksWorker();
     }
     return workerRef.current;
