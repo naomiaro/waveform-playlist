@@ -40,13 +40,11 @@ const LAYOUT_PROPS = new Set([
  */
 function groupDirtyByChunk(
   dirtyPixels: Set<number>,
-  step: number
+  step: number,
+  barWidth: number
 ): Map<number, { min: number; max: number }> {
   const dirtyByChunk = new Map<number, { min: number; max: number }>();
-  for (const peakIdx of dirtyPixels) {
-    // Map peak index to its bar's global pixel position
-    const barPixel = Math.floor(peakIdx / step) * step;
-    const chunkIdx = Math.floor(barPixel / MAX_CANVAS_WIDTH);
+  const mark = (chunkIdx: number, barPixel: number) => {
     const existing = dirtyByChunk.get(chunkIdx);
     if (existing) {
       dirtyByChunk.set(chunkIdx, {
@@ -55,6 +53,21 @@ function groupDirtyByChunk(
       });
     } else {
       dirtyByChunk.set(chunkIdx, { min: barPixel, max: barPixel });
+    }
+  };
+  for (const peakIdx of dirtyPixels) {
+    // Map peak index to its bar's global pixel position
+    const barPixel = Math.floor(peakIdx / step) * step;
+    const chunkIdx = Math.floor(barPixel / MAX_CANVAS_WIDTH);
+    mark(chunkIdx, barPixel);
+    // A bar straddling the chunk boundary (barWidth+barGap not dividing
+    // MAX_CANVAS_WIDTH) has pixels on the NEXT canvas too — mark that chunk
+    // dirty for the same bar, or its clipped remainder is a permanent 1-2px
+    // gap at every boundary. _drawChunk's loop is global-indexed, so the
+    // next chunk draws the bar at a negative local x.
+    const endChunkIdx = Math.floor((barPixel + barWidth - 1) / MAX_CANVAS_WIDTH);
+    if (endChunkIdx !== chunkIdx) {
+      mark(endChunkIdx, barPixel);
     }
   }
   return dirtyByChunk;
@@ -194,7 +207,7 @@ export class DawWaveformElement extends LitElement {
         this._drawSegments(canvas, chunkIdx, dpr, halfHeight, bits, waveColor);
       }
     } else {
-      const dirtyByChunk = groupDirtyByChunk(this._dirtyPixels, step);
+      const dirtyByChunk = groupDirtyByChunk(this._dirtyPixels, step, this.barWidth);
       for (const canvas of canvases) {
         const chunkIdx = Number(canvas.dataset.index);
         this._drawnChunks.add(chunkIdx);

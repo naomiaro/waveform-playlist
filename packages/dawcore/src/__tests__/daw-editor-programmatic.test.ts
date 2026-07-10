@@ -1151,3 +1151,169 @@ describe('zoom floor recompute (audit wave 5 review)', () => {
     editor.remove();
   });
 });
+
+describe('audit wave 6 — lifecycle & rendering state', () => {
+  it('a reparented editor does not retain ghost render state', async () => {
+    const editor = setupEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    expect(editor._engineTracks.size).toBe(1);
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    other.appendChild(editor); // synchronous disconnect → reconnect
+
+    // The engine (and the consumer's adapter through it) was disposed and
+    // the clip caches cleared — retained render state would show waveforms
+    // that can never play. Element-backed tracks re-register via their own
+    // deferred connect events; element-less content does not survive.
+    expect(editor._engineTracks.size).toBe(0);
+    expect(editor._peaksData.size).toBe(0);
+    expect(editor.tracks).toHaveLength(0);
+    other.remove();
+  });
+
+  it('synthesizes descriptors for engine tracks restored by undo', () => {
+    const editor = setupEditor();
+
+    editor._reconcileDescriptorsWithEngineTracks([
+      {
+        id: 'ghost',
+        name: 'Guitar',
+        volume: 0.7,
+        pan: -0.2,
+        muted: false,
+        soloed: false,
+        clips: [],
+      },
+    ]);
+
+    // Undo restores the track in ENGINE state, but _tracks was purged at
+    // removal — without a synthesized descriptor the track plays and renders
+    // yet shows "Untitled" controls and is missing from editor.tracks.
+    const t = editor.tracks.find((x: any) => x.trackId === 'ghost');
+    expect(t?.name).toBe('Guitar');
+    expect(t?.volume).toBe(0.7);
+    editor.remove();
+  });
+
+  it('prunes a synthesized descriptor when redo removes the track again', () => {
+    const editor = setupEditor();
+    const ghost = {
+      id: 'ghost',
+      name: 'Guitar',
+      volume: 0.7,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      clips: [],
+    };
+    editor._reconcileDescriptorsWithEngineTracks([ghost]); // undo restored it
+
+    editor._reconcileDescriptorsWithEngineTracks([]); // redo removed it again
+
+    // Without the prune, editor.tracks forever lists a track the engine no
+    // longer has — and removeTrack() can't clean it (no element, no engine
+    // entry → warns "no track found").
+    expect(editor.tracks).toHaveLength(0);
+    editor.remove();
+  });
+
+  it('does not prune descriptors for tracks that are still loading or element-backed', async () => {
+    const editor = setupEditor();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+    const promise = editor.addTrack({ name: 'Loading', clips: [{ src: '/a.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+
+    // A statechange arriving mid-load doesn't contain the loading track —
+    // its descriptor must survive (it is loading, not removed).
+    editor._reconcileDescriptorsWithEngineTracks([]);
+    expect(editor.tracks).toHaveLength(1);
+
+    releaseDecode(makeAudioBuffer());
+    await promise;
+    editor.remove();
+  });
+
+  it('refuses to rebuild an engine on an adapter its own teardown disposed', async () => {
+    const editor = setupEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    other.appendChild(editor); // teardown disposed the consumer's adapter
+
+    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so decode
+    // SUCCEEDS on reconnect and tracks wire into a dead transport graph —
+    // waveforms render, play() runs, no audio. The rebuild must fail loudly
+    // instead.
+    const err = await editor.addTrack({ name: 'U', clips: [{ src: '/b.opus' }] }).then(
+      () => null,
+      (e: Error) => e
+    );
+    expect(err?.message).toMatch(/adapter.*disposed|fresh/i);
+
+    // Setting a fresh adapter restores service
+    editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+    stubAudioPipeline(editor);
+    await expect(editor.addTrack({ name: 'V', clips: [{ src: '/c.opus' }] })).resolves.toBeTruthy();
+    other.remove();
+  });
+
+  it('toggling mono re-extracts peaks immediately', async () => {
+    const editor = setupEditor();
+    await editor.updateComplete; // consume the initial render cycle
+    editor._clipBuffers.set('c1', {} as AudioBuffer);
+    editor._peakPipeline.reextractPeaks = vi.fn().mockReturnValue(new Map());
+
+    editor.mono = true;
+    await editor.updateComplete;
+
+    // mono changes the derived peak data (per-channel vs merged) — waiting
+    // for the next zoom change leaves stale channel layout, then snaps
+    // mid-session with no related user action.
+    expect(editor._peakPipeline.reextractPeaks).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      true,
+      expect.anything()
+    );
+    editor.remove();
+  });
+
+  it('clears the spectrogram viewport cache when the controller is disposed', () => {
+    const editor = setupEditor();
+    editor._spectrogramController = { dispose: vi.fn() };
+    editor._lastSpectrogramViewport = { vs: 0, ve: 500, spp: 1024 };
+
+    editor._disposeSpectrogramControllerIfEmpty(); // no spectrogram tracks → disposes
+
+    // A recreated controller diffs against this cache — if it survives, the
+    // fresh orchestrator never receives an initial setViewport and renders
+    // black until a ≥100px scroll or a zoom change.
+    expect(editor._lastSpectrogramViewport).toBeNull();
+    editor.remove();
+  });
+
+  it('MIME-rejected files dispatch daw-files-load-error', async () => {
+    const editor = setupEditor();
+    const events: CustomEvent[] = [];
+    editor.addEventListener('daw-files-load-error', ((e: Event) => {
+      events.push(e as CustomEvent);
+    }) as EventListener);
+
+    const result = await editor.loadFiles([new File(['x'], 'notes.txt', { type: 'text/plain' })]);
+
+    expect(result.failed).toHaveLength(1);
+    // Apps whose only error surface is the documented event otherwise see a
+    // silently swallowed drop.
+    expect(events).toHaveLength(1);
+    expect(events[0].detail.file.name).toBe('notes.txt');
+    editor.remove();
+  });
+});

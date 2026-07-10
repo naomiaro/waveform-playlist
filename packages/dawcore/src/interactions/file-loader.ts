@@ -44,8 +44,21 @@ export async function loadFiles(
 
   for (const file of fileArray) {
     if (file.type && !file.type.startsWith('audio/')) {
-      failed.push({ file, error: new Error('Non-audio MIME type: ' + file.type) });
+      const error = new Error('Non-audio MIME type: ' + file.type);
+      failed.push({ file, error });
       console.warn('[dawcore] Skipping non-audio file: ' + file.name + ' (' + file.type + ')');
+      // Same error surface as decode failures — apps whose only error
+      // handling is the documented daw-files-load-error event otherwise see
+      // the drop silently swallowed.
+      if (host.isConnected) {
+        host.dispatchEvent(
+          new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
+            bubbles: true,
+            composed: true,
+            detail: { file, error },
+          })
+        );
+      }
       continue;
     }
 
