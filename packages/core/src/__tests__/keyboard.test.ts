@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleKeyboardEvent, getShortcutLabel } from '../keyboard';
+import { handleKeyboardEvent, getShortcutLabel, matchesKeyBinding } from '../keyboard';
 import type { KeyboardShortcut } from '../keyboard';
 
 function makeKeyboardEvent(
@@ -163,5 +163,30 @@ describe('getShortcutLabel', () => {
       action: () => {},
     });
     expect(label).toBe('Ctrl+Shift+S');
+  });
+});
+
+describe('matchesKeyBinding', () => {
+  const ev = (init: KeyboardEventInit) => new KeyboardEvent('keydown', init);
+
+  it('matches key case-insensitively', () => {
+    expect(matchesKeyBinding(ev({ key: 'S' }), { key: 's' })).toBe(true);
+  });
+
+  it('undefined modifier matches any state', () => {
+    expect(matchesKeyBinding(ev({ key: 'a', ctrlKey: true }), { key: 'a' })).toBe(true);
+  });
+
+  it('explicit false modifier must NOT be pressed', () => {
+    expect(matchesKeyBinding(ev({ key: 'a', ctrlKey: true }), { key: 'a', ctrlKey: false })).toBe(
+      false
+    );
+  });
+
+  it('explicit true modifier must be pressed', () => {
+    expect(matchesKeyBinding(ev({ key: 'z', shiftKey: true }), { key: 'z', shiftKey: true })).toBe(
+      true
+    );
+    expect(matchesKeyBinding(ev({ key: 'z' }), { key: 'z', shiftKey: true })).toBe(false);
   });
 });
