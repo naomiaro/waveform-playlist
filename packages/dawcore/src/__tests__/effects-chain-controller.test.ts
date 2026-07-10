@@ -225,3 +225,51 @@ describe('EffectsChainController', () => {
     expect(chain.entries).toHaveLength(0);
   });
 });
+
+describe('serialize placeholders (audit wave 3)', () => {
+  it('marks wam placeholder entries so export can skip them', async () => {
+    const chain = new EffectsChainController(mockAudioContext());
+    chain.add(
+      makeItem({
+        kind: 'wam',
+        type: 'wam',
+        url: 'https://x/dead.js',
+        error: 'unreachable',
+        placeholder: { state: { preset: 1 }, bypassed: false },
+      })
+    );
+
+    const [entry] = await chain.serialize();
+
+    expect(entry).toMatchObject({
+      kind: 'wam',
+      url: 'https://x/dead.js',
+      bypassed: false,
+      state: { preset: 1 },
+      placeholder: true,
+    });
+  });
+
+  it('marks native placeholder entries and round-trips their saved params', async () => {
+    const chain = new EffectsChainController(mockAudioContext());
+    chain.add(
+      makeItem({
+        kind: 'native',
+        type: 'my-eq',
+        params: { gain: 0.5 },
+        error: 'no registry definition',
+        placeholder: { bypassed: true },
+      })
+    );
+
+    const [entry] = await chain.serialize();
+
+    expect(entry).toMatchObject({
+      kind: 'native',
+      type: 'my-eq',
+      params: { gain: 0.5 },
+      bypassed: true,
+      placeholder: true,
+    });
+  });
+});

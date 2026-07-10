@@ -73,6 +73,9 @@ export class EffectsChainController {
               ...sourceFields,
               bypassed: entry.placeholder.bypassed,
               ...(entry.placeholder.state !== undefined ? { state: entry.placeholder.state } : {}),
+              // Lets offline export skip this entry (live playback silently
+              // skips it too); restore ignores the flag and retries.
+              placeholder: true,
             };
           }
           let state: unknown;
@@ -93,6 +96,17 @@ export class EffectsChainController {
             ...sourceFields,
             bypassed: entry.bypassed,
             ...(state !== undefined ? { state } : {}),
+          };
+        }
+        if (entry.placeholder) {
+          // Native placeholder (e.g. unregistered custom type on restore):
+          // re-emit the SAVED params/bypassed so the snapshot round-trips.
+          return {
+            kind: 'native',
+            type: entry.type,
+            params: { ...entry.params },
+            bypassed: entry.placeholder.bypassed,
+            placeholder: true,
           };
         }
         return {
@@ -141,13 +155,17 @@ export class EffectsChainController {
     this._rebuild();
   }
 
-  move(effectId: string, newIndex: number): void {
+  /** Returns the index the entry actually landed at (the requested index is
+   *  clamped to the chain bounds), or -1 for an unknown effectId — event
+   *  dispatchers must report the actual index, not the raw request. */
+  move(effectId: string, newIndex: number): number {
     const entry = this._find('move', effectId);
-    if (!entry) return;
+    if (!entry) return -1;
     const without = this._entries.filter((e) => e.id !== effectId);
     const at = Math.max(0, Math.min(newIndex, without.length));
     this._entries = [...without.slice(0, at), entry, ...without.slice(at)];
     this._rebuild();
+    return at;
   }
 
   setParams(effectId: string, params: Record<string, number>): void {

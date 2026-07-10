@@ -213,7 +213,7 @@ localStorage.setItem('master-fx', JSON.stringify(saved));
 await editor.setEffectsState(JSON.parse(localStorage.getItem('master-fx')));
 ```
 
-WAM entries carry the plugin's own `getState()` snapshot, reapplied on restore. Faust entries (added with `addFaustEffect`) persist their DSP source instead of a URL — `{ kind: 'wam', faustDsp, faustName, bypassed, state }` — and are recompiled in the browser on restore. If a saved plugin URL is unreachable (or a saved Faust source no longer compiles), the restore **continues**: the entry becomes a bypassed passthrough placeholder at its saved position (a `daw-effect-error` event fires with `{effectId, url?, source?, message}`), and its saved state is retained so re-serializing round-trips it for a later retry.
+WAM entries carry the plugin's own `getState()` snapshot, reapplied on restore. Faust entries (added with `addFaustEffect`) persist their DSP source instead of a URL — `{ kind: 'wam', faustDsp, faustName, bypassed, state }` — and are recompiled in the browser on restore. If a saved plugin URL is unreachable (or a saved Faust source no longer compiles), the restore **continues**: the entry becomes a bypassed passthrough placeholder at its saved position (a `daw-effect-error` event fires with `{effectId, url?, source?, type?, message}`), and its saved state is retained so re-serializing round-trips it for a later retry. Failed **native** entries get the same treatment — a saved `registerEffect()` type that isn't re-registered on this page becomes a placeholder carrying its saved params instead of rejecting the whole restore. Placeholder entries re-serialize with `placeholder: true`; `exportAudio()` skips them (parity with live playback, which passes audio through them silently), and `setEffectsState` ignores the flag and retries normally.
 
 ## Transport Access
 
@@ -301,11 +301,11 @@ track.closeEffectGui(wamId); // hides — audio keeps processing, element stays 
 await track.openEffectGui(wamId, panel); // instant reopen, same element
 ```
 
-The GUI is created lazily on first open and only destroyed (`destroyGui`) when the effect — or its track — is removed from the chain. Plugins without a GUI, and `native-*` effects, get a generic parameter panel (labeled sliders from the plugin's `getParameterInfo()` or the registry's params metadata) rendered by `@dawcore/wam`; slider edits apply live and dispatch `daw-effect-change` like any other parameter edit.
+The GUI is created lazily on first open and only destroyed (`destroyGui`) when the effect — or its track — is removed from the chain. Plugins without a GUI, and `native-*` effects, get a generic parameter panel (labeled sliders from the plugin's `getParameterInfo()` or the registry's params metadata) rendered by `@dawcore/wam`; slider edits apply live and dispatch `daw-effect-change` like any other parameter edit. Generic panels are rebuilt on reopen so they always show the current parameter values (plugin-provided GUIs stay cached across close/reopen).
 
 ### Offline Export
 
-`editor.exportAudio(options?)` renders the whole session — clips, volume/pan, mute/solo, per-track and master effect chains — on an `OfflineAudioContext` and resolves to an `AudioBuffer` (encode it to WAV/FLAC however you like):
+`editor.exportAudio(options?)` renders the whole session — clips, volume/pan, mute/solo, master volume, per-track and master effect chains — on an `OfflineAudioContext` and resolves to an `AudioBuffer` (encode it to WAV/FLAC however you like):
 
 ```javascript
 const buffer = await editor.exportAudio();

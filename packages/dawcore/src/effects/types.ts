@@ -82,7 +82,16 @@ export interface EffectState {
 
 /** Persisted form of a chain — see README for the consumer contract. */
 export type SerializedEffectEntry =
-  | { kind: 'native'; type: string; params: Record<string, number>; bypassed: boolean }
+  | {
+      kind: 'native';
+      type: string;
+      params: Record<string, number>;
+      bypassed: boolean;
+      /** Present when the live entry was a failed-plugin placeholder (silent
+       *  passthrough). Offline export skips these for parity with live
+       *  playback; restore ignores the flag and retries normally. */
+      placeholder?: true;
+    }
   | {
       kind: 'wam';
       /** Module URL for url-loaded plugins. Absent for Faust entries. */
@@ -94,6 +103,10 @@ export type SerializedEffectEntry =
       faustDsp?: string;
       /** Name the Faust entry was compiled under (restores the same label). */
       faustName?: string;
+      /** Present when the live entry was a failed-plugin placeholder (silent
+       *  passthrough). Offline export skips these for parity with live
+       *  playback; restore ignores the flag and retries the URL/DSP. */
+      placeholder?: true;
     };
 
 /** Result of creating an effect via the registry. */

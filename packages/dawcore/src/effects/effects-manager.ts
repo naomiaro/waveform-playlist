@@ -23,12 +23,21 @@ interface AdapterLike {
 interface GuiRecord {
   element: HTMLElement;
   destroy: () => void;
+  /** True for manager-built generic parameter panels — they bake values at
+   *  build time, so reopen rebuilds them instead of reusing the cache
+   *  (plugin-provided GUIs manage their own state and stay cached). */
+  isFallback: boolean;
 }
 
-function makeGuiRecord(element: HTMLElement, destroyImpl: () => void): GuiRecord {
+function makeGuiRecord(
+  element: HTMLElement,
+  destroyImpl: () => void,
+  isFallback = false
+): GuiRecord {
   let destroyed = false;
   return {
     element,
+    isFallback,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
@@ -294,10 +303,16 @@ export class EffectsManager {
     }
 
     const cached = this._guis.get(effectId);
-    if (cached) {
+    if (cached && !cached.isFallback) {
       container.appendChild(cached.element);
       return cached.element;
     }
+    // A cached FALLBACK panel is rebuilt instead of reused: generic panels
+    // bake their slider values at build time, so an API-side setEffectParams
+    // while the panel was closed would show stale values (and the first drag
+    // would snap the audio back to the stale position). The old panel is kept
+    // until the rebuild succeeds — a transient failure (dynamic-import blip)
+    // must not destroy a working panel.
 
     let pending = this._guiPending.get(effectId);
     if (!pending) {
@@ -306,7 +321,26 @@ export class EffectsManager {
       });
       this._guiPending.set(effectId, pending);
     }
-    const record = await pending;
+    let record: GuiRecord;
+    try {
+      record = await pending;
+    } catch (err) {
+      if (cached) {
+        console.warn(
+          PREFIX +
+            'openEffectGui: rebuilding the parameter panel for "' +
+            effectId +
+            '" failed — serving the cached panel (values may be stale): ' +
+            String(err)
+        );
+        container.appendChild(cached.element);
+        return cached.element;
+      }
+      throw err;
+    }
+    if (cached && cached !== record) {
+      cached.element.remove();
+    }
 
     // The effect (or its whole chain) may have been removed while the GUI
     // was building — a late mount would leak a GUI for a destroyed plugin.
@@ -363,7 +397,7 @@ export class EffectsManager {
     const element = await this._createFallbackPanel(chain, target, entry, effectId);
     // The generic panel is plain DOM owned by this manager — removal from the
     // document (done by _destroyGui) is its entire teardown.
-    return makeGuiRecord(element, () => {});
+    return makeGuiRecord(element, () => {}, true);
   }
 
   /** The generic parameter panel — one code path for "no custom GUI":
@@ -682,9 +716,33 @@ export class EffectsManager {
     for (const entry of entries) {
       if (superseded()) return;
       if (entry.kind === 'native') {
-        const id = this._addToChain(chain, target, entry.type, entry.params);
-        if (entry.bypassed) {
-          this._runOp(chain, target, 'setBypassed', id, true);
+        try {
+          const id = this._addToChain(chain, target, entry.type, entry.params);
+          if (entry.bypassed) {
+            this._runOp(chain, target, 'setBypassed', id, true);
+          }
+        } catch (err) {
+          // Same policy as failed WAM loads below: the old chain is already
+          // destroyed at this point, so a throw here would strand a
+          // half-built chain and lose every remaining entry. Placeholder +
+          // error event + continue. (Reachable via an unregistered custom
+          // type — the consumer saved state with registerEffect()'d types
+          // that aren't re-registered on this page.)
+          if (superseded() || chain.disposed) return;
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(
+            PREFIX +
+              'setEffectsState: native effect "' +
+              entry.type +
+              '" failed to restore: ' +
+              message
+          );
+          const effectId = this._addNativePlaceholder(chain, entry, message);
+          this._dispatch(target, 'daw-effect-error', {
+            effectId,
+            type: entry.type,
+            message,
+          });
         }
         continue;
       }
@@ -708,7 +766,11 @@ export class EffectsManager {
           this._runOp(chain, target, 'setBypassed', id, true);
         }
       } catch (err) {
-        if (superseded()) return;
+        // chain.disposed guard: the chain can be torn down mid-restore (track
+        // removed while a plugin loaded) — the placeholder add would itself
+        // throw on the disposed chain, escaping setEffectsState with an error
+        // about internal chain lifecycle instead of the plugin failure.
+        if (superseded() || chain.disposed) return;
         const message = err instanceof Error ? err.message : String(err);
         const sourceLabel = entry.url ?? entry.faustName ?? 'Faust effect';
         console.warn(
@@ -723,6 +785,30 @@ export class EffectsManager {
         });
       }
     }
+  }
+
+  /** A silent passthrough occupying a failed NATIVE entry's chain position.
+   *  Carries the saved params/bypassed so the snapshot round-trips (serialize
+   *  re-emits them with `placeholder: true`). */
+  private _addNativePlaceholder(
+    chain: EffectsChainController,
+    entry: { type: string; params: Record<string, number>; bypassed: boolean },
+    message: string
+  ): string {
+    const { audioContext } = this._requireWiring();
+    const node = audioContext.createGain();
+    const effectId = chain.add({
+      kind: 'native',
+      type: entry.type,
+      label: entry.type,
+      error: message,
+      placeholder: { bypassed: entry.bypassed },
+      instance: { input: node, output: node, applyParams: () => {} },
+      params: { ...entry.params },
+    });
+    // Placeholders pass audio through, bypassed-style (no wet param).
+    chain.setBypassed(effectId, true);
+    return effectId;
   }
 
   /** A silent passthrough occupying the failed plugin's chain position. */
@@ -798,10 +884,14 @@ export class EffectsManager {
         chain.setBypassed(effectId, arg);
         this._dispatch(target, 'daw-effect-bypass', { effectId, bypassed: arg });
         break;
-      case 'move':
-        chain.move(effectId, arg);
-        this._dispatch(target, 'daw-effect-reorder', { effectId, fromIndex, toIndex: arg });
+      case 'move': {
+        // Report the index the chain ACTUALLY used — it clamps out-of-range
+        // requests, and a consumer mirroring order from the event detail
+        // would mis-sort (or crash indexing) on the raw request.
+        const toIndex = chain.move(effectId, arg);
+        this._dispatch(target, 'daw-effect-reorder', { effectId, fromIndex, toIndex });
         break;
+      }
     }
   }
 
@@ -846,6 +936,12 @@ function validateSerializedEntries(entries: unknown): asserts entries is Seriali
     }
     if (typeof e.bypassed !== 'boolean') {
       throw new Error(PREFIX + 'setEffectsState: entry requires a boolean bypassed flag' + at);
+    }
+    if (e.placeholder !== undefined && e.placeholder !== true) {
+      // A malformed truthy value (e.g. "false", 1, {}) would restore as a
+      // working live effect but be silently SKIPPED by exportAudio — an
+      // export missing an effect the user hears, with zero warning.
+      throw new Error(PREFIX + 'setEffectsState: placeholder must be true when present' + at);
     }
   });
 }
