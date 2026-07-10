@@ -74,6 +74,24 @@ describe('AnnotationController', () => {
     expect(geo).toEqual({ left: 46, width: 94 });
   });
 
+  it('unregisters a track removed inside a wrapper subtree and requests an update', async () => {
+    const wrapper = document.createElement('div');
+    const nestedTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    nestedTrack.innerHTML = '<daw-annotation id="b" start="2" end="4">Bye</daw-annotation>';
+    wrapper.appendChild(nestedTrack);
+    host.appendChild(wrapper);
+    await flush();
+    controller.handleTrackConnected(nestedTrack);
+    expect(controller.tracks).toContain(nestedTrack);
+
+    host.requestUpdate.mockClear();
+    wrapper.remove();
+    await flush();
+
+    expect(controller.tracks).not.toContain(nestedTrack);
+    expect(host.requestUpdate).toHaveBeenCalled();
+  });
+
   it('requests a host update on daw-annotation-update bubbling through the host', async () => {
     host.requestUpdate.mockClear();
     const el = track.querySelector('daw-annotation')! as HTMLElement & { end: number };

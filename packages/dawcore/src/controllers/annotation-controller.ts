@@ -53,6 +53,20 @@ export class AnnotationController implements ReactiveController {
           } else if (node.tagName === 'DAW-ANNOTATION') {
             changed = true;
           }
+          // A wrapper element containing a track (rather than the track
+          // itself) is removed — recurse into the subtree like the editor's
+          // track observer, or the nested track is never unregistered.
+          const nestedTracks = node.querySelectorAll?.('daw-annotation-track');
+          if (nestedTracks) {
+            for (const nested of nestedTracks) {
+              this._tracks = this._tracks.filter((t) => t !== nested);
+              changed = true;
+            }
+          }
+          const nestedAnnotations = node.querySelectorAll?.('daw-annotation');
+          if (nestedAnnotations && nestedAnnotations.length > 0) {
+            changed = true;
+          }
         }
       }
       if (changed) this._host.requestUpdate();
