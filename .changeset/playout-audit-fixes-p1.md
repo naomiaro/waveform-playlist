@@ -1,5 +1,0 @@
----
-'@waveform-playlist/playout': patch
----
-
-Correctness audit fixes (part 1): mixed audio+MIDI tracks' runtime controls (mute/volume/pan/solo) now reach the `:midi` companion playout track — previously muting a mixed track left its MIDI playing and soloing it silenced its own MIDI half; deleting a mixed track's last MIDI clip now removes the stale companion instead of leaving ghost MIDI playback; `TonePlayout.setMute` routes through solo-aware muting so unmuting a non-soloed track during an active solo no longer makes it audible; `closeGlobalAudioContext` resets the singleton even when the raw context was closed externally (previously stranded every future caller on a dead context); `SoundFontCache.load`/`loadFromBuffer` invalidate the per-sample AudioBuffer cache on hot-swap (stale entries paired the old font's buffers with the new font's pitch/envelope — mispitched audio); SoundFontToneTrack's Part callback contains `triggerNote` failures so one throwing note can't abort same-tick events across all tracks.
