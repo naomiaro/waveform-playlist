@@ -423,6 +423,139 @@ describe('RecordingController', () => {
     expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
   });
 
+  it('restores armed-track mute when no audio data was captured', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
+    };
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    host._engine.setTrackMute.mockClear();
+
+    // Stop without ever delivering worklet samples → "No audio data captured" path
+    await controller.stopRecording();
+
+    expect(controller.isRecording).toBe(false);
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
+  });
+
+  it('cleans up the session and dispatches daw-recording-error when finalization throws', async () => {
+    host._engine = {
+      setTrackMute: vi.fn(),
+      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
+    };
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1');
+
+    const { concatenateAudioData } = await import('@waveform-playlist/core');
+    vi.mocked(concatenateAudioData).mockImplementationOnce(() => {
+      throw new Error('allocation failed');
+    });
+    host._engine.setTrackMute.mockClear();
+    const events: string[] = [];
+    host.dispatchEvent = vi.fn((e: CustomEvent) => {
+      events.push(e.type);
+      return true;
+    });
+
+    // Must resolve (error surfaces via the event, matching the existing
+    // no-audio / too-short error-path convention), not reject.
+    await expect(controller.stopRecording()).resolves.toBeUndefined();
+
+    expect(controller.isRecording).toBe(false);
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
+    expect(events).toContain('daw-recording-error');
+  });
+
+  it('a finalization throw does not wedge the next recording on the same track', async () => {
+    const controller = new RecordingController(host);
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    simulateWorkletData('track-1');
+
+    const { concatenateAudioData } = await import('@waveform-playlist/core');
+    vi.mocked(concatenateAudioData).mockImplementationOnce(() => {
+      throw new Error('allocation failed');
+    });
+    await controller.stopRecording();
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    expect(controller.isRecording).toBe(true);
+    expect(controller.getSession('track-1')).toBeTruthy();
+  });
+
+  it('a stop during the async start window cancels the recording', async () => {
+    // Hold startRecording inside its worklet-module-load await so the stop
+    // lands before the session exists (record→stop double-click on first use).
+    const { addRecordingWorkletModule } = await import('@waveform-playlist/worklets');
+    let releaseModuleLoad!: () => void;
+    vi.mocked(addRecordingWorkletModule).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseModuleLoad = resolve;
+        })
+    );
+    const controller = new RecordingController(host);
+
+    const startPromise = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    await vi.waitFor(() => expect(addRecordingWorkletModule).toHaveBeenCalled());
+
+    // Stop button fires with no explicit trackId — no session exists yet.
+    await controller.stopRecording();
+
+    releaseModuleLoad();
+    await startPromise;
+
+    expect(controller.isRecording).toBe(false);
+    expect(controller.getSession('track-1')).toBeUndefined();
+    expect(mockSource.connect).not.toHaveBeenCalled();
+  });
+
+  it('hostDisconnected during the async start window prevents a leaked capture session', async () => {
+    const { addRecordingWorkletModule } = await import('@waveform-playlist/worklets');
+    let releaseModuleLoad!: () => void;
+    vi.mocked(addRecordingWorkletModule).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseModuleLoad = resolve;
+        })
+    );
+    const controller = new RecordingController(host);
+
+    const startPromise = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    await vi.waitFor(() => expect(addRecordingWorkletModule).toHaveBeenCalled());
+
+    controller.hostDisconnected();
+
+    releaseModuleLoad();
+    await startPromise;
+
+    expect(controller.isRecording).toBe(false);
+    expect(mockSource.connect).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled start does not poison the next startRecording on the same track', async () => {
+    const { addRecordingWorkletModule } = await import('@waveform-playlist/worklets');
+    let releaseModuleLoad!: () => void;
+    vi.mocked(addRecordingWorkletModule).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseModuleLoad = resolve;
+        })
+    );
+    const controller = new RecordingController(host);
+
+    const startPromise = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    await vi.waitFor(() => expect(addRecordingWorkletModule).toHaveBeenCalled());
+    await controller.stopRecording();
+    releaseModuleLoad();
+    await startPromise;
+
+    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+    expect(controller.isRecording).toBe(true);
+  });
+
   it('records without error when the host has no engine', async () => {
     host._engine = null;
     const controller = new RecordingController(host);

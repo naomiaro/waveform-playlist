@@ -149,6 +149,15 @@ export class RecordingController implements ReactiveController {
    * start calls both pass the _sessions guard and build two capture
    * pipelines feeding one session (garbled audio + a leaked worklet). */
   private _starting = new Set<string>();
+  /** Stop requests that arrived while startRecording was still in its async
+   * setup (session not yet in _sessions). Consulted after the awaits so the
+   * start aborts — otherwise the stop is silently lost and the recording
+   * runs on until a second stop. */
+  private _stopRequestedDuringStart = new Set<string>();
+  /** True between hostDisconnected and hostConnected. An in-flight
+   * startRecording consults this after its awaits so a teardown mid-setup
+   * doesn't leak a live capture session on a detached editor. */
+  private _hostDisconnected = false;
   private _workletLoadedCtx: AudioContext | null = null;
   /** Tracks worklet pause state explicitly so external consumers (editor,
    * pause button, spacebar) can share one source of truth. */
@@ -159,9 +168,12 @@ export class RecordingController implements ReactiveController {
     host.addController(this);
   }
 
-  hostConnected() {}
+  hostConnected() {
+    this._hostDisconnected = false;
+  }
 
   hostDisconnected() {
+    this._hostDisconnected = true;
     for (const trackId of [...this._sessions.keys()]) {
       // notifyError: captured audio is silently discarded here — without an
       // event, record buttons living in a still-connected <daw-transport>
@@ -230,6 +242,16 @@ export class RecordingController implements ReactiveController {
           : (url: string) => rawCtx.audioWorklet.addModule(url);
         await addRecordingWorkletModule(addModule);
         this._workletLoadedCtx = rawCtx;
+      }
+
+      // A stop request or host disconnect that arrived during the awaits
+      // above (context resume, worklet module load — 50-300ms on first use)
+      // must cancel the start. Without this re-check the stop is silently
+      // lost (recording runs on) or a live capture session leaks on a
+      // torn-down editor. Nothing is wired yet at this point, so bailing
+      // needs no cleanup.
+      if (this._stopRequestedDuringStart.has(trackId) || this._hostDisconnected) {
+        return;
       }
 
       // Detect channel count from stream (not source.channelCount — defaults to 2 per spec).
@@ -360,6 +382,7 @@ export class RecordingController implements ReactiveController {
       );
     } finally {
       this._starting.delete(trackId);
+      this._stopRequestedDuringStart.delete(trackId);
     }
   }
 
@@ -398,11 +421,20 @@ export class RecordingController implements ReactiveController {
   }
 
   async stopRecording(trackId?: string): Promise<void> {
-    const id = trackId ?? [...this._sessions.keys()][0];
+    // Fall back to an in-flight start's trackId too — the stop button fires
+    // with no id, and during the async start window there's no session yet.
+    const id = trackId ?? [...this._sessions.keys()][0] ?? [...this._starting][0];
     if (!id) return;
 
     const session = this._sessions.get(id);
-    if (!session) return;
+    if (!session) {
+      // startRecording is still in its async setup — flag it to abort after
+      // its awaits instead of losing the stop.
+      if (this._starting.has(id)) {
+        this._stopRequestedDuringStart.add(id);
+      }
+      return;
+    }
 
     // Re-entrant stop (stop-button double-click, unmount cleanup) during the
     // ack/drain window must not build a second AudioBuffer or dispatch a
@@ -420,6 +452,31 @@ export class RecordingController implements ReactiveController {
   }
 
   private async _finishStopRecording(id: string, session: RecordingSession): Promise<void> {
+    try {
+      await this._finalizeRecording(id, session);
+    } catch (err) {
+      // A throw anywhere in the stop pipeline (host.stop(), chunk
+      // concatenation RangeError on a long take, AudioBuffer creation, clip
+      // insertion) must not strand the session with stopping=true — that
+      // wedges isRecording, keeps the mic graph connected, and leaves the
+      // armed-track transient mute engaged. Resolve (not reject) and surface
+      // the failure via daw-recording-error, matching the no-audio/too-short
+      // error-path convention — fire-and-forget callers (stop button,
+      // mic-unplug handler) only observe the event.
+      console.warn('[dawcore] RecordingController: Failed to finalize recording: ' + String(err));
+      this._cleanupSession(id);
+      this._host.requestUpdate();
+      this._host.dispatchEvent(
+        new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId: id, error: err },
+        })
+      );
+    }
+  }
+
+  private async _finalizeRecording(id: string, session: RecordingSession): Promise<void> {
     // Capture whether we were paused — pause already flushed the partial
     // buffer, so there's no full-buffer backlog to wait for on stop.
     const wasPaused = this._isPaused;
@@ -472,6 +529,7 @@ export class RecordingController implements ReactiveController {
     // Build AudioBuffer from accumulated chunks
     if (session.totalSamples === 0) {
       console.warn('[dawcore] RecordingController: No audio data captured');
+      this._restoreArmedTrackMute(session);
       this._sessions.delete(id);
       this._host.requestUpdate();
       // Dispatch error so record button can reset its state (fix #3)

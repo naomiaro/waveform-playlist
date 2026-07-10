@@ -33,6 +33,7 @@ export interface PointerHandlerHost {
     tryHandle(target: Element, e: PointerEvent): boolean;
     onPointerMove(e: PointerEvent): void;
     onPointerUp(e: PointerEvent): void;
+    onPointerCancel(e: PointerEvent): void;
     isActive: boolean;
   } | null;
   readonly scaleMode: 'temporal' | 'beats';
@@ -105,12 +106,12 @@ export class PointerHandler {
             console.warn('[dawcore] setPointerCapture failed: ' + String(err));
           }
           const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
-          const onUp = (ue: Event) => {
-            clipHandler.onPointerUp(ue as PointerEvent);
+          const detach = (pe: PointerEvent) => {
             this._timeline?.removeEventListener('pointermove', onMove);
             this._timeline?.removeEventListener('pointerup', onUp);
+            this._timeline?.removeEventListener('pointercancel', onCancel);
             try {
-              this._timeline?.releasePointerCapture((ue as PointerEvent).pointerId);
+              this._timeline?.releasePointerCapture(pe.pointerId);
             } catch (err) {
               console.warn(
                 '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
@@ -118,8 +119,20 @@ export class PointerHandler {
             }
             this._timeline = null;
           };
+          const onUp = (ue: Event) => {
+            clipHandler.onPointerUp(ue as PointerEvent);
+            detach(ue as PointerEvent);
+          };
+          // pointercancel fires INSTEAD of pointerup on touch interruption /
+          // pen leaving range / OS gestures — the clip drag must be reverted
+          // or it stays armed and its transaction stays open.
+          const onCancel = (ce: Event) => {
+            clipHandler.onPointerCancel(ce as PointerEvent);
+            detach(ce as PointerEvent);
+          };
           this._timeline.addEventListener('pointermove', onMove);
           this._timeline.addEventListener('pointerup', onUp);
+          this._timeline.addEventListener('pointercancel', onCancel);
         }
         return;
       }
@@ -144,6 +157,7 @@ export class PointerHandler {
     }
     this._timeline.addEventListener('pointermove', this._onPointerMove);
     this._timeline.addEventListener('pointerup', this._onPointerUp);
+    this._timeline.addEventListener('pointercancel', this._onPointerCancel);
   };
 
   private _onPointerMove = (e: PointerEvent) => {
@@ -187,6 +201,7 @@ export class PointerHandler {
     }
     this._timeline.removeEventListener('pointermove', this._onPointerMove);
     this._timeline.removeEventListener('pointerup', this._onPointerUp);
+    this._timeline.removeEventListener('pointercancel', this._onPointerCancel);
 
     try {
       if (this._isDragging) {
@@ -201,6 +216,45 @@ export class PointerHandler {
       this._timeline = null;
       this._timelineRect = null;
     }
+  };
+
+  /** pointercancel fires INSTEAD of pointerup on touch interruption / pen
+   * leaving range / OS gestures — discard the interaction (no seek, no
+   * selection finalize) and detach the drag listeners, or the still-attached
+   * move handler keeps mutating the selection on hover with a stale rect. */
+  private _onPointerCancel = (e: PointerEvent) => {
+    if (!this._timeline) return;
+
+    try {
+      this._timeline.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      console.warn(
+        '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
+      );
+    }
+    this._timeline.removeEventListener('pointermove', this._onPointerMove);
+    this._timeline.removeEventListener('pointerup', this._onPointerUp);
+    this._timeline.removeEventListener('pointercancel', this._onPointerCancel);
+
+    if (this._isDragging) {
+      // Clear the uncommitted selection preview (host fields + <daw-selection>
+      // were mutated imperatively during the drag but never finalized).
+      const h = this._host;
+      h._selectionStartTime = 0;
+      h._selectionEndTime = 0;
+      const sel = h.shadowRoot?.querySelector('daw-selection') as
+        | { startPx: number; endPx: number }
+        | undefined;
+      if (sel) {
+        sel.startPx = 0;
+        sel.endPx = 0;
+      }
+      h.requestUpdate();
+    }
+
+    this._isDragging = false;
+    this._timeline = null;
+    this._timelineRect = null;
   };
 
   private _finalizeSelection() {

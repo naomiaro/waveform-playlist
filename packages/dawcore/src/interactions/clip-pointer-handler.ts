@@ -411,6 +411,27 @@ export class ClipPointerHandler {
     }
   }
 
+  /** Processes pointercancel — reverts the in-progress drag.
+   *
+   * pointercancel fires INSTEAD of pointerup on touch interruption, pen
+   * leaving hover range, or OS gestures. Without this handler the drag stays
+   * armed (hover keeps moving the clip), the engine transaction stays open
+   * (every later edit becomes un-undoable until some drag commits), and the
+   * per-frame skipAdapter moveClip mutations are never synced or rolled back
+   * (waveform and audio permanently disagree). */
+  onPointerCancel(_e: PointerEvent): void {
+    if (this._mode === null) return;
+    try {
+      // Undo the trim CSS preview; move mutations are rolled back by
+      // abortTransaction below (restores the pre-drag snapshot and rebuilds
+      // the adapter when mutations occurred).
+      this._restoreTrimVisual();
+    } finally {
+      this._host.engine?.abortTransaction();
+      this._reset();
+    }
+  }
+
   /** Re-extract peaks from cache and set on waveform elements during trim drag.
    *  Returns true if peaks were successfully updated. */
   private _updateWaveformPeaks(offsetSamples: number, durationSamples: number): boolean {
