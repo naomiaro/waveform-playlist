@@ -1,7 +1,13 @@
-import { updateAnnotationBoundaries } from '@waveform-playlist/core';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { updateAnnotationBoundaries, snapTickToGrid } from '@waveform-playlist/core';
+import {
+  ANNOTATION_LINK_THRESHOLD_TICKS,
+  annotationMinDurationTicks,
+} from '@waveform-playlist/core';
+import type { AnnotationData, SnapTo, MeterEntry } from '@waveform-playlist/core';
 import {
   applyBoundaryResults,
+  applyTickBoundaryResults,
+  tickSpaceData,
   type DawAnnotationTrackElement,
 } from '../elements/daw-annotation-track';
 import { DRAG_THRESHOLD } from './constants';
@@ -11,6 +17,13 @@ export interface AnnotationDragHost {
   _renderSpp: number;
   _annotationClampDuration: number;
   seekTo(time: number): void;
+  scaleMode: string;
+  ticksPerPixel: number;
+  snapTo: SnapTo;
+  _meterEntries: MeterEntry[];
+  ppqn: number;
+  _secondsToTicks(seconds: number): number;
+  _ticksToSeconds(ticks: number): number;
 }
 
 interface DragState {
@@ -22,9 +35,14 @@ interface DragState {
   /** Boundary drag only (null = box click candidate). */
   edge: 'start' | 'end' | null;
   annotationId: string;
-  /** Snapshot at drag start — pointercancel restores it. */
+  /** 'ticks' when the dragged annotation is tick-based; 'seconds' otherwise. */
+  mode: 'seconds' | 'ticks';
+  /** Snapshot at drag start — pointercancel restores it. In 'ticks' mode this
+   * is tick-space data (see tickSpaceData); in 'seconds' mode it's the
+   * ordinary AnnotationData snapshot. */
   snapshot: AnnotationData[];
-  /** Edge time at drag start (boundary drags). */
+  /** Edge time at drag start (boundary drags). Ticks in 'ticks' mode,
+   * seconds in 'seconds' mode. */
   edgeTime: number;
 }
 
@@ -57,7 +75,12 @@ export class AnnotationDragHandler {
     e.stopPropagation();
     e.preventDefault();
 
-    const snapshot = track.annotations;
+    const elements = track.annotationElements;
+    const el = elements.find((x) => x.annotationId === annotationId);
+    if (!el) return;
+    const mode: 'seconds' | 'ticks' = el.isTickBased ? 'ticks' : 'seconds';
+    const snapshot =
+      mode === 'ticks' ? elements.map((x) => tickSpaceData(x, this._host)) : track.annotations;
     const index = snapshot.findIndex((a) => a.id === annotationId);
     if (index === -1) return;
 
@@ -72,7 +95,9 @@ export class AnnotationDragHandler {
       moved: false,
       edge,
       annotationId,
+      mode,
       snapshot,
+      // edgeTime holds ticks in 'ticks' mode, seconds in 'seconds' mode.
       edgeTime: edge === 'start' ? snapshot[index].start : snapshot[index].end,
     };
 
@@ -94,10 +119,54 @@ export class AnnotationDragHandler {
     if (Math.abs(deltaPx) >= DRAG_THRESHOLD) drag.moved = true;
     if (drag.edge === null || !drag.moved) return;
 
-    const deltaSeconds = (deltaPx * this._host._renderSpp) / this._host.effectiveSampleRate;
     const elements = drag.track.annotationElements;
     const index = drag.snapshot.findIndex((a) => a.id === drag.annotationId);
     if (index === -1) return;
+
+    if (drag.mode === 'ticks') {
+      // px → tick delta: beats mode is tick-linear; temporal mode converts
+      // through seconds at the edge's local tempo.
+      const deltaTicks =
+        this._host.scaleMode === 'beats'
+          ? deltaPx * this._host.ticksPerPixel
+          : this._host._secondsToTicks(
+              this._host._ticksToSeconds(drag.edgeTime) +
+                (deltaPx * this._host._renderSpp) / this._host.effectiveSampleRate
+            ) - drag.edgeTime;
+      let newTick = drag.edgeTime + deltaTicks;
+      if (this._host.scaleMode === 'beats' && this._host.snapTo !== 'off') {
+        newTick = snapTickToGrid(
+          newTick,
+          this._host.snapTo,
+          this._host._meterEntries,
+          this._host.ppqn
+        );
+      }
+      const clamp = this._host._annotationClampDuration;
+      const updated = updateAnnotationBoundaries(
+        {
+          annotationIndex: index,
+          newTime: newTick,
+          isDraggingStart: drag.edge === 'start',
+          annotations: drag.snapshot,
+          duration: clamp === Infinity ? Infinity : this._host._secondsToTicks(clamp),
+          linkEndpoints: drag.track.linkEndpoints,
+        },
+        {
+          linkThreshold: ANNOTATION_LINK_THRESHOLD_TICKS,
+          minDuration: annotationMinDurationTicks(this._host.ppqn),
+        }
+      );
+      applyTickBoundaryResults(
+        elements,
+        elements.map((x) => tickSpaceData(x, this._host)),
+        updated,
+        (t) => this._host._ticksToSeconds(t)
+      );
+      return;
+    }
+
+    const deltaSeconds = (deltaPx * this._host._renderSpp) / this._host.effectiveSampleRate;
     // Compute from the drag-start snapshot each move — cumulative deltas
     // against live state would compound the link/collision adjustments.
     const updated = updateAnnotationBoundaries({
@@ -134,11 +203,20 @@ export class AnnotationDragHandler {
     if (!drag || e.pointerId !== drag.pointerId) return;
     // Restore the drag-start snapshot — a cancelled drag must not commit.
     const elements = drag.track.annotationElements;
-    applyBoundaryResults(
-      elements,
-      elements.map((el) => el.toAnnotationData()),
-      drag.snapshot
-    );
+    if (drag.mode === 'ticks') {
+      applyTickBoundaryResults(
+        elements,
+        elements.map((x) => tickSpaceData(x, this._host)),
+        drag.snapshot,
+        (t) => this._host._ticksToSeconds(t)
+      );
+    } else {
+      applyBoundaryResults(
+        elements,
+        elements.map((el) => el.toAnnotationData()),
+        drag.snapshot
+      );
+    }
     this._teardown();
   };
 
