@@ -50,9 +50,12 @@ import { ViewportController } from '../controllers/viewport-controller';
 import { AudioResumeController } from '../controllers/audio-resume-controller';
 import { RecordingController } from '../controllers/recording-controller';
 import type { RecordingOptions } from '../controllers/recording-controller';
+import { AnnotationController, ANNOTATION_LANE_HEIGHT } from '../controllers/annotation-controller';
+import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import { SpectrogramController } from '../controllers/spectrogram-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import { ClipPointerHandler } from '../interactions/clip-pointer-handler';
+import { AnnotationDragHandler } from '../interactions/annotation-drag';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
@@ -427,13 +430,20 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @state() _engineTracks: Map<string, ClipTrack> = new Map();
   @state() _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
-  @state() private _duration = 0;
+  @state() _duration = 0;
   @state() _selectedTrackId: string | null = null;
   @state() _dragOver = false;
   // Not @state — updated directly to avoid 60fps Lit re-renders
   _selectionStartTime = 0;
   _selectionEndTime = 0;
   _currentTime = 0;
+  // Bounded-playback watermark for the current play(start, end) call
+  // (selection/annotation playback). The adapter's own auto-stop at
+  // endTime (e.g. native Transport's internal timer) tears down audio but
+  // never notifies isPlaying/daw-stop back up — the _startPlayhead rAF
+  // loop below is the sole place that detects reaching it, same pattern
+  // as the whole-track _duration check.
+  _activePlayEndTime: number | null = null;
   @property({ attribute: false })
   set adapter(value: PlayoutAdapter | null) {
     if (value && value.audioContext.state === 'closed') {
@@ -697,6 +707,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ attribute: 'eager-resume' })
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
+  private _annotations = new AnnotationController(this);
   // Closures (not direct references) — _timeToPixels/_getPlayhead are
   // declared later in the class body; class-field init order would read
   // `undefined` for a direct reference here.
@@ -713,6 +724,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _inSeekTransition = false;
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
+  private _annotationDrag = new AnnotationDragHandler(this);
   get _clipHandler() {
     return this.interactiveClips ? this._clipPointer : null;
   }
@@ -841,6 +853,56 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         outline: 2px dashed var(--daw-selection-color, rgba(99, 199, 95, 0.3));
         outline-offset: -2px;
       }
+      .annotation-lane {
+        position: relative;
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+        background: var(--daw-annotation-lane-background, rgba(0, 0, 0, 0.15));
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+      .annotation-lane-spacer {
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+      }
+      .annotation-box {
+        position: absolute;
+        top: 3px;
+        bottom: 3px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        border: 1px solid var(--daw-annotation-box-border, #c49a6c);
+        border-radius: 3px;
+        background: var(--daw-annotation-box-background, rgba(196, 154, 108, 0.2));
+        color: var(--daw-annotation-text-color, #e0d4c8);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .annotation-box.active {
+        background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.45));
+      }
+      .annotation-box-text {
+        padding: 0 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        pointer-events: none;
+      }
+      .annotation-boundary {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        cursor: ew-resize;
+        flex-shrink: 0;
+      }
+      .annotation-boundary[data-edge='start'] {
+        left: 0;
+      }
+      .annotation-boundary[data-edge='end'] {
+        right: 0;
+      }
     `,
     clipStyles,
   ];
@@ -855,7 +917,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * In beats mode, derive samplesPerPixel from ticksPerPixel so that
    * clip positions, waveforms, and the tick-space grid all align.
    */
-  private get _renderSpp(): number {
+  get _renderSpp(): number {
     if (this.scaleMode === 'beats') {
       // Round to integer — WaveformData.resample() uses integer scale math.
       const spp = Math.ceil(
@@ -894,6 +956,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     return (ticks * 60) / (this.bpm * this.ppqn);
   }
+  /** Clamp limit for annotation boundary edits. indefinite-playback removes the
+   * end-of-timeline bound — annotations may extend past the audio (DAW-style
+   * unbounded timeline); the shared boundary math treats Infinity as "no end cap". */
+  get _annotationClampDuration(): number {
+    return this.indefinitePlayback ? Infinity : this._duration;
+  }
   private get _totalWidth(): number {
     if (this.scaleMode === 'beats') {
       const contentTicks = this._secondsToTicks(this._duration);
@@ -902,8 +970,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const minTicks = 32 * num * this.ppqn;
       return Math.ceil(Math.max(contentTicks, minTicks) / this.ticksPerPixel);
     }
+    // Extend past the natural (clip-derived) duration to cover annotations
+    // that reach beyond the audio — DAW-style unbounded timeline (temporal
+    // mode only; beats-mode annotation extent is a documented limitation).
+    const naturalDuration = Math.max(this._duration, this._annotations.maxAnnotationEndSeconds);
     const naturalWidth = Math.ceil(
-      (this._duration * this.effectiveSampleRate) / this.samplesPerPixel
+      (naturalDuration * this.effectiveSampleRate) / this.samplesPerPixel
     );
     if (this.indefinitePlayback || this.fillViewport) {
       // Fill the visible viewport when natural duration is shorter — lets the
@@ -958,6 +1030,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
     this.addEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    this.addEventListener(
+      'daw-annotation-track-connected',
+      this._onAnnotationTrackConnected as EventListener
+    );
+    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     // Detect track + clip removal via MutationObserver (detached elements can't bubble events).
     this._childObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
@@ -996,6 +1073,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
     this.removeEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    this.removeEventListener(
+      'daw-annotation-track-connected',
+      this._onAnnotationTrackConnected as EventListener
+    );
+    this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -1132,6 +1214,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
     }
   }
+
+  // --- Annotation Events ---
+  private _onAnnotationTrackConnected = (e: CustomEvent<{ element: HTMLElement }>) => {
+    this._annotations.handleTrackConnected(e.detail.element as DawAnnotationTrackElement);
+  };
+  private _onAnnotationSelect = (e: CustomEvent<{ annotation: { start: number } | null }>) => {
+    const annotation = e.detail.annotation;
+    if (!annotation) return;
+    const scrollArea = this.shadowRoot?.querySelector('.scroll-area') as HTMLElement | null;
+    if (!scrollArea) return;
+    const px = Math.floor((annotation.start * this.effectiveSampleRate) / this._renderSpp);
+    scrollArea.scrollLeft = Math.max(0, px - scrollArea.clientWidth / 2);
+  };
 
   // --- Track Events ---
   private _onTrackConnected = (e: CustomEvent) => {
@@ -2675,15 +2770,35 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return clipEl;
   }
   // --- Playback ---
-  async play(startTime?: number) {
+  /**
+   * Start playback, optionally seeking to `startTime` first. When `endTime`
+   * is provided, playback stops at that time (selection/annotation playback).
+   */
+  async play(startTime?: number, endTime?: number) {
     try {
       const engine = await this._ensureEngine();
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
-      engine.play(startTime);
+      // Register the editor's rAF loop BEFORE starting the low-level engine
+      // playback. requestAnimationFrame callbacks fire in registration
+      // order — this guarantees _startPlayhead's per-frame check (below)
+      // runs BEFORE the native Transport's own endTime-triggered auto-stop
+      // timer each frame. Without this ordering, a bounded play(start, end)
+      // (selection/annotation playback) races: the Transport's internal
+      // timer silently resets its own clock to 0 before this loop's
+      // getCurrentTime() check ever observes time >= endTime, leaving
+      // isPlaying stuck true forever with no daw-stop.
+      this._activePlayEndTime = endTime ?? null;
       this._startPlayhead();
+      engine.play(startTime, endTime);
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
+      // _startPlayhead() above runs BEFORE engine.play() (see the ordering
+      // comment above), so a throwing engine.play() (PlaylistEngine rolls
+      // back its own state and rethrows on adapter.play() failure) leaves a
+      // dangling rAF loop unless we undo the pre-start here — mirrors stop().
+      this._stopPlayhead();
+      this._activePlayEndTime = null;
       console.warn('[dawcore] Playback failed: ' + String(err));
       this.dispatchEvent(
         new CustomEvent<DawErrorDetail>('daw-error', {
@@ -2702,6 +2817,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   stop() {
     if (!this._engine) return;
+    this._activePlayEndTime = null;
     this._engine.stop();
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
@@ -2767,6 +2883,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         );
         return;
       }
+      // Seeking past a bounded (selection/annotation) play reschedules via
+      // the engine directly (no endTime) — clear the stale watermark so
+      // the rAF loop doesn't stop the resumed playback prematurely at the
+      // old bound. Mirrors Transport.seek()'s own _endTime clearing.
+      this._activePlayEndTime = null;
       this._currentTime = target;
       this._startPlayhead();
     } else {
@@ -3039,6 +3160,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Runs even when the playhead element isn't rendered (empty/indefinite
     // editors) so daw-timeupdate consumers still get frames.
     this._playbackAnimation.start(() => {
+      // Bounded playback (selection/annotation via play(start, end)): the
+      // adapter's own endTime auto-stop tears down audio internally but
+      // never reaches back up to isPlaying/daw-stop, so this rAF loop must
+      // detect it too. Checked before the whole-track duration bound below.
+      if (
+        this._activePlayEndTime !== null &&
+        !this.isRecording &&
+        engine.getCurrentTime() >= this._activePlayEndTime
+      ) {
+        this.stop();
+        const t = this._currentTime;
+        return Number.isFinite(t) ? Math.max(0, t) : 0;
+      }
       // Auto-stop at the end of the timeline (player-style default — parity
       // with the React provider's animation loop). `indefinite-playback`
       // opts out (DAW-style: roll until explicit stop), and an active
@@ -3175,6 +3309,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         ${showControls
           ? html`<div class="controls-viewport">
               <div class="controls-column">
+                ${this._annotations.tracks.map(
+                  () =>
+                    html`<div
+                      class="annotation-lane-spacer"
+                      style="height: ${ANNOTATION_LANE_HEIGHT}px;"
+                    ></div>`
+                )}
                 ${orderedTracks.map(
                   (t) => html`
                     <daw-track-controls
@@ -3201,9 +3342,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             @dragleave=${this._onDragLeave}
             @drop=${this._onDrop}
           >
+            ${this._annotations.renderLanes(
+              spp,
+              this.effectiveSampleRate,
+              this._annotationDrag.onPointerDown
+            )}
             ${this.scaleMode === 'beats'
               ? html`<daw-grid
-                  style="top: 0px;"
+                  style="top: ${this._annotations.totalLaneHeight}px;"
                   .ticksPerPixel=${this.ticksPerPixel}
                   .meterEntries=${this._meterEntries}
                   .ppqn=${this.ppqn}

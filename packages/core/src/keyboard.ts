@@ -14,6 +14,26 @@ export interface KeyboardShortcut {
   preventDefault?: boolean;
 }
 
+/** A key + modifier combination, without an action. Used for remapping maps. */
+export type KeyBinding = Pick<
+  KeyboardShortcut,
+  'key' | 'ctrlKey' | 'shiftKey' | 'metaKey' | 'altKey'
+>;
+
+/**
+ * Does a keyboard event match a key binding?
+ * `undefined` modifier = match any state; `false` = must NOT be pressed.
+ */
+export function matchesKeyBinding(event: KeyboardEvent, binding: KeyBinding): boolean {
+  const keyMatch =
+    event.key.toLowerCase() === binding.key.toLowerCase() || event.key === binding.key;
+  const ctrlMatch = binding.ctrlKey === undefined || event.ctrlKey === binding.ctrlKey;
+  const shiftMatch = binding.shiftKey === undefined || event.shiftKey === binding.shiftKey;
+  const metaMatch = binding.metaKey === undefined || event.metaKey === binding.metaKey;
+  const altMatch = binding.altKey === undefined || event.altKey === binding.altKey;
+  return keyMatch && ctrlMatch && shiftMatch && metaMatch && altMatch;
+}
+
 /**
  * Handle a keyboard event against a list of shortcuts.
  * Pure function, no framework dependency.
@@ -34,17 +54,7 @@ export function handleKeyboardEvent(
     return;
   }
 
-  const matchingShortcut = shortcuts.find((shortcut) => {
-    const keyMatch =
-      event.key.toLowerCase() === shortcut.key.toLowerCase() || event.key === shortcut.key;
-
-    const ctrlMatch = shortcut.ctrlKey === undefined || event.ctrlKey === shortcut.ctrlKey;
-    const shiftMatch = shortcut.shiftKey === undefined || event.shiftKey === shortcut.shiftKey;
-    const metaMatch = shortcut.metaKey === undefined || event.metaKey === shortcut.metaKey;
-    const altMatch = shortcut.altKey === undefined || event.altKey === shortcut.altKey;
-
-    return keyMatch && ctrlMatch && shiftMatch && metaMatch && altMatch;
-  });
+  const matchingShortcut = shortcuts.find((shortcut) => matchesKeyBinding(event, shortcut));
 
   if (matchingShortcut) {
     if (matchingShortcut.preventDefault !== false) {

@@ -599,8 +599,8 @@ describe('Phase 2: end-to-end engine state assertions', () => {
 
   it('removeClip cleans up engine state, _clipBuffers, _clipOffsets, _peaksData', async () => {
     const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    await new Promise((r) => setTimeout(r, 60));
+    // Await the load promise — a fixed delay races the clip load on slow CI.
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
     const trackEl = editor.querySelector('daw-track') as any;
     const clipEl = trackEl.querySelector('daw-clip') as any;
     const clipId = clipEl.clipId;
@@ -612,13 +612,13 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     expect(editor._peaksData.has(clipId)).toBe(true);
 
     editor.removeClip(trackId, clipId);
-    // MutationObserver fires asynchronously
-    await new Promise((r) => setTimeout(r, 0));
-
-    expect(editor._engineTracks.get(trackId).clips.length).toBe(0);
-    expect(editor._clipBuffers.has(clipId)).toBe(false);
-    expect(editor._clipOffsets.has(clipId)).toBe(false);
-    expect(editor._peaksData.has(clipId)).toBe(false);
+    // MutationObserver cleanup is async — retry instead of one macrotask.
+    await vi.waitFor(() => {
+      expect(editor._engineTracks.get(trackId).clips.length).toBe(0);
+      expect(editor._clipBuffers.has(clipId)).toBe(false);
+      expect(editor._clipOffsets.has(clipId)).toBe(false);
+      expect(editor._peaksData.has(clipId)).toBe(false);
+    });
     expect(editor._engine.updateTrack).toHaveBeenCalledWith(trackId, expect.any(Object));
     editor.remove();
   });
@@ -628,20 +628,23 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     // Stub _stopPlayhead — happy-dom playhead controller isn't fully realized
     // and throws when the engine empties at the end of MutationObserver work.
     editor._stopPlayhead = vi.fn();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
-    await new Promise((r) => setTimeout(r, 80));
+    // Await the load promise — a fixed delay races the clip loads on slow CI
+    // runners, and a removal that lands mid-load purges caches through the
+    // async cancellation path, after a single-macrotask wait has elapsed.
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
     const trackEl = editor.querySelector('daw-track') as any;
     const clipIds = [...trackEl.querySelectorAll('daw-clip')].map((c: any) => c.clipId);
     expect(clipIds.length).toBe(2);
 
     editor.removeTrack(trackEl.trackId);
-    await new Promise((r) => setTimeout(r, 0));
-
-    for (const id of clipIds) {
-      expect(editor._clipBuffers.has(id)).toBe(false);
-      expect(editor._peaksData.has(id)).toBe(false);
-    }
-    expect(editor._engineTracks.has(trackEl.trackId)).toBe(false);
+    // MutationObserver cleanup is async — retry instead of one macrotask.
+    await vi.waitFor(() => {
+      for (const id of clipIds) {
+        expect(editor._clipBuffers.has(id)).toBe(false);
+        expect(editor._peaksData.has(id)).toBe(false);
+      }
+      expect(editor._engineTracks.has(trackEl.trackId)).toBe(false);
+    });
     editor.remove();
   });
 

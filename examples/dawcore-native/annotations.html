@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore annotations</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+    }
+    h1 { font-size: 1.2rem; margin-bottom: 16px; }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport { display: flex; gap: 8px; margin-bottom: 12px; }
+    daw-annotation-list { border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; }
+    .hint { font-size: 0.75rem; color: #888; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>dawcore — annotations (dual view, keyboard controls)</h1>
+
+  <script type="module">import '@dawcore/components';</script>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="100" timescale indefinite-playback>
+    <daw-annotation-track id="sections" editable link-endpoints keyboard-controls>
+      <daw-annotation start="0" end="4">Intro</daw-annotation>
+      <daw-annotation start="4" end="12">Verse 1</daw-annotation>
+      <daw-annotation start="12" end="20">Chorus</daw-annotation>
+      <daw-annotation start="20" end="28">Verse 2</daw-annotation>
+    </daw-annotation-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+    <daw-keyboard-shortcuts playback></daw-keyboard-shortcuts>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+    <daw-time-display></daw-time-display>
+  </daw-transport>
+
+  <daw-annotation-list for="sections"></daw-annotation-list>
+
+  <p class="hint">
+    Click a box or list row to select + seek. Arrows navigate, Enter plays the
+    selection, [ ] / { } nudge boundaries ±10ms, Escape deselects (Escape again
+    stops playback). Drag box edges to resize; text in the list is editable.
+  </p>
+
+  <script type="module">
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+    const editor = document.getElementById('editor');
+    const audioCtx = new AudioContext({ sampleRate: 48000, latencyHint: 0 });
+    editor.adapter = new NativePlayoutAdapter(audioCtx);
+  </script>
+</body>
+</html>

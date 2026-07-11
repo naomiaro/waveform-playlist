@@ -26,35 +26,30 @@ The original plan renamed every `@waveform-playlist/*` package into the `@dawcor
 - **`@waveform-playlist/*`** remains the React surface (`browser`, `ui-components`, `recording`, `annotations`, `spectrogram`, `midi`) plus the shared framework-agnostic foundations (`core`, `engine`, `playout`, `worklets`, `webaudio-peaks`, `loaders`, `media-element-playout`). No renames.
 - **`@dawcore/*`** is the Web Components ecosystem, versioned independently at 0.x:
 
-| Package | Directory | Description |
-|---------|-----------|-------------|
-| `@dawcore/components` | `packages/dawcore` | Web Components UI layer — Lit Custom Elements with Shadow DOM |
-| `@dawcore/transport` | `packages/transport` | Native Web Audio transport/scheduler (no Tone.js); provides `NativePlayoutAdapter` |
-| `@dawcore/spectrogram` | `packages/dawcore-spectrogram` | Framework-agnostic spectrogram compute (worker pool) |
-| `@dawcore/midi` | `packages/dawcore-midi` | Framework-agnostic MIDI parsing (optional peer of components) |
-| `@dawcore/wam` | `packages/dawcore-wam` | WAM 2.0 plugin hosting (optional peer) |
-| `@dawcore/faust` | `packages/dawcore-faust` | In-browser Faust DSP → WAM compilation (optional peer) |
+| Package                | Directory                      | Description                                                                        |
+| ---------------------- | ------------------------------ | ---------------------------------------------------------------------------------- |
+| `@dawcore/components`  | `packages/dawcore`             | Web Components UI layer — Lit Custom Elements with Shadow DOM                      |
+| `@dawcore/transport`   | `packages/transport`           | Native Web Audio transport/scheduler (no Tone.js); provides `NativePlayoutAdapter` |
+| `@dawcore/spectrogram` | `packages/dawcore-spectrogram` | Framework-agnostic spectrogram compute (worker pool)                               |
+| `@dawcore/midi`        | `packages/dawcore-midi`        | Framework-agnostic MIDI parsing (optional peer of components)                      |
+| `@dawcore/wam`         | `packages/dawcore-wam`         | WAM 2.0 plugin hosting (optional peer)                                             |
+| `@dawcore/faust`       | `packages/dawcore-faust`       | In-browser Faust DSP → WAM compilation (optional peer)                             |
 
 `@dawcore/components` consumes the shared foundations as peers (`@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/worklets`) — the engine and type layer serve both surfaces. When a React package has framework-agnostic logic worth sharing, it follows the two-flavor split convention: `@dawcore/X` core + `@waveform-playlist/X` React wrapper (precedents: spectrogram, midi).
 
-React packages without a Web Components equivalent yet: annotations (epic #455) and the recording arming surface (epic #453).
+React packages without a Web Components equivalent yet: the recording arming surface (epic #453).
 
 ---
 
 ## Custom Elements
 
-> **Implementation status:** the core editor elements are shipped. `<daw-player>` core (#473) is implemented. Elements listed in this spec that don't exist yet are tracked in epics: transport/control elements (#452), record arming + VU meter (#453), `<daw-player>` follow-ups — effects (#475), `<daw-playback-rate>` (#476), transport-compat tests (#474), annotations (#477) — annotations (#455), individual track-control elements (#457).
+> **Implementation status:** the core editor elements are shipped. `<daw-player>` core (#473) is implemented. Annotation elements (epic #455) are implemented. Elements listed in this spec that don't exist yet are tracked in epics: transport/control elements (#452), record arming + VU meter (#453), `<daw-player>` follow-ups — effects (#475), `<daw-playback-rate>` (#476), transport-compat tests (#474), annotation hosting in `<daw-player>` (#477) — individual track-control elements (#457).
 
 ### Core Elements
 
 ```html
 <!-- Minimal setup -->
-<daw-editor
-  id="my-editor"
-  samples-per-pixel="1024"
-  wave-height="128"
-  timescale
->
+<daw-editor id="my-editor" samples-per-pixel="1024" wave-height="128" timescale>
   <daw-keyboard-shortcuts playback splitting></daw-keyboard-shortcuts>
   <daw-track src="/audio/vocals.mp3" name="Vocals"></daw-track>
   <daw-track src="/audio/guitar.mp3" name="Guitar"></daw-track>
@@ -84,44 +79,44 @@ React packages without a Web Components equivalent yet: annotations (epic #455) 
 
 ### Element Registry
 
-| Element | Wraps | Responsibilities |
-|---------|-------|-----------------|
-| `<daw-editor>` | PlaylistEngine + external `PlayoutAdapter` | Root element. Manages engine, tracks, state. Requires a consumer-provided adapter (`editor.adapter`) — it creates no AudioContext or adapter of its own (#378). |
-| `<daw-track>` | Track state | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`, `render-mode`. `src` is shorthand for a track with a single implicit clip. |
-| `<daw-clip>` | AudioClip | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer. |
-| `<daw-waveform>` | Canvas rendering | Waveform visualization. Renders peaks to canvas. |
-| `<daw-transport>` | Transport controls container | Groups transport buttons, links to an editor via `for` attribute. |
-| `<daw-track-controls>` | Track mixer strip | Shipped composite: name, volume, pan, mute, solo for one track, rendered by the editor in the frozen controls column. Dispatches a unified `daw-track-control` event (`{trackId, prop, value}`). Individual control elements below complement it (#457). |
-| `<daw-play-button>` | play() | Triggers playback. If recording is armed, starts overdub recording simultaneously. |
-| `<daw-pause-button>` | pause() / togglePauseRecording() | Pauses playback. During recording, toggles pause/resume of the worklet capture (Audacity-style). Reflects state via `data-paused` attribute; sync handled by `daw-recording-pause` / `daw-recording-resume` events so the spacebar shortcut and the button stay consistent. |
-| `<daw-stop-button>` | stop() | Stops playback and recording. Finalizes any in-progress recording into a new clip. |
-| `<daw-record-button>` | record() | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks. |
-| `<daw-rewind-button>` | seekTo(0) | Rewinds playhead to the start of the timeline. |
-| `<daw-fast-forward-button>` | seekTo(duration) | Jumps playhead to the end of the timeline. |
-| `<daw-loop-button>` | toggleLoop() | Toggles loop playback for the current selection. Reflects `aria-pressed` state. |
-| `<daw-time-display>` | currentTime | Shows formatted playback time. |
-| `<daw-selection-start>` | setSelection() | Editable input showing selection start time. Updates selection on change. |
-| `<daw-selection-end>` | setSelection() | Editable input showing selection end time. Updates selection on change. |
-| `<daw-time-format>` | setTimeFormat() | Select for time display format (`hh:mm:ss.sss`, `hh:mm:ss`, `seconds`). Affects time display and selection inputs. |
-| `<daw-tempo>` | editor.bpm property | Editable BPM input. Reflects current tempo. Drives grid/ruler musical time and snap. Display-only when consumer tick callbacks make the external tempo map authoritative (#407). |
-| `<daw-time-signature>` | editor.timeSignature property | Editable time signature (e.g., `4/4`, `3/4`, `6/8`). Drives ruler subdivisions and snap grid. |
-| `<daw-snap-to>` | setSnapTo() | Select for snap granularity. Controls clip drag/trim snapping and `<daw-grid>` line density. See [Snap Subdivisions](#snap-subdivisions). |
-| `<daw-scale-mode>` | setScaleMode() | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler. |
-| `<daw-zoom-in>` | zoomIn() | Zoom in button. Disabled when at maximum zoom. |
-| `<daw-zoom-out>` | zoomOut() | Zoom out button. Disabled when at minimum zoom. |
-| `<daw-undo-button>` | undo() | Undo last structural edit. Auto-disables when `canUndo` is false. |
-| `<daw-redo-button>` | redo() | Redo last undone edit. Auto-disables when `canRedo` is false. |
-| `<daw-playback-rate>` | setPlaybackRate() | Playback speed control. Works with both `<daw-editor>` and `<daw-player>`. |
-| `<daw-player>` | HTMLMediaElement | Lightweight single-track player. Uses `<audio>` element internally — no Tone.js, no engine. Supports waveform, transport, annotations, and optional effects. |
-| `<daw-mute-button>` | mute toggle | Dispatches `daw-mute` event. Auto-wires to parent `<daw-track>` via `closest()`. Reflects `aria-pressed` state. |
-| `<daw-solo-button>` | solo toggle | Dispatches `daw-solo` event. Auto-wires to parent `<daw-track>`. Reflects `aria-pressed` state. |
-| `<daw-volume-slider>` | setTrackVolume() / setMasterVolume() | Volume control. When inside a `<daw-track>`, controls that track. When inside `<daw-transport>`, controls master volume. |
-| `<daw-pan-slider>` | setTrackPan() | Per-track pan control. |
-| `<daw-vu-meter>` | Meter worklet | Level metering (replaces SegmentedVUMeter). |
-| `<daw-ruler>` | Time ruler | Renders time ruler above tracks. In beats & bars mode, uses adaptive label density — skips labels at coarse zoom, shows every bar/beat at fine zoom. Shares tick computation with `<daw-grid>`. |
-| `<daw-grid>` | Beat/bar grid | Canvas-based background grid behind waveforms. Visible only in beats & bars scale mode. Chunked rendering with virtual scrolling (same pattern as `<daw-waveform>`). See [Beat & Bar Grid](#beat--bar-grid). |
-| `<daw-playhead>` | Playhead | Animated playhead line. |
-| `<daw-keyboard-shortcuts>` | Keyboard handler | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`, `undo`. Properties: `customShortcuts`, `playbackShortcuts`, `splittingShortcuts`, `undoShortcuts` (key remapping), `shortcuts` (read-only, all active). |
+| Element                     | Wraps                                      | Responsibilities                                                                                                                                                                                                                                                            |
+| --------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<daw-editor>`              | PlaylistEngine + external `PlayoutAdapter` | Root element. Manages engine, tracks, state. Requires a consumer-provided adapter (`editor.adapter`) — it creates no AudioContext or adapter of its own (#378).                                                                                                             |
+| `<daw-track>`               | Track state                                | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`, `render-mode`. `src` is shorthand for a track with a single implicit clip.                                                        |
+| `<daw-clip>`                | AudioClip                                  | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer.                                         |
+| `<daw-waveform>`            | Canvas rendering                           | Waveform visualization. Renders peaks to canvas.                                                                                                                                                                                                                            |
+| `<daw-transport>`           | Transport controls container               | Groups transport buttons, links to an editor via `for` attribute.                                                                                                                                                                                                           |
+| `<daw-track-controls>`      | Track mixer strip                          | Shipped composite: name, volume, pan, mute, solo for one track, rendered by the editor in the frozen controls column. Dispatches a unified `daw-track-control` event (`{trackId, prop, value}`). Individual control elements below complement it (#457).                    |
+| `<daw-play-button>`         | play()                                     | Triggers playback. If recording is armed, starts overdub recording simultaneously.                                                                                                                                                                                          |
+| `<daw-pause-button>`        | pause() / togglePauseRecording()           | Pauses playback. During recording, toggles pause/resume of the worklet capture (Audacity-style). Reflects state via `data-paused` attribute; sync handled by `daw-recording-pause` / `daw-recording-resume` events so the spacebar shortcut and the button stay consistent. |
+| `<daw-stop-button>`         | stop()                                     | Stops playback and recording. Finalizes any in-progress recording into a new clip.                                                                                                                                                                                          |
+| `<daw-record-button>`       | record()                                   | Arms/starts recording on all armed tracks. When clicked during stop, arms the selected track (or first track). When clicked during play, starts overdub on armed tracks.                                                                                                    |
+| `<daw-rewind-button>`       | seekTo(0)                                  | Rewinds playhead to the start of the timeline.                                                                                                                                                                                                                              |
+| `<daw-fast-forward-button>` | seekTo(duration)                           | Jumps playhead to the end of the timeline.                                                                                                                                                                                                                                  |
+| `<daw-loop-button>`         | toggleLoop()                               | Toggles loop playback for the current selection. Reflects `aria-pressed` state.                                                                                                                                                                                             |
+| `<daw-time-display>`        | currentTime                                | Shows formatted playback time.                                                                                                                                                                                                                                              |
+| `<daw-selection-start>`     | setSelection()                             | Editable input showing selection start time. Updates selection on change.                                                                                                                                                                                                   |
+| `<daw-selection-end>`       | setSelection()                             | Editable input showing selection end time. Updates selection on change.                                                                                                                                                                                                     |
+| `<daw-time-format>`         | setTimeFormat()                            | Select for time display format (`hh:mm:ss.sss`, `hh:mm:ss`, `seconds`). Affects time display and selection inputs.                                                                                                                                                          |
+| `<daw-tempo>`               | editor.bpm property                        | Editable BPM input. Reflects current tempo. Drives grid/ruler musical time and snap. Display-only when consumer tick callbacks make the external tempo map authoritative (#407).                                                                                            |
+| `<daw-time-signature>`      | editor.timeSignature property              | Editable time signature (e.g., `4/4`, `3/4`, `6/8`). Drives ruler subdivisions and snap grid.                                                                                                                                                                               |
+| `<daw-snap-to>`             | setSnapTo()                                | Select for snap granularity. Controls clip drag/trim snapping and `<daw-grid>` line density. See [Snap Subdivisions](#snap-subdivisions).                                                                                                                                   |
+| `<daw-scale-mode>`          | setScaleMode()                             | Select for ruler display mode (`beats`, `temporal`). Switches between bar:beat and minutes:seconds ruler.                                                                                                                                                                   |
+| `<daw-zoom-in>`             | zoomIn()                                   | Zoom in button. Disabled when at maximum zoom.                                                                                                                                                                                                                              |
+| `<daw-zoom-out>`            | zoomOut()                                  | Zoom out button. Disabled when at minimum zoom.                                                                                                                                                                                                                             |
+| `<daw-undo-button>`         | undo()                                     | Undo last structural edit. Auto-disables when `canUndo` is false.                                                                                                                                                                                                           |
+| `<daw-redo-button>`         | redo()                                     | Redo last undone edit. Auto-disables when `canRedo` is false.                                                                                                                                                                                                               |
+| `<daw-playback-rate>`       | setPlaybackRate()                          | Playback speed control. Works with both `<daw-editor>` and `<daw-player>`.                                                                                                                                                                                                  |
+| `<daw-player>`              | HTMLMediaElement                           | Lightweight single-track player. Uses `<audio>` element internally — no Tone.js, no engine. Supports waveform, transport, annotations, and optional effects.                                                                                                                |
+| `<daw-mute-button>`         | mute toggle                                | Dispatches `daw-mute` event. Auto-wires to parent `<daw-track>` via `closest()`. Reflects `aria-pressed` state.                                                                                                                                                             |
+| `<daw-solo-button>`         | solo toggle                                | Dispatches `daw-solo` event. Auto-wires to parent `<daw-track>`. Reflects `aria-pressed` state.                                                                                                                                                                             |
+| `<daw-volume-slider>`       | setTrackVolume() / setMasterVolume()       | Volume control. When inside a `<daw-track>`, controls that track. When inside `<daw-transport>`, controls master volume.                                                                                                                                                    |
+| `<daw-pan-slider>`          | setTrackPan()                              | Per-track pan control.                                                                                                                                                                                                                                                      |
+| `<daw-vu-meter>`            | Meter worklet                              | Level metering (replaces SegmentedVUMeter).                                                                                                                                                                                                                                 |
+| `<daw-ruler>`               | Time ruler                                 | Renders time ruler above tracks. In beats & bars mode, uses adaptive label density — skips labels at coarse zoom, shows every bar/beat at fine zoom. Shares tick computation with `<daw-grid>`.                                                                             |
+| `<daw-grid>`                | Beat/bar grid                              | Canvas-based background grid behind waveforms. Visible only in beats & bars scale mode. Chunked rendering with virtual scrolling (same pattern as `<daw-waveform>`). See [Beat & Bar Grid](#beat--bar-grid).                                                                |
+| `<daw-playhead>`            | Playhead                                   | Animated playhead line.                                                                                                                                                                                                                                                     |
+| `<daw-keyboard-shortcuts>`  | Keyboard handler                           | Render-less element inside `<daw-editor>`. Boolean attributes: `playback`, `splitting`, `undo`. Properties: `customShortcuts`, `playbackShortcuts`, `splittingShortcuts`, `undoShortcuts` (key remapping), `shortcuts` (read-only, all active).                             |
 
 ### Beat & Bar Grid
 
@@ -131,11 +126,11 @@ React packages without a Web Components equivalent yet: annotations (epic #455) 
 
 **Zoom-dependent display:**
 
-| Zoom Level | Lines | Striping |
-|------------|-------|----------|
-| Coarse (bars too dense for labels) | Every Nth bar (matches ruler label density) | None — lines only |
-| Medium (bars visible, beats dense) | Every bar | Bar-level odd/even |
-| Fine (beats visible) | Every beat | Beat-level odd/even |
+| Zoom Level                         | Lines                                       | Striping            |
+| ---------------------------------- | ------------------------------------------- | ------------------- |
+| Coarse (bars too dense for labels) | Every Nth bar (matches ruler label density) | None — lines only   |
+| Medium (bars visible, beats dense) | Every bar                                   | Bar-level odd/even  |
+| Fine (beats visible)               | Every beat                                  | Beat-level odd/even |
 
 Grid line spacing matches the ruler's label spacing — they share the same tick computation logic. The ruler's beats & bars mode uses adaptive label density (skip labels when they'd overlap, show every Nth bar at coarse zoom). The grid follows the same thresholds.
 
@@ -143,8 +138,8 @@ Grid line spacing matches the ruler's label spacing — they share the same tick
 
 ```css
 --daw-grid-bar-highlight: rgba(255, 255, 255, 0.02); /* alternating bar fill */
---daw-grid-major-line: rgba(255, 255, 255, 0.1);     /* bar lines */
---daw-grid-minor-line: rgba(255, 255, 255, 0.06);    /* beat/subdivision lines */
+--daw-grid-major-line: rgba(255, 255, 255, 0.1); /* bar lines */
+--daw-grid-minor-line: rgba(255, 255, 255, 0.06); /* beat/subdivision lines */
 ```
 
 Highlight stripes alternate at whatever the current granularity is (bars at medium zoom, beats at fine zoom). At coarse zoom, no stripes — just lines.
@@ -168,27 +163,34 @@ Expand `SnapTo` from `'bar' | 'beat' | 'off'` to support note subdivisions and t
 
 ```typescript
 type SnapTo =
-  | 'bar'                                          // ticksPerBar
-  | 'beat'                                         // ticksPerBeat (quarter in 4/4, eighth in 6/8)
-  | '1/2' | '1/4' | '1/8' | '1/16' | '1/32'      // straight subdivisions
-  | '1/2T' | '1/4T' | '1/8T' | '1/16T'           // triplets (2/3 of straight value)
+  | 'bar' // ticksPerBar
+  | 'beat' // ticksPerBeat (quarter in 4/4, eighth in 6/8)
+  | '1/2'
+  | '1/4'
+  | '1/8'
+  | '1/16'
+  | '1/32' // straight subdivisions
+  | '1/2T'
+  | '1/4T'
+  | '1/8T'
+  | '1/16T' // triplets (2/3 of straight value)
   | 'off';
 ```
 
 **Grid tick calculation** (shared by `SnapToGridModifier`, `<daw-grid>`, and `<daw-ruler>`):
 
-| SnapTo | Grid ticks (at 960 PPQN, 4/4) | Musical value |
-|--------|-------------------------------|---------------|
-| `bar` | 3840 | 1 bar |
-| `beat` | 960 | quarter note |
-| `1/2` | 1920 | half note |
-| `1/4` | 960 | quarter note (same as beat in 4/4) |
-| `1/8` | 480 | eighth note |
-| `1/16` | 240 | sixteenth note |
-| `1/32` | 120 | thirty-second note |
-| `1/4T` | 640 | quarter triplet (960 * 2/3) |
-| `1/8T` | 320 | eighth triplet (480 * 2/3) |
-| `1/16T` | 160 | sixteenth triplet (240 * 2/3) |
+| SnapTo  | Grid ticks (at 960 PPQN, 4/4) | Musical value                      |
+| ------- | ----------------------------- | ---------------------------------- |
+| `bar`   | 3840                          | 1 bar                              |
+| `beat`  | 960                           | quarter note                       |
+| `1/2`   | 1920                          | half note                          |
+| `1/4`   | 960                           | quarter note (same as beat in 4/4) |
+| `1/8`   | 480                           | eighth note                        |
+| `1/16`  | 240                           | sixteenth note                     |
+| `1/32`  | 120                           | thirty-second note                 |
+| `1/4T`  | 640                           | quarter triplet (960 \* 2/3)       |
+| `1/8T`  | 320                           | eighth triplet (480 \* 2/3)        |
+| `1/16T` | 160                           | sixteenth triplet (240 \* 2/3)     |
 
 The `T` suffix denotes triplet — the note value is multiplied by 2/3. For compound meters (6/8), `beat` is an eighth note (480 ticks), so `1/8T` would be 320 ticks (eighth triplet).
 
@@ -197,7 +199,7 @@ The `T` suffix denotes triplet — the note value is multiplied by 2/3. For comp
 **Utility function** (shipped in `@waveform-playlist/core` — `src/utils/musicalTicks.ts`):
 
 ```typescript
-function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number
+function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number;
 ```
 
 Single source of truth for converting `SnapTo` → tick count. Used by `SnapToGridModifier`, `<daw-grid>`, and `<daw-ruler>`.
@@ -237,12 +239,12 @@ const editor = document.getElementById('my-editor');
 const tracks = editor.querySelectorAll('daw-track');
 
 // Arm specific tracks
-tracks[1].arm();                    // Default mic
+tracks[1].arm(); // Default mic
 tracks[2].arm('specific-device-id'); // Specific mic
 
 // Check armed state
-console.log(editor.armedTrackIds);  // ['track-2', 'track-3']
-console.log(editor.isRecordArmed);  // true
+console.log(editor.armedTrackIds); // ['track-2', 'track-3']
+console.log(editor.isRecordArmed); // true
 
 // Listen for recording events
 editor.addEventListener('daw-recording-start', (e) => {
@@ -260,20 +262,20 @@ editor.addEventListener('daw-recording-pause', (e) => {
 });
 
 // Disarm all
-editor.armedTrackIds.forEach(id => {
+editor.armedTrackIds.forEach((id) => {
   editor.querySelector(`daw-track[id="${id}"]`).disarm();
 });
 ```
 
 ### Optional Elements
 
-> Annotation elements are tracked in epic #455 — not yet implemented. `parseAeneas`/`serializeAeneas` in `@waveform-playlist/annotations` are already framework-agnostic and will be reused.
+> Annotation elements shipped under epic #455. `parseAeneas`/`serializeAeneas` remain React-only in `@waveform-playlist/annotations` — the dawcore elements consume `<daw-annotation>` light-DOM children directly, not those parsers. Hosting `<daw-annotation-track>`/`<daw-annotation>` children inside `<daw-player>` is still open (#477); today they're documented under `<daw-editor>`.
 
-| Element | Package | Responsibilities |
-|---------|---------|-----------------|
-| `<daw-annotation-track>` | annotations | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`. |
-| `<daw-annotation>` | annotations | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track. |
-| `<daw-annotation-list>` | annotations | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data. |
+| Element                  | Package    | Responsibilities                                                                                                                                                                |
+| ------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<daw-annotation-track>` | components | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`, `keyboard-controls`. |
+| `<daw-annotation>`       | components | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track.                                                                               |
+| `<daw-annotation-list>`  | components | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data.                                                                             |
 
 ```html
 <!-- Annotations: single source of truth, dual view -->
@@ -303,6 +305,7 @@ Spectrogram and piano-roll are render modes on `<daw-track>` (via the `render-mo
 **Adapter (required):** `<daw-editor>` does not create an AudioContext or a default adapter. Set `editor.adapter` to a `PlayoutAdapter` before use — `NativePlayoutAdapter` (from `@dawcore/transport`) or `TonePlayoutAdapter` (Tone.js backend). The adapter owns the `AudioContext` and exposes a required `ppqn`; the engine aligns its tick resolution to `adapter.ppqn` on construction (#378).
 
 **Attributes (reflected):**
+
 ```
 samples-per-pixel    Number    1024     Zoom level
 wave-height          Number    128      Track height in px
@@ -319,6 +322,7 @@ file-drop            Boolean   false    Accept dropped audio/MIDI files
 ```
 
 **Properties (JS only):**
+
 ```typescript
 editor.adapter: PlayoutAdapter       // Required — consumer-provided audio backend (#378)
 editor.tracks: TrackWithId[]         // {trackId, name, …} for every track incl. element-less (dropped/programmatic); the trackId keys the per-track APIs (addTrackEffect, removeTrack, updateTrack, …)
@@ -339,8 +343,11 @@ editor.engine: PlaylistEngine        // Direct engine access
 ```
 
 **Methods:**
+
 ```typescript
-editor.play(startTime?): Promise<void>             // Starts overdub if record is armed
+editor.play(startTime?, endTime?): Promise<void>    // Starts overdub if record is armed. endTime disables
+                                                     // looping and stops playback at that time (selection/
+                                                     // annotation playback — used by annotationTrack.playActive())
 editor.pause(): void                               // Pauses playback Transport (does NOT pause active recording — use togglePauseRecording for that)
 editor.stop(): void                                // Stops playback
 editor.record(): Promise<void>                     // Starts recording on all armed tracks
@@ -401,45 +408,47 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 ```
 
 **Events:**
+
 ```typescript
-'daw-ready'         // All tracks loaded
-'daw-play'          // Playback started
-'daw-pause'         // Playback paused
-'daw-stop'          // Playback stopped
-'daw-recording-start'    // Recording started on a track: detail: {trackId, stream}
-'daw-recording-complete' // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
-'daw-recording-error'    // Recording failed: detail: {trackId, error}
-'daw-recording-pause'    // Worklet capture paused: detail: {trackId}
-'daw-recording-resume'   // Worklet capture resumed: detail: {trackId}
-'daw-record-arm'         // Track armed/disarmed: detail: {trackId, armed, armedTrackIds}
-'daw-timeupdate'    // Playback time changed (RAF)
-'daw-selection'     // Selection changed: detail: {start, end}
-'daw-track-select'  // Track selected: detail: {trackId}
-'daw-tracks-change' // Tracks mutated (move/trim/split): detail: {tracks}
-'daw-zoom'          // Zoom changed: detail: {samplesPerPixel}
+'daw-ready'; // All tracks loaded
+'daw-play'; // Playback started
+'daw-pause'; // Playback paused
+'daw-stop'; // Playback stopped
+'daw-recording-start'; // Recording started on a track: detail: {trackId, stream}
+'daw-recording-complete'; // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
+'daw-recording-error'; // Recording failed: detail: {trackId, error}
+'daw-recording-pause'; // Worklet capture paused: detail: {trackId}
+'daw-recording-resume'; // Worklet capture resumed: detail: {trackId}
+'daw-record-arm'; // Track armed/disarmed: detail: {trackId, armed, armedTrackIds}
+'daw-timeupdate'; // Playback time changed (RAF)
+'daw-selection'; // Selection changed: detail: {start, end}
+'daw-track-select'; // Track selected: detail: {trackId}
+'daw-tracks-change'; // Tracks mutated (move/trim/split): detail: {tracks}
+'daw-zoom'; // Zoom changed: detail: {samplesPerPixel}
 // Effect events (bubble from <daw-track> for per-track, dispatched on <daw-editor> for master)
-'daw-effect-add'     // Effect added: detail: {effectId, kind, type, params, index, url?, source?}
-'daw-effect-remove'  // Effect removed: detail: {effectId}
-'daw-effect-change'  // Params updated: detail: {effectId, params}
-'daw-effect-bypass'  // Bypass toggled: detail: {effectId, bypassed}
-'daw-effect-reorder' // Effect moved: detail: {effectId, fromIndex, toIndex}
+'daw-effect-add'; // Effect added: detail: {effectId, kind, type, params, index, url?, source?}
+'daw-effect-remove'; // Effect removed: detail: {effectId}
+'daw-effect-change'; // Params updated: detail: {effectId, params}
+'daw-effect-bypass'; // Bypass toggled: detail: {effectId, bypassed}
+'daw-effect-reorder'; // Effect moved: detail: {effectId, fromIndex, toIndex}
 // Spectrogram
-'daw-spectrogram-ready' // Visible viewport FFT complete: detail: {trackId}
+'daw-spectrogram-ready'; // Visible viewport FFT complete: detail: {trackId}
 // Undo/redo
-'daw-undo-state'        // canUndo/canRedo changed: detail: {canUndo, canRedo}
+'daw-undo-state'; // canUndo/canRedo changed: detail: {canUndo, canRedo}
 // File loading
-'daw-files-load-error'  // Decode/parse failed: detail: {file: File, error: string}
+'daw-files-load-error'; // Decode/parse failed: detail: {file: File, error: string}
 // Programmatic mutation
-'daw-track-ready'       // Track finished loading: detail: {trackId}
-'daw-track-removed'     // Track removed (DOM removal / removeTrack / controls): detail: {trackId} — fired after editor.tracks reflects the removal
-'daw-track-error'       // Track failed to load: detail: {trackId, error}
-'daw-clip-ready'        // Clip finished loading: detail: {trackId, clipId}
-'daw-clip-error'        // Clip failed to load: detail: {trackId, clipId, error}
+'daw-track-ready'; // Track finished loading: detail: {trackId}
+'daw-track-removed'; // Track removed (DOM removal / removeTrack / controls): detail: {trackId} — fired after editor.tracks reflects the removal
+'daw-track-error'; // Track failed to load: detail: {trackId, error}
+'daw-clip-ready'; // Clip finished loading: detail: {trackId, clipId}
+'daw-clip-error'; // Clip failed to load: detail: {trackId, clipId, error}
 ```
 
 ### `<daw-track>` API
 
 **Attributes (reflected):**
+
 ```
 src              String    —        Audio source URL
 name             String    —        Track display name
@@ -453,6 +462,7 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split' | 'pian
 ```
 
 **Properties (JS only):**
+
 ```typescript
 track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
@@ -464,6 +474,7 @@ track.spectrogramConfig: SpectrogramConfig | null  // Per-track override (null =
 ```
 
 **Methods:**
+
 ```typescript
 track.arm(deviceId?: string): Promise<void>   // Arm for recording, request mic access
 track.disarm(): void                          // Disarm, release mic stream
@@ -482,6 +493,7 @@ When `arm()` is called without a `deviceId`, it uses the default input device. T
 ### `<daw-clip>` API
 
 **Attributes (reflected):**
+
 ```
 src              String    —        Audio file URL
 peaks-src        String    —        Pre-computed BBC audiowaveform peaks URL (.dat/.json)
@@ -499,6 +511,7 @@ midi-program     Number    —        MIDI program number (0-127)
 ```
 
 **Properties (JS only):**
+
 ```typescript
 clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
 ```
@@ -518,20 +531,22 @@ Attributes use seconds for human readability. The element converts to the intern
 
 <!-- Multi-clip with positioning, fades, and shared audio source -->
 <daw-track name="Chorus Repeats">
-  <daw-clip src="/audio/chorus.mp3" start="0" duration="8"
-            fade-in="0.5" fade-out="1.0" fade-type="sCurve">
+  <daw-clip
+    src="/audio/chorus.mp3"
+    start="0"
+    duration="8"
+    fade-in="0.5"
+    fade-out="1.0"
+    fade-type="sCurve"
+  >
   </daw-clip>
-  <daw-clip src="/audio/chorus.mp3" start="20" duration="8">
-  </daw-clip>
-  <daw-clip src="/audio/chorus.mp3" start="40" duration="4"
-            offset="2.0" fade-in="0.3">
-  </daw-clip>
+  <daw-clip src="/audio/chorus.mp3" start="20" duration="8"> </daw-clip>
+  <daw-clip src="/audio/chorus.mp3" start="40" duration="4" offset="2.0" fade-in="0.3"> </daw-clip>
 </daw-track>
 
 <!-- Pre-computed peaks for large files (render before decode) -->
 <daw-track name="Full Mix">
-  <daw-clip src="/audio/full-mix.mp3" peaks-src="/peaks/full-mix.dat">
-  </daw-clip>
+  <daw-clip src="/audio/full-mix.mp3" peaks-src="/peaks/full-mix.dat"> </daw-clip>
 </daw-track>
 ```
 
@@ -549,6 +564,7 @@ Multiple `<daw-clip>` elements with the same `src` share one `AudioBuffer` — e
 ### `<daw-annotation-track>` API
 
 **Attributes (reflected):**
+
 ```
 editable           Boolean   false    Allow drag/resize of annotation boxes
 link-endpoints     Boolean   false    Snap adjacent annotation boundaries together
@@ -559,12 +575,14 @@ keyboard-controls  Boolean   false    Enable keyboard navigation and boundary ed
 `editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)).
 
 **Properties (JS only):**
+
 ```typescript
 annotationTrack.activeAnnotationId: string | null                  // Currently selected annotation
 annotationTrack.annotationShortcuts: AnnotationShortcutMap | null  // Key remapping (null = defaults)
 ```
 
 **Methods:**
+
 ```typescript
 annotationTrack.selectNext(): void
 annotationTrack.selectPrevious(): void
@@ -576,6 +594,24 @@ annotationTrack.moveStartBoundary(deltaMs: number): void
 annotationTrack.moveEndBoundary(deltaMs: number): void
 ```
 
+**Navigation with no active selection:** `selectNext()` with no `activeAnnotationId` selects the FIRST annotation (not the second); `selectPrevious()` with no selection selects the LAST annotation. Both wrap normally (last→first, first→last) once a selection exists. This lets `ArrowDown`/`ArrowRight` and `ArrowUp`/`ArrowLeft` behave symmetrically as "enter the list from either end" on first press.
+
+**Capture-phase keyboard priority:** each `<daw-annotation-track keyboard-controls>` registers its keydown listener on `document` in the **capture** phase (`addEventListener('keydown', handler, true)`), which runs before `<daw-keyboard-shortcuts>`' bubble-phase listener regardless of DOM position. A consumed key calls `e.stopImmediatePropagation()` (not `stopPropagation()`) — this is required because multiple annotation tracks each register their own capture listener on the same `document` node, and `stopPropagation()` does not stop sibling listeners on that node, only `stopImmediatePropagation()` does. The practical effect: when two or more `<daw-annotation-track keyboard-controls>` elements are present, a consumed key acts on exactly the **first-registered track (DOM connection order)** — not every track, and not the "closest" or "focused" one. Keys the track doesn't consume (`Escape` with no selection, boundary-edit keys when not `editable` or nothing selected) fall through both to sibling annotation tracks and to `<daw-keyboard-shortcuts>`.
+
+**Beats-mode variable-tempo limitation:** the annotation lane positions boxes with `left = floor(start_seconds * sampleRate / spp)` — a seconds-based mapping — using the same `spp` (`_renderSpp`) the beats grid uses. Clip positions in beats mode instead derive pixels from `startTick / ticksPerPixel` directly. Under a **fixed** tempo the two mappings agree, but under **variable tempo** (consumer-supplied `secondsToTicks`/`ticksToSeconds` callbacks with tempo changes), annotation boxes drift out of alignment with the tick-positioned clips and grid — annotations have no tick-space representation (`AnnotationData.start`/`end` are seconds-only). Fixing this requires giving annotations first-class tick positions, tracked as a follow-up.
+
+**Events (`<daw-annotation>` / `<daw-annotation-track>`):**
+
+```typescript
+'daw-annotation-connected'; // <daw-annotation> mounted: detail: {annotationId, element}
+'daw-annotation-update'; // start/end changed (after first render, not on initial mount): detail: {annotationId}
+'daw-annotation-select'; // activeAnnotationId changed on a track (incl. clear → null): detail: {annotation: AnnotationData | null}
+'daw-annotation-track-connected'; // <daw-annotation-track> mounted: detail: {element}
+'daw-error'; // annotation shortcut action threw: detail: {operation: 'annotation-shortcut', key, error}
+```
+
+All bubble and compose (cross Shadow DOM boundaries). `daw-annotation-select` is dispatched on the `<daw-annotation-track>` element (`e.target` identifies which track), consumed by `<daw-annotation-list for="...">` to sync its active row.
+
 ### `<daw-player>` API
 
 > Core implemented in #473 (epic #454). Wraps `@waveform-playlist/media-element-playout`. Outstanding follow-ups: effects (#475), `<daw-playback-rate>` element (#476), transport-compat tests (#474), annotations (#477).
@@ -583,6 +619,7 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 A lightweight single-track audio player that uses `HTMLMediaElement` (`<audio>`) internally — no Tone.js, no PlaylistEngine. Ideal for podcast players, music previews, audiobook readers, or any scenario that needs waveform visualization without multi-track editing.
 
 **Attributes (reflected):**
+
 ```
 src              String    —        Audio source URL
 peaks-src        String    —        Pre-computed BBC audiowaveform peaks URL (.dat/.json)
@@ -597,6 +634,7 @@ playback-rate    Number    1        Playback speed (0.25–4.0)
 ```
 
 **Properties (JS only):**
+
 ```typescript
 player.isPlaying: boolean            // Read-only: playback state
 player.currentTime: number           // Current playback position (seconds)
@@ -608,6 +646,7 @@ player.theme: DawcoreTheme           // Theme object
 ```
 
 **Methods:**
+
 ```typescript
 player.play(): void
 player.pause(): void
@@ -624,24 +663,25 @@ player.moveEffect(effectId: string, newIndex: number): void
 ```
 
 **Events:**
+
 ```typescript
-'daw-ready'       // Audio metadata loaded, waveform rendered
-'daw-play'        // Playback started
-'daw-pause'       // Playback paused
-'daw-stop'        // Playback stopped (reset to 0)
-'daw-timeupdate'  // Playback time changed (RAF)
-'daw-ended'       // Playback reached end of audio
+'daw-ready'; // Audio metadata loaded, waveform rendered
+'daw-play'; // Playback started
+'daw-pause'; // Playback paused
+'daw-stop'; // Playback stopped (reset to 0)
+'daw-timeupdate'; // Playback time changed (RAF)
+'daw-ended'; // Playback reached end of audio
 ```
 
 **AudioContext lifecycle:** The player uses `HTMLMediaElement` directly — no AudioContext needed for basic playback. When the first effect is added via `addEffect()`, the player lazily creates an AudioContext, connects the `<audio>` element through a `MediaElementAudioSourceNode`, routes through the effects chain, and connects to the destination. This means zero Web Audio overhead for simple playback use cases.
 
-**Children:** `<daw-player>` accepts `<daw-annotation-track>` and `<daw-annotation>` children for lyric display, chapter markers, or transcription overlays.
+**Children (planned, #477):** `<daw-player>` does not yet render `<daw-annotation-track>` / `<daw-annotation>` children for lyric display, chapter markers, or transcription overlays — only `<daw-editor>` hosts the annotation lane today (see [`<daw-annotation-track>` API](#daw-annotation-track-api)). The markup below is the target shape once #477 lands.
 
 ```html
 <!-- Simple player -->
 <daw-player src="/audio/episode-42.mp3" wave-height="80" timescale></daw-player>
 
-<!-- Player with transport controls -->
+<!-- Player with transport controls (annotation children not yet supported, #477) -->
 <daw-player id="my-player" src="/audio/song.mp3" wave-height="64">
   <daw-annotation-track editable>
     <daw-annotation start="0" end="30">Intro</daw-annotation>
@@ -661,9 +701,9 @@ player.moveEffect(effectId: string, newIndex: number): void
 
 <!-- Player with effects (AudioContext created lazily) -->
 <script>
-const player = document.querySelector('daw-player');
-player.addEffect('tonejs-reverb', { decay: 3, wet: 0.4 });
-// AudioContext now exists, audio routed through reverb
+  const player = document.querySelector('daw-player');
+  player.addEffect('tonejs-reverb', { decay: 3, wet: 0.4 });
+  // AudioContext now exists, audio routed through reverb
 </script>
 ```
 
@@ -671,29 +711,29 @@ player.addEffect('tonejs-reverb', { decay: 3, wet: 0.4 });
 
 `<daw-transport>` works with both `<daw-editor>` and `<daw-player>` via the `for` attribute. Most transport elements work with either target, but some are editor-only:
 
-| Element | `<daw-editor>` | `<daw-player>` | Notes |
-|---------|:-:|:-:|-------|
-| `<daw-play-button>` | Yes | Yes | |
-| `<daw-pause-button>` | Yes | Yes | |
-| `<daw-stop-button>` | Yes | Yes | |
-| `<daw-rewind-button>` | Yes | Yes | |
-| `<daw-fast-forward-button>` | Yes | Yes | |
-| `<daw-time-display>` | Yes | Yes | |
-| `<daw-volume-slider>` | Yes | Yes | Master volume in transport context |
-| `<daw-playback-rate>` | Yes | Yes | |
-| `<daw-undo-button>` | Yes | No | Player has no undo stack |
-| `<daw-redo-button>` | Yes | No | Player has no undo stack |
-| `<daw-loop-button>` | Yes | No | Player has no selection-based loop |
-| `<daw-record-button>` | Yes | No | Player doesn't support recording |
-| `<daw-selection-start>` | Yes | No | |
-| `<daw-selection-end>` | Yes | No | |
-| `<daw-time-format>` | Yes | Yes | |
-| `<daw-tempo>` | Yes | No | |
-| `<daw-time-signature>` | Yes | No | |
-| `<daw-snap-to>` | Yes | No | |
-| `<daw-scale-mode>` | Yes | No | |
-| `<daw-zoom-in>` | Yes | No | Player has fixed zoom |
-| `<daw-zoom-out>` | Yes | No | |
+| Element                     | `<daw-editor>` | `<daw-player>` | Notes                              |
+| --------------------------- | :------------: | :------------: | ---------------------------------- |
+| `<daw-play-button>`         |      Yes       |      Yes       |                                    |
+| `<daw-pause-button>`        |      Yes       |      Yes       |                                    |
+| `<daw-stop-button>`         |      Yes       |      Yes       |                                    |
+| `<daw-rewind-button>`       |      Yes       |      Yes       |                                    |
+| `<daw-fast-forward-button>` |      Yes       |      Yes       |                                    |
+| `<daw-time-display>`        |      Yes       |      Yes       |                                    |
+| `<daw-volume-slider>`       |      Yes       |      Yes       | Master volume in transport context |
+| `<daw-playback-rate>`       |      Yes       |      Yes       |                                    |
+| `<daw-undo-button>`         |      Yes       |       No       | Player has no undo stack           |
+| `<daw-redo-button>`         |      Yes       |       No       | Player has no undo stack           |
+| `<daw-loop-button>`         |      Yes       |       No       | Player has no selection-based loop |
+| `<daw-record-button>`       |      Yes       |       No       | Player doesn't support recording   |
+| `<daw-selection-start>`     |      Yes       |       No       |                                    |
+| `<daw-selection-end>`       |      Yes       |       No       |                                    |
+| `<daw-time-format>`         |      Yes       |      Yes       |                                    |
+| `<daw-tempo>`               |      Yes       |       No       |                                    |
+| `<daw-time-signature>`      |      Yes       |       No       |                                    |
+| `<daw-snap-to>`             |      Yes       |       No       |                                    |
+| `<daw-scale-mode>`          |      Yes       |       No       |                                    |
+| `<daw-zoom-in>`             |      Yes       |       No       | Player has fixed zoom              |
+| `<daw-zoom-out>`            |      Yes       |       No       |                                    |
 
 Transport elements that don't apply to `<daw-player>` render as disabled and log a warning to the console on first interaction.
 
@@ -708,7 +748,7 @@ Replace styled-components theme with CSS custom properties:
 ```css
 daw-editor {
   --daw-wave-color: #c49a6c;
-  --daw-progress-color: #63C75F;
+  --daw-progress-color: #63c75f;
   --daw-playhead-color: #d08070;
   --daw-selection-color: rgba(99, 199, 95, 0.3);
   --daw-background: #1a1a2e;
@@ -717,10 +757,10 @@ daw-editor {
   --daw-ruler-background: #0f0f1a;
   --daw-controls-background: #1a1a2e;
   --daw-controls-text: #e0d4c8;
-  --daw-controls-width: 180px;       /* Track-controls column width */
-  --daw-clip-header-background: rgba(0,0,0,0.4);
+  --daw-controls-width: 180px; /* Track-controls column width */
+  --daw-clip-header-background: rgba(0, 0, 0, 0.4);
   --daw-clip-header-text: #e0d4c8;
-  --daw-min-height: 200px;            /* Min scroll-area height for empty editor / drop zone */
+  --daw-min-height: 200px; /* Min scroll-area height for empty editor / drop zone */
 }
 ```
 
@@ -728,12 +768,24 @@ daw-editor {
 
 ```css
 /* Style internal parts from outside */
-daw-editor::part(timescale) { font-family: 'Courier New'; }
-daw-editor::part(track) { border-bottom: 1px solid #333; }
-daw-editor::part(cursor) { width: 2px; }
-daw-track::part(controls) { width: 200px; }
-daw-track::part(waveform) { background: #111; }
-daw-vu-meter::part(segment) { border-radius: 2px; }
+daw-editor::part(timescale) {
+  font-family: 'Courier New';
+}
+daw-editor::part(track) {
+  border-bottom: 1px solid #333;
+}
+daw-editor::part(cursor) {
+  width: 2px;
+}
+daw-track::part(controls) {
+  width: 200px;
+}
+daw-track::part(waveform) {
+  background: #111;
+}
+daw-vu-meter::part(segment) {
+  border-radius: 2px;
+}
 ```
 
 ### Slots
@@ -790,10 +842,12 @@ Slotted content lives in the light DOM and can't access shadow DOM internals dir
   // Custom events bubble up through the DOM tree.
   // Use composed: true to cross shadow DOM boundaries.
   document.querySelector('.fx-btn').addEventListener('click', (e) => {
-    e.target.dispatchEvent(new CustomEvent('open-fx', {
-      bubbles: true,
-      composed: true,
-    }));
+    e.target.dispatchEvent(
+      new CustomEvent('open-fx', {
+        bubbles: true,
+        composed: true,
+      })
+    );
   });
 
   // Ancestor catches the event — closest() identifies which track
@@ -818,7 +872,9 @@ Slotted content lives in the light DOM and can't access shadow DOM internals dir
     <!-- Built-in: fires daw-mute event -->
     <daw-mute-button></daw-mute-button>
     <!-- Custom: fires the same event, same behavior -->
-    <button onclick="this.dispatchEvent(new CustomEvent('daw-mute', { bubbles: true, composed: true }))">
+    <button
+      onclick="this.dispatchEvent(new CustomEvent('daw-mute', { bubbles: true, composed: true }))"
+    >
       My Custom Mute
     </button>
   </div>
@@ -854,15 +910,15 @@ Effects are **imperative only** — no `<daw-effect>` element. Effects are confi
 
 ```typescript
 interface EffectState {
-  id: string;                        // Generated unique ID
-  kind: string;                      // 'native' | 'wam'
-  type: string;                      // Registry key (e.g., 'native-delay') or 'wam'
-  params: Record<string, number>;    // Current parameter values
+  id: string; // Generated unique ID
+  kind: string; // 'native' | 'wam'
+  type: string; // Registry key (e.g., 'native-delay') or 'wam'
+  params: Record<string, number>; // Current parameter values
   bypassed: boolean;
-  url?: string;                      // WAM plugin source URL (url-loaded plugins)
-  source?: { faust: string };        // Faust entries: the DSP source they were compiled from
-  label?: string;                    // Human-readable name (e.g. a WAM descriptor's name)
-  error?: string;                    // Set when the entry is a non-functional placeholder
+  url?: string; // WAM plugin source URL (url-loaded plugins)
+  source?: { faust: string }; // Faust entries: the DSP source they were compiled from
+  label?: string; // Human-readable name (e.g. a WAM descriptor's name)
+  error?: string; // Set when the entry is a non-functional placeholder
 }
 ```
 
@@ -872,13 +928,13 @@ Chain state round-trips via `getEffectsState()` / `setEffectsState()` — native
 
 Built-ins use a `native-` prefix and plain Web Audio nodes:
 
-| Type | Label | Category |
-|------|-------|----------|
-| `native-gain` | Gain | dynamics |
-| `native-filter` | Lowpass Filter | filter |
-| `native-compressor` | Compressor | dynamics |
-| `native-stereo-panner` | Stereo Panner | spatial |
-| `native-delay` | Delay | delay |
+| Type                   | Label          | Category |
+| ---------------------- | -------------- | -------- |
+| `native-gain`          | Gain           | dynamics |
+| `native-filter`        | Lowpass Filter | filter   |
+| `native-compressor`    | Compressor     | dynamics |
+| `native-stereo-panner` | Stereo Panner  | spatial  |
+| `native-delay`         | Delay          | delay    |
 
 ### WAM & Faust Plugins
 
@@ -975,15 +1031,15 @@ interface EffectDefinition {
   category: string;
   defaults: Record<string, number>;
   params: Record<string, EffectParamDef>;
-  wetParam?: string;  // Name of the wet/dry param, when the effect has one
+  wetParam?: string; // Name of the wet/dry param, when the effect has one
   // Must work on any BaseAudioContext so the same definitions serve offline rendering:
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => EffectInstance;
 }
 
 interface EffectInstance {
-  input: AudioNode;    // Chain attachment points (same node for single-node effects)
+  input: AudioNode; // Chain attachment points (same node for single-node effects)
   output: AudioNode;
-  applyParams: (params: Record<string, number>) => void;  // In-place — chain never rebuilds for param changes
+  applyParams: (params: Record<string, number>) => void; // In-place — chain never rebuilds for param changes
   dispose?: () => void;
 }
 
@@ -991,7 +1047,7 @@ interface EffectParamDef {
   min: number;
   max: number;
   step?: number;
-  unit?: string;  // 's', 'ms', 'Hz', 'dB', '%'
+  unit?: string; // 's', 'ms', 'Hz', 'dB', '%'
 }
 ```
 
@@ -1023,11 +1079,11 @@ track.setEffectBypassed(delayId, true);
 track.setEffectBypassed(delayId, false);
 
 // Reorder and remove
-track.moveEffect(filterId, 0);     // Move filter before delay
+track.moveEffect(filterId, 0); // Move filter before delay
 track.removeEffect(filterId);
 
 // Read current state
-console.log(track.effects);  // EffectState[] (see Effect State above)
+console.log(track.effects); // EffectState[] (see Effect State above)
 console.log(editor.effects); // Master chain, same shape
 ```
 
@@ -1058,11 +1114,11 @@ editor.addEventListener('daw-effect-bypass', (e) => {
 
 ```typescript
 interface ExportOptions {
-  format?: 'wav';           // Extensible for future formats
-  sampleRate?: number;       // Default: audioContext.sampleRate
-  startTime?: number;        // Default: 0
-  duration?: number;         // Default: editor.duration
-  channels?: 1 | 2;         // Default: 2 (stereo)
+  format?: 'wav'; // Extensible for future formats
+  sampleRate?: number; // Default: audioContext.sampleRate
+  startTime?: number; // Default: 0
+  duration?: number; // Default: editor.duration
+  channels?: 1 | 2; // Default: 2 (stereo)
 }
 ```
 
@@ -1078,7 +1134,7 @@ const buffer = await editor.exportAudio({
 });
 
 // Convert to WAV blob for download
-const wav = audioBufferToWav(buffer);  // utility from @dawcore/core
+const wav = audioBufferToWav(buffer); // utility from @dawcore/core
 const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
 ```
 
@@ -1107,6 +1163,7 @@ Spectrogram and piano-roll are **render modes on `<daw-track>`**, not standalone
 `waveform`, `spectrogram`, and `piano-roll` are shipped. `split` is tracked in #491 — today it warns and falls back to `spectrogram`.
 
 Switchable at runtime:
+
 ```js
 track.renderMode = 'spectrogram';
 // or
@@ -1119,15 +1176,15 @@ Complex object — JS property, not attributes. Global defaults on the editor, p
 
 ```typescript
 interface SpectrogramConfig {
-  fftSize?: 256 | 512 | 1024 | 2048 | 4096 | 8192;  // Default: 2048
-  hopSize?: number;                                    // Default: fftSize / 4
+  fftSize?: 256 | 512 | 1024 | 2048 | 4096 | 8192; // Default: 2048
+  hopSize?: number; // Default: fftSize / 4
   windowFunction?: 'hann' | 'hamming' | 'blackman' | 'rectangular' | 'bartlett' | 'blackman-harris';
-  frequencyScale?: 'linear' | 'logarithmic' | 'mel' | 'bark' | 'erb';  // Default: 'mel'
+  frequencyScale?: 'linear' | 'logarithmic' | 'mel' | 'bark' | 'erb'; // Default: 'mel'
   colorMap?: 'viridis' | 'magma' | 'inferno' | 'grayscale' | 'igray' | 'roseus';
-  minFrequency?: number;     // Default: 0
-  maxFrequency?: number;     // Default: sampleRate / 2
-  gainDb?: number;           // Default: 20
-  rangeDb?: number;          // Default: 80
+  minFrequency?: number; // Default: 0
+  maxFrequency?: number; // Default: sampleRate / 2
+  gainDb?: number; // Default: 20
+  rangeDb?: number; // Default: 80
 }
 ```
 
@@ -1149,8 +1206,9 @@ track.spectrogramConfig = null;
 **Worker pool:** Created lazily when the first track uses `'spectrogram'` or `'split'` mode. Disposed when no tracks use those modes. Internal — no consumer-facing pool API.
 
 **Event:**
+
 ```typescript
-'daw-spectrogram-ready'  // Visible viewport FFT complete: detail: {trackId}
+'daw-spectrogram-ready'; // Visible viewport FFT complete: detail: {trackId}
 ```
 
 Useful for E2E tests and screenshot tooling.
@@ -1196,11 +1254,13 @@ Created tracks get `render-mode="piano-roll"` automatically. Each track's clip c
 **Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks before rejecting — the editor returns to its pre-call state. Documented limitation: an `AbortSignal` only cancels the fetch phase; aborts during the track-creation phase are a no-op (the in-flight `addTrack` calls run to completion).
 
 **Deferred to future versions:**
+
 - `flatten` option (needs a "hidden audio-only track" primitive in dawcore)
 - `name` override (ambiguous semantics with multi-track files)
 - Auto-applied tempo / time signature (currently caller does `editor.bpm = result.bpm`)
 
 For programmatic MIDI (no file), set `clip.midiNotes` directly:
+
 ```javascript
 const track = await editor.addTrack({ name: 'Synth Lead' });
 const clip = track.querySelector('daw-clip');
@@ -1243,6 +1303,7 @@ Render-less element placed inside `<daw-editor>`. Enables built-in shortcut pres
 ```
 
 **Attributes (reflected):**
+
 ```
 playback         Boolean   false    Space=play/pause, Escape=stop, 0=rewind
 splitting        Boolean   false    S=split clip at playhead on selected track
@@ -1250,6 +1311,7 @@ undo             Boolean   false    Cmd/Ctrl+Z=undo, Cmd/Ctrl+Shift+Z=redo
 ```
 
 **Properties (JS only):**
+
 ```typescript
 shortcuts.customShortcuts: KeyboardShortcut[]          // Additional custom shortcuts
 shortcuts.shortcuts: KeyboardShortcut[]                // Read-only. All active shortcuts (built-in + custom)
@@ -1258,12 +1320,13 @@ shortcuts.splittingShortcuts: SplittingShortcutMap | null  // Remap splitting ke
 ```
 
 **Shortcut definition shape:**
+
 ```typescript
 interface KeyboardShortcut {
-  key: string;              // 'Space', 's', 'Escape', 'ArrowUp', etc.
-  action: () => void;       // Callback
-  description?: string;     // Human-readable label
-  ctrlKey?: boolean;        // Modifier (optional — if omitted, any state matches)
+  key: string; // 'Space', 's', 'Escape', 'ArrowUp', etc.
+  action: () => void; // Callback
+  description?: string; // Human-readable label
+  ctrlKey?: boolean; // Modifier (optional — if omitted, any state matches)
   shiftKey?: boolean;
   metaKey?: boolean;
   altKey?: boolean;
@@ -1281,19 +1344,20 @@ interface KeyBinding {
 
 **Built-in playback shortcuts:**
 
-| Action | Default Key | Description |
-|--------|------------|-------------|
-| `playPause` | `Space` | Play/Pause |
-| `stop` | `Escape` | Stop |
-| `rewindToStart` | `0` | Rewind to start |
+| Action          | Default Key | Description     |
+| --------------- | ----------- | --------------- |
+| `playPause`     | `Space`     | Play/Pause      |
+| `stop`          | `Escape`    | Stop            |
+| `rewindToStart` | `0`         | Rewind to start |
 
 **Built-in splitting shortcuts:**
 
-| Action | Default Key | Description |
-|--------|------------|-------------|
-| `splitAtPlayhead` | `S` | Split clip at playhead |
+| Action            | Default Key | Description            |
+| ----------------- | ----------- | ---------------------- |
+| `splitAtPlayhead` | `S`         | Split clip at playhead |
 
 **Remapping built-in shortcuts:**
+
 ```typescript
 interface PlaybackShortcutMap {
   playPause?: KeyBinding;
@@ -1326,12 +1390,13 @@ shortcuts.playbackShortcuts = null;
 ```
 
 **Behaviors:**
+
 - Ignores key repeat (no rapid toggling from held keys)
 - Ignores events from `<input>`, `<textarea>`, and `contentEditable` elements
 - Case-insensitive key matching
 - First match wins
 
-**Priority rule:** When both `<daw-keyboard-shortcuts>` and `<daw-annotation-track keyboard-controls>` are active, annotation shortcuts run first. If an annotation is selected and the key matches an annotation action, the event is consumed (`stopPropagation`). Otherwise it falls through to editor-level shortcuts. This means `Escape` clears the annotation selection first; pressing `Escape` again (with no selection) stops playback.
+**Priority rule:** When both `<daw-keyboard-shortcuts>` and `<daw-annotation-track keyboard-controls>` are active, annotation shortcuts run first — the annotation track's `keydown` listener registers on `document` in the **capture** phase, ahead of `<daw-keyboard-shortcuts>`' bubble-phase listener. If an annotation is selected and the key matches an annotation action, the event is consumed via `stopImmediatePropagation()` (also blocks sibling annotation-track capture listeners — see [multi-track arbitration](#daw-annotation-track-api)). Otherwise it falls through to editor-level shortcuts. This means `Escape` clears the annotation selection first; pressing `Escape` again (with no selection) stops playback.
 
 ### Annotation Keyboard Controls
 
@@ -1345,6 +1410,7 @@ Enabled via `keyboard-controls` attribute on `<daw-annotation-track>`. Shortcuts
 ```
 
 **Properties (JS only):**
+
 ```typescript
 annotationTrack.activeAnnotationId: string | null              // Currently selected annotation
 annotationTrack.annotationShortcuts: AnnotationShortcutMap | null  // Key remapping (null = defaults)
@@ -1352,20 +1418,21 @@ annotationTrack.annotationShortcuts: AnnotationShortcutMap | null  // Key remapp
 
 **Default key bindings:**
 
-| Action | Default Key | Description |
-|--------|------------|-------------|
-| `selectPrevious` | `ArrowUp` / `ArrowLeft` | Select previous (wraps) |
-| `selectNext` | `ArrowDown` / `ArrowRight` | Select next (wraps) |
-| `selectFirst` | `Home` | Select first |
-| `selectLast` | `End` | Select last |
-| `clearSelection` | `Escape` | Deselect |
-| `moveStartEarlier` | `[` | Start −10ms |
-| `moveStartLater` | `]` | Start +10ms |
-| `moveEndEarlier` | `{` (Shift+[) | End −10ms |
-| `moveEndLater` | `}` (Shift+]) | End +10ms |
-| `playActive` | `Enter` | Play selected annotation |
+| Action             | Default Key                | Description              |
+| ------------------ | -------------------------- | ------------------------ |
+| `selectPrevious`   | `ArrowUp` / `ArrowLeft`    | Select previous (wraps)  |
+| `selectNext`       | `ArrowDown` / `ArrowRight` | Select next (wraps)      |
+| `selectFirst`      | `Home`                     | Select first             |
+| `selectLast`       | `End`                      | Select last              |
+| `clearSelection`   | `Escape`                   | Deselect                 |
+| `moveStartEarlier` | `[`                        | Start −10ms              |
+| `moveStartLater`   | `]`                        | Start +10ms              |
+| `moveEndEarlier`   | `{` (Shift+[)              | End −10ms                |
+| `moveEndLater`     | `}` (Shift+])              | End +10ms                |
+| `playActive`       | `Enter`                    | Play selected annotation |
 
 **Remapping:**
+
 ```typescript
 interface AnnotationShortcutMap {
   selectPrevious?: KeyBinding;
@@ -1390,6 +1457,7 @@ annotationTrack.annotationShortcuts = {
 ```
 
 **Exposed methods** (for programmatic use outside keyboard shortcuts):
+
 ```typescript
 annotationTrack.selectNext(): void
 annotationTrack.selectPrevious(): void
@@ -1402,10 +1470,14 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 ```
 
 **Behaviors:**
+
 - Auto-scrolls to center the active annotation on keyboard selection change
 - Respects `link-endpoints` — boundary moves cascade to adjacent annotations
-- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration
+- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration — unless `<daw-editor indefinite-playback>` is set, which lifts the end bound entirely (DAW-style unbounded timeline) so annotations may extend past the audio. In temporal mode (not beats mode) the timeline width also extends to cover the furthest annotation end, keeping such annotations reachable/scrollable regardless of `indefinite-playback`.
 - Navigation shortcuts always active; boundary editing requires `editable` attribute
+- `selectNext`/`selectPrevious` with no active selection jump to the first/last annotation respectively rather than a no-op (see [Navigation with no active selection](#daw-annotation-track-api))
+- Multiple `keyboard-controls` tracks: a consumed key acts on the first-registered track only (capture-phase `stopImmediatePropagation` — see [Capture-phase keyboard priority](#daw-annotation-track-api))
+- In `scale-mode="beats"` with variable tempo, annotation-box positions can drift from tick-positioned clips/grid (see [Beats-mode variable-tempo limitation](#daw-annotation-track-api))
 
 ---
 
@@ -1425,7 +1497,7 @@ Two consumer-facing ways to mutate tracks at runtime exist by design: **declarat
 // Engine is null until something loads
 console.log(editor.engine); // null
 
-await editor.ready();        // builds engine if needed
+await editor.ready(); // builds engine if needed
 console.log(editor.engine); // PlaylistEngine
 ```
 
@@ -1437,7 +1509,7 @@ Appending a `<daw-track>` element to a connected `<daw-editor>` is fully support
 const t = document.createElement('daw-track');
 t.setAttribute('src', '/audio/kick.opus');
 t.setAttribute('name', 'Kick');
-editor.appendChild(t);   // → daw-track-ready event fires when loaded
+editor.appendChild(t); // → daw-track-ready event fires when loaded
 ```
 
 Removal works via `element.remove()` — the editor's MutationObserver detects detached `<daw-track>` nodes and cleans up engine state, peaks, and clip buffers. The engine call is incremental (`adapter.removeTrack`) when the adapter supports it; otherwise it falls back to `setTracks()` and stops playback.
@@ -1592,7 +1664,7 @@ midiInput.onchange = async () => {
 `loadFiles()` does no upfront MIME type filtering — every file is passed to `AudioContext.decodeAudioData()`. Non-audio files (`.pdf`, `.txt`, `.mid`, etc.) will fail at decode and emit a `daw-files-load-error` event. This is intentional for audio: the browser's decoder is the most reliable detector of valid audio. For MIDI files, route through `editor.loadMidi()` instead.
 
 ```typescript
-'daw-files-load-error'  // detail: {file: File, error: string}
+'daw-files-load-error'; // detail: {file: File, error: string}
 ```
 
 ```javascript
@@ -1612,51 +1684,62 @@ All elements render correct ARIA roles, labels, and states in their Shadow DOM a
 ### ARIA Roles & Semantics
 
 **`<daw-editor>`:**
+
 - `role="region"` — preserves standard screen reader browse-mode navigation
 - `aria-label="Audio editor"` (default, overridable)
 - `aria-roledescription="audio editor"`
 
 **`<daw-track>`:**
+
 - `role="group"`
 - `aria-label` derived from `name` attribute (e.g., "Vocals")
 - `aria-roledescription="audio track"`
 - `aria-selected` reflects track selection state
 
 **`<daw-clip>`:**
+
 - `aria-hidden="true"` — clips are visual representations within the canvas, not keyboard-navigable in this phase
 
 **Transport buttons** (`<daw-play-button>`, `<daw-stop-button>`, etc.):
+
 - Render a native `<button>` in Shadow DOM
 - `aria-label` set automatically ("Play", "Pause", "Stop", etc.)
 - Toggle buttons (`<daw-loop-button>`, `<daw-mute-button>`, `<daw-solo-button>`, `<daw-record-button>`) — `aria-pressed` reflects toggle state
 
 **`<daw-volume-slider>`, `<daw-pan-slider>`:**
+
 - Render a native `<input type="range">` in Shadow DOM
 - `aria-label` set automatically ("Volume", "Pan", or "Track Vocals volume")
 - `aria-valuemin`, `aria-valuemax`, `aria-valuenow` reflect current range
 
 **`<daw-time-display>`:**
+
 - `role="status"`
 - `aria-label="Playback time"`
 - `aria-live="off"` — not announced every frame; screen reader users query on demand
 
 **`<daw-vu-meter>`:**
+
 - `role="meter"` (ARIA 1.2)
 - `aria-valuenow`, `aria-valuemin`, `aria-valuemax` reflect current level
 - `aria-label` set automatically (e.g., "Vocals level", "Master level")
 
 **`<daw-selection-start>`, `<daw-selection-end>`:**
+
 - Render native `<input>` in Shadow DOM
 - `aria-label="Selection start time"` / `aria-label="Selection end time"`
 
 **`<daw-tempo>`, `<daw-time-signature>`, `<daw-time-format>`, `<daw-snap-to>`, `<daw-scale-mode>`:**
+
 - Render native `<input>` or `<select>` in Shadow DOM
 - `aria-label` set automatically ("Tempo", "Time signature", "Time format", "Snap to", "Scale mode")
 
 **`<daw-ruler>`, `<daw-playhead>`:**
+
 - `aria-hidden="true"` — visual-only elements, screen readers skip them
 
 **`<daw-annotation-track>` / `<daw-annotation>`:**
+
 - Track: `role="list"`, annotations: `role="listitem"`
 - `aria-label` from text content and time range (e.g., "First line, 0.0 to 2.5 seconds")
 - `aria-selected` reflects active annotation state
@@ -1665,17 +1748,18 @@ All elements render correct ARIA roles, labels, and states in their Shadow DOM a
 
 Arrow keys navigate between tracks when the editor has focus. Standard Tab order applies within track controls and transport.
 
-| Key | Action |
-|-----|--------|
-| `ArrowUp` | Focus previous track |
-| `ArrowDown` | Focus next track |
-| `Tab` | Move focus to next focusable element (controls, then next track) |
-| `Shift+Tab` | Move focus backwards |
-| `Enter` | Select focused track |
+| Key         | Action                                                           |
+| ----------- | ---------------------------------------------------------------- |
+| `ArrowUp`   | Focus previous track                                             |
+| `ArrowDown` | Focus next track                                                 |
+| `Tab`       | Move focus to next focusable element (controls, then next track) |
+| `Shift+Tab` | Move focus backwards                                             |
+| `Enter`     | Select focused track                                             |
 
 **Note:** `Space` is reserved for play/pause (via `<daw-keyboard-shortcuts playback>`), not track selection. ArrowUp/Down for track navigation only applies when no `<daw-annotation-track keyboard-controls>` has an active selection — annotation shortcuts take priority per the [Keyboard Shortcuts](#keyboard-shortcuts) priority rule.
 
 **Focus order within a track:**
+
 1. Track itself (group)
 2. Track controls slot (volume, pan, mute, solo — standard Tab order)
 3. Next track
@@ -1686,7 +1770,7 @@ Arrow keys navigate between tracks when the editor has focus. Standard Tab order
 
 ```css
 daw-track::part(focus-ring) {
-  outline: 2px solid #63C75F;
+  outline: 2px solid #63c75f;
   outline-offset: 2px;
 }
 ```
@@ -1697,29 +1781,30 @@ daw-track::part(focus-ring) {
 
 **Transport state:**
 
-| Event | Announcement |
-|-------|-------------|
-| Play | "Playing" |
-| Pause | "Paused" |
-| Stop | "Stopped" |
+| Event        | Announcement                  |
+| ------------ | ----------------------------- |
+| Play         | "Playing"                     |
+| Pause        | "Paused"                      |
+| Stop         | "Stopped"                     |
 | Record start | "Recording on Vocals, Guitar" |
-| Record stop | "Recording stopped" |
+| Record stop  | "Recording stopped"           |
 
 **Track/clip operations:**
 
-| Event | Announcement |
-|-------|-------------|
-| Track selected | "Track Vocals selected" |
-| Track added | "Track Piano added" |
-| Track removed | "Track Piano removed" |
-| Track muted / unmuted | "Vocals muted" / "Vocals unmuted" |
+| Event                   | Announcement                        |
+| ----------------------- | ----------------------------------- |
+| Track selected          | "Track Vocals selected"             |
+| Track added             | "Track Piano added"                 |
+| Track removed           | "Track Piano removed"               |
+| Track muted / unmuted   | "Vocals muted" / "Vocals unmuted"   |
 | Track soloed / unsoloed | "Vocals soloed" / "Vocals unsoloed" |
-| Clip split | "Clip split at 5.2 seconds" |
-| Record armed | "Vocals armed for recording" |
-| Loop enabled / disabled | "Loop enabled" / "Loop disabled" |
-| Zoom in / out | "Zoom: 512 samples per pixel" |
+| Clip split              | "Clip split at 5.2 seconds"         |
+| Record armed            | "Vocals armed for recording"        |
+| Loop enabled / disabled | "Loop enabled" / "Loop disabled"    |
+| Zoom in / out           | "Zoom: 512 samples per pixel"       |
 
 **Not announced** (query on demand):
+
 - Time updates during playback (continuous, would be noisy)
 - Selection changes (visual operation)
 
@@ -1735,13 +1820,13 @@ Clip drag, boundary trim, and waveform scrubbing remain mouse-only. Keyboard alt
 
 Only structural edits are undoable — operations that change the track/clip document model:
 
-| Undoable | Not Undoable |
-|----------|-------------|
-| Clip move (drop) | Volume, pan, mute, solo |
-| Clip trim | Selection changes |
-| Clip split | Zoom |
-| Add/remove track | Loop region |
-| Add/remove clip | Playback transport (play/pause/stop/seek) |
+| Undoable         | Not Undoable                              |
+| ---------------- | ----------------------------------------- |
+| Clip move (drop) | Volume, pan, mute, solo                   |
+| Clip trim        | Selection changes                         |
+| Clip split       | Zoom                                      |
+| Add/remove track | Loop region                               |
+| Add/remove clip  | Playback transport (play/pause/stop/seek) |
 
 Volume, pan, mute, and solo are live mixing adjustments — non-destructive and instantly reversible by the user. Selection and zoom are navigation, not edits.
 
@@ -1844,6 +1929,7 @@ editor.clearHistory(): void
 ```
 
 Default bindings:
+
 - **Cmd/Ctrl+Z** — Undo
 - **Cmd/Ctrl+Shift+Z** — Redo
 
@@ -1862,7 +1948,7 @@ interface UndoShortcutMap {
 - **`daw-undo-state`** fires when `canUndo` or `canRedo` changes:
 
 ```typescript
-'daw-undo-state'  // detail: {canUndo: boolean, canRedo: boolean}
+'daw-undo-state'; // detail: {canUndo: boolean, canRedo: boolean}
 ```
 
 ```javascript
@@ -1877,9 +1963,9 @@ Note: `<daw-undo-button>` and `<daw-redo-button>` handle this automatically — 
 ### Live Region Announcements
 
 | Action | Announcement |
-|--------|-------------|
-| Undo | "Undo" |
-| Redo | "Redo" |
+| ------ | ------------ |
+| Undo   | "Undo"       |
+| Redo   | "Redo"       |
 
 ---
 
@@ -1979,10 +2065,18 @@ import '@dawcore/components';
 import { ref } from 'vue';
 
 const editorRef = ref(null);
-function play() { editorRef.value?.play(); }
-function onReady() { console.log('loaded'); }
-function onTracksChange(e) { console.log(e.detail.tracks); }
-function onRecord(e) { console.log('recording', e.detail.trackIds); }
+function play() {
+  editorRef.value?.play();
+}
+function onReady() {
+  console.log('loaded');
+}
+function onTracksChange(e) {
+  console.log(e.detail.tracks);
+}
+function onRecord(e) {
+  console.log('recording', e.detail.trackIds);
+}
 </script>
 ```
 
@@ -1990,7 +2084,7 @@ One config line tells the Vue compiler which tags are custom elements:
 
 ```typescript
 // vite.config.ts
-vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('daw-') } } })
+vue({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('daw-') } } });
 ```
 
 ### Svelte
@@ -2050,13 +2144,13 @@ export class AppModule {}
 
 ### Framework Compatibility
 
-| Framework | Properties | Custom Events | Config Needed | Extra Types |
-|-----------|-----------|---------------|---------------|-------------|
-| Vanilla JS | `.property =` | `addEventListener()` | None | None |
-| React 19+ | Native | `onDawReady` | None | JSX `IntrinsicElements` (shipped) |
-| Vue 3 | `:prop` binding | `@event` | `isCustomElement` | Optional Volar types |
-| Svelte | `prop={value}` | `on:event` | None | None |
-| Angular | `[prop]` binding | `(event)` | `CUSTOM_ELEMENTS_SCHEMA` | None |
+| Framework  | Properties       | Custom Events        | Config Needed            | Extra Types                       |
+| ---------- | ---------------- | -------------------- | ------------------------ | --------------------------------- |
+| Vanilla JS | `.property =`    | `addEventListener()` | None                     | None                              |
+| React 19+  | Native           | `onDawReady`         | None                     | JSX `IntrinsicElements` (shipped) |
+| Vue 3      | `:prop` binding  | `@event`             | `isCustomElement`        | Optional Volar types              |
+| Svelte     | `prop={value}`   | `on:event`           | None                     | None                              |
+| Angular    | `[prop]` binding | `(event)`            | `CUSTOM_ELEMENTS_SCHEMA` | None                              |
 
 ---
 
@@ -2114,8 +2208,8 @@ Create `@dawcore/components` package with core elements:
 
 ### Phase 4: Optional Features
 
-- [ ] `<daw-annotation-track>`, `<daw-annotation>`, `<daw-annotation-list>` → **epic #455**
-- [ ] Annotation keyboard controls → #480
+- [x] `<daw-annotation-track>`, `<daw-annotation>`, `<daw-annotation-list>` → **epic #455**
+- [x] Annotation keyboard controls → #480
 - [x] Spectrogram render mode (`split` → #491)
 - [x] Spectrogram config — editor global + track override, lazy worker pool
 - [x] `editor.loadMidi()` — multi-track MIDI loading with cleanup-on-failure
@@ -2141,14 +2235,14 @@ Create `@dawcore/components` package with core elements:
 
 ## Build & Tooling
 
-| Concern | Approach |
-|---------|---------|
-| **Build** | tsup (same as current packages) |
-| **Types** | TypeScript; Custom Elements Manifest planned (#487) |
-| **CSS** | CSS custom properties + `::part()` (part exposure tracked in #494) |
-| **Testing** | Vitest + happy-dom |
+| Concern         | Approach                                                                                |
+| --------------- | --------------------------------------------------------------------------------------- |
+| **Build**       | tsup (same as current packages)                                                         |
+| **Types**       | TypeScript; Custom Elements Manifest planned (#487)                                     |
+| **CSS**         | CSS custom properties + `::part()` (part exposure tracked in #494)                      |
+| **Testing**     | Vitest + happy-dom                                                                      |
 | **Drag & Drop** | Native pointer events (`PointerHandler` / `ClipPointerHandler`) — @dnd-kit/dom not used |
-| **Docs** | Docusaurus (existing website) |
+| **Docs**        | Docusaurus (existing website)                                                           |
 
 Storybook was dropped from the plan (decision 2026-06-11).
 
@@ -2158,27 +2252,27 @@ Storybook was dropped from the plan (decision 2026-06-11).
 
 The React packages are **not** being replaced — both surfaces coexist (see Package Landscape). This table maps React APIs to their Web Components equivalents for consumers moving between them:
 
-| React (`@waveform-playlist/*`) | Web Components (`@dawcore/*`) |
-|-----------------------|-------------|
-| `@waveform-playlist/browser` (React) | `@dawcore/components` (Web Components) |
-| `@waveform-playlist/ui-components` (React) | Merged into `@dawcore/components` |
-| `WaveformPlaylistProvider` (React context) | `<daw-editor>` element |
-| `usePlaylistControls()` | `element.play()`, `element.stop()`, etc. |
-| `usePlaylistState()` | `element.isPlaying`, `element.selection`, etc. |
-| `usePlaylistData()` | `element.tracks`, `element.duration`, etc. |
-| `usePlaybackAnimation()` | `daw-timeupdate` event |
-| `onTracksChange` prop | `daw-tracks-change` event |
-| styled-components theme | CSS custom properties |
-| `@dnd-kit/react` | `@dnd-kit/dom` |
-| `useDynamicEffects()` / `useTrackDynamicEffects()` | `editor.addEffect()` / `track.addEffect()` (imperative) |
-| `SpectrogramProvider` (React context) | `render-mode="spectrogram"` attribute + `spectrogramConfig` property |
-| `useMidiTracks()` hook | `editor.loadMidi()` method |
-| `<KeyboardShortcuts>` (React component) | `<daw-keyboard-shortcuts>` element |
-| `useAnnotationKeyboardControls()` hook | `<daw-annotation-track keyboard-controls>` attribute |
-| `useDynamicTracks()` hook (file/blob loading) | `editor.loadFiles()` method + `file-drop` attribute |
-| `useUndoRedo()` hook (planned) | `engine.undo()` / `engine.redo()` + `<daw-undo-button>` / `<daw-redo-button>` |
-| `MediaElementPlaylistProvider` (React context) | `<daw-player>` element |
-| `useMediaElementControls()` | `player.play()`, `player.pause()`, etc. |
+| React (`@waveform-playlist/*`)                     | Web Components (`@dawcore/*`)                                                 |
+| -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `@waveform-playlist/browser` (React)               | `@dawcore/components` (Web Components)                                        |
+| `@waveform-playlist/ui-components` (React)         | Merged into `@dawcore/components`                                             |
+| `WaveformPlaylistProvider` (React context)         | `<daw-editor>` element                                                        |
+| `usePlaylistControls()`                            | `element.play()`, `element.stop()`, etc.                                      |
+| `usePlaylistState()`                               | `element.isPlaying`, `element.selection`, etc.                                |
+| `usePlaylistData()`                                | `element.tracks`, `element.duration`, etc.                                    |
+| `usePlaybackAnimation()`                           | `daw-timeupdate` event                                                        |
+| `onTracksChange` prop                              | `daw-tracks-change` event                                                     |
+| styled-components theme                            | CSS custom properties                                                         |
+| `@dnd-kit/react`                                   | `@dnd-kit/dom`                                                                |
+| `useDynamicEffects()` / `useTrackDynamicEffects()` | `editor.addEffect()` / `track.addEffect()` (imperative)                       |
+| `SpectrogramProvider` (React context)              | `render-mode="spectrogram"` attribute + `spectrogramConfig` property          |
+| `useMidiTracks()` hook                             | `editor.loadMidi()` method                                                    |
+| `<KeyboardShortcuts>` (React component)            | `<daw-keyboard-shortcuts>` element                                            |
+| `useAnnotationKeyboardControls()` hook             | `<daw-annotation-track keyboard-controls>` attribute                          |
+| `useDynamicTracks()` hook (file/blob loading)      | `editor.loadFiles()` method + `file-drop` attribute                           |
+| `useUndoRedo()` hook (planned)                     | `engine.undo()` / `engine.redo()` + `<daw-undo-button>` / `<daw-redo-button>` |
+| `MediaElementPlaylistProvider` (React context)     | `<daw-player>` element                                                        |
+| `useMediaElementControls()`                        | `player.play()`, `player.pause()`, etc.                                       |
 
 React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 

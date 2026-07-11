@@ -1,3 +1,6 @@
+import './elements/daw-annotation';
+import './elements/daw-annotation-track';
+import './elements/daw-annotation-list';
 import './elements/daw-clip';
 import './elements/daw-track';
 import './elements/daw-waveform';
@@ -19,6 +22,9 @@ import './elements/daw-time-display';
 import './elements/daw-time-format';
 import './elements/daw-player';
 
+export { DawAnnotationElement } from './elements/daw-annotation';
+export { DawAnnotationTrackElement } from './elements/daw-annotation-track';
+export { DawAnnotationListElement } from './elements/daw-annotation-list';
 export { DawClipElement } from './elements/daw-clip';
 export { DawTrackElement } from './elements/daw-track';
 export { DawWaveformElement } from './elements/daw-waveform';
@@ -50,6 +56,7 @@ export type {
 } from './elements/daw-keyboard-shortcuts';
 
 export { AudioResumeController } from './controllers/audio-resume-controller';
+export { ANNOTATION_LANE_HEIGHT } from './controllers/annotation-controller';
 export { RecordingController } from './controllers/recording-controller';
 export type { RecordingOptions, RecordingSession } from './controllers/recording-controller';
 export { PlaybackAnimationController } from './controllers/playback-animation-controller';
@@ -117,6 +124,10 @@ export type {
   DawEffectBypassDetail,
   DawEffectReorderDetail,
   DawEffectErrorDetail,
+  DawAnnotationConnectedDetail,
+  DawAnnotationUpdateDetail,
+  DawAnnotationSelectDetail,
+  DawAnnotationTrackConnectedDetail,
   DawTimeUpdateDetail,
   DawTimeFormatChangeDetail,
   LoadFilesResult,

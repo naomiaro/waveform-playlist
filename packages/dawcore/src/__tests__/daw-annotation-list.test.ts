@@ -1,0 +1,138 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import '../elements/daw-annotation';
+import '../elements/daw-annotation-track';
+import '../elements/daw-annotation-list';
+import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
+import type { DawAnnotationListElement } from '../elements/daw-annotation-list';
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
+describe('<daw-annotation-list>', () => {
+  let track: DawAnnotationTrackElement;
+  let list: DawAnnotationListElement;
+
+  beforeEach(async () => {
+    track = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track.id = 'lyrics';
+    track.innerHTML =
+      '<daw-annotation id="a" start="0" end="2.5">First line</daw-annotation>' +
+      '<daw-annotation id="b" start="2.5" end="5">Second line</daw-annotation>';
+    document.body.appendChild(track);
+    list = document.createElement('daw-annotation-list') as DawAnnotationListElement;
+    list.setAttribute('for', 'lyrics');
+    document.body.appendChild(list);
+    await flush();
+    await list.updateComplete;
+  });
+
+  afterEach(() => {
+    track.remove();
+    list.remove();
+  });
+
+  it('renders one row per annotation with text and times', () => {
+    const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toContain('First line');
+    expect(rows[0].textContent).toContain('0:00');
+  });
+
+  it('re-renders when an annotation attribute changes (dual-view sync)', async () => {
+    const el = track.querySelector('#b') as HTMLElement & { end: number };
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    el.end = 9;
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    await flush();
+    await list.updateComplete;
+    const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+    expect(rows[1].textContent).toContain('0:09');
+  });
+
+  it('re-renders when an annotation is added or removed', async () => {
+    track.insertAdjacentHTML(
+      'beforeend',
+      '<daw-annotation id="c" start="5" end="7">Third</daw-annotation>'
+    );
+    await flush();
+    await list.updateComplete;
+    expect(list.shadowRoot!.querySelectorAll('.annotation-row')).toHaveLength(3);
+    track.querySelector('#c')!.remove();
+    await flush();
+    await list.updateComplete;
+    expect(list.shadowRoot!.querySelectorAll('.annotation-row')).toHaveLength(2);
+  });
+
+  it('clicking a row selects it and seeks the host editor', async () => {
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    editor.appendChild(track);
+    const seekTo = vi.fn();
+    (editor as unknown as { seekTo: unknown }).seekTo = seekTo;
+    await flush();
+    await list.updateComplete;
+    const row = list.shadowRoot!.querySelectorAll('.annotation-row')[1] as HTMLElement;
+    row.click();
+    expect(track.activeAnnotationId).toBe('b');
+    expect(seekTo).toHaveBeenCalledWith(2.5);
+    editor.remove();
+  });
+
+  it('highlights the active row on daw-annotation-select', async () => {
+    track.activeAnnotationId = 'a';
+    await list.updateComplete;
+    const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+    expect(rows[0].classList.contains('active')).toBe(true);
+    expect(rows[1].classList.contains('active')).toBe(false);
+  });
+
+  it('text is contenteditable only when the track is editable', async () => {
+    let span = list.shadowRoot!.querySelector('.annotation-row-text') as HTMLElement;
+    expect(span.getAttribute('contenteditable')).toBeNull();
+    track.editable = true;
+    await track.updateComplete;
+    await flush();
+    await list.updateComplete;
+    span = list.shadowRoot!.querySelector('.annotation-row-text') as HTMLElement;
+    expect(span.getAttribute('contenteditable')).toBe('true');
+  });
+
+  it('committing a text edit writes back to the daw-annotation textContent', async () => {
+    track.editable = true;
+    await track.updateComplete;
+    await flush();
+    await list.updateComplete;
+    const span = list.shadowRoot!.querySelector('.annotation-row-text') as HTMLElement;
+    span.textContent = 'Edited line';
+    span.dispatchEvent(new FocusEvent('blur'));
+    expect(track.querySelector('#a')!.textContent).toBe('Edited line');
+  });
+
+  it('renders empty and warns on unresolvable for target', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const orphan = document.createElement('daw-annotation-list') as DawAnnotationListElement;
+    orphan.setAttribute('for', 'missing');
+    document.body.appendChild(orphan);
+    await flush();
+    await orphan.updateComplete;
+    expect(orphan.shadowRoot!.querySelectorAll('.annotation-row')).toHaveLength(0);
+    expect(warn).toHaveBeenCalled();
+    orphan.remove();
+    warn.mockRestore();
+  });
+
+  it('cancelling an edit with Escape restores the original text and does not commit on the resulting blur', async () => {
+    track.editable = true;
+    await track.updateComplete;
+    await flush();
+    await list.updateComplete;
+    const span = list.shadowRoot!.querySelector('.annotation-row-text') as HTMLElement;
+    span.dispatchEvent(new FocusEvent('focus'));
+    span.textContent = 'draft text';
+    span.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(span.textContent).toBe('First line');
+    expect(track.querySelector('#a')!.textContent).toBe('First line');
+    // A subsequent blur (e.g. focus moving elsewhere) must not commit 'draft text'.
+    span.dispatchEvent(new FocusEvent('blur'));
+    expect(track.querySelector('#a')!.textContent).toBe('First line');
+  });
+});
