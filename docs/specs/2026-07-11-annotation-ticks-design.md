@@ -45,6 +45,16 @@ For tick-based annotations, ticks are authoritative; `start`/`end` seconds are a
 - **Temporal mode: no changes.** Tick annotations render from their (always-fresh) seconds cache.
 - **Beats mode:** `boxGeometry` branches for tick-based annotations: `left = Math.round(startTick / ticksPerPixel)`, `width = Math.round(endTick / ticksPerPixel) − left` — the identical math clips use, so tick annotations align pixel-exactly with `<daw-grid>`. This removes the documented lane-drift limitation for tick-based annotations; it remains only for seconds-based annotations under variable tempo (docs updated accordingly).
 
+## Lane Box Labels (`box-label` attribute)
+
+The React annotations example renders the annotation **id** in the timeline box and the full text only in the list (`AnnotationText.tsx:299` vs `:335`). To recreate that faithfully while preserving the shipped text-in-bar behavior, `<daw-annotation-track>` gains a `box-label` enum attribute (reflected string):
+
+- `"text"` (default — current behavior): box shows the annotation's text.
+- `"id"`: box shows the annotation's `id` attribute when set, else its 1-based position in the track. Sonnet-style: short ids in the bars, full lines in the list.
+- `"none"`: box renders no label — pure region bar even when text exists for the list.
+
+The controller's lane template reads `track.boxLabel` per track. The list is unaffected (always full text).
+
 ## Label-less Regions & Optional List (contractual)
 
 - Empty-text `<daw-annotation start-tick end-tick></daw-annotation>` renders as a clean bar (already works; gains tests).
@@ -54,7 +64,7 @@ For tick-based annotations, ticks are authoritative; `start`/`end` seconds are a
 ## Demos
 
 1. **`examples/dawcore-native/beats-grid.html`** (existing beats-mode demo): add a tick-based, label-less annotation region track — bar-aligned sections (`start-tick`/`end-tick`, blank text, NO `<daw-annotation-list>`) — demonstrating tick positioning against `<daw-grid>`, snap-on boundary dragging, and data-only region marking, all in the mode where they matter. The existing temporal `annotations.html` demo is untouched.
-2. **`examples/dawcore-native/sonnet.html`** (new): recreates the classic React Sonnet 18 annotations example (seconds-based — aeneas timings are time-domain). Inlines the aeneas-format `defaultNotes` array from `website/src/components/examples/AnnotationsExample.tsx` (line ~41) and builds `<daw-annotation>` elements in a module script (no package import needed — the begin/end/lines mapping is three fields); audio `/media/audio/sonnet.mp3` (already in `website/static`, the examples' publicDir). Editable, link-endpoints, keyboard-controls, with a `<daw-annotation-list>`. Listed in the demo index + README.
+2. **`examples/dawcore-native/sonnet.html`** (new): recreates the classic React Sonnet 18 annotations example (seconds-based — aeneas timings are time-domain). Inlines the aeneas-format `defaultNotes` array from `website/src/components/examples/AnnotationsExample.tsx` (line ~41) and builds `<daw-annotation>` elements in a module script (no package import needed — the begin/end/lines mapping is three fields); audio `/media/audio/sonnet.mp3` (already in `website/static`, the examples' publicDir). Editable, link-endpoints, keyboard-controls, `box-label="id"` (aeneas ids in the bars, full lines only in the list — matching the React example), with a `<daw-annotation-list>`. Listed in the demo index + README.
 
 ## Error Handling
 
@@ -66,7 +76,7 @@ For tick-based annotations, ticks are authoritative; `start`/`end` seconds are a
 ## Testing
 
 - **Core:** `updateAnnotationBoundaries` options parameter — defaults preserve existing behavior (existing suite unmodified); tick-unit runs (integer positions, linkThreshold 0.5, minDuration 30 @ ppqn 960) cover link cascade, collision, min-duration in tick space.
-- **dawcore (happy-dom):** tick attribute validation + `isTickBased` rules (both/one/none); `toAnnotationData` tick fields; derive sweep on connect and BPM change (seconds rewritten, loop settles); beats-mode `boxGeometry` tick branch (exact clip-math parity values); drag in tick space honoring `snapTo` (mock host with beats fields per dawcore test conventions); mixed-track link math across unit spaces; `moveStartBoundary` ms→tick conversion; blank-text bar rendering; list-less track functionality; empty-row placeholder.
+- **dawcore (happy-dom):** tick attribute validation + `isTickBased` rules (both/one/none); `toAnnotationData` tick fields; derive sweep on connect and BPM change (seconds rewritten, loop settles); beats-mode `boxGeometry` tick branch (exact clip-math parity values); drag in tick space honoring `snapTo` (mock host with beats fields per dawcore test conventions); mixed-track link math across unit spaces; `moveStartBoundary` ms→tick conversion; blank-text bar rendering; list-less track functionality; empty-row placeholder; `box-label` modes (text default / id-with-fallback-to-position / none) rendering the right lane label while the list stays full-text.
 - **Real browser (beats mode):** drag a tick annotation with snap on → edges land on grid lines; change BPM → annotations stay on their bars while the list's times update; sonnet page: lines display/edit/seek correctly, Enter plays a line and stops.
 
 ## Documentation (same PR)
