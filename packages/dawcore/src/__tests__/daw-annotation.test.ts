@@ -88,4 +88,66 @@ describe('<daw-annotation>', () => {
     expect(spy).toHaveBeenCalled();
     document.body.removeEventListener('daw-annotation-update', spy);
   });
+
+  it('parses start-tick/end-tick and reports isTickBased', async () => {
+    el.setAttribute('start-tick', '960');
+    el.setAttribute('end-tick', '1920');
+    document.body.appendChild(el);
+    await flush();
+    expect(el.startTick).toBe(960);
+    expect(el.endTick).toBe(1920);
+    expect(el.isTickBased).toBe(true);
+    expect(el.toAnnotationData().startTick).toBe(960);
+    expect(el.toAnnotationData().endTick).toBe(1920);
+  });
+
+  it('is not tick-based without tick attributes, and omits tick fields', async () => {
+    document.body.appendChild(el);
+    await flush();
+    expect(el.isTickBased).toBe(false);
+    expect('startTick' in el.toAnnotationData()).toBe(false);
+  });
+
+  it('rejects invalid tick values with a warning', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    document.body.appendChild(el);
+    await flush();
+    el.startTick = 960;
+    el.startTick = -5; // rejected
+    el.startTick = 1.5; // rejected (non-integer)
+    el.startTick = NaN; // rejected
+    expect(el.startTick).toBe(960);
+    expect(warn).toHaveBeenCalledTimes(3);
+    warn.mockRestore();
+  });
+
+  it('warns once when exactly one tick attribute is set', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    el.setAttribute('start-tick', '960');
+    document.body.appendChild(el);
+    await flush();
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    expect(el.isTickBased).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    // Setting the second tick clears the half-configured state; no repeat warn.
+    el.endTick = 1920;
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    expect(el.isTickBased).toBe(true);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('dispatches daw-annotation-update on tick change after first render', async () => {
+    el.setAttribute('start-tick', '0');
+    el.setAttribute('end-tick', '960');
+    document.body.appendChild(el);
+    await flush();
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    const spy = vi.fn();
+    document.body.addEventListener('daw-annotation-update', spy);
+    el.endTick = 1920;
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+    expect(spy).toHaveBeenCalled();
+    document.body.removeEventListener('daw-annotation-update', spy);
+  });
 });
