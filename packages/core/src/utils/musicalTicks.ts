@@ -285,6 +285,61 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
 }
 
 /**
+ * Convert an absolute tick to a 1-based bar.beat position, honoring meter
+ * changes. Bars/beats are counted per meter segment (the same walk
+ * `computeMusicalTicks` uses to build its `barOffset` accumulator). Beat is
+ * the integer beat the tick falls WITHIN (floor, 1-based) — a tick exactly on
+ * a bar line is beat 1.
+ *
+ * Guards: empty `meterEntries` → treat as 4/4 from tick 0. `ppqn <= 0` →
+ * returns `{ bar: 1, beat: 1 }` (division-by-zero guard, matches
+ * `computeMusicalTicks`'s ppqn guard).
+ */
+export function ticksToBarBeat(
+  tick: number,
+  meterEntries: MeterEntry[],
+  ppqn: number
+): { bar: number; beat: number } {
+  if (ppqn <= 0) return { bar: 1, beat: 1 };
+
+  const entries =
+    meterEntries.length > 0 ? meterEntries : [{ tick: 0, numerator: 4, denominator: 4 }];
+
+  let barOffset = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const meter = entries[i];
+    const segmentStart = meter.tick;
+    const segmentEnd = i + 1 < entries.length ? entries[i + 1].tick : Number.MAX_SAFE_INTEGER;
+    const ts: [number, number] = [meter.numerator, meter.denominator];
+    const tpBar = ticksPerBar(ts, ppqn);
+    const tpBeat = ticksPerBeat(ts, ppqn);
+
+    if (tick >= segmentStart && tick < segmentEnd) {
+      const offset = tick - segmentStart;
+      const barIndexInSegment = Math.floor(offset / tpBar);
+      const beatInBar = Math.floor((offset % tpBar) / tpBeat);
+      return { bar: barOffset + barIndexInSegment + 1, beat: beatInBar + 1 };
+    }
+
+    if (segmentEnd !== Number.MAX_SAFE_INTEGER) {
+      const segmentLen = segmentEnd - segmentStart;
+      barOffset += Math.floor(segmentLen / tpBar);
+    }
+  }
+
+  // tick precedes the first meter entry (non-standard input) — fall back to
+  // the first meter's math from its own start tick.
+  const first = entries[0];
+  const ts: [number, number] = [first.numerator, first.denominator];
+  const tpBar = ticksPerBar(ts, ppqn);
+  const tpBeat = ticksPerBeat(ts, ppqn);
+  const offset = tick - first.tick;
+  const barIndexInSegment = Math.floor(offset / tpBar);
+  const beatInBar = Math.floor((offset % tpBar) / tpBeat);
+  return { bar: barIndexInSegment + 1, beat: beatInBar + 1 };
+}
+
+/**
  * Snaps a tick position to the nearest grid boundary defined by `snapTo`.
  *
  * Finds the meter entry active at the tick position and snaps relative to

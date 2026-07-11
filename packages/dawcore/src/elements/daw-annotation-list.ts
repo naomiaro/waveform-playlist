@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { ticksToBarBeat } from '@waveform-playlist/core';
+import type { AnnotationData, MeterEntry } from '@waveform-playlist/core';
 import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import type { DawAnnotationElement } from './daw-annotation';
 import type { DawAnnotationSelectDetail, DawTimeUpdateDetail } from '../events';
@@ -15,6 +16,13 @@ function formatAnnotationTime(seconds: number): string {
   return m + ':' + String(s).padStart(2, '0') + '.' + String(ms).padStart(3, '0');
 }
 
+/** Structural view of the host editor — only what bars-mode formatting touches. */
+interface AnnotationListHostEditor extends HTMLElement {
+  _secondsToTicks(seconds: number): number;
+  _meterEntries: MeterEntry[];
+  ppqn: number;
+}
+
 /**
  * Scrollable text panel over a <daw-annotation-track>'s children — the same
  * <daw-annotation> elements the editor lane renders (single source of truth).
@@ -23,6 +31,13 @@ function formatAnnotationTime(seconds: number): string {
 @customElement('daw-annotation-list')
 export class DawAnnotationListElement extends LitElement {
   @property() for = '';
+
+  /** `'time'` (default): m:ss.mmm clock times, unchanged. `'bars'`: B.b – B.b
+   *  bar.beat ranges resolved via the host editor's meter map — falls back
+   *  to time display (and warns once) when no `<daw-editor>` ancestor is
+   *  found via `this.track?.closest('daw-editor')`. */
+  @property({ type: String, attribute: 'time-display', reflect: true })
+  timeDisplay: 'time' | 'bars' = 'time';
 
   /** Suppress re-render while a row's text is being edited. */
   @state() private _editingId: string | null = null;
@@ -35,6 +50,10 @@ export class DawAnnotationListElement extends LitElement {
   private _observer: MutationObserver | null = null;
   private _observedTrack: DawAnnotationTrackElement | null = null;
   private _warnedMissing = false;
+  /** Warn once per resolved `for` target when bars mode can't find a host
+   *  editor — reset alongside `_warnedMissing` on `for` change so a
+   *  retargeted list can warn again for its new target. */
+  private _warnedNoEditorForBars = false;
   /** Set around `_cancelEdit`'s `span.blur()` so the resulting synchronous
    *  blur event doesn't re-enter `_commitEdit` (cancel already restores the
    *  text and clears `_editingId` itself). */
@@ -106,7 +125,10 @@ export class DawAnnotationListElement extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>): void {
     // Allow a retargeted list to warn again for its new `for` value.
-    if (changed.has('for')) this._warnedMissing = false;
+    if (changed.has('for')) {
+      this._warnedMissing = false;
+      this._warnedNoEditorForBars = false;
+    }
   }
 
   connectedCallback() {
@@ -222,6 +244,31 @@ export class DawAnnotationListElement extends LitElement {
     editor?.seekTo?.(a.start);
   }
 
+  /** Formats a row's times span per `timeDisplay`. `'bars'` resolves the
+   *  host editor once (shared across all rows in a render) and falls back
+   *  to time display, warning once, when no editor is found. */
+  private _formatTimes(a: AnnotationData, editor: AnnotationListHostEditor | null): string {
+    if (this.timeDisplay === 'bars') {
+      if (editor) {
+        const isTickBased = a.startTick !== undefined && a.endTick !== undefined;
+        const startTick = isTickBased ? (a.startTick as number) : editor._secondsToTicks(a.start);
+        const endTick = isTickBased ? (a.endTick as number) : editor._secondsToTicks(a.end);
+        const start = ticksToBarBeat(startTick, editor._meterEntries, editor.ppqn);
+        const end = ticksToBarBeat(endTick, editor._meterEntries, editor.ppqn);
+        return start.bar + '.' + start.beat + ' – ' + end.bar + '.' + end.beat;
+      }
+      if (!this._warnedNoEditorForBars) {
+        console.warn(
+          '[dawcore] <daw-annotation-list for="' +
+            this.for +
+            '" time-display="bars"> found no parent <daw-editor> — falling back to time display'
+        );
+        this._warnedNoEditorForBars = true;
+      }
+    }
+    return formatAnnotationTime(a.start) + ' – ' + formatAnnotationTime(a.end);
+  }
+
   private _annotationElement(id: string): DawAnnotationElement | null {
     return this.track?.annotationElements.find((el) => el.annotationId === id) ?? null;
   }
@@ -252,6 +299,10 @@ export class DawAnnotationListElement extends LitElement {
     const track = this.track;
     const annotations = track?.annotations ?? [];
     const editable = track?.editable ?? false;
+    const editor =
+      this.timeDisplay === 'bars'
+        ? ((track?.closest('daw-editor') as AnnotationListHostEditor | null) ?? null)
+        : null;
     return html`
       ${annotations.map(
         (a) => html`
@@ -278,9 +329,7 @@ export class DawAnnotationListElement extends LitElement {
               this._onRowClick(a);
             }}
           >
-            <span class="annotation-row-times">
-              ${formatAnnotationTime(a.start)} – ${formatAnnotationTime(a.end)}
-            </span>
+            <span class="annotation-row-times"> ${this._formatTimes(a, editor)} </span>
             <span
               class="annotation-row-text"
               data-id=${a.id}

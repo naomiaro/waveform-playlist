@@ -258,4 +258,103 @@ describe('<daw-annotation-list>', () => {
       expect(rows[1].classList.contains('playing')).toBe(true);
     });
   });
+
+  describe('time-display="bars"', () => {
+    it("time-display absent renders today's m:ss.mmm format (no change)", () => {
+      const times = list.shadowRoot!.querySelectorAll('.annotation-row-times');
+      expect(times[0].textContent).toContain('0:00.000 – 0:02.500');
+      expect(times[1].textContent).toContain('0:02.500 – 0:05.000');
+    });
+
+    it("converts a tick-based annotation's edges to bar.beat via a host editor", async () => {
+      const barsTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+      barsTrack.id = 'bars-ticks';
+      barsTrack.innerHTML =
+        '<daw-annotation id="t" start-tick="3840" end-tick="7680">Tick-based</daw-annotation>';
+      const editor = document.createElement('daw-editor');
+      (editor as unknown as { _secondsToTicks: unknown })._secondsToTicks = vi.fn();
+      (editor as unknown as { _meterEntries: unknown })._meterEntries = [
+        { tick: 0, numerator: 4, denominator: 4 },
+      ];
+      (editor as unknown as { ppqn: unknown }).ppqn = 960;
+      document.body.appendChild(editor);
+      editor.appendChild(barsTrack);
+
+      const barsList = document.createElement('daw-annotation-list') as DawAnnotationListElement;
+      barsList.setAttribute('for', 'bars-ticks');
+      barsList.setAttribute('time-display', 'bars');
+      document.body.appendChild(barsList);
+      await flush();
+      await barsList.updateComplete;
+
+      const times = barsList.shadowRoot!.querySelector('.annotation-row-times');
+      expect(times!.textContent).toContain('2.1 – 3.1');
+
+      editor.remove();
+      barsList.remove();
+    });
+
+    it('converts a seconds-based annotation via editor._secondsToTicks', async () => {
+      const barsTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+      barsTrack.id = 'bars-seconds';
+      barsTrack.innerHTML =
+        '<daw-annotation id="s" start="4" end="8">Seconds-based</daw-annotation>';
+      const editor = document.createElement('daw-editor');
+      const secondsToTicks = vi.fn((seconds: number) => seconds * 1920);
+      (editor as unknown as { _secondsToTicks: unknown })._secondsToTicks = secondsToTicks;
+      (editor as unknown as { _meterEntries: unknown })._meterEntries = [
+        { tick: 0, numerator: 4, denominator: 4 },
+      ];
+      (editor as unknown as { ppqn: unknown }).ppqn = 960;
+      document.body.appendChild(editor);
+      editor.appendChild(barsTrack);
+
+      const barsList = document.createElement('daw-annotation-list') as DawAnnotationListElement;
+      barsList.setAttribute('for', 'bars-seconds');
+      barsList.setAttribute('time-display', 'bars');
+      document.body.appendChild(barsList);
+      await flush();
+      await barsList.updateComplete;
+
+      expect(secondsToTicks).toHaveBeenCalledWith(4);
+      expect(secondsToTicks).toHaveBeenCalledWith(8);
+
+      editor.remove();
+      barsList.remove();
+    });
+
+    it('falls back to time display and warns once when no host editor is resolvable', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const orphanTrack = document.createElement(
+        'daw-annotation-track'
+      ) as DawAnnotationTrackElement;
+      orphanTrack.id = 'no-editor-lyrics';
+      orphanTrack.innerHTML = '<daw-annotation id="n" start="1" end="3">No editor</daw-annotation>';
+      document.body.appendChild(orphanTrack);
+
+      const orphanList = document.createElement('daw-annotation-list') as DawAnnotationListElement;
+      orphanList.setAttribute('for', 'no-editor-lyrics');
+      orphanList.setAttribute('time-display', 'bars');
+      document.body.appendChild(orphanList);
+      await flush();
+      await orphanList.updateComplete;
+
+      const times = orphanList.shadowRoot!.querySelector('.annotation-row-times');
+      expect(times!.textContent).toContain('0:01.000');
+      expect(warn).toHaveBeenCalled();
+
+      warn.mockClear();
+      orphanTrack.insertAdjacentHTML(
+        'beforeend',
+        '<daw-annotation id="n2" start="5" end="6">Another</daw-annotation>'
+      );
+      await flush();
+      await orphanList.updateComplete;
+      expect(warn).not.toHaveBeenCalled();
+
+      orphanTrack.remove();
+      orphanList.remove();
+      warn.mockRestore();
+    });
+  });
 });

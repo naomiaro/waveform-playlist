@@ -271,11 +271,11 @@ editor.armedTrackIds.forEach((id) => {
 
 > Annotation elements shipped under epic #455. `parseAeneas`/`serializeAeneas` remain React-only in `@waveform-playlist/annotations` — the dawcore elements consume `<daw-annotation>` light-DOM children directly, not those parsers. Hosting `<daw-annotation-track>`/`<daw-annotation>` children inside `<daw-player>` is still open (#477); today they're documented under `<daw-editor>`.
 
-| Element                  | Package    | Responsibilities                                                                                                                                                                                     |
-| ------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<daw-annotation-track>` | components | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`, `keyboard-controls`, `box-label`, `name`. |
-| `<daw-annotation>`       | components | Single annotation with `start`, `end` (seconds) attributes, optional `start-tick`, `end-tick` (musical position) attributes, and text content. Renders as a box in the track.                        |
-| `<daw-annotation-list>`  | components | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data.                                                                                                  |
+| Element                  | Package    | Responsibilities                                                                                                                                                                                                     |
+| ------------------------ | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<daw-annotation-track>` | components | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`, `keyboard-controls`, `box-label`, `name`.                 |
+| `<daw-annotation>`       | components | Single annotation with `start`, `end` (seconds) attributes, optional `start-tick`, `end-tick` (musical position) attributes, and text content. Renders as a box in the track.                                        |
+| `<daw-annotation-list>`  | components | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data. `time-display` (`'time'` default \| `'bars'`) switches the times column between clock times and bar.beat ranges. |
 
 ```html
 <!-- Annotations: single source of truth, dual view -->
@@ -295,6 +295,8 @@ editor.armedTrackIds.forEach((id) => {
 Annotations are defined once as `<daw-annotation>` children. The `<daw-annotation-list>` reads from the same elements — edits in either view (dragging a box or editing text) update the shared `<daw-annotation>` attributes.
 
 **Tick authority rule:** an annotation is tick-based iff BOTH `start-tick` and `end-tick` are set — `start`/`end` seconds then become a derived cache the host editor keeps fresh (same pattern as clip `startTick`). Setting only one of the two tick attributes is a half-configured state: it's treated as seconds-based and logs a one-time warning per annotation. Tick edits (boundary drag, `moveStartBoundary`/`moveEndBoundary`) require a host `<daw-editor>` for tempo conversion — calling them on a tick-based annotation with no parent editor warns and is ignored.
+
+**`<daw-annotation-list time-display="bars">`:** shows each row's times span as `B.b – B.b` bar.beat ranges instead of clock times. Resolves the host editor via `this.track.closest('daw-editor')`; tick-based annotations use `startTick`/`endTick` directly, seconds-based annotations convert via `editor._secondsToTicks()`. Both edges are converted with `ticksToBarBeat(tick, editor._meterEntries, editor.ppqn)` from `@waveform-playlist/core` (1-based bar/beat, multi-meter aware). No host editor → falls back to time display and warns once.
 
 Spectrogram and piano-roll are render modes on `<daw-track>` (via the `render-mode` attribute), not standalone elements. See the [Spectrogram & Piano-Roll](#spectrogram--piano-roll) section.
 

@@ -200,9 +200,10 @@ Scrollable text panel (Shadow DOM) over a `<daw-annotation-track>`'s children. L
 
 **Attributes:**
 
-| Attribute | Type   | Default | Description                                                                                                                         |
-| --------- | ------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `for`     | string | `''`    | `id` of the target `<daw-annotation-track>`. Warns once if missing or pointing at the wrong tag; warning resets when `for` changes. |
+| Attribute      | Type   | Default  | Description                                                                                                                                                                                                                             |
+| -------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `for`          | string | `''`     | `id` of the target `<daw-annotation-track>`. Warns once if missing or pointing at the wrong tag; warning resets when `for` changes.                                                                                                     |
+| `time-display` | string | `'time'` | `'time'`: m:ss.mmm clock times (unchanged). `'bars'`: `B.b – B.b` bar.beat ranges from the host editor's meter map (`this.track.closest('daw-editor')`). Falls back to time display, and warns once, when no host editor is resolvable. |
 
 **Behavior:** each row shows the formatted time range and annotation text. Clicking a row selects it (`track.activeAnnotationId = id`) and seeks the editor to the annotation's start. When the target track is `editable`, row text becomes `contenteditable` — `Enter` commits (blur), `Escape` cancels and restores the original text; committing writes back to the `<daw-annotation>` element's `textContent`. Auto-scrolls the active row into view on `daw-annotation-select`.
 
