@@ -4,6 +4,8 @@ import {
   updateAnnotationBoundaries,
   resolveAnnotationShortcuts,
   matchesKeyBinding,
+  ANNOTATION_LINK_THRESHOLD_TICKS,
+  annotationMinDurationTicks,
 } from '@waveform-playlist/core';
 import type {
   AnnotationData,
@@ -18,6 +20,9 @@ interface AnnotationHostEditor extends HTMLElement {
   play(startTime?: number, endTime?: number): Promise<void>;
   seekTo(time: number): void;
   _annotationClampDuration: number;
+  _secondsToTicks(seconds: number): number;
+  _ticksToSeconds(ticks: number): number;
+  ppqn: number;
 }
 
 /**
@@ -46,6 +51,62 @@ export function applyBoundaryResults(
     if (next.start !== before[i].start) el.start = next.start;
     if (next.end !== before[i].end) el.end = next.end;
   });
+}
+
+/**
+ * Tick-space sibling of applyBoundaryResults: `before`/`after` carry TICK
+ * values in start/end. Id-matched targets; a tick-based element gets rounded
+ * integer ticks PLUS a re-derived seconds cache (single write pass keeps both
+ * units coherent); a seconds-based element (converted in for mixed-track link
+ * math) gets seconds back in ITS authoritative unit and never gains tick attrs.
+ */
+export function applyTickBoundaryResults(
+  elements: DawAnnotationElement[],
+  before: AnnotationData[],
+  after: AnnotationData[],
+  ticksToSeconds: (ticks: number) => number
+): void {
+  const byId = new Map(elements.map((el) => [el.annotationId, el]));
+  after.forEach((next, i) => {
+    const el = byId.get(next.id);
+    if (!el) return;
+    const startChanged = next.start !== before[i].start;
+    const endChanged = next.end !== before[i].end;
+    if (!startChanged && !endChanged) return;
+    if (el.isTickBased) {
+      if (startChanged) {
+        const tick = Math.round(next.start);
+        el.startTick = tick;
+        el.start = ticksToSeconds(tick);
+      }
+      if (endChanged) {
+        const tick = Math.round(next.end);
+        el.endTick = tick;
+        el.end = ticksToSeconds(tick);
+      }
+    } else {
+      if (startChanged) el.start = ticksToSeconds(next.start);
+      if (endChanged) el.end = ticksToSeconds(next.end);
+    }
+  });
+}
+
+/** Map an annotation element into tick-space AnnotationData: tick-based
+ * elements use their authoritative ticks; seconds-based neighbors are
+ * converted so mixed-track link/collision math runs in one unit space. */
+export function tickSpaceData(
+  el: DawAnnotationElement,
+  editor: { _secondsToTicks(seconds: number): number }
+): AnnotationData {
+  const base = el.toAnnotationData();
+  if (el.isTickBased) {
+    return { ...base, start: base.startTick as number, end: base.endTick as number };
+  }
+  return {
+    ...base,
+    start: editor._secondsToTicks(base.start),
+    end: editor._secondsToTicks(base.end),
+  };
 }
 
 /**
@@ -179,6 +240,42 @@ export class DawAnnotationTrackElement extends LitElement {
     const elements = this.annotationElements;
     const index = elements.findIndex((el) => el.annotationId === this._activeAnnotationId);
     if (index === -1) return;
+    const active = elements[index];
+
+    if (active.isTickBased) {
+      const editor = this._hostEditor();
+      if (!editor) {
+        console.warn(
+          '[dawcore] daw-annotation-track: tick-based boundary edits need a parent <daw-editor> for tempo conversion — call ignored'
+        );
+        return;
+      }
+      // Tick space: siblings converted in; ms delta converted at the edge's
+      // local tempo (correct under variable-tempo callbacks).
+      const tickData = elements.map((el) => tickSpaceData(el, editor));
+      const edgeTick = isStart ? tickData[index].start : tickData[index].end;
+      const edgeSeconds = editor._ticksToSeconds(edgeTick);
+      const deltaTicks =
+        editor._secondsToTicks(edgeSeconds + deltaMs / 1000) - editor._secondsToTicks(edgeSeconds);
+      const clamp = this._timelineDuration();
+      const updated = updateAnnotationBoundaries(
+        {
+          annotationIndex: index,
+          newTime: edgeTick + deltaTicks,
+          isDraggingStart: isStart,
+          annotations: tickData,
+          duration: clamp === Infinity ? Infinity : editor._secondsToTicks(clamp),
+          linkEndpoints: this.linkEndpoints,
+        },
+        {
+          linkThreshold: ANNOTATION_LINK_THRESHOLD_TICKS,
+          minDuration: annotationMinDurationTicks(editor.ppqn),
+        }
+      );
+      applyTickBoundaryResults(elements, tickData, updated, (t) => editor._ticksToSeconds(t));
+      return;
+    }
+
     const data = elements.map((el) => el.toAnnotationData());
     const edge = isStart ? data[index].start : data[index].end;
     const updated = updateAnnotationBoundaries({
