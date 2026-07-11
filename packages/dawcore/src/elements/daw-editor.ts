@@ -2783,6 +2783,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       engine.play(startTime, endTime);
       this.dispatchEvent(new CustomEvent('daw-play', { bubbles: true, composed: true }));
     } catch (err) {
+      // _startPlayhead() above runs BEFORE engine.play() (see the ordering
+      // comment above), so a throwing engine.play() (PlaylistEngine rolls
+      // back its own state and rethrows on adapter.play() failure) leaves a
+      // dangling rAF loop unless we undo the pre-start here — mirrors stop().
+      this._stopPlayhead();
+      this._activePlayEndTime = null;
       console.warn('[dawcore] Playback failed: ' + String(err));
       this.dispatchEvent(
         new CustomEvent<DawErrorDetail>('daw-error', {
