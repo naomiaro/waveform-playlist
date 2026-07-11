@@ -144,14 +144,22 @@ export class AnnotationController implements ReactiveController {
   ): TemplateResult[] {
     return this._tracks.map((track) => {
       const activeId = track.activeAnnotationId;
+      const elements = track.annotationElements;
       return html`
         <div
           class="annotation-lane"
           style="height: ${ANNOTATION_LANE_HEIGHT}px;"
           @pointerdown=${(e: PointerEvent) => onPointerDown(e, track)}
         >
-          ${track.annotations.map((a) => {
+          ${elements.map((el, i) => {
+            const a = el.toAnnotationData();
             const geo = this.boxGeometry(a, spp, sampleRate);
+            const label =
+              track.boxLabel === 'none'
+                ? ''
+                : track.boxLabel === 'id'
+                  ? el.id || String(i + 1)
+                  : a.lines.join(' ');
             return html`
               <div
                 class="annotation-box ${a.id === activeId ? 'active' : ''}"
@@ -161,7 +169,7 @@ export class AnnotationController implements ReactiveController {
                 ${track.editable
                   ? html`<div class="annotation-boundary" data-edge="start"></div>`
                   : ''}
-                <span class="annotation-box-text">${a.lines.join(' ')}</span>
+                <span class="annotation-box-text">${label}</span>
                 ${track.editable
                   ? html`<div class="annotation-boundary" data-edge="end"></div>`
                   : ''}

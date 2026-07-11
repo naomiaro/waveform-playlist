@@ -147,4 +147,49 @@ describe('<daw-editor> annotation lanes', () => {
     expect(el.end).toBeCloseTo(2);
     editor.remove();
   });
+
+  it('box-label="id" renders element ids (or 1-based position) in the bars', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="s" box-label="id">' +
+      '<daw-annotation id="7" start="0" end="1">First line of text</daw-annotation>' +
+      '<daw-annotation start="1" end="2">Second line of text</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const labels = [...editor.shadowRoot!.querySelectorAll('.annotation-box-text')].map((s) =>
+      s.textContent?.trim()
+    );
+    expect(labels).toEqual(['7', '2']); // explicit id, then position fallback
+    editor.remove();
+  });
+
+  it('box-label="none" renders empty bars even when text exists', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track box-label="none">' +
+      '<daw-annotation start="0" end="1">Hidden in lane</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const label = editor.shadowRoot!.querySelector('.annotation-box-text');
+    expect(label?.textContent?.trim()).toBe('');
+    editor.remove();
+  });
+
+  it('blank-text annotations render as bars and the track works without any list', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="regions">' +
+      '<daw-annotation start="0" end="1"></daw-annotation>' +
+      '<daw-annotation start="1" end="2"></daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelectorAll('.annotation-box')).toHaveLength(2);
+    const track = editor.querySelector('#regions') as any;
+    track.selectNext();
+    expect(track.activeAnnotationId).toBeTruthy(); // fully functional, no list anywhere
+    editor.remove();
+  });
 });

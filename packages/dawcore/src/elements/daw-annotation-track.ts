@@ -62,6 +62,10 @@ export class DawAnnotationTrackElement extends LitElement {
   @property({ type: Boolean, reflect: true, attribute: 'continuous-play' }) continuousPlay = false;
   @property({ type: Boolean, reflect: true, attribute: 'keyboard-controls' })
   keyboardControls = false;
+  /** Lane box label mode: 'text' (default) | 'id' (sonnet-style: explicit id
+   * attribute, else 1-based position) | 'none' (pure region bars). The list
+   * always shows full text — this only affects the timeline lane. */
+  @property({ reflect: true, attribute: 'box-label' }) boxLabel: 'text' | 'id' | 'none' = 'text';
 
   // --- Selection (ephemeral UI state — deliberately NOT DOM data) ---
 

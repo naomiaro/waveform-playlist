@@ -70,6 +70,10 @@ export class DawAnnotationListElement extends LitElement {
       cursor: text;
       outline-offset: 2px;
     }
+    .annotation-row-text:empty::before {
+      content: '—';
+      opacity: 0.4;
+    }
   `;
 
   get track(): DawAnnotationTrackElement | null {

@@ -135,4 +135,21 @@ describe('<daw-annotation-list>', () => {
     span.dispatchEvent(new FocusEvent('blur'));
     expect(track.querySelector('#a')!.textContent).toBe('First line');
   });
+
+  it('empty-text rows keep a selectable presence (placeholder styling hook)', async () => {
+    track.insertAdjacentHTML(
+      'beforeend',
+      '<daw-annotation id="blank" start="5" end="6"></daw-annotation>'
+    );
+    await flush();
+    await list.updateComplete;
+    const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+    expect(rows).toHaveLength(3);
+    const span = rows[2].querySelector('.annotation-row-text') as HTMLElement;
+    expect(span.textContent).toBe(''); // :empty — the CSS ::before placeholder applies
+    // Structural assertion for the placeholder rule (happy-dom doesn't compute
+    // pseudo-elements — assert the stylesheet carries it).
+    const cssText = String((list.constructor as typeof DawAnnotationListElement).styles);
+    expect(cssText).toContain(':empty::before');
+  });
 });
