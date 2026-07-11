@@ -236,7 +236,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 - [`basic.html`](examples/dawcore-native/basic.html) — Basic playback with timescale and file drop
 - [`multiclip.html`](examples/dawcore-native/multiclip.html) — Multi-clip editing with move, trim, and split
 - [`programmatic.html`](examples/dawcore-native/programmatic.html) — Imperative `editor.addTrack` / `addClip` / `updateClip` / `removeClip` plus declarative DOM mutation, side-by-side
-- [`beats-grid.html`](examples/dawcore-native/beats-grid.html) — Beats & bars grid mode with snap-to-grid
+- [`beats-grid.html`](examples/dawcore-native/beats-grid.html) — Beats & bars grid mode with snap-to-grid, plus bar-aligned tick-based annotation regions (`start-tick`/`end-tick`)
 - [`beat-map-grid.html`](examples/dawcore-native/beat-map-grid.html) — Variable tempo from beat maps with metronome
 - [`record.html`](examples/dawcore-native/record.html) — Recording with overdub
 - [`metronome.html`](examples/dawcore-native/metronome.html) — Metronome with mixed meters, tempo presets, and looping sequences
@@ -246,6 +246,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 - [`effects.html`](examples/dawcore-native/effects.html) — Per-track and master insert effects (`native-*` registry) with live parameter sliders, bypass, and `daw-effect-*` event log
 - [`player.html`](examples/dawcore-native/player.html) — Lightweight `<daw-player>` single-track HTMLMediaElement player: waveform with `peaks-src` + timescale ruler, and a scrubber-only fallback (no `peaks-src`), with `daw-ready`/`daw-timeupdate`/`daw-play`/`daw-stop` event log
 - [`annotations.html`](examples/dawcore-native/annotations.html) — `<daw-annotation-track>` lyric/section markers with dual-view sync between the timeline lane and `<daw-annotation-list>`, drag-to-resize boundaries, and keyboard navigation/playback
+- [`sonnet.html`](examples/dawcore-native/sonnet.html) — Sonnet 18 parity demo: box-label="id" bars with the full text in <daw-annotation-list>
 
 **dawcore-tone** example pages:
 
