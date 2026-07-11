@@ -576,7 +576,7 @@ box-label          String    'text'   Lane box label mode: 'text' | 'id' | 'none
 name               String    ''       Display label for the editor's controls-column lane row
 ```
 
-`editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)). `box-label` only affects the timeline lane's box text — `'text'` shows the annotation's line text (default), `'id'` shows the `id` attribute or a 1-based position fallback, `'none'` renders bare region bars; `<daw-annotation-list>` always shows full text regardless of this setting. `name` mirrors `<daw-track name>` — an empty string (default) renders a blank spacer so setting it is opt-in and doesn't shift layout.
+`editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)). `box-label` only affects the timeline lane's box text — `'text'` shows the annotation's text lines joined with spaces (default), `'id'` shows the `id` attribute or a 1-based position fallback, `'none'` renders bare region bars; `<daw-annotation-list>` always shows full text regardless of this setting. `name` mirrors `<daw-track name>` — an empty string (default) renders a blank spacer so setting it is opt-in and doesn't shift layout.
 
 **Properties (JS only):**
 

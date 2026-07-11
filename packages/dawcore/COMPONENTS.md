@@ -133,14 +133,14 @@ Declarative annotation track (light DOM). Owns the ephemeral selection state and
 
 **Attributes:**
 
-| Attribute           | Type    | Default  | Description                                                                                                                                                                                                    |
-| ------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `editable`          | boolean | `false`  | Allow drag/resize of annotation boxes and boundary-editing shortcuts                                                                                                                                           |
-| `link-endpoints`    | boolean | `false`  | Snap adjacent annotation boundaries together; boundary moves cascade to linked neighbors                                                                                                                       |
-| `continuous-play`   | boolean | `false`  | `playActive()` plays past the annotation's end instead of stopping there                                                                                                                                       |
-| `keyboard-controls` | boolean | `false`  | Enable keyboard navigation and boundary-editing shortcuts (capture-phase, see Key Patterns below)                                                                                                              |
-| `box-label`         | string  | `'text'` | Lane box label mode: `'text'` (line text), `'id'` (`id` attribute or 1-based position fallback), `'none'` (bare region bars). Only affects the timeline lane — `<daw-annotation-list>` always shows full text. |
-| `name`              | string  | `''`     | Display label for the editor's controls-column lane row (mirrors `<daw-track name>`). Empty renders a blank spacer.                                                                                            |
+| Attribute           | Type    | Default  | Description                                                                                                                                                                                                                            |
+| ------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `editable`          | boolean | `false`  | Allow drag/resize of annotation boxes and boundary-editing shortcuts                                                                                                                                                                   |
+| `link-endpoints`    | boolean | `false`  | Snap adjacent annotation boundaries together; boundary moves cascade to linked neighbors                                                                                                                                               |
+| `continuous-play`   | boolean | `false`  | `playActive()` plays past the annotation's end instead of stopping there                                                                                                                                                               |
+| `keyboard-controls` | boolean | `false`  | Enable keyboard navigation and boundary-editing shortcuts (capture-phase, see Key Patterns below)                                                                                                                                      |
+| `box-label`         | string  | `'text'` | Lane box label mode: `'text'` (all text lines joined with spaces), `'id'` (`id` attribute or 1-based position fallback), `'none'` (bare region bars). Only affects the timeline lane — `<daw-annotation-list>` always shows full text. |
+| `name`              | string  | `''`     | Display label for the editor's controls-column lane row (mirrors `<daw-track name>`). Empty renders a blank spacer.                                                                                                                    |
 
 **JS-only properties:**
 
