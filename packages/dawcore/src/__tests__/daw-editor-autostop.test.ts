@@ -123,6 +123,38 @@ describe('daw-editor end-of-timeline auto-stop', () => {
     expect(rafCallbacks).toHaveLength(0);
   });
 
+  it('does not dispatch a trailing daw-timeupdate after daw-stop in the same auto-stop flush', async () => {
+    // The frame that crosses the end-of-timeline boundary calls this.stop()
+    // from inside the playback loop's own getTime() callback (see
+    // playback-animation-controller.ts). stop() synchronously dispatches its
+    // own settle daw-timeupdate as part of daw-stop's flush; the rAF wrapper
+    // must not dispatch a second, stale one for that same frame afterward —
+    // consumers (e.g. the annotation lane/list "playing" highlight) rely on
+    // daw-stop being the last word for this flush.
+    const events: string[] = [];
+    editor.addEventListener('daw-stop', () => events.push('daw-stop'));
+    editor.addEventListener('daw-timeupdate', () => events.push('daw-timeupdate'));
+
+    await editor.play();
+
+    // Inside the timeline: normal per-frame timeupdate, no stop yet.
+    setPosition(1.0);
+    stepFrame();
+    expect(events).not.toContain('daw-stop');
+
+    events.length = 0;
+
+    // Past the 2s end: triggers the in-frame auto-stop.
+    setPosition(2.1);
+    stepFrame();
+
+    expect(editor.isPlaying).toBe(false);
+    const stopIndex = events.indexOf('daw-stop');
+    expect(stopIndex).toBeGreaterThanOrEqual(0);
+    // No daw-timeupdate may follow daw-stop within this flush.
+    expect(events.slice(stopIndex + 1)).not.toContain('daw-timeupdate');
+  });
+
   it('indefinite-playback rolls past the end until explicit stop (DAW style)', async () => {
     editor.setAttribute('indefinite-playback', '');
     await editor.updateComplete;
