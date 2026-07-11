@@ -12,6 +12,9 @@ export const ANNOTATION_LANE_HEIGHT = 32;
 export interface AnnotationControllerHost extends ReactiveControllerHost, HTMLElement {
   effectiveSampleRate: number;
   seekTo(time: number): void;
+  /** Tick→seconds conversion (fixed BPM or variable-tempo callbacks) —
+   * the editor owns tempo; the controller derives annotation seconds caches. */
+  _ticksToSeconds(ticks: number): number;
 }
 
 /**
@@ -94,6 +97,7 @@ export class AnnotationController implements ReactiveController {
   }
 
   private _onDataChange = (): void => {
+    this.deriveSecondsCaches();
     this._host.requestUpdate();
   };
 
@@ -101,6 +105,25 @@ export class AnnotationController implements ReactiveController {
     if (this._tracks.includes(el)) return;
     this._tracks = [...this._tracks, el];
     this._host.requestUpdate();
+    this.deriveSecondsCaches();
+  }
+
+  /**
+   * Keep the seconds attributes (derived cache) of tick-based annotations in
+   * sync with the host's tempo. Write-only-on-change: a write fires
+   * daw-annotation-update → _onDataChange → this sweep again → values equal →
+   * no write → the loop settles (idempotent).
+   */
+  deriveSecondsCaches(): void {
+    for (const track of this._tracks) {
+      for (const el of track.annotationElements) {
+        if (!el.isTickBased) continue;
+        const startSeconds = this._host._ticksToSeconds(el.startTick as number);
+        const endSeconds = this._host._ticksToSeconds(el.endTick as number);
+        if (el.start !== startSeconds) el.start = startSeconds;
+        if (el.end !== endSeconds) el.end = endSeconds;
+      }
+    }
   }
 
   /** Pixel geometry for one annotation box. Floor-based like clip positioning. */

@@ -15,6 +15,7 @@ function makeHost() {
     removeController: ReturnType<typeof vi.fn>;
     requestUpdate: ReturnType<typeof vi.fn>;
     updateComplete: Promise<boolean>;
+    _ticksToSeconds: ReturnType<typeof vi.fn>;
   };
   Object.assign(host, {
     effectiveSampleRate: 48000,
@@ -24,6 +25,7 @@ function makeHost() {
     removeController: vi.fn(),
     requestUpdate: vi.fn(),
     updateComplete: Promise.resolve(true),
+    _ticksToSeconds: vi.fn((t: number) => t / 960), // 60 BPM at ppqn 960 → 1 beat = 1 second
   });
   document.body.appendChild(host);
   return host;
@@ -99,5 +101,45 @@ describe('AnnotationController', () => {
     el.end = 5;
     await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
     expect(host.requestUpdate).toHaveBeenCalled();
+  });
+
+  it('derives seconds caches for tick-based annotations (write-only-on-change)', async () => {
+    const tickEl = document.createElement('daw-annotation') as HTMLElement & {
+      startTick: number | null;
+      endTick: number | null;
+      start: number;
+      end: number;
+    };
+    tickEl.setAttribute('start-tick', '960');
+    tickEl.setAttribute('end-tick', '2880');
+    track.appendChild(tickEl);
+    await flush();
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(1); // 960 / 960
+    expect(tickEl.end).toBe(3);
+    // Second sweep with unchanged tempo: no writes → no update events.
+    const spy = vi.fn();
+    host.addEventListener('daw-annotation-update', spy);
+    controller.deriveSecondsCaches();
+    await flush();
+    expect(spy).not.toHaveBeenCalled();
+    host.removeEventListener('daw-annotation-update', spy);
+  });
+
+  it('re-derives when the conversion changes (BPM change)', async () => {
+    const tickEl = document.createElement('daw-annotation') as HTMLElement & {
+      start: number;
+      end: number;
+    };
+    tickEl.setAttribute('start-tick', '960');
+    tickEl.setAttribute('end-tick', '1920');
+    track.appendChild(tickEl);
+    await flush();
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(1);
+    host._ticksToSeconds = vi.fn((t: number) => t / 1920); // 120 BPM
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(0.5);
+    expect(tickEl.end).toBe(1);
   });
 });

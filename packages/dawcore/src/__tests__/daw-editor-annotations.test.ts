@@ -128,4 +128,23 @@ describe('<daw-editor> annotation lanes', () => {
     expect(editor.shadowRoot!.querySelector('.annotation-lane')).toBeNull();
     editor.remove();
   });
+
+  it('re-derives tick annotation seconds when the engine BPM changes', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="ticks">' +
+      '<daw-annotation id="t1" start-tick="960" end-tick="1920"></daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const el = editor.querySelector('#t1') as HTMLElement & { start: number; end: number };
+    // Default 120 BPM, ppqn 960: 960 ticks = 0.5s.
+    expect(el.start).toBeCloseTo(0.5);
+    editor.bpm = 60;
+    await editor.updateComplete;
+    await flush();
+    expect(el.start).toBeCloseTo(1);
+    expect(el.end).toBeCloseTo(2);
+    editor.remove();
+  });
 });

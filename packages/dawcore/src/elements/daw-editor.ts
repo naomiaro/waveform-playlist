@@ -708,6 +708,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
   private _annotations = new AnnotationController(this);
+  /** Last engine BPM seen by the statechange handler — re-derives tick
+   * annotation seconds caches only when it actually changes. */
+  private _lastAnnotationBpm: number | null = null;
   // Closures (not direct references) — _timeToPixels/_getPlayhead are
   // declared later in the class body; class-field init order would read
   // `undefined` for a direct reference here.
@@ -2407,6 +2410,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           return desc?.renderMode !== 'piano-roll';
         });
         syncPeaksForChangedClips(this, audioTracks);
+      }
+      // Tick-based annotations: BPM changes move their time-domain positions —
+      // re-derive the seconds caches (write-only-on-change; loop-safe).
+      if (engineState.bpm !== this._lastAnnotationBpm) {
+        this._lastAnnotationBpm = engineState.bpm;
+        this._annotations.deriveSecondsCaches();
       }
     });
     engine.on('pause', () => {
