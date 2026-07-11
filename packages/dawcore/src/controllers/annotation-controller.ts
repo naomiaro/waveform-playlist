@@ -2,6 +2,8 @@ import { html } from 'lit';
 import type { ReactiveController, ReactiveControllerHost, TemplateResult } from 'lit';
 import type { AnnotationData } from '@waveform-playlist/core';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
+import type { DawTimeUpdateDetail } from '../events';
+import { computePlayingAnnotationId } from '../utils/annotation-playing';
 
 /**
  * Fixed lane height. A TS constant (not a CSS var) because the frozen-panes
@@ -12,6 +14,9 @@ export const ANNOTATION_LANE_HEIGHT = 32;
 export interface AnnotationControllerHost extends ReactiveControllerHost, HTMLElement {
   effectiveSampleRate: number;
   seekTo(time: number): void;
+  /** Tick→seconds conversion (fixed BPM or variable-tempo callbacks) —
+   * the editor owns tempo; the controller derives annotation seconds caches. */
+  _ticksToSeconds(ticks: number): number;
 }
 
 /**
@@ -23,6 +28,11 @@ export class AnnotationController implements ReactiveController {
   private _host: AnnotationControllerHost;
   private _tracks: DawAnnotationTrackElement[] = [];
   private _removalObserver: MutationObserver | null = null;
+  /** Playback-following highlight per track, separate from each track's
+   *  `activeAnnotationId` (selection) so playback never disturbs selection.
+   *  Driven by daw-timeupdate, cleared on daw-stop, retained on pause.
+   *  Replaced immutably (a fresh Map) on every change. */
+  private _playingIds: Map<DawAnnotationTrackElement, string | null> = new Map();
 
   constructor(host: AnnotationControllerHost) {
     this._host = host;
@@ -31,6 +41,12 @@ export class AnnotationController implements ReactiveController {
 
   get tracks(): readonly DawAnnotationTrackElement[] {
     return this._tracks;
+  }
+
+  /** Current playback-following highlight id for a track, or `null` when the
+   *  playhead isn't inside any of the track's annotations. */
+  getPlayingAnnotationId(track: DawAnnotationTrackElement): string | null {
+    return this._playingIds.get(track) ?? null;
   }
 
   get totalLaneHeight(): number {
@@ -51,6 +67,11 @@ export class AnnotationController implements ReactiveController {
     this._host.addEventListener('daw-annotation-update', this._onDataChange);
     this._host.addEventListener('daw-annotation-select', this._onDataChange);
     this._host.addEventListener('daw-annotation-connected', this._onDataChange);
+    // The host IS the editor and daw-timeupdate/daw-stop are dispatched on
+    // it directly (see playback-animation-controller.ts) — no document-level
+    // listening or target filtering needed, unlike <daw-annotation-list>.
+    this._host.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    this._host.addEventListener('daw-stop', this._onStop);
     // Removals can't bubble — observe childList like the editor's track observer.
     this._removalObserver = new MutationObserver((mutations) => {
       let changed = false;
@@ -88,12 +109,41 @@ export class AnnotationController implements ReactiveController {
     this._host.removeEventListener('daw-annotation-update', this._onDataChange);
     this._host.removeEventListener('daw-annotation-select', this._onDataChange);
     this._host.removeEventListener('daw-annotation-connected', this._onDataChange);
+    this._host.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    this._host.removeEventListener('daw-stop', this._onStop);
     this._removalObserver?.disconnect();
     this._removalObserver = null;
     this._tracks = [];
+    this._playingIds = new Map();
   }
 
   private _onDataChange = (): void => {
+    this.deriveSecondsCaches();
+    this._host.requestUpdate();
+  };
+
+  /**
+   * Update only on annotation-boundary crossings, not per animation frame.
+   */
+  private _onTimeUpdate = (e: CustomEvent<DawTimeUpdateDetail>): void => {
+    const time = e.detail.time;
+    let changed = false;
+    const next = new Map(this._playingIds);
+    for (const track of this._tracks) {
+      const playingId = computePlayingAnnotationId(track.annotations, time);
+      if (playingId !== (this._playingIds.get(track) ?? null)) {
+        next.set(track, playingId);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    this._playingIds = next;
+    this._host.requestUpdate();
+  };
+
+  private _onStop = (): void => {
+    if (this._playingIds.size === 0) return;
+    this._playingIds = new Map();
     this._host.requestUpdate();
   };
 
@@ -101,10 +151,47 @@ export class AnnotationController implements ReactiveController {
     if (this._tracks.includes(el)) return;
     this._tracks = [...this._tracks, el];
     this._host.requestUpdate();
+    this.deriveSecondsCaches();
   }
 
-  /** Pixel geometry for one annotation box. Floor-based like clip positioning. */
-  boxGeometry(a: AnnotationData, spp: number, sampleRate: number): { left: number; width: number } {
+  /**
+   * Keep the seconds attributes (derived cache) of tick-based annotations in
+   * sync with the host's tempo. Write-only-on-change: a write fires
+   * daw-annotation-update → _onDataChange → this sweep again → values equal →
+   * no write → the loop settles (idempotent).
+   */
+  deriveSecondsCaches(): void {
+    for (const track of this._tracks) {
+      for (const el of track.annotationElements) {
+        if (!el.isTickBased) continue;
+        const startSeconds = this._host._ticksToSeconds(el.startTick as number);
+        const endSeconds = this._host._ticksToSeconds(el.endTick as number);
+        if (el.start !== startSeconds) el.start = startSeconds;
+        if (el.end !== endSeconds) el.end = endSeconds;
+      }
+    }
+  }
+
+  /** Pixel geometry for one annotation box. Tick-based annotations in beats
+   * mode use CLIP-IDENTICAL tick math (round(tick / ticksPerPixel)) so they
+   * align pixel-exactly with <daw-grid>; everything else uses the floor-based
+   * seconds math (temporal mode reads the always-fresh seconds cache). */
+  boxGeometry(
+    a: AnnotationData,
+    spp: number,
+    sampleRate: number,
+    ticksPerPixel: number | null = null
+  ): { left: number; width: number } {
+    if (
+      ticksPerPixel !== null &&
+      ticksPerPixel > 0 &&
+      a.startTick !== undefined &&
+      a.endTick !== undefined
+    ) {
+      const left = Math.round(a.startTick / ticksPerPixel);
+      const width = Math.round(a.endTick / ticksPerPixel) - left;
+      return { left, width };
+    }
     const left = Math.floor((a.start * sampleRate) / spp);
     const width = Math.floor((a.end * sampleRate) / spp) - left;
     return { left, width };
@@ -117,28 +204,40 @@ export class AnnotationController implements ReactiveController {
   renderLanes(
     spp: number,
     sampleRate: number,
-    onPointerDown: (e: PointerEvent, track: DawAnnotationTrackElement) => void = () => {}
+    onPointerDown: (e: PointerEvent, track: DawAnnotationTrackElement) => void = () => {},
+    ticksPerPixel: number | null = null
   ): TemplateResult[] {
     return this._tracks.map((track) => {
       const activeId = track.activeAnnotationId;
+      const playingId = this._playingIds.get(track) ?? null;
+      const elements = track.annotationElements;
       return html`
         <div
           class="annotation-lane"
           style="height: ${ANNOTATION_LANE_HEIGHT}px;"
           @pointerdown=${(e: PointerEvent) => onPointerDown(e, track)}
         >
-          ${track.annotations.map((a) => {
-            const geo = this.boxGeometry(a, spp, sampleRate);
+          ${elements.map((el, i) => {
+            const a = el.toAnnotationData();
+            const geo = this.boxGeometry(a, spp, sampleRate, ticksPerPixel);
+            const label =
+              track.boxLabel === 'none'
+                ? ''
+                : track.boxLabel === 'id'
+                  ? el.id || String(i + 1)
+                  : a.lines.join(' ');
             return html`
               <div
-                class="annotation-box ${a.id === activeId ? 'active' : ''}"
+                class="annotation-box ${a.id === activeId ? 'active' : ''} ${a.id === playingId
+                  ? 'playing'
+                  : ''}"
                 data-annotation-id=${a.id}
                 style="left: ${geo.left}px; width: ${geo.width}px;"
               >
                 ${track.editable
                   ? html`<div class="annotation-boundary" data-edge="start"></div>`
                   : ''}
-                <span class="annotation-box-text">${a.lines.join(' ')}</span>
+                <span class="annotation-box-text">${label}</span>
                 ${track.editable
                   ? html`<div class="annotation-boundary" data-edge="end"></div>`
                   : ''}

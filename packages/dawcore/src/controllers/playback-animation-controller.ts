@@ -48,6 +48,16 @@ export class PlaybackAnimationController {
     this._running = true;
     this._animation.start(() => {
       const time = getTime();
+      // getTime() (the editor's frame callback) can call this.stop() mid-
+      // frame on auto-stop paths (end-of-timeline, bounded play(start, end)
+      // annotation playback) — stop() already dispatched its own settle
+      // daw-timeupdate synchronously before returning here. Skip this
+      // frame's position/dispatch entirely so that settle event isn't
+      // immediately followed by a stale trailing one (which would, e.g.,
+      // re-set an annotation's "playing" highlight that daw-stop just
+      // cleared). Manual stop/seek settle events are unaffected — they
+      // dispatch from stop() itself, never from this wrapper.
+      if (!this._running) return;
       this._options.getPlayhead()?.setPosition(this._options.timeToPixels(time));
       this._dispatchTimeUpdate(time);
     });

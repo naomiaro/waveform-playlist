@@ -172,4 +172,98 @@ describe('<daw-annotation-track>', () => {
     expect(spy).toHaveBeenCalled();
     t2.remove();
   });
+
+  it('moveEndBoundary on a tick annotation edits in tick space and re-derives seconds', async () => {
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    Object.assign(editor, {
+      _secondsToTicks: (s: number) => Math.round(s * 960),
+      _ticksToSeconds: (t: number) => t / 960,
+      ppqn: 960,
+    });
+    Object.defineProperty(editor, '_annotationClampDuration', { get: () => Infinity });
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.editable = true;
+    track2.innerHTML =
+      '<daw-annotation id="ta" start-tick="0" end-tick="960" start="0" end="1"></daw-annotation>';
+    editor.appendChild(track2);
+    await flush();
+    track2.activeAnnotationId = 'ta';
+    track2.moveEndBoundary(500); // +0.5s at 60 BPM = +480 ticks
+    const el = track2.querySelector('#ta') as HTMLElement & {
+      endTick: number | null;
+      end: number;
+    };
+    expect(el.endTick).toBe(1440);
+    expect(el.end).toBeCloseTo(1.5); // derived cache updated in the same write
+    editor.remove();
+  });
+
+  it('tick min duration (ppqn/32) clamps tick-space nudges', async () => {
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    Object.assign(editor, {
+      _secondsToTicks: (s: number) => Math.round(s * 960),
+      _ticksToSeconds: (t: number) => t / 960,
+      ppqn: 960,
+    });
+    Object.defineProperty(editor, '_annotationClampDuration', { get: () => Infinity });
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.editable = true;
+    track2.innerHTML =
+      '<daw-annotation id="tb" start-tick="0" end-tick="960" start="0" end="1"></daw-annotation>';
+    editor.appendChild(track2);
+    await flush();
+    track2.activeAnnotationId = 'tb';
+    track2.moveStartBoundary(100000); // way past the end → clamps to end - 30 ticks
+    const el = track2.querySelector('#tb') as HTMLElement & { startTick: number | null };
+    expect(el.startTick).toBe(930);
+    editor.remove();
+  });
+
+  it('mixed track: tick-space edit converts a seconds neighbor for link math and writes it back in seconds', async () => {
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    Object.assign(editor, {
+      _secondsToTicks: (s: number) => Math.round(s * 960),
+      _ticksToSeconds: (t: number) => t / 960,
+      ppqn: 960,
+    });
+    Object.defineProperty(editor, '_annotationClampDuration', { get: () => Infinity });
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.editable = true;
+    track2.linkEndpoints = true;
+    track2.innerHTML =
+      '<daw-annotation id="sec" start="0" end="1">s</daw-annotation>' +
+      '<daw-annotation id="tick" start-tick="960" end-tick="1920" start="1" end="2">t</daw-annotation>';
+    editor.appendChild(track2);
+    await flush();
+    track2.activeAnnotationId = 'tick';
+    track2.moveStartBoundary(-500); // tick.start 960→480; linked neighbor sec.end follows
+    const tickEl = track2.querySelector('#tick') as HTMLElement & { startTick: number | null };
+    const secEl = track2.querySelector('#sec') as HTMLElement & {
+      end: number;
+      startTick: number | null;
+    };
+    expect(tickEl.startTick).toBe(480);
+    expect(secEl.end).toBeCloseTo(0.5); // written back in ITS unit (seconds)
+    expect(secEl.startTick).toBeNull(); // never gained tick attrs
+    editor.remove();
+  });
+
+  it('tick-based boundary edits without a host editor warn and no-op', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.editable = true;
+    track2.innerHTML = '<daw-annotation id="tc" start-tick="0" end-tick="960"></daw-annotation>';
+    document.body.appendChild(track2);
+    await flush();
+    track2.activeAnnotationId = 'tc';
+    track2.moveEndBoundary(100);
+    const el = track2.querySelector('#tc') as HTMLElement & { endTick: number | null };
+    expect(el.endTick).toBe(960);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    track2.remove();
+  });
 });

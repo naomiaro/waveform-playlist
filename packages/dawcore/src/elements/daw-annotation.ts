@@ -3,6 +3,11 @@ import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
 import type { AnnotationData } from '@waveform-playlist/core';
 
+/** Valid tick value: finite non-negative integer. */
+function isValidTick(value: number): boolean {
+  return Number.isFinite(value) && Number.isInteger(value) && value >= 0;
+}
+
 /**
  * Declarative annotation data element (light DOM). Its `start`/`end`
  * attributes and text content ARE the single source of truth — the editor's
@@ -42,6 +47,59 @@ export class DawAnnotationElement extends LitElement {
   }
   private _end = 0;
 
+  /** Musical start position (ticks). Authoritative when end-tick is also set —
+   * start/end seconds become a derived cache the host editor keeps fresh
+   * (clip startTick pattern). */
+  @property({ type: Number, noAccessor: true, reflect: true, attribute: 'start-tick' })
+  get startTick(): number | null {
+    return this._startTick;
+  }
+  set startTick(value: number | null) {
+    const old = this._startTick;
+    if (value === null) {
+      this._startTick = null;
+      this.requestUpdate('startTick', old);
+      return;
+    }
+    if (!isValidTick(value)) {
+      console.warn(
+        '[dawcore] daw-annotation start-tick ' + String(value) + ' is invalid — ignored'
+      );
+      return;
+    }
+    this._startTick = value;
+    this.requestUpdate('startTick', old);
+  }
+  private _startTick: number | null = null;
+
+  /** Musical end position (ticks). See startTick. */
+  @property({ type: Number, noAccessor: true, reflect: true, attribute: 'end-tick' })
+  get endTick(): number | null {
+    return this._endTick;
+  }
+  set endTick(value: number | null) {
+    const old = this._endTick;
+    if (value === null) {
+      this._endTick = null;
+      this.requestUpdate('endTick', old);
+      return;
+    }
+    if (!isValidTick(value)) {
+      console.warn('[dawcore] daw-annotation end-tick ' + String(value) + ' is invalid — ignored');
+      return;
+    }
+    this._endTick = value;
+    this.requestUpdate('endTick', old);
+  }
+  private _endTick: number | null = null;
+
+  /** Tick-based iff BOTH tick attributes are set (authority rule). */
+  get isTickBased(): boolean {
+    return this._startTick !== null && this._endTick !== null;
+  }
+
+  private _warnedHalfTick = false;
+
   private readonly _generatedId = 'annotation-' + crypto.randomUUID();
 
   /** Stable identity: the id attribute when present, else a generated UUID. */
@@ -51,12 +109,17 @@ export class DawAnnotationElement extends LitElement {
 
   toAnnotationData(): AnnotationData {
     const text = this.textContent?.trim() ?? '';
-    return {
+    const data: AnnotationData = {
       id: this.annotationId,
       start: this.start,
       end: this.end,
       lines: text.length > 0 ? text.split('\n') : [''],
     };
+    if (this.isTickBased) {
+      data.startTick = this._startTick as number;
+      data.endTick = this._endTick as number;
+    }
+    return data;
   }
 
   // Light DOM — data container only.
@@ -87,11 +150,26 @@ export class DawAnnotationElement extends LitElement {
   private _hasRendered = false;
 
   updated(changed: PropertyValues) {
+    // Exactly one tick attribute set is a half-configured state — warn once.
+    const halfTick = (this._startTick !== null) !== (this._endTick !== null);
+    if (halfTick && !this._warnedHalfTick) {
+      this._warnedHalfTick = true;
+      console.warn(
+        '[dawcore] daw-annotation "' +
+          this.annotationId +
+          '": only one of start-tick/end-tick is set — treated as seconds-based until both are present'
+      );
+    }
     if (!this._hasRendered) {
       this._hasRendered = true;
       return;
     }
-    if (changed.has('start') || changed.has('end')) {
+    if (
+      changed.has('start') ||
+      changed.has('end') ||
+      changed.has('startTick') ||
+      changed.has('endTick')
+    ) {
       this.dispatchEvent(
         new CustomEvent('daw-annotation-update', {
           bubbles: true,

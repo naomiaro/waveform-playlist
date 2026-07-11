@@ -708,6 +708,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   eagerResume?: string;
   private _recordingController = new RecordingController(this);
   private _annotations = new AnnotationController(this);
+  /** Last engine BPM seen by the statechange handler — re-derives tick
+   * annotation seconds caches only when it actually changes. */
+  private _lastAnnotationBpm: number | null = null;
   // Closures (not direct references) — _timeToPixels/_getPlayhead are
   // declared later in the class body; class-field init order would read
   // `undefined` for a direct reference here.
@@ -864,6 +867,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       .annotation-lane-spacer {
         box-sizing: border-box;
         border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+      }
+      .annotation-lane-name {
+        padding: 0 10px;
+        font-size: 11px;
+        color: var(--daw-controls-text, #e0d4c8);
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .annotation-box {
         position: absolute;
@@ -878,6 +893,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         color: var(--daw-annotation-text-color, #e0d4c8);
         font-size: 11px;
         cursor: pointer;
+      }
+      .annotation-box.playing {
+        box-shadow: inset 0 0 0 1px var(--daw-annotation-box-border, #c49a6c);
+        background: var(--daw-annotation-playing-background, rgba(196, 154, 108, 0.32));
       }
       .annotation-box.active {
         background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.45));
@@ -2408,6 +2427,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         });
         syncPeaksForChangedClips(this, audioTracks);
       }
+      // Tick-based annotations: BPM changes move their time-domain positions —
+      // re-derive the seconds caches (write-only-on-change; loop-safe).
+      if (engineState.bpm !== this._lastAnnotationBpm) {
+        this._lastAnnotationBpm = engineState.bpm;
+        this._annotations.deriveSecondsCaches();
+      }
     });
     engine.on('pause', () => {
       this._currentTime = engine.getCurrentTime();
@@ -3310,11 +3335,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           ? html`<div class="controls-viewport">
               <div class="controls-column">
                 ${this._annotations.tracks.map(
-                  () =>
+                  (track) =>
                     html`<div
                       class="annotation-lane-spacer"
                       style="height: ${ANNOTATION_LANE_HEIGHT}px;"
-                    ></div>`
+                    >
+                      <span class="annotation-lane-name">${track.name}</span>
+                    </div>`
                 )}
                 ${orderedTracks.map(
                   (t) => html`
@@ -3345,7 +3372,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             ${this._annotations.renderLanes(
               spp,
               this.effectiveSampleRate,
-              this._annotationDrag.onPointerDown
+              this._annotationDrag.onPointerDown,
+              this.scaleMode === 'beats' ? this.ticksPerPixel : null
             )}
             ${this.scaleMode === 'beats'
               ? html`<daw-grid

@@ -15,6 +15,7 @@ function makeHost() {
     removeController: ReturnType<typeof vi.fn>;
     requestUpdate: ReturnType<typeof vi.fn>;
     updateComplete: Promise<boolean>;
+    _ticksToSeconds: ReturnType<typeof vi.fn>;
   };
   Object.assign(host, {
     effectiveSampleRate: 48000,
@@ -24,6 +25,7 @@ function makeHost() {
     removeController: vi.fn(),
     requestUpdate: vi.fn(),
     updateComplete: Promise.resolve(true),
+    _ticksToSeconds: vi.fn((t: number) => t / 960), // 60 BPM at ppqn 960 → 1 beat = 1 second
   });
   document.body.appendChild(host);
   return host;
@@ -99,5 +101,104 @@ describe('AnnotationController', () => {
     el.end = 5;
     await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
     expect(host.requestUpdate).toHaveBeenCalled();
+  });
+
+  it('derives seconds caches for tick-based annotations (write-only-on-change)', async () => {
+    const tickEl = document.createElement('daw-annotation') as HTMLElement & {
+      startTick: number | null;
+      endTick: number | null;
+      start: number;
+      end: number;
+    };
+    tickEl.setAttribute('start-tick', '960');
+    tickEl.setAttribute('end-tick', '2880');
+    track.appendChild(tickEl);
+    await flush();
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(1); // 960 / 960
+    expect(tickEl.end).toBe(3);
+    // Second sweep with unchanged tempo: no writes → no update events.
+    const spy = vi.fn();
+    host.addEventListener('daw-annotation-update', spy);
+    controller.deriveSecondsCaches();
+    await flush();
+    expect(spy).not.toHaveBeenCalled();
+    host.removeEventListener('daw-annotation-update', spy);
+  });
+
+  it('re-derives when the conversion changes (BPM change)', async () => {
+    const tickEl = document.createElement('daw-annotation') as HTMLElement & {
+      start: number;
+      end: number;
+    };
+    tickEl.setAttribute('start-tick', '960');
+    tickEl.setAttribute('end-tick', '1920');
+    track.appendChild(tickEl);
+    await flush();
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(1);
+    host._ticksToSeconds = vi.fn((t: number) => t / 1920); // 120 BPM
+    controller.deriveSecondsCaches();
+    expect(tickEl.start).toBe(0.5);
+    expect(tickEl.end).toBe(1);
+  });
+
+  it('boxGeometry uses tick math when ticksPerPixel is provided and data is tick-based', () => {
+    const a = { id: 'x', start: 1, end: 3, lines: [''], startTick: 960, endTick: 3840 };
+    // ticksPerPixel 10 → left round(96), width round(384) - 96 = 288.
+    expect(controller.boxGeometry(a, 1024, 48000, 10)).toEqual({ left: 96, width: 288 });
+    // Seconds-based data ignores ticksPerPixel (falls back to seconds math).
+    const s = { id: 'y', start: 1, end: 3, lines: [''] };
+    expect(controller.boxGeometry(s, 1024, 48000, 10)).toEqual(
+      controller.boxGeometry(s, 1024, 48000)
+    );
+  });
+
+  describe('playing highlight (daw-timeupdate)', () => {
+    // The host IS the editor and daw-timeupdate/daw-stop are dispatched on
+    // it directly — no document-level listening or target filtering needed.
+    function dispatchTimeUpdate(time: number) {
+      host.dispatchEvent(new CustomEvent('daw-timeupdate', { detail: { time } }));
+    }
+
+    function dispatchStop() {
+      host.dispatchEvent(new CustomEvent('daw-stop'));
+    }
+
+    it('requests a host update when a timeupdate crosses into an annotation', () => {
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(2); // inside annotation a (1-3)
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe('a');
+    });
+
+    it('does not request a host update for a second timeupdate inside the same annotation', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(2.5);
+      expect(host.requestUpdate).not.toHaveBeenCalled();
+    });
+
+    it('reports null once the playhead leaves the annotation into a gap', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(4); // past annotation a's end (3)
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe(null);
+    });
+
+    it('clears the playing map and requests an update on daw-stop', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchStop();
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe(null);
+    });
+
+    it('does not request an update on daw-stop when nothing was playing', () => {
+      host.requestUpdate.mockClear();
+      dispatchStop();
+      expect(host.requestUpdate).not.toHaveBeenCalled();
+    });
   });
 });

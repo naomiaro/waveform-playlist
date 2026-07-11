@@ -3,6 +3,7 @@ import '../elements/daw-annotation';
 import '../elements/daw-annotation-track';
 import { AnnotationDragHandler } from '../interactions/annotation-drag';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
+import type { SnapTo } from '@waveform-playlist/core';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -12,6 +13,13 @@ function makeHost() {
     _renderSpp: 480, // 100px per second — round numbers for assertions
     _annotationClampDuration: 100,
     seekTo: vi.fn(),
+    scaleMode: 'temporal',
+    ticksPerPixel: 10,
+    snapTo: 'off' as SnapTo,
+    _meterEntries: [{ tick: 0, numerator: 4, denominator: 4 }],
+    ppqn: 960,
+    _secondsToTicks: (s: number) => Math.round(s * 960),
+    _ticksToSeconds: (t: number) => t / 960,
   };
 }
 
@@ -157,5 +165,104 @@ describe('AnnotationDragHandler', () => {
     expect(bEl.end).toBeCloseTo(5); // b's end never touched by this drag
 
     handler._onPointerUp(fakePointer(bBoundary, 20));
+  });
+
+  it('tick annotation drag edits ticks via beats-mode pixel math', async () => {
+    host.scaleMode = 'beats';
+    const tickTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    tickTrack.editable = true;
+    tickTrack.innerHTML =
+      '<daw-annotation id="ta" start-tick="0" end-tick="960" start="0" end="1">A</daw-annotation>';
+    document.body.appendChild(tickTrack);
+    await flush();
+    const lane2 = document.createElement('div');
+    lane2.innerHTML =
+      '<div class="annotation-box" data-annotation-id="ta">' +
+      '<div class="annotation-boundary" data-edge="end"></div></div>';
+    document.body.appendChild(lane2);
+    const boundary = lane2.querySelector('.annotation-boundary') as HTMLElement;
+    boundary.setPointerCapture = vi.fn();
+    boundary.releasePointerCapture = vi.fn();
+
+    handler.onPointerDown(fakePointer(boundary, 96), tickTrack); // end at 960/10=96px
+    handler._onPointerMove(fakePointer(boundary, 144)); // +48px × 10 = +480 ticks
+    const el = tickTrack.querySelector('#ta') as HTMLElement & {
+      endTick: number | null;
+      end: number;
+    };
+    expect(el.endTick).toBe(1440);
+    expect(el.end).toBeCloseTo(1.5); // seconds cache re-derived
+    handler._onPointerUp(fakePointer(boundary, 144));
+    tickTrack.remove();
+    lane2.remove();
+  });
+
+  it('snapTo snaps the dragged tick edge to the grid', async () => {
+    host.scaleMode = 'beats';
+    host.snapTo = 'beat';
+    const tickTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    tickTrack.editable = true;
+    tickTrack.innerHTML =
+      '<daw-annotation id="ta" start-tick="0" end-tick="960" start="0" end="1">A</daw-annotation>';
+    document.body.appendChild(tickTrack);
+    await flush();
+    const lane2 = document.createElement('div');
+    lane2.innerHTML =
+      '<div class="annotation-box" data-annotation-id="ta">' +
+      '<div class="annotation-boundary" data-edge="end"></div></div>';
+    document.body.appendChild(lane2);
+    const boundary = lane2.querySelector('.annotation-boundary') as HTMLElement;
+    boundary.setPointerCapture = vi.fn();
+    boundary.releasePointerCapture = vi.fn();
+
+    handler.onPointerDown(fakePointer(boundary, 96), tickTrack);
+    // raw: 960 + (190-96)*10 = 960 + 940 = 1900 ticks.
+    // snapTickToGrid(1900, 'beat', [{tick:0,numerator:4,denominator:4}], 960):
+    // gridSize = ticksPerBeat([4,4], 960) = 960 * (4/4) = 960; offset = 1900 - 0 = 1900;
+    // Math.round(1900 / 960) = Math.round(1.979...) = 2 -> snapped tick = 0 + 2*960 = 1920.
+    // 1920 differs from BOTH the initial end-tick (960, catches a no-op
+    // regression) and the unsnapped raw value (1900, catches a snap-skipped
+    // regression) — a discriminating assertion on both axes.
+    handler._onPointerMove(fakePointer(boundary, 190));
+    const el = tickTrack.querySelector('#ta') as HTMLElement & { endTick: number | null };
+    expect(el.endTick).toBe(1920);
+    handler._onPointerUp(fakePointer(boundary, 190));
+    tickTrack.remove();
+    lane2.remove();
+  });
+
+  it('pointercancel restores tick snapshot in both units', async () => {
+    host.scaleMode = 'beats';
+    const tickTrack = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    tickTrack.editable = true;
+    tickTrack.innerHTML =
+      '<daw-annotation id="ta" start-tick="0" end-tick="960" start="0" end="1">A</daw-annotation>';
+    document.body.appendChild(tickTrack);
+    await flush();
+    const lane2 = document.createElement('div');
+    lane2.innerHTML =
+      '<div class="annotation-box" data-annotation-id="ta">' +
+      '<div class="annotation-boundary" data-edge="end"></div></div>';
+    document.body.appendChild(lane2);
+    const boundary = lane2.querySelector('.annotation-boundary') as HTMLElement;
+    boundary.setPointerCapture = vi.fn();
+    boundary.releasePointerCapture = vi.fn();
+
+    handler.onPointerDown(fakePointer(boundary, 96), tickTrack);
+    // +104px × 10 ticks/px = +1040 ticks -> end moves 960 -> 2000 (snapTo off).
+    handler._onPointerMove(fakePointer(boundary, 200));
+    const el = tickTrack.querySelector('#ta') as HTMLElement & {
+      endTick: number | null;
+      end: number;
+    };
+    // Interim assertion: the move must have actually changed the element —
+    // otherwise the post-cancel "restoration" would pass vacuously.
+    expect(el.endTick).toBe(2000);
+    expect(el.end).toBeCloseTo(2000 / 960);
+    handler._onPointerCancel(fakePointer(boundary, 200));
+    expect(el.endTick).toBe(960);
+    expect(el.end).toBeCloseTo(1);
+    tickTrack.remove();
+    lane2.remove();
   });
 });

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { snapToTicks, snapTickToGrid, computeMusicalTicks } from '../utils/musicalTicks';
+import {
+  snapToTicks,
+  snapTickToGrid,
+  computeMusicalTicks,
+  ticksToBarBeat,
+} from '../utils/musicalTicks';
 import type { MusicalTickParams } from '../utils/musicalTicks';
 
 const PPQN = 960;
@@ -423,5 +428,61 @@ describe('computeMusicalTicks', () => {
     for (let i = 1; i < barIndices.length; i++) {
       expect(barIndices[i]).toBeGreaterThan(barIndices[i - 1]);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ticksToBarBeat — 1-based bar.beat conversion, multi-meter aware
+// ---------------------------------------------------------------------------
+describe('ticksToBarBeat', () => {
+  const single44 = [{ tick: 0, numerator: 4, denominator: 4 }];
+
+  it('tick 0 → 1.1 (4/4 @960)', () => {
+    expect(ticksToBarBeat(0, single44, 960)).toEqual({ bar: 1, beat: 1 });
+  });
+
+  it('tick 960 → 1.2 (4/4 @960)', () => {
+    expect(ticksToBarBeat(960, single44, 960)).toEqual({ bar: 1, beat: 2 });
+  });
+
+  it('tick 3840 → 2.1 (4/4 @960)', () => {
+    expect(ticksToBarBeat(3840, single44, 960)).toEqual({ bar: 2, beat: 1 });
+  });
+
+  it('tick 7680 → 3.1 (4/4 @960)', () => {
+    expect(ticksToBarBeat(7680, single44, 960)).toEqual({ bar: 3, beat: 1 });
+  });
+
+  it('multi-meter: 4/4 from tick 0 then 3/4 from tick 7680 — tick 7680 → 3.1', () => {
+    const meters = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 7680, numerator: 3, denominator: 4 },
+    ];
+    expect(ticksToBarBeat(7680, meters, 960)).toEqual({ bar: 3, beat: 1 });
+  });
+
+  it('multi-meter: tick 7680+960 → 3.2', () => {
+    const meters = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 7680, numerator: 3, denominator: 4 },
+    ];
+    expect(ticksToBarBeat(7680 + 960, meters, 960)).toEqual({ bar: 3, beat: 2 });
+  });
+
+  it('multi-meter: tick 7680+2880 (one full 3/4 bar) → 4.1', () => {
+    const meters = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 7680, numerator: 3, denominator: 4 },
+    ];
+    expect(ticksToBarBeat(7680 + 2880, meters, 960)).toEqual({ bar: 4, beat: 1 });
+  });
+
+  it('empty meterEntries defaults to 4/4 from tick 0', () => {
+    expect(ticksToBarBeat(3840, [], 960)).toEqual({ bar: 2, beat: 1 });
+  });
+
+  it('ppqn <= 0 guards to { bar: 1, beat: 1 }', () => {
+    expect(ticksToBarBeat(3840, single44, 0)).toEqual({ bar: 1, beat: 1 });
+    expect(ticksToBarBeat(3840, single44, -10)).toEqual({ bar: 1, beat: 1 });
   });
 });

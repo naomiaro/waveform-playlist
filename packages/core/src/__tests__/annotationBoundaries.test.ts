@@ -3,6 +3,8 @@ import {
   updateAnnotationBoundaries,
   LINK_THRESHOLD,
   MIN_ANNOTATION_DURATION,
+  ANNOTATION_LINK_THRESHOLD_TICKS,
+  annotationMinDurationTicks,
 } from '../annotations/boundaries';
 import type { AnnotationData } from '../types/annotations';
 
@@ -140,5 +142,77 @@ describe('updateAnnotationBoundaries', () => {
     // NOT pushed. The brief's draft assertion (4.5) contradicted its own inline note;
     // corrected here to match actual hook behavior (characterization, not a "fix").
     expect(result[2].start).toBeCloseTo(4.2); // NOT pushed — current.end === next.start, not >
+  });
+});
+
+describe('updateAnnotationBoundaries — parameterized units', () => {
+  it('exports tick constants', () => {
+    expect(ANNOTATION_LINK_THRESHOLD_TICKS).toBe(0.5);
+    expect(annotationMinDurationTicks(960)).toBe(30);
+    expect(annotationMinDurationTicks(16)).toBe(1); // floor at 1 tick
+  });
+
+  it('defaults preserve existing behavior (min duration 0.1)', () => {
+    const result = updateAnnotationBoundaries({
+      annotationIndex: 0,
+      newTime: 5,
+      isDraggingStart: true,
+      annotations: [ann('a', 1, 2)],
+      duration: 10,
+      linkEndpoints: false,
+    });
+    expect(result[0].start).toBeCloseTo(1.9);
+  });
+
+  it('tick units: min duration and link threshold from options', () => {
+    // Integer tick positions; minDuration 30 ticks (ppqn 960).
+    const result = updateAnnotationBoundaries(
+      {
+        annotationIndex: 0,
+        newTime: 99999,
+        isDraggingStart: false,
+        annotations: [{ id: 'a', start: 0, end: 960, lines: [''] }],
+        duration: 3840,
+        linkEndpoints: false,
+      },
+      {
+        linkThreshold: ANNOTATION_LINK_THRESHOLD_TICKS,
+        minDuration: annotationMinDurationTicks(960),
+      }
+    );
+    expect(result[0].end).toBe(3840); // clamped to duration, not 0.1-seconds math
+
+    // Linked neighbors at integer ticks: |960 - 960| < 0.5 → linked.
+    const linked = updateAnnotationBoundaries(
+      {
+        annotationIndex: 1,
+        newTime: 480,
+        isDraggingStart: true,
+        annotations: [
+          { id: 'a', start: 0, end: 960, lines: [''] },
+          { id: 'b', start: 960, end: 1920, lines: [''] },
+        ],
+        duration: 3840,
+        linkEndpoints: true,
+      },
+      { linkThreshold: 0.5, minDuration: 30 }
+    );
+    expect(linked[1].start).toBe(480);
+    expect(linked[0].end).toBe(480);
+  });
+
+  it('tick min duration clamps start drags', () => {
+    const result = updateAnnotationBoundaries(
+      {
+        annotationIndex: 0,
+        newTime: 950,
+        isDraggingStart: true,
+        annotations: [{ id: 'a', start: 0, end: 960, lines: [''] }],
+        duration: 3840,
+        linkEndpoints: false,
+      },
+      { linkThreshold: 0.5, minDuration: 30 }
+    );
+    expect(result[0].start).toBe(930); // end - 30 ticks
   });
 });

@@ -128,4 +128,95 @@ describe('<daw-editor> annotation lanes', () => {
     expect(editor.shadowRoot!.querySelector('.annotation-lane')).toBeNull();
     editor.remove();
   });
+
+  it('re-derives tick annotation seconds when the engine BPM changes', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="ticks">' +
+      '<daw-annotation id="t1" start-tick="960" end-tick="1920"></daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const el = editor.querySelector('#t1') as HTMLElement & { start: number; end: number };
+    // Default 120 BPM, ppqn 960: 960 ticks = 0.5s.
+    expect(el.start).toBeCloseTo(0.5);
+    editor.bpm = 60;
+    await editor.updateComplete;
+    await flush();
+    expect(el.start).toBeCloseTo(1);
+    expect(el.end).toBeCloseTo(2);
+    editor.remove();
+  });
+
+  it('box-label="id" renders element ids (or 1-based position) in the bars', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="s" box-label="id">' +
+      '<daw-annotation id="7" start="0" end="1">First line of text</daw-annotation>' +
+      '<daw-annotation start="1" end="2">Second line of text</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const labels = [...editor.shadowRoot!.querySelectorAll('.annotation-box-text')].map((s) =>
+      s.textContent?.trim()
+    );
+    expect(labels).toEqual(['7', '2']); // explicit id, then position fallback
+    editor.remove();
+  });
+
+  it('box-label="none" renders empty bars even when text exists', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track box-label="none">' +
+      '<daw-annotation start="0" end="1">Hidden in lane</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const label = editor.shadowRoot!.querySelector('.annotation-box-text');
+    expect(label?.textContent?.trim()).toBe('');
+    editor.remove();
+  });
+
+  it('blank-text annotations render as bars and the track works without any list', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track id="regions">' +
+      '<daw-annotation start="0" end="1"></daw-annotation>' +
+      '<daw-annotation start="1" end="2"></daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    expect(editor.shadowRoot!.querySelectorAll('.annotation-box')).toHaveLength(2);
+    const track = editor.querySelector('#regions') as any;
+    track.selectNext();
+    expect(track.activeAnnotationId).toBeTruthy(); // fully functional, no list anywhere
+    editor.remove();
+  });
+
+  it('renders the annotation track name in the controls-column lane spacer', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track name="Sections">' +
+      '<daw-annotation start="0" end="1">x</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const spacer = editor.shadowRoot!.querySelector('.annotation-lane-spacer');
+    expect(spacer).toBeTruthy();
+    expect(spacer!.textContent?.trim()).toBe('Sections');
+    editor.remove();
+  });
+
+  it('lane spacer stays empty when the annotation track has no name', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track>' +
+      '<daw-annotation start="0" end="1">x</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const spacer = editor.shadowRoot!.querySelector('.annotation-lane-spacer');
+    expect(spacer!.textContent?.trim()).toBe('');
+    editor.remove();
+  });
 });

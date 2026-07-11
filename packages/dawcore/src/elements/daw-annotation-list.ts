@@ -1,9 +1,11 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { ticksToBarBeat } from '@waveform-playlist/core';
+import type { AnnotationData, MeterEntry } from '@waveform-playlist/core';
 import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import type { DawAnnotationElement } from './daw-annotation';
-import type { DawAnnotationSelectDetail } from '../events';
+import type { DawAnnotationSelectDetail, DawTimeUpdateDetail } from '../events';
+import { computePlayingAnnotationId } from '../utils/annotation-playing';
 
 /** m:ss.mmm for annotation timestamps (finer than the ruler's m:ss). */
 function formatAnnotationTime(seconds: number): string {
@@ -12,6 +14,13 @@ function formatAnnotationTime(seconds: number): string {
   const s = whole % 60;
   const m = (whole - s) / 60;
   return m + ':' + String(s).padStart(2, '0') + '.' + String(ms).padStart(3, '0');
+}
+
+/** Structural view of the host editor — only what bars-mode formatting touches. */
+interface AnnotationListHostEditor extends HTMLElement {
+  _secondsToTicks(seconds: number): number;
+  _meterEntries: MeterEntry[];
+  ppqn: number;
 }
 
 /**
@@ -23,13 +32,28 @@ function formatAnnotationTime(seconds: number): string {
 export class DawAnnotationListElement extends LitElement {
   @property() for = '';
 
+  /** `'time'` (default): m:ss.mmm clock times, unchanged. `'bars'`: B.b – B.b
+   *  bar.beat ranges resolved via the host editor's meter map — falls back
+   *  to time display (and warns once) when no `<daw-editor>` ancestor is
+   *  found via `this.track?.closest('daw-editor')`. */
+  @property({ type: String, attribute: 'time-display', reflect: true })
+  timeDisplay: 'time' | 'bars' = 'time';
+
   /** Suppress re-render while a row's text is being edited. */
   @state() private _editingId: string | null = null;
 
   private _activeId: string | null = null;
+  /** Playback-following highlight, separate from `_activeId` (selection) so
+   *  playback never disturbs selection/keyboard editing. Driven by
+   *  daw-timeupdate, cleared on daw-stop, retained on pause. */
+  private _playingId: string | null = null;
   private _observer: MutationObserver | null = null;
   private _observedTrack: DawAnnotationTrackElement | null = null;
   private _warnedMissing = false;
+  /** Warn once per resolved `for` target when bars mode can't find a host
+   *  editor — reset alongside `_warnedMissing` on `for` change so a
+   *  retargeted list can warn again for its new target. */
+  private _warnedNoEditorForBars = false;
   /** Set around `_cancelEdit`'s `span.blur()` so the resulting synchronous
    *  blur event doesn't re-enter `_commitEdit` (cancel already restores the
    *  text and clears `_editingId` itself). */
@@ -53,6 +77,10 @@ export class DawAnnotationListElement extends LitElement {
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       cursor: pointer;
     }
+    .annotation-row.playing {
+      background: var(--daw-annotation-playing-background, rgba(196, 154, 108, 0.12));
+      box-shadow: inset 2px 0 0 var(--daw-annotation-box-border, #c49a6c);
+    }
     .annotation-row.active {
       background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.25));
     }
@@ -69,6 +97,10 @@ export class DawAnnotationListElement extends LitElement {
     .annotation-row-text[contenteditable='true'] {
       cursor: text;
       outline-offset: 2px;
+    }
+    .annotation-row-text:empty::before {
+      content: '—';
+      opacity: 0.4;
     }
   `;
 
@@ -93,17 +125,24 @@ export class DawAnnotationListElement extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>): void {
     // Allow a retargeted list to warn again for its new `for` value.
-    if (changed.has('for')) this._warnedMissing = false;
+    if (changed.has('for')) {
+      this._warnedMissing = false;
+      this._warnedNoEditorForBars = false;
+    }
   }
 
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('daw-annotation-select', this._onSelect as EventListener);
+    document.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    document.addEventListener('daw-stop', this._onStop as EventListener);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('daw-annotation-select', this._onSelect as EventListener);
+    document.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    document.removeEventListener('daw-stop', this._onStop as EventListener);
     this._observer?.disconnect();
     this._observer = null;
     this._observedTrack = null;
@@ -169,12 +208,65 @@ export class DawAnnotationListElement extends LitElement {
     });
   };
 
+  /**
+   * Update only on annotation-boundary crossings, not per animation frame.
+   * `shouldUpdate()` suppresses the resulting render while a row is being
+   * edited (`_editingId`) — intentional, not bypassed here. A boundary
+   * crossed mid-edit is caught up on the NEXT crossing after the edit ends;
+   * the highlight is briefly stale in that window, which is acceptable
+   * (edits are rare and short-lived relative to playback).
+   */
+  private _onTimeUpdate = (e: CustomEvent<DawTimeUpdateDetail>): void => {
+    if (e.target !== this.track?.closest('daw-editor')) return;
+    const playingId = computePlayingAnnotationId(this.track?.annotations ?? [], e.detail.time);
+    if (playingId === this._playingId) return;
+    this._playingId = playingId;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      const row = this.shadowRoot?.querySelector('.annotation-row.playing');
+      // happy-dom lacks scrollIntoView — guard.
+      (row as HTMLElement | null)?.scrollIntoView?.({ block: 'center' });
+    });
+  };
+
+  private _onStop = (e: Event): void => {
+    if (e.target !== this.track?.closest('daw-editor')) return;
+    if (this._playingId === null) return;
+    this._playingId = null;
+    this.requestUpdate();
+  };
+
   private _onRowClick(a: AnnotationData): void {
     const track = this.track;
     if (!track) return;
     track.activeAnnotationId = a.id;
     const editor = track.closest('daw-editor') as { seekTo?: (t: number) => void } | null;
     editor?.seekTo?.(a.start);
+  }
+
+  /** Formats a row's times span per `timeDisplay`. `'bars'` resolves the
+   *  host editor once (shared across all rows in a render) and falls back
+   *  to time display, warning once, when no editor is found. */
+  private _formatTimes(a: AnnotationData, editor: AnnotationListHostEditor | null): string {
+    if (this.timeDisplay === 'bars') {
+      if (editor) {
+        const isTickBased = a.startTick !== undefined && a.endTick !== undefined;
+        const startTick = isTickBased ? (a.startTick as number) : editor._secondsToTicks(a.start);
+        const endTick = isTickBased ? (a.endTick as number) : editor._secondsToTicks(a.end);
+        const start = ticksToBarBeat(startTick, editor._meterEntries, editor.ppqn);
+        const end = ticksToBarBeat(endTick, editor._meterEntries, editor.ppqn);
+        return start.bar + '.' + start.beat + ' – ' + end.bar + '.' + end.beat;
+      }
+      if (!this._warnedNoEditorForBars) {
+        console.warn(
+          '[dawcore] <daw-annotation-list for="' +
+            this.for +
+            '" time-display="bars"> found no parent <daw-editor> — falling back to time display'
+        );
+        this._warnedNoEditorForBars = true;
+      }
+    }
+    return formatAnnotationTime(a.start) + ' – ' + formatAnnotationTime(a.end);
   }
 
   private _annotationElement(id: string): DawAnnotationElement | null {
@@ -207,21 +299,37 @@ export class DawAnnotationListElement extends LitElement {
     const track = this.track;
     const annotations = track?.annotations ?? [];
     const editable = track?.editable ?? false;
+    const editor =
+      this.timeDisplay === 'bars'
+        ? ((track?.closest('daw-editor') as AnnotationListHostEditor | null) ?? null)
+        : null;
     return html`
       ${annotations.map(
         (a) => html`
           <div
-            class="annotation-row ${a.id === this._activeId ? 'active' : ''}"
+            class="annotation-row ${a.id === this._activeId ? 'active' : ''} ${a.id ===
+            this._playingId
+              ? 'playing'
+              : ''}"
             @click=${(e: Event) => {
-              // Ignore clicks that land on the text span while editing.
-              if (this._editingId === a.id) return;
+              // Ignore clicks that land on the text span while this row is
+              // ALREADY the active/selected one and mid-edit — avoids
+              // re-seeking (jumping the playhead back to the row's start)
+              // on every cursor-repositioning click while typing.
+              //
+              // Must NOT also fire on the very first click into an unselected
+              // row's contenteditable text: browsers dispatch `focus` before
+              // `click`, so `_editingId` is already `a.id` by the time this
+              // handler runs even though `_onRowClick` (which sets it) never
+              // ran yet. Gating on `_activeId === a.id` too lets that first
+              // click through. (Not reproducible via `row.click()` in tests —
+              // the DOM method skips the native focus-then-click sequence.)
+              if (this._editingId === a.id && this._activeId === a.id) return;
               e.stopPropagation();
               this._onRowClick(a);
             }}
           >
-            <span class="annotation-row-times">
-              ${formatAnnotationTime(a.start)} – ${formatAnnotationTime(a.end)}
-            </span>
+            <span class="annotation-row-times"> ${this._formatTimes(a, editor)} </span>
             <span
               class="annotation-row-text"
               data-id=${a.id}
