@@ -25,15 +25,26 @@ interface AnnotationHostEditor extends HTMLElement {
  * only edges that actually changed, so no spurious daw-annotation-update
  * events fire. Module-level helper (must sit ABOVE @customElement per the
  * dawcore decorator gotcha) — exported for reuse by the drag interaction.
+ *
+ * `before`/`after` are index-aligned with EACH OTHER (the core boundary math
+ * preserves input order), but `elements` is a live, start-sorted snapshot
+ * (`track.annotationElements` re-sorts on every access) that can disagree
+ * with the snapshot order the caller computed `before`/`after` from — e.g.
+ * mid-drag, once a dragged start edge crosses a neighbor's start. Matching
+ * `elements[i]` by POSITION would then silently write results onto the
+ * wrong element. Look up the target element by `after[i].id` instead.
  */
 export function applyBoundaryResults(
   elements: DawAnnotationElement[],
   before: AnnotationData[],
   after: AnnotationData[]
 ): void {
+  const byId = new Map(elements.map((el) => [el.annotationId, el]));
   after.forEach((next, i) => {
-    if (next.start !== before[i].start) elements[i].start = next.start;
-    if (next.end !== before[i].end) elements[i].end = next.end;
+    const el = byId.get(next.id);
+    if (!el) return;
+    if (next.start !== before[i].start) el.start = next.start;
+    if (next.end !== before[i].end) el.end = next.end;
   });
 }
 

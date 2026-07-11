@@ -112,4 +112,50 @@ describe('AnnotationDragHandler', () => {
     handler.onPointerDown(down, track);
     expect(down.stopPropagation).not.toHaveBeenCalled();
   });
+
+  it('applyBoundaryResults matches elements by id, not live sort position, across a mid-drag reorder', () => {
+    // Extend the fake lane with a box for "b" whose start-edge boundary we'll
+    // drag — the existing beforeEach lane only wires "a".
+    lane.insertAdjacentHTML(
+      'beforeend',
+      '<div class="annotation-box" data-annotation-id="b">' +
+        '<div class="annotation-boundary" data-edge="start"></div>' +
+        '</div>'
+    );
+    const bBox = lane.querySelector('[data-annotation-id="b"]') as HTMLElement;
+    const bBoundary = bBox.querySelector('.annotation-boundary') as HTMLElement;
+    bBoundary.setPointerCapture = vi.fn();
+    bBoundary.releasePointerCapture = vi.fn();
+
+    // b.start = 3s at 100px/s (_renderSpp 480 / 48000 sampleRate) = 300px.
+    handler.onPointerDown(fakePointer(bBoundary, 300), track);
+
+    // Frame 1: drag start edge far left, from 300px to 40px -> newTime 0.4s.
+    // Core math (linkEndpoints=false): constrainedStart = min(b.end-0.1, max(0,0.4)) = 0.4;
+    // 0.4 < a.end(3) so a's end is pushed back to 0.4 (collision, not link).
+    handler._onPointerMove(fakePointer(bBoundary, 40));
+    const aEl = track.annotationElements.find((el) => el.annotationId === 'a')!;
+    const bEl = track.annotationElements.find((el) => el.annotationId === 'b')!;
+    expect(aEl.start).toBeCloseTo(1);
+    expect(aEl.end).toBeCloseTo(0.4);
+    expect(bEl.start).toBeCloseTo(0.4);
+    expect(bEl.end).toBeCloseTo(5);
+
+    // Live start-sort order is now [b(0.4), a(1)] — flipped versus the
+    // drag-start snapshot order [a, b]. A second frame exercises the
+    // mismatch: with the OLD index-based write-back this cross-writes the
+    // two elements' data.
+    handler._onPointerMove(fakePointer(bBoundary, 20)); // -280px -> newTime 0.2s
+    // Core math (always recomputed from the FROZEN drag-start snapshot,
+    // where a.end is still 3): constrainedStart = min(4.9, 0.2) = 0.2;
+    // 0.2 < a.end(3) (frozen) so a's end -> 0.2, b's start -> 0.2.
+    expect(aEl.annotationId).toBe('a');
+    expect(bEl.annotationId).toBe('b');
+    expect(aEl.start).toBeCloseTo(1); // a's start never touched by this drag
+    expect(aEl.end).toBeCloseTo(0.2);
+    expect(bEl.start).toBeCloseTo(0.2);
+    expect(bEl.end).toBeCloseTo(5); // b's end never touched by this drag
+
+    handler._onPointerUp(fakePointer(bBoundary, 20));
+  });
 });
