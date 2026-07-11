@@ -126,8 +126,26 @@ export class AnnotationController implements ReactiveController {
     }
   }
 
-  /** Pixel geometry for one annotation box. Floor-based like clip positioning. */
-  boxGeometry(a: AnnotationData, spp: number, sampleRate: number): { left: number; width: number } {
+  /** Pixel geometry for one annotation box. Tick-based annotations in beats
+   * mode use CLIP-IDENTICAL tick math (round(tick / ticksPerPixel)) so they
+   * align pixel-exactly with <daw-grid>; everything else uses the floor-based
+   * seconds math (temporal mode reads the always-fresh seconds cache). */
+  boxGeometry(
+    a: AnnotationData,
+    spp: number,
+    sampleRate: number,
+    ticksPerPixel: number | null = null
+  ): { left: number; width: number } {
+    if (
+      ticksPerPixel !== null &&
+      ticksPerPixel > 0 &&
+      a.startTick !== undefined &&
+      a.endTick !== undefined
+    ) {
+      const left = Math.round(a.startTick / ticksPerPixel);
+      const width = Math.round(a.endTick / ticksPerPixel) - left;
+      return { left, width };
+    }
     const left = Math.floor((a.start * sampleRate) / spp);
     const width = Math.floor((a.end * sampleRate) / spp) - left;
     return { left, width };
@@ -140,7 +158,8 @@ export class AnnotationController implements ReactiveController {
   renderLanes(
     spp: number,
     sampleRate: number,
-    onPointerDown: (e: PointerEvent, track: DawAnnotationTrackElement) => void = () => {}
+    onPointerDown: (e: PointerEvent, track: DawAnnotationTrackElement) => void = () => {},
+    ticksPerPixel: number | null = null
   ): TemplateResult[] {
     return this._tracks.map((track) => {
       const activeId = track.activeAnnotationId;
@@ -153,7 +172,7 @@ export class AnnotationController implements ReactiveController {
         >
           ${elements.map((el, i) => {
             const a = el.toAnnotationData();
-            const geo = this.boxGeometry(a, spp, sampleRate);
+            const geo = this.boxGeometry(a, spp, sampleRate, ticksPerPixel);
             const label =
               track.boxLabel === 'none'
                 ? ''

@@ -142,4 +142,15 @@ describe('AnnotationController', () => {
     expect(tickEl.start).toBe(0.5);
     expect(tickEl.end).toBe(1);
   });
+
+  it('boxGeometry uses tick math when ticksPerPixel is provided and data is tick-based', () => {
+    const a = { id: 'x', start: 1, end: 3, lines: [''], startTick: 960, endTick: 3840 };
+    // ticksPerPixel 10 → left round(96), width round(384) - 96 = 288.
+    expect(controller.boxGeometry(a, 1024, 48000, 10)).toEqual({ left: 96, width: 288 });
+    // Seconds-based data ignores ticksPerPixel (falls back to seconds math).
+    const s = { id: 'y', start: 1, end: 3, lines: [''] };
+    expect(controller.boxGeometry(s, 1024, 48000, 10)).toEqual(
+      controller.boxGeometry(s, 1024, 48000)
+    );
+  });
 });

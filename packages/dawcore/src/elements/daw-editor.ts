@@ -3354,7 +3354,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             ${this._annotations.renderLanes(
               spp,
               this.effectiveSampleRate,
-              this._annotationDrag.onPointerDown
+              this._annotationDrag.onPointerDown,
+              this.scaleMode === 'beats' ? this.ticksPerPixel : null
             )}
             ${this.scaleMode === 'beats'
               ? html`<daw-grid
