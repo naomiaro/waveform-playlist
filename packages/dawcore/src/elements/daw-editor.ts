@@ -894,6 +894,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         font-size: 11px;
         cursor: pointer;
       }
+      .annotation-box.playing {
+        box-shadow: inset 0 0 0 1px var(--daw-annotation-box-border, #c49a6c);
+        background: var(--daw-annotation-playing-background, rgba(196, 154, 108, 0.32));
+      }
       .annotation-box.active {
         background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.45));
       }

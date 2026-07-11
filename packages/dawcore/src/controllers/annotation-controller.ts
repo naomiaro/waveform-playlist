@@ -2,6 +2,8 @@ import { html } from 'lit';
 import type { ReactiveController, ReactiveControllerHost, TemplateResult } from 'lit';
 import type { AnnotationData } from '@waveform-playlist/core';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
+import type { DawTimeUpdateDetail } from '../events';
+import { computePlayingAnnotationId } from '../utils/annotation-playing';
 
 /**
  * Fixed lane height. A TS constant (not a CSS var) because the frozen-panes
@@ -26,6 +28,11 @@ export class AnnotationController implements ReactiveController {
   private _host: AnnotationControllerHost;
   private _tracks: DawAnnotationTrackElement[] = [];
   private _removalObserver: MutationObserver | null = null;
+  /** Playback-following highlight per track, separate from each track's
+   *  `activeAnnotationId` (selection) so playback never disturbs selection.
+   *  Driven by daw-timeupdate, cleared on daw-stop, retained on pause.
+   *  Replaced immutably (a fresh Map) on every change. */
+  private _playingIds: Map<DawAnnotationTrackElement, string | null> = new Map();
 
   constructor(host: AnnotationControllerHost) {
     this._host = host;
@@ -34,6 +41,12 @@ export class AnnotationController implements ReactiveController {
 
   get tracks(): readonly DawAnnotationTrackElement[] {
     return this._tracks;
+  }
+
+  /** Current playback-following highlight id for a track, or `null` when the
+   *  playhead isn't inside any of the track's annotations. */
+  getPlayingAnnotationId(track: DawAnnotationTrackElement): string | null {
+    return this._playingIds.get(track) ?? null;
   }
 
   get totalLaneHeight(): number {
@@ -54,6 +67,11 @@ export class AnnotationController implements ReactiveController {
     this._host.addEventListener('daw-annotation-update', this._onDataChange);
     this._host.addEventListener('daw-annotation-select', this._onDataChange);
     this._host.addEventListener('daw-annotation-connected', this._onDataChange);
+    // The host IS the editor and daw-timeupdate/daw-stop are dispatched on
+    // it directly (see playback-animation-controller.ts) — no document-level
+    // listening or target filtering needed, unlike <daw-annotation-list>.
+    this._host.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    this._host.addEventListener('daw-stop', this._onStop);
     // Removals can't bubble — observe childList like the editor's track observer.
     this._removalObserver = new MutationObserver((mutations) => {
       let changed = false;
@@ -91,13 +109,41 @@ export class AnnotationController implements ReactiveController {
     this._host.removeEventListener('daw-annotation-update', this._onDataChange);
     this._host.removeEventListener('daw-annotation-select', this._onDataChange);
     this._host.removeEventListener('daw-annotation-connected', this._onDataChange);
+    this._host.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    this._host.removeEventListener('daw-stop', this._onStop);
     this._removalObserver?.disconnect();
     this._removalObserver = null;
     this._tracks = [];
+    this._playingIds = new Map();
   }
 
   private _onDataChange = (): void => {
     this.deriveSecondsCaches();
+    this._host.requestUpdate();
+  };
+
+  /**
+   * Update only on annotation-boundary crossings, not per animation frame.
+   */
+  private _onTimeUpdate = (e: CustomEvent<DawTimeUpdateDetail>): void => {
+    const time = e.detail.time;
+    let changed = false;
+    const next = new Map(this._playingIds);
+    for (const track of this._tracks) {
+      const playingId = computePlayingAnnotationId(track.annotations, time);
+      if (playingId !== (this._playingIds.get(track) ?? null)) {
+        next.set(track, playingId);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    this._playingIds = next;
+    this._host.requestUpdate();
+  };
+
+  private _onStop = (): void => {
+    if (this._playingIds.size === 0) return;
+    this._playingIds = new Map();
     this._host.requestUpdate();
   };
 
@@ -163,6 +209,7 @@ export class AnnotationController implements ReactiveController {
   ): TemplateResult[] {
     return this._tracks.map((track) => {
       const activeId = track.activeAnnotationId;
+      const playingId = this._playingIds.get(track) ?? null;
       const elements = track.annotationElements;
       return html`
         <div
@@ -181,7 +228,9 @@ export class AnnotationController implements ReactiveController {
                   : a.lines.join(' ');
             return html`
               <div
-                class="annotation-box ${a.id === activeId ? 'active' : ''}"
+                class="annotation-box ${a.id === activeId ? 'active' : ''} ${a.id === playingId
+                  ? 'playing'
+                  : ''}"
                 data-annotation-id=${a.id}
                 style="left: ${geo.left}px; width: ${geo.width}px;"
               >

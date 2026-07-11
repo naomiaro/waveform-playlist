@@ -3,7 +3,8 @@ import { customElement, property, state } from 'lit/decorators.js';
 import type { AnnotationData } from '@waveform-playlist/core';
 import type { DawAnnotationTrackElement } from './daw-annotation-track';
 import type { DawAnnotationElement } from './daw-annotation';
-import type { DawAnnotationSelectDetail } from '../events';
+import type { DawAnnotationSelectDetail, DawTimeUpdateDetail } from '../events';
+import { computePlayingAnnotationId } from '../utils/annotation-playing';
 
 /** m:ss.mmm for annotation timestamps (finer than the ruler's m:ss). */
 function formatAnnotationTime(seconds: number): string {
@@ -27,6 +28,10 @@ export class DawAnnotationListElement extends LitElement {
   @state() private _editingId: string | null = null;
 
   private _activeId: string | null = null;
+  /** Playback-following highlight, separate from `_activeId` (selection) so
+   *  playback never disturbs selection/keyboard editing. Driven by
+   *  daw-timeupdate, cleared on daw-stop, retained on pause. */
+  private _playingId: string | null = null;
   private _observer: MutationObserver | null = null;
   private _observedTrack: DawAnnotationTrackElement | null = null;
   private _warnedMissing = false;
@@ -52,6 +57,10 @@ export class DawAnnotationListElement extends LitElement {
       padding: 6px 10px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       cursor: pointer;
+    }
+    .annotation-row.playing {
+      background: var(--daw-annotation-playing-background, rgba(196, 154, 108, 0.12));
+      box-shadow: inset 2px 0 0 var(--daw-annotation-box-border, #c49a6c);
     }
     .annotation-row.active {
       background: var(--daw-annotation-active-background, rgba(196, 154, 108, 0.25));
@@ -103,11 +112,15 @@ export class DawAnnotationListElement extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener('daw-annotation-select', this._onSelect as EventListener);
+    document.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    document.addEventListener('daw-stop', this._onStop as EventListener);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('daw-annotation-select', this._onSelect as EventListener);
+    document.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
+    document.removeEventListener('daw-stop', this._onStop as EventListener);
     this._observer?.disconnect();
     this._observer = null;
     this._observedTrack = null;
@@ -173,6 +186,34 @@ export class DawAnnotationListElement extends LitElement {
     });
   };
 
+  /**
+   * Update only on annotation-boundary crossings, not per animation frame.
+   * `shouldUpdate()` suppresses the resulting render while a row is being
+   * edited (`_editingId`) — intentional, not bypassed here. A boundary
+   * crossed mid-edit is caught up on the NEXT crossing after the edit ends;
+   * the highlight is briefly stale in that window, which is acceptable
+   * (edits are rare and short-lived relative to playback).
+   */
+  private _onTimeUpdate = (e: CustomEvent<DawTimeUpdateDetail>): void => {
+    if (e.target !== this.track?.closest('daw-editor')) return;
+    const playingId = computePlayingAnnotationId(this.track?.annotations ?? [], e.detail.time);
+    if (playingId === this._playingId) return;
+    this._playingId = playingId;
+    this.requestUpdate();
+    void this.updateComplete.then(() => {
+      const row = this.shadowRoot?.querySelector('.annotation-row.playing');
+      // happy-dom lacks scrollIntoView — guard.
+      (row as HTMLElement | null)?.scrollIntoView?.({ block: 'center' });
+    });
+  };
+
+  private _onStop = (e: Event): void => {
+    if (e.target !== this.track?.closest('daw-editor')) return;
+    if (this._playingId === null) return;
+    this._playingId = null;
+    this.requestUpdate();
+  };
+
   private _onRowClick(a: AnnotationData): void {
     const track = this.track;
     if (!track) return;
@@ -215,7 +256,10 @@ export class DawAnnotationListElement extends LitElement {
       ${annotations.map(
         (a) => html`
           <div
-            class="annotation-row ${a.id === this._activeId ? 'active' : ''}"
+            class="annotation-row ${a.id === this._activeId ? 'active' : ''} ${a.id ===
+            this._playingId
+              ? 'playing'
+              : ''}"
             @click=${(e: Event) => {
               // Ignore clicks that land on the text span while this row is
               // ALREADY the active/selected one and mid-edit — avoids

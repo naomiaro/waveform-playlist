@@ -153,4 +153,52 @@ describe('AnnotationController', () => {
       controller.boxGeometry(s, 1024, 48000)
     );
   });
+
+  describe('playing highlight (daw-timeupdate)', () => {
+    // The host IS the editor and daw-timeupdate/daw-stop are dispatched on
+    // it directly — no document-level listening or target filtering needed.
+    function dispatchTimeUpdate(time: number) {
+      host.dispatchEvent(new CustomEvent('daw-timeupdate', { detail: { time } }));
+    }
+
+    function dispatchStop() {
+      host.dispatchEvent(new CustomEvent('daw-stop'));
+    }
+
+    it('requests a host update when a timeupdate crosses into an annotation', () => {
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(2); // inside annotation a (1-3)
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe('a');
+    });
+
+    it('does not request a host update for a second timeupdate inside the same annotation', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(2.5);
+      expect(host.requestUpdate).not.toHaveBeenCalled();
+    });
+
+    it('reports null once the playhead leaves the annotation into a gap', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchTimeUpdate(4); // past annotation a's end (3)
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe(null);
+    });
+
+    it('clears the playing map and requests an update on daw-stop', () => {
+      dispatchTimeUpdate(2);
+      host.requestUpdate.mockClear();
+      dispatchStop();
+      expect(host.requestUpdate).toHaveBeenCalled();
+      expect(controller.getPlayingAnnotationId(track)).toBe(null);
+    });
+
+    it('does not request an update on daw-stop when nothing was playing', () => {
+      host.requestUpdate.mockClear();
+      dispatchStop();
+      expect(host.requestUpdate).not.toHaveBeenCalled();
+    });
+  });
 });

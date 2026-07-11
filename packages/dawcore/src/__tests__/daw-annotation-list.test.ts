@@ -182,4 +182,80 @@ describe('<daw-annotation-list>', () => {
     const cssText = String((list.constructor as typeof DawAnnotationListElement).styles);
     expect(cssText).toContain(':empty::before');
   });
+
+  describe('playing highlight (daw-timeupdate)', () => {
+    // Filtered by e.target === this.track?.closest('daw-editor') — the
+    // track must be reparented under a stub editor and events dispatched
+    // FROM that editor (bubbles: true), mirroring the daw-annotation-select
+    // pattern used by the tests above.
+    let editor: HTMLElement;
+
+    beforeEach(async () => {
+      editor = document.createElement('daw-editor');
+      document.body.appendChild(editor);
+      editor.appendChild(track);
+      await flush();
+      await list.updateComplete;
+    });
+
+    afterEach(() => {
+      editor.remove();
+    });
+
+    function dispatchTimeUpdate(time: number) {
+      editor.dispatchEvent(
+        new CustomEvent('daw-timeupdate', { detail: { time }, bubbles: true, composed: true })
+      );
+    }
+
+    function dispatchStop() {
+      editor.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
+    }
+
+    it('highlights the row for the annotation the playhead is inside', async () => {
+      dispatchTimeUpdate(3.5); // inside annotation b (2.5-5)
+      await list.updateComplete;
+      const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+      expect(rows[0].classList.contains('playing')).toBe(false);
+      expect(rows[1].classList.contains('playing')).toBe(true);
+    });
+
+    it('does not re-render for a second timeupdate inside the same annotation', async () => {
+      dispatchTimeUpdate(3.5);
+      await list.updateComplete;
+      const spy = vi.spyOn(list, 'requestUpdate');
+      dispatchTimeUpdate(3.6);
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('shows no playing row when the playhead is in a gap', async () => {
+      dispatchTimeUpdate(3.5);
+      await list.updateComplete;
+      dispatchTimeUpdate(6); // past both annotations (b ends at 5)
+      await list.updateComplete;
+      const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+      expect(rows[0].classList.contains('playing')).toBe(false);
+      expect(rows[1].classList.contains('playing')).toBe(false);
+    });
+
+    it('clears the playing highlight on daw-stop', async () => {
+      dispatchTimeUpdate(3.5);
+      await list.updateComplete;
+      dispatchStop();
+      await list.updateComplete;
+      const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+      expect(rows[1].classList.contains('playing')).toBe(false);
+    });
+
+    it('active (selection) and playing coexist on the same row', async () => {
+      track.activeAnnotationId = 'b';
+      await list.updateComplete;
+      dispatchTimeUpdate(3.5);
+      await list.updateComplete;
+      const rows = list.shadowRoot!.querySelectorAll('.annotation-row');
+      expect(rows[1].classList.contains('active')).toBe(true);
+      expect(rows[1].classList.contains('playing')).toBe(true);
+    });
+  });
 });
