@@ -10,7 +10,7 @@ function makeHost() {
   return {
     effectiveSampleRate: 48000,
     _renderSpp: 480, // 100px per second — round numbers for assertions
-    _duration: 100,
+    _annotationClampDuration: 100,
     seekTo: vi.fn(),
   };
 }

@@ -123,6 +123,23 @@ describe('<daw-annotation-track>', () => {
     expect(track.annotations[2].end).toBeCloseTo(6.25);
   });
 
+  it('moveEndBoundary is unclamped past the natural duration when the host editor reports Infinity (indefinite-playback)', () => {
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    // Shadow the accessor for this instance only — emulates
+    // indefinite-playback without exercising the full editor lifecycle.
+    Object.defineProperty(editor, '_annotationClampDuration', {
+      value: Infinity,
+      configurable: true,
+    });
+    editor.appendChild(track);
+    track.editable = true;
+    track.activeAnnotationId = 'c'; // last annotation, end=6
+    track.moveEndBoundary(100000); // +100s
+    expect(track.annotations[2].end).toBeCloseTo(106);
+    editor.remove();
+  });
+
   it('playActive with continuous-play off plays the annotation range on the host editor', () => {
     const editor = document.createElement('daw-editor');
     document.body.appendChild(editor);

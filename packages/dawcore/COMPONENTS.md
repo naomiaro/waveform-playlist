@@ -162,6 +162,8 @@ Declarative annotation track (light DOM). Owns the ephemeral selection state and
 
 **Events:** `daw-annotation-track-connected` (`{element}`), `daw-annotation-select` (`{annotation: AnnotationData \| null}`), `daw-error` (`{operation: 'annotation-shortcut', key, error}`) — all bubble + compose.
 
+Boundary edits (drag or `moveEndBoundary`) clamp `end` to the parent `<daw-editor>`'s timeline duration by default. Setting `<daw-editor indefinite-playback>` lifts that end bound entirely, so annotations may extend past the audio; in temporal mode (not beats mode) the editor's timeline width also extends to cover the furthest annotation end, keeping such annotations reachable/scrollable.
+
 ### `<daw-annotation>`
 
 Declarative annotation data element (light DOM). Its `start`/`end` attributes and text content ARE the single source of truth — must be a child of `<daw-annotation-track>`.

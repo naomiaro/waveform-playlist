@@ -100,6 +100,22 @@ describe('<daw-editor> annotation lanes', () => {
     editor.remove();
   });
 
+  it('extends the temporal-mode timeline width to cover an annotation past the audio, and keeps working with indefinite-playback set', async () => {
+    const editor = await makeEditor(1, { 'indefinite-playback': '' });
+    const annotationEnd = 1000; // seconds — far past the short MIDI-clip duration
+    editor.innerHTML += `<daw-annotation-track><daw-annotation start="0" end="${annotationEnd}">x</daw-annotation></daw-annotation-track>`;
+    await flush();
+    await editor.updateComplete;
+    const timeline = editor.shadowRoot!.querySelector('.timeline') as HTMLElement;
+    expect(timeline).toBeTruthy();
+    const widthPx = parseFloat(timeline.style.width);
+    const expectedMin = Math.floor(
+      (annotationEnd * editor.effectiveSampleRate) / editor.samplesPerPixel
+    );
+    expect(widthPx).toBeGreaterThanOrEqual(expectedMin);
+    editor.remove();
+  });
+
   it('removing the annotation track removes the lane', async () => {
     const editor = await makeEditor();
     editor.innerHTML +=

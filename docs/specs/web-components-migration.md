@@ -1473,7 +1473,7 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 - Auto-scrolls to center the active annotation on keyboard selection change
 - Respects `link-endpoints` — boundary moves cascade to adjacent annotations
-- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration
+- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration — unless `<daw-editor indefinite-playback>` is set, which lifts the end bound entirely (DAW-style unbounded timeline) so annotations may extend past the audio. In temporal mode (not beats mode) the timeline width also extends to cover the furthest annotation end, keeping such annotations reachable/scrollable regardless of `indefinite-playback`.
 - Navigation shortcuts always active; boundary editing requires `editable` attribute
 - `selectNext`/`selectPrevious` with no active selection jump to the first/last annotation respectively rather than a no-op (see [Navigation with no active selection](#daw-annotation-track-api))
 - Multiple `keyboard-controls` tracks: a consumed key acts on the first-registered track only (capture-phase `stopImmediatePropagation` — see [Capture-phase keyboard priority](#daw-annotation-track-api))

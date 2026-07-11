@@ -37,6 +37,16 @@ export class AnnotationController implements ReactiveController {
     return this._tracks.length * ANNOTATION_LANE_HEIGHT;
   }
 
+  /** Max annotation end (seconds) across registered tracks — 0 when none.
+   * Lets the editor extend the timeline so annotations past the audio stay
+   * reachable/scrollable. */
+  get maxAnnotationEndSeconds(): number {
+    return this._tracks.reduce(
+      (max, track) => track.annotations.reduce((m, a) => Math.max(m, a.end), max),
+      0
+    );
+  }
+
   hostConnected(): void {
     this._host.addEventListener('daw-annotation-update', this._onDataChange);
     this._host.addEventListener('daw-annotation-select', this._onDataChange);

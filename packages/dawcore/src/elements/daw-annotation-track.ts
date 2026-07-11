@@ -17,7 +17,7 @@ import type { DawAnnotationElement } from './daw-annotation';
 interface AnnotationHostEditor extends HTMLElement {
   play(startTime?: number, endTime?: number): Promise<void>;
   seekTo(time: number): void;
-  _duration: number;
+  _annotationClampDuration: number;
 }
 
 /**
@@ -189,7 +189,7 @@ export class DawAnnotationTrackElement extends LitElement {
   }
 
   private _timelineDuration(): number {
-    return this._hostEditor()?._duration ?? Infinity;
+    return this._hostEditor()?._annotationClampDuration ?? Infinity;
   }
 
   private _activeElement(): DawAnnotationElement | null {

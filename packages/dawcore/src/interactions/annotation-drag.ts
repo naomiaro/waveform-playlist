@@ -9,7 +9,7 @@ import { DRAG_THRESHOLD } from './constants';
 export interface AnnotationDragHost {
   effectiveSampleRate: number;
   _renderSpp: number;
-  _duration: number;
+  _annotationClampDuration: number;
   seekTo(time: number): void;
 }
 
@@ -105,7 +105,7 @@ export class AnnotationDragHandler {
       newTime: drag.edgeTime + deltaSeconds,
       isDraggingStart: drag.edge === 'start',
       annotations: drag.snapshot,
-      duration: this._host._duration,
+      duration: this._host._annotationClampDuration,
       linkEndpoints: drag.track.linkEndpoints,
     });
     applyBoundaryResults(

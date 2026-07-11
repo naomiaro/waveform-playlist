@@ -956,6 +956,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     return (ticks * 60) / (this.bpm * this.ppqn);
   }
+  /** Clamp limit for annotation boundary edits. indefinite-playback removes the
+   * end-of-timeline bound — annotations may extend past the audio (DAW-style
+   * unbounded timeline); the shared boundary math treats Infinity as "no end cap". */
+  get _annotationClampDuration(): number {
+    return this.indefinitePlayback ? Infinity : this._duration;
+  }
   private get _totalWidth(): number {
     if (this.scaleMode === 'beats') {
       const contentTicks = this._secondsToTicks(this._duration);
@@ -964,8 +970,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const minTicks = 32 * num * this.ppqn;
       return Math.ceil(Math.max(contentTicks, minTicks) / this.ticksPerPixel);
     }
+    // Extend past the natural (clip-derived) duration to cover annotations
+    // that reach beyond the audio — DAW-style unbounded timeline (temporal
+    // mode only; beats-mode annotation extent is a documented limitation).
+    const naturalDuration = Math.max(this._duration, this._annotations.maxAnnotationEndSeconds);
     const naturalWidth = Math.ceil(
-      (this._duration * this.effectiveSampleRate) / this.samplesPerPixel
+      (naturalDuration * this.effectiveSampleRate) / this.samplesPerPixel
     );
     if (this.indefinitePlayback || this.fillViewport) {
       // Fill the visible viewport when natural duration is shorter — lets the
