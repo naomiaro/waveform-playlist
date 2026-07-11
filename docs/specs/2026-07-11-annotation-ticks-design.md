@@ -33,7 +33,7 @@ For tick-based annotations, ticks are authoritative; `start`/`end` seconds are a
 
 ## Boundary Editing (tick-native)
 
-- Core `updateAnnotationBoundaries` gains an optional third parameter `options?: { linkThreshold?: number; minDuration?: number }` defaulting to the existing constants (`LINK_THRESHOLD` 0.01, `MIN_ANNOTATION_DURATION` 0.1) — fully non-breaking; existing tests prove it.
+- Core `updateAnnotationBoundaries` gains an optional second parameter `options?: { linkThreshold?: number; minDuration?: number }` defaulting to the existing constants (`LINK_THRESHOLD` 0.01, `MIN_ANNOTATION_DURATION` 0.1) — fully non-breaking; existing tests prove it.
 - Tick-space runs use `{ linkThreshold: 0.5, minDuration: ppqn / 32 }` (ticks are integers, so "closer than 0.5" means equal; ppqn/32 = a 128th note minimum duration). Constants exported from core as `ANNOTATION_LINK_THRESHOLD_TICKS` and `annotationMinDurationTicks(ppqn)`.
 - Callers map tick annotations to `{ start: startTick, end: endTick }` for the math and write results back to tick attributes plus re-derived seconds (extend `applyBoundaryResults` to handle tick-based targets).
 - **Mixed-track rule:** link/collision math runs in the dragged (or nudged) annotation's unit space; neighbors are converted into that space for the computation and results are written back in each annotation's own authoritative unit.
