@@ -127,6 +127,9 @@ export class DawAnnotationTrackElement extends LitElement {
    * attribute, else 1-based position) | 'none' (pure region bars). The list
    * always shows full text — this only affects the timeline lane. */
   @property({ reflect: true, attribute: 'box-label' }) boxLabel: 'text' | 'id' | 'none' = 'text';
+  /** Display label for the editor's controls-column lane row (mirrors
+   * <daw-track name>). Empty = blank spacer (opt-in, no layout change). */
+  @property({ reflect: true }) name = '';
 
   // --- Selection (ephemeral UI state — deliberately NOT DOM data) ---
 

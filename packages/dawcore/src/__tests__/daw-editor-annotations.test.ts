@@ -192,4 +192,31 @@ describe('<daw-editor> annotation lanes', () => {
     expect(track.activeAnnotationId).toBeTruthy(); // fully functional, no list anywhere
     editor.remove();
   });
+
+  it('renders the annotation track name in the controls-column lane spacer', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track name="Sections">' +
+      '<daw-annotation start="0" end="1">x</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const spacer = editor.shadowRoot!.querySelector('.annotation-lane-spacer');
+    expect(spacer).toBeTruthy();
+    expect(spacer!.textContent?.trim()).toBe('Sections');
+    editor.remove();
+  });
+
+  it('lane spacer stays empty when the annotation track has no name', async () => {
+    const editor = await makeEditor();
+    editor.innerHTML +=
+      '<daw-annotation-track>' +
+      '<daw-annotation start="0" end="1">x</daw-annotation>' +
+      '</daw-annotation-track>';
+    await flush();
+    await editor.updateComplete;
+    const spacer = editor.shadowRoot!.querySelector('.annotation-lane-spacer');
+    expect(spacer!.textContent?.trim()).toBe('');
+    editor.remove();
+  });
 });

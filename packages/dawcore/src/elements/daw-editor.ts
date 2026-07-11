@@ -867,6 +867,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       .annotation-lane-spacer {
         box-sizing: border-box;
         border-bottom: 1px solid var(--daw-annotation-lane-border, rgba(255, 255, 255, 0.08));
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+      }
+      .annotation-lane-name {
+        padding: 0 10px;
+        font-size: 11px;
+        color: var(--daw-controls-text, #e0d4c8);
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       .annotation-box {
         position: absolute;
@@ -3319,11 +3331,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           ? html`<div class="controls-viewport">
               <div class="controls-column">
                 ${this._annotations.tracks.map(
-                  () =>
+                  (track) =>
                     html`<div
                       class="annotation-lane-spacer"
                       style="height: ${ANNOTATION_LANE_HEIGHT}px;"
-                    ></div>`
+                    >
+                      <span class="annotation-lane-name">${track.name}</span>
+                    </div>`
                 )}
                 ${orderedTracks.map(
                   (t) => html`
