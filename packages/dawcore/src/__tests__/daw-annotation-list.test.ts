@@ -77,6 +77,36 @@ describe('<daw-annotation-list>', () => {
     editor.remove();
   });
 
+  it('clicking directly on an editable row text still selects and seeks (real-browser focus-before-click order)', async () => {
+    // Real browsers dispatch `focus` on the contenteditable text span BEFORE
+    // the `click` event bubbles to the row — `row.click()` (used by the test
+    // above) skips that native sequence entirely. Reproduce it explicitly:
+    // a naive "skip while _editingId===a.id" guard would treat this focus as
+    // proof editing was already underway and swallow the click, silently
+    // breaking select+seek for the very first click into a row's text.
+    track.editable = true;
+    await track.updateComplete;
+    await flush();
+    await list.updateComplete;
+
+    const editor = document.createElement('daw-editor');
+    document.body.appendChild(editor);
+    editor.appendChild(track);
+    const seekTo = vi.fn();
+    (editor as unknown as { seekTo: unknown }).seekTo = seekTo;
+    await flush();
+    await list.updateComplete;
+
+    const row = list.shadowRoot!.querySelectorAll('.annotation-row')[1] as HTMLElement;
+    const span = row.querySelector('.annotation-row-text') as HTMLElement;
+    span.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+    row.click();
+
+    expect(track.activeAnnotationId).toBe('b');
+    expect(seekTo).toHaveBeenCalledWith(2.5);
+    editor.remove();
+  });
+
   it('highlights the active row on daw-annotation-select', async () => {
     track.activeAnnotationId = 'a';
     await list.updateComplete;

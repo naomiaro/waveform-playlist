@@ -217,8 +217,19 @@ export class DawAnnotationListElement extends LitElement {
           <div
             class="annotation-row ${a.id === this._activeId ? 'active' : ''}"
             @click=${(e: Event) => {
-              // Ignore clicks that land on the text span while editing.
-              if (this._editingId === a.id) return;
+              // Ignore clicks that land on the text span while this row is
+              // ALREADY the active/selected one and mid-edit — avoids
+              // re-seeking (jumping the playhead back to the row's start)
+              // on every cursor-repositioning click while typing.
+              //
+              // Must NOT also fire on the very first click into an unselected
+              // row's contenteditable text: browsers dispatch `focus` before
+              // `click`, so `_editingId` is already `a.id` by the time this
+              // handler runs even though `_onRowClick` (which sets it) never
+              // ran yet. Gating on `_activeId === a.id` too lets that first
+              // click through. (Not reproducible via `row.click()` in tests —
+              // the DOM method skips the native focus-then-click sequence.)
+              if (this._editingId === a.id && this._activeId === a.id) return;
               e.stopPropagation();
               this._onRowClick(a);
             }}
