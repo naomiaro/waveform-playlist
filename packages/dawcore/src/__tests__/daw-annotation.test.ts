@@ -113,6 +113,7 @@ describe('<daw-annotation>', () => {
     document.body.appendChild(el);
     await flush();
     el.startTick = 960;
+    el.endTick = 1920;
     el.startTick = -5; // rejected
     el.startTick = 1.5; // rejected (non-integer)
     el.startTick = NaN; // rejected

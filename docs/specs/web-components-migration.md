@@ -271,11 +271,11 @@ editor.armedTrackIds.forEach((id) => {
 
 > Annotation elements shipped under epic #455. `parseAeneas`/`serializeAeneas` remain React-only in `@waveform-playlist/annotations` — the dawcore elements consume `<daw-annotation>` light-DOM children directly, not those parsers. Hosting `<daw-annotation-track>`/`<daw-annotation>` children inside `<daw-player>` is still open (#477); today they're documented under `<daw-editor>`.
 
-| Element                  | Package    | Responsibilities                                                                                                                                                                |
-| ------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<daw-annotation-track>` | components | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`, `keyboard-controls`. |
-| `<daw-annotation>`       | components | Single annotation with `start`, `end` attributes and text content. Renders as a box in the track.                                                                               |
-| `<daw-annotation-list>`  | components | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data.                                                                             |
+| Element                  | Package    | Responsibilities                                                                                                                                                                                     |
+| ------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<daw-annotation-track>` | components | Timeline row containing draggable annotation boxes. Children are `<daw-annotation>` elements. Attributes: `editable`, `link-endpoints`, `continuous-play`, `keyboard-controls`, `box-label`, `name`. |
+| `<daw-annotation>`       | components | Single annotation with `start`, `end` (seconds) attributes, optional `start-tick`, `end-tick` (musical position) attributes, and text content. Renders as a box in the track.                        |
+| `<daw-annotation-list>`  | components | Scrollable text panel. Links to a `<daw-annotation-track>` via `for` attribute — no duplicate data.                                                                                                  |
 
 ```html
 <!-- Annotations: single source of truth, dual view -->
@@ -293,6 +293,8 @@ editor.armedTrackIds.forEach((id) => {
 ```
 
 Annotations are defined once as `<daw-annotation>` children. The `<daw-annotation-list>` reads from the same elements — edits in either view (dragging a box or editing text) update the shared `<daw-annotation>` attributes.
+
+**Tick authority rule:** an annotation is tick-based iff BOTH `start-tick` and `end-tick` are set — `start`/`end` seconds then become a derived cache the host editor keeps fresh (same pattern as clip `startTick`). Setting only one of the two tick attributes is a half-configured state: it's treated as seconds-based and logs a one-time warning per annotation. Tick edits (boundary drag, `moveStartBoundary`/`moveEndBoundary`) require a host `<daw-editor>` for tempo conversion — calling them on a tick-based annotation with no parent editor warns and is ignored.
 
 Spectrogram and piano-roll are render modes on `<daw-track>` (via the `render-mode` attribute), not standalone elements. See the [Spectrogram & Piano-Roll](#spectrogram--piano-roll) section.
 
@@ -570,9 +572,11 @@ editable           Boolean   false    Allow drag/resize of annotation boxes
 link-endpoints     Boolean   false    Snap adjacent annotation boundaries together
 continuous-play    Boolean   false    Auto-advance playback through annotations
 keyboard-controls  Boolean   false    Enable keyboard navigation and boundary editing
+box-label          String    'text'   Lane box label mode: 'text' | 'id' | 'none'
+name               String    ''       Display label for the editor's controls-column lane row
 ```
 
-`editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)).
+`editable`, `link-endpoints`, and `continuous-play` map directly to `AnnotationListOptions` from `@waveform-playlist/core`. `keyboard-controls` enables keyboard shortcuts for annotation navigation and boundary editing (see [Keyboard Shortcuts](#keyboard-shortcuts)). `box-label` only affects the timeline lane's box text — `'text'` shows the annotation's line text (default), `'id'` shows the `id` attribute or a 1-based position fallback, `'none'` renders bare region bars; `<daw-annotation-list>` always shows full text regardless of this setting. `name` mirrors `<daw-track name>` — an empty string (default) renders a blank spacer so setting it is opt-in and doesn't shift layout.
 
 **Properties (JS only):**
 
@@ -598,13 +602,15 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 **Capture-phase keyboard priority:** each `<daw-annotation-track keyboard-controls>` registers its keydown listener on `document` in the **capture** phase (`addEventListener('keydown', handler, true)`), which runs before `<daw-keyboard-shortcuts>`' bubble-phase listener regardless of DOM position. A consumed key calls `e.stopImmediatePropagation()` (not `stopPropagation()`) — this is required because multiple annotation tracks each register their own capture listener on the same `document` node, and `stopPropagation()` does not stop sibling listeners on that node, only `stopImmediatePropagation()` does. The practical effect: when two or more `<daw-annotation-track keyboard-controls>` elements are present, a consumed key acts on exactly the **first-registered track (DOM connection order)** — not every track, and not the "closest" or "focused" one. Keys the track doesn't consume (`Escape` with no selection, boundary-edit keys when not `editable` or nothing selected) fall through both to sibling annotation tracks and to `<daw-keyboard-shortcuts>`.
 
-**Beats-mode variable-tempo limitation:** the annotation lane positions boxes with `left = floor(start_seconds * sampleRate / spp)` — a seconds-based mapping — using the same `spp` (`_renderSpp`) the beats grid uses. Clip positions in beats mode instead derive pixels from `startTick / ticksPerPixel` directly. Under a **fixed** tempo the two mappings agree, but under **variable tempo** (consumer-supplied `secondsToTicks`/`ticksToSeconds` callbacks with tempo changes), annotation boxes drift out of alignment with the tick-positioned clips and grid — annotations have no tick-space representation (`AnnotationData.start`/`end` are seconds-only). Fixing this requires giving annotations first-class tick positions, tracked as a follow-up.
+**Beats-mode variable-tempo limitation (seconds-based annotations only):** a **seconds-based** annotation (no `start-tick`/`end-tick`) positions its lane box with `left = floor(start_seconds * sampleRate / spp)` — using the same `spp` (`_renderSpp`) the beats grid uses. Clip positions in beats mode instead derive pixels from `startTick / ticksPerPixel` directly. Under a **fixed** tempo the two mappings agree, but under **variable tempo** (consumer-supplied `secondsToTicks`/`ticksToSeconds` callbacks with tempo changes), a seconds-based annotation's box drifts out of alignment with the tick-positioned clips and grid. A **tick-based** annotation (both `start-tick` and `end-tick` set) does not have this limitation: its lane box uses the same clip-identical tick math as clips (`round(tick / ticksPerPixel)`), so it stays pixel-exact under variable tempo. Give drifting annotations first-class tick positions (`start-tick`/`end-tick`) to eliminate the limitation.
+
+The editor keeps a tick-based annotation's seconds cache fresh via a sweep (`AnnotationController.deriveSecondsCaches`) that runs on annotation connect/update/select and whenever the engine's reported `bpm` changes on `statechange`. A variable-tempo tempo-map edit that doesn't change the engine's scalar `bpm` (e.g. editing a later tempo-map segment) does not trigger this sweep — the seconds cache re-derives lazily on the next annotation connect/update/select event instead. Temporal-mode rendering always reads this seconds cache, so it's never stale by more than one such event.
 
 **Events (`<daw-annotation>` / `<daw-annotation-track>`):**
 
 ```typescript
 'daw-annotation-connected'; // <daw-annotation> mounted: detail: {annotationId, element}
-'daw-annotation-update'; // start/end changed (after first render, not on initial mount): detail: {annotationId}
+'daw-annotation-update'; // start/end or start-tick/end-tick changed (after first render, not on initial mount): detail: {annotationId}
 'daw-annotation-select'; // activeAnnotationId changed on a track (incl. clear → null): detail: {annotation: AnnotationData | null}
 'daw-annotation-track-connected'; // <daw-annotation-track> mounted: detail: {element}
 'daw-error'; // annotation shortcut action threw: detail: {operation: 'annotation-shortcut', key, error}
@@ -1473,7 +1479,8 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 - Auto-scrolls to center the active annotation on keyboard selection change
 - Respects `link-endpoints` — boundary moves cascade to adjacent annotations
-- Boundary constraints: minimum 0.1s duration, end cannot exceed timeline duration — unless `<daw-editor indefinite-playback>` is set, which lifts the end bound entirely (DAW-style unbounded timeline) so annotations may extend past the audio. In temporal mode (not beats mode) the timeline width also extends to cover the furthest annotation end, keeping such annotations reachable/scrollable regardless of `indefinite-playback`.
+- Boundary constraints: minimum 0.1s duration for seconds-based annotations, end cannot exceed timeline duration — unless `<daw-editor indefinite-playback>` is set, which lifts the end bound entirely (DAW-style unbounded timeline) so annotations may extend past the audio. In temporal mode (not beats mode) the timeline width also extends to cover the furthest annotation end, keeping such annotations reachable/scrollable regardless of `indefinite-playback`. Tick-based annotations use a tick-space minimum duration instead: `max(1, round(ppqn / 32))` ticks (a 128th note, floored at 1 tick so it's never zero even at very low PPQN) — boundary math runs entirely in tick space (`ANNOTATION_LINK_THRESHOLD_TICKS` link threshold) so edits stay tempo-independent.
+- In `scale-mode="beats"` with `snapTo` set to anything other than `'off'`, dragging a tick-based annotation's boundary snaps the target tick to the grid (`snapTickToGrid`) before applying boundary/link math — same snap behavior as clip drag. Seconds-based annotations and non-drag boundary edits (`moveStartBoundary`/`moveEndBoundary`) never snap.
 - Navigation shortcuts always active; boundary editing requires `editable` attribute
 - `selectNext`/`selectPrevious` with no active selection jump to the first/last annotation respectively rather than a no-op (see [Navigation with no active selection](#daw-annotation-track-api))
 - Multiple `keyboard-controls` tracks: a consumed key acts on the first-registered track only (capture-phase `stopImmediatePropagation` — see [Capture-phase keyboard priority](#daw-annotation-track-api))

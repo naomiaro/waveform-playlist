@@ -133,12 +133,14 @@ Declarative annotation track (light DOM). Owns the ephemeral selection state and
 
 **Attributes:**
 
-| Attribute           | Type    | Default | Description                                                                                       |
-| ------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `editable`          | boolean | `false` | Allow drag/resize of annotation boxes and boundary-editing shortcuts                              |
-| `link-endpoints`    | boolean | `false` | Snap adjacent annotation boundaries together; boundary moves cascade to linked neighbors          |
-| `continuous-play`   | boolean | `false` | `playActive()` plays past the annotation's end instead of stopping there                          |
-| `keyboard-controls` | boolean | `false` | Enable keyboard navigation and boundary-editing shortcuts (capture-phase, see Key Patterns below) |
+| Attribute           | Type    | Default  | Description                                                                                                                                                                                                    |
+| ------------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `editable`          | boolean | `false`  | Allow drag/resize of annotation boxes and boundary-editing shortcuts                                                                                                                                           |
+| `link-endpoints`    | boolean | `false`  | Snap adjacent annotation boundaries together; boundary moves cascade to linked neighbors                                                                                                                       |
+| `continuous-play`   | boolean | `false`  | `playActive()` plays past the annotation's end instead of stopping there                                                                                                                                       |
+| `keyboard-controls` | boolean | `false`  | Enable keyboard navigation and boundary-editing shortcuts (capture-phase, see Key Patterns below)                                                                                                              |
+| `box-label`         | string  | `'text'` | Lane box label mode: `'text'` (line text), `'id'` (`id` attribute or 1-based position fallback), `'none'` (bare region bars). Only affects the timeline lane — `<daw-annotation-list>` always shows full text. |
+| `name`              | string  | `''`     | Display label for the editor's controls-column lane row (mirrors `<daw-track name>`). Empty renders a blank spacer.                                                                                            |
 
 **JS-only properties:**
 
@@ -170,11 +172,15 @@ Declarative annotation data element (light DOM). Its `start`/`end` attributes an
 
 **Attributes:**
 
-| Attribute | Type   | Default | Description                                                                                                        |
-| --------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| `start`   | number | `0`     | Start time (seconds). Reflected. Rejects negative/non-finite values with a warning (ignored, previous value kept). |
-| `end`     | number | `0`     | End time (seconds). Reflected. Same validation as `start`.                                                         |
-| `id`      | string | —       | Standard HTML `id`. Used as the stable `annotationId` when present; otherwise a generated UUID is used.            |
+| Attribute    | Type           | Default | Description                                                                                                               |
+| ------------ | -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `start`      | number         | `0`     | Start time (seconds). Reflected. Rejects negative/non-finite values with a warning (ignored, previous value kept).        |
+| `end`        | number         | `0`     | End time (seconds). Reflected. Same validation as `start`.                                                                |
+| `start-tick` | number \| null | `null`  | Musical start position (ticks). Reflected as `start-tick`. Rejects non-finite/non-integer/negative values with a warning. |
+| `end-tick`   | number \| null | `null`  | Musical end position (ticks). Reflected as `end-tick`. Same validation as `start-tick`.                                   |
+| `id`         | string         | —       | Standard HTML `id`. Used as the stable `annotationId` when present; otherwise a generated UUID is used.                   |
+
+**Tick authority rule:** the annotation is tick-based (`isTickBased` returns `true`) iff BOTH `start-tick` and `end-tick` are set — `start`/`end` seconds then become a derived cache the host editor keeps fresh (clip `startTick` pattern; the editor's `AnnotationController.deriveSecondsCaches` sweep does the work). Setting only one of the two tick attributes is a half-configured state, treated as seconds-based and logged with a one-time warning per annotation. Tick-based boundary edits (drag, `moveStartBoundary`/`moveEndBoundary`) require a parent `<daw-editor>` for tempo conversion — without one, the edit is ignored with a warning.
 
 Text content (light-DOM children) is the annotation's label — read via `.trim()`, split on `\n` into `AnnotationData.lines`.
 
@@ -184,7 +190,7 @@ Text content (light-DOM children) is the annotation's label — read via `.trim(
 | -------------- | -------------------- | ----------------------------------------------------------- |
 | `annotationId` | `string` (read-only) | `id` attribute if set, else a generated `annotation-<uuid>` |
 
-**Events:** `daw-annotation-connected` (`{annotationId, element}`, deferred one tick), `daw-annotation-update` (`{annotationId}`, fires on `start`/`end` change after the initial render — not on mount) — both bubble + compose.
+**Events:** `daw-annotation-connected` (`{annotationId, element}`, deferred one tick), `daw-annotation-update` (`{annotationId}`, fires on `start`/`end`/`start-tick`/`end-tick` change after the initial render — not on mount) — both bubble + compose.
 
 **Rendering:** self-hides (`display: none`) on connect — it's a data container, not a visual element. The editor's annotation lane and `<daw-annotation-list>` render views derived from it.
 
