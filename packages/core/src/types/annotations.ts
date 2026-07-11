@@ -11,6 +11,10 @@ export interface AnnotationData {
   end: number;
   lines: string[];
   language?: string;
+  /** Musical position (ticks). Authoritative when BOTH tick fields are set —
+   * start/end seconds are then a derived cache (clip startTick pattern). */
+  startTick?: number;
+  endTick?: number;
 }
 
 /**
