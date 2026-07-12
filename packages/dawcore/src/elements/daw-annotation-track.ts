@@ -26,69 +26,61 @@ interface AnnotationHostEditor extends HTMLElement {
 }
 
 /**
- * Write boundary-math results back to the <daw-annotation> elements —
- * only edges that actually changed, so no spurious daw-annotation-update
- * events fire. Module-level helper (must sit ABOVE @customElement per the
- * dawcore decorator gotcha) — exported for reuse by the drag interaction.
- *
- * `before`/`after` are index-aligned with EACH OTHER (the core boundary math
- * preserves input order), but `elements` is a live, start-sorted snapshot
- * (`track.annotationElements` re-sorts on every access) that can disagree
- * with the snapshot order the caller computed `before`/`after` from — e.g.
- * mid-drag, once a dragged start edge crosses a neighbor's start. Matching
- * `elements[i]` by POSITION would then silently write results onto the
- * wrong element. Look up the target element by `after[i].id` instead.
+ * Write boundary-math results back to the <daw-annotation> elements — only
+ * edges that actually differ from the element's CURRENT values, so no
+ * spurious daw-annotation-update events fire. Targets are resolved by
+ * annotation id and diffed against the live element (#609): the math's input
+ * snapshot can be ordered differently than the live sorted children mid-drag,
+ * so index-paired comparisons are never trustworthy.
  */
 export function applyBoundaryResults(
   elements: DawAnnotationElement[],
-  before: AnnotationData[],
   after: AnnotationData[]
 ): void {
   const byId = new Map(elements.map((el) => [el.annotationId, el]));
-  after.forEach((next, i) => {
+  for (const next of after) {
     const el = byId.get(next.id);
-    if (!el) return;
-    if (next.start !== before[i].start) el.start = next.start;
-    if (next.end !== before[i].end) el.end = next.end;
-  });
+    if (!el) continue;
+    if (el.start !== next.start) el.start = next.start;
+    if (el.end !== next.end) el.end = next.end;
+  }
 }
 
 /**
- * Tick-space sibling of applyBoundaryResults: `before`/`after` carry TICK
- * values in start/end. Id-matched targets; a tick-based element gets rounded
- * integer ticks PLUS a re-derived seconds cache (single write pass keeps both
- * units coherent); a seconds-based element (converted in for mixed-track link
- * math) gets seconds back in ITS authoritative unit and never gains tick attrs.
+ * Tick-space sibling of applyBoundaryResults: `after` carries TICK values in
+ * start/end. Id-resolved targets diffed against the element's CURRENT values
+ * (#609). A tick-based element gets rounded integer ticks PLUS a re-derived
+ * seconds cache in the same write pass; a seconds-based element (converted in
+ * for mixed-track link math) gets seconds back in ITS authoritative unit and
+ * never gains tick attributes.
  */
 export function applyTickBoundaryResults(
   elements: DawAnnotationElement[],
-  before: AnnotationData[],
   after: AnnotationData[],
   ticksToSeconds: (ticks: number) => number
 ): void {
   const byId = new Map(elements.map((el) => [el.annotationId, el]));
-  after.forEach((next, i) => {
+  for (const next of after) {
     const el = byId.get(next.id);
-    if (!el) return;
-    const startChanged = next.start !== before[i].start;
-    const endChanged = next.end !== before[i].end;
-    if (!startChanged && !endChanged) return;
+    if (!el) continue;
     if (el.isTickBased) {
-      if (startChanged) {
-        const tick = Math.round(next.start);
-        el.startTick = tick;
-        el.start = ticksToSeconds(tick);
+      const startTick = Math.round(next.start);
+      const endTick = Math.round(next.end);
+      if (el.startTick !== startTick) {
+        el.startTick = startTick;
+        el.start = ticksToSeconds(startTick);
       }
-      if (endChanged) {
-        const tick = Math.round(next.end);
-        el.endTick = tick;
-        el.end = ticksToSeconds(tick);
+      if (el.endTick !== endTick) {
+        el.endTick = endTick;
+        el.end = ticksToSeconds(endTick);
       }
     } else {
-      if (startChanged) el.start = ticksToSeconds(next.start);
-      if (endChanged) el.end = ticksToSeconds(next.end);
+      const start = ticksToSeconds(next.start);
+      const end = ticksToSeconds(next.end);
+      if (el.start !== start) el.start = start;
+      if (el.end !== end) el.end = end;
     }
-  });
+  }
 }
 
 /** Map an annotation element into tick-space AnnotationData: tick-based
@@ -275,7 +267,7 @@ export class DawAnnotationTrackElement extends LitElement {
           minDuration: annotationMinDurationTicks(editor.ppqn),
         }
       );
-      applyTickBoundaryResults(elements, tickData, updated, (t) => editor._ticksToSeconds(t));
+      applyTickBoundaryResults(elements, updated, (t) => editor._ticksToSeconds(t));
       return;
     }
 
@@ -289,7 +281,7 @@ export class DawAnnotationTrackElement extends LitElement {
       duration: this._timelineDuration(),
       linkEndpoints: this.linkEndpoints,
     });
-    applyBoundaryResults(elements, data, updated);
+    applyBoundaryResults(elements, updated);
   }
 
   private _timelineDuration(): number {
