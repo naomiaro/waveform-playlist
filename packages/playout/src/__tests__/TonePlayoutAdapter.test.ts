@@ -1226,4 +1226,48 @@ describe('createToneAdapter', () => {
       expect(() => adapter.transport.connectMasterOutput({} as AudioNode)).toThrow(/dispose/);
     });
   });
+
+  describe('onPlaybackEnded', () => {
+    it('fires the subscribed callback when the playout reports completion', () => {
+      const adapter = createToneAdapter();
+      const ended = vi.fn();
+      adapter.onPlaybackEnded!(ended);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      const completion = mockInstance.setOnPlaybackComplete.mock.calls.at(-1)![0] as () => void;
+      completion();
+
+      expect(ended).toHaveBeenCalledTimes(1);
+      expect(adapter.isPlaying()).toBe(false); // internal flag flipped before notifying
+    });
+
+    it('null unsubscribes', () => {
+      const adapter = createToneAdapter();
+      const ended = vi.fn();
+      adapter.onPlaybackEnded!(ended);
+      adapter.onPlaybackEnded!(null);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      const completion = mockInstance.setOnPlaybackComplete.mock.calls.at(-1)![0] as () => void;
+      completion();
+
+      expect(ended).not.toHaveBeenCalled();
+    });
+
+    it('subscription survives the first setTracks build', () => {
+      const adapter = createToneAdapter();
+      const ended = vi.fn();
+      adapter.onPlaybackEnded!(ended);
+      adapter.setTracks([]); // triggers buildPlayout → re-registers setOnPlaybackComplete
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      const completion = mockInstance.setOnPlaybackComplete.mock.calls.at(-1)![0] as () => void;
+      completion();
+
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+  });
 });
