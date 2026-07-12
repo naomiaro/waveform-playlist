@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/midi",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Framework-agnostic MIDI file loading and parsing for the dawcore family",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
