@@ -68,7 +68,7 @@ export class PlaylistEngine {
     // can land between the callback and the microtask.
     this._adapter?.onPlaybackEnded?.(() => {
       queueMicrotask(() => {
-        if (this._isPlaying) {
+        if (this._isPlaying && !this._disposed) {
           this.stop();
         }
       });
@@ -810,6 +810,7 @@ export class PlaylistEngine {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
+    this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
       this._adapter?.dispose();

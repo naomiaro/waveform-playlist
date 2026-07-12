@@ -1772,6 +1772,35 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('completion callback is a no-op when engine is disposed (race with dispose)', async () => {
+      const adapter = createMockAdapter();
+      adapter.onPlaybackEnded = vi.fn();
+      const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
+      const cb = (adapter.onPlaybackEnded as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as () => void;
+      const stopEvents: number[] = [];
+      engine.on('stop', () => stopEvents.push(1));
+
+      engine.play(0);
+      expect(engine.getState().isPlaying).toBe(true);
+
+      cb(); // adapter reports completion
+      expect(engine.getState().isPlaying).toBe(true); // deferred — not yet
+
+      const stopCountBeforeDispose = (adapter.stop as ReturnType<typeof vi.fn>).mock.calls.length;
+      engine.dispose(); // disposes before the microtask runs
+
+      // Flush the microtask
+      await Promise.resolve();
+
+      // Verify stop was not called after dispose
+      const stopCountAfterMicrotask = (adapter.stop as ReturnType<typeof vi.fn>).mock.calls.length;
+      expect(stopCountAfterMicrotask).toBe(stopCountBeforeDispose);
+
+      // Verify no stop event fired after dispose
+      expect(stopEvents).toHaveLength(0);
+    });
+
     it('dispose unsubscribes with null before adapter.dispose', () => {
       const adapter = createMockAdapter();
       const calls: string[] = [];
