@@ -725,6 +725,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * play-start position). Non-private: pointer-handler's seek path sets it.
    */
   _inSeekTransition = false;
+  /**
+   * True while `stop()` (the public API) is actively calling `this._engine.stop()`.
+   * Suppresses the engine 'stop' handler's own `daw-stop` dispatch — `stop()`
+   * dispatches its own, and without this guard a consumer-initiated stop would
+   * fire `daw-stop` twice. See the engine 'stop' handler for the counterpart
+   * engine-initiated case this flag does NOT suppress.
+   */
+  private _inConsumerStop = false;
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
   private _annotationDrag = new AnnotationDragHandler(this);
@@ -2438,8 +2446,27 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._currentTime = engine.getCurrentTime();
     });
     engine.on('stop', () => {
+      // Fires synchronously from PlaylistEngine.stop() (see engine CLAUDE.md
+      // "Bounded playback" / #608) — reached via EITHER a consumer-initiated
+      // stop (editor.stop(), or a seek-adjacent stop+reschedule guarded by
+      // _inSeekTransition — pointer-handler seek, seekTo, splitAtPlayhead,
+      // empty-timeline rewind) OR the engine's OWN bounded-playback
+      // completion path: the Tone adapter reports `onPlaybackEnded` for a
+      // duration-limited play(start, end) (selection/annotation playback),
+      // and the engine calls `this.stop()` internally from a queued
+      // microtask with no consumer call in sight. That engine-initiated case
+      // has no other `daw-stop` dispatcher — mirror it here so consumers
+      // still get a daw-stop paired with their earlier daw-play. Consumer
+      // stops dispatch their own daw-stop (editor.stop(), guarded by
+      // _inConsumerStop) or intentionally suppress it (seek-adjacent stops,
+      // guarded by _inSeekTransition) — this handler must not double-fire
+      // for those.
       this._currentTime = engine.getCurrentTime();
       this._stopPlayhead();
+      this._activePlayEndTime = null;
+      if (!this._inConsumerStop && !this._inSeekTransition && this.isConnected) {
+        this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
+      }
     });
 
     this._engine = engine;
@@ -2843,7 +2870,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   stop() {
     if (!this._engine) return;
     this._activePlayEndTime = null;
-    this._engine.stop();
+    // The engine 'stop' handler fires SYNCHRONOUSLY during engine.stop() —
+    // bracket it so that handler's own daw-stop dispatch is suppressed and
+    // this method remains the single dispatcher for a consumer-initiated stop.
+    this._inConsumerStop = true;
+    try {
+      this._engine.stop();
+    } finally {
+      this._inConsumerStop = false;
+    }
     this._stopPlayhead();
     this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
   }

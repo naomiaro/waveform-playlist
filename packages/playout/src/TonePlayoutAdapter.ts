@@ -65,9 +65,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
   let _playoutGeneration = 1;
   let playout: TonePlayout | null = new TonePlayout({ effects: options?.effects });
+  let _onPlaybackEnded: (() => void) | null = null;
   playout.setOnPlaybackComplete(() => {
     if (_playoutGeneration === 1) {
       _isPlaying = false;
+      _onPlaybackEnded?.();
     }
   });
   let _isPlaying = false;
@@ -237,6 +239,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     playout.setOnPlaybackComplete(() => {
       if (generation === _playoutGeneration) {
         _isPlaying = false;
+        _onPlaybackEnded?.();
       }
     });
   }
@@ -443,6 +446,10 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       return _isPlaying;
     },
 
+    onPlaybackEnded(callback: (() => void) | null): void {
+      _onPlaybackEnded = callback;
+    },
+
     setMasterVolume(volume: number): void {
       playout?.setMasterGain(volume);
     },
@@ -610,6 +617,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
       playout = null;
       _isPlaying = false;
+      _onPlaybackEnded = null;
       _currentTracks.clear();
       _midiTrackBuild.clear();
     },

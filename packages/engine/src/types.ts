@@ -24,6 +24,11 @@ export interface PlayoutAdapter {
   seek(time: number): void;
   getCurrentTime(): number;
   isPlaying(): boolean;
+  /** Subscribe to adapter-initiated playback completion (duration-limited
+   *  play(start, end) reaching its end). NOT fired for consumer-initiated
+   *  stop()/pause(). Pass null to unsubscribe. Optional — adapters without
+   *  self-terminating playback (or whose consumers poll) omit it. */
+  onPlaybackEnded?(callback: (() => void) | null): void;
   setMasterVolume(volume: number): void;
   setTrackVolume(trackId: string, volume: number): void;
   setTrackMute(trackId: string, muted: boolean): void;

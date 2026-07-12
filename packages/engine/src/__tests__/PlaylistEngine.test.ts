@@ -1728,4 +1728,94 @@ describe('PlaylistEngine', () => {
       spy.mockRestore();
     });
   });
+
+  describe('bounded playback completion (onPlaybackEnded)', () => {
+    it('subscribes when the adapter exposes the hook and stops on completion', async () => {
+      const adapter = createMockAdapter();
+      adapter.onPlaybackEnded = vi.fn();
+      const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
+      expect(adapter.onPlaybackEnded).toHaveBeenCalledTimes(1);
+      const cb = (adapter.onPlaybackEnded as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as () => void;
+
+      const stopEvents: number[] = [];
+      engine.on('stop', () => stopEvents.push(1));
+      engine.play(1, 2);
+      expect(engine.getState().isPlaying).toBe(true);
+      cb(); // adapter reports bounded completion
+      expect(engine.getState().isPlaying).toBe(true); // deferred — not yet
+      await Promise.resolve(); // flush the microtask
+      expect(engine.getState().isPlaying).toBe(false);
+      expect(stopEvents).toHaveLength(1);
+      expect(adapter.stop).toHaveBeenCalled();
+      engine.dispose();
+    });
+
+    it('completion callback is a no-op when not playing (and after a consumer stop raced in)', async () => {
+      const adapter = createMockAdapter();
+      adapter.onPlaybackEnded = vi.fn();
+      const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
+      const cb = (adapter.onPlaybackEnded as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as () => void;
+      const stopEvents: number[] = [];
+      engine.on('stop', () => stopEvents.push(1));
+      cb(); // never played
+      await Promise.resolve();
+      expect(stopEvents).toHaveLength(0);
+      // raced: playing → callback fires → consumer stops before the microtask runs
+      engine.play(0);
+      cb();
+      engine.stop();
+      const stopsAfterConsumerStop = stopEvents.length; // 1 from the consumer stop
+      await Promise.resolve();
+      expect(stopEvents).toHaveLength(stopsAfterConsumerStop); // microtask no-ops
+      engine.dispose();
+    });
+
+    it('completion callback is a no-op when engine is disposed (race with dispose)', async () => {
+      const adapter = createMockAdapter();
+      adapter.onPlaybackEnded = vi.fn();
+      const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
+      const cb = (adapter.onPlaybackEnded as ReturnType<typeof vi.fn>).mock
+        .calls[0][0] as () => void;
+      const stopEvents: number[] = [];
+      engine.on('stop', () => stopEvents.push(1));
+
+      engine.play(0);
+      expect(engine.getState().isPlaying).toBe(true);
+
+      cb(); // adapter reports completion
+      expect(engine.getState().isPlaying).toBe(true); // deferred — not yet
+
+      const stopCountBeforeDispose = (adapter.stop as ReturnType<typeof vi.fn>).mock.calls.length;
+      engine.dispose(); // disposes before the microtask runs
+
+      // Flush the microtask
+      await Promise.resolve();
+
+      // Verify stop was not called after dispose
+      const stopCountAfterMicrotask = (adapter.stop as ReturnType<typeof vi.fn>).mock.calls.length;
+      expect(stopCountAfterMicrotask).toBe(stopCountBeforeDispose);
+
+      // Verify no stop event fired after dispose
+      expect(stopEvents).toHaveLength(0);
+    });
+
+    it('dispose unsubscribes with null before adapter.dispose', () => {
+      const adapter = createMockAdapter();
+      const calls: string[] = [];
+      adapter.onPlaybackEnded = vi.fn(() => calls.push('sub'));
+      adapter.dispose = vi.fn(() => calls.push('dispose'));
+      const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
+      engine.dispose();
+      expect(adapter.onPlaybackEnded).toHaveBeenLastCalledWith(null);
+      expect(calls[calls.length - 1]).toBe('dispose'); // null-unsubscribe precedes dispose
+    });
+
+    it('adapters without the hook work unchanged', () => {
+      const adapter = createMockAdapter();
+      delete (adapter as unknown as Record<string, unknown>).onPlaybackEnded;
+      expect(() => new PlaylistEngine({ adapter, sampleRate: 48000 })).not.toThrow();
+    });
+  });
 });

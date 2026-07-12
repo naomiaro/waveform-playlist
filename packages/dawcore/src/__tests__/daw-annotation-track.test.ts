@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import '../elements/daw-annotation';
-import '../elements/daw-annotation-track';
+import { applyBoundaryResults } from '../elements/daw-annotation-track';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -264,6 +264,31 @@ describe('<daw-annotation-track>', () => {
     expect(el.endTick).toBe(960);
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+    track2.remove();
+  });
+
+  it('boundary write-back diffs against live element values, not snapshot pairing (#609)', async () => {
+    // Directly exercise the helper with a mismatched-order after array whose
+    // values collide with a DIFFERENT element's current values under index
+    // pairing. Elements: a(start 1, end 2), b(start 3, end 4).
+    const track2 = document.createElement('daw-annotation-track') as DawAnnotationTrackElement;
+    track2.innerHTML =
+      '<daw-annotation id="a" start="1" end="2">a</daw-annotation>' +
+      '<daw-annotation id="b" start="3" end="4">b</daw-annotation>';
+    document.body.appendChild(track2);
+    await flush();
+    const elements = track2.annotationElements;
+    // after: b first (order differs from elements' sorted order), and b's new
+    // end (2) equals a's CURRENT end — under the old before/after index
+    // pairing (before[0] = a, live-sorted order) the b-entry compared 2 === 2
+    // and skipped the write, leaving b.end stuck at its stale value (4).
+    const after = [
+      { id: 'b', start: 3, end: 2, lines: ['b'] },
+      { id: 'a', start: 1, end: 2, lines: ['a'] },
+    ];
+    applyBoundaryResults(elements, after);
+    const bEl = track2.querySelector('#b') as HTMLElement & { end: number };
+    expect(bEl.end).toBe(2); // written — id-resolved diff sees live 4 !== 2
     track2.remove();
   });
 });

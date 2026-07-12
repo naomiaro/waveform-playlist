@@ -60,6 +60,20 @@ export class PlaylistEngine {
     this._adapter = options.adapter ?? null;
     this.undoLimit = options.undoLimit ?? 100;
 
+    // Bounded playback (#608): adapters that self-terminate at an endTime
+    // report completion here. Deferred via queueMicrotask — the Tone adapter
+    // fires this from inside the Transport tick chain, which catches nothing;
+    // stopping the Transport re-entrantly from a tick callback is the hazard
+    // the microtask sidesteps. Re-check _isPlaying inside: a consumer stop()
+    // can land between the callback and the microtask.
+    this._adapter?.onPlaybackEnded?.(() => {
+      queueMicrotask(() => {
+        if (this._isPlaying && !this._disposed) {
+          this.stop();
+        }
+      });
+    });
+
     if (this._zoomLevels.length === 0) {
       throw new Error('PlaylistEngine: zoomLevels must not be empty');
     }
@@ -796,6 +810,8 @@ export class PlaylistEngine {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
+    this._isPlaying = false;
+    this._adapter?.onPlaybackEnded?.(null);
     try {
       this._adapter?.dispose();
     } catch (err) {

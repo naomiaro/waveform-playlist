@@ -25,6 +25,14 @@
 - **Tone.js catches NOTHING in the tick chain** — `ToneEvent._tick → Transport._processTick → Clock._loop` are all unguarded (verified in 15.1.22 source). Every `Part`/`Transport.schedule` callback must contain its own failures in try/catch, or one throw aborts every other same-tick event across ALL tracks.
 - **MediaStream has no `ended`/`inactive` events** — `ended` is track-level and fires only on remote end/device removal; a local `track.stop()` fires NO event (per spec). `getMediaStreamSource` auto-cleanup covers remote ends only; local teardown requires `releaseMediaStreamSource()`.
 
+## Bounded Playback Completion (`onPlaybackEnded`, #608)
+
+`TonePlayoutAdapter` implements the engine's optional `onPlaybackEnded(callback | null)` hook so the engine can observe a duration-limited `play(start, end)` (annotation/selection playback) ending on its own, without polling. Both `setOnPlaybackComplete` wirings — the eagerly-created initial playout (guarded by `_playoutGeneration === 1`) and the one set inside `buildPlayout` for a rebuilt playout (guarded by `generation === _playoutGeneration`) — call `_onPlaybackEnded?.()` right after clearing `_isPlaying`, inside their existing generation guard. A stale playout from a superseded rebuild can't fire completion into the current generation.
+
+`dispose()` clears `_onPlaybackEnded = null` — idempotent with the engine's own `onPlaybackEnded(null)` unsubscribe on its `dispose()` (either side may run first depending on teardown order; both leave the slot empty).
+
+**`dispose()` → `setTracks()` is the only real `buildPlayout` rebuild path.** The initial playout is created eagerly at adapter construction (not via `buildPlayout`), so `playout` only becomes `null` — the condition `setTracks()` checks to call `buildPlayout` — after `dispose()`. Every rebuild re-registers the completion callback there, generation-guarded as above.
+
 ## Cross-Context Worklet Bridge
 
 `TonePlayoutAdapter` implements `createAudioWorkletNode` and `createMediaStreamSource` for dawcore recording compatibility. These use `getGlobalContext()` (Tone.js Context wrapper) which works with standardized-audio-context. `addWorkletModule` is NOT needed — `rawContext.audioWorklet.addModule()` works identically for both native and standardized contexts.

@@ -157,12 +157,7 @@ export class AnnotationDragHandler {
           minDuration: annotationMinDurationTicks(this._host.ppqn),
         }
       );
-      applyTickBoundaryResults(
-        elements,
-        elements.map((x) => tickSpaceData(x, this._host)),
-        updated,
-        (t) => this._host._ticksToSeconds(t)
-      );
+      applyTickBoundaryResults(elements, updated, (t) => this._host._ticksToSeconds(t));
       return;
     }
 
@@ -177,11 +172,7 @@ export class AnnotationDragHandler {
       duration: this._host._annotationClampDuration,
       linkEndpoints: drag.track.linkEndpoints,
     });
-    applyBoundaryResults(
-      elements,
-      elements.map((el) => el.toAnnotationData()),
-      updated
-    );
+    applyBoundaryResults(elements, updated);
   };
 
   _onPointerUp = (e: PointerEvent): void => {
@@ -204,18 +195,9 @@ export class AnnotationDragHandler {
     // Restore the drag-start snapshot — a cancelled drag must not commit.
     const elements = drag.track.annotationElements;
     if (drag.mode === 'ticks') {
-      applyTickBoundaryResults(
-        elements,
-        elements.map((x) => tickSpaceData(x, this._host)),
-        drag.snapshot,
-        (t) => this._host._ticksToSeconds(t)
-      );
+      applyTickBoundaryResults(elements, drag.snapshot, (t) => this._host._ticksToSeconds(t));
     } else {
-      applyBoundaryResults(
-        elements,
-        elements.map((el) => el.toAnnotationData()),
-        drag.snapshot
-      );
+      applyBoundaryResults(elements, drag.snapshot);
     }
     this._teardown();
   };
