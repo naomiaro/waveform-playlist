@@ -472,6 +472,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
+  // Suppresses the engine 'stop' mirror (below) around provider-initiated
+  // engine.stop() calls that immediately seek/restart playback in the same
+  // synchronous block (play(), setSelection, reschedulePlayback, the
+  // engine-rebuild-with-resume path). Without this, the mirror's ref writes
+  // would race the restart's own writes and briefly show the pre-restart
+  // position/isPlaying=false. Stop paths that don't restart afterward don't
+  // need suppression — see the mirror's own comment for why.
+  const suppressEngineStopMirrorRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const isAutomaticScrollRef = useRef<boolean>(false);
   // Animation frame callback registry — components register per-frame DOM update
@@ -795,7 +803,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     // Stop current playback and animation before disposing
     if (engineRef.current && wasPlaying) {
+      // Suppressed: resumePlayback() (below) restarts from resumePosition once
+      // the rebuilt engine is ready — an unguarded mirror would clobber the
+      // refs with this (old, about-to-be-replaced) engine's rewound position
+      // in the meantime. See suppressEngineStopMirrorRef declaration.
+      suppressEngineStopMirrorRef.current = true;
       engineRef.current.stop();
+      suppressEngineStopMirrorRef.current = false;
       stopAnimationFrameLoop();
       // Mark that we need to resume playback after playout is rebuilt
       pendingResumeRef.current = { position: resumePosition };
@@ -940,6 +954,40 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
               );
             }
           }
+        });
+
+        // Engine-initiated stop mirror (final-review CRITICAL 1, #608 follow-up).
+        // PlaylistEngine self-stops when a bounded play(start, end) completes on
+        // an adapter that reports onPlaybackEnded (Tone) — see engine CLAUDE.md
+        // "onPlaybackEnded hook". That self-stop rewinds the engine's own current
+        // time to playStartPosition BEFORE the rAF loop's own end-of-playback
+        // checks (below) can observe it, so the loop's `time >= playbackEndTimeRef`
+        // / `time >= duration` comparisons never fire — React isPlaying stays
+        // true and the loop spins forever at the rewound position. Mirroring the
+        // engine's 'stop' event makes React authoritative-from-engine for ANY
+        // engine-initiated stop, closing that race. The engine already rewound
+        // its own time (`_currentTime = _playStartPosition`) — we only mirror
+        // that into React's refs/state, we never seek() again here.
+        //
+        // Suppressed via suppressEngineStopMirrorRef around provider-initiated
+        // engine.stop() calls that immediately seek/restart playback (play(),
+        // setSelection, reschedulePlayback, engine-rebuild-with-resume) — those
+        // already set the correct target position themselves; an unguarded
+        // mirror would clobber it mid-transition with the pre-restart position.
+        // Stop paths that terminate playback (stop(), the rAF loop's own
+        // annotation/selection/duration-end branches) don't need suppression:
+        // they either write the identical value the mirror would (both read
+        // _playStartPosition), or run their own setCurrentTimeRefs call
+        // synchronously right after this listener, which — as plain refs, not
+        // batched state — simply overwrites the mirror's write with no other
+        // code observing the transient value in between.
+        engine.on('stop', () => {
+          if (suppressEngineStopMirrorRef.current) return;
+          setIsPlaying(false);
+          stopAnimationFrameLoop();
+          const stoppedAt = engine.getCurrentTime();
+          setCurrentTimeRefs(stoppedAt);
+          setCurrentTime(stoppedAt);
         });
 
         engine.setTracks(tracksWithState);
@@ -1357,8 +1405,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         if (continuousPlay) {
           const currentPos = currentTimeRef.current;
 
-          // Stop current playout (which may have duration limit + pause callback)
+          // Stop current playout (which may have duration limit + pause callback).
+          // Suppressed: this immediately restarts playback below — see
+          // suppressEngineStopMirrorRef declaration.
+          suppressEngineStopMirrorRef.current = true;
           engineRef.current.stop();
+          suppressEngineStopMirrorRef.current = false;
           stopAnimationLoop();
 
           const timeNow = getAudioContextTime();
@@ -1437,7 +1489,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // window and call engine.getCurrentTime() which would return 0.
       // The seek() immediately sets _currentTime to the intended start position,
       // preventing the cursor flash.
+      // Suppressed: seek()+play() below immediately re-establish the correct
+      // position — see suppressEngineStopMirrorRef declaration.
+      suppressEngineStopMirrorRef.current = true;
       engineRef.current.stop();
+      suppressEngineStopMirrorRef.current = false;
       engineRef.current.seek(actualStartTime);
       stopAnimationLoop();
 
@@ -1600,7 +1656,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // where getCurrentTime() returns wrong value. seek() immediately
         // corrects _currentTime so any RAF firing in between reads the
         // intended position. engine.play() then restarts everything.
+        // Suppressed: seek()+play() below immediately re-establish the correct
+        // position — see suppressEngineStopMirrorRef declaration. Unguarded,
+        // the mirror would also flip isPlaying to false with nothing here to
+        // set it back true (isPlaying was already true on entry to this branch).
+        suppressEngineStopMirrorRef.current = true;
         engineRef.current.stop();
+        suppressEngineStopMirrorRef.current = false;
         engineRef.current.seek(start);
         engineRef.current.play(start);
       }
