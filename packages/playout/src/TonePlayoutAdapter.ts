@@ -617,6 +617,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
       playout = null;
       _isPlaying = false;
+      _onPlaybackEnded = null;
       _currentTracks.clear();
       _midiTrackBuild.clear();
     },

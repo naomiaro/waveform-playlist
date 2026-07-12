@@ -1256,18 +1256,69 @@ describe('createToneAdapter', () => {
       expect(ended).not.toHaveBeenCalled();
     });
 
-    it('subscription survives the first setTracks build', () => {
+    it('a fresh subscription is correctly wired after a real playout rebuild (dispose + setTracks)', () => {
+      // createToneAdapter() eagerly constructs the first TonePlayout, and
+      // setTracks() takes the INCREMENTAL path whenever a playout already
+      // exists — buildPlayout() only runs when `playout` is null. dispose()
+      // is the legitimate way to null it out (and — per the hygiene fix —
+      // also clears any prior _onPlaybackEnded subscription), so the next
+      // setTracks() call actually rebuilds and exercises the
+      // generation-guarded wiring at buildPlayout()'s
+      // `playout.setOnPlaybackComplete(...)` (~line 239). Subscribing after
+      // the rebuild mirrors how a real consumer resubscribes post-dispose,
+      // and still exercises the untested closure wiring: the NEW playout's
+      // completion callback must read the CURRENT `_onPlaybackEnded`.
       const adapter = createToneAdapter();
+
+      adapter.dispose();
+      adapter.setTracks([]); // playout is null → buildPlayout() runs
+
       const ended = vi.fn();
       adapter.onPlaybackEnded!(ended);
-      adapter.setTracks([]); // triggers buildPlayout → re-registers setOnPlaybackComplete
 
-      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
-        .value;
-      const completion = mockInstance.setOnPlaybackComplete.mock.calls.at(-1)![0] as () => void;
+      const mockCtor = TonePlayout as unknown as ReturnType<typeof vi.fn>;
+      expect(mockCtor.mock.results).toHaveLength(2);
+      const rebuiltInstance = mockCtor.mock.results[1].value;
+      const completion = rebuiltInstance.setOnPlaybackComplete.mock.calls.at(-1)![0] as () => void;
       completion();
 
       expect(ended).toHaveBeenCalledTimes(1);
+    });
+
+    it('a stale completion callback from a superseded rebuild generation is swallowed by the generation guard', () => {
+      // The eager (generation-1) playout created by createToneAdapter() wires
+      // its completion callback with a hardcoded `_playoutGeneration === 1`
+      // check — a DIFFERENT code path from buildPlayout()'s closure-captured
+      // `generation === _playoutGeneration` guard (~line 240), which only
+      // runs on rebuilds. To exercise THAT guard specifically, force TWO
+      // rebuilds: capture the callback registered by the first rebuild
+      // (generation 2), then force a second rebuild (generation 3) and fire
+      // the now-stale generation-2 callback. Without the guard, this would
+      // incorrectly flip isPlaying and fire the current onPlaybackEnded
+      // subscriber.
+      const adapter = createToneAdapter();
+      const mockCtor = TonePlayout as unknown as ReturnType<typeof vi.fn>;
+
+      adapter.dispose();
+      adapter.setTracks([]); // rebuild #1 → generation 2, buildPlayout() wiring
+      const generation2Instance = mockCtor.mock.results[1].value;
+      const staleCompletion = generation2Instance.setOnPlaybackComplete.mock.calls.at(
+        -1
+      )![0] as () => void;
+
+      adapter.dispose();
+      adapter.setTracks([]); // rebuild #2 → generation 3, supersedes generation 2
+
+      const ended = vi.fn();
+      adapter.onPlaybackEnded!(ended);
+      adapter.play(0);
+      expect(adapter.isPlaying()).toBe(true);
+
+      // Fire the stale generation-2 completion callback captured before rebuild #2.
+      staleCompletion();
+
+      expect(ended).not.toHaveBeenCalled();
+      expect(adapter.isPlaying()).toBe(true);
     });
   });
 });
