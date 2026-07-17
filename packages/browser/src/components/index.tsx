@@ -10,6 +10,11 @@ export * from './PlaylistVisualization';
 export * from './PlaylistAnnotationList';
 export { KeyboardShortcuts } from './KeyboardShortcuts';
 export type { KeyboardShortcutsProps } from './KeyboardShortcuts';
+export { SortableTrackControls } from './SortableTrackControls';
+export type {
+  SortableTrackControlsProps,
+  SortableTrackControlsRenderProps,
+} from './SortableTrackControls';
 
 // Re-export WaveformPlaylistProvider and types from context
 export { WaveformPlaylistProvider, type WaveformTrack } from '../WaveformPlaylistContext';

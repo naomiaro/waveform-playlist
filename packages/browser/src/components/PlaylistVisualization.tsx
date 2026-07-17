@@ -33,7 +33,11 @@ import {
   type RenderPlayheadFunction,
   SpectrogramLabels,
   CLIP_HEADER_HEIGHT,
+  GripIcon,
+  MoveUpIcon,
+  MoveDownIcon,
 } from '@waveform-playlist/ui-components';
+import { SortableTrackControls } from './SortableTrackControls';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
   usePlaybackAnimation,
@@ -41,14 +45,19 @@ import {
   usePlaylistControls,
   usePlaylistData,
   type ClipPeaks,
+  type TrackState,
 } from '../WaveformPlaylistContext';
 import { resolveRecordingOffsetSamples, type Peaks } from '@waveform-playlist/core';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
 import type { AnnotationAction } from '@waveform-playlist/core';
+import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
-import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
+import {
+  SpectrogramIntegrationContext,
+  type SpectrogramIntegration,
+} from '../SpectrogramIntegrationContext';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -111,6 +120,10 @@ export interface PlaylistVisualizationProps {
      */
     latencyOffset?: number;
   };
+  /** Enable vertical track reordering: a drag grip + move up/down buttons on
+   *  each default track control panel. Drag requires ClipInteractionProvider
+   *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
+  trackReordering?: boolean;
 }
 
 /**
@@ -174,6 +187,176 @@ function getTrackChannelCount(
   return Math.max(clipChannels, recordingChannels);
 }
 
+interface DefaultTrackControlsProps {
+  trackIndex: number;
+  track: ClipTrack;
+  trackState: TrackState;
+  effectiveRenderMode: RenderMode;
+  selectTrack: (trackIndex: number) => void;
+  onRemoveTrack?: (trackIndex: number) => void;
+  setTrackMute: (trackIndex: number, muted: boolean) => void;
+  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
+  setTrackVolume: (trackIndex: number, volume: number) => void;
+  setTrackPan: (trackIndex: number, pan: number) => void;
+  spectrogram: SpectrogramIntegration | null;
+  setSettingsModalTrackId: (id: string | null) => void;
+  trackReordering: boolean;
+  reorderTrack: (trackId: string, toIndex: number) => void;
+  trackCount: number;
+  /** Attach to the drag grip element (the `handleRef` from SortableTrackControls). */
+  gripRef?: (element: Element | null) => void;
+}
+
+/**
+ * Default track control panel: name/close header, mute/solo, volume/pan sliders,
+ * plus an optional drag grip and move up/down buttons when `trackReordering` is
+ * enabled. Extracted into its own component (used both directly and wrapped in
+ * SortableTrackControls) so the trackReordering branch doesn't change the hook
+ * count of the shared JSX.
+ */
+function DefaultTrackControls({
+  trackIndex,
+  track,
+  trackState,
+  effectiveRenderMode,
+  selectTrack,
+  onRemoveTrack,
+  setTrackMute,
+  setTrackSolo,
+  setTrackVolume,
+  setTrackPan,
+  spectrogram,
+  setSettingsModalTrackId,
+  trackReordering,
+  reorderTrack,
+  trackCount,
+  gripRef,
+}: DefaultTrackControlsProps) {
+  return (
+    <Controls onClick={() => selectTrack(trackIndex)}>
+      <Header style={{ justifyContent: 'center', position: 'relative' }}>
+        {onRemoveTrack && (
+          <CloseButton
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveTrack(trackIndex);
+            }}
+          />
+        )}
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            padding: '0 24px',
+            display: 'block',
+          }}
+        >
+          {trackState.name || `Track ${trackIndex + 1}`}
+        </span>
+        {spectrogram?.renderMenuItems && (
+          <span style={{ position: 'absolute', right: 0, top: 0 }}>
+            <TrackMenu
+              items={(onClose) =>
+                spectrogram.renderMenuItems!({
+                  renderMode: effectiveRenderMode,
+                  onRenderModeChange: (mode) => spectrogram.setTrackRenderMode(track.id, mode),
+                  onOpenSettings: () => setSettingsModalTrackId(track.id),
+                  onClose,
+                })
+              }
+            />
+          </span>
+        )}
+        {trackReordering && (
+          <span
+            style={{ position: 'absolute', right: spectrogram?.renderMenuItems ? 20 : 0, top: 0 }}
+          >
+            <button
+              ref={gripRef as React.Ref<HTMLButtonElement>}
+              aria-label="Drag to reorder track"
+              title="Drag to reorder track"
+              style={{
+                border: 'none',
+                background: 'transparent',
+                color: 'inherit',
+                cursor: 'grab',
+                padding: '2px',
+                touchAction: 'none',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripIcon size={14} />
+            </button>
+          </span>
+        )}
+      </Header>
+      <ButtonGroup>
+        <Button
+          $variant={trackState.muted ? 'danger' : 'outline'}
+          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
+        >
+          Mute
+        </Button>
+        <Button
+          $variant={trackState.soloed ? 'info' : 'outline'}
+          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
+        >
+          Solo
+        </Button>
+      </ButtonGroup>
+      {trackReordering && (
+        <ButtonGroup>
+          <Button
+            $variant="outline"
+            aria-label="Move track up"
+            disabled={trackIndex === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              reorderTrack(track.id, trackIndex - 1);
+            }}
+          >
+            <MoveUpIcon size={12} />
+          </Button>
+          <Button
+            $variant="outline"
+            aria-label="Move track down"
+            disabled={trackIndex === trackCount - 1}
+            onClick={(e) => {
+              e.stopPropagation();
+              reorderTrack(track.id, trackIndex + 1);
+            }}
+          >
+            <MoveDownIcon size={12} />
+          </Button>
+        </ButtonGroup>
+      )}
+      <SliderWrapper>
+        <VolumeDownIcon />
+        <Slider
+          min="0"
+          max="1"
+          step="0.01"
+          value={trackState.volume}
+          onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
+        />
+        <VolumeUpIcon />
+      </SliderWrapper>
+      <SliderWrapper>
+        <span>L</span>
+        <Slider
+          min="-1"
+          max="1"
+          step="0.01"
+          value={trackState.pan}
+          onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
+        />
+        <span>R</span>
+      </SliderWrapper>
+    </Controls>
+  );
+}
+
 /**
  * Standalone playlist visualization component (WebAudio version).
  *
@@ -197,6 +380,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   touchOptimized = false,
   onRemoveTrack,
   recordingState,
+  trackReordering = false,
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
@@ -231,6 +415,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     setCurrentTime,
     setLoopRegion,
     setRecordingActive,
+    reorderTrack,
   } = usePlaylistControls();
   const {
     peaksDataArray,
@@ -494,83 +679,39 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         // Height must match Track component: waveHeight * numChannels + clipHeaderHeight
         const slotHeight = waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0);
 
+        const defaultControlProps: Omit<DefaultTrackControlsProps, 'gripRef'> = {
+          trackIndex,
+          track,
+          trackState,
+          effectiveRenderMode,
+          selectTrack,
+          onRemoveTrack,
+          setTrackMute,
+          setTrackSolo,
+          setTrackVolume,
+          setTrackPan,
+          spectrogram,
+          setSettingsModalTrackId,
+          trackReordering,
+          reorderTrack,
+          trackCount: peaksDataArray.length,
+        };
+
         const trackControlContent = renderTrackControls ? (
           renderTrackControls(trackIndex)
+        ) : trackReordering ? (
+          <SortableTrackControls trackId={track.id} index={trackIndex}>
+            {({ ref, handleRef, isDragSource }) => (
+              <div
+                ref={ref as React.Ref<HTMLDivElement>}
+                style={{ height: '100%', opacity: isDragSource ? 0.85 : 1 }}
+              >
+                <DefaultTrackControls {...defaultControlProps} gripRef={handleRef} />
+              </div>
+            )}
+          </SortableTrackControls>
         ) : (
-          <Controls onClick={() => selectTrack(trackIndex)}>
-            <Header style={{ justifyContent: 'center', position: 'relative' }}>
-              {onRemoveTrack && (
-                <CloseButton
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveTrack(trackIndex);
-                  }}
-                />
-              )}
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  padding: '0 24px',
-                  display: 'block',
-                }}
-              >
-                {trackState.name || `Track ${trackIndex + 1}`}
-              </span>
-              {spectrogram?.renderMenuItems && (
-                <span style={{ position: 'absolute', right: 0, top: 0 }}>
-                  <TrackMenu
-                    items={(onClose) =>
-                      spectrogram.renderMenuItems!({
-                        renderMode: effectiveRenderMode,
-                        onRenderModeChange: (mode) =>
-                          spectrogram.setTrackRenderMode(track.id, mode),
-                        onOpenSettings: () => setSettingsModalTrackId(track.id),
-                        onClose,
-                      })
-                    }
-                  />
-                </span>
-              )}
-            </Header>
-            <ButtonGroup>
-              <Button
-                $variant={trackState.muted ? 'danger' : 'outline'}
-                onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-              >
-                Mute
-              </Button>
-              <Button
-                $variant={trackState.soloed ? 'info' : 'outline'}
-                onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-              >
-                Solo
-              </Button>
-            </ButtonGroup>
-            <SliderWrapper>
-              <VolumeDownIcon />
-              <Slider
-                min="0"
-                max="1"
-                step="0.01"
-                value={trackState.volume}
-                onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
-              />
-              <VolumeUpIcon />
-            </SliderWrapper>
-            <SliderWrapper>
-              <span>L</span>
-              <Slider
-                min="-1"
-                max="1"
-                step="0.01"
-                value={trackState.pan}
-                onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
-              />
-              <span>R</span>
-            </SliderWrapper>
-          </Controls>
+          <DefaultTrackControls {...defaultControlProps} />
         );
 
         return (
