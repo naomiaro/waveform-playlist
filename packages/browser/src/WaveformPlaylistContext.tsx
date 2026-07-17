@@ -165,6 +165,11 @@ export interface PlaylistControlsContextValue {
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
 
+  /** Move a track to a new index in the vertical track order. Purely
+   *  organizational — playback is not interrupted. The reordered tracks
+   *  array flows back through onTracksChange. */
+  reorderTrack: (trackId: string, toIndex: number) => void;
+
   // Selection
   setSelection: (start: number, end: number) => void;
   setSelectedTrackId: (trackId: string | null) => void;
@@ -1643,6 +1648,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [trackStates]
   );
 
+  const reorderTrack = useCallback(
+    (trackId: string, toIndex: number) => {
+      if (!engineRef.current) {
+        console.warn('[waveform-playlist] reorderTrack: engine not ready, call ignored');
+        return;
+      }
+      engineRef.current.reorderTrack(trackId, toIndex);
+    },
+    [engineRef]
+  );
+
   // Selection — wraps hook setter with playback side-effects (provider concern).
   const setSelection = useCallback(
     (start: number, end: number) => {
@@ -1800,6 +1816,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackSolo,
       setTrackVolume,
       setTrackPan,
+      reorderTrack,
 
       // Selection
       setSelection,
@@ -1851,6 +1868,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackSolo,
       setTrackVolume,
       setTrackPan,
+      reorderTrack,
       setSelection,
       setSelectedTrackIdControl,
       setTimeFormat,
