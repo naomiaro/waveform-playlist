@@ -142,3 +142,85 @@ describe('<daw-editor> track reordering (#612)', () => {
     editor.remove();
   });
 });
+
+describe('<daw-editor> track reordering — redundant reconnect guard (#612)', () => {
+  it('does not re-fetch/re-decode audio or replace the clip buffer when a loaded audio track is moved', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+    editor._peakPipeline = makeMockPeakPipeline();
+
+    const fetchAndDecodeSpy = vi.fn().mockResolvedValue(makeAudioBuffer());
+    editor._fetchAndDecode = fetchAndDecodeSpy;
+
+    const errorSpy = vi.fn();
+    editor.addEventListener('daw-track-error', errorSpy);
+
+    await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
+    await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+
+    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    const clipElA = elA.querySelector('daw-clip') as unknown as { clipId: string };
+    const clipIdA = clipElA.clipId;
+    const bufferBefore = editor._clipBuffers.get(clipIdA);
+    expect(bufferBefore).toBeDefined();
+    const callsBefore = fetchAndDecodeSpy.mock.calls.length;
+
+    editor.insertBefore(elB, elA); // consumer-initiated DOM reorder — fires
+    // disconnectedCallback+connectedCallback on elB per custom-element spec.
+
+    await vi.waitFor(() => {
+      const order = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
+      expect(order).toEqual([elB.trackId, elA.trackId]);
+    });
+    // Flush the deferred setTimeout(0) daw-track-connected / daw-clip-connected
+    // re-dispatches fired by the moved element's connectedCallback.
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(fetchAndDecodeSpy.mock.calls.length).toBe(callsBefore);
+    expect(errorSpy).not.toHaveBeenCalled();
+    // Same AudioBuffer reference — nothing re-fetched/re-decoded/re-finalized.
+    expect(editor._clipBuffers.get(clipIdA)).toBe(bufferBefore);
+
+    editor.remove();
+  });
+
+  it('keeps engine track clip ids unique and unchanged after a move settles', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+    editor._peakPipeline = makeMockPeakPipeline();
+    editor._fetchAndDecode = vi.fn().mockResolvedValue(makeAudioBuffer());
+
+    await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
+    await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+
+    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    type EngineTrack = { id: string; clips: { id: string }[] };
+    // elB is the element being moved (insertBefore(elB, elA)) — its
+    // disconnectedCallback+connectedCallback (and its <daw-clip> child's)
+    // fire per custom-element spec, so it's the track whose clip list is at
+    // risk of gaining a duplicate entry.
+    const trackBBefore = editor
+      .engine!.getState()
+      .tracks.find((t: EngineTrack) => t.id === elB.trackId) as EngineTrack;
+    const clipIdsBefore = trackBBefore.clips.map((c) => c.id).sort();
+
+    editor.insertBefore(elB, elA);
+
+    await vi.waitFor(() => {
+      const order = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
+      expect(order).toEqual([elB.trackId, elA.trackId]);
+    });
+    await new Promise((r) => setTimeout(r, 10));
+
+    const trackBAfter = editor
+      .engine!.getState()
+      .tracks.find((t: EngineTrack) => t.id === elB.trackId) as EngineTrack;
+    const clipIdsAfter = trackBAfter.clips.map((c) => c.id);
+    expect(new Set(clipIdsAfter).size).toBe(clipIdsAfter.length); // no duplicate ids
+    expect(clipIdsAfter.slice().sort()).toEqual(clipIdsBefore);
+
+    editor.remove();
+  });
+});

@@ -1285,6 +1285,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Invalid daw-track-connected event detail: ' + String(e.detail));
       return;
     }
+    // Custom elements fire disconnectedCallback+connectedCallback on a pure
+    // DOM MOVE (e.g. insertBefore during a consumer reorder), not just on a
+    // genuine removal — no moveBefore() is used anywhere in this codebase.
+    // daw-track.ts's connectedCallback re-dispatches a deferred
+    // daw-track-connected for the SAME trackId in that case. If the track is
+    // already registered (loading or fully loaded), this is a reconnect from
+    // a move, not a first-time (or post-teardown) registration: refresh the
+    // element mapping and bail out WITHOUT re-reading the descriptor or
+    // reloading. Re-reading would revert live daw-track-control mixer edits
+    // (they mutate the _tracks descriptor at runtime, not the element's
+    // attributes); reloading would re-fetch — for a file-dropped track whose
+    // blob: URL was already revoked after its first load (Task 6), that
+    // fetch is against a dead URL and spuriously fires daw-track-error.
+    // Genuine re-registration after the EDITOR itself is reparented still
+    // works: the editor's disconnectedCallback clears _tracks entirely, so
+    // this guard is a no-op then and a full reload happens as before.
+    if (this._tracks.has(trackId)) {
+      this._trackElements.set(trackId, trackEl as DawTrackElement);
+      return;
+    }
     const descriptor = this._readTrackDescriptor(trackEl as DawTrackElement);
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     this._trackElements.set(trackId, trackEl as DawTrackElement);
@@ -1557,6 +1577,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           })
         );
       }
+      return;
+    }
+    // Reconnect from a DOM move (custom elements fire disconnectedCallback+
+    // connectedCallback on insertBefore, same as the track-level case in
+    // _onTrackConnected) — or any other duplicate deferred daw-clip-connected
+    // for a clip already registered on this FULLY LOADED track. Unlike the
+    // still-loading branch above, _readTrackDescriptor cannot have filtered
+    // this one out (that only runs once, before the track finished loading),
+    // so this check is the only guard against _loadAndAppendClip inserting a
+    // second engine clip with the same id. Reuses the exact same isDomClip
+    // membership check as the still-loading branch.
+    const loadedDesc = this._tracks.get(trackId);
+    if (loadedDesc && loadedDesc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
       return;
     }
     const clipDesc: ClipDescriptor = {
