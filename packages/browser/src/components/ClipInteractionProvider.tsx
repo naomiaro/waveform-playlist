@@ -39,7 +39,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
 }) => {
   const { tracks, samplesPerPixel, sampleRate, playoutRef, isDraggingRef, onTracksChange } =
     usePlaylistData();
-  const { setSelectedTrackId } = usePlaylistControls();
+  const { setSelectedTrackId, reorderTrack } = usePlaylistControls();
   const beatsAndBars = useBeatsAndBars();
 
   // Derive snap mode from context: beats if provider is in beats mode with snap enabled,
@@ -99,13 +99,42 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   // Wrap onDragStart to auto-select track
   const onDragStart = React.useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
-      const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
+      const data = event.operation?.source?.data as
+        | { kind?: string; trackId?: string; trackIndex?: number }
+        | undefined;
+      if (data?.kind === 'track-reorder') {
+        if (data.trackId) setSelectedTrackId(data.trackId);
+        return; // clip handler guards also skip this kind
+      }
+      const trackIndex = data?.trackIndex;
       if (trackIndex !== undefined && tracks[trackIndex]) {
         setSelectedTrackId(tracks[trackIndex].id);
       }
       handleDragStart(event);
     },
     [handleDragStart, tracks, setSelectedTrackId]
+  );
+
+  // Wrap onDragEnd: track-reorder sources commit via reorderTrack, clip sources
+  // flow through to the existing move/trim handler unchanged.
+  const handleDragEnd = React.useCallback(
+    (event: Parameters<typeof onDragEnd>[0]) => {
+      const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
+      if (data?.kind === 'track-reorder') {
+        if (event.canceled || !data.trackId) return;
+        const sortable = (
+          event.operation.source as unknown as {
+            sortable?: { index: number; initialIndex: number };
+          }
+        ).sortable;
+        if (sortable && sortable.index !== sortable.initialIndex) {
+          reorderTrack(data.trackId, sortable.index);
+        }
+        return;
+      }
+      onDragEnd(event);
+    },
+    [onDragEnd, reorderTrack]
   );
 
   // Build modifiers array
@@ -143,7 +172,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         sensors={sensors}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
+        onDragEnd={handleDragEnd}
         modifiers={modifiers}
         plugins={noDropAnimationPlugins}
       >
