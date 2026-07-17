@@ -1062,31 +1062,53 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._onAnnotationTrackConnected as EventListener
     );
     this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
-    // Detect track + clip removal via MutationObserver (detached elements can't bubble events).
+    // Detect track + clip removal via MutationObserver (detached elements can't
+    // bubble events). A node present in BOTH removedNodes and addedNodes within
+    // one batch is a MOVE (insertBefore fires remove+insert) — treated as a
+    // reorder, never a teardown (#612).
     this._childObserver = new MutationObserver((mutations) => {
+      const removedTracks = new Map<string, DawTrackElement>();
+      const removedClips = new Set<DawClipElement>();
+      const addedTrackIds = new Set<string>();
       for (const mutation of mutations) {
-        for (const node of mutation.removedNodes) {
-          if (node instanceof HTMLElement) {
-            if (node.tagName === 'DAW-TRACK') {
-              this._onTrackRemoved((node as DawTrackElement).trackId);
-            } else if (node.tagName === 'DAW-CLIP') {
-              this._onClipRemovedFromDom(node as DawClipElement);
-            }
-            const nestedTracks = node.querySelectorAll?.('daw-track');
-            if (nestedTracks) {
-              for (const track of nestedTracks) {
-                this._onTrackRemoved((track as DawTrackElement).trackId);
-              }
-            }
-            const nestedClips = node.querySelectorAll?.('daw-clip');
-            if (nestedClips) {
-              for (const clip of nestedClips) {
-                this._onClipRemovedFromDom(clip as DawClipElement);
-              }
-            }
+        for (const node of mutation.addedNodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          if (node.tagName === 'DAW-TRACK') {
+            addedTrackIds.add((node as DawTrackElement).trackId);
           }
+          node.querySelectorAll?.('daw-track').forEach((t) => {
+            addedTrackIds.add((t as DawTrackElement).trackId);
+          });
+        }
+        for (const node of mutation.removedNodes) {
+          if (!(node instanceof HTMLElement)) continue;
+          if (node.tagName === 'DAW-TRACK') {
+            removedTracks.set((node as DawTrackElement).trackId, node as DawTrackElement);
+          } else if (node.tagName === 'DAW-CLIP') {
+            removedClips.add(node as DawClipElement);
+          }
+          node.querySelectorAll?.('daw-track').forEach((t) => {
+            removedTracks.set((t as DawTrackElement).trackId, t as DawTrackElement);
+          });
+          node.querySelectorAll?.('daw-clip').forEach((c) => {
+            removedClips.add(c as DawClipElement);
+          });
         }
       }
+      let orderMayHaveChanged = addedTrackIds.size > 0;
+      for (const [trackId] of removedTracks) {
+        if (addedTrackIds.has(trackId)) {
+          orderMayHaveChanged = true; // move, not removal
+          continue;
+        }
+        this._onTrackRemoved(trackId);
+      }
+      for (const clip of removedClips) {
+        // A clip that moved with its track (or was re-slotted) is still connected.
+        if (clip.isConnected) continue;
+        this._onClipRemovedFromDom(clip);
+      }
+      if (orderMayHaveChanged) this._syncEngineOrderToDom();
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
   }
@@ -1865,7 +1887,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _commitTrackChange(trackId: string, updatedTrack: ClipTrack) {
     this._recomputeDuration();
     if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-    else if (this._engine) this._engine.setTracks([...this._engineTracks.values()]);
+    else if (this._engine)
+      this._engine.setTracks(this._getOrderedTracks().map(([, track]) => track));
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
@@ -2257,7 +2280,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         this._maybeRegisterSpectrogramClipAudio(trackId, c);
       }
       const engine = await this._ensureEngine();
-      engine.setTracks([...this._engineTracks.values()]);
+      engine.setTracks(this._getOrderedTracks().map(([, track]) => track));
       this.dispatchEvent(
         new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
           bubbles: true,
@@ -3280,6 +3303,53 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         this.fillViewport) &&
       this.timescale
     );
+  }
+
+  /** Guards the statechange handler's engine→DOM sync (Task: reorder #612)
+   *  while the observer is pushing DOM order INTO the engine — the intermediate
+   *  statechange emissions during the transaction would otherwise bounce
+   *  half-applied orders back into the DOM. */
+  _inOrderSync = false;
+
+  /**
+   * DOM → engine: make the engine's track order match the light-DOM
+   * `<daw-track>` order. Single write path for reorders — editor-initiated
+   * (buttons/drag move the element) and consumer-initiated (insertBefore)
+   * mutations both land here via the MutationObserver. Element-less tracks
+   * (undo-resurrected) keep their engine positions (stable sort).
+   * Write-only-on-change: a no-op when orders already match, so the
+   * engine→DOM direction (statechange handler) converges in one pass.
+   */
+  _syncEngineOrderToDom(): void {
+    const engine = this._engine;
+    if (!engine) return;
+    const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
+      (el) => (el as DawTrackElement).trackId
+    );
+    const engineIds: string[] = engine.getState().tracks.map((t) => t.id);
+    const target = [...engineIds].sort((a, b) => {
+      const ai = domOrder.indexOf(a);
+      const bi = domOrder.indexOf(b);
+      if (ai === -1 || bi === -1) return 0; // element-less: keep relative position
+      return ai - bi;
+    });
+    if (target.every((id, i) => id === engineIds[i])) return;
+    this._inOrderSync = true;
+    try {
+      engine.beginTransaction(); // one undo step for the whole permutation
+      const current = [...engineIds];
+      for (let i = 0; i < target.length; i++) {
+        if (current[i] === target[i]) continue;
+        engine.reorderTrack(target[i], i);
+        const from = current.indexOf(target[i]);
+        current.splice(from, 1);
+        current.splice(i, 0, target[i]);
+      }
+      engine.commitTransaction();
+    } finally {
+      this._inOrderSync = false;
+    }
+    this.requestUpdate();
   }
 
   private _getOrderedTracks(): Array<[string, ClipTrack]> {
