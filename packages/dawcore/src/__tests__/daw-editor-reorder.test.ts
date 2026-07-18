@@ -241,17 +241,94 @@ describe('<daw-editor> engine-to-DOM reorder sync (#612)', () => {
     editor.remove();
   });
 
-  it('reorder sync converges — no ping-pong between observer and statechange', async () => {
-    const editor = await makeEditor(2);
-    const [, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+  it('reorder sync converges under a 3-track permutation that forces 2 reorderTrack calls in one sync, without the engine->DOM handler bouncing mid-transaction', async () => {
+    const editor = await makeEditor(3);
+    const [elA, elB, elC] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
     const reorderSpy = vi.spyOn(editor.engine!, 'reorderTrack');
-    editor.reorderTrack(elB.trackId, 0);
+    // White-box spy on the engine->DOM direction: this is the method the
+    // `_inOrderSync` guard exists to suppress while a DOM->engine transaction
+    // (_syncEngineOrderToDom) is in flight. NOTE: because
+    // _syncEngineOrderToDom's forward-fill loop is self-correcting (its
+    // LAST reorderTrack call always lands the fully-converged permutation,
+    // by construction — every already-placed prefix position is never
+    // revisited), the FINAL DOM/engine state and the reorderTrack call
+    // count are identical whether or not the guard is present, for this
+    // single-batch scenario. The only observable difference is that,
+    // unguarded, `_syncDomToEngineOrder` fires once per mid-transaction
+    // reorderTrack call (bouncing the DOM to intermediate, not-yet-final
+    // orders) instead of zero times. That call-count is the load-bearing
+    // assertion below (sabotage-verified: with the `!this._inOrderSync`
+    // guard condition deleted, this spy is called 2 times instead of 0 —
+    // see #612 PR notes).
+    const domSyncSpy = vi.spyOn(
+      editor as unknown as { _syncDomToEngineOrder: () => void },
+      '_syncDomToEngineOrder'
+    );
+
+    // Two synchronous DOM mutations (no await between them) land in ONE
+    // MutationObserver batch, so _syncEngineOrderToDom sees the SETTLED
+    // order [c, b, a] (a full reversal) in a single call. Its forward-fill
+    // selection-sort algorithm needs 2 reorderTrack calls to realize this
+    // permutation (hand-traced against the algorithm in _syncEngineOrderToDom):
+    //   current=[a,b,c] target=[c,b,a]
+    //   i=0: c !== a -> reorderTrack(c, 0); current=[c,a,b]
+    //   i=1: b !== a -> reorderTrack(b, 1); current=[c,b,a]
+    //   i=2: a === a -> no call
+    // A single-rotation permutation (e.g. insertBefore(elC, elA) alone,
+    // giving [c,a,b]) only takes ONE reorderTrack call and would NOT
+    // exercise the mid-transaction statechange path that _inOrderSync
+    // guards — that was the weakness in the original 2-track version of
+    // this test (2 tracks can only ever produce a single transposition).
+    editor.insertBefore(elC, elA); // [c, a, b]
+    editor.insertBefore(elB, elA); // [c, b, a]
+
     await vi.waitFor(() => {
-      expect(editor.engine!.getState().tracks[0].id).toBe(elB.trackId);
+      const order = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
+      expect(order).toEqual([elC.trackId, elB.trackId, elA.trackId]);
     });
+    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrder).toEqual([elC.trackId, elB.trackId, elA.trackId]);
+    expect(reorderSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(domSyncSpy).not.toHaveBeenCalled(); // guard held for the whole transaction
+
     const calls = reorderSpy.mock.calls.length;
     await new Promise((r) => setTimeout(r, 50));
     expect(reorderSpy.mock.calls.length).toBe(calls); // settled, no further churn
+    expect(domSyncSpy).not.toHaveBeenCalled();
+    editor.remove();
+  });
+});
+
+describe('<daw-editor> reorderTrack input hardening (#612)', () => {
+  it('warns and no-ops for a non-finite toIndex', async () => {
+    const editor = await makeEditor(2);
+    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    editor.reorderTrack(elB.trackId, NaN);
+
+    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrder).toEqual([elA.trackId, elB.trackId]); // unchanged
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('reorderTrack: invalid toIndex'));
+
+    editor.reorderTrack(elB.trackId, Infinity);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('reorderTrack: invalid toIndex'));
+    const domOrderAfter = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrderAfter).toEqual([elA.trackId, elB.trackId]); // still unchanged
+
+    editor.remove();
+  });
+
+  it('warns when trackId matches neither a DOM element nor an engine track', async () => {
+    const editor = await makeEditor(2);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    editor.reorderTrack('does-not-exist', 0);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('reorderTrack: no track found for id "does-not-exist"')
+    );
+
     editor.remove();
   });
 });

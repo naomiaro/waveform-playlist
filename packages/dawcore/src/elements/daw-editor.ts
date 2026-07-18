@@ -2705,6 +2705,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * tracks (undo-resurrected) reorder the engine directly.
    */
   reorderTrack(trackId: string, toIndex: number): void {
+    if (!Number.isFinite(toIndex)) {
+      console.warn('[dawcore] reorderTrack: invalid toIndex ' + String(toIndex));
+      return;
+    }
     const el = this._trackElements.get(trackId);
     if (el) {
       const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
@@ -2715,9 +2719,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const anchor = els[clamped];
       if (clamped > from) anchor.after(el);
       else anchor.before(el);
-    } else if (this._engine) {
-      this._engine.reorderTrack(trackId, toIndex);
+    } else if (this._engineTracks.has(trackId)) {
+      this._engine!.reorderTrack(trackId, toIndex);
       this.requestUpdate();
+    } else {
+      console.warn('[dawcore] reorderTrack: no track found for id "' + trackId + '"');
     }
   }
 
@@ -3435,6 +3441,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const desired = tracks
       .map((t) => byId.get(t.id))
       .filter((el): el is DawTrackElement => el != null);
+    if (desired.length === 0) return;
     if (desired.every((el, i) => el === els[i])) return;
     // Anchor the first desired element, then chain the rest after it in order.
     if (els[0] !== desired[0]) els[0].before(desired[0]);
