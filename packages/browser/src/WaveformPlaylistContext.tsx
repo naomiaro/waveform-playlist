@@ -950,6 +950,31 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           if (!suppressTracksMirroring && state.tracksVersion !== lastTracksVersionRef.current) {
             lastTracksVersionRef.current = state.tracksVersion;
             engineTracksRef.current = state.tracks;
+
+            // trackStates is positionally indexed (no track id of its own) and
+            // is otherwise never touched by reorderTrack — the engine reorder is
+            // "purely organizational" (see PlaylistEngine.reorderTrack) and never
+            // rebuilds. Without this, a track's mixer identity (name/mute/solo/
+            // volume/pan) stays pinned to its OLD index after a reorder, so the
+            // control panel silently shows/controls the wrong track. Re-derive an
+            // id->state map from the pre-reorder pairing (tracksRef/trackStatesRef
+            // reflect the last committed render, i.e. before this mutation) and
+            // re-project it onto the new track order. Guarded to same-length
+            // arrays (addTrack/removeTrack already flow through a full rebuild
+            // that reinitializes trackStates) and to an actual order change (so
+            // non-reorder structural mutations like moveClip/trimClip/splitClip
+            // — which don't change track order — are a no-op here).
+            const oldTracks = tracksRef.current;
+            const oldStates = trackStatesRef.current;
+            if (oldTracks.length === oldStates.length && oldTracks.length === state.tracks.length) {
+              const idToState = new Map(oldTracks.map((t, i) => [t.id, oldStates[i]]));
+              const reordered = state.tracks.map((t, i) => idToState.get(t.id) ?? oldStates[i]);
+              const orderChanged = reordered.some((s, i) => s !== oldStates[i]);
+              if (orderChanged) {
+                setTrackStates(reordered);
+              }
+            }
+
             if (onTracksChange) {
               onTracksChange(state.tracks);
             } else {
