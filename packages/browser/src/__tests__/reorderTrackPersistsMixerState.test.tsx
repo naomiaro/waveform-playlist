@@ -142,9 +142,6 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     await act(async () => {
       probe.reorderTrack('track-1', 1);
     });
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
 
     expect(probe.tracks.map((t) => t.id)).toEqual(['track-2', 'track-1', 'track-3']);
 
@@ -190,9 +187,6 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     const statesBefore = probe.trackStates;
     await act(async () => {
       probe.reorderTrack('track-1', 0);
-    });
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
     });
 
     expect(probe.trackStates).toBe(statesBefore);
