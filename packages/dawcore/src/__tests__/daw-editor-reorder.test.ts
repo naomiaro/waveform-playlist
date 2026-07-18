@@ -160,9 +160,9 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
     await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
 
     const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
-    const clipElA = elA.querySelector('daw-clip') as unknown as { clipId: string };
-    const clipIdA = clipElA.clipId;
-    const bufferBefore = editor._clipBuffers.get(clipIdA);
+    const clipElB = elB.querySelector('daw-clip') as unknown as { clipId: string };
+    const clipIdB = clipElB.clipId;
+    const bufferBefore = editor._clipBuffers.get(clipIdB);
     expect(bufferBefore).toBeDefined();
     const callsBefore = fetchAndDecodeSpy.mock.calls.length;
 
@@ -179,8 +179,8 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
 
     expect(fetchAndDecodeSpy.mock.calls.length).toBe(callsBefore);
     expect(errorSpy).not.toHaveBeenCalled();
-    // Same AudioBuffer reference — nothing re-fetched/re-decoded/re-finalized.
-    expect(editor._clipBuffers.get(clipIdA)).toBe(bufferBefore);
+    // Same AudioBuffer reference for moved track B — nothing re-fetched/re-decoded/re-finalized.
+    expect(editor._clipBuffers.get(clipIdB)).toBe(bufferBefore);
 
     editor.remove();
   });
