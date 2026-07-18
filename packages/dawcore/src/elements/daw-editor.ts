@@ -1140,6 +1140,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
+    this._trackReorderDrag.cancel();
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();

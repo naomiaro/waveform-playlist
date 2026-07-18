@@ -68,6 +68,14 @@ export class TrackReorderHandler {
     gripEl.addEventListener('pointercancel', this._onPointerCancel);
   };
 
+  /** Abort any in-progress drag and reset state. Called by the editor on
+   *  disconnect — without this, a drag interrupted by editor removal (with no
+   *  pointercancel delivered) would leave the handler wedged and silently
+   *  block every future grab. */
+  cancel(): void {
+    this._cleanup();
+  }
+
   private _onPointerMove = (e: PointerEvent): void => {
     if (e.pointerId !== this._pointerId || this._trackId === null) return;
     const dragged = this._rows[this._fromIndex];

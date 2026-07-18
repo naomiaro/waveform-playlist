@@ -72,4 +72,23 @@ describe('TrackReorderHandler', () => {
     grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientY: 40 }));
     expect(host.reorderTrack).not.toHaveBeenCalled();
   });
+
+  it('cancel() aborts an in-progress drag and allows a fresh grab', () => {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80)];
+    const host = makeHost(rows);
+    const handler = new TrackReorderHandler(host);
+    const grip = document.createElement('button');
+    rows[0].appendChild(grip);
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 130 }));
+    expect(rows[0].style.transform).not.toBe('');
+    handler.cancel();
+    expect(host.reorderTrack).not.toHaveBeenCalled();
+    expect(rows[0].style.transform).toBe('');
+    // A fresh grab works after cancel
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 2, clientY: 40 }), grip);
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientY: 130 }));
+    grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, clientY: 130 }));
+    expect(host.reorderTrack).toHaveBeenCalledWith('a', 1);
+  });
 });
