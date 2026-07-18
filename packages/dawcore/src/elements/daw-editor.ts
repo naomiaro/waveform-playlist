@@ -56,11 +56,13 @@ import { SpectrogramController } from '../controllers/spectrogram-controller';
 import { PointerHandler } from '../interactions/pointer-handler';
 import { ClipPointerHandler } from '../interactions/clip-pointer-handler';
 import { AnnotationDragHandler } from '../interactions/annotation-drag';
+import { TrackReorderHandler } from '../interactions/track-reorder-handler';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
   DawTrackErrorDetail,
   DawTrackReorderDetail,
+  DawTrackReorderGrabDetail,
   DawClipIdDetail,
   DawClipErrorDetail,
   DawErrorDetail,
@@ -742,6 +744,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _spectrogramController: SpectrogramController | null = null;
   private _clipPointer = new ClipPointerHandler(this);
   private _annotationDrag = new AnnotationDragHandler(this);
+  private _trackReorderDrag = new TrackReorderHandler(this);
   get _clipHandler() {
     return this.interactiveClips ? this._clipPointer : null;
   }
@@ -1069,6 +1072,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
     this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
+    this.addEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     // Detect track + clip removal via MutationObserver (detached elements can't
     // bubble events). A node present in BOTH removedNodes and addedNodes within
     // one batch is a MOVE (insertBefore fires remove+insert) — treated as a
@@ -1135,6 +1139,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
     this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
+    this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -2734,6 +2739,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
   private _onTrackReorder = (e: CustomEvent<DawTrackReorderDetail>) => {
     this.reorderTrack(e.detail.trackId, e.detail.toIndex);
+  };
+
+  private _onTrackReorderGrab = (e: CustomEvent<DawTrackReorderGrabDetail>) => {
+    if (!this.trackReordering) return;
+    this._trackReorderDrag.onGrab(e.detail.trackId, e.detail.pointerEvent, e.detail.gripElement);
   };
 
   /**
