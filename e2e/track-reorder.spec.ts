@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * Track name lives in a sibling `span` (ellipsis-truncated inline style) inside
- * the same Controls panel as the move buttons: button -> ButtonGroup -> Controls.
+ * the same Controls panel as the move buttons: button -> ReorderRail -> Controls.
  */
 function trackNameFromButton(btn: Element): string | null {
   const panel = btn.closest('div')?.parentElement;

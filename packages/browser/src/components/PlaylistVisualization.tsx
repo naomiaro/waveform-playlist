@@ -33,9 +33,7 @@ import {
   type RenderPlayheadFunction,
   SpectrogramLabels,
   CLIP_HEADER_HEIGHT,
-  GripIcon,
-  MoveUpIcon,
-  MoveDownIcon,
+  ReorderRail,
 } from '@waveform-playlist/ui-components';
 import { SortableTrackControls } from './SortableTrackControls';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
@@ -233,7 +231,12 @@ function DefaultTrackControls({
   gripRef,
 }: DefaultTrackControlsProps) {
   return (
-    <Controls onClick={() => selectTrack(trackIndex)}>
+    <Controls
+      onClick={() => selectTrack(trackIndex)}
+      style={
+        trackReordering ? { position: 'relative', paddingLeft: 18, paddingRight: 18 } : undefined
+      }
+    >
       <Header style={{ justifyContent: 'center', position: 'relative' }}>
         {onRemoveTrack && (
           <CloseButton
@@ -268,28 +271,6 @@ function DefaultTrackControls({
             />
           </span>
         )}
-        {trackReordering && (
-          <span
-            style={{ position: 'absolute', right: spectrogram?.renderMenuItems ? 20 : 0, top: 0 }}
-          >
-            <button
-              ref={gripRef as React.Ref<HTMLButtonElement>}
-              aria-label="Drag to reorder track"
-              title="Drag to reorder track"
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: 'inherit',
-                cursor: 'grab',
-                padding: '2px',
-                touchAction: 'none',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <GripIcon size={14} />
-            </button>
-          </span>
-        )}
       </Header>
       <ButtonGroup>
         <Button
@@ -305,32 +286,6 @@ function DefaultTrackControls({
           Solo
         </Button>
       </ButtonGroup>
-      {trackReordering && (
-        <ButtonGroup>
-          <Button
-            $variant="outline"
-            aria-label="Move track up"
-            disabled={trackIndex === 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              reorderTrack(track.id, trackIndex - 1);
-            }}
-          >
-            <MoveUpIcon size={12} />
-          </Button>
-          <Button
-            $variant="outline"
-            aria-label="Move track down"
-            disabled={trackIndex === trackCount - 1}
-            onClick={(e) => {
-              e.stopPropagation();
-              reorderTrack(track.id, trackIndex + 1);
-            }}
-          >
-            <MoveDownIcon size={12} />
-          </Button>
-        </ButtonGroup>
-      )}
       <SliderWrapper>
         <VolumeDownIcon />
         <Slider
@@ -353,6 +308,23 @@ function DefaultTrackControls({
         />
         <span>R</span>
       </SliderWrapper>
+      {trackReordering && (
+        <ReorderRail
+          style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)' }}
+          gripRef={gripRef as React.Ref<HTMLButtonElement>}
+          onGripClick={(e) => e.stopPropagation()}
+          upDisabled={trackIndex === 0}
+          downDisabled={trackIndex === trackCount - 1}
+          onMoveUp={(e) => {
+            e.stopPropagation();
+            reorderTrack(track.id, trackIndex - 1);
+          }}
+          onMoveDown={(e) => {
+            e.stopPropagation();
+            reorderTrack(track.id, trackIndex + 1);
+          }}
+        />
+      )}
     </Controls>
   );
 }
