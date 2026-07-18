@@ -253,6 +253,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   @property({ type: Boolean, attribute: 'fill-viewport' }) fillViewport = false;
   /**
+   * Enable vertical track reordering UI: grip + move up/down buttons on each
+   * track's controls. Reordering is purely organizational.
+   */
+  @property({ type: Boolean, attribute: 'track-reordering' }) trackReordering = false;
+  /**
    * Default spectrogram FFT/render config inherited by tracks with
    * `render-mode="spectrogram"` that do not set their own. Wired into the
    * orchestrator by `SpectrogramController` in Task 14.
@@ -3547,7 +3552,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                     </div>`
                 )}
                 ${orderedTracks.map(
-                  (t) => html`
+                  (t, i) => html`
                     <daw-track-controls
                       style="height: ${t.trackHeight}px;"
                       .trackId=${t.trackId}
@@ -3556,6 +3561,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                       .pan=${t.descriptor?.pan ?? 0}
                       .muted=${t.descriptor?.muted ?? false}
                       .soloed=${t.descriptor?.soloed ?? false}
+                      .reorderable=${this.trackReordering}
+                      .trackIndex=${i}
+                      .trackCount=${orderedTracks.length}
                     ></daw-track-controls>
                   `
                 )}

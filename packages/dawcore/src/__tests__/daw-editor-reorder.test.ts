@@ -299,6 +299,37 @@ describe('<daw-editor> engine-to-DOM reorder sync (#612)', () => {
   });
 });
 
+describe('<daw-editor track-reordering> UI-driven reorder (#612)', () => {
+  it('clicking the rendered move-down button reorders both the engine and the DOM', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    editor.setAttribute('track-reordering', '');
+    document.body.appendChild(editor);
+    await editor.addTrack({ name: 'A', midi: { notes: NOTES } });
+    await editor.addTrack({ name: 'B', midi: { notes: NOTES } });
+    await editor.updateComplete;
+
+    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+
+    const controlsEls = editor.shadowRoot!.querySelectorAll('daw-track-controls');
+    expect(controlsEls.length).toBe(2);
+    const firstControls = controlsEls[0] as HTMLElement & { updateComplete: Promise<boolean> };
+    await firstControls.updateComplete;
+    const downBtn = firstControls.shadowRoot!.querySelector('.reorder-down') as HTMLButtonElement;
+    expect(downBtn).not.toBeNull();
+    downBtn.click();
+
+    await vi.waitFor(() => {
+      const engineOrder = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
+      expect(engineOrder).toEqual([elB.trackId, elA.trackId]);
+      const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+      expect(domOrder).toEqual([elB.trackId, elA.trackId]);
+    });
+
+    editor.remove();
+  });
+});
+
 describe('<daw-editor> reorderTrack input hardening (#612)', () => {
   it('warns and no-ops for a non-finite toIndex', async () => {
     const editor = await makeEditor(2);
