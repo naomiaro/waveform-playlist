@@ -39,7 +39,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
 }) => {
   const { tracks, samplesPerPixel, sampleRate, playoutRef, isDraggingRef, onTracksChange } =
     usePlaylistData();
-  const { setSelectedTrackId, reorderTrack } = usePlaylistControls();
+  const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch } = usePlaylistControls();
   const beatsAndBars = useBeatsAndBars();
 
   // Derive snap mode from context: beats if provider is in beats mode with snap enabled,
@@ -121,6 +121,15 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: Parameters<typeof onDragEnd>[0]) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind === 'track-reorder') {
+        // Unconditional, regardless of canceled/committed: @dnd-kit/react's
+        // sortable plugins can splice React-owned DOM nodes (Feedback's
+        // placeholder, OptimisticSortingPlugin's reorder()) during the drag
+        // that just ended, desyncing React's fiber tree from the true DOM.
+        // Bumping this forces PlaylistVisualization to remount the
+        // track-controls slots, healing the corruption before the next
+        // reorder (drag or button) needs to touch the DOM. See
+        // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.
+        bumpTrackReorderEpoch();
         if (event.canceled || !data.trackId) return;
         const sortable = (
           event.operation.source as unknown as {
@@ -134,7 +143,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       }
       onDragEnd(event);
     },
-    [onDragEnd, reorderTrack]
+    [onDragEnd, reorderTrack, bumpTrackReorderEpoch]
   );
 
   // Build modifiers array

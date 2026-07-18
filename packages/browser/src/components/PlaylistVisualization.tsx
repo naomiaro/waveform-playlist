@@ -403,6 +403,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     barGap,
     roundedBars,
     isReady,
+    trackReorderEpoch,
     mono,
   } = usePlaylistData();
 
@@ -687,8 +688,13 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         );
 
         return (
+          // key includes trackReorderEpoch: forces a remount after every
+          // track-reorder drag, discarding @dnd-kit sortable-plugin DOM
+          // corruption (see bumpTrackReorderEpoch's doc comment in
+          // WaveformPlaylistContext). Stays at `-0` — a no-op suffix — for
+          // consumers that never enable trackReordering.
           <ControlSlot
-            key={track.id}
+            key={`${track.id}-${trackReorderEpoch}`}
             $height={slotHeight}
             $isSelected={track.id === selectedTrackId}
           >

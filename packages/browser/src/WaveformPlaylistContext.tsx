@@ -170,6 +170,13 @@ export interface PlaylistControlsContextValue {
    *  array flows back through onTracksChange. */
   reorderTrack: (trackId: string, toIndex: number) => void;
 
+  /** Internal: call after every track-reorder DRAG interaction ends
+   *  (committed or canceled) to force PlaylistVisualization to remount the
+   *  track-controls slots, discarding any @dnd-kit sortable-plugin DOM
+   *  corruption. Not needed for button-driven reorderTrack calls (they never
+   *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
+  bumpTrackReorderEpoch: () => void;
+
   // Selection
   setSelection: (start: number, end: number) => void;
   setSelectedTrackId: (trackId: string | null) => void;
@@ -245,6 +252,11 @@ export interface PlaylistDataContextValue {
   progressBarWidth: number;
   /** Whether the playlist has finished loading all tracks */
   isReady: boolean;
+  /** Internal: incremented after every track-reorder drag interaction ends.
+   *  PlaylistVisualization folds this into the track-controls slot `key` to
+   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
+   *  (see bumpTrackReorderEpoch in PlaylistControlsContextValue). */
+  trackReorderEpoch: number;
   /** Whether tracks are rendered in mono mode */
   mono: boolean;
   /** Ref set by useClipDragHandlers during boundary trim drags.
@@ -417,6 +429,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
   const [isReady, setIsReady] = useState(false);
+  // Bumped after every track-reorder DRAG interaction (committed or not) —
+  // see bumpTrackReorderEpoch below for the full rationale.
+  const [trackReorderEpoch, setTrackReorderEpoch] = useState(0);
 
   // Refs
   // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
@@ -1684,6 +1699,28 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [engineRef]
   );
 
+  // @dnd-kit/react's Feedback and OptimisticSortingPlugin sortable plugins
+  // perform raw, React-bypassing DOM node moves (insertAdjacentElement /
+  // replaceWith) as part of their live drag-preview and collision-commit
+  // mechanics — confirmed via MutationObserver instrumentation to physically
+  // relocate the React-owned track-controls row during a track-reorder drag,
+  // leaving its parent/nextSibling different from what React's fiber tree
+  // still believes. That desync is permanent for the session: every LATER
+  // React-driven reorder (button OR drag) computes correct data but silently
+  // fails to patch the DOM for these rows. `SortableTrackControls` already
+  // sets `feedback: 'move'` to avoid the placeholder-splice half of this (see
+  // its comment), but OptimisticSortingPlugin's own `reorder()` DOM splice
+  // fires independently on any drag that commits a real index change and
+  // isn't configurable away without losing live index tracking. Bumping this
+  // epoch forces PlaylistVisualization to re-key (remount) the track-controls
+  // slots after every track-reorder drag ends — committed or canceled, since
+  // corruption can occur before a final index is even decided — discarding
+  // any corrupted fiber state so the NEXT reorder (drag or button) starts
+  // from a clean DOM. Called from ClipInteractionProvider's onDragEnd.
+  const bumpTrackReorderEpoch = useCallback(() => {
+    setTrackReorderEpoch((epoch) => epoch + 1);
+  }, []);
+
   // Selection — wraps hook setter with playback side-effects (provider concern).
   const setSelection = useCallback(
     (start: number, end: number) => {
@@ -1842,6 +1879,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackVolume,
       setTrackPan,
       reorderTrack,
+      bumpTrackReorderEpoch,
 
       // Selection
       setSelection,
@@ -1894,6 +1932,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackVolume,
       setTrackPan,
       reorderTrack,
+      bumpTrackReorderEpoch,
       setSelection,
       setSelectedTrackIdControl,
       setTimeFormat,
@@ -1942,6 +1981,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       isReady,
+      trackReorderEpoch,
       mono,
       isDraggingRef,
       onTracksChange,
@@ -1968,6 +2008,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       isReady,
+      trackReorderEpoch,
       mono,
       isDraggingRef,
       onTracksChange,
