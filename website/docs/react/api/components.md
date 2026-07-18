@@ -44,6 +44,7 @@ The main visualization component that renders tracks and handles interactions.
 | `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips (requires @dnd-kit/react DragDropProvider setup) |
 | `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
 | `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |
+| `trackReordering` | `boolean` | `false` | Show a drag grip + move up/down buttons on the default track control panel for vertical track reordering. Drag requires `ClipInteractionProvider`; the buttons work regardless |
 
 Note: The `timescale` prop is set on `WaveformPlaylistProvider`, not on `Waveform`.
 
@@ -357,6 +358,30 @@ Built-in control panel for a track.
 - Solo button
 - Volume slider
 - Pan slider
+
+### SortableTrackControls
+
+Registers a custom track-controls row as a vertical drag source for reordering. Use this when rendering your own track control panel (via `renderTrackControls`) instead of the default one — the default panel already wires this up internally when `trackReordering` is set on `Waveform`.
+
+```tsx
+<SortableTrackControls trackId={track.id} index={trackIndex}>
+  {({ ref, handleRef, isDragSource }) => (
+    <div ref={ref} style={{ opacity: isDragSource ? 0.5 : 1 }}>
+      <button ref={handleRef}>Drag</button>
+      {/* rest of your custom track controls */}
+    </div>
+  )}
+</SortableTrackControls>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `trackId` | `string` | - | The track's id |
+| `index` | `number` | - | The track's current position |
+| `disabled` | `boolean` | `false` | Disable the drag source |
+| `children` | `(props: SortableTrackControlsRenderProps) => ReactNode` | - | Render prop receiving `ref` (sortable item wrapper), `handleRef` (drag grip), and `isDragSource` |
+
+Requires `ClipInteractionProvider` (or another ambient `@dnd-kit/react` `DragDropProvider`) — drags are committed by calling `usePlaylistControls().reorderTrack(trackId, toIndex)` from the shared `onDragEnd` handler.
 
 ---
 

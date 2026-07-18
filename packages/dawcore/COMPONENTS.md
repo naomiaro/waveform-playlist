@@ -26,6 +26,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport`. Recording sessions suppress the auto-stop automatically |
 | `fill-viewport`       | boolean | `false` | Timeline fills the visible viewport even when audio is shorter (layout only)                                                                                   |
 | `sample-rate`         | number  | `48000` | Sample rate hint for AudioContext and peaks matching                                                                                                           |
+| `track-reordering`    | boolean | `false` | Show a drag grip + move up/down buttons on `<daw-track-controls>` for vertical track reordering (drag and buttons both undoable)                               |
 
 **JS Properties:**
 
@@ -44,6 +45,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `stopRecording()`         | `void`                     | Stop recording                    |
 | `pauseRecording()`        | `void`                     | Pause recording                   |
 | `resumeRecording()`       | `void`                     | Resume recording                  |
+| `reorderTrack(trackId, toIndex)` | `void`              | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable. |
 
 **Events:**
 
@@ -60,6 +62,8 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `daw-track-error`        | `{ trackId, error }`                          | Track failed to load                            |
 | `daw-track-control`      | `{ trackId, property, value }`                | Track control changed (volume, pan, mute, solo) |
 | `daw-track-remove`       | `{ trackId }`                                 | Track removed                                   |
+| `daw-track-reorder`      | `{ trackId, fromIndex, toIndex }`             | Move up/down button clicked on `<daw-track-controls>` (bubbles to the editor, which calls `reorderTrack`) |
+| `daw-track-reorder-grab` | `{ trackId, pointerEvent, gripElement }`      | Drag grip pointerdown on `<daw-track-controls>` (bubbles to the editor, which starts the pointer-drag handler) |
 | `daw-clip-move`          | `{ clipId, trackId, deltaSamples }`           | Clip moved                                      |
 | `daw-clip-trim`          | `{ clipId, trackId, boundary, deltaSamples }` | Clip boundary trimmed                           |
 | `daw-clip-split`         | `{ originalClipId, leftClipId, rightClipId }` | Clip split at playhead                          |
@@ -257,6 +261,16 @@ Visual overlay for the selected time region.
 ### `<daw-track-controls>`
 
 Per-track control panel showing track name, volume slider, pan knob, mute/solo buttons, and remove button. Fixed position — doesn't scroll with the waveforms.
+
+**JS Properties (set by `<daw-editor>`, not attributes):**
+
+| Property      | Type      | Default | Description                                                                                    |
+| ------------- | --------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons |
+| `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                        |
+| `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)  |
+
+Dispatches `daw-track-reorder` (move buttons) and `daw-track-reorder-grab` (drag grip pointerdown) — see the `<daw-editor>` events table above.
 
 ---
 

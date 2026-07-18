@@ -404,6 +404,10 @@ interface PlaylistControlsContextValue {
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
+  /** Move a track to a new position in the track order (undoable). Purely
+   *  organizational — never rebuilds the audio adapter. Clamps toIndex, no-ops
+   *  on an unknown trackId or a same-index move. */
+  reorderTrack: (trackId: string, toIndex: number) => void;
 
   // Selection
   setSelection: (start: number, end: number) => void;
