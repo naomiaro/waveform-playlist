@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
+  ClipInteractionProvider,
   Waveform,
   PlayButton,
   PauseButton,
@@ -15,6 +16,7 @@ import {
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
+import { type ClipTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
@@ -102,7 +104,16 @@ export function StemTracksExample() {
   const { theme } = useDocusaurusTheme();
 
   // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
+  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
+  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+
+  // Sync local track state as peaks fill in; once loading finishes this stops
+  // firing, so subsequent updates (e.g. track reordering) come from onTracksChange.
+  useEffect(() => {
+    if (loadedTracks.length > 0) {
+      setTracks(loadedTracks);
+    }
+  }, [loadedTracks]);
 
   if (error) {
     return (
@@ -118,6 +129,8 @@ export function StemTracksExample() {
     <Container>
       <WaveformPlaylistProvider
         tracks={tracks}
+        onTracksChange={setTracks}
+        deferEngineRebuild={loading}
         sampleRate={48000}
         samplesPerPixel={512}
         mono
@@ -129,35 +142,37 @@ export function StemTracksExample() {
         barWidth={4}
         barGap={0}
       >
-        <KeyboardShortcuts playback />
-        <Controls>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-            {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
-          </ControlGroup>
+        <ClipInteractionProvider>
+          <KeyboardShortcuts playback />
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+              {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+            </ControlGroup>
 
-          <ControlGroup>
-            <ZoomInButton />
-            <ZoomOutButton />
-          </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AudioPosition />
-          </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
 
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
+            <ControlGroup>
+              <MasterVolumeControl />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-          </ControlGroup>
+            <ControlGroup>
+              <AutomaticScrollCheckbox />
+            </ControlGroup>
 
-        </Controls>
+          </Controls>
 
-        <Waveform renderPlayhead={PlayheadWithMarker} />
+          <Waveform renderPlayhead={PlayheadWithMarker} trackReordering />
+        </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>
   );
