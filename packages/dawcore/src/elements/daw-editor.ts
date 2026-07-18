@@ -60,6 +60,7 @@ import type {
   DawSelectionDetail,
   DawTrackIdDetail,
   DawTrackErrorDetail,
+  DawTrackReorderDetail,
   DawClipIdDetail,
   DawClipErrorDetail,
   DawErrorDetail,
@@ -1062,6 +1063,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._onAnnotationTrackConnected as EventListener
     );
     this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
+    this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     // Detect track + clip removal via MutationObserver (detached elements can't
     // bubble events). A node present in BOTH removedNodes and addedNodes within
     // one batch is a MOVE (insertBefore fires remove+insert) — treated as a
@@ -1127,6 +1129,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._onAnnotationTrackConnected as EventListener
     );
     this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
+    this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -2480,6 +2483,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // Sync clip positions when tracks change structurally (moveClip, trimClip,
       // splitClip, setTracks, addTrack, removeTrack).
       if (structuralChange) {
+        // Engine-initiated order changes (undo/redo of a reorder) move the
+        // DOM to match; guarded so the observer's own DOM→engine sync (which
+        // emits intermediate statechanges mid-transaction) can't bounce
+        // half-applied orders back into the DOM (#612).
+        if (!this._inOrderSync) {
+          this._syncDomToEngineOrder(engineState.tracks);
+        }
         // Transport setTracks rebuilds TrackNodes, severing effects hookups.
         this._effectsManager?.rewireTrackChains();
         // Regenerate peaks for new or trimmed clips.
@@ -2688,6 +2698,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] removeTrack: no track found for id "' + trackId + '"');
     }
   }
+  /**
+   * Move a track to a new position in the vertical order (0-based index among
+   * `<daw-track>` elements). Element-backed tracks move their DOM element —
+   * the MutationObserver syncs the engine (single write path). Element-less
+   * tracks (undo-resurrected) reorder the engine directly.
+   */
+  reorderTrack(trackId: string, toIndex: number): void {
+    const el = this._trackElements.get(trackId);
+    if (el) {
+      const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
+      const from = els.indexOf(el);
+      if (from === -1) return;
+      const clamped = Math.max(0, Math.min(toIndex, els.length - 1));
+      if (from === clamped) return;
+      const anchor = els[clamped];
+      if (clamped > from) anchor.after(el);
+      else anchor.before(el);
+    } else if (this._engine) {
+      this._engine.reorderTrack(trackId, toIndex);
+      this.requestUpdate();
+    }
+  }
+
+  private _onTrackReorder = (e: CustomEvent<DawTrackReorderDetail>) => {
+    this.reorderTrack(e.detail.trackId, e.detail.toIndex);
+  };
+
   /**
    * Update reflected attributes on a track. For DOM-element tracks the changes
    * are written to the `<daw-track>` element (which fires `daw-track-update`);
@@ -3383,6 +3420,27 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._inOrderSync = false;
     }
     this.requestUpdate();
+  }
+
+  /**
+   * Engine → DOM: after an engine-initiated order change (undo/redo), move
+   * `<daw-track>` elements to match engine order. The resulting mutations fire
+   * the observer's _syncEngineOrderToDom, which finds the orders equal and
+   * no-ops — converges in one pass (write-only-on-change).
+   */
+  _syncDomToEngineOrder(tracks: ClipTrack[]): void {
+    const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
+    if (els.length < 2) return;
+    const byId = new Map<string, DawTrackElement>(els.map((el) => [el.trackId, el]));
+    const desired = tracks
+      .map((t) => byId.get(t.id))
+      .filter((el): el is DawTrackElement => el != null);
+    if (desired.every((el, i) => el === els[i])) return;
+    // Anchor the first desired element, then chain the rest after it in order.
+    if (els[0] !== desired[0]) els[0].before(desired[0]);
+    for (let i = 1; i < desired.length; i++) {
+      if (desired[i - 1].nextElementSibling !== desired[i]) desired[i - 1].after(desired[i]);
+    }
   }
 
   private _getOrderedTracks(): Array<[string, ClipTrack]> {

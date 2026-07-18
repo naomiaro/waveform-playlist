@@ -182,6 +182,18 @@ export interface DawEffectReorderDetail {
   toIndex: number;
 }
 
+export interface DawTrackReorderDetail {
+  trackId: string;
+  fromIndex: number;
+  toIndex: number;
+}
+
+export interface DawTrackReorderGrabDetail {
+  trackId: string;
+  pointerEvent: PointerEvent;
+  gripElement: HTMLElement;
+}
+
 export interface DawEffectErrorDetail {
   effectId: string;
   /** Plugin source URL (absent for Faust entries, which have no URL). */
@@ -255,6 +267,8 @@ export interface DawEventMap {
   'daw-effect-bypass': CustomEvent<DawEffectBypassDetail>;
   'daw-effect-reorder': CustomEvent<DawEffectReorderDetail>;
   'daw-effect-error': CustomEvent<DawEffectErrorDetail>;
+  'daw-track-reorder': CustomEvent<DawTrackReorderDetail>;
+  'daw-track-reorder-grab': CustomEvent<DawTrackReorderGrabDetail>;
   'daw-annotation-connected': CustomEvent<DawAnnotationConnectedDetail>;
   'daw-annotation-update': CustomEvent<DawAnnotationUpdateDetail>;
   'daw-annotation-select': CustomEvent<DawAnnotationSelectDetail>;

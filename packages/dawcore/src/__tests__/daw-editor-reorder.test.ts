@@ -224,3 +224,34 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
     editor.remove();
   });
 });
+
+describe('<daw-editor> engine-to-DOM reorder sync (#612)', () => {
+  it('undo after a reorder moves the <daw-track> elements back', async () => {
+    const editor = await makeEditor(2);
+    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    editor.reorderTrack(elB.trackId, 0);
+    await vi.waitFor(() => {
+      expect([...editor.querySelectorAll('daw-track')][0]).toBe(elB);
+    });
+    editor.engine!.undo();
+    await vi.waitFor(() => {
+      expect([...editor.querySelectorAll('daw-track')][0]).toBe(elA);
+      expect(editor.engine!.getState().tracks[0].id).toBe(elA.trackId);
+    });
+    editor.remove();
+  });
+
+  it('reorder sync converges — no ping-pong between observer and statechange', async () => {
+    const editor = await makeEditor(2);
+    const [, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    const reorderSpy = vi.spyOn(editor.engine!, 'reorderTrack');
+    editor.reorderTrack(elB.trackId, 0);
+    await vi.waitFor(() => {
+      expect(editor.engine!.getState().tracks[0].id).toBe(elB.trackId);
+    });
+    const calls = reorderSpy.mock.calls.length;
+    await new Promise((r) => setTimeout(r, 50));
+    expect(reorderSpy.mock.calls.length).toBe(calls); // settled, no further churn
+    editor.remove();
+  });
+});
