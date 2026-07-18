@@ -181,6 +181,9 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Example: dawcore-native**: `pnpm example:dawcore-native` — Vite dev server at localhost:5173 (Vite falls back to next free port when 5173 is taken; check the server's startup log for the actual URL)
 - **Example: dawcore-tone**: `pnpm example:dawcore-tone` — Vite dev server at localhost:5174 (same fallback behavior — log shows the actual port)
 - **Example: dawcore-wam**: `pnpm example:dawcore-wam` — Vite dev server at localhost:5175. WAM plugins load from webaudiomodules.com (network required)
+- **`pnpm <script> -- --flag` passes a LITERAL `"--"`** — `pnpm example:dawcore-native -- --port 5199` and `pnpm --filter website start -- --port N` hand vite/docusaurus the strings `"--" "--port" …`, which they ignore (server starts on its default port; docusaurus exits 1). Use `pnpm exec vite --port N` / `cd website && pnpm exec docusaurus start --port N`, or read the startup log for the real port.
+- **Vite dev servers SPA-fallback unknown paths to index.html with HTTP 200** — `fetch(url).ok` is not proof an asset exists; a ~3KB "audio file" that fails `decodeAudioData` is usually the HTML fallback. Verify content-type or byte size when fetching fixtures in browser-driven tests.
+- **Docusaurus dev pages live under the site baseUrl `/waveform-playlist/`** — ad-hoc browser scripts must use `http://localhost:<port>/waveform-playlist/examples/...`; the bare path returns SPA-fallback 200 with no page (the e2e config's BASE_PATH already handles this).
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
 - **vitest `-t` is a REGEX, not a substring** — `-t 'play() after'` matches nothing (the `()` is an empty group). Filter on a paren-free fragment of the test name.
 - **Hard refresh**: Always use Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux) after builds
@@ -191,6 +194,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **CI Validation:** `.github/workflows/ci.yml` runs on PRs to `main`: build and lint (includes prettier check). Fix formatting with `pnpm format` before pushing. `gh pr checks --watch` can exit 0 while checks are still pending/queued — always re-run `gh pr checks` and read the actual states before merging or diagnosing.
 
 **GitHub closing keywords don't distribute over comma lists** — `fixes #589, #590, #593` in a squash-merge commit closes ONLY #589; each reference needs its own keyword (`fixes #589, fixes #590, fixes #593`). A `closes #N` in the PR body works independently. After merging a multi-issue PR, verify each issue actually closed (`gh issue view N --json state`).
+
+**Sub-issues don't close with their parent epic** — `closes #<epic>` closes only the epic; its sub-issues stay open (found on #455: all three sub-issues open after the epic closed). Enumerate them via GraphQL (no `gh` subcommand): `gh api graphql -f query='{ repository(owner:"naomiaro", name:"waveform-playlist") { issue(number:N) { subIssues(first:50) { nodes { number title state } } } } }'`, then close each with a comment pointing at the implementing PR.
 
 **Commit messages with backticks:** never inline them in a double-quoted `git commit -m "…"` — the shell command-substitutes them (one release-arc commit shipped with a word silently deleted). Use `git commit -F - << 'EOF'` (quoted delimiter).
 
