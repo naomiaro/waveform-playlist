@@ -70,10 +70,22 @@ rows (including the dragged track's waveform) slide; cancel → preview null →
 rows slide back; drop → committed order equals previewed order → tops unchanged → no
 motion.
 
-### 3. Opaque lifted row
+### 3. Opaque lifted row + dragged-lane emphasis
 
 Drag-source opacity 0.85 → 1 in `PlaylistVisualization`'s sortable wrapper; add a
 box-shadow while `isDragSource` so the floating row still reads as lifted.
+
+The dragged track's **waveform row** gets a subtle emphasis while a preview is active
+(`trackDragPreview.trackId` matches), tying the floating controls row to its lane in the
+timeline: reuse the existing selected-track background tint (theme token, no new visual
+vocabulary), applied via a `data-track-drag-source` attribute on the row so e2e can assert
+it. Cleared when the preview clears (drop or cancel).
+
+Note on the waveform column: there is deliberately **no gap and no insertion line** at the
+drop position — the dragged track's waveform itself occupies the target slot live (the
+preview shows the literal post-drop result). The "gap" appears only in the controls
+column, where the dragged row floats in the top layer and its emptied `ControlSlot`
+slides to the target position.
 
 ### 4. dawcore parity (`@dawcore/components`)
 
@@ -94,6 +106,10 @@ cancel). Two gaps close for parity:
   cleared in `_cleanup()`; skipped when `matchMedia('(prefers-reduced-motion: reduce)')`
   matches. The dragged controls row keeps *no* transition (it pixel-follows the pointer);
   the dragged lane keeps the transition (it slot-snaps).
+- **Dragged-lane emphasis:** same as React — the dragged track's `<daw-track>` lane gets
+  a `data-track-drag-source` attribute for the duration of the drag (styled with the
+  existing selected-track tint via the element's CSS theming hooks), cleared in
+  `_cleanup()`.
 
 ## Edge cases and accepted trade-offs
 
@@ -125,6 +141,7 @@ cancel). Two gaps close for parity:
   shift map on target changes; dragged lane slot-snap offset; cleanup (pointerup,
   pointercancel, editor disconnect) clears lane transforms and transitions.
 - **e2e (`track-reorder.spec.ts`):** mid-drag, waveform-column `data-track-id` rect order
-  already shows the previewed order before `mouse.up`; Escape reverts both columns to the
-  original order; existing drop-commit and mixer-identity assertions unchanged. The
-  dawcore-native reorder e2e gains the same mid-drag lane-order assertion.
+  already shows the previewed order before `mouse.up` and the dragged track's row carries
+  `data-track-drag-source`; Escape reverts both columns to the original order and clears
+  the emphasis; existing drop-commit and mixer-identity assertions unchanged. The
+  dawcore-native reorder e2e gains the same mid-drag lane-order and emphasis assertions.
