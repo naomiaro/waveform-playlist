@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { useSortable } from '@dnd-kit/react/sortable';
 import { RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers';
+import { createDragPopoverHealer } from '../utils/dragPopoverHealer';
 
 export interface SortableTrackControlsRenderProps {
   /** Attach to the slot wrapper element (the sortable item). */
@@ -66,5 +67,24 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
     // "Track Reordering".
     feedback: 'move',
   });
-  return <>{children({ ref, handleRef, isDragSource })}</>;
+  // `feedback: 'move'` opts out of dnd-kit's placeholder — and with it the
+  // plugin's own popover-recovery MutationObserver, which is only created
+  // when a placeholder exists. OptimisticSortingPlugin's mid-drag
+  // insertAdjacentElement splices force-dismiss the top-layer popover
+  // (eventlessly, per spec), leaving the dragged row UA-hidden
+  // (`[popover]:not(:popover-open) { display: none }`) for the rest of the
+  // drag. Run our own healer while this row is the drag source.
+  const elementRef = useRef<HTMLElement | null>(null);
+  const composedRef = useCallback(
+    (element: Element | null) => {
+      elementRef.current = element instanceof HTMLElement ? element : null;
+      ref(element);
+    },
+    [ref]
+  );
+  useEffect(() => {
+    if (!isDragSource || !elementRef.current) return undefined;
+    return createDragPopoverHealer(elementRef.current);
+  }, [isDragSource]);
+  return <>{children({ ref: composedRef, handleRef, isDragSource })}</>;
 };

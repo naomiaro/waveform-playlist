@@ -96,6 +96,22 @@ test.describe('Track Reordering', () => {
       await page.waitForTimeout(60);
     }
     await page.waitForTimeout(300);
+
+    // Mid-drag, after crossing the collision boundary: the dragged row must
+    // still be visible. OptimisticSortingPlugin's insertAdjacentElement
+    // splice force-dismisses dnd-kit's top-layer popover (eventlessly), and
+    // a dismissed [popover] element is UA-hidden (display: none) — the
+    // dragPopoverHealer in SortableTrackControls must have re-shown it.
+    const midDrag = await page.evaluate(() => {
+      const el = document.querySelector('[data-dnd-dragging]');
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return { popoverOpen: el.matches(':popover-open'), height: rect.height };
+    });
+    expect(midDrag).not.toBeNull();
+    expect(midDrag?.popoverOpen).toBe(true);
+    expect(midDrag?.height).toBeGreaterThan(0);
+
     await page.mouse.up();
 
     await expect(async () => {
