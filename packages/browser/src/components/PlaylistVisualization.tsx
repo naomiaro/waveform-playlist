@@ -84,7 +84,7 @@ const TracksLayout = styled.div.attrs<{ $height: number }>((props) => ({
  * Positions one waveform track row from the shared layout map. Transform
  * (not top) so position changes composite; transition only while a track
  * drag is active (+trailing window) so unrelated layout changes stay
- * instant. See docs/specs/2026-07-25-track-reorder-drag-preview-design.md.
+ * instant.
  */
 const TrackRowPositioner = styled.div.attrs<PositionedRowProps>((props) => ({
   style: { transform: `translateY(${props.$top}px)` },
@@ -869,6 +869,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                     key={track.id}
                     $top={trackLayout.topById.get(track.id) ?? 0}
                     $animate={animateTrackLayout}
+                    data-track-row=""
                     data-track-id={track.id}
                     data-track-drag-source={
                       trackDragPreview?.trackId === track.id ? 'true' : undefined

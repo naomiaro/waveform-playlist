@@ -62,8 +62,8 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
     // 'none', collision (and therefore sortable.index) never updates, so
     // drag-based reordering silently never commits. Boundary trims don't hit
     // this because they're plain useDraggable (no collision-based commit) —
-    // sortables need shape. `isDragSource` (opacity feedback below) is a
-    // reactive signal, unaffected either way. See browser/CLAUDE.md
+    // sortables need shape. `isDragSource` (box-shadow lift feedback below)
+    // is a reactive signal, unaffected either way. See browser/CLAUDE.md
     // "Track Reordering".
     feedback: 'move',
   });

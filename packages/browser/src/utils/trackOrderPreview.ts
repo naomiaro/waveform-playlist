@@ -1,6 +1,5 @@
 /**
- * Pure helpers for the track-reorder drag preview (see
- * docs/specs/2026-07-25-track-reorder-drag-preview-design.md).
+ * Pure helpers for the track-reorder drag preview.
  *
  * The preview is view-level only: it produces a DISPLAY order/geometry while
  * the engine's committed `tracks` order stays untouched until drop.
