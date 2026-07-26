@@ -159,19 +159,28 @@ test.describe('Track Reordering', () => {
   });
 
   test('Escape mid-drag reverts the preview in both columns', async ({ page }) => {
-    const readIds = () =>
-      page.evaluate(() =>
-        [...document.querySelectorAll('[data-clip-container]')]
+    const readState = () =>
+      page.evaluate(() => ({
+        ids: [...document.querySelectorAll('[data-clip-container]')]
           .map((c) => ({ id: c.getAttribute('data-track-id'), top: c.getBoundingClientRect().top }))
           .sort((a, b) => a.top - b.top)
-          .map((r) => r.id)
-      );
-    const before = await readIds();
+          .map((r) => r.id),
+        names: [...document.querySelectorAll('span[style*="ellipsis"]')].map((s) => s.textContent),
+      }));
+    const before = await readState();
 
     const grips = page.locator('button[aria-label="Drag to reorder track"]');
-    const box0 = await grips.nth(0).boundingBox();
-    const box1 = await grips.nth(1).boundingBox();
-    if (!box0 || !box1) throw new Error('Grip elements not laid out');
+    let g0: { x: number; y: number; width: number; height: number } | null = null;
+    let g1: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      g0 = await grips.nth(0).boundingBox();
+      g1 = await grips.nth(1).boundingBox();
+      expect(g0).toBeTruthy();
+      expect(g1).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    if (!g0 || !g1) throw new Error('Grip elements not laid out');
+    const box0 = g0 as { x: number; y: number; width: number; height: number };
+    const box1 = g1 as { x: number; y: number; width: number; height: number };
     const startY = box0.y + box0.height / 2;
     const endY = box1.y + box1.height / 2;
     await page.mouse.move(box0.x + box0.width / 2, startY);
@@ -182,17 +191,22 @@ test.describe('Track Reordering', () => {
     }
     // Preview active: order swapped, emphasis present
     await expect(async () => {
-      const mid = await readIds();
-      expect(mid[0]).toBe(before[1]);
+      const mid = await readState();
+      expect(mid.ids[0]).toBe(before.ids[1]);
     }).toPass({ timeout: 5000 });
     await expect(page.locator('[data-track-drag-source]')).toHaveCount(1);
 
     await page.keyboard.press('Escape');
     await page.mouse.up();
 
-    // Reverted: original order, no emphasis, no commit
+    // Reverted: original order in BOTH the waveform column (ids) and the
+    // mixer/name column (names) — this is exactly where the historical
+    // OptimisticSortingPlugin DOM-corruption bug manifested (see the drag
+    // test above), so a revert check must cover names too, not just ids.
     await expect(async () => {
-      expect(await readIds()).toEqual(before);
+      const restored = await readState();
+      expect(restored.ids).toEqual(before.ids);
+      expect(restored.names).toEqual(before.names);
     }).toPass({ timeout: 5000 });
     await expect(page.locator('[data-track-drag-source]')).toHaveCount(0);
   });
