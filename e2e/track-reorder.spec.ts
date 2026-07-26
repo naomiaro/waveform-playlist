@@ -112,6 +112,28 @@ test.describe('Track Reordering', () => {
     expect(midDrag?.popoverOpen).toBe(true);
     expect(midDrag?.height).toBeGreaterThan(0);
 
+    // Slot-snap preview: after crossing the boundary the WAVEFORM column
+    // already shows the previewed order (rect-top order of the row wrappers),
+    // and the dragged row carries the emphasis attribute. Row wrappers carry
+    // a unique `data-track-row` marker (Clip and channel-container elements
+    // inside each row also carry `data-track-id`, so that alone is
+    // ambiguous).
+    await expect(async () => {
+      const midDragWaveformOrder = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-track-row]')]
+          .map((el) => ({
+            id: el.getAttribute('data-track-id'),
+            top: el.getBoundingClientRect().top,
+            isDragSource: el.hasAttribute('data-track-drag-source'),
+          }))
+          .sort((a, b) => a.top - b.top)
+      );
+      expect(midDragWaveformOrder[0]?.id).toBe(before.ids[1]);
+      expect(midDragWaveformOrder[1]?.id).toBe(before.ids[0]);
+      expect(midDragWaveformOrder[1]?.isDragSource).toBe(true);
+      expect(midDragWaveformOrder.filter((r) => r.isDragSource)).toHaveLength(1);
+    }).toPass({ timeout: 5000 });
+
     await page.mouse.up();
 
     await expect(async () => {
@@ -121,6 +143,8 @@ test.describe('Track Reordering', () => {
       expect(afterDrag.names[0]).toBe(before.names[1]);
       expect(afterDrag.names[1]).toBe(before.names[0]);
     }).toPass({ timeout: 5000 });
+
+    await expect(page.locator('[data-track-drag-source]')).toHaveCount(0);
 
     // Restore via the move-up button and confirm BOTH order and name follow
     // back — this second reorder is what the corruption bug broke: names
@@ -132,5 +156,44 @@ test.describe('Track Reordering', () => {
       expect(restored.ids).toEqual(before.ids);
       expect(restored.names).toEqual(before.names);
     }).toPass({ timeout: 5000 });
+  });
+
+  test('Escape mid-drag reverts the preview in both columns', async ({ page }) => {
+    const readIds = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-clip-container]')]
+          .map((c) => ({ id: c.getAttribute('data-track-id'), top: c.getBoundingClientRect().top }))
+          .sort((a, b) => a.top - b.top)
+          .map((r) => r.id)
+      );
+    const before = await readIds();
+
+    const grips = page.locator('button[aria-label="Drag to reorder track"]');
+    const box0 = await grips.nth(0).boundingBox();
+    const box1 = await grips.nth(1).boundingBox();
+    if (!box0 || !box1) throw new Error('Grip elements not laid out');
+    const startY = box0.y + box0.height / 2;
+    const endY = box1.y + box1.height / 2;
+    await page.mouse.move(box0.x + box0.width / 2, startY);
+    await page.mouse.down();
+    for (let i = 1; i <= 15; i++) {
+      await page.mouse.move(box0.x + box0.width / 2, startY + ((endY - startY) * i) / 15);
+      await page.waitForTimeout(60);
+    }
+    // Preview active: order swapped, emphasis present
+    await expect(async () => {
+      const mid = await readIds();
+      expect(mid[0]).toBe(before[1]);
+    }).toPass({ timeout: 5000 });
+    await expect(page.locator('[data-track-drag-source]')).toHaveCount(1);
+
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+
+    // Reverted: original order, no emphasis, no commit
+    await expect(async () => {
+      expect(await readIds()).toEqual(before);
+    }).toPass({ timeout: 5000 });
+    await expect(page.locator('[data-track-drag-source]')).toHaveCount(0);
   });
 });
