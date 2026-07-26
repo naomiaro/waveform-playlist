@@ -328,6 +328,8 @@ interface PlaylistDataContextValue {
   mono: boolean;
   /** Ref toggled during boundary trim drags — when true, loadAudio skips engine rebuild */
   isDraggingRef: MutableRefObject<boolean>;
+  /** Non-null while a track-reorder drag is live; null otherwise */
+  trackDragPreview: TrackDragPreview | null;
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 ```
@@ -362,6 +364,11 @@ interface ClipPeaks {
 }
 
 type TrackClipPeaks = ClipPeaks[];
+
+interface TrackDragPreview {
+  trackId: string;
+  toIndex: number;
+}
 ```
 
 ---
