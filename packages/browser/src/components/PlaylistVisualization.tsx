@@ -758,6 +758,11 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                     style={{
                       height: '100%',
                       boxShadow: isDragSource ? DRAG_SOURCE_SHADOW : undefined,
+                      // Opaque background for the floating (top-layer, popover-based)
+                      // drag-source row — without it the row underneath shows through.
+                      // onDragStart selects the dragged track, so its slot always shows
+                      // the selected-track background while lifted.
+                      background: isDragSource ? theme.selectedTrackControlsBackground : undefined,
                     }}
                   >
                     <DefaultTrackControls {...defaultControlProps} gripRef={handleRef} />
