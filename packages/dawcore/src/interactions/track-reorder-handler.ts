@@ -26,12 +26,19 @@ export class TrackReorderHandler {
   private _pointerId = -1;
   private _startY = 0;
   private _rows: RowInfo[] = [];
+  private _lanes: (RowInfo | null)[] = []; // aligned with _rows indices; null = lane not found
   private _fromIndex = 0;
   private _targetIndex = 0;
   private _gripEl: HTMLElement | null = null;
 
   constructor(host: TrackReorderHost) {
     this._host = host;
+  }
+
+  private static _reducedMotion(): boolean {
+    return (
+      typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
   }
 
   onGrab = (trackId: string, e: PointerEvent, gripEl: HTMLElement): void => {
@@ -58,6 +65,35 @@ export class TrackReorderHandler {
     this._pointerId = e.pointerId;
     this._startY = e.clientY;
     this._gripEl = gripEl;
+
+    // Waveform-lane parity (drag-preview spec): snapshot the shadow timeline's
+    // .track-row lanes by trackId. Transform-only mirroring — lane DOM order
+    // never changes, so the editor's MutationObserver order-sync never fires.
+    const timeline = this._host.shadowRoot?.querySelector('.timeline');
+    const laneEls = timeline ? ([...timeline.querySelectorAll('.track-row')] as HTMLElement[]) : [];
+    this._lanes = this._rows.map((r) => {
+      const el = laneEls.find((l) => l.getAttribute('data-track-id') === r.trackId) ?? null;
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return { el, top: rect.top, height: rect.height, trackId: r.trackId };
+    });
+
+    const draggedLane = this._lanes[this._fromIndex];
+    if (draggedLane) {
+      draggedLane.el.setAttribute('data-track-drag-source', '');
+      draggedLane.el.style.zIndex = '10';
+      draggedLane.el.style.position = 'relative';
+    }
+    if (!TrackReorderHandler._reducedMotion()) {
+      // Displaced rows and ALL lanes animate; the dragged CONTROLS row does not
+      // (it pixel-follows the pointer, a transition would make it lag).
+      for (let i = 0; i < this._rows.length; i++) {
+        if (i !== this._fromIndex) this._rows[i].el.style.transition = 'transform 150ms ease';
+        const lane = this._lanes[i];
+        if (lane) lane.el.style.transition = 'transform 150ms ease';
+      }
+    }
+
     try {
       gripEl.setPointerCapture(e.pointerId);
     } catch {
@@ -108,6 +144,30 @@ export class TrackReorderHandler {
       else if (i < this._fromIndex && i >= target) shift = dragged.height;
       row.el.style.transform = shift === 0 ? '' : 'translateY(' + shift + 'px)';
     }
+
+    // Mirror the preview onto the waveform lanes.
+    const draggedLaneInfo = this._lanes[this._fromIndex];
+    for (let i = 0; i < this._lanes.length; i++) {
+      const lane = this._lanes[i];
+      if (!lane || !draggedLaneInfo) continue;
+      if (i === this._fromIndex) {
+        // Slot-snap the dragged lane to the target slot (not pixel-follow).
+        let offset = 0;
+        const targetLane = this._lanes[target];
+        if (targetLane && target > this._fromIndex) {
+          offset =
+            targetLane.top + targetLane.height - (draggedLaneInfo.top + draggedLaneInfo.height);
+        } else if (targetLane && target < this._fromIndex) {
+          offset = targetLane.top - draggedLaneInfo.top;
+        }
+        lane.el.style.transform = offset === 0 ? '' : 'translateY(' + offset + 'px)';
+        continue;
+      }
+      let laneShift = 0;
+      if (i > this._fromIndex && i <= target) laneShift = -draggedLaneInfo.height;
+      else if (i < this._fromIndex && i >= target) laneShift = draggedLaneInfo.height;
+      lane.el.style.transform = laneShift === 0 ? '' : 'translateY(' + laneShift + 'px)';
+    }
   };
 
   private _onPointerUp = (e: PointerEvent): void => {
@@ -131,7 +191,17 @@ export class TrackReorderHandler {
       row.el.style.transform = '';
       row.el.style.zIndex = '';
       row.el.style.position = '';
+      row.el.style.transition = '';
     }
+    for (const lane of this._lanes) {
+      if (!lane) continue;
+      lane.el.style.transform = '';
+      lane.el.style.transition = '';
+      lane.el.style.zIndex = '';
+      lane.el.style.position = '';
+      lane.el.removeAttribute('data-track-drag-source');
+    }
+    this._lanes = [];
     const grip = this._gripEl;
     if (grip) {
       grip.removeEventListener('pointermove', this._onPointerMove);

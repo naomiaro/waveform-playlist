@@ -860,6 +860,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       .track-row.selected {
         background: rgba(99, 199, 95, 0.08);
       }
+      .track-row[data-track-drag-source] {
+        background: rgba(99, 199, 95, 0.08);
+      }
       :host([scale-mode='beats']) .track-row {
         background: transparent;
       }

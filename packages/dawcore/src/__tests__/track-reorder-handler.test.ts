@@ -18,17 +18,37 @@ function makeRow(trackId: string, top: number, height: number): HTMLElement {
   return el;
 }
 
-function makeHost(rows: HTMLElement[]): TrackReorderHost {
+function makeLane(trackId: string, top: number, height: number): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'track-row';
+  el.setAttribute('data-track-id', trackId);
+  vi.spyOn(el, 'getBoundingClientRect').mockReturnValue({
+    top,
+    height,
+    bottom: top + height,
+    left: 0,
+    right: 500,
+    width: 500,
+    x: 0,
+    y: top,
+    toJSON: () => ({}),
+  } as DOMRect);
+  return el;
+}
+
+function makeHost(rows: HTMLElement[], lanes: HTMLElement[] = []): TrackReorderHost {
   const column = document.createElement('div');
   column.className = 'controls-column';
   rows.forEach((r) => column.appendChild(r));
-  const shadow = document.createElement('div');
-  shadow.appendChild(column);
+  const timeline = document.createElement('div');
+  timeline.className = 'timeline';
+  lanes.forEach((l) => timeline.appendChild(l));
   return {
     isConnected: true,
     reorderTrack: vi.fn(),
     shadowRoot: {
-      querySelector: (sel: string) => (sel === '.controls-column' ? column : null),
+      querySelector: (sel: string) =>
+        sel === '.controls-column' ? column : sel === '.timeline' ? timeline : null,
     } as unknown as ShadowRoot,
   };
 }
@@ -89,6 +109,55 @@ describe('TrackReorderHandler', () => {
     handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 2, clientY: 40 }), grip);
     grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 2, clientY: 130 }));
     grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 2, clientY: 130 }));
+    expect(host.reorderTrack).toHaveBeenCalledWith('a', 1);
+  });
+});
+
+describe('lane preview parity', () => {
+  it('shifts displaced lanes and slot-snaps the dragged lane on pointermove', () => {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80), makeRow('c', 160, 80)];
+    const lanes = [makeLane('a', 0, 120), makeLane('b', 120, 120), makeLane('c', 240, 120)];
+    const host = makeHost(rows, lanes);
+    const handler = new TrackReorderHandler(host);
+    const grip = document.createElement('div');
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    // past row b's midpoint (rows drive collision, at 120)
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 130 }));
+    // displaced lane b shifts up by dragged LANE height (120, not row height 80)
+    expect(lanes[1].style.transform).toBe('translateY(-120px)');
+    expect(lanes[2].style.transform).toBe('');
+    // dragged lane slot-snaps to lane b's slot: (120 + 120) - (0 + 120) = 120
+    expect(lanes[0].style.transform).toBe('translateY(120px)');
+    expect(lanes[0].getAttribute('data-track-drag-source')).not.toBeNull();
+    expect(lanes[0].style.zIndex).toBe('10');
+  });
+
+  it('cleanup on pointerup clears all lane styles and the emphasis attribute', () => {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80)];
+    const lanes = [makeLane('a', 0, 100), makeLane('b', 100, 100)];
+    const host = makeHost(rows, lanes);
+    const handler = new TrackReorderHandler(host);
+    const grip = document.createElement('div');
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 140 }));
+    grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientY: 140 }));
+    for (const lane of lanes) {
+      expect(lane.style.transform).toBe('');
+      expect(lane.style.transition).toBe('');
+      expect(lane.style.zIndex).toBe('');
+      expect(lane.getAttribute('data-track-drag-source')).toBeNull();
+    }
+  });
+
+  it('missing lanes (no timeline) degrade to rows-only behavior', () => {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80)];
+    const host = makeHost(rows); // no lanes
+    const handler = new TrackReorderHandler(host);
+    const grip = document.createElement('div');
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 140 }));
+    expect(rows[1].style.transform).toBe('translateY(-80px)');
+    grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientY: 140 }));
     expect(host.reorderTrack).toHaveBeenCalledWith('a', 1);
   });
 });
