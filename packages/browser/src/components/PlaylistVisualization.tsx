@@ -81,18 +81,22 @@ const TracksLayout = styled.div.attrs<{ $height: number }>((props) => ({
 `;
 
 /**
- * Positions one waveform track row from the shared layout map. Transform
- * (not top) so position changes composite; transition only while a track
- * drag is active (+trailing window) so unrelated layout changes stay
- * instant.
+ * Positions one waveform track row from the shared layout map. Positioned
+ * via `top`, NOT `translateY` — a transform (even translateY(0)) creates a
+ * stacking context on every row, which flattens the clips' z-index: 105
+ * beneath the ClickOverlay (z-index: 1) and blocks all clip interactions
+ * (header drag, boundary trim, split). `top` moves the row without a
+ * stacking context, so clip z-indexes keep competing globally as before.
+ * Transition only while a track drag is active (+trailing window) so
+ * unrelated layout changes stay instant.
  */
 const TrackRowPositioner = styled.div.attrs<PositionedRowProps>((props) => ({
-  style: { transform: `translateY(${props.$top}px)` },
+  style: { top: `${props.$top}px` },
 }))<PositionedRowProps>`
   position: absolute;
   left: 0;
   right: 0;
-  ${(props) => props.$animate && 'transition: transform 150ms ease;'}
+  ${(props) => props.$animate && 'transition: top 150ms ease;'}
   @media (prefers-reduced-motion: reduce) {
     transition: none;
   }
@@ -112,7 +116,7 @@ interface ControlSlotProps {
 const ControlSlot = styled.div.attrs<ControlSlotProps>((props) => ({
   style: {
     height: `${props.$height}px`,
-    transform: `translateY(${props.$top}px)`,
+    top: `${props.$top}px`,
   },
 }))<ControlSlotProps>`
   position: absolute;
@@ -122,7 +126,7 @@ const ControlSlot = styled.div.attrs<ControlSlotProps>((props) => ({
   pointer-events: auto;
   background: ${(props) => props.theme.surfaceColor};
   transition: background 0.15s ease-in-out;
-  ${(props) => props.$animate && 'transition: transform 150ms ease, background 0.15s ease-in-out;'}
+  ${(props) => props.$animate && 'transition: top 150ms ease, background 0.15s ease-in-out;'}
   @media (prefers-reduced-motion: reduce) {
     transition: background 0.15s ease-in-out;
   }
