@@ -234,7 +234,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 **dawcore-native** example pages:
 
 - [`basic.html`](examples/dawcore-native/basic.html) — Basic playback with timescale and file drop
-- [`multiclip.html`](examples/dawcore-native/multiclip.html) — Multi-clip editing with move, trim, and split
+- [`multiclip.html`](examples/dawcore-native/multiclip.html) — Multi-clip editing with move, trim, and split, plus drag-to-reorder tracks with a live slot-snap drop preview
 - [`programmatic.html`](examples/dawcore-native/programmatic.html) — Imperative `editor.addTrack` / `addClip` / `updateClip` / `removeClip` plus declarative DOM mutation, side-by-side
 - [`beats-grid.html`](examples/dawcore-native/beats-grid.html) — Beats & bars grid mode with snap-to-grid, plus bar-aligned tick-based annotation regions (`start-tick`/`end-tick`)
 - [`beat-map-grid.html`](examples/dawcore-native/beat-map-grid.html) — Variable tempo from beat maps with metronome
@@ -251,7 +251,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 **dawcore-tone** example pages:
 
 - [`basic.html`](examples/dawcore-tone/basic.html) — Basic playback with Tone.js adapter
-- [`multiclip.html`](examples/dawcore-tone/multiclip.html) — Multi-clip editing with Tone.js
+- [`multiclip.html`](examples/dawcore-tone/multiclip.html) — Multi-clip editing with Tone.js, plus drag-to-reorder tracks with a live slot-snap drop preview
 - [`programmatic.html`](examples/dawcore-tone/programmatic.html) — Imperative `editor.addTrack` / `addClip` / `updateClip` / `removeClip` plus declarative DOM mutation, with the Tone.js adapter
 - [`beats-grid.html`](examples/dawcore-tone/beats-grid.html) — Beats & bars grid with Tone.js
 - [`record.html`](examples/dawcore-tone/record.html) — Mic recording with overdub
