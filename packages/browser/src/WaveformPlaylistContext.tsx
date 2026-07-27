@@ -445,8 +445,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Bumped after every track-reorder DRAG interaction (committed or not) —
   // see bumpTrackReorderEpoch below for the full rationale.
   const [trackReorderEpoch, setTrackReorderEpoch] = useState(0);
-  // Live track-reorder drag preview (view-level only; see
-  // docs/specs/2026-07-25-track-reorder-drag-preview-design.md and the
+  // Live track-reorder drag preview (view-level only; see the
   // "Track Reordering" section of packages/browser/CLAUDE.md). Set by
   // ClipInteractionProvider's onDragOver, cleared on drag end/cancel.
   // The engine's committed order is untouched until drop.
