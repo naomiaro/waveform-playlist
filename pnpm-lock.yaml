@@ -93,6 +93,55 @@ importers:
         specifier: ^8.0.0
         version: 8.0.16(@types/node@20.19.42)
 
+  examples/react-starter:
+    dependencies:
+      '@dnd-kit/abstract':
+        specifier: ^0.3.0
+        version: 0.3.2
+      '@dnd-kit/dom':
+        specifier: ^0.3.0
+        version: 0.3.2
+      '@dnd-kit/react':
+        specifier: ^0.3.0
+        version: 0.3.2(react-dom@18.3.1)(react@18.3.1)
+      '@waveform-playlist/browser':
+        specifier: workspace:*
+        version: link:../../packages/browser
+      '@waveform-playlist/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@waveform-playlist/playout':
+        specifier: workspace:*
+        version: link:../../packages/playout
+      '@waveform-playlist/ui-components':
+        specifier: workspace:*
+        version: link:../../packages/ui-components
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+      styled-components:
+        specifier: ^6.0.0
+        version: 6.4.2(react-dom@18.3.1)(react@18.3.1)
+      tone:
+        specifier: ^15.1.22
+        version: 15.1.22
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.31)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.0.0
+        version: 8.0.16(@types/node@20.19.42)
+
   packages/annotations:
     dependencies:
       '@dnd-kit/react':

@@ -225,7 +225,14 @@ pnpm example:dawcore-native  # Native Web Audio — localhost:5173
 pnpm example:dawcore-tone    # Tone.js backend — localhost:5174
 pnpm example:dawcore-wam     # WAM 2.0 plugins + Faust — localhost:5175
 pnpm example:media-element   # MediaElement-only React starter (no Tone) — localhost:5176
+pnpm example:react-starter   # Full multitrack React starter (Tone engine) — localhost:5177
 ```
+
+The **[react-starter](examples/react-starter/)** is the smallest correct setup for the full
+multitrack editor — `WaveformPlaylistProvider` on the default Tone.js engine with mixer
+controls, plus a README section explaining the "AudioContext was prevented from starting"
+browser warning and how the provider's gesture-safe startup avoids it (see its
+[README](examples/react-starter/README.md)).
 
 The **[media-element-player](examples/media-element-player/)** starter is a minimal React
 single-track player using only `@waveform-playlist/browser` + `@waveform-playlist/media-element-playout`
