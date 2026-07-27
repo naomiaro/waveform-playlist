@@ -50,6 +50,10 @@ export interface WaveformProps {
   touchOptimized?: boolean;
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
   onRemoveTrack?: (trackIndex: number) => void;
+  /** Enable vertical track reordering: a drag grip + move up/down buttons on
+   *  each default track control panel. Drag requires ClipInteractionProvider
+   *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
+  trackReordering?: boolean;
   // Live recording state for real-time waveform preview
   recordingState?: {
     isRecording: boolean;
@@ -91,6 +95,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   showFades = false,
   touchOptimized = false,
   onRemoveTrack,
+  trackReordering = false,
   recordingState,
 }) => {
   const { annotations } = usePlaylistState();
@@ -116,6 +121,7 @@ export const Waveform: React.FC<WaveformProps> = ({
         showFades={showFades}
         touchOptimized={touchOptimized}
         onRemoveTrack={onRemoveTrack}
+        trackReordering={trackReordering}
         recordingState={recordingState}
       />
       {annotations.length > 0 && (

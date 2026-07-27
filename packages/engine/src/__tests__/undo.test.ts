@@ -287,6 +287,24 @@ describe('PlaylistEngine — Undo/Redo', () => {
     });
   });
 
+  describe('reorderTrack undo', () => {
+    it('undo restores the previous order; redo re-applies it', () => {
+      const t1 = makeTrack([makeClip(0, 48000)]);
+      const t2 = makeTrack([makeClip(0, 24000)]);
+      engine.setTracks([t1, t2]);
+      const [idA, idB] = engine.getState().tracks.map((t) => t.id);
+
+      engine.reorderTrack(idA, 1);
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual([idB, idA]);
+
+      engine.undo();
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual([idA, idB]);
+
+      engine.redo();
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual([idB, idA]);
+    });
+  });
+
   describe('empty stack safety', () => {
     it('undo on empty stack is a no-op (no throw, no state change)', () => {
       expect(engine.canUndo).toBe(false);

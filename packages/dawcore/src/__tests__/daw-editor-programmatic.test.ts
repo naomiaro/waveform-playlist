@@ -1319,4 +1319,29 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
     expect(events[0].detail.file.name).toBe('notes.txt');
     editor.remove();
   });
+
+  it('loadFiles creates a <daw-track> element per dropped file', async () => {
+    const editor = setupEditor();
+    const file = new File([new ArrayBuffer(8)], 'kick.wav', { type: 'audio/wav' });
+    const result = await editor.loadFiles([file]);
+    expect(result.loaded).toHaveLength(1);
+    expect(result.failed).toHaveLength(0);
+    const trackEls = editor.querySelectorAll('daw-track');
+    expect(trackEls.length).toBe(1);
+    expect(trackEls[0].getAttribute('name')).toBe('kick');
+    expect(trackEls[0].querySelectorAll('daw-clip').length).toBe(1);
+    // The engine knows the track under the same id
+    expect(result.loaded[0]).toBe(trackEls[0].trackId);
+    editor.remove();
+  });
+
+  it('loadFiles rejects non-audio files without creating elements', async () => {
+    const editor = setupEditor();
+    const file = new File(['x'], 'notes.txt', { type: 'text/plain' });
+    const result = await editor.loadFiles([file]);
+    expect(result.loaded).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+    expect(editor.querySelectorAll('daw-track').length).toBe(0);
+    editor.remove();
+  });
 });

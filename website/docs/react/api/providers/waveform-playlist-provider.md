@@ -302,6 +302,7 @@ interface PlaylistControlsContextValue {
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
+  reorderTrack: (trackId: string, toIndex: number) => void;
   setSelection: (start: number, end: number) => void;
   setSelectedTrackId: (trackId: string | null) => void;
   setTimeFormat: (format: TimeFormat) => void;

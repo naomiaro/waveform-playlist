@@ -87,13 +87,14 @@ export function useClipDragHandlers({
     (event: Parameters<DragStartCallback>[0]) => {
       const data = event.operation.source?.data as
         | {
+            kind?: string;
             boundary?: 'left' | 'right';
             trackIndex: number;
             clipIndex: number;
           }
         | undefined;
 
-      if (!data) return;
+      if (!data || data.kind === 'track-reorder') return;
 
       // Only store state for boundary trimming operations
       if (!data.boundary) {
@@ -138,13 +139,14 @@ export function useClipDragHandlers({
     (event: Parameters<DragMoveCallback>[0]) => {
       const data = event.operation.source?.data as
         | {
+            kind?: string;
             boundary?: 'left' | 'right';
             trackIndex: number;
             clipIndex: number;
           }
         | undefined;
 
-      if (!data) return;
+      if (!data || data.kind === 'track-reorder') return;
 
       // Only update for boundary trimming operations (not clip movement)
       if (!data.boundary) return;
@@ -232,6 +234,9 @@ export function useClipDragHandlers({
 
   const onDragEnd = React.useCallback(
     (event: Parameters<DragEndCallback>[0]) => {
+      const kindData = event.operation.source?.data as { kind?: string } | undefined;
+      if (kindData?.kind === 'track-reorder') return;
+
       // Handle canceled drags (focus loss, Escape key, component unmount).
       // Without this, isDraggingRef stays true and loadAudio skips rebuilds permanently.
       if (event.canceled) {

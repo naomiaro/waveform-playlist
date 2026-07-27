@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import type { DawTrackControlsElement } from '../elements/daw-track-controls';
 
 beforeAll(async () => {
   await import('../elements/daw-track-controls');
@@ -224,6 +225,68 @@ describe('DawTrackControlsElement', () => {
       expect(cssText).toMatch(/:host\s*\{[^}]*container-type:\s*size/);
       expect(cssText).toContain('@container (max-height: 76px)');
       expect(cssText).toContain('@container (max-height: 60px)');
+    });
+  });
+
+  describe('reordering', () => {
+    it('reorderable renders grip and move buttons; buttons dispatch daw-track-reorder', async () => {
+      const el = document.createElement('daw-track-controls') as DawTrackControlsElement;
+      el.trackId = 't1';
+      el.reorderable = true;
+      el.trackIndex = 1;
+      el.trackCount = 3;
+      document.body.appendChild(el);
+      await el.updateComplete;
+      const events: CustomEvent[] = [];
+      el.addEventListener('daw-track-reorder', ((e: CustomEvent) => {
+        events.push(e);
+      }) as EventListener);
+      const up = el.shadowRoot!.querySelector('.reorder-up') as HTMLButtonElement;
+      const down = el.shadowRoot!.querySelector('.reorder-down') as HTMLButtonElement;
+      up.click();
+      down.click();
+      expect(events.map((e) => e.detail)).toEqual([
+        { trackId: 't1', fromIndex: 1, toIndex: 0 },
+        { trackId: 't1', fromIndex: 1, toIndex: 2 },
+      ]);
+      el.remove();
+    });
+
+    it('move up is disabled at index 0, move down at the last index', async () => {
+      const el = document.createElement('daw-track-controls') as DawTrackControlsElement;
+      el.trackId = 't1';
+      el.reorderable = true;
+      el.trackIndex = 0;
+      el.trackCount = 3;
+      document.body.appendChild(el);
+      await el.updateComplete;
+
+      let up = el.shadowRoot!.querySelector('.reorder-up') as HTMLButtonElement;
+      let down = el.shadowRoot!.querySelector('.reorder-down') as HTMLButtonElement;
+      expect(up.disabled).toBe(true);
+      expect(down.disabled).toBe(false);
+
+      el.trackIndex = 2;
+      await el.updateComplete;
+      up = el.shadowRoot!.querySelector('.reorder-up') as HTMLButtonElement;
+      down = el.shadowRoot!.querySelector('.reorder-down') as HTMLButtonElement;
+      expect(up.disabled).toBe(false);
+      expect(down.disabled).toBe(true);
+
+      el.remove();
+    });
+
+    it('non-reorderable renders no grip/buttons', async () => {
+      const el = document.createElement('daw-track-controls') as DawTrackControlsElement;
+      el.trackId = 't1';
+      document.body.appendChild(el);
+      await el.updateComplete;
+
+      expect(el.shadowRoot!.querySelector('.grip')).toBeNull();
+      expect(el.shadowRoot!.querySelector('.reorder-up')).toBeNull();
+      expect(el.shadowRoot!.querySelector('.reorder-down')).toBeNull();
+
+      el.remove();
     });
   });
 });

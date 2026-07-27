@@ -29,6 +29,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { extractPeaksFromWaveformDataFull } from './waveformDataLoader';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
+import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
@@ -59,6 +60,8 @@ export interface ClipPeaks {
 }
 
 export type TrackClipPeaks = ClipPeaks[];
+
+export type { TrackDragPreview };
 
 // Legacy WaveformTrack type - kept for reference but deprecated
 // @deprecated Use ClipTrack from @waveform-playlist/core instead
@@ -165,6 +168,23 @@ export interface PlaylistControlsContextValue {
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
 
+  /** Move a track to a new index in the vertical track order. Purely
+   *  organizational — playback is not interrupted. The reordered tracks
+   *  array flows back through onTracksChange. */
+  reorderTrack: (trackId: string, toIndex: number) => void;
+
+  /** Internal: call after every track-reorder DRAG interaction ends
+   *  (committed or canceled) to force PlaylistVisualization to remount the
+   *  track-controls slots, discarding any @dnd-kit sortable-plugin DOM
+   *  corruption. Not needed for button-driven reorderTrack calls (they never
+   *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
+  bumpTrackReorderEpoch: () => void;
+
+  /** INTERNAL wiring for ClipInteractionProvider: publishes/clears the live
+   *  track-reorder drag preview. Custom drag integrations may call it, but
+   *  most consumers only ever READ trackDragPreview from usePlaylistData(). */
+  setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
+
   // Selection
   setSelection: (start: number, end: number) => void;
   setSelectedTrackId: (trackId: string | null) => void;
@@ -240,6 +260,16 @@ export interface PlaylistDataContextValue {
   progressBarWidth: number;
   /** Whether the playlist has finished loading all tracks */
   isReady: boolean;
+  /** Internal: incremented after every track-reorder drag interaction ends.
+   *  PlaylistVisualization folds this into the track-controls slot `key` to
+   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
+   *  (see bumpTrackReorderEpoch in PlaylistControlsContextValue). */
+  trackReorderEpoch: number;
+  /** Non-null while a track-reorder drag is live: the dragged track and the
+   *  index it would drop at. Both playlist columns derive their display
+   *  layout from it; custom renderTrackControls consumers can read it to
+   *  mirror the preview in their own UI. */
+  trackDragPreview: TrackDragPreview | null;
   /** Whether tracks are rendered in mono mode */
   mono: boolean;
   /** Ref set by useClipDragHandlers during boundary trim drags.
@@ -412,6 +442,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
   const [isReady, setIsReady] = useState(false);
+  // Bumped after every track-reorder DRAG interaction (committed or not) —
+  // see bumpTrackReorderEpoch below for the full rationale.
+  const [trackReorderEpoch, setTrackReorderEpoch] = useState(0);
+  // Live track-reorder drag preview (view-level only; see the
+  // "Track Reordering" section of packages/browser/CLAUDE.md). Set by
+  // ClipInteractionProvider's onDragOver, cleared on drag end/cancel.
+  // The engine's committed order is untouched until drop.
+  const [trackDragPreview, setTrackDragPreview] = useState<TrackDragPreview | null>(null);
 
   // Refs
   // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
@@ -945,6 +983,31 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           if (!suppressTracksMirroring && state.tracksVersion !== lastTracksVersionRef.current) {
             lastTracksVersionRef.current = state.tracksVersion;
             engineTracksRef.current = state.tracks;
+
+            // trackStates is positionally indexed (no track id of its own) and
+            // is otherwise never touched by reorderTrack — the engine reorder is
+            // "purely organizational" (see PlaylistEngine.reorderTrack) and never
+            // rebuilds. Without this, a track's mixer identity (name/mute/solo/
+            // volume/pan) stays pinned to its OLD index after a reorder, so the
+            // control panel silently shows/controls the wrong track. Re-derive an
+            // id->state map from the pre-reorder pairing (tracksRef/trackStatesRef
+            // reflect the last committed render, i.e. before this mutation) and
+            // re-project it onto the new track order. Guarded to same-length
+            // arrays (addTrack/removeTrack already flow through a full rebuild
+            // that reinitializes trackStates) and to an actual order change (so
+            // non-reorder structural mutations like moveClip/trimClip/splitClip
+            // — which don't change track order — are a no-op here).
+            const oldTracks = tracksRef.current;
+            const oldStates = trackStatesRef.current;
+            if (oldTracks.length === oldStates.length && oldTracks.length === state.tracks.length) {
+              const idToState = new Map(oldTracks.map((t, i) => [t.id, oldStates[i]]));
+              const reordered = state.tracks.map((t, i) => idToState.get(t.id) ?? oldStates[i]);
+              const orderChanged = reordered.some((s, i) => s !== oldStates[i]);
+              if (orderChanged) {
+                setTrackStates(reordered);
+              }
+            }
+
             if (onTracksChange) {
               onTracksChange(state.tracks);
             } else {
@@ -1643,6 +1706,39 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [trackStates]
   );
 
+  const reorderTrack = useCallback(
+    (trackId: string, toIndex: number) => {
+      if (!engineRef.current) {
+        console.warn('[waveform-playlist] reorderTrack: engine not ready, call ignored');
+        return;
+      }
+      engineRef.current.reorderTrack(trackId, toIndex);
+    },
+    [engineRef]
+  );
+
+  // @dnd-kit/react's Feedback and OptimisticSortingPlugin sortable plugins
+  // perform raw, React-bypassing DOM node moves (insertAdjacentElement /
+  // replaceWith) as part of their live drag-preview and collision-commit
+  // mechanics — confirmed via MutationObserver instrumentation to physically
+  // relocate the React-owned track-controls row during a track-reorder drag,
+  // leaving its parent/nextSibling different from what React's fiber tree
+  // still believes. That desync is permanent for the session: every LATER
+  // React-driven reorder (button OR drag) computes correct data but silently
+  // fails to patch the DOM for these rows. `SortableTrackControls` already
+  // sets `feedback: 'move'` to avoid the placeholder-splice half of this (see
+  // its comment), but OptimisticSortingPlugin's own `reorder()` DOM splice
+  // fires independently on any drag that commits a real index change and
+  // isn't configurable away without losing live index tracking. Bumping this
+  // epoch forces PlaylistVisualization to re-key (remount) the track-controls
+  // slots after every track-reorder drag ends — committed or canceled, since
+  // corruption can occur before a final index is even decided — discarding
+  // any corrupted fiber state so the NEXT reorder (drag or button) starts
+  // from a clean DOM. Called from ClipInteractionProvider's onDragEnd.
+  const bumpTrackReorderEpoch = useCallback(() => {
+    setTrackReorderEpoch((epoch) => epoch + 1);
+  }, []);
+
   // Selection — wraps hook setter with playback side-effects (provider concern).
   const setSelection = useCallback(
     (start: number, end: number) => {
@@ -1800,6 +1896,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackSolo,
       setTrackVolume,
       setTrackPan,
+      reorderTrack,
+      bumpTrackReorderEpoch,
+      setTrackDragPreview,
 
       // Selection
       setSelection,
@@ -1851,6 +1950,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setTrackSolo,
       setTrackVolume,
       setTrackPan,
+      reorderTrack,
+      bumpTrackReorderEpoch,
+      setTrackDragPreview,
       setSelection,
       setSelectedTrackIdControl,
       setTimeFormat,
@@ -1899,6 +2001,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       isReady,
+      trackReorderEpoch,
+      trackDragPreview,
       mono,
       isDraggingRef,
       onTracksChange,
@@ -1925,6 +2029,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       isReady,
+      trackReorderEpoch,
+      trackDragPreview,
       mono,
       isDraggingRef,
       onTracksChange,

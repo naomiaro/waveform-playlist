@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
+import type { DawTrackReorderDetail, DawTrackReorderGrabDetail } from '../events';
 
 @customElement('daw-track-controls')
 export class DawTrackControlsElement extends LitElement {
@@ -10,6 +11,11 @@ export class DawTrackControlsElement extends LitElement {
   @property({ type: Number, attribute: false }) pan = 0;
   @property({ type: Boolean, attribute: false }) muted = false;
   @property({ type: Boolean, attribute: false }) soloed = false;
+  /** Show the reorder grip + move up/down buttons (set by the editor from
+   *  its track-reordering attribute). */
+  @property({ type: Boolean, attribute: false }) reorderable = false;
+  @property({ type: Number, attribute: false }) trackIndex = 0;
+  @property({ type: Number, attribute: false }) trackCount = 1;
 
   static styles = css`
     :host {
@@ -55,6 +61,20 @@ export class DawTrackControlsElement extends LitElement {
       opacity: 1;
       color: #d08070;
     }
+    .grip {
+      background: none;
+      border: none;
+      color: var(--daw-controls-text, #c49a6c);
+      cursor: grab;
+      padding: 0 2px;
+      font-size: 12px;
+      line-height: 1;
+      opacity: 0.4;
+      touch-action: none;
+    }
+    .grip:hover {
+      opacity: 1;
+    }
     .buttons {
       display: flex;
       gap: 3px;
@@ -83,6 +103,10 @@ export class DawTrackControlsElement extends LitElement {
       background: rgba(208, 128, 112, 0.25);
       border-color: rgba(208, 128, 112, 0.5);
       color: #d08070;
+    }
+    .btn:disabled {
+      opacity: 0.3;
+      cursor: default;
     }
     .slider-row {
       display: flex;
@@ -218,6 +242,36 @@ export class DawTrackControlsElement extends LitElement {
     );
   }
 
+  private _dispatchReorder(toIndex: number) {
+    if (!this.trackId) return;
+    this.dispatchEvent(
+      new CustomEvent<DawTrackReorderDetail>('daw-track-reorder', {
+        bubbles: true,
+        composed: true,
+        detail: { trackId: this.trackId, fromIndex: this.trackIndex, toIndex },
+      })
+    );
+  }
+
+  private _onMoveUp = () => this._dispatchReorder(this.trackIndex - 1);
+  private _onMoveDown = () => this._dispatchReorder(this.trackIndex + 1);
+
+  private _onGripPointerDown = (e: PointerEvent) => {
+    if (!this.trackId) return;
+    e.preventDefault();
+    this.dispatchEvent(
+      new CustomEvent<DawTrackReorderGrabDetail>('daw-track-reorder-grab', {
+        bubbles: true,
+        composed: true,
+        detail: {
+          trackId: this.trackId,
+          pointerEvent: e,
+          gripElement: e.currentTarget as HTMLElement,
+        },
+      })
+    );
+  };
+
   render() {
     const volPercent = Math.round(this.volume * 100);
     const panPercent = Math.round(Math.abs(this.pan) * 100);
@@ -225,6 +279,16 @@ export class DawTrackControlsElement extends LitElement {
 
     return html`
       <div class="header">
+        ${this.reorderable
+          ? html`<button
+              class="grip"
+              title="Drag to reorder track"
+              aria-label="Drag to reorder track"
+              @pointerdown=${this._onGripPointerDown}
+            >
+              ⠿
+            </button>`
+          : ''}
         <span class="name" title=${this.trackName}>${this.trackName || 'Untitled'}</span>
         <button class="remove-btn" @click=${this._onRemoveClick} title="Remove track">
           &times;
@@ -241,6 +305,26 @@ export class DawTrackControlsElement extends LitElement {
         <button class="btn ${this.soloed ? 'active' : ''}" @click=${this._onSoloClick} title="Solo">
           S
         </button>
+        ${this.reorderable
+          ? html`<button
+                class="btn reorder-up"
+                title="Move track up"
+                aria-label="Move track up"
+                ?disabled=${this.trackIndex <= 0}
+                @click=${this._onMoveUp}
+              >
+                ▲
+              </button>
+              <button
+                class="btn reorder-down"
+                title="Move track down"
+                aria-label="Move track down"
+                ?disabled=${this.trackIndex >= this.trackCount - 1}
+                @click=${this._onMoveDown}
+              >
+                ▼
+              </button>`
+          : ''}
       </div>
       <div class="slider-row vol-row">
         <span class="slider-label">

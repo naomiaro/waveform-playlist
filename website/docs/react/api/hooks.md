@@ -102,6 +102,11 @@ function usePlaylistData(): {
   playoutRef: RefObject<PlaylistEngine | null>;  // from @waveform-playlist/engine
   isDraggingRef: MutableRefObject<boolean>;       // true during boundary trim drags
 
+  // Track reordering
+  /** Non-null while a track-reorder drag is live; null otherwise. Custom
+   *  renderTrackControls consumers read this to mirror the drag preview. */
+  trackDragPreview: TrackDragPreview | null;
+
   // Loading state
   isReady: boolean;  // True when all tracks are loaded
 
@@ -404,6 +409,10 @@ interface PlaylistControlsContextValue {
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
+  /** Move a track to a new position in the track order (undoable). Purely
+   *  organizational — never rebuilds the audio adapter. Clamps toIndex, no-ops
+   *  on an unknown trackId or a same-index move. */
+  reorderTrack: (trackId: string, toIndex: number) => void;
 
   // Selection
   setSelection: (start: number, end: number) => void;

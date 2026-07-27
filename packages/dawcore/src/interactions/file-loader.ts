@@ -1,31 +1,18 @@
 /**
- * File loading logic extracted from daw-editor to keep the editor under 800 lines.
- * Operates on the editor instance via a narrow interface.
+ * File loading: routes dropped files through the same element pipeline as
+ * editor.addTrack() — each file becomes a real `<daw-track><daw-clip>` in the
+ * editor's light DOM, "as a fresh page load would have" (#612). The existing
+ * daw-track-connected → _loadTrack pipeline does the fetch/decode.
  */
 
-import type { ClipTrack, PeakData } from '@waveform-playlist/core';
-import { createClip, createTrack } from '@waveform-playlist/core';
-import type { PeakPipeline } from '../workers/peakPipeline';
-import type { DawTrackIdDetail, DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
-import type { TrackDescriptor } from '../types';
+import type { DawTrackElement } from '../elements/daw-track';
+import type { DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
+import type { TrackConfig } from '../types';
 
 export interface FileLoaderHost {
-  readonly samplesPerPixel: number;
-  /** In beats mode, the tick-derived SPP used for rendering. */
-  readonly renderSamplesPerPixel: number;
-  readonly mono: boolean;
   readonly isConnected: boolean;
-  _resolvedSampleRate: number | null;
-  _tracks: Map<string, TrackDescriptor>;
-  _engineTracks: Map<string, ClipTrack>;
-  _peaksData: Map<string, PeakData>;
-  _clipBuffers: Map<string, AudioBuffer>;
-  _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
   _audioCache: Map<string, Promise<AudioBuffer>>;
-  _peakPipeline: PeakPipeline;
-  _fetchAndDecode(src: string): Promise<AudioBuffer>;
-  _recomputeDuration(): void;
-  _ensureEngine(): Promise<{ setTracks(tracks: ClipTrack[]): void }>;
+  addTrack(config: TrackConfig): Promise<DawTrackElement>;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -42,118 +29,44 @@ export async function loadFiles(
   const loaded: string[] = [];
   const failed: Array<{ file: File; error: unknown }> = [];
 
+  const dispatchLoadError = (file: File, error: unknown) => {
+    failed.push({ file, error });
+    if (host.isConnected) {
+      host.dispatchEvent(
+        new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
+          bubbles: true,
+          composed: true,
+          detail: { file, error },
+        })
+      );
+    }
+  };
+
   for (const file of fileArray) {
+    // file.type can be '' for valid audio (.opus on some browsers) — only
+    // reject explicitly non-audio MIME types.
     if (file.type && !file.type.startsWith('audio/')) {
       const error = new Error('Non-audio MIME type: ' + file.type);
-      failed.push({ file, error });
       console.warn('[dawcore] Skipping non-audio file: ' + file.name + ' (' + file.type + ')');
-      // Same error surface as decode failures — apps whose only error
-      // handling is the documented daw-files-load-error event otherwise see
-      // the drop silently swallowed.
-      if (host.isConnected) {
-        host.dispatchEvent(
-          new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
-            bubbles: true,
-            composed: true,
-            detail: { file, error },
-          })
-        );
-      }
+      dispatchLoadError(file, error);
       continue;
     }
 
     const blobUrl = URL.createObjectURL(file);
+    const name = file.name.replace(/\.\w+$/, '');
     try {
-      const audioBuffer = await host._fetchAndDecode(blobUrl);
+      // Sequential on purpose: preserves drop order as DOM/track order.
+      const trackEl = await host.addTrack({ name, clips: [{ src: blobUrl, name }] });
+      loaded.push(trackEl.trackId);
+      // daw-track-ready was dispatched by the load pipeline — don't re-dispatch.
+    } catch (err) {
+      console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
+      dispatchLoadError(file, err);
+    } finally {
+      // The decode is complete either way; the blob URL and its cache entry
+      // (keyed by a URL that will never be fetched again) are dead weight.
       URL.revokeObjectURL(blobUrl);
       host._audioCache.delete(blobUrl);
-
-      host._resolvedSampleRate = audioBuffer.sampleRate;
-
-      const name = file.name.replace(/\.\w+$/, '');
-      const clip = createClip({
-        audioBuffer,
-        startSample: 0,
-        durationSamples: audioBuffer.length,
-        offsetSamples: 0,
-        gain: 1,
-        name,
-        sampleRate: audioBuffer.sampleRate,
-        sourceDurationSamples: audioBuffer.length,
-      });
-
-      host._clipBuffers = new Map(host._clipBuffers).set(clip.id, audioBuffer);
-      host._clipOffsets = new Map(host._clipOffsets).set(clip.id, {
-        offsetSamples: clip.offsetSamples,
-        durationSamples: clip.durationSamples,
-      });
-      const peakData = await host._peakPipeline.generatePeaks(
-        audioBuffer,
-        host.renderSamplesPerPixel,
-        host.mono,
-        clip.offsetSamples,
-        clip.durationSamples
-      );
-      host._peaksData = new Map(host._peaksData).set(clip.id, peakData);
-
-      const trackId = crypto.randomUUID();
-      const track = createTrack({ name, clips: [clip] });
-      track.id = trackId;
-
-      host._tracks = new Map(host._tracks).set(trackId, {
-        name,
-        src: '',
-        volume: 1,
-        pan: 0,
-        muted: false,
-        soloed: false,
-        renderMode: 'waveform',
-        clips: [
-          {
-            kind: 'drop',
-            src: '',
-            peaksSrc: '',
-            start: 0,
-            duration: audioBuffer.duration,
-            offset: 0,
-            gain: 1,
-            name,
-            fadeIn: 0,
-            fadeOut: 0,
-            fadeType: 'linear',
-            midiNotes: null,
-            midiChannel: null,
-            midiProgram: null,
-          },
-        ],
-      });
-      host._engineTracks = new Map(host._engineTracks).set(trackId, track);
-      host._recomputeDuration();
-
-      const engine = await host._ensureEngine();
-      engine.setTracks([...host._engineTracks.values()]);
-
-      loaded.push(trackId);
-      host.dispatchEvent(
-        new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
-          bubbles: true,
-          composed: true,
-          detail: { trackId },
-        })
-      );
-    } catch (err) {
-      URL.revokeObjectURL(blobUrl);
-      console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
-      failed.push({ file, error: err });
-      if (host.isConnected) {
-        host.dispatchEvent(
-          new CustomEvent<DawFilesLoadErrorDetail>('daw-files-load-error', {
-            bubbles: true,
-            composed: true,
-            detail: { file, error: err },
-          })
-        );
-      }
     }
   }
 

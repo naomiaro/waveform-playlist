@@ -71,12 +71,14 @@ test.describe('BBC Waveform Data Example', () => {
 
     test('play button starts playback', async ({ page }) => {
       await page.getByRole('button', { name: 'Play' }).click();
-      await page.waitForTimeout(200);
 
-      // Time display should advance
+      // Retrying assertion: the time text mutates ~60fps during playback, so a
+      // one-shot getByText resolution can race the mutation under parallel-
+      // worker load and time out even though the display is present.
       const timeDisplay = page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
-      const time = await timeDisplay.textContent();
-      expect(time).not.toBe('00:00:00.000');
+      await expect(async () => {
+        expect(await timeDisplay.textContent()).not.toBe('00:00:00.000');
+      }).toPass({ timeout: 10000 });
 
       // Clean up
       await page.getByRole('button', { name: 'Stop' }).click();

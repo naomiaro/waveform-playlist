@@ -7,6 +7,10 @@ import { VolumeDownIcon } from './VolumeDownIcon';
 import { VolumeUpIcon } from './VolumeUpIcon';
 import { TrashIcon } from './TrashIcon';
 import { DotsIcon } from './DotsIcon';
+import { GripIcon } from './GripIcon';
+import { MoveUpIcon } from './MoveUpIcon';
+import { MoveDownIcon } from './MoveDownIcon';
+import { ReorderRail } from './ReorderRail';
 import { Slider } from './Slider';
 import { SliderWrapper } from './SliderWrapper';
 
@@ -20,6 +24,11 @@ export {
   VolumeUpIcon,
   TrashIcon,
   DotsIcon,
+  GripIcon,
+  MoveUpIcon,
+  MoveDownIcon,
+  ReorderRail,
   Slider,
   SliderWrapper,
 };
+export type { ReorderRailProps } from './ReorderRail';

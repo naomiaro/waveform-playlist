@@ -298,6 +298,65 @@ describe('PlaylistEngine', () => {
       expect(eng.getState().tracks).toHaveLength(1);
       eng.dispose();
     });
+
+    it('reorderTrack moves a track to the target index', () => {
+      engine.setTracks([makeTrack('a', []), makeTrack('b', []), makeTrack('c', [])]);
+      engine.reorderTrack('a', 2);
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual(['b', 'c', 'a']);
+      engine.reorderTrack('c', 0);
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual(['c', 'b', 'a']);
+      engine.dispose();
+    });
+
+    it('reorderTrack clamps toIndex to the valid range', () => {
+      engine.setTracks([makeTrack('a', []), makeTrack('b', [])]);
+      engine.reorderTrack('a', 99);
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual(['b', 'a']);
+      engine.reorderTrack('a', -5);
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual(['a', 'b']);
+      engine.dispose();
+    });
+
+    it('reorderTrack is a no-op for unknown trackId (no event, no version bump)', () => {
+      engine.setTracks([makeTrack('a', []), makeTrack('b', [])]);
+      const before = engine.getState().tracksVersion;
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      engine.reorderTrack('nope', 0);
+      expect(listener).not.toHaveBeenCalled();
+      expect(engine.getState().tracksVersion).toBe(before);
+      engine.dispose();
+    });
+
+    it('reorderTrack is a no-op when already at the target index (no undo snapshot)', () => {
+      engine.setTracks([makeTrack('a', []), makeTrack('b', [])]);
+      engine.reorderTrack('a', 0);
+      expect(engine.canUndo).toBe(false);
+      engine.dispose();
+    });
+
+    it('reorderTrack bumps tracksVersion and emits statechange', () => {
+      engine.setTracks([makeTrack('a', []), makeTrack('b', [])]);
+      const before = engine.getState().tracksVersion;
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      engine.reorderTrack('a', 1);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(engine.getState().tracksVersion).toBe(before + 1);
+      engine.dispose();
+    });
+
+    it('reorderTrack never calls the adapter (order is not audible)', () => {
+      const adapter = createMockAdapter();
+      const eng = new PlaylistEngine({ adapter });
+      eng.setTracks([makeTrack('a', []), makeTrack('b', [])]);
+      const setTracksCalls = (adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls.length;
+      eng.reorderTrack('a', 1);
+      expect((adapter.setTracks as ReturnType<typeof vi.fn>).mock.calls.length).toBe(
+        setTracksCalls
+      );
+      eng.dispose();
+    });
   });
 
   describe('clip editing', () => {

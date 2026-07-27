@@ -247,6 +247,10 @@ interface PlaylistControlsContextValue {
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
+  /** Move a track to a new position in the track order (undoable). Purely
+   *  organizational — never rebuilds the audio adapter. Clamps toIndex, no-ops
+   *  on an unknown trackId or a same-index move. */
+  reorderTrack: (trackId: string, toIndex: number) => void;
 
   // Selection
   setSelection: (start: number, end: number) => void;
@@ -324,6 +328,8 @@ interface PlaylistDataContextValue {
   mono: boolean;
   /** Ref toggled during boundary trim drags — when true, loadAudio skips engine rebuild */
   isDraggingRef: MutableRefObject<boolean>;
+  /** Non-null while a track-reorder drag is live; null otherwise */
+  trackDragPreview: TrackDragPreview | null;
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 ```
@@ -358,6 +364,11 @@ interface ClipPeaks {
 }
 
 type TrackClipPeaks = ClipPeaks[];
+
+interface TrackDragPreview {
+  trackId: string;
+  toIndex: number;
+}
 ```
 
 ---
@@ -1080,6 +1091,11 @@ interface WaveformProps {
   interactiveClips?: boolean;     // Default: false
   showFades?: boolean;
   touchOptimized?: boolean;
+  onRemoveTrack?: (trackIndex: number) => void;
+  /** Enable vertical track reordering: a drag grip + move up/down buttons on
+   *  each default track control panel. Drag requires ClipInteractionProvider;
+   *  the buttons work regardless. Default: false. */
+  trackReordering?: boolean;
   recordingState?: {
     isRecording: boolean;
     trackId: string;

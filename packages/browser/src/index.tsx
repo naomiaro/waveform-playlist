@@ -77,6 +77,7 @@ export {
   PlaylistVisualization,
   PlaylistAnnotationList,
   KeyboardShortcuts,
+  SortableTrackControls,
 } from './components';
 export type { KeyboardShortcutsProps } from './components/KeyboardShortcuts';
 export type { ClearAllButtonProps } from './components/PlaybackControls';
@@ -86,6 +87,10 @@ export type { MediaElementPlaylistProps } from './components/MediaElementPlaylis
 export type { MediaElementAnnotationListProps } from './components/MediaElementAnnotationList';
 export type { PlaylistVisualizationProps } from './components/PlaylistVisualization';
 export type { PlaylistAnnotationListProps } from './components/PlaylistAnnotationList';
+export type {
+  SortableTrackControlsProps,
+  SortableTrackControlsRenderProps,
+} from './components/SortableTrackControls';
 
 // Re-export TimeFormat type from ui-components for convenience
 export type { TimeFormat } from '@waveform-playlist/ui-components';

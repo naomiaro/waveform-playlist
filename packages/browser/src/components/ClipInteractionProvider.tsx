@@ -39,7 +39,8 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
 }) => {
   const { tracks, samplesPerPixel, sampleRate, playoutRef, isDraggingRef, onTracksChange } =
     usePlaylistData();
-  const { setSelectedTrackId } = usePlaylistControls();
+  const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
+    usePlaylistControls();
   const beatsAndBars = useBeatsAndBars();
 
   // Derive snap mode from context: beats if provider is in beats mode with snap enabled,
@@ -99,13 +100,78 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   // Wrap onDragStart to auto-select track
   const onDragStart = React.useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
-      const trackIndex = event.operation?.source?.data?.trackIndex as number | undefined;
+      const data = event.operation?.source?.data as
+        | { kind?: string; trackId?: string; trackIndex?: number }
+        | undefined;
+      if (data?.kind === 'track-reorder') {
+        if (data.trackId) setSelectedTrackId(data.trackId);
+        return; // clip handler guards also skip this kind
+      }
+      const trackIndex = data?.trackIndex;
       if (trackIndex !== undefined && tracks[trackIndex]) {
         setSelectedTrackId(tracks[trackIndex].id);
       }
       handleDragStart(event);
     },
     [handleDragStart, tracks, setSelectedTrackId]
+  );
+
+  // Publish the live track-reorder preview. dnd-kit fires dragover on every
+  // collision change; OptimisticSortingPlugin has already updated
+  // source.sortable.index by then. Functional set with an equality guard so
+  // repeated dragovers at the same index don't re-render the playlist.
+  const handleDragOver = React.useCallback(
+    (event: { operation: { source?: { data?: unknown } | null } }) => {
+      const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
+      if (data?.kind !== 'track-reorder' || !data.trackId) return;
+      const sortable = (
+        event.operation.source as unknown as {
+          sortable?: { index: number; initialIndex: number };
+        }
+      ).sortable;
+      if (!sortable) return;
+      const trackId = data.trackId;
+      const toIndex = sortable.index;
+      setTrackDragPreview((prev) =>
+        prev && prev.trackId === trackId && prev.toIndex === toIndex ? prev : { trackId, toIndex }
+      );
+    },
+    [setTrackDragPreview]
+  );
+
+  // Wrap onDragEnd: track-reorder sources commit via reorderTrack, clip sources
+  // flow through to the existing move/trim handler unchanged.
+  const handleDragEnd = React.useCallback(
+    (event: Parameters<typeof onDragEnd>[0]) => {
+      const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
+      if (data?.kind === 'track-reorder') {
+        // Unconditional, regardless of canceled/committed: @dnd-kit/react's
+        // sortable plugins can splice React-owned DOM nodes (Feedback's
+        // placeholder, OptimisticSortingPlugin's reorder()) during the drag
+        // that just ended, desyncing React's fiber tree from the true DOM.
+        // Bumping this forces PlaylistVisualization to remount the
+        // track-controls slots, healing the corruption before the next
+        // reorder (drag or button) needs to touch the DOM. See
+        // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.
+        bumpTrackReorderEpoch();
+        // Clear the preview in the same handler that commits: React batches this
+        // with reorderTrack's state updates, so the columns go straight from
+        // previewed layout to committed layout with no intermediate frame.
+        setTrackDragPreview(null);
+        if (event.canceled || !data.trackId) return;
+        const sortable = (
+          event.operation.source as unknown as {
+            sortable?: { index: number; initialIndex: number };
+          }
+        ).sortable;
+        if (sortable && sortable.index !== sortable.initialIndex) {
+          reorderTrack(data.trackId, sortable.index);
+        }
+        return;
+      }
+      onDragEnd(event);
+    },
+    [onDragEnd, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview]
   );
 
   // Build modifiers array
@@ -143,7 +209,8 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         sensors={sensors}
         onDragStart={onDragStart}
         onDragMove={onDragMove}
-        onDragEnd={onDragEnd}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
         modifiers={modifiers}
         plugins={noDropAnimationPlugins}
       >

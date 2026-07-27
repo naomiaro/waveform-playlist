@@ -254,6 +254,25 @@ export class PlaylistEngine {
     this._emitStateChange();
   }
 
+  /**
+   * Move a track to a new position in the track order. Purely organizational —
+   * track order is not audible (adapter nodes are keyed by track id), so the
+   * adapter is deliberately NOT called: a setTracks() here would rebuild
+   * playout and interrupt playback for a visual-only change.
+   */
+  reorderTrack(trackId: string, toIndex: number): void {
+    const fromIndex = this._tracks.findIndex((t) => t.id === trackId);
+    if (fromIndex === -1) return;
+    const clamped = Math.max(0, Math.min(toIndex, this._tracks.length - 1));
+    if (clamped === fromIndex) return;
+    this._pushUndoSnapshot();
+    const track = this._tracks[fromIndex];
+    const without = this._tracks.filter((t) => t.id !== trackId);
+    this._tracks = [...without.slice(0, clamped), track, ...without.slice(clamped)];
+    this._tracksVersion++;
+    this._emitStateChange();
+  }
+
   /** Update a single track's clips on the adapter (no full rebuild). */
   updateTrack(trackId: string, track?: ClipTrack): void {
     const resolved = track ?? this._tracks.find((t) => t.id === trackId);
