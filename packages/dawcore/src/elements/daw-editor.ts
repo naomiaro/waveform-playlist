@@ -3460,12 +3460,25 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const desired = tracks
       .map((t) => byId.get(t.id))
       .filter((el): el is DawTrackElement => el != null);
-    if (desired.length === 0) return;
-    if (desired.every((el, i) => el === els[i])) return;
-    // Anchor the first desired element, then chain the rest after it in order.
-    if (els[0] !== desired[0]) els[0].before(desired[0]);
-    for (let i = 1; i < desired.length; i++) {
-      if (desired[i - 1].nextElementSibling !== desired[i]) desired[i - 1].after(desired[i]);
+    if (desired.length < 2) return;
+    // Permute engine-known elements into engine order. Elements the engine
+    // hasn't seen yet (tracks still loading — the engine holds only the
+    // loaded subset during startup) are never moved, so they keep their
+    // relative order among themselves (their absolute index can still shift
+    // when engine-known neighbors move around them); anchoring desired[0] at
+    // els[0] instead would promote the loaded subset to the top and reorder
+    // tracks by decode-completion order (#625).
+    const desiredSet = new Set(desired);
+    const slots = els.filter((el) => desiredSet.has(el));
+    if (desired.every((el, i) => el === slots[i])) return;
+    for (let i = 0; i < desired.length; i++) {
+      if (slots[i] === desired[i]) continue;
+      // desired[i] currently sits at a later slot (earlier ones are settled);
+      // insert it directly before the element occupying slot i.
+      slots[i].before(desired[i]);
+      const from = slots.indexOf(desired[i]);
+      slots.splice(from, 1);
+      slots.splice(i, 0, desired[i]);
     }
   }
 

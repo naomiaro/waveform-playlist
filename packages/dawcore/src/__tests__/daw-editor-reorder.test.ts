@@ -141,6 +141,76 @@ describe('<daw-editor> track reordering (#612)', () => {
     expect(engineOrder).toEqual(domOrder);
     editor.remove();
   });
+
+  it('preserves the declared <daw-track> DOM order when decodes finish out of order (#625)', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeMockAdapter();
+    document.body.appendChild(editor);
+    editor._peakPipeline = makeMockPeakPipeline();
+
+    // Decode completion order is C, B, A — the reverse of the declared DOM
+    // order [A, B, C]. Each completion calls engine.setTracks with only the
+    // loaded subset; the statechange handler's _syncDomToEngineOrder must NOT
+    // move that subset ahead of still-loading tracks (#625: tracks ended up
+    // in load-completion order, breaking consumer grouping).
+    let releaseA!: (b: AudioBuffer) => void;
+    let releaseB!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<AudioBuffer>((resolve) => {
+            releaseA = resolve;
+          })
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<AudioBuffer>((resolve) => {
+            releaseB = resolve;
+          })
+      )
+      .mockResolvedValue(makeAudioBuffer());
+
+    const aPromise = editor.addTrack({ name: 'A', clips: [{ src: '/a.wav' }] });
+    const bPromise = editor.addTrack({ name: 'B', clips: [{ src: '/b.wav' }] });
+    const cPromise = editor.addTrack({ name: 'C', clips: [{ src: '/c.wav' }] });
+    // Elements are appended synchronously — this IS the declared order.
+    const declaredOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(declaredOrder.length).toBe(3);
+
+    await cPromise; // C's decode resolves immediately and wins the race
+    releaseB(makeAudioBuffer());
+    await bPromise;
+    releaseA(makeAudioBuffer());
+    await aPromise;
+    await editor.updateComplete;
+
+    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrder).toEqual(declaredOrder);
+    const engineOrder = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
+    expect(engineOrder).toEqual(declaredOrder);
+    editor.remove();
+  });
+
+  it('_syncDomToEngineOrder permutes only engine-known elements; unknown elements keep their relative order (#625)', async () => {
+    // Direct unit test of the branch where the permutation loop actually
+    // mutates the DOM while engine-UNKNOWN elements are interleaved (an
+    // engine-initiated reorder landing while other tracks are still
+    // loading). The staggered-load test above only exercises the no-op
+    // early-return path.
+    const editor = await makeEditor(4);
+    const [elX, elA, elY, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+
+    // DOM [X, A, Y, B]; engine reports only [B, A] (X and Y "still loading").
+    editor._syncDomToEngineOrder([{ id: elB.trackId }, { id: elA.trackId }]);
+
+    // Committed invariants (assert synchronously, before the MutationObserver
+    // batch): engine-known elements land in engine order [B, A]; unknown
+    // elements X and Y are never moved, so X stays before Y.
+    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrder).toEqual([elX.trackId, elB.trackId, elA.trackId, elY.trackId]);
+    editor.remove();
+  });
 });
 
 describe('<daw-editor> track reordering — redundant reconnect guard (#612)', () => {
