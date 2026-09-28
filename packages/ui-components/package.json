@@ -79,7 +79,7 @@
     "styled-components": "^6.4.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.11"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
