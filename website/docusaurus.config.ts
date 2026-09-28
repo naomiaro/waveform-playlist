@@ -244,9 +244,9 @@ const config: Config = {
 
   themeConfig: {
     announcementBar: {
-      id: 'v11_release',
+      id: 'v16_release',
       content:
-        '🎉 <strong>v11 Released!</strong> — Hooks read sampleRate from context automatically, simplified useMidiTracks API. See the <a href="https://github.com/naomiaro/waveform-playlist/releases/tag/v11.0.0">release notes</a>.',
+        '🎉 <strong>v16 Released!</strong> — <code>@dnd-kit</code> 0.5 support with self-contained drag components; <code>noDropAnimationPlugins</code> is gone. See the <a href="https://github.com/naomiaro/waveform-playlist/releases/tag/dnd-kit-0-5">release notes</a>.',
       isCloseable: true,
     },
     // Social card image for Open Graph and Twitter

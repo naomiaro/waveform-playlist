@@ -24,7 +24,7 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 npm install @waveform-playlist/browser tone @dnd-kit/react
 ```
 
-> **Note**: `tone` and `@dnd-kit/react` are peer dependencies and must be installed separately. `@dnd-kit/dom` and `@dnd-kit/abstract` are transitive dependencies of `@dnd-kit/react`.
+> **Note**: `tone` and `@dnd-kit/react` are peer dependencies and must be installed separately. `@dnd-kit/dom` and `@dnd-kit/abstract` are also declared peers (they install automatically as dependencies of `@dnd-kit/react`).
 
 > **v14:** the playout engines are optional peers. Install the one(s) you use:
 > - WebAudio/Tone path: `npm install @waveform-playlist/browser @waveform-playlist/playout tone`
@@ -34,6 +34,8 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 > The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
 >
 > **v14:** effects, WAV export, output metering, and the `useAudioTracks`/`useDynamicTracks` loaders import from `@waveform-playlist/browser/tone`.
+>
+> **v16:** `@dnd-kit/*` `^0.5.0` is required (`^0.3` is no longer supported). `noDropAnimationPlugins` was removed — `Clip`, `AnnotationBox`, and `SortableTrackControls` configure their own `@dnd-kit` Feedback behavior, so a custom `DragDropProvider` needs no `plugins` prop. `@dnd-kit/dom` is now a declared peer of `ui-components` and `annotations`.
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';
