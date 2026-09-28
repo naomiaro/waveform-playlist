@@ -26,7 +26,7 @@ Peer dependencies (install alongside):
 npm install react react-dom styled-components
 ```
 
-`@dnd-kit/react` is an optional peer — only needed if you use the drag/trim-enabled clip components.
+`@dnd-kit/react` and `@dnd-kit/dom` are optional peers — only needed if you use the drag/trim-enabled clip components.
 
 ## Usage
 

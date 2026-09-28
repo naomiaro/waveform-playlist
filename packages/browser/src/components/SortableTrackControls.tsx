@@ -20,6 +20,9 @@ export interface SortableTrackControlsProps {
   children: (props: SortableTrackControlsRenderProps) => React.ReactNode;
 }
 
+const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move' });
+const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEEDBACK];
+
 /**
  * Registers a track-controls row as a vertical sortable item in the ambient
  * DragDropProvider (ClipInteractionProvider). The per-source modifiers
@@ -27,9 +30,6 @@ export interface SortableTrackControlsProps {
  * are vertical-only and skip clip collision/snap. Data kind 'track-reorder'
  * is the discriminator the shared drag handlers branch on.
  */
-const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move' });
-const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEEDBACK];
-
 export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
   trackId,
   index,
