@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { useSortable } from '@dnd-kit/react/sortable';
 import { RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers';
+import { Feedback } from '@dnd-kit/dom';
+import type { Plugins } from '@dnd-kit/abstract';
 import { createDragPopoverHealer } from '../utils/dragPopoverHealer';
 
 export interface SortableTrackControlsRenderProps {
@@ -25,6 +27,9 @@ export interface SortableTrackControlsProps {
  * are vertical-only and skip clip collision/snap. Data kind 'track-reorder'
  * is the discriminator the shared drag handlers branch on.
  */
+const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move' });
+const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEEDBACK];
+
 export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
   trackId,
   index,
@@ -40,6 +45,12 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
     data: { kind: 'track-reorder', trackId },
     modifiers: [RestrictToVerticalAxis],
     disabled,
+    // Per-entity Feedback config (@dnd-kit 0.5+ moved `feedback` out of the
+    // hook options into `plugins`). The FUNCTION form extends the sortable's
+    // default plugins — a bare array would silently drop
+    // OptimisticSortingPlugin, which drives the live `sortable.index` that
+    // drag-commit reads (covered by sortableTrackControlsFeedbackPlugins.test).
+    //
     // feedback: 'move' (NOT 'none' — see below) disables the Feedback
     // plugin's placeholder/clone splicing for this sortable while KEEPING its
     // dragOperation.shape computation alive. That plugin does raw,
@@ -65,7 +76,7 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
     // sortables need shape. `isDragSource` (box-shadow lift feedback below)
     // is a reactive signal, unaffected either way. See browser/CLAUDE.md
     // "Track Reordering".
-    feedback: 'move',
+    plugins: withMoveFeedback,
   });
   // `feedback: 'move'` opts out of dnd-kit's placeholder — and with it the
   // plugin's own popover-recovery MutationObserver, which is only created

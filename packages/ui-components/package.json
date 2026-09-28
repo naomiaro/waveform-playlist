@@ -45,21 +45,25 @@
     "README.md"
   ],
   "peerDependencies": {
-    "@dnd-kit/react": "^0.3.0",
+    "@dnd-kit/dom": "^0.5.0",
+    "@dnd-kit/react": "^0.5.0",
     "react": ">=17.0.0",
     "react-dom": ">=17.0.0",
     "styled-components": ">=5.0.0"
   },
   "peerDependenciesMeta": {
+    "@dnd-kit/dom": {
+      "optional": true
+    },
     "@dnd-kit/react": {
       "optional": true
     }
   },
   "devDependencies": {
-    "@dnd-kit/abstract": "^0.3.2",
-    "@dnd-kit/dom": "^0.3.2",
-    "@dnd-kit/react": "^0.3.2",
-    "@dnd-kit/state": "^0.3.2",
+    "@dnd-kit/abstract": "^0.5.0",
+    "@dnd-kit/dom": "^0.5.0",
+    "@dnd-kit/react": "^0.5.0",
+    "@dnd-kit/state": "^0.5.0",
     "@storybook/addon-actions": "^9.0.8",
     "@storybook/addon-docs": "^10.4.3",
     "@storybook/addon-webpack5-compiler-swc": "^4.0.3",

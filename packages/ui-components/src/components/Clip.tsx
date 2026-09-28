@@ -1,11 +1,25 @@
 import React, { FunctionComponent, ReactNode } from 'react';
 import styled from 'styled-components';
 import { useDraggable } from '@dnd-kit/react';
+import { Feedback } from '@dnd-kit/dom';
 import { ClipHeader } from './ClipHeader';
 import { ClipBoundary } from './ClipBoundary';
 import { FadeOverlay } from './FadeOverlay';
 import { clipPixelWidth, type Fade } from '@waveform-playlist/core';
 import { ClipViewportOriginProvider } from '../contexts/ClipViewportOrigin';
+
+// Per-entity Feedback plugin config (@dnd-kit 0.5+). Hoisted so the hooks
+// receive a stable reference across renders.
+//
+// Clip move: dropAnimation null — without it the Feedback plugin animates the
+// dragged clip back to its origin on drop, a visible snap-back before React
+// re-renders it at the new position. Declared on the entity (not the provider)
+// so it works inside ANY DragDropProvider, and because in 0.5 an entity that
+// carries its own Feedback config resets the provider-level Feedback options.
+const CLIP_MOVE_PLUGINS = [Feedback.configure({ dropAnimation: null })];
+// Trim handles: 'none' disables the Feedback plugin for the handle — trim
+// visual feedback comes from React state resizing the clip, not CSS translate.
+const TRIM_HANDLE_PLUGINS = [Feedback.configure({ feedback: 'none' })];
 
 interface ClipContainerProps {
   readonly $left?: number; // Horizontal position in pixels (optional for overlay)
@@ -118,17 +132,16 @@ export const Clip: FunctionComponent<ClipProps> = ({
     id: draggableId,
     data: { clipId, trackIndex, clipIndex, startSample, durationSamples },
     disabled: !enableDrag,
+    plugins: CLIP_MOVE_PLUGINS,
   });
 
   // Left boundary draggable (for trimming start)
-  // feedback: 'none' disables the Feedback plugin for this draggable — trim visual feedback
-  // comes from React state updates resizing the clip, not CSS translate.
   const leftBoundaryId = `clip-boundary-left-${trackIndex}-${clipIndex}`;
   const { ref: leftBoundaryRef, isDragSource: isLeftBoundaryDragging } = useDraggable({
     id: leftBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'left', startSample, durationSamples },
     disabled: !enableDrag,
-    feedback: 'none',
+    plugins: TRIM_HANDLE_PLUGINS,
   });
 
   // Right boundary draggable (for trimming end)
@@ -137,7 +150,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
     id: rightBoundaryId,
     data: { clipId, trackIndex, clipIndex, boundary: 'right', startSample, durationSamples },
     disabled: !enableDrag,
-    feedback: 'none',
+    plugins: TRIM_HANDLE_PLUGINS,
   });
 
   // Elevate z-index during drag (below controls z-index: 999, above other clips)

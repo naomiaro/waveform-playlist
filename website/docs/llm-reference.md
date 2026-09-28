@@ -638,14 +638,6 @@ class SnapToGridModifier extends Modifier {
 
 Snap-to-grid modifier for clip moves. `'beats'` mode quantizes in PPQN tick space; `'timescale'` mode quantizes by `gridSamples`. Snaps the clip's absolute timeline position to the grid (not the drag delta). Skips boundary trims (handled separately by `useClipDragHandlers`). Compose: snap first, then `ClipCollisionModifier` constrains the snapped position.
 
-### noDropAnimationPlugins
-
-```typescript
-const noDropAnimationPlugins: PluginDescriptor[];
-```
-
-Configures DragDropProvider's Feedback plugin with `dropAnimation: null` to prevent snap-back animation on clip drop. Pass to DragDropProvider's `plugins` prop. Only needed for clip moves (boundary trims use `feedback: 'none'` per-entity).
-
 ### useClipSplitting
 
 ```typescript

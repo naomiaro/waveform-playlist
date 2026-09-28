@@ -42,9 +42,12 @@
     "README.md"
   ],
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.31",
     "@types/styled-components": "^5.1.36",
     "@waveform-playlist/browser": "workspace:*",
+    "jsdom": "^28.1.0",
+    "react-dom": "^18.3.1",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^3.2.6"
@@ -54,7 +57,8 @@
     "@waveform-playlist/ui-components": "workspace:*"
   },
   "peerDependencies": {
-    "@dnd-kit/react": "^0.3.0",
+    "@dnd-kit/dom": "^0.5.0",
+    "@dnd-kit/react": "^0.5.0",
     "@waveform-playlist/browser": "workspace:^",
     "react": "^18.0.0",
     "styled-components": "^6.0.0"

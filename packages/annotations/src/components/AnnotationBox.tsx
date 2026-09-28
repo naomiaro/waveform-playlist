@@ -1,6 +1,13 @@
 import React, { FunctionComponent } from 'react';
 import styled from 'styled-components';
 import { useDraggable } from '@dnd-kit/react';
+import { Feedback } from '@dnd-kit/dom';
+
+// Per-entity Feedback plugin config (@dnd-kit 0.5+), hoisted for a stable
+// reference. 'none' disables the Feedback plugin for the edge handles — resize
+// visual feedback comes from React state repositioning the annotation, not CSS
+// translate. Declared on the entity so it works inside ANY DragDropProvider.
+const EDGE_HANDLE_PLUGINS = [Feedback.configure({ feedback: 'none' })];
 
 interface WrapperProps {
   readonly $left: number;
@@ -151,14 +158,12 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   const width = Math.max(0, endPosition - startPosition);
 
   // Left (start) boundary draggable
-  // feedback: 'none' disables the Feedback plugin for this draggable — resize visual
-  // feedback comes from React state updates repositioning the annotation, not CSS translate.
   const leftBoundaryId = `annotation-boundary-start-${annotationIndex}`;
   const { ref: leftRef, isDragSource: isLeftDragging } = useDraggable({
     id: leftBoundaryId,
     data: { annotationId, annotationIndex, edge: 'start' as const },
     disabled: !editable,
-    feedback: 'none',
+    plugins: EDGE_HANDLE_PLUGINS,
   });
 
   // Right (end) boundary draggable
@@ -167,7 +172,7 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
     id: rightBoundaryId,
     data: { annotationId, annotationIndex, edge: 'end' as const },
     disabled: !editable,
-    feedback: 'none',
+    plugins: EDGE_HANDLE_PLUGINS,
   });
 
   if (width <= 0) {

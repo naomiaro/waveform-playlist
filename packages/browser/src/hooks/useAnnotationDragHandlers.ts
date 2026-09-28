@@ -1,9 +1,5 @@
 import React from 'react';
-import type {
-  DragStartEvent as DragStartCallback,
-  DragMoveEvent as DragMoveCallback,
-  DragEndEvent as DragEndCallback,
-} from '@dnd-kit/abstract';
+import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
 import type { AnnotationData } from '@waveform-playlist/core';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
@@ -64,7 +60,7 @@ export function useAnnotationDragHandlers({
   } | null>(null);
 
   const onDragStart = React.useCallback(
-    (event: Parameters<DragStartCallback>[0]) => {
+    (event: DragStartEvent) => {
       const data = event.operation.source?.data as
         | {
             annotationId: string;
@@ -91,7 +87,7 @@ export function useAnnotationDragHandlers({
   );
 
   const onDragMove = React.useCallback(
-    (event: Parameters<DragMoveCallback>[0]) => {
+    (event: DragMoveEvent) => {
       if (!originalAnnotationStateRef.current) {
         return;
       }
@@ -136,7 +132,7 @@ export function useAnnotationDragHandlers({
   );
 
   const onDragEnd = React.useCallback(
-    (event: Parameters<DragEndCallback>[0]) => {
+    (event: DragEndEvent) => {
       // Handle canceled drags — revert annotations to pre-drag state
       if (event.canceled && originalAnnotationStateRef.current) {
         const { annotationIndex, start, end } = originalAnnotationStateRef.current;
