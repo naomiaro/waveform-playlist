@@ -125,11 +125,11 @@
 
 ## @dnd-kit Feedback Plugin Per-Entity Config
 
-**Pattern:** `useDraggable({ feedback: 'none' })` disables the Feedback plugin for that draggable — no fixed positioning, no CSS translate, no placeholder, no drop animation. Used on boundary trim handles where React state provides visual feedback.
+**Pattern (@dnd-kit 0.5+):** Feedback behavior is configured per-entity through the `plugins` hook option — `useDraggable({ plugins: [Feedback.configure({ feedback: 'none' })] })` disables the Feedback plugin for that draggable (no fixed positioning, no CSS translate, no placeholder, no drop animation); `plugins: [Feedback.configure({ dropAnimation: null })]` keeps default feedback but skips the snap-back animation on drop. `Feedback` comes from `@dnd-kit/dom` (declared optional peer alongside `@dnd-kit/react`). Hoist the arrays to module constants — `useDraggable` re-assigns `draggable.plugins` on reference change.
 
-**Type chain:** `UseDraggableInput` extends `Omit<DraggableInput, 'handle' | 'element'>` where `DraggableInput` is from `@dnd-kit/dom` (includes `feedback?: FeedbackType`). The `plugins` property does NOT exist on `useDraggable` in v0.3.2.
+**0.3 → 0.5 trap:** the old top-level `feedback: 'none'` hook option was REMOVED upstream and is silently ignored at runtime (type error only). The Feedback plugin reads `source.pluginConfig(Feedback)`, which matches the `Feedback` constructor by identity — a duplicated `@dnd-kit/dom` copy in a consumer bundle makes `'none'` silently no-op too, which is why it's a peer, never a dependency. `clipFeedbackPlugins.test.tsx` reads the config back from the real registered entities rather than asserting on props.
 
-**Applied in:** `Clip.tsx` (left/right boundary draggables), `AnnotationBox.tsx` (start/end boundary draggables).
+**Applied in:** `Clip.tsx` (trim handles `'none'`, clip-move `dropAnimation: null`), `AnnotationBox.tsx` (start/end handles `'none'`).
 
 ## Bar Width Peak Aggregation (Channel.tsx)
 

@@ -20,7 +20,7 @@ Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform
 npm install @waveform-playlist/annotations
 ```
 
-Peer dependencies: `react` (^18.0.0), `styled-components` (^6.0.0), `@dnd-kit/react` (^0.3.0), and `@waveform-playlist/browser` (matching major version).
+Peer dependencies: `react` (^18.0.0), `styled-components` (^6.0.0), `@dnd-kit/react` and `@dnd-kit/dom` (^0.5.0), and `@waveform-playlist/browser` (matching major version).
 
 ## Usage
 

@@ -16,7 +16,6 @@ import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
-import { noDropAnimationPlugins } from '../plugins/noDropAnimationPlugins';
 import { ClipInteractionContextProvider } from '../contexts/ClipInteractionContext';
 
 // Stable noop to avoid creating a new function reference on every render
@@ -212,7 +211,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
         modifiers={modifiers}
-        plugins={noDropAnimationPlugins}
       >
         {children}
       </DragDropProvider>

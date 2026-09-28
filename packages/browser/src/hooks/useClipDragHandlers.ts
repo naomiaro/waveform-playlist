@@ -1,9 +1,5 @@
 import React from 'react';
-import type {
-  DragStartEvent as DragStartCallback,
-  DragMoveEvent as DragMoveCallback,
-  DragEndEvent as DragEndCallback,
-} from '@dnd-kit/abstract';
+import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
 import type { ClipTrack } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
@@ -84,7 +80,7 @@ export function useClipDragHandlers({
   const lastBoundaryDeltaRef = React.useRef(0);
 
   const onDragStart = React.useCallback(
-    (event: Parameters<DragStartCallback>[0]) => {
+    (event: DragStartEvent) => {
       const data = event.operation.source?.data as
         | {
             kind?: string;
@@ -136,7 +132,7 @@ export function useClipDragHandlers({
   );
 
   const onDragMove = React.useCallback(
-    (event: Parameters<DragMoveCallback>[0]) => {
+    (event: DragMoveEvent) => {
       const data = event.operation.source?.data as
         | {
             kind?: string;
@@ -233,7 +229,7 @@ export function useClipDragHandlers({
   );
 
   const onDragEnd = React.useCallback(
-    (event: Parameters<DragEndCallback>[0]) => {
+    (event: DragEndEvent) => {
       const kindData = event.operation.source?.data as { kind?: string } | undefined;
       if (kindData?.kind === 'track-reorder') return;
 

@@ -113,7 +113,6 @@ Both providers use React Context with 4 split contexts for performance.
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
 - `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'timescale'` (sample-based grid). Snaps absolute position, not delta.
-- `noDropAnimationPlugins` — Disables Feedback plugin drop animation for clip moves
 - `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0)

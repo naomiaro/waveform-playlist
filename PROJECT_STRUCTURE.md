@@ -339,8 +339,6 @@ const clip = createClipFromSeconds({
   ├── modifiers/                        # @dnd-kit drag modifiers
   │   ├── ClipCollisionModifier.ts      # Prevents overlapping clips during drag
   │   └── SnapToGridModifier.ts         # Snap-to-grid (beats or timescale mode)
-  ├── plugins/                          # @dnd-kit plugins
-  │   └── noDropAnimationPlugins.ts     # Disables Feedback plugin drop animation
   ├── playout/                           # Optional-engine resolution (#510)
   │   ├── resolvePlayoutAdapter.ts       # Dynamic-imports @waveform-playlist/playout + tone
   │   └── resolveMediaElementPlayout.ts  # Dynamic-imports @waveform-playlist/media-element-playout

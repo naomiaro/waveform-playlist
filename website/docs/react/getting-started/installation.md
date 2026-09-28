@@ -25,7 +25,7 @@ Waveform Playlist requires the following peer dependencies:
 | `react-dom` | ^18.0.0 | React DOM rendering |
 | `styled-components` | ^6.0.0 | CSS-in-JS styling |
 | `tone` | ^15.0.0 | Web Audio framework |
-| `@dnd-kit/react` | ^0.3.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
+| `@dnd-kit/react` | ^0.5.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 
 ## Additional Packages
 

@@ -33,4 +33,4 @@ const annotationIntegration = useContext(AnnotationIntegrationContext);
 
 ## @dnd-kit Feedback Plugin
 
-Annotation boundary resize handles use `useDraggable({ feedback: 'none' })` to disable the Feedback plugin. Resize visual feedback comes from React state updates repositioning the annotation, not CSS translate.
+Annotation boundary resize handles disable the Feedback plugin per-entity: `useDraggable({ plugins: [Feedback.configure({ feedback: 'none' })] })` (`Feedback` from `@dnd-kit/dom`, a declared peer; hoist the array to a module constant for a stable reference). `@dnd-kit` 0.5 removed the old top-level `feedback` hook option — it is silently ignored at runtime, so `annotationBoxFeedbackPlugins.test.tsx` reads the config back from the real registered entity. Resize visual feedback comes from React state updates repositioning the annotation, not CSS translate.

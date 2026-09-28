@@ -808,7 +808,7 @@ interface UseClipDragHandlersOptions {
 ```tsx
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
-import { ClipCollisionModifier, noDropAnimationPlugins, useDragSensors } from '@waveform-playlist/browser';
+import { ClipCollisionModifier, useDragSensors } from '@waveform-playlist/browser';
 
 function EditablePlaylist() {
   const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
@@ -830,7 +830,6 @@ function EditablePlaylist() {
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-      plugins={noDropAnimationPlugins}
     >
       <Waveform interactiveClips showClipHeaders />
     </DragDropProvider>

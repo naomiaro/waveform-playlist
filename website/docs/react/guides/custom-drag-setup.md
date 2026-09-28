@@ -31,7 +31,6 @@ import {
   useDragSensors,
   ClipCollisionModifier,
   SnapToGridModifier,     // Only if using snap-to-grid
-  noDropAnimationPlugins,
   Waveform,
 } from '@waveform-playlist/browser';
 ```
@@ -80,7 +79,6 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
         RestrictToHorizontalAxis,
         ClipCollisionModifier.configure({ tracks, samplesPerPixel }),
       ]}
-      plugins={noDropAnimationPlugins}
     >
       <Waveform showClipHeaders interactiveClips />
     </DragDropProvider>
@@ -93,7 +91,7 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
 - **`useDragSensors()`** — Configures pointer activation. Pass `{ touchOptimized: true }` for mobile (250ms touch delay).
 - **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming.
 - **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track.
-- **`noDropAnimationPlugins`** — Disables the default snap-back animation on drop.
+- **Feedback plugin config is per-entity** — the clip components declare their own `@dnd-kit` Feedback settings (no drop animation on clip moves, no Feedback on trim handles) via `useDraggable({ plugins })`, so a plain `DragDropProvider` needs no `plugins` prop for them.
 - **`RestrictToHorizontalAxis`** — Constrains drag to horizontal movement only.
 
 :::
@@ -170,7 +168,6 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       modifiers={modifiers}
-      plugins={noDropAnimationPlugins}
     >
       <Waveform showClipHeaders interactiveClips />
     </DragDropProvider>
@@ -281,7 +278,6 @@ function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnota
       onDragMove={onDragMove}
       onDragEnd={onDragEnd}
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-      plugins={noDropAnimationPlugins}
     >
       <Waveform showClipHeaders interactiveClips />
     </DragDropProvider>

@@ -27,7 +27,7 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 | `react` / `react-dom` | ^18.0.0 or ^19.0.0 |
 | `styled-components` | ^6.0.0 — CSS-in-JS styling |
 | `tone` | ^15.0.0 — Web Audio engine (optional if you supply your own `PlayoutAdapter`) |
-| `@dnd-kit/react` | ^0.3.0 — drag-and-drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
+| `@dnd-kit/react` | ^0.5.0 — drag-and-drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 | `@waveform-playlist/playout` | Tone.js playout engine (optional peer, dynamically imported by default) |
 | `@waveform-playlist/media-element-playout` | engine for `MediaElementPlaylistProvider` (optional peer) |
 | `@waveform-playlist/annotations` / `@waveform-playlist/recording` / `@dawcore/wam` | optional, install only if you use those features |
