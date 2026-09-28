@@ -56,6 +56,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **`workspace:*` in devDependencies does NOT trigger the republish cascade** — devDeps are build-time only (never published pins), so changesets correctly excludes such packages (e.g. transport/worklets in the 2026-07-12 annotation-suite release). When auditing a computed closure, check WHICH section a workspace ref lives in before suspecting a missed bump.
 
+**npm auth failures during `changeset publish` are disguised:** an EXPIRED token surfaces as `E404 Not Found - PUT …` ("could not be found or you do not have permission") on every package, not as a 401 — check `npm whoami` first (it returns the real E401). With 2FA-for-writes enabled on the account, `changeset publish` spawns `npm publish` with no TTY, so npm can't open its OTP prompt and fails with `E403 … Two-factor authentication or granular access token with bypass 2fa enabled is required` — even when the user runs it themselves. Fix: `pnpm exec changeset publish --no-git-tag --otp=<6-digit code>` (one code covers all packages in the run), or a granular token with 2FA bypass in `~/.npmrc`. Publish PUTs return `202` and packuments lag the CDN by 1–3 minutes — poll `curl` with `Cache-Control: no-cache` before concluding a publish failed (the npm debug log's `http fetch PUT 202` + `verbose exit 0` lines are the immediate proof).
+
 **Build before publishing:** No package defines prepublish hooks — always run `pnpm --filter <pkg> build` before `pnpm publish`, or the tarball ships a stale `dist/`.
 
 **Prerelease Tag:** Use `@next` for prerelease versions when preparing future major releases.
