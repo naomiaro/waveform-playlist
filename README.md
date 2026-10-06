@@ -6,6 +6,10 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
   <img src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/waveform-playlist.png" alt="Waveform Playlist Screenshot" width="800">
 </p>
 
+<p align="center">
+  <a href="https://discord.gg/dsZZBpmD7k"><img src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white" alt="Join the dawcore Discord"></a>
+</p>
+
 ## Features
 
 - **Multi-track editing** - Multiple clips per track with drag-to-move and trim
@@ -81,6 +85,12 @@ function App() {
 - [**Getting Started**](https://naomiaro.github.io/waveform-playlist/docs/getting-started/installation) - Installation and basic usage
 - [**Guides**](https://naomiaro.github.io/waveform-playlist/docs/guides/loading-audio) - In-depth tutorials
 - [**API Reference**](https://naomiaro.github.io/waveform-playlist/docs/api/provider) - Component and hook documentation
+
+## Community
+
+- [**Discord**](https://discord.gg/dsZZBpmD7k) - Chat, get help, and share what you're building on the dawcore server
+- [**GitHub Discussions**](https://github.com/naomiaro/waveform-playlist/discussions) - Longer-form questions and ideas
+- [**Issues**](https://github.com/naomiaro/waveform-playlist/issues) - Bug reports and feature requests
 
 ## Examples
 
