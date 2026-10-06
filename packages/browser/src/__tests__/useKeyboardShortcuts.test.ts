@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { handleKeyboardEvent, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 
 function makeKeyboardEvent(
@@ -18,7 +18,7 @@ function makeKeyboardEvent(
 }
 
 describe('handleKeyboardEvent', () => {
-  let action: ReturnType<typeof vi.fn>;
+  let action: Mock<() => void>;
   let shortcuts: KeyboardShortcut[];
 
   beforeEach(() => {

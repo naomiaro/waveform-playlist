@@ -34,7 +34,7 @@
     "@changesets/cli": "^2.31.0",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.60.0",
-    "@types/node": "^20.19.42",
+    "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
     "eslint": "^9.39.4",
@@ -72,8 +72,8 @@
   },
   "pnpm": {
     "overrides": {
-      "joi@<17.13.4": "17.13.4",
-      "serialize-javascript@<7.0.5": "7.0.5",
+      "esbuild@^0.27.0": "^0.28.1",
+      "serialize-javascript@<7.0.5": "^7.0.5",
       "uuid@<11.1.1": "^11.1.1"
     }
   },

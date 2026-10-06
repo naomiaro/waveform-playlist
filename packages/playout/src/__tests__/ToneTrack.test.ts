@@ -51,9 +51,15 @@ const mockMuteGain = {
 };
 
 vi.mock('tone', () => ({
-  Volume: vi.fn(() => mockVolume),
-  Panner: vi.fn(() => mockPanner),
-  Gain: vi.fn(() => mockMuteGain),
+  Volume: vi.fn(function () {
+    return mockVolume;
+  }),
+  Panner: vi.fn(function () {
+    return mockPanner;
+  }),
+  Gain: vi.fn(function () {
+    return mockMuteGain;
+  }),
   getTransport: vi.fn(() => mockTransport),
   getContext: vi.fn(() => mockContext),
   getDestination: vi.fn(() => ({})),

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from 'vitest';
 import { SpectrogramOrchestrator } from '../src/orchestrator/SpectrogramOrchestrator';
 import type { SpectrogramConfig } from '@waveform-playlist/core';
 import { makeMockWorker } from './helpers/orchestratorTestUtils';
@@ -13,7 +13,7 @@ const defaultConfig: SpectrogramConfig = { fftSize: 2048, frequencyScale: 'mel' 
  */
 describe('SpectrogramOrchestrator — chunk layout contract validation', () => {
   let orch: SpectrogramOrchestrator;
-  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: MockInstance<typeof console.warn>;
 
   function register(clipId: string, chunkIndex: number, globalPixelOffset: number): void {
     orch.registerCanvas({
@@ -46,18 +46,14 @@ describe('SpectrogramOrchestrator — chunk layout contract validation', () => {
     register('c1', 0, 5000);
     register('c1', 1, 6000);
     register('c1', 2, 7000);
-    const layoutWarnings = warnSpy.mock.calls.filter((c) =>
-      String(c[0]).includes('layout')
-    );
+    const layoutWarnings = warnSpy.mock.calls.filter((c) => String(c[0]).includes('layout'));
     expect(layoutWarnings).toEqual([]);
   });
 
   it('warns when a clip canvas violates the chunkIndex * MAX_CANVAS_WIDTH layout', () => {
     register('c1', 0, 5000);
     register('c1', 1, 6200); // expected 6000 — 200px drift would shift audio
-    const layoutWarnings = warnSpy.mock.calls.filter((c) =>
-      String(c[0]).includes('layout')
-    );
+    const layoutWarnings = warnSpy.mock.calls.filter((c) => String(c[0]).includes('layout'));
     expect(layoutWarnings.length).toBe(1);
   });
 
@@ -69,9 +65,7 @@ describe('SpectrogramOrchestrator — chunk layout contract validation', () => {
     // Clip moved on the timeline; fresh registration cycle at a new origin.
     register('c1', 0, 9000);
     register('c1', 1, 10000);
-    const layoutWarnings = warnSpy.mock.calls.filter((c) =>
-      String(c[0]).includes('layout')
-    );
+    const layoutWarnings = warnSpy.mock.calls.filter((c) => String(c[0]).includes('layout'));
     expect(layoutWarnings).toEqual([]);
   });
 });

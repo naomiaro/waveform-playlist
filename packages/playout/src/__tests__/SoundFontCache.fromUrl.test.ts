@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Parsing arbitrary bytes with the real soundfont2 parser throws, so mock it.
 // Kept in its own file: SoundFontCache.test.ts imports the REAL GeneratorType.
 vi.mock('soundfont2', () => ({
-  SoundFont2: vi.fn().mockImplementation(() => ({})),
+  SoundFont2: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 import { SoundFontCache } from '../SoundFontCache';
@@ -20,7 +22,9 @@ describe('SoundFontCache.fromUrl', () => {
     // Node has no OfflineAudioContext; the no-context constructor path needs it.
     vi.stubGlobal(
       'OfflineAudioContext',
-      vi.fn().mockImplementation(() => ({}))
+      vi.fn().mockImplementation(function () {
+        return {};
+      })
     );
   });
 
@@ -88,7 +92,7 @@ describe('SoundFontCache.fromUrl', () => {
       } as unknown as Response)
     );
     const { SoundFont2 } = await import('soundfont2');
-    (SoundFont2 as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+    (SoundFont2 as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(function () {
       throw new Error('bad RIFF header');
     });
 

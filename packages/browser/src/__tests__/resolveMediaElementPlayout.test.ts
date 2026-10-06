@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => {
   const instance = { addTrack: vi.fn(), dispose: vi.fn() };
-  const MediaElementPlayout = vi.fn(() => instance);
+  const MediaElementPlayout = vi.fn(function () {
+    return instance;
+  });
   return { instance, MediaElementPlayout };
 });
 
