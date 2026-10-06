@@ -288,6 +288,11 @@ const config: Config = {
           className: 'navbar__link--bmc',
         },
         {
+          href: 'https://discord.gg/dsZZBpmD7k',
+          label: 'Discord',
+          position: 'right',
+        },
+        {
           href: 'https://github.com/naomiaro/waveform-playlist',
           label: 'GitHub',
           position: 'right',
@@ -310,8 +315,8 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'GitHub Discussions',
-              href: 'https://github.com/naomiaro/waveform-playlist/discussions',
+              label: 'Discord',
+              href: 'https://discord.gg/dsZZBpmD7k',
             },
             {
               label: 'Issues',
