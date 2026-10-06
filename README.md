@@ -319,18 +319,6 @@ Originally created for the [Airtime](https://www.sourcefabric.org/software/airti
 
 [MIT License](http://doge.mit-license.org)
 
-## Sponsors
-
-<p align="center">
-  <a href="https://moises.ai/" target="_blank">
-    <img width="222px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/logos/moises-ai.svg" alt="Moises.ai">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/sponsors/naomiaro">Become a sponsor</a>
-</p>
-
 ## Partners
 
 <p align="center">
