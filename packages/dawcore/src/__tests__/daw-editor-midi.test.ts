@@ -94,7 +94,7 @@ describe('<daw-editor> MIDI loading', () => {
       editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
     });
 
-    const lastCall = adapter.setTracks.mock.calls.at(-1);
+    const lastCall = adapter.setTracks.mock.lastCall;
     expect(lastCall).toBeDefined();
     const tracks = lastCall![0];
     expect(tracks).toHaveLength(1);
@@ -145,7 +145,7 @@ describe('<daw-editor> MIDI loading', () => {
       editor.addEventListener('daw-track-ready', () => resolve(), { once: true });
     });
 
-    const lastCall = adapter.setTracks.mock.calls.at(-1);
+    const lastCall = adapter.setTracks.mock.lastCall;
     const engineClip = lastCall![0][0].clips[0];
     // Discriminator: must be != null (and specifically [] in this case)
     expect(engineClip.midiNotes).toEqual([]);
@@ -211,7 +211,7 @@ describe('<daw-editor> MIDI loading', () => {
     const updateTrackCallsAfter = adapter.updateTrack.mock.calls.length;
     expect(updateTrackCallsAfter).toBeGreaterThan(updateTrackCallsBefore);
 
-    const lastUpdateTrack = adapter.updateTrack.mock.calls.at(-1);
+    const lastUpdateTrack = adapter.updateTrack.mock.lastCall;
     expect(lastUpdateTrack).toBeDefined();
     const updatedClip = lastUpdateTrack![1].clips[0];
     expect(updatedClip).toBeDefined();

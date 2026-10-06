@@ -1,10 +1,10 @@
 import { StrictMode } from 'react';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 
 interface MockWorkletNode {
   port: {
-    postMessage: ReturnType<typeof vi.fn>;
+    postMessage: Mock<(msg: { command?: string }) => void>;
     onmessage: ((event: MessageEvent) => void) | null;
   };
   onprocessorerror: ((event: Event) => void) | null;

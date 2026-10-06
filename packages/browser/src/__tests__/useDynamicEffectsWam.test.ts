@@ -46,11 +46,16 @@ vi.mock('tone', () => {
     set: vi.fn(),
     wet: { value: 0.5 },
   });
-  const effectCtor = () => vi.fn(() => toneEffectStub());
+  const effectCtor = () =>
+    vi.fn(function () {
+      return toneEffectStub();
+    });
   return {
     connect: vi.fn(),
     disconnect: vi.fn(),
-    Analyser: vi.fn(() => ({ connect: vi.fn(), dispose: vi.fn() })),
+    Analyser: vi.fn(function () {
+      return { connect: vi.fn(), dispose: vi.fn() };
+    }),
     Volume: vi.fn(),
     ToneAudioNode: vi.fn(),
     Reverb: effectCtor(),

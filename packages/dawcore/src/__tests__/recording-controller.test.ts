@@ -106,7 +106,9 @@ describe('RecordingController', () => {
     // Stub AudioWorkletNode constructor (recording-controller uses `new AudioWorkletNode()`)
     vi.stubGlobal(
       'AudioWorkletNode',
-      vi.fn(() => mockWorkletNode)
+      vi.fn(function () {
+        return mockWorkletNode;
+      })
     );
     host = createMockHost();
     // Override audioContext with mocks that tests can mutate

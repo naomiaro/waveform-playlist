@@ -18,11 +18,13 @@ function createWrapper(scrollLeft: number, clientWidth: number) {
 
   // Mock ResizeObserver since jsdom doesn't support it
   const originalRO = globalThis.ResizeObserver;
-  globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
-    observe: vi.fn(),
-    unobserve: vi.fn(),
-    disconnect: vi.fn(),
-  }));
+  globalThis.ResizeObserver = vi.fn().mockImplementation(function () {
+    return {
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn(),
+    };
+  });
 
   const wrapper = ({ children }: { children: ReactNode }) => (
     <ScrollViewportProvider containerRef={containerRef}>{children}</ScrollViewportProvider>

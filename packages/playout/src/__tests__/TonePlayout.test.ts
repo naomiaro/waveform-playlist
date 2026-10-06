@@ -37,8 +37,12 @@ const { mockTransport, mockVolume, mockMasterTap } = vi.hoisted(() => {
 });
 
 vi.mock('tone', () => ({
-  Volume: vi.fn().mockImplementation(() => mockVolume),
-  Gain: vi.fn().mockImplementation(() => mockMasterTap),
+  Volume: vi.fn().mockImplementation(function () {
+    return mockVolume;
+  }),
+  Gain: vi.fn().mockImplementation(function () {
+    return mockMasterTap;
+  }),
   getTransport: vi.fn().mockReturnValue(mockTransport),
   getDestination: vi.fn(),
   getContext: vi.fn().mockReturnValue({ sampleRate: 44100 }),

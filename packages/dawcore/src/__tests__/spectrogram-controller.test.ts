@@ -16,7 +16,9 @@ const mockOrchestrator = {
 };
 
 vi.mock('@dawcore/spectrogram', () => ({
-  SpectrogramOrchestrator: vi.fn().mockImplementation(() => mockOrchestrator),
+  SpectrogramOrchestrator: vi.fn().mockImplementation(function () {
+    return mockOrchestrator;
+  }),
 }));
 
 function makeHost() {
@@ -79,8 +81,8 @@ describe('SpectrogramController', () => {
     controller.setEditorColorMap('magma');
     controller.registerCanvas(makeCanvasReg());
 
-    const lastConfig = mockOrchestrator.setConfig.mock.calls.at(-1)?.[0];
-    const lastColorMap = mockOrchestrator.setColorMap.mock.calls.at(-1)?.[0];
+    const lastConfig = mockOrchestrator.setConfig.mock.lastCall?.[0];
+    const lastColorMap = mockOrchestrator.setColorMap.mock.lastCall?.[0];
     expect(lastConfig.fftSize).toBe(2048);
     expect(lastColorMap).toBe('magma');
   });

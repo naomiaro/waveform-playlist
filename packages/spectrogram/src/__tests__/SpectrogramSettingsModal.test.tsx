@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
 import { SpectrogramSettingsModal } from '../components/SpectrogramSettingsModal';
@@ -40,8 +40,8 @@ function renderModal(
     open?: boolean;
     config?: SpectrogramConfig;
     colorMap?: ColorMapValue;
-    onApply?: ReturnType<typeof vi.fn>;
-    onClose?: ReturnType<typeof vi.fn>;
+    onApply?: Mock<(config: SpectrogramConfig, colorMap: ColorMapValue) => void>;
+    onClose?: Mock<() => void>;
   } = {}
 ) {
   const onApply = overrides.onApply ?? vi.fn();

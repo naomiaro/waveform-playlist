@@ -55,25 +55,32 @@ const { mockPartInstances, createdGainNodes, mockRawContext } = vi.hoisted(() =>
 });
 
 vi.mock('tone', () => ({
-  Volume: vi.fn().mockImplementation(() => ({
-    chain: vi.fn(),
-    dispose: vi.fn(),
-    volume: { value: 0 },
-    input: { input: {} },
-  })),
-  Panner: vi.fn().mockImplementation(() => ({ dispose: vi.fn(), pan: { value: 0 } })),
-  Gain: vi.fn().mockImplementation(() => ({
-    connect: vi.fn(),
-    dispose: vi.fn(),
-    gain: { value: 1 },
-  })),
-  Part: vi
-    .fn()
-    .mockImplementation((callback: (time: number, event: unknown) => void, events: unknown[]) => {
-      const instance = { callback, events, start: vi.fn(), dispose: vi.fn() };
-      mockPartInstances.push(instance);
-      return instance;
-    }),
+  Volume: vi.fn().mockImplementation(function () {
+    return {
+      chain: vi.fn(),
+      dispose: vi.fn(),
+      volume: { value: 0 },
+      input: { input: {} },
+    };
+  }),
+  Panner: vi.fn().mockImplementation(function () {
+    return { dispose: vi.fn(), pan: { value: 0 } };
+  }),
+  Gain: vi.fn().mockImplementation(function () {
+    return {
+      connect: vi.fn(),
+      dispose: vi.fn(),
+      gain: { value: 1 },
+    };
+  }),
+  Part: vi.fn().mockImplementation(function (
+    callback: (time: number, event: unknown) => void,
+    events: unknown[]
+  ) {
+    const instance = { callback, events, start: vi.fn(), dispose: vi.fn() };
+    mockPartInstances.push(instance);
+    return instance;
+  }),
   getDestination: vi.fn(() => ({})),
   getContext: vi.fn(() => ({ rawContext: mockRawContext })),
   ToneAudioNode: vi.fn(),

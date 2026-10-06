@@ -38,7 +38,7 @@ const mockConnect = vi.fn();
 let polySynthCallCount = 0;
 
 vi.mock('tone', () => ({
-  PolySynth: vi.fn().mockImplementation(() => {
+  PolySynth: vi.fn().mockImplementation(function () {
     polySynthCallCount++;
     // First call = melodic synth, subsequent = percussion PolySynth wrappers
     if (polySynthCallCount === 1) {
@@ -59,12 +59,17 @@ vi.mock('tone', () => ({
   Synth: vi.fn(),
   MembraneSynth: vi.fn(),
   MetalSynth: vi.fn(),
-  NoiseSynth: vi.fn().mockImplementation(() => ({
-    connect: mockNoiseConnect,
-    triggerAttackRelease: mockNoiseTriggerAttackRelease,
-    dispose: mockNoiseDispose,
-  })),
-  Part: vi.fn().mockImplementation((callback: (...args: unknown[]) => void, events: unknown[]) => {
+  NoiseSynth: vi.fn().mockImplementation(function () {
+    return {
+      connect: mockNoiseConnect,
+      triggerAttackRelease: mockNoiseTriggerAttackRelease,
+      dispose: mockNoiseDispose,
+    };
+  }),
+  Part: vi.fn().mockImplementation(function (
+    callback: (...args: unknown[]) => void,
+    events: unknown[]
+  ) {
     const instance = {
       callback,
       events,
@@ -74,20 +79,26 @@ vi.mock('tone', () => ({
     mockPartInstances.push(instance);
     return instance;
   }),
-  Volume: vi.fn().mockImplementation(() => ({
-    chain: mockVolumeChain,
-    dispose: mockVolumeDispose,
-    volume: { value: 0 },
-  })),
-  Gain: vi.fn().mockImplementation(() => ({
-    connect: mockConnect,
-    dispose: mockGainDispose,
-    gain: mockMuteGainGain,
-  })),
-  Panner: vi.fn().mockImplementation(() => ({
-    dispose: mockPannerDispose,
-    pan: { value: 0 },
-  })),
+  Volume: vi.fn().mockImplementation(function () {
+    return {
+      chain: mockVolumeChain,
+      dispose: mockVolumeDispose,
+      volume: { value: 0 },
+    };
+  }),
+  Gain: vi.fn().mockImplementation(function () {
+    return {
+      connect: mockConnect,
+      dispose: mockGainDispose,
+      gain: mockMuteGainGain,
+    };
+  }),
+  Panner: vi.fn().mockImplementation(function () {
+    return {
+      dispose: mockPannerDispose,
+      pan: { value: 0 },
+    };
+  }),
   ToneAudioNode: vi.fn(),
   getDestination: vi.fn().mockReturnValue({}),
   getContext: vi.fn().mockReturnValue({

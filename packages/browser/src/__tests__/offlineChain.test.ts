@@ -22,7 +22,10 @@ vi.mock('tone', () => {
     set: vi.fn(),
     wet: { value: 0.5 },
   });
-  const effectCtor = () => vi.fn(() => toneEffectStub());
+  const effectCtor = () =>
+    vi.fn(function () {
+      return toneEffectStub();
+    });
   return {
     connect: vi.fn(),
     disconnect: vi.fn(),

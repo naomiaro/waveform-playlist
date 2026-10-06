@@ -1,4 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  type MockInstance,
+} from 'vitest';
 import type { DawSpectrogramElement } from '../elements/daw-spectrogram';
 
 beforeAll(async () => {
@@ -8,7 +17,7 @@ beforeAll(async () => {
 
 const NO_HOST_PATTERN = 'could not find host <daw-editor>';
 
-function countNoHostWarns(spy: ReturnType<typeof vi.spyOn>): number {
+function countNoHostWarns(spy: MockInstance<typeof console.warn>): number {
   return spy.mock.calls.filter((call) => {
     const first = call[0];
     return typeof first === 'string' && first.includes(NO_HOST_PATTERN);
@@ -16,7 +25,7 @@ function countNoHostWarns(spy: ReturnType<typeof vi.spyOn>): number {
 }
 
 describe('<daw-spectrogram> host traversal', () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let warnSpy: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
