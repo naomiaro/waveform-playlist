@@ -319,10 +319,6 @@ const config: Config = {
               href: 'https://discord.gg/dsZZBpmD7k',
             },
             {
-              label: 'GitHub Discussions',
-              href: 'https://github.com/naomiaro/waveform-playlist/discussions',
-            },
-            {
               label: 'Issues',
               href: 'https://github.com/naomiaro/waveform-playlist/issues',
             },
