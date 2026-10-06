@@ -90,6 +90,7 @@ function App() {
 
 - [**Discord**](https://discord.gg/dsZZBpmD7k) - Chat, get help, and share what you're building on the dawcore server
 - [**Issues**](https://github.com/naomiaro/waveform-playlist/issues) - Bug reports and feature requests
+- [**Code of Conduct**](CODE_OF_CONDUCT.md) - The standards we hold this community to, on GitHub and Discord
 
 ## Examples
 
