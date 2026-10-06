@@ -90,20 +90,6 @@ declare module '@theme/Heading' {
   export default Heading;
 }
 
-declare module '@theme/Footer' {
-  import type { ComponentType } from 'react';
-
-  const Footer: ComponentType<object>;
-  export default Footer;
-}
-
-declare module '@theme-original/Footer' {
-  import type { ComponentType } from 'react';
-
-  const Footer: ComponentType<object>;
-  export default Footer;
-}
-
 // CSS modules
 declare module '*.module.css' {
   const classes: { [key: string]: string };
