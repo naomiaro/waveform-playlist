@@ -318,11 +318,3 @@ Originally created for the [Airtime](https://www.sourcefabric.org/software/airti
 ## License
 
 [MIT License](http://doge.mit-license.org)
-
-## Partners
-
-<p align="center">
-  <a href="https://www.telecom-paris.fr/" target="_blank">
-    <img width="120px" src="https://raw.githubusercontent.com/naomiaro/waveform-playlist/main/website/static/img/logos/telecom-paris.svg" alt="Télécom Paris">
-  </a>
-</p>
