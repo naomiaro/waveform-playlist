@@ -227,15 +227,30 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
       continue;
     }
 
-    // First step: align to step boundary relative to segment start
+    // Grid lines restart at each bar line (the rule snapTickToGrid and
+    // @dawcore/transport's quantizeTick follow), so a step that does not
+    // divide the bar — eighths in 7/16 — never crosses one. The coarse level
+    // is meter-independent by design (constant visual density) and keeps
+    // stepping from the segment start.
+    const restartAtBar = zoomLevel !== 'coarse';
     const offsetIntoSegment = segmentTickStart - segmentStartTick;
-    const firstStepOffset = Math.floor(offsetIntoSegment / stepTicks) * stepTicks;
-    const firstStepTick = segmentStartTick + firstStepOffset;
+    const anchorTick = restartAtBar
+      ? segmentStartTick + Math.floor(offsetIntoSegment / tpBar) * tpBar
+      : segmentStartTick;
+    const firstStepTick =
+      anchorTick + Math.floor((segmentTickStart - anchorTick) / stepTicks) * stepTicks;
+    const nextGridTick = (tick: number): number => {
+      const next = tick + stepTicks;
+      if (!restartAtBar) return next;
+      const nextBarTick =
+        segmentStartTick + (Math.floor((tick - segmentStartTick) / tpBar) + 1) * tpBar;
+      return Math.min(next, nextBarTick);
+    };
 
     for (
       let tick = firstStepTick;
       tick <= segmentTickEnd && tick < segmentEndTick;
-      tick += stepTicks
+      tick = nextGridTick(tick)
     ) {
       const pixel = tick / ticksPerPixel;
 
@@ -342,8 +357,13 @@ export function ticksToBarBeat(
 /**
  * Snaps a tick position to the nearest grid boundary defined by `snapTo`.
  *
- * Finds the meter entry active at the tick position and snaps relative to
- * that meter's segment start.
+ * Finds the meter entry active at the tick position, then the BAR containing
+ * the tick, and snaps relative to that bar's start: grid lines restart at
+ * each bar line (the same rule as `@dawcore/transport`'s `quantizeTick` and
+ * the drawn ruler grid), so odd meters stay aligned — in 7/8 at 960 PPQN a
+ * quarter-note grid is 0, 960, 1920, 2880 and then the bar line at 3360,
+ * never 3840. A subdivision longer than the bar leaves only the bar lines.
+ * An exact tie snaps up; a tick already on a line stays put.
  *
  * Returns the original tick unchanged when `snapTo` is 'off'.
  */
@@ -369,7 +389,11 @@ export function snapTickToGrid(
   const gridSize = snapToTicks(snapTo, ts, ppqn);
   if (gridSize <= 0) return tick;
 
-  // Snap relative to the meter's start tick
-  const offset = tick - meter.tick;
-  return meter.tick + Math.round(offset / gridSize) * gridSize;
+  // Snap within the bar containing the tick; the line after the bar's last
+  // whole subdivision is the next bar line.
+  const barLength = ticksPerBar(ts, ppqn);
+  const barStart = meter.tick + Math.floor((tick - meter.tick) / barLength) * barLength;
+  const previous = barStart + Math.floor((tick - barStart) / gridSize) * gridSize;
+  const next = Math.min(previous + gridSize, barStart + barLength);
+  return tick - previous < next - tick ? previous : next;
 }

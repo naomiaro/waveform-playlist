@@ -49,7 +49,7 @@ Framework-agnostic types, pure functions, and utilities shared across all packag
 
 **Keyboard shortcuts:** `handleKeyboardEvent` is a pure function — no React dependency. The `undefined` vs `false` distinction in modifier keys matters: `undefined` = match any state, `false` = must NOT be pressed.
 
-**Musical ticks:** `beatsAndBars.ts` uses Tone.js-compatible PPQN (192). `musicalTicks.ts` uses 960 PPQN for finer resolution in snap-to-grid. Both accept PPQN as a parameter.
+**Musical ticks:** `beatsAndBars.ts` uses Tone.js-compatible PPQN (192). `musicalTicks.ts` uses 960 PPQN for finer resolution in snap-to-grid. Both accept PPQN as a parameter. **Grid lines restart at each bar line** (#643): `snapTickToGrid` snaps within the bar containing the tick (the line after the bar's last whole subdivision is the next bar line; ties snap up; a line is a fixed point) and `computeMusicalTicks` draws its bar/beat/eighth/sixteenth levels the same way — identical to `@dawcore/transport`'s `quantizeTick`, so a drag snap, the drawn grid and a transport quantize agree in odd meters (7/8 quarter grid: 0, 960, 1920, 2880, 3360 — never 3840). Only the `coarse` level steps meter-independently from the segment start (constant visual density). In 4/4 and any meter whose bar is a multiple of the step, nothing changed. The parity test in `musicalTicks.test.ts` sweeps 7/8, 5/4, 7/16 and a 4/4→7/8 map at every zoom level.
 
 ## Clip Constructors
 
