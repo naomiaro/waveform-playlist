@@ -7,9 +7,20 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   private _transport: Transport;
   private _audioContext: AudioContext;
 
+  private _onPlaybackEnded: (() => void) | null = null;
+  /** > 0 while a stop originates from this adapter's stop()/dispose(). */
+  private _consumerStopDepth = 0;
+
   constructor(audioContext: AudioContext, options?: TransportOptions) {
     this._audioContext = audioContext;
     this._transport = new Transport(audioContext, options);
+    // Bounded playback (#608 parity): the transport stops itself when
+    // play(start, end) reaches end (inside its timer tick). Report that to the
+    // engine's onPlaybackEnded hook — but not a stop the consumer initiated
+    // through this adapter, which the engine already knows about.
+    this._transport.on('stop', () => {
+      if (this._consumerStopDepth === 0) this._onPlaybackEnded?.();
+    });
   }
 
   get audioContext(): AudioContext {
@@ -39,6 +50,7 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
       const warmupTarget = Math.max(MIN_WARMUP, this._audioContext.outputLatency ?? MIN_WARMUP);
       if (this._audioContext.currentTime < warmupTarget) {
         const MAX_WARMUP_MS = 2000;
+        const WARMUP_POLL_MS = 16;
         await new Promise<void>((resolve) => {
           const startMs = performance.now();
           const check = () => {
@@ -60,10 +72,12 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
               );
               resolve();
             } else {
-              requestAnimationFrame(check);
+              // setTimeout, not rAF: rAF freezes in a hidden tab and would
+              // hang init() (and its 2 s timeout) until the tab is shown.
+              setTimeout(check, WARMUP_POLL_MS);
             }
           };
-          requestAnimationFrame(check);
+          setTimeout(check, WARMUP_POLL_MS);
         });
       }
     }
@@ -94,7 +108,18 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   stop(): void {
-    this._transport.stop();
+    this._consumerStopDepth++;
+    try {
+      this._transport.stop();
+    } finally {
+      this._consumerStopDepth--;
+    }
+  }
+
+  /** Engine hook: adapter-initiated completion of a bounded play(start, end).
+   *  Never fired for consumer stop()/pause()/seek()/dispose(). */
+  onPlaybackEnded(callback: (() => void) | null): void {
+    this._onPlaybackEnded = callback;
   }
 
   seek(time: number): void {
@@ -208,6 +233,12 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   dispose(): void {
-    this._transport.dispose();
+    this._onPlaybackEnded = null;
+    this._consumerStopDepth++;
+    try {
+      this._transport.dispose();
+    } finally {
+      this._consumerStopDepth--;
+    }
   }
 }

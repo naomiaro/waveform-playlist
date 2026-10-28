@@ -5,7 +5,7 @@ Native Web Audio transport for the dawcore family — multi-track scheduling, lo
 ## Features
 
 - **Native Web Audio** — No Tone.js, no `standardized-audio-context`. Direct `AudioContext` with full `sampleRate` and `latencyHint` control.
-- **Sliding window scheduler** — Schedules audio 200ms ahead via `requestAnimationFrame` for glitch-free playback.
+- **Sliding window scheduler** — Schedules audio 200ms ahead, driven by a Web Worker timer so playback keeps running in a hidden tab (rAF stops there; main-thread timers throttle).
 - **Dual timeline** — Sample-absolute positions for audio clips, PPQN tick positions for metronome/MIDI.
 - **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Default synthesized click sounds out of the box.
 - **Count-in (pre-roll)** — Configurable bars of click sounds before playback begins. Beat-by-beat events for UI countdown.

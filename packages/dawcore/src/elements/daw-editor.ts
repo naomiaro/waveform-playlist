@@ -2950,14 +2950,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
       // Register the editor's rAF loop BEFORE starting the low-level engine
-      // playback. requestAnimationFrame callbacks fire in registration
-      // order — this guarantees _startPlayhead's per-frame check (below)
-      // runs BEFORE the native Transport's own endTime-triggered auto-stop
-      // timer each frame. Without this ordering, a bounded play(start, end)
-      // (selection/annotation playback) races: the Transport's internal
-      // timer silently resets its own clock to 0 before this loop's
-      // getCurrentTime() check ever observes time >= endTime, leaving
-      // isPlaying stuck true forever with no daw-stop.
+      // playback so the first frame never observes a playing engine without
+      // a playhead loop. Bounded play(start, end) completion does NOT depend
+      // on this loop racing the transport: the native transport's timer runs
+      // in a Worker (not rAF, #636) and reports its endTime self-stop through
+      // the adapter's onPlaybackEnded hook → engine 'stop' → the daw-stop
+      // dispatch in the engine stop handler. This loop's own time >= endTime
+      // check is a belt-and-braces path for adapters without the hook.
       this._activePlayEndTime = endTime ?? null;
       this._startPlayhead();
       engine.play(startTime, endTime);

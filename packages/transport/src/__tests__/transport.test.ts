@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { Transport } from '../transport';
+import { DEFAULT_TIMER_INTERVAL_MS } from '../core/timer';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { Tick, Sample, SchedulerListenerError } from '../types';
 
@@ -35,9 +36,6 @@ function createMockPannerNode() {
     disconnect: vi.fn(),
   };
 }
-
-let rafCallbacks: Array<(time: number) => void>;
-let rafId: number;
 
 function mockAudioContext(currentTime = 0): AudioContext {
   return {
@@ -88,20 +86,14 @@ function makeTrack(clips: AudioClip[], overrides: Partial<ClipTrack> = {}): Clip
 }
 
 describe('Transport', () => {
+  // No Worker in Node → the Timer takes its setTimeout fallback; fake timers
+  // drive it. One advance of DEFAULT_TIMER_INTERVAL_MS = one scheduler tick.
   beforeEach(() => {
-    rafCallbacks = [];
-    rafId = 0;
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((cb: (time: number) => void) => {
-        rafCallbacks.push(cb);
-        return ++rafId;
-      })
-    );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -812,7 +804,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       // Delivered on a microtask, after the scheduler window completes, so a
       // handler that calls stop()/setTracks() cannot re-enter the iteration.
       expect(onError).not.toHaveBeenCalled();
@@ -847,7 +839,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       await Promise.resolve();
 
       expect(transport.isPlaying()).toBe(false);
@@ -855,7 +847,7 @@ describe('Transport', () => {
       // the handler ran (same window) and silenced by stop(); no source may be
       // created after the stop.
       const createdAfterStop = create.mock.results.length;
-      for (const cb of [...rafCallbacks]) cb(32);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 2);
       expect(create.mock.results.length).toBe(createdAfterStop);
       warn.mockRestore();
     });
@@ -939,7 +931,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       transport.stop();
       await Promise.resolve();
 

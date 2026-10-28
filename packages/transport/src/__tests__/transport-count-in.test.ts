@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Transport } from '../transport';
+import { DEFAULT_TIMER_INTERVAL_MS } from '../core/timer';
 import type { CountInEventData } from '../types';
-
-let rafCallbacks: Array<(time: number) => void>;
-let rafId: number;
 
 function mockAudioContext(currentTime = 0): AudioContext {
   return {
@@ -46,20 +44,14 @@ function mockAudioContext(currentTime = 0): AudioContext {
 }
 
 describe('Transport Count-In', () => {
+  // No Worker in Node → the Timer takes its setTimeout fallback; fake timers
+  // drive it. One advance of DEFAULT_TIMER_INTERVAL_MS = one scheduler tick.
   beforeEach(() => {
-    rafCallbacks = [];
-    rafId = 0;
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((cb: (time: number) => void) => {
-        rafCallbacks.push(cb);
-        return ++rafId;
-      })
-    );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -216,14 +208,10 @@ describe('Transport Count-In', () => {
     transport.play();
     expect(transport.isCountingIn()).toBe(true);
 
-    // Drive the rAF loop — advance time past count-in duration
+    // Drive one timer tick — advance time past count-in duration
     // 1 bar of 4/4 at 120 BPM = 2 seconds
     (ctx as any).currentTime = 12.5; // 2.5s after start
-    // Snapshot callbacks to avoid infinite growth — each rAF schedules another
-    const snapshot = [...rafCallbacks];
-    for (const cb of snapshot) {
-      cb(performance.now());
-    }
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
 
     // Should have received 4 beat events (1 bar of 4/4)
     expect(countInEvents.length).toBe(4);
@@ -246,10 +234,7 @@ describe('Transport Count-In', () => {
 
     // Drive past count-in
     (ctx as any).currentTime = 12.5;
-    const snapshot = [...rafCallbacks];
-    for (const cb of snapshot) {
-      cb(performance.now());
-    }
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
 
     expect(onCountInEnd).toHaveBeenCalledTimes(1);
     // After count-in ends, should be playing normally
@@ -275,10 +260,7 @@ describe('Transport Count-In', () => {
 
     // 2 bars of 4/4 at 120 BPM = 4 seconds
     (ctx as any).currentTime = 14.5; // 4.5s after start
-    const snapshot = [...rafCallbacks];
-    for (const cb of snapshot) {
-      cb(performance.now());
-    }
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
 
     expect(countInEvents.length).toBe(8);
     expect(countInEvents[0]).toEqual({ beat: 1, totalBeats: 8 });
@@ -303,10 +285,7 @@ describe('Transport Count-In', () => {
 
     // 1 bar of 3/4 at 120 BPM = 1.5 seconds
     (ctx as any).currentTime = 12; // 2s after start (past 1.5s duration)
-    const snapshot = [...rafCallbacks];
-    for (const cb of snapshot) {
-      cb(performance.now());
-    }
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
 
     expect(countInEvents.length).toBe(3);
     expect(countInEvents[0]).toEqual({ beat: 1, totalBeats: 3 });
@@ -330,10 +309,7 @@ describe('Transport Count-In', () => {
 
     // Drive past count-in
     (ctx as any).currentTime = 12.5;
-    const snapshot = [...rafCallbacks];
-    for (const cb of snapshot) {
-      cb(performance.now());
-    }
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
 
     // After count-in, position restored and play event emitted
     expect(onPlay).toHaveBeenCalledTimes(1);

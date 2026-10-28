@@ -718,6 +718,7 @@ export class Transport {
     }
     this._trackNodes.clear();
     this._masterNode.dispose();
+    this._timer.dispose();
     this._listeners.clear();
   }
 

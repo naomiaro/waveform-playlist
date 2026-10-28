@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NativePlayoutAdapter } from '../adapter';
+import { DEFAULT_TIMER_INTERVAL_MS } from '../core/timer';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -91,15 +92,8 @@ function makeTrack(clips: AudioClip[], overrides: Partial<ClipTrack> = {}): Clip
 }
 
 describe('NativePlayoutAdapter', () => {
-  beforeEach(() => {
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((_cb: (time: number) => void) => 1)
-    );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  });
-
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -138,22 +132,15 @@ describe('NativePlayoutAdapter', () => {
     expect(ctx.resume).toHaveBeenCalled();
   });
 
-  it('init warmup loop polls until currentTime advances', async () => {
+  it('init warmup loop polls (setTimeout, not rAF) until currentTime advances', async () => {
+    vi.useFakeTimers();
     const ctx = mockAudioContext();
     // Override: resume does NOT advance currentTime (simulates Safari warmup)
-    let rafCallback: ((time: number) => void) | null = null;
     (ctx as any).resume = vi.fn(() => {
       (ctx as any).state = 'running';
       // currentTime stays at 0 — warmup loop must poll
       return Promise.resolve();
     });
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((cb: (time: number) => void) => {
-        rafCallback = cb;
-        return 1;
-      })
-    );
 
     const adapter = new NativePlayoutAdapter(ctx);
     let resolved = false;
@@ -165,13 +152,17 @@ describe('NativePlayoutAdapter', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Warmup should be polling — not yet resolved
+    // Warmup should be polling on a timer — not yet resolved
     expect(resolved).toBe(false);
-    expect(rafCallback).not.toBeNull();
+    expect(vi.getTimerCount()).toBe(1);
 
-    // Advance currentTime past warmup target and fire the rAF callback
+    // A poll that finds currentTime still at 0 schedules another
+    await vi.advanceTimersByTimeAsync(16);
+    expect(resolved).toBe(false);
+
+    // Advance currentTime past warmup target and let the next poll run
     (ctx as any).currentTime = 0.05;
-    rafCallback!(0);
+    await vi.advanceTimersByTimeAsync(16);
 
     await initPromise;
     expect(resolved).toBe(true);
@@ -185,18 +176,10 @@ describe('NativePlayoutAdapter', () => {
     });
 
     // Mock performance.now to jump past timeout
+    vi.useFakeTimers();
     const originalNow = performance.now;
     let mockNow = 0;
     vi.stubGlobal('performance', { now: () => mockNow });
-
-    let rafCallback: ((time: number) => void) | null = null;
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((cb: (time: number) => void) => {
-        rafCallback = cb;
-        return 1;
-      })
-    );
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -206,9 +189,9 @@ describe('NativePlayoutAdapter', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Jump past 2s timeout and fire callback
+    // Jump past 2s timeout and let the next poll run
     mockNow = 3000;
-    rafCallback!(0);
+    await vi.advanceTimersByTimeAsync(16);
 
     await initPromise;
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('warmup timed out'));
@@ -404,5 +387,64 @@ describe('NativePlayoutAdapter', () => {
     const spy = vi.spyOn(adapter.transport, 'setMeter');
     adapter.setMeter(3, 4);
     expect(spy).toHaveBeenCalledWith(3, 4, undefined);
+  });
+
+  describe('onPlaybackEnded — bounded playback completion (#608 parity)', () => {
+    // Without this hook the editor's rAF loop was the sole stopper of a
+    // bounded play(start, end) on the native path, and it only won the race
+    // against the transport's own endTime self-stop because both ran on rAF
+    // in registration order. The Worker timer (#636) removes that ordering.
+    function playingAdapter() {
+      vi.useFakeTimers();
+      const ctx = mockAudioContext();
+      const adapter = new NativePlayoutAdapter(ctx);
+      const ended = vi.fn();
+      adapter.onPlaybackEnded(ended);
+      return { ctx, adapter, ended };
+    }
+
+    it('fires once when the transport stops itself at endTime', () => {
+      const { ctx, adapter, ended } = playingAdapter();
+      adapter.play(0, 1);
+      (ctx as any).currentTime = 1.5;
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(ended).toHaveBeenCalledTimes(1);
+      expect(adapter.isPlaying()).toBe(false);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 4);
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire for a consumer stop() or pause()', () => {
+      const { adapter, ended } = playingAdapter();
+      adapter.play(0, 10);
+      adapter.stop();
+      adapter.play(0, 10);
+      adapter.pause();
+      expect(ended).not.toHaveBeenCalled();
+    });
+
+    it('does not fire for a stop caused by seek while playing', () => {
+      const { adapter, ended } = playingAdapter();
+      adapter.play(0, 10);
+      adapter.seek(2);
+      expect(ended).not.toHaveBeenCalled();
+      expect(adapter.isPlaying()).toBe(true);
+      adapter.stop();
+    });
+
+    it('unsubscribes with null and never fires after dispose', () => {
+      const { ctx, adapter, ended } = playingAdapter();
+      adapter.onPlaybackEnded(null);
+      adapter.play(0, 1);
+      (ctx as any).currentTime = 1.5;
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(ended).not.toHaveBeenCalled();
+
+      const again = vi.fn();
+      adapter.onPlaybackEnded(again);
+      adapter.play(0, 10);
+      adapter.dispose(); // disposes the transport mid-play — a consumer teardown, not completion
+      expect(again).not.toHaveBeenCalled();
+    });
   });
 });

@@ -36,7 +36,7 @@ Sliding window event generation. `advance(currentTime)` expands the window to `c
 
 ### Timer
 
-Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeout` or `setInterval`. The scheduler's 200ms lookahead absorbs any frame timing jitter.
+Drives the scheduler from a **Web Worker `setTimeout` loop** (default 25 ms, `DEFAULT_TIMER_INTERVAL_MS`), never `requestAnimationFrame` (#636). Browsers stop rAF and throttle main-thread timers in a hidden tab, but Worker timers and message delivery keep their cadence, so the 200 ms lookahead never runs dry in the background. One Blob-URL Worker lives for the Timer's lifetime (created lazily on first `start()`, `start`/`stop` are messages, `dispose()` terminates it — `Transport.dispose()` calls it). Fallback: a main-thread `setTimeout` loop when there is no `Worker`/`Blob`/`URL.createObjectURL` (Node, SSR — silent) or the Worker constructor throws (CSP without `worker-src blob:` — warns once); correct while the tab is visible or audible, but a hidden silent tab may throttle it to ~1 Hz. `NativePlayoutAdapter.init()`'s Safari warmup poll is `setTimeout`-based for the same reason. rAF belongs to UI position updates only (consumers).
 
 ## Branded Types
 
@@ -159,6 +159,8 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext and waits for Safari warmup (see Patterns). `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
 
+**`onPlaybackEnded(callback)` (#608 parity, added with the Worker timer in #636):** the adapter subscribes to the transport `stop` event and forwards it to the engine's hook ONLY when the stop was not initiated through the adapter's own `stop()`/`dispose()` (`_consumerStopDepth` guard) — i.e. the transport's endTime self-stop inside a timer tick. Before this, the native path had no hook at all: dawcore's rAF loop was the sole stopper of bounded playback and only won the race against the transport's self-stop because both ran on rAF in registration order. With a Worker tick that ordering is gone, so the hook is load-bearing — a consumer that mirrors `isPlaying` must learn about self-stops from the engine's `stop` event, never by polling time before the transport's tick.
+
 `setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` (integer), `secondsToTicksExact(seconds)` (fractional) — delegate to the underlying Transport. These enable the engine to forward tempo changes and use the adapter's TempoMap for `startSample` cache recomputation.
 
 ## Patterns
@@ -168,7 +170,7 @@ Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (requir
 - **`silence()` on stop/seek** — listeners are responsible for stopping their active sources. `AudioBufferSourceNode.stop()` is instantaneous.
 - **No Tone.js in the signal path** — all audio nodes are native Web Audio.
 - **`_activeSources` cleanup** — ClipPlayer uses `ended` event listener for automatic cleanup. MetronomePlayer clicks are short one-shots.
-- **rAF exclusively** — no setTimeout/setInterval anywhere. The lookahead window (200ms) provides sufficient scheduling headroom.
+- **No rAF in the engine** — the Timer is a Worker `setTimeout` loop (see Timer); rAF stops in hidden tabs. The lookahead window (200ms) provides the scheduling headroom over the 25 ms tick.
 - **Scheduler lookahead ≠ perceptible latency** — The 200ms lookahead is scheduling headroom only. `source.start(when)` uses precise `AudioContext.currentTime` values, so audio plays at the exact right time. Recording latency compensation only needs `outputLatency`, not `outputLatency + lookahead`.
 - **Safari AudioContext Warmup** — `audioContext.resume()` resolves but Safari's audio thread may not be ready to output samples. `NativePlayoutAdapter.init()` waits for `currentTime` to advance past `outputLatency` (fallback 20ms) before returning, with a 2s timeout and `state === 'closed'` guard to prevent infinite hang. Without this, clips scheduled at time 0 have audible start delay on Safari.
 - **onPositionJump Strict Less-Than** — `ClipPlayer.onPositionJump` uses strict `<` (not `<=`) for clip start boundary: `clipStartSample < newSample`. Clips starting exactly AT the position are handled by `generate()`, not `onPositionJump`. Using `<=` causes double-scheduling (both produce the same clip).
@@ -196,9 +198,9 @@ After `pause()`, `silence()` kills all active sources. On `play()` (resume), the
 
 The reference library (webaudio-transport) avoids this entirely by not implementing pause — only stop + start.
 
-### rAF Test Snapshot Pattern
+### Timer Test Pattern (fake timers)
 
-Tests that drive the Timer via `requestAnimationFrame` stubs must snapshot the callback array before iterating: `const snapshot = [...rafCallbacks]; for (const cb of snapshot) { cb(...); }`. Iterating `rafCallbacks` directly causes infinite growth — each callback schedules another via `_scheduleFrame()`. Always call `transport.stop()` after driving the loop to prevent zombie timers.
+Under vitest there is no `Worker`, so the Timer takes its `setTimeout` fallback: tests call `vi.useFakeTimers()` in `beforeEach` (`vi.useRealTimers()` in `afterEach`) and drive one scheduler tick with `vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS)` (imported from `core/timer`). The Worker path is unit-tested in `timer.test.ts` with a `FakeWorker` global that records the Blob script and the posted `{ type: 'start' | 'stop' }` messages and delivers ticks via `onmessage`. Never stub `requestAnimationFrame` to drive the transport — nothing reads it any more. Always call `transport.stop()`/`dispose()` after driving the loop so no fallback timeout stays pending.
 
 ## What This Solves
 

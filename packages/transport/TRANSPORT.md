@@ -27,7 +27,7 @@ This transport uses native Web Audio exclusively, receiving the `AudioContext` f
 │  │  Core Layer                                           │   │
 │  │  ┌─────────┐  ┌───────────┐  ┌─────────┐            │   │
 │  │  │  Clock   │  │ Scheduler │  │  Timer  │            │   │
-│  │  │ elapsed  │  │  sliding  │  │  rAF    │            │   │
+│  │  │ elapsed  │  │  sliding  │  │ Worker  │            │   │
 │  │  │  time    │  │  window   │  │  loop   │            │   │
 │  │  └─────────┘  └───────────┘  └─────────┘            │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -68,7 +68,7 @@ Each layer is independently testable. The core layer knows nothing about audio. 
 Every animation frame:
 
 ```
-Timer (rAF) → reads Clock.getTime() → Scheduler.advance(currentTime)
+Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() → Scheduler.advance(currentTime)
 ```
 
 The scheduler maintains a **sliding window** that expands forward as time advances. It only generates events for the *new* portion of the window (tracked by `rightEdge`), preventing duplicate work.
@@ -79,7 +79,7 @@ The scheduler runs 200ms ahead of real-time audio. This means:
 
 1. At clock time `T`, the scheduler generates events up to `T + 200ms`
 2. Events are scheduled on the audio hardware with precise `AudioContext.currentTime` timestamps
-3. The 200ms buffer absorbs frame timing jitter from `requestAnimationFrame`
+3. The 200ms buffer absorbs tick jitter from the Worker timer (25 ms cadence; rAF is never used — it stops in hidden tabs, Worker timers do not)
 
 ### Listener Contract
 
@@ -230,7 +230,7 @@ Key design choices:
 2. Reset scheduler to current position
 3. Start clock (captures `AudioContext.currentTime` reference)
 4. Call `clipPlayer.onPositionJump()` to create mid-clip sources
-5. Start rAF timer loop
+5. Start the Worker timer loop
 
 ### Pause
 
