@@ -448,7 +448,7 @@ Core orchestrator. Attributes:
 | `fill-viewport` | boolean | `false` | Keep ruler/timeline filling the viewport even when audio is shorter (layout only) |
 | `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |
 | `ticks-per-pixel` | number | `24` | Zoom level in beats mode |
-| `snap-to` | string | `'off'` | Grid snapping in beats mode (`'bar'`, `'beat'`, `'1/2'`…`'1/16'`, `'off'`) |
+| `snap-to` | string | `'off'` | Grid snapping in beats mode (`'bar'`, `'beat'`, `'1/2'`…`'1/16'`, `'off'`). Grid lines restart at each bar line, so in odd meters (7/8) and for subdivisions that don't divide the bar (a half note in 3/4) the last line before a bar line is the bar line itself — the same grid the ruler draws and `Transport.quantizeTick` uses |
 | `eager-resume` | string | — | Resume AudioContext on first gesture; bare attribute targets the editor, or pass `"document"` / a CSS selector |
 | `time-format` | string | `'hh:mm:ss.sss'` | Clock format read by `<daw-time-display>` / `<daw-time-format>`: `'hh:mm:ss.sss'`, `'hh:mm:ss'`, or `'seconds'` |
 

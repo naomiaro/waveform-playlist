@@ -202,7 +202,7 @@ The `T` suffix denotes triplet — the note value is multiplied by 2/3. For comp
 function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number;
 ```
 
-Single source of truth for converting `SnapTo` → tick count. Used by `SnapToGridModifier`, `<daw-grid>`, and `<daw-ruler>`.
+Single source of truth for converting `SnapTo` → tick count. Used by `SnapToGridModifier`, `<daw-grid>`, and `<daw-ruler>`. Positions snap via `snapTickToGrid`, whose grid restarts at each bar line (#643): in 7/8 a quarter-note grid is 0, 960, 1920, 2880, then the bar line at 3360 — the same lines `computeMusicalTicks` draws and `@dawcore/transport`'s `quantizeTick` snaps to.
 
 ### Multi-Track Record Arming
 

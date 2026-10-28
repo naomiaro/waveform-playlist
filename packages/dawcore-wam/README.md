@@ -41,7 +41,10 @@ await track.setEffectsState(saved);
 
 // Transport sync is automatic: dawcore broadcasts wam-transport events
 // (tempo, time signature, bar position, playing state) to every loaded
-// plugin on play/pause/stop/seek and tempo/meter changes.
+// plugin on play/pause/stop/seek and tempo/meter changes, and during
+// playback whenever the playhead crosses a tempo-map boundary or loops
+// (driven by the transport's Worker timer, so it keeps working in a
+// hidden tab).
 
 // Offline export renders through all chains — WAM plugins are
 // re-instantiated on the OfflineAudioContext with their saved state
