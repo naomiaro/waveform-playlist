@@ -447,11 +447,24 @@ describe('Scheduler (tick-based)', () => {
       scheduler.addListener(listener);
       scheduler.advance(0); // 0.5 s at 120 BPM = 960 ticks → events 0, 480
       expect(listener.consumed.map((e) => e.tick)).toEqual([0, 480]);
-      scheduler.setTempoMap(new TempoMap(ppqn, 240)); // 0.5 s is now 1920 ticks
-      scheduler.advance(0.5); // window [960, 3840)
-      expect(listener.consumed.map((e) => e.tick)).toEqual([
-        0, 480, 960, 1440, 1920, 2400, 2880, 3360,
-      ]);
+      scheduler.setTempoMap(new TempoMap(ppqn, 240)); // the 0.5 s edge is now tick 1920
+      scheduler.advance(0.5); // window [0.5 s, 1.0 s) = [1920, 3840) at 240 BPM
+      expect(listener.consumed.map((e) => e.tick)).toEqual([0, 480, 1920, 2400, 2880, 3360]);
+    });
+
+    it('setTempoMap re-anchors the cursor so already-scheduled seconds are neither skipped nor regenerated', () => {
+      const scheduler = createScheduler(0.2);
+      const listener = createMockListener();
+      scheduler.addListener(listener);
+      scheduler.advance(0); // 120 BPM: window [0, 0.2 s) = [0, 384) ticks → event 0
+      expect(listener.consumed.map((e) => e.tick)).toEqual([0]);
+      // 0.2 s is 768 ticks at 240 BPM. The next window must start there — not at
+      // tick 384 (which would regenerate 0.1 s of already-scheduled audio) and
+      // not stall until the clock reaches the old edge's new seconds value.
+      scheduler.setTempoMap(new TempoMap(ppqn, 240));
+      scheduler.advance(0.1); // window [0.2 s, 0.3 s) = [768, 1152) ticks → event 960
+      expect(listener.consumed.map((e) => e.tick)).toEqual([0, 960]);
+      expect(listener.generateRanges[1]).toEqual([768, 1152]);
     });
 
     it('a swap during a listener callback does not change the in-progress window', () => {

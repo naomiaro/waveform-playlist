@@ -910,6 +910,11 @@ export class Transport {
     this._sampleTimeline.setTempoMap(next);
     this._clipPlayer.setTempoMap(next);
     this._metronomePlayer.setTempoMap(next);
+    // A bounded play(start, end) is defined in seconds; its tick bound moves
+    // with the tempo.
+    if (this._endTime !== undefined) {
+      this._scheduler.setPlayEnd(next.secondsToTicks(this._endTime));
+    }
   }
 
   private _silenceAll(): void {

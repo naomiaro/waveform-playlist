@@ -484,6 +484,20 @@ describe('Transport', () => {
     expect(transport.tickToTime(3840 as Tick)).toBeCloseTo(1, 10);
   });
 
+  it('setTempo during bounded playback recomputes the play-end bound in the new map', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    // Clip at tick 5000: beyond the 2 s end at 120 BPM (3840 ticks) but inside
+    // it at 240 BPM (7680 ticks). After the tempo change it must be scheduled.
+    transport.setTracks([makeTrack([makeClip({ startTick: 5000 as Tick, startSample: 120000 })])]);
+    transport.play(0, 2);
+    transport.setTempo(240);
+    (ctx as any).currentTime = 1.2; // window [1.2, 1.4 s) = ticks [4608, 5376) at 240 BPM
+    for (const cb of [...rafCallbacks]) cb(16);
+    expect((ctx.createBufferSource as Mock).mock.results.length).toBe(1);
+    transport.stop();
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

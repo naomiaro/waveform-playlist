@@ -86,8 +86,35 @@ export interface SetTempoOptions {
   interpolation?: TempoInterpolation;
 }
 
+/** Module-private token: the entries constructor form is only reachable from
+ *  withTempo/withoutTempo (via _derive). A caller without the token gets a
+ *  thrown error instead of a map built from unvalidated, unsealed entries. */
+const INTERNAL = Symbol('TempoMap.internal');
+
+function freezeInterpolation(interpolation: TempoInterpolation): TempoInterpolation {
+  return typeof interpolation === 'object'
+    ? Object.freeze({ type: 'curve' as const, slope: interpolation.slope })
+    : interpolation;
+}
+
+/** Freeze every entry (and its interpolation object) that is not already
+ *  frozen; entries carried over from a previous map are reused as-is. */
 function sealEntries(entries: readonly TempoEntry[]): readonly TempoEntry[] {
-  return Object.freeze(entries.map((e) => Object.freeze({ ...e })));
+  return Object.freeze(
+    entries.map((e) =>
+      Object.isFrozen(e) && Object.isFrozen(e.interpolation)
+        ? e
+        : Object.freeze({ ...e, interpolation: freezeInterpolation(e.interpolation) })
+    )
+  );
+}
+
+function validateTick(what: string, tick: number): void {
+  if (!Number.isFinite(tick) || tick < 0 || !Number.isInteger(tick)) {
+    throw new Error(
+      '[waveform-playlist] TempoMap: ' + what + ' tick must be a non-negative integer, got ' + tick
+    );
+  }
 }
 
 /**
@@ -102,12 +129,13 @@ export class TempoMap {
   private readonly _entries: readonly TempoEntry[];
 
   /** `new TempoMap(ppqn, initialBpm)` — a single-tempo map. The entries
-   *  overload is internal: it is how withTempo/withoutTempo build their
-   *  result (entries already validated, cached and sealed). */
+   *  form is internal: it is how withTempo/withoutTempo build their result
+   *  (entries already validated, cached and sealed) and it requires a
+   *  module-private token, so it cannot be used from outside. */
   constructor(ppqn?: number, initialBpm?: number);
   /** @internal */
-  constructor(ppqn: number, entries: readonly TempoEntry[]);
-  constructor(ppqn: number = 960, init: number | readonly TempoEntry[] = 120) {
+  constructor(ppqn: number, entries: readonly TempoEntry[], token: symbol);
+  constructor(ppqn: number = 960, init: number | readonly TempoEntry[] = 120, token?: symbol) {
     this._ppqn = ppqn;
     if (typeof init === 'number') {
       TempoMap._validateBpm(init);
@@ -115,6 +143,11 @@ export class TempoMap {
         { tick: 0 as Tick, bpm: init, interpolation: 'step', secondsAtTick: 0 },
       ]);
     } else {
+      if (token !== INTERNAL) {
+        throw new Error(
+          '[waveform-playlist] TempoMap: the entries constructor is internal — use new TempoMap(ppqn, bpm) and withTempo()'
+        );
+      }
       this._entries = init;
     }
   }
@@ -151,16 +184,19 @@ export class TempoMap {
    *  this map is never modified. */
   withTempo(bpm: number, atTick: Tick = 0 as Tick, options?: SetTempoOptions): TempoMap {
     TempoMap._validateBpm(bpm);
-    const interpolation = options?.interpolation ?? 'step';
+    validateTick('atTick', atTick);
+    const requested = options?.interpolation ?? 'step';
 
-    if (typeof interpolation === 'object' && interpolation.type === 'curve') {
-      const s = interpolation.slope;
+    if (typeof requested === 'object' && requested.type === 'curve') {
+      const s = requested.slope;
       if (!Number.isFinite(s) || s <= 0 || s >= 1) {
         throw new Error(
           '[waveform-playlist] TempoMap: curve slope must be between 0 and 1 (exclusive), got ' + s
         );
       }
     }
+    // Own copy: the caller's object must not be able to change this map later.
+    const interpolation = freezeInterpolation(requested);
 
     const entries = [...this._entries];
     if (atTick === 0) {
@@ -186,6 +222,7 @@ export class TempoMap {
    *  is permanent (a map must always have a tempo), and a tick with no entry
    *  is a no-op — both return this same map. */
   withoutTempo(atTick: Tick): TempoMap {
+    validateTick('atTick', atTick);
     if (atTick === 0) return this;
     const i = this._entries.findIndex((e) => e.tick === atTick);
     if (i === -1) return this;
@@ -198,7 +235,9 @@ export class TempoMap {
   }
 
   /** Build the successor map: recompute cumulative seconds from `fromIndex`
-   *  into a fresh, sealed entry list. Nothing on `this` is written. */
+   *  into a fresh, sealed entry list. Entries before `fromIndex` are the
+   *  previous map's frozen objects, reused by reference. Nothing on `this`
+   *  is written. */
   private _derive(entries: TempoEntry[], fromIndex: number): TempoMap {
     for (let i = Math.max(1, fromIndex); i < entries.length; i++) {
       const prev = entries[i - 1];
@@ -207,7 +246,7 @@ export class TempoMap {
         secondsAtTick: prev.secondsAtTick + this._segmentSeconds(prev, entries[i]),
       };
     }
-    return new TempoMap(this._ppqn, sealEntries(entries));
+    return new TempoMap(this._ppqn, sealEntries(entries), INTERNAL);
   }
 
   /** Seconds spanned from `prev` to `entry` under `entry`'s interpolation. */

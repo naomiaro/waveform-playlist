@@ -95,9 +95,21 @@ export class Scheduler<T extends SchedulerEvent> {
     this._onError = options.onError;
   }
 
-  /** Swap in a new (immutable) TempoMap. Takes effect from the next advance();
-   *  an advance() already in progress keeps the map it started with. */
+  /** Swap in a new (immutable) TempoMap. The scheduling cursor is re-anchored
+   *  through seconds — the window already handed to listeners (in seconds)
+   *  stays covered, so the next advance() neither regenerates it nor stalls
+   *  until the clock catches up with the old edge's new tick value. Loop
+   *  bounds stay in ticks (they are musical positions); a seconds-defined
+   *  play end is the Transport's to recompute. Takes effect from the next
+   *  advance(); an advance() already in progress keeps the TEMPO map it
+   *  started with (loop bounds and the MeterMap are not snapshotted). Audio
+   *  already scheduled in the lookahead keeps its old-tempo timing. */
   setTempoMap(tempoMap: TempoMap): void {
+    const previous = this._tempoMap;
+    if (previous !== tempoMap) {
+      const edgeSeconds = previous.ticksToSeconds(this._rightEdge as Tick);
+      this._rightEdge = tempoMap.secondsToTicks(edgeSeconds);
+    }
     this._tempoMap = tempoMap;
   }
 

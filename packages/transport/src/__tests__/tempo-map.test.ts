@@ -742,6 +742,55 @@ describe('TempoMap immutability (#636)', () => {
     expect(Object.isFrozen(map.entries[0])).toBe(true);
   });
 
+  it('withTempo copies and freezes the interpolation option', () => {
+    const curve = { type: 'curve' as const, slope: 0.3 };
+    const map = new TempoMap(960, 120).withTempo(180, 3840 as Tick, { interpolation: curve });
+    const before = map.ticksToSeconds(1920 as Tick);
+    curve.slope = 0.9; // caller mutates its own object afterwards
+    expect(map.ticksToSeconds(1920 as Tick)).toBe(before);
+    expect(Object.isFrozen(map.entries[1].interpolation)).toBe(true);
+  });
+
+  it('withTempo and withoutTempo reject a negative, non-finite or fractional tick', () => {
+    const map = new TempoMap(960, 120);
+    expect(() => map.withTempo(90, -960 as Tick)).toThrow(/tick/);
+    expect(() => map.withTempo(90, NaN as Tick)).toThrow(/tick/);
+    expect(() => map.withTempo(90, 100.5 as Tick)).toThrow(/tick/);
+    expect(() => map.withoutTempo(NaN as Tick)).toThrow(/tick/);
+    expect(map.entryCount).toBe(1);
+  });
+
+  it('withoutTempo of a middle entry recomputes the cumulative seconds of the tail', () => {
+    // 120 → 60 at 3840 → 240 at 7680: entry 7680 sits at 2 s + 4 s = 6 s.
+    const map = new TempoMap(960, 120).withTempo(60, 3840 as Tick).withTempo(240, 7680 as Tick);
+    expect(map.entries[2].secondsAtTick).toBeCloseTo(6, 10);
+    // Without the 60 BPM entry, 7680 ticks at 120 BPM is 4 s.
+    const removed = map.withoutTempo(3840 as Tick);
+    expect(removed.entries.map((e) => e.tick)).toEqual([0, 7680]);
+    expect(removed.entries[1].secondsAtTick).toBeCloseTo(4, 10);
+  });
+
+  it('withTempo replacing an existing non-zero entry keeps the count and recomputes the tail', () => {
+    const map = new TempoMap(960, 120).withTempo(60, 3840 as Tick).withTempo(240, 7680 as Tick);
+    const replaced = map.withTempo(120, 3840 as Tick);
+    expect(replaced.entryCount).toBe(3);
+    expect(replaced.entries[2].secondsAtTick).toBeCloseTo(4, 10);
+    expect(map.entries[2].secondsAtTick).toBeCloseTo(6, 10); // original untouched
+  });
+
+  it('entries before the edit point are reused by reference', () => {
+    const original = new TempoMap(960, 120).withTempo(60, 3840 as Tick);
+    const next = original.withTempo(240, 7680 as Tick);
+    expect(next.entries[0]).toBe(original.entries[0]);
+    expect(next.entries[1]).toBe(original.entries[1]);
+  });
+
+  it('the entries constructor form is not usable from outside the module', () => {
+    expect(
+      () => new (TempoMap as unknown as new (p: number, e: unknown[]) => TempoMap)(960, [])
+    ).toThrow(/internal/);
+  });
+
   it('a snapshot taken before an edit keeps converting with the old tempo', () => {
     const before = new TempoMap(960, 120);
     const after = before.withTempo(240, 0 as Tick);
