@@ -391,10 +391,10 @@ describe('Transport Count-In', () => {
     transport.play(0, 4);
     transport.setTempo(240); // the count-in keeps its dedicated 120 BPM map
     (ctx as any).currentTime = 11.5; // 1.5 s in: a 240 BPM bar would be over (1 s), a 120 BPM one is not
-    for (const cb of [...rafCallbacks]) cb(16);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     expect(onEnd).not.toHaveBeenCalled();
     (ctx as any).currentTime = 12.5;
-    for (const cb of [...rafCallbacks]) cb(32);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     expect(onEnd).toHaveBeenCalledTimes(1);
     expect(transport.tempoMap.getTempo()).toBe(240);
     transport.stop();
