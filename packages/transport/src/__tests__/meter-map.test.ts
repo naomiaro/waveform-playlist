@@ -282,4 +282,20 @@ describe('MeterMap ppqn divisibility validation', () => {
       expect(() => new MeterMap(960, 4, d)).not.toThrow();
     }
   });
+
+  it('removeMeter re-snaps downstream entries onto bar lines of the preceding meter', () => {
+    // 4/4 → 7/8 at 3840 → 4/4 at 7200 (a 7/8 bar line). Removing the 7/8
+    // entry leaves 7200 mid-bar in 4/4 (1.875 bars in); it must move to the
+    // next 4/4 bar line (7680) so bar numbers stay whole.
+    const map = new MeterMap(960, 4, 4);
+    map.setMeter(7, 8, 3840 as Tick);
+    map.setMeter(4, 4, 7200 as Tick);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    map.removeMeter(3840 as Tick);
+    warn.mockRestore();
+    expect(map.getEntryAt(7680 as Tick).tick).toBe(7680);
+    expect(map.isBarBoundary(7680 as Tick)).toBe(true);
+    expect(Number.isInteger(map.tickToBar(8000 as Tick))).toBe(true);
+    expect(map.barToTick(map.tickToBar(8000 as Tick))).toBe(7680);
+  });
 });

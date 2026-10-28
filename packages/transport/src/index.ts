@@ -23,6 +23,12 @@ export { Timer } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';
 export { TempoMap, type SetTempoOptions } from './timeline/tempo-map';
 export { MeterMap } from './timeline/meter-map';
+export {
+  quantizeTick,
+  type GridSubdivision,
+  type QuantizeMode,
+  type QuantizeOptions,
+} from './timeline/quantize';
 export { MasterNode } from './audio/master-node';
 export { TrackNode } from './audio/track-node';
 export { ClipPlayer, type ClipEvent } from './audio/clip-player';

@@ -81,6 +81,10 @@ export class MeterMap {
     const idx = this._entries.findIndex((e) => e.tick === atTick);
     if (idx > 0) {
       this._entries.splice(idx, 1);
+      // The entries after the removed one were snapped to ITS bar lines; the
+      // preceding meter now governs them, so re-snap (same as setMeter does)
+      // or barAtTick turns fractional and tickToBar/barToTick disagree.
+      this._resnapDownstreamEntries(idx - 1);
       this._recomputeCache(idx);
     } else if (idx === -1) {
       console.warn('[waveform-playlist] MeterMap.removeMeter: no entry at tick ' + atTick);

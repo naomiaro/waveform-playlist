@@ -18,6 +18,11 @@ import { Timer } from './core/timer';
 import { SampleTimeline } from './timeline/sample-timeline';
 import { TempoMap } from './timeline/tempo-map';
 import { MeterMap } from './timeline/meter-map';
+import {
+  quantizeTick as quantizeTickOnGrid,
+  type GridSubdivision,
+  type QuantizeOptions,
+} from './timeline/quantize';
 import { ClipPlayer } from './audio/clip-player';
 import { MetronomePlayer } from './audio/metronome-player';
 import { CountInPlayer } from './audio/count-in-player';
@@ -551,6 +556,15 @@ export class Transport {
 
   barToTick(bar: number): Tick {
     return this._meterMap.barToTick(bar);
+  }
+
+  /** Snap a (possibly fractional) tick to the meter grid: `subdivision` is
+   *  `{ ticks }`, `{ note, dotted?, triplet? }`, 'bar' or 'beat'; `mode` is
+   *  'nearest' (default) | 'next' | 'previous'; `strength` 0–1 scales the
+   *  move. Grid lines restart at each bar line, so odd meters stay aligned.
+   *  Pure function over the (live) MeterMap. */
+  quantizeTick(tick: number, subdivision: GridSubdivision, options?: QuantizeOptions): Tick {
+    return quantizeTickOnGrid(this._meterMap, tick, subdivision, options);
   }
 
   tickToBar(tick: Tick): number {
