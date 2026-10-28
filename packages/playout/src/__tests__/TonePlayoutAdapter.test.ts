@@ -730,15 +730,26 @@ describe('createToneAdapter', () => {
       expect(adapter.ticksToSeconds!(384)).toBeCloseTo(1.0);
     });
 
-    it('secondsToTicks converts using current BPM and ppqn', () => {
+    it('secondsToTicks converts using current BPM and ppqn, returning an integer tick', () => {
       const adapter = createToneAdapter();
-      expect(adapter.secondsToTicks!(1.0)).toBeCloseTo(384);
+      expect(adapter.secondsToTicks!(1.0)).toBe(384);
+      // 0.0005 s is 0.192 ticks: the integer contract rounds it, as the native adapter does
+      expect(adapter.secondsToTicks!(0.0005)).toBe(0);
+      expect(adapter.secondsToTicks!(0.002)).toBe(1); // 0.768 ticks
     });
 
     it('secondsToTicksExact returns the fractional tick position', () => {
       const adapter = createToneAdapter();
       // 120 BPM × 192 PPQN = 384 ticks/s → 0.0005 s is 0.192 ticks
       expect(adapter.secondsToTicksExact!(0.0005)).toBeCloseTo(0.192, 10);
+    });
+
+    it('secondsToTicksExact follows tempo and ppqn changes', () => {
+      const adapter = createToneAdapter();
+      adapter.setTempo!(60);
+      expect(adapter.secondsToTicksExact!(0.0005)).toBeCloseTo(0.096, 10);
+      const fine = createToneAdapter({ ppqn: 960 });
+      expect(fine.secondsToTicksExact!(0.0005)).toBeCloseTo(0.96, 10);
     });
 
     it('ticksToSeconds reflects updated BPM', () => {

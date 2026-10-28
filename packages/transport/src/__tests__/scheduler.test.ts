@@ -177,6 +177,12 @@ describe('Scheduler (tick-based)', () => {
     expect(listener.consumed.length).toBe(0);
   });
 
+  it('reset keeps the cursor on whole ticks for a fractional-second position', () => {
+    const scheduler = createScheduler();
+    scheduler.reset(0.0005); // 0.96 ticks at 120 BPM
+    expect((scheduler as unknown as { _rightEdge: number })._rightEdge).toBe(1);
+  });
+
   it('reset clears rightEdge', () => {
     const scheduler = createScheduler();
     const listener = createMockListener();

@@ -533,12 +533,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       return (tick * 60) / (_bpm * _ppqn);
     },
 
+    /** Integer tick (engine `PlayoutAdapter.secondsToTicks` contract): the
+     *  exact position rounded once here, as NativePlayoutAdapter does. */
     secondsToTicks(seconds: number): number {
-      return (seconds * _bpm * _ppqn) / 60;
+      return Math.round((seconds * _bpm * _ppqn) / 60);
     },
 
-    /** Fractional tick position (engine `PlayoutAdapter.secondsToTicksExact`).
-     *  Single-tempo, so the same formula as secondsToTicks. */
+    /** Fractional tick position (engine `PlayoutAdapter.secondsToTicksExact`). */
     secondsToTicksExact(seconds: number): number {
       return (seconds * _bpm * _ppqn) / 60;
     },

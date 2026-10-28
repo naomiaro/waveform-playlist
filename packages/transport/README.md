@@ -227,7 +227,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`
 - `barToTick(bar): Tick` / `tickToBar(tick: Tick)`
-- `timeToTick(seconds): Tick` / `tickToTime(tick: Tick)` — integer ticks (rounded once at this boundary)
+- `timeToTick(seconds): Tick` / `tickToTime(tick: number)` — `timeToTick` is the integer tick (`TempoMap.secondsToTicks` rounds the exact value once); `tickToTime` accepts an integer or fractional tick position
 - `timeToTickExact(seconds): number` — fractional tick position, for sub-tick placement (e.g. a recorded note between ticks before quantising); `tickToTime` accepts it back. The same pairing exists one layer down: `TempoMap.secondsToTicks` / `secondsToTicksExact`, `SampleTimeline.samplesToTicks` / `samplesToTicksExact` (rounding happens once, in the integer variant), and `TempoMap.secondsToBeats` is continuous.
 
 **Metronome:**

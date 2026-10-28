@@ -50,8 +50,9 @@ export interface PlayoutAdapter {
   secondsToTicks?(seconds: number): number;
   /** Convert seconds to a fractional tick position using the adapter's tempo
    *  map — for sub-tick placement (a recorded note between ticks, before
-   *  quantising). Optional; adapters that cannot provide it leave it out and
-   *  consumers fall back to secondsToTicks. */
+   *  quantising). Optional; an adapter that cannot provide it leaves it out,
+   *  and a consumer that needs it should fall back to secondsToTicks (no
+   *  engine code path consumes it yet). */
   secondsToTicksExact?(seconds: number): number;
   /** Register a worklet module URL on this adapter's AudioContext.
    *  Abstracts native vs standardized-audio-context differences. */

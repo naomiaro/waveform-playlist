@@ -664,6 +664,29 @@ describe('TempoMap fractional conversions (#636)', () => {
     expect(tm.secondsToTicksExact(5.0005)).toBeCloseTo(3840 + 3 * 960 + 0.48, 9);
   });
 
+  it('ticksToSeconds is continuous and monotonic across a tempo boundary for fractional ticks', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick);
+    expect(tm.ticksToSeconds(3839.5)).toBeCloseTo(2 - 0.5 / 1920, 12);
+    expect(tm.ticksToSeconds(3840.5)).toBeCloseTo(2 + 0.5 / 960, 12);
+    expect(tm.ticksToSeconds(3839.999)).toBeLessThan(tm.ticksToSeconds(3840 as Tick));
+    expect(tm.ticksToSeconds(3840 as Tick)).toBeLessThan(tm.ticksToSeconds(3840.001));
+  });
+
+  it('beatsToSeconds and secondsToBeats are exact inverses on a multi-segment map', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick, { interpolation: 'linear' });
+    tm.setTempo(90, 7680 as Tick);
+    for (const seconds of [0.3, 2.7, 5.1]) {
+      expect(tm.beatsToSeconds(tm.secondsToBeats(seconds))).toBeCloseTo(seconds, 10);
+    }
+  });
+
+  it('negative fractional ticks convert back to the negative seconds they came from', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.ticksToSeconds(-19.2)).toBeCloseTo(-0.01, 12);
+  });
+
   it('secondsToTicksExact extrapolates linearly for negative seconds (no clamping)', () => {
     const tm = new TempoMap(960, 120);
     expect(tm.secondsToTicksExact(-0.01)).toBeCloseTo(-19.2, 9);
