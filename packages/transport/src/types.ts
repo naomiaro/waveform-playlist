@@ -37,6 +37,9 @@ export interface TransportOptions {
   denominator?: number;
   /** How far ahead to schedule audio, in seconds. Default: 0.2 */
   schedulerLookahead?: number;
+  /** Scheduling tick cadence in milliseconds (a Worker setTimeout loop).
+   *  Must be shorter than the lookahead. Default: 25 */
+  timerIntervalMs?: number;
   /** Accent click frequency in Hz. Default: 1000 */
   accentFrequency?: number;
   /** Normal click frequency in Hz. Default: 800 */

@@ -46,7 +46,7 @@ The solution: **schedule audio before it's needed.** A typical lookahead is 100â
               clock time    clock + lookahead
 ```
 
-On every animation frame (~16ms at 60fps), the transport:
+On every timer tick (25 ms, from a Web Worker), the transport:
 1. Reads the current clock time
 2. Computes the target: `clockTime + lookahead`
 3. Generates audio events for any new portion of the window
@@ -232,7 +232,7 @@ When a time signature changes mid-song, the new meter must start on a bar bounda
 
 ## The Scheduling Loop
 
-Putting it all together, the transport's main loop runs on every animation frame:
+Putting it all together, the transport's main loop runs on every Worker timer tick:
 
 ```
 1. timer fires (Worker `setTimeout` tick, 25 ms)

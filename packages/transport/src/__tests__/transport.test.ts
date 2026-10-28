@@ -265,11 +265,107 @@ describe('Transport', () => {
     transport.play(0, 1);
     (ctx as any).currentTime = 1.5;
     vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
-    expect(order).toEqual(['ended', 'stop']);
+    // 'stop' first, so an 'ended' handler sees a stopped transport and may
+    // restart it (loop-on-end); the engine's hook is deferred anyway.
+    expect(order).toEqual(['stop', 'ended']);
     // Consumer stop: no 'ended'
     transport.play(0, 10);
     transport.stop();
-    expect(order).toEqual(['ended', 'stop', 'stop']);
+    expect(order).toEqual(['stop', 'ended', 'stop']);
+  });
+
+  it("an 'ended' handler can restart playback (loop-on-end)", () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    let restarts = 0;
+    transport.on('ended', () => {
+      if (restarts++ === 0) transport.play(0, 1);
+    });
+    transport.play(0, 1);
+    (ctx as any).currentTime = 1.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(restarts).toBe(1);
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+  });
+
+  it("'ended' never fires during a count-in and the bound survives the transition", () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const click = {
+      duration: 0.04,
+      length: 1920,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+    transport.setMetronomeClickSounds(click, click);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    const order: string[] = [];
+    for (const name of ['ended', 'countInEnd', 'play', 'stop'] as const) {
+      transport.on(name, () => order.push(name));
+    }
+    transport.play(0, 1); // the count-in bar (2 s) is longer than the 1 s bound
+    (ctx as any).currentTime = 12.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(order).toEqual(['countInEnd', 'play']);
+    (ctx as any).currentTime = 14; // 1.5 s into playback: past the 1 s bound
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(order).toEqual(['countInEnd', 'play', 'stop', 'ended']);
+  });
+
+  it('with a loop enabled, an endTime beyond loopEnd never ends and one inside it does', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const ended = vi.fn();
+    transport.on('ended', ended);
+    transport.setLoop(true, 0 as Tick, 1920 as Tick); // [0, 1 s)
+    transport.play(0, 5);
+    (ctx as any).currentTime = 2.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).not.toHaveBeenCalled();
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+    transport.play(0, 0.5); // the clock re-anchors at currentTime 2.5
+    (ctx as any).currentTime = 3.1; // 0.6 s later: past the 0.5 s bound inside the loop
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tick that keeps throwing stops the transport instead of flooding the console', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const onStop = vi.fn();
+    transport.on('stop', onStop);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    transport.play();
+    Object.defineProperty(ctx, 'currentTime', {
+      get() {
+        throw new Error('context gone');
+      },
+    });
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 10);
+    expect(transport.isPlaying()).toBe(false);
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('context gone'))).toBe(true);
+    warn.mockRestore();
+  });
+
+  it('play() and seek() after dispose() are warned no-ops', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const onPlay = vi.fn();
+    transport.on('play', onPlay);
+    transport.dispose();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    transport.play();
+    transport.seek(1);
+    expect(transport.isPlaying()).toBe(false);
+    expect(onPlay).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('disposed'));
+    warn.mockRestore();
   });
 
   it('seek emits a seek event with the target position', () => {

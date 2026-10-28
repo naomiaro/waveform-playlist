@@ -5,16 +5,19 @@
  * requestAnimationFrame and throttle main-thread timers in a hidden tab, but
  * Worker timers and message delivery keep their cadence, so the scheduler's
  * lookahead window never runs dry while the tab is in the background (#636).
- * One Worker lives for the Timer's lifetime; start/stop are messages, so a
- * seek during playback costs no Worker spin-up.
+ * One Worker lives from the first start() until dispose(); start/stop are
+ * messages, so a seek during playback costs no Worker spin-up.
  *
  * Fallback: a main-thread setTimeout loop, used when there is no Worker/Blob
- * URL support (Node, SSR), when constructing the Worker is refused (a CSP
- * without `worker-src blob:` — synchronously or via the Worker's error
- * event), or when a running Worker dies. Correct while the tab is visible or
- * audible; a hidden, silent tab may throttle it to ~1 Hz, which exceeds the
- * 200 ms lookahead. The refusal verdict is remembered per page, so the probe
- * and its warning happen once, not once per Timer.
+ * URL support (Node, SSR), when constructing the Worker throws (a CSP
+ * without `worker-src blob:`), when the Worker fires `error`/`messageerror`
+ * after construction, or when a started Worker never delivers its first tick
+ * within WATCHDOG_INTERVALS ticks (a Worker the browser killed without an
+ * event). Correct while the tab is visible or audible; a hidden, silent tab
+ * may throttle it to 1 Hz and, after several minutes, to once per minute —
+ * far beyond the 200 ms lookahead. Only a synchronous constructor refusal is
+ * remembered page-wide (it is an environment fact, warned once); a later
+ * Worker death is per Timer and is warned each time it happens.
  *
  * requestAnimationFrame is never used — it belongs to UI position updates.
  */
@@ -49,13 +52,22 @@ const TIMER_WORKER_SCRIPT =
   '  }\n' +
   '};\n';
 
-/** Page-wide memo: once a Worker was refused (constructor threw or the
- *  Worker errored), every later Timer skips the probe and the warning. */
+/** Ticks of silence after `start` before a Worker is presumed dead. */
+const WATCHDOG_INTERVALS = 4;
+
+/** Page-wide memo: once a Worker CONSTRUCTOR was refused (CSP), every later
+ *  Timer skips the probe and the warning — the environment will not change. */
 let workerRefusedOnThisPage = false;
 
 /** Test hook: forget the page-wide refusal verdict. */
 export function _resetTimerWorkerVerdictForTests(): void {
   workerRefusedOnThisPage = false;
+}
+
+function describeWorkerError(event: unknown): string {
+  const e = event as Partial<ErrorEvent> & { type?: string };
+  const where = e.filename ? ' at ' + e.filename + ':' + (e.lineno ?? '?') : '';
+  return 'worker ' + (e.type ?? 'error') + ': ' + (e.message ?? String(event)) + where;
 }
 
 function hasWorkerPlatform(): boolean {
@@ -78,6 +90,8 @@ export class Timer {
   /** Set once the Worker path has been ruled out for this Timer. */
   private _useTimeoutFallback = false;
   private _timeoutId: ReturnType<typeof setTimeout> | null = null;
+  /** Armed when `start` is posted to the Worker; cleared by its first tick. */
+  private _watchdogId: ReturnType<typeof setTimeout> | null = null;
 
   constructor(onTick: () => void, options: TimerOptions = {}) {
     const intervalMs = options.intervalMs ?? DEFAULT_TIMER_INTERVAL_MS;
@@ -103,6 +117,7 @@ export class Timer {
     const worker = this._ensureWorker();
     if (worker) {
       worker.postMessage({ type: 'start', intervalMs: this._intervalMs } as TimerWorkerMessage);
+      this._armWatchdog();
     } else if (this._timeoutId === null) {
       // (a synchronous Worker refusal inside _ensureWorker already scheduled it)
       this._scheduleTimeout();
@@ -112,6 +127,7 @@ export class Timer {
   stop(): void {
     if (!this._running) return;
     this._running = false;
+    this._clearWatchdog();
     if (this._worker) {
       this._worker.postMessage({ type: 'stop' } as TimerWorkerMessage);
     }
@@ -133,6 +149,7 @@ export class Timer {
   private _handleTick(): void {
     // A Worker tick may be in flight when stop() was posted; drop it.
     if (!this._running) return;
+    this._clearWatchdog();
     try {
       this._onTick();
     } catch (err) {
@@ -166,17 +183,39 @@ export class Timer {
     }
   }
 
-  /** The Worker path failed (constructor threw, or the Worker errored later):
-   *  remember it for the page, warn once, and keep ticking on setTimeout. */
-  private _fallBackFromWorker(reason: string): void {
+  private _armWatchdog(): void {
+    this._clearWatchdog();
+    this._watchdogId = setTimeout(() => {
+      this._watchdogId = null;
+      this._fallBackFromWorker(
+        'no tick received within ' + WATCHDOG_INTERVALS * this._intervalMs + ' ms of start',
+        false
+      );
+    }, WATCHDOG_INTERVALS * this._intervalMs);
+  }
+
+  private _clearWatchdog(): void {
+    if (this._watchdogId !== null) {
+      clearTimeout(this._watchdogId);
+      this._watchdogId = null;
+    }
+  }
+
+  /** The Worker path failed: release it and keep ticking on setTimeout. A
+   *  constructor refusal is an environment fact remembered (and warned) once
+   *  per page; a Worker that errored or went silent later is this Timer's
+   *  own event and is warned every time. */
+  private _fallBackFromWorker(reason: string, constructorRefused: boolean): void {
     this._useTimeoutFallback = true;
+    this._clearWatchdog();
     this._releaseWorker();
-    if (!workerRefusedOnThisPage) {
-      workerRefusedOnThisPage = true;
+    const silenced = constructorRefused && workerRefusedOnThisPage;
+    if (constructorRefused) workerRefusedOnThisPage = true;
+    if (!silenced) {
       console.warn(
         '[waveform-playlist] Timer: could not run a Worker ticker (' +
           reason +
-          '); falling back to a main-thread setTimeout loop, which browsers may throttle in a hidden tab'
+          '); falling back to a main-thread setTimeout loop, which browsers throttle in a hidden tab'
       );
     }
     if (this._running && this._timeoutId === null) this._scheduleTimeout();
@@ -197,14 +236,13 @@ export class Timer {
       // Some engines surface a CSP violation (or a later crash) here instead
       // of throwing from the constructor; a Worker that never ticks would
       // otherwise leave the transport silent with no fallback.
-      worker.onerror = (event) =>
-        this._fallBackFromWorker('worker error: ' + String((event as ErrorEvent).message ?? event));
-      worker.onmessageerror = () => this._fallBackFromWorker('worker message error');
+      worker.onerror = (event) => this._fallBackFromWorker(describeWorkerError(event), false);
+      worker.onmessageerror = () => this._fallBackFromWorker('worker message error', false);
       this._worker = worker;
       this._workerUrl = url;
       return worker;
     } catch (err) {
-      this._fallBackFromWorker(String(err));
+      this._fallBackFromWorker(String(err), true);
       return null;
     }
   }

@@ -253,7 +253,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
 - Events: `play`, `pause`, `stop`, `ended`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`, `error`
-- `ended` — a bounded `play(start, end)` reached `end` and the transport stopped itself; fires right before `stop`, never for a consumer `stop()`/`pause()`/`seek()`
+- `ended` — a bounded `play(start, end)` reached `end` and the transport stopped itself; fires right after `stop` (so a handler may restart playback), never for a consumer `stop()`/`pause()`/`seek()`
 - `seek` payload: `{ seconds: number }`
 - `tempochange` payload: `{ bpm: number, atTick: Tick }`
 - `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`

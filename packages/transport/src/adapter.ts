@@ -48,15 +48,18 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
       if (this._audioContext.currentTime < warmupTarget) {
         const MAX_WARMUP_MS = 2000;
         const WARMUP_POLL_MS = 16;
-        await new Promise<void>((resolve) => {
+        await new Promise<void>((resolve, reject) => {
           const startMs = performance.now();
           const check = () => {
             if (this._audioContext.currentTime >= warmupTarget) {
               resolve();
-            } else if (
-              this._audioContext.state === 'closed' ||
-              performance.now() - startMs > MAX_WARMUP_MS
-            ) {
+            } else if (this._audioContext.state === 'closed') {
+              // Same outcome as a context that was already closed at entry:
+              // nothing can play, so init() must not succeed.
+              reject(
+                new Error('[waveform-playlist] Cannot init: AudioContext closed during warmup')
+              );
+            } else if (performance.now() - startMs > MAX_WARMUP_MS) {
               console.warn(
                 '[waveform-playlist] AudioContext warmup timed out' +
                   ' (currentTime=' +

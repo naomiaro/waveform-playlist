@@ -653,7 +653,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 - **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (consumer-side, optional).
 - **Architecture:** Layered — core (clock/scheduler/timer) → timeline (samples/ticks/tempo: `TempoMap`, `MeterMap`, branded `Tick`/`Sample` types) → audio (track nodes, `ClipPlayer`, metronome) → transport (orchestrator) → adapter (`NativePlayoutAdapter`, the `PlayoutAdapter` bridge for `PlaylistEngine`)
-- **Scheduler:** Sliding-window event generation driven by `requestAnimationFrame` with ~200ms lookahead; integer-tick loop boundaries (no float drift at loop wrap)
+- **Scheduler:** Sliding-window event generation driven by a Web Worker `setTimeout` tick (25 ms; keeps its cadence in a hidden tab) with ~200ms lookahead; integer-tick loop boundaries (no float drift at loop wrap)
 - **Effects insertion hooks:** `connectTrackOutput(trackId, node)` inserts any AudioNode chain (native, WAM, Tone.js) into a track's output path; `connectMasterOutput(node)` / `disconnectMasterOutput()` do the same between the master gain and `audioContext.destination`. The transport has zero knowledge of plugin types.
 - **Events:** `seek(time)` emits a `seek` event (`{ seconds }`) — consumed by the WAM transport bridge among others
 - **Dependencies:** None (zero runtime deps; `@waveform-playlist/core`/`engine` are type-only devDeps)

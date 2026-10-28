@@ -200,6 +200,24 @@ describe('NativePlayoutAdapter', () => {
     vi.stubGlobal('performance', { now: originalNow });
   });
 
+  it('init rejects when the context closes during the warmup poll', async () => {
+    vi.useFakeTimers();
+    const ctx = mockAudioContext();
+    (ctx as any).resume = vi.fn(() => {
+      (ctx as any).state = 'running';
+      return Promise.resolve();
+    });
+    const adapter = new NativePlayoutAdapter(ctx);
+    const initPromise = adapter.init();
+    await Promise.resolve();
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(16);
+    (ctx as any).state = 'closed';
+    await vi.advanceTimersByTimeAsync(16);
+    await expect(initPromise).rejects.toThrow(/closed/);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('init skips resume for running AudioContext', async () => {
     const ctx = mockAudioContext();
     (ctx as any).state = 'running';

@@ -446,11 +446,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _selectionEndTime = 0;
   _currentTime = 0;
   // Bounded-playback watermark for the current play(start, end) call
-  // (selection/annotation playback). The adapter's own auto-stop at
-  // endTime (e.g. native Transport's internal timer) tears down audio but
-  // never notifies isPlaying/daw-stop back up — the _startPlayhead rAF
-  // loop below is the sole place that detects reaching it, same pattern
-  // as the whole-track _duration check.
+  // (selection/annotation playback). Adapters with the engine's
+  // onPlaybackEnded hook (Tone, and native since #636) report their
+  // endTime self-stop through the engine's `stop` event; this watermark is
+  // the fallback check in the _startPlayhead loop for adapters without the
+  // hook, same pattern as the whole-track _duration check.
   _activePlayEndTime: number | null = null;
   @property({ attribute: false })
   set adapter(value: PlayoutAdapter | null) {
@@ -2531,7 +2531,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // stop (editor.stop(), or a seek-adjacent stop+reschedule guarded by
       // _inSeekTransition — pointer-handler seek, seekTo, splitAtPlayhead,
       // empty-timeline rewind) OR the engine's OWN bounded-playback
-      // completion path: the Tone adapter reports `onPlaybackEnded` for a
+      // completion path: an adapter (Tone, native) reports `onPlaybackEnded` for a
       // duration-limited play(start, end) (selection/annotation playback),
       // and the engine calls `this.stop()` internally from a queued
       // microtask with no consumer call in sight. That engine-initiated case
@@ -2950,8 +2950,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // Always init — resumes AudioContext if suspended (requires user gesture).
       await engine.init();
       // Register the editor's rAF loop BEFORE starting the low-level engine
-      // playback so the first frame never observes a playing engine without
-      // a playhead loop. Bounded play(start, end) completion does NOT depend
+      // playback: the catch block below relies on it having been started so
+      // it can undo it. Bounded play(start, end) completion does NOT depend
       // on this loop racing the transport: the native transport's timer runs
       // in a Worker (not rAF, #636) and reports its endTime self-stop through
       // the adapter's onPlaybackEnded hook → engine 'stop' → the daw-stop
@@ -3337,10 +3337,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Runs even when the playhead element isn't rendered (empty/indefinite
     // editors) so daw-timeupdate consumers still get frames.
     this._playbackAnimation.start(() => {
-      // Bounded playback (selection/annotation via play(start, end)): the
-      // adapter's own endTime auto-stop tears down audio internally but
-      // never reaches back up to isPlaying/daw-stop, so this rAF loop must
-      // detect it too. Checked before the whole-track duration bound below.
+      // Bounded playback (selection/annotation via play(start, end)): an
+      // adapter with the onPlaybackEnded hook reports its endTime self-stop
+      // through the engine's `stop` event; this check is the fallback for
+      // adapters without it. Checked before the whole-track duration bound
+      // below.
       if (
         this._activePlayEndTime !== null &&
         !this.isRecording &&

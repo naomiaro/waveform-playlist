@@ -65,7 +65,7 @@ Each layer is independently testable. The core layer knows nothing about audio. 
 
 ### The Core Loop
 
-Every animation frame:
+Every timer tick (25 ms, from a Web Worker):
 
 ```
 Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() → Scheduler.advance(currentTime)
@@ -301,7 +301,7 @@ CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as 
 **Events:**
 - `countIn` — fires per beat with `{ beat: number, totalBeats: number }` for UI countdown
 - `countInEnd` — fires when count-in completes and playback begins
-- `ended` — a bounded `play(start, end)` reached `end`; the transport stops itself (`ended` then `stop`). Consumer stops emit only `stop`. `NativePlayoutAdapter` forwards `ended` to the engine's `onPlaybackEnded` hook.
+- `ended` — a bounded `play(start, end)` reached `end`; the transport stops itself (`stop` then `ended`, so an `ended` handler may restart playback). Consumer stops emit only `stop`. `NativePlayoutAdapter` forwards `ended` to the engine's `onPlaybackEnded` hook.
 
 **Error surfacing (#636):** both schedulers are constructed with an `onError` handler that forwards `SchedulerListenerError` (a union on `phase`: `generate` with `fromTick`/`toTick`, `consume` with `event`, `positionJump` with `tick`; all with `listener` and `error`) to the transport `error` event, delivered on a microtask after the window completes (the subscriber check happens at delivery, so an unsubscribe or dispose in between falls back to the console). A failing `generate()` skips that listener for the window; a failing `consume()` skips that one event; a failing `onPositionJump()` skips that listener's jump without aborting the loop wrap. Nothing is retried. With no `error` subscriber the transport falls back to `console.warn`, once per listener and phase, so the failure is never silent. Invalid loop points (`setLoop`/`setLoopSeconds`/`setLoopSamples` with `enabled` and a non-finite, empty or inverted range) throw instead of warning — `NativePlayoutAdapter.setLoop` translates the engine's empty default region (`loopStart = loopEnd = 0`) to a disabled loop before it gets there.
 

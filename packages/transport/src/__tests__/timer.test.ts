@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { runInNewContext } from 'node:vm';
 import { Timer, DEFAULT_TIMER_INTERVAL_MS, _resetTimerWorkerVerdictForTests } from '../core/timer';
 
 /** A stand-in for the browser Worker: records the script and messages, and
@@ -8,6 +9,7 @@ class FakeWorker {
   static failConstruction = false;
   onmessage: ((event: { data: unknown }) => void) | null = null;
   onerror: ((event: unknown) => void) | null = null;
+  onmessageerror: ((event: unknown) => void) | null = null;
   readonly posted: unknown[] = [];
   terminated = false;
   constructor(readonly url: string) {
@@ -131,6 +133,46 @@ describe('Timer (Worker-driven)', () => {
     timer.dispose();
   });
 
+  it('the Worker script itself ticks on setTimeout, honours start/stop, and does not double on restart', () => {
+    vi.useFakeTimers();
+    new Timer(vi.fn()).start();
+    const postMessage = vi.fn();
+    const sandbox = {
+      setTimeout,
+      clearTimeout,
+      postMessage,
+      onmessage: null as null | ((e: { data: unknown }) => void),
+    };
+    runInNewContext(blobScripts[0], sandbox);
+    sandbox.onmessage!({ data: { type: 'start', intervalMs: 25 } });
+    vi.advanceTimersByTime(100);
+    expect(postMessage).toHaveBeenCalledTimes(4); // 25, 50, 75, 100
+    expect(postMessage).toHaveBeenLastCalledWith('tick');
+    sandbox.onmessage!({ data: { type: 'stop' } });
+    vi.advanceTimersByTime(100);
+    expect(postMessage).toHaveBeenCalledTimes(4);
+    sandbox.onmessage!({ data: { type: 'start', intervalMs: 25 } });
+    sandbox.onmessage!({ data: { type: 'start', intervalMs: 25 } }); // replaces, does not double
+    vi.advanceTimersByTime(100);
+    expect(postMessage).toHaveBeenCalledTimes(8);
+    vi.useRealTimers();
+  });
+
+  it('a Worker tick that was already dequeued when dispose() ran is dropped', () => {
+    const onTick = vi.fn();
+    const timer = new Timer(onTick);
+    timer.start();
+    const worker = FakeWorker.instances[0];
+    const handler = worker.onmessage!;
+    timer.dispose();
+    handler({ data: 'tick' });
+    expect(onTick).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, NaN, Infinity])('rejects intervalMs %s', (intervalMs) => {
+    expect(() => new Timer(vi.fn(), { intervalMs })).toThrow(/positive number/);
+  });
+
   it('uses the default interval when none is given', () => {
     const timer = new Timer(vi.fn());
     timer.start();
@@ -208,6 +250,80 @@ describe('Timer (setTimeout fallback)', () => {
     vi.advanceTimersByTime(50);
     expect(onTick).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('setTimeout'));
+    warn.mockRestore();
+    timer.dispose();
+  });
+
+  it('a Worker messageerror falls back to setTimeout like an error does', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start();
+    FakeWorker.instances[0].onmessageerror?.({});
+    expect(FakeWorker.instances[0].terminated).toBe(true);
+    vi.advanceTimersByTime(50);
+    expect(onTick).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('message error'));
+    warn.mockRestore();
+    timer.dispose();
+  });
+
+  it('a Worker that never ticks is abandoned for setTimeout by a watchdog', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start(); // Worker created, start posted, nothing ever comes back
+    vi.advanceTimersByTime(75);
+    expect(onTick).not.toHaveBeenCalled(); // still waiting for the Worker
+    vi.advanceTimersByTime(200);
+    expect(FakeWorker.instances[0].terminated).toBe(true);
+    expect(onTick.mock.calls.length).toBeGreaterThan(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('no tick'));
+    warn.mockRestore();
+    timer.dispose();
+  });
+
+  it('a Worker that does tick keeps the Worker: the watchdog is cleared by the first tick', () => {
+    installWorkerGlobals();
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start();
+    FakeWorker.instances[0].tick();
+    vi.advanceTimersByTime(1000);
+    expect(FakeWorker.instances[0].terminated).toBe(false);
+    expect(onTick).toHaveBeenCalledTimes(1);
+    timer.dispose();
+  });
+
+  it('an asynchronous Worker death does not poison the page for later Timers', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const a = new Timer(vi.fn(), { intervalMs: 25 });
+    a.start();
+    FakeWorker.instances[0].onerror?.({ message: 'runtime death' });
+    const b = new Timer(vi.fn(), { intervalMs: 25 });
+    b.start();
+    expect(FakeWorker.instances).toHaveLength(2); // b still tries a Worker
+    expect(warn).toHaveBeenCalledTimes(1);
+    a.dispose();
+    b.dispose();
+    warn.mockRestore();
+  });
+
+  it('a Worker error while stopped is honoured by the next start()', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start();
+    timer.stop();
+    FakeWorker.instances[0].onerror?.({ message: 'died while idle' });
+    timer.start();
+    vi.advanceTimersByTime(50);
+    expect(onTick).toHaveBeenCalledTimes(2);
+    expect(FakeWorker.instances).toHaveLength(1);
     warn.mockRestore();
     timer.dispose();
   });
