@@ -4,8 +4,8 @@ import { MeterMap } from '../timeline/meter-map';
 import type { Tick } from '../types';
 
 const PPQN = 960;
-const EIGHTH = 480;
-const QUARTER = 960;
+const EIGHTH = { ticks: 480 };
+const QUARTER = { ticks: 960 };
 
 describe('quantizeTick', () => {
   const fourFour = () => new MeterMap(PPQN, 4, 4);
@@ -65,8 +65,8 @@ describe('quantizeTick', () => {
     // 3/4 bar = 2880 ticks; a whole-note (3840) step cannot fit, so the only
     // lines are the bar lines.
     const threeFour = new MeterMap(PPQN, 3, 4);
-    expect(quantizeTick(threeFour, 3000 as Tick, 3840, { mode: 'previous' })).toBe(2880);
-    expect(quantizeTick(threeFour, 3000 as Tick, 3840, { mode: 'next' })).toBe(5760);
+    expect(quantizeTick(threeFour, 3000 as Tick, { ticks: 3840 }, { mode: 'previous' })).toBe(2880);
+    expect(quantizeTick(threeFour, 3000 as Tick, { ticks: 3840 }, { mode: 'next' })).toBe(5760);
   });
 
   it('accepts a fractional tick position and returns an integer line', () => {
@@ -105,12 +105,100 @@ describe('quantizeTick', () => {
     expect(quantizeTick(map, 6000 as Tick, 'bar', { mode: 'next' })).toBe(6720);
   });
 
+  it('note-value subdivisions are PPQN-independent: { note: 8 } is an eighth at any ppqn', () => {
+    expect(quantizeTick(fourFour(), 400 as Tick, { note: 8 })).toBe(480);
+    const fine = new MeterMap(1920, 4, 4);
+    expect(quantizeTick(fine, 800 as Tick, { note: 8 })).toBe(960);
+    // dotted eighth = 720 ticks, eighth triplet = 320 ticks at 960 PPQN
+    expect(quantizeTick(fourFour(), 700 as Tick, { note: 8, dotted: true })).toBe(720);
+    expect(quantizeTick(fourFour(), 330 as Tick, { note: 8, triplet: true })).toBe(320);
+  });
+
+  it('float tolerance also applies at the clamped next-bar line', () => {
+    const sevenEight = new MeterMap(PPQN, 7, 8); // bar = 3360
+    expect(quantizeTick(sevenEight, 3359.9999999999995, QUARTER, { mode: 'previous' })).toBe(3360);
+    expect(quantizeTick(sevenEight, 3359.9999999999995, QUARTER, { mode: 'next' })).toBe(3360);
+    const map = new MeterMap(PPQN, 4, 4);
+    map.setMeter(3, 4, 7680 as Tick);
+    expect(quantizeTick(map, 7679.999999999999, QUARTER, { mode: 'previous' })).toBe(7680);
+  });
+
+  it('strength scales the move in every mode', () => {
+    expect(quantizeTick(fourFour(), 400 as Tick, EIGHTH, { mode: 'previous', strength: 0.5 })).toBe(
+      200
+    );
+    expect(quantizeTick(fourFour(), 100 as Tick, EIGHTH, { mode: 'next', strength: 0.25 })).toBe(
+      195
+    );
+  });
+
+  it('strength 0 on a fractional tick returns the nearest integer, not a grid line', () => {
+    expect(quantizeTick(fourFour(), 200.4, EIGHTH, { strength: 0 })).toBe(200);
+    expect(quantizeTick(fourFour(), 200.6, EIGHTH, { strength: 0 })).toBe(201);
+  });
+
+  it('a tick exactly on a meter-change entry stays put in every mode and unit', () => {
+    const map = new MeterMap(PPQN, 4, 4);
+    map.setMeter(3, 4, 7680 as Tick);
+    for (const mode of ['nearest', 'previous', 'next'] as const) {
+      expect(quantizeTick(map, 7680 as Tick, QUARTER, { mode })).toBe(7680);
+      expect(quantizeTick(map, 7680 as Tick, 'bar', { mode })).toBe(7680);
+      expect(quantizeTick(map, 7680 as Tick, 'beat', { mode })).toBe(7680);
+    }
+    // Approaching the entry from a grid that does not divide the old bar:
+    // step 720 in 4/4 → lines 0, 720, …, 3600, then the entry at 3840.
+    const odd = new MeterMap(PPQN, 4, 4);
+    odd.setMeter(3, 4, 3840 as Tick);
+    expect(quantizeTick(odd, 3700 as Tick, { ticks: 720 }, { mode: 'next' })).toBe(3840);
+    expect(quantizeTick(odd, 3700 as Tick, { ticks: 720 })).toBe(3600);
+  });
+
+  it("'beat' in 7/8 is an eighth and restarts at the bar line", () => {
+    const sevenEight = new MeterMap(PPQN, 7, 8);
+    expect(quantizeTick(sevenEight, 3300 as Tick, 'beat', { mode: 'previous' })).toBe(2880);
+    expect(quantizeTick(sevenEight, 3300 as Tick, 'beat', { mode: 'next' })).toBe(3360);
+    expect(quantizeTick(sevenEight, 3400 as Tick, 'beat', { mode: 'previous' })).toBe(3360);
+  });
+
+  it('a subdivision equal to the bar behaves like bar', () => {
+    expect(quantizeTick(fourFour(), 5000 as Tick, { ticks: 3840 }, { mode: 'previous' })).toBe(
+      3840
+    );
+    expect(quantizeTick(fourFour(), 5000 as Tick, { ticks: 3840 }, { mode: 'next' })).toBe(7680);
+    expect(quantizeTick(fourFour(), 5000 as Tick, 'bar', { mode: 'next' })).toBe(7680);
+  });
+
+  it('stays exact at very large tick positions', () => {
+    expect(quantizeTick(fourFour(), 960_000_000_100, EIGHTH, { mode: 'previous' })).toBe(
+      960_000_000_000
+    );
+    expect(quantizeTick(fourFour(), 960_000_000_100, EIGHTH, { mode: 'next' })).toBe(
+      960_000_000_480
+    );
+    expect(quantizeTick(fourFour(), 960_000_000_000, EIGHTH, { mode: 'next' })).toBe(
+      960_000_000_000
+    );
+  });
+
   it('rejects invalid input instead of guessing', () => {
     expect(() => quantizeTick(fourFour(), -1 as Tick, EIGHTH)).toThrow(/tick/);
     expect(() => quantizeTick(fourFour(), NaN as Tick, EIGHTH)).toThrow(/tick/);
-    expect(() => quantizeTick(fourFour(), 100 as Tick, 0)).toThrow(/subdivision/);
-    expect(() => quantizeTick(fourFour(), 100 as Tick, -480)).toThrow(/subdivision/);
-    expect(() => quantizeTick(fourFour(), 100 as Tick, 480.5)).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, { ticks: 0 })).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, { ticks: -480 })).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, { ticks: 480.5 })).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, 480 as never)).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, { note: 0 } as never)).toThrow(
+      /subdivision/
+    );
+    expect(() => quantizeTick(fourFour(), 100 as Tick, { note: 3 } as never)).toThrow(
+      /subdivision/
+    );
+    expect(() => quantizeTick(fourFour(), 100 as Tick, EIGHTH, { mode: 'floor' as never })).toThrow(
+      /mode/
+    );
+    expect(() => quantizeTick(fourFour(), 100 as Tick, EIGHTH, { strength: NaN })).toThrow(
+      /strength/
+    );
     expect(() => quantizeTick(fourFour(), 100 as Tick, EIGHTH, { strength: 1.5 })).toThrow(
       /strength/
     );

@@ -558,10 +558,11 @@ export class Transport {
     return this._meterMap.barToTick(bar);
   }
 
-  /** Snap a (possibly fractional) tick to the meter grid: `subdivision` is a
-   *  tick count, 'bar' or 'beat'; `mode` is 'nearest' (default) | 'next' |
-   *  'previous'; `strength` 0–1 scales the move. Grid lines restart at each
-   *  bar line, so odd meters stay aligned. Pure function over the MeterMap. */
+  /** Snap a (possibly fractional) tick to the meter grid: `subdivision` is
+   *  `{ ticks }`, `{ note, dotted?, triplet? }`, 'bar' or 'beat'; `mode` is
+   *  'nearest' (default) | 'next' | 'previous'; `strength` 0–1 scales the
+   *  move. Grid lines restart at each bar line, so odd meters stay aligned.
+   *  Pure function over the (live) MeterMap. */
   quantizeTick(tick: number, subdivision: GridSubdivision, options?: QuantizeOptions): Tick {
     return quantizeTickOnGrid(this._meterMap, tick, subdivision, options);
   }

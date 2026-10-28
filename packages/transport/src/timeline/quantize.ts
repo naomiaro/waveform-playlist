@@ -1,9 +1,19 @@
 import type { Tick } from '../types';
 import type { MeterMap } from './meter-map';
 
-/** Grid step for quantizeTick: a tick count (positive integer), or the bar or
- *  beat length of the meter in force at the tick's bar. */
-export type GridSubdivision = number | 'bar' | 'beat';
+/** Grid step for quantizeTick.
+ *  - `{ ticks }`: an explicit tick count (positive integer) — a duration, not
+ *    a position, hence the object form rather than a bare number.
+ *  - `{ note, dotted?, triplet? }`: a note value by denominator (4 = quarter,
+ *    8 = eighth, 16 = sixteenth …), resolved against the MeterMap's PPQN;
+ *    dotted ×3/2, triplet ×2/3.
+ *  - `'bar'` / `'beat'`: the bar or beat length of the meter in force at the
+ *    tick's bar. */
+export type GridSubdivision =
+  | { readonly ticks: number }
+  | { readonly note: number; readonly dotted?: boolean; readonly triplet?: boolean }
+  | 'bar'
+  | 'beat';
 
 /** 'nearest' (exact ties go up), 'next' (ceiling), 'previous' (floor). All
  *  three are idempotent: a tick already on a grid line stays put. This differs
@@ -54,12 +64,7 @@ export function quantizeTick(
   const ticksPerBar = meterMap.ticksPerBar(entry.tick);
   const barStart = entry.tick + Math.floor((tick - entry.tick) / ticksPerBar) * ticksPerBar;
   const nextBarStart = barStart + ticksPerBar;
-  const step =
-    subdivision === 'bar'
-      ? ticksPerBar
-      : subdivision === 'beat'
-        ? meterMap.ticksPerBeat(entry.tick)
-        : subdivision;
+  const step = resolveStep(meterMap, subdivision, ticksPerBar, meterMap.ticksPerBeat(entry.tick));
 
   const previous = barStart + Math.floor((tick - barStart) / step) * step;
   const candidateNext = Math.min(previous + step, nextBarStart);
@@ -71,6 +76,39 @@ export function quantizeTick(
   }
   const target = pickLine(mode, tick, previous, candidateNext);
   return Math.round(tick + (target - tick) * strength) as Tick;
+}
+
+function resolveStep(
+  meterMap: MeterMap,
+  subdivision: GridSubdivision,
+  ticksPerBar: number,
+  ticksPerBeat: number
+): number {
+  if (subdivision === 'bar') return ticksPerBar;
+  if (subdivision === 'beat') return ticksPerBeat;
+  if ('ticks' in subdivision) return subdivision.ticks;
+  let step = (meterMap.ppqn * 4) / subdivision.note;
+  if (subdivision.dotted) step = (step * 3) / 2;
+  if (subdivision.triplet) step = (step * 2) / 3;
+  return step;
+}
+
+const NOTE_VALUES = [1, 2, 4, 8, 16, 32, 64];
+
+function isValidSubdivision(subdivision: GridSubdivision): boolean {
+  if (subdivision === 'bar' || subdivision === 'beat') return true;
+  if (typeof subdivision !== 'object' || subdivision === null) return false;
+  if ('ticks' in subdivision) {
+    return Number.isInteger(subdivision.ticks) && subdivision.ticks > 0;
+  }
+  return 'note' in subdivision && NOTE_VALUES.includes(subdivision.note);
+}
+
+function describeSubdivision(subdivision: unknown): string {
+  if (typeof subdivision === 'object' && subdivision !== null) {
+    return JSON.stringify(subdivision);
+  }
+  return String(subdivision);
 }
 
 function pickLine(mode: QuantizeMode, tick: number, previous: number, next: number): number {
@@ -90,13 +128,11 @@ function validateQuantizeInput(
       '[waveform-playlist] quantizeTick: tick must be a finite number >= 0, got ' + tick
     );
   }
-  const validTickCount =
-    typeof subdivision === 'number' && Number.isInteger(subdivision) && subdivision > 0;
-  if (!validTickCount && subdivision !== 'bar' && subdivision !== 'beat') {
+  if (!isValidSubdivision(subdivision)) {
     throw new Error(
-      '[waveform-playlist] quantizeTick: subdivision must be a positive integer tick count, ' +
-        "'bar' or 'beat', got " +
-        String(subdivision)
+      '[waveform-playlist] quantizeTick: subdivision must be { ticks: positive integer }, ' +
+        "{ note: 1 | 2 | 4 | 8 | 16 | 32 | 64, dotted?, triplet? }, 'bar' or 'beat', got " +
+        describeSubdivision(subdivision)
     );
   }
   if (!MODES.includes(mode)) {
