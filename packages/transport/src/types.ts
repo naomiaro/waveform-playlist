@@ -6,6 +6,14 @@ export type Tick = number & { readonly [__tick]: never };
 declare const __sample: unique symbol;
 export type Sample = number & { readonly [__sample]: never };
 
+/** Branded type for AudioContext frames (the Clock's unit, at `audioContext.sampleRate`).
+ *  Distinct from `Sample` (the SampleTimeline's `sampleRate` option, which may
+ *  differ from the context's) so the two rates cannot be mixed silently. Like
+ *  `Sample`, it does not distinguish frames of different AudioContexts (e.g. an
+ *  offline render context at another rate). */
+declare const __contextFrame: unique symbol;
+export type ContextFrame = number & { readonly [__contextFrame]: never };
+
 export interface SchedulerEvent {
   /** Tick position (integer) on the timeline */
   tick: Tick;

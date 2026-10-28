@@ -9,6 +9,7 @@ import type {
   TempoChangeEventData,
   MeterChangeEventData,
   SchedulerListenerError,
+  ContextFrame,
 } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
@@ -46,6 +47,16 @@ export interface TransportEvents {
    *  stop()/pause()/seek(). (NativePlayoutAdapter forwards this to the
    *  engine's onPlaybackEnded hook.) */
   ended: () => void;
+  /** The AudioContext's clock was read lower than before while playing (a
+   *  defensive path — the spec makes `currentTime` monotonic). The position
+   *  was held: `seconds` is what getCurrentTime() reports (the loop-start
+   *  clamp and count-in hold included) and `shiftSeconds` how far the context
+   *  clock went back. Outside a count-in every scheduled source was re-created
+   *  from the held position; during one the clicks already armed (which would
+   *  fire late by the shift) are dropped and the count-in continues.
+   *  Diagnostics only — nothing for a consumer to do. With no subscriber the
+   *  first occurrence is warned to the console instead. */
+  discontinuity: (event: { seconds: number; shiftSeconds: number }) => void;
   /** A scheduler listener threw while generating or consuming events. The
    *  scheduler skipped it and kept going; the host decides what to do. With
    *  no `error` listener registered the failure is reported via console.warn
@@ -73,6 +84,10 @@ export class Transport {
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
   private _disposed = false;
+  /** `Clock.rebaseCount` as of the last resync; a higher count means sources
+   *  armed in the old time base are still scheduled. */
+  private _rebasesHandled = 0;
+  private _warnedDiscontinuity = false;
   private _endTime: number | undefined;
   private _loopEnabled = false;
   private _loopStartTick: Tick = 0 as Tick;
@@ -99,6 +114,14 @@ export class Transport {
 
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
     this._audioContext = audioContext;
+    // The Clock counts frames at the CONTEXT rate; options.sampleRate only
+    // sets the SampleTimeline's rate and cannot stand in for it.
+    if (!(Number.isFinite(audioContext.sampleRate) && audioContext.sampleRate > 0)) {
+      throw new Error(
+        '[waveform-playlist] Transport: the AudioContext must report a positive finite sampleRate, got ' +
+          audioContext.sampleRate
+      );
+    }
 
     const sampleRate = options.sampleRate ?? audioContext.sampleRate;
     const ppqn = options.ppqn ?? 960;
@@ -163,6 +186,10 @@ export class Transport {
   private _tick(): void {
     {
       const time = this._clock.getTime();
+      if (this._clock.rebaseCount !== this._rebasesHandled) {
+        this._rebasesHandled = this._clock.rebaseCount;
+        this._resyncAfterDiscontinuity(time);
+      }
       if (this._countingIn) {
         this._countInScheduler?.advance(time);
         // Transition when the full bar duration has elapsed — not when the
@@ -180,6 +207,52 @@ export class Transport {
       }
       this._scheduler.advance(time);
     }
+  }
+
+  /** The clock absorbed a backward context re-base since the last resync:
+   *  sources armed through the old anchor's toAudioTime() hold ABSOLUTE
+   *  context times and would now fire late by the shift. Outside a count-in,
+   *  re-create them from the held position (the seek-while-playing path minus
+   *  the move), clamped to loopStart like getCurrentTime() — right after a
+   *  wrap the clock sits behind loopStart and a resync from there would play
+   *  pre-loop material. During a count-in the clicks already armed are
+   *  dropped rather than regenerated (CountInPlayer counts beats, so a
+   *  regenerate would double-fire); the count-in→play transition is
+   *  clock-driven and still lands on the held clock. */
+  private _resyncAfterDiscontinuity(time: number): void {
+    const shiftSeconds = this._clock.frameToSeconds(this._clock.lastRebaseFrames as ContextFrame);
+    let seconds: number;
+    if (this._countingIn) {
+      this._countInPlayer.silence();
+      seconds = this._countInStartPosition;
+    } else {
+      seconds = this._loopEnabled && time < this._loopStartSeconds ? this._loopStartSeconds : time;
+      this._silenceAll();
+      this._scheduler.reset(seconds);
+      this._clipPlayer.onPositionJump(this._tempoMap.secondsToTicks(seconds));
+    }
+    const listeners = this._listeners.get('discontinuity');
+    if (listeners && listeners.size > 0) {
+      this._emit('discontinuity', { seconds, shiftSeconds });
+    } else if (!this._warnedDiscontinuity) {
+      // Keep the one path that produces an audible artifact visible.
+      this._warnedDiscontinuity = true;
+      console.warn(
+        '[waveform-playlist] Transport: discontinuity — the AudioContext clock went backwards by ' +
+          shiftSeconds +
+          ' s while playing (re-base #' +
+          this._clock.rebaseCount +
+          '); position held at ' +
+          seconds +
+          ' s and scheduled audio re-created. Subscribe to the "discontinuity" event for further occurrences.'
+      );
+    }
+  }
+
+  /** Sources are (re)created from the current anchor here: any re-base
+   *  absorbed before this point concerns audio that no longer exists. */
+  private _markRebasesHandled(): void {
+    this._rebasesHandled = this._clock.rebaseCount;
   }
 
   /** A tick threw: warn once and stop, so the engine sees a `stop` and no
@@ -220,6 +293,8 @@ export class Transport {
 
   play(startTime?: number, endTime?: number): void {
     if (this._refuseIfDisposed('play')) return;
+    if (startTime !== undefined) assertFiniteSeconds('play', 'startTime', startTime);
+    if (endTime !== undefined) assertFiniteSeconds('play', 'endTime', endTime);
     if (this._playing) return;
 
     if (startTime !== undefined) {
@@ -243,6 +318,7 @@ export class Transport {
       endTime !== undefined ? this._tempoMap.secondsToTicks(endTime) : null
     );
 
+    this._markRebasesHandled();
     this._clock.start();
 
     // Re-create sources for clips spanning the current position.
@@ -294,6 +370,9 @@ export class Transport {
 
   seek(time: number): void {
     if (this._refuseIfDisposed('seek')) return;
+    // Before any mutation: a NaN that threw mid-seek left the transport
+    // "playing" with no timer and every source silenced.
+    assertFiniteSeconds('seek', 'time', time);
     const wasPlaying = this._playing;
     const wasCountingIn = this._countingIn;
 
@@ -308,6 +387,7 @@ export class Transport {
 
     this._silenceAll();
     this._clock.seekTo(time);
+    this._markRebasesHandled(); // seek re-creates everything below
     this._scheduler.reset(time);
     // Clear stale endTime — seeking past a previous endTime shouldn't
     // cause immediate stop on the next play()
@@ -336,6 +416,35 @@ export class Transport {
       return this._loopStartSeconds;
     }
     return t;
+  }
+
+  /** Current position in whole AudioContext frames (the clock's native unit
+   *  for elapsed time). Same loop-wrap clamp and count-in hold as
+   *  getCurrentTime(). CONTEXT-rate frames — `getCurrentSample()` is the
+   *  timeline-rate view. */
+  getCurrentFrame(): ContextFrame {
+    if (this._countingIn) {
+      return this._clock.secondsToFrame(this._countInStartPosition);
+    }
+    const frame = this._clock.getFrame();
+    const loopStartFrame = this._clock.secondsToFrame(this._loopStartSeconds);
+    if (this._loopEnabled && frame < loopStartFrame) {
+      return loopStartFrame;
+    }
+    return frame;
+  }
+
+  /** Current position in SampleTimeline samples (the `sampleRate` option's
+   *  rate; equal to getCurrentFrame() only when that matches the context).
+   *  Rounded once, at the Sample boundary. */
+  getCurrentSample(): Sample {
+    return this._sampleTimeline.secondsToSamples(this.getCurrentTime());
+  }
+
+  /** How many backward AudioContext clock readings the transport has absorbed
+   *  (see the `discontinuity` event). Diagnostics. */
+  get rebaseCount(): number {
+    return this._clock.rebaseCount;
   }
 
   isPlaying(): boolean {
@@ -789,9 +898,10 @@ export class Transport {
     lookahead: number,
     timerIntervalMs: number
   ): void {
-    if (sampleRate <= 0) {
+    if (!(Number.isFinite(sampleRate) && sampleRate > 0)) {
       throw new Error(
-        '[waveform-playlist] Transport: sampleRate must be positive, got ' + sampleRate
+        '[waveform-playlist] Transport: options.sampleRate must be a positive finite number, got ' +
+          sampleRate
       );
     }
     if (ppqn <= 0 || !Number.isInteger(ppqn)) {
@@ -934,6 +1044,7 @@ export class Transport {
     this._countInScheduler.addListener(this._countInPlayer);
     this._countInScheduler.reset(0);
     this._clock.seekTo(0);
+    this._markRebasesHandled();
     this._clock.start();
     // Use the main timer to drive the count-in scheduler (one Worker tick source, not two)
     this._timer.start();
@@ -1049,5 +1160,13 @@ export class Transport {
         }
       }
     }
+  }
+}
+
+function assertFiniteSeconds(method: string, name: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      '[waveform-playlist] Transport.' + method + ': ' + name + ' must be finite, got ' + value
+    );
   }
 }

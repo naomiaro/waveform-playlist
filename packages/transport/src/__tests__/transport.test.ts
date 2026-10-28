@@ -655,6 +655,259 @@ describe('Transport', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('a backward re-based context reading re-creates scheduled sources and emits discontinuity', () => {
+    // Sources already armed through the old anchor's toAudioTime() are in
+    // the wrong time base after a re-base; holding the position is not
+    // enough — they must be re-created from the held position.
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0 })])]);
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    const create = ctx.createBufferSource as Mock;
+    const before = create.mock.results.length;
+    expect(before).toBeGreaterThan(0);
+    const firstSource = create.mock.results[0].value;
+    (ctx as any).currentTime = 0.2; // re-based backwards by 0.3 s
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(transport.getCurrentTime()).toBeCloseTo(0.5, 6); // held
+    expect(firstSource.stop).toHaveBeenCalled();
+    expect(create.mock.results.length).toBeGreaterThan(before); // re-created
+    expect(onDiscontinuity).toHaveBeenCalledTimes(1);
+    expect(onDiscontinuity.mock.calls[0][0].seconds).toBeCloseTo(0.5, 6);
+    expect(onDiscontinuity.mock.calls[0][0].shiftSeconds).toBeCloseTo(0.3, 6);
+    expect(transport.rebaseCount).toBe(1);
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+  });
+
+  it('a re-base seen by a UI reader before a stop is not replayed on the next play', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0 })])]);
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.2;
+    transport.getCurrentTime(); // the rAF reader absorbs it; no tick runs before the stop
+    transport.stop();
+    expect(onDiscontinuity).not.toHaveBeenCalled();
+    transport.play();
+    const create = ctx.createBufferSource as Mock;
+    const afterPlay = create.mock.results.length;
+    (ctx as any).currentTime = 0.21;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.25;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(onDiscontinuity).not.toHaveBeenCalled();
+    // A replayed resync would have silenced the sources this run created.
+    const thisRun = create.mock.results.slice(afterPlay);
+    expect(thisRun.length).toBeGreaterThan(0);
+    for (const r of thisRun) expect(r.value.stop).not.toHaveBeenCalled();
+    transport.stop();
+  });
+
+  it('a backward reading while paused re-anchors silently on resume', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play();
+    (ctx as any).currentTime = 1;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    transport.pause();
+    (ctx as any).currentTime = 0.25; // the context clock moved back while nothing was playing
+    transport.play();
+    (ctx as any).currentTime = 0.75;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(onDiscontinuity).not.toHaveBeenCalled();
+    expect(transport.rebaseCount).toBe(0);
+    expect(transport.getCurrentTime()).toBeCloseTo(1.5, 6);
+    transport.stop();
+  });
+
+  it('a re-base absorbed inside seek() while playing is not resynced a second time', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0 })])]);
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.2;
+    transport.seek(0.75); // seek re-creates everything itself
+    const create = ctx.createBufferSource as Mock;
+    const afterSeek = create.mock.results.length;
+    (ctx as any).currentTime = 0.21;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(onDiscontinuity).not.toHaveBeenCalled();
+    expect(create.mock.results.length).toBe(afterSeek);
+    transport.stop();
+  });
+
+  it('a resync in the post-wrap window re-creates from loopStart, not from pre-loop content', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([
+      makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0, durationSamples: 480000 })]),
+    ]);
+    transport.setLoop(true, 1920 as Tick, 3840 as Tick); // [1 s, 2 s)
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play(1);
+    (ctx as any).currentTime = 0.85; // transport 1.85: the lookahead crosses loopEnd → wrap
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(transport.getCurrentTime()).toBe(1); // clamped: the clock sits at 0.85
+    (ctx as any).currentTime = 0.55; // re-based backwards by 0.3 s
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(onDiscontinuity).toHaveBeenCalledTimes(1);
+    expect(onDiscontinuity.mock.calls[0][0].seconds).toBe(1);
+    expect(transport.isPlaying()).toBe(true);
+    (ctx as any).currentTime = 1.6; // keeps looping afterwards
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(transport.getCurrentTime()).toBeGreaterThanOrEqual(1);
+    expect(transport.getCurrentTime()).toBeLessThan(2);
+    transport.stop();
+  });
+
+  it('a resync keeps a bounded play bound', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const ended = vi.fn();
+    transport.on('ended', ended);
+    transport.play(0, 1);
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.2; // held at 0.5
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.65; // 0.95 held-time: not yet
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).not.toHaveBeenCalled();
+    (ctx as any).currentTime = 0.75; // 1.05: past the bound
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
+  it('a re-base during a count-in drops the stale clicks, keeps counting in, and reports the transport position', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const click = {
+      duration: 0.04,
+      length: 1920,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+    transport.setMetronomeClickSounds(click, click);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    const silence = vi.spyOn((transport as any)._countInPlayer, 'silence');
+    transport.play(0.031);
+    (ctx as any).currentTime = 10.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    silence.mockClear();
+    (ctx as any).currentTime = 10.2;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(silence).toHaveBeenCalledTimes(1); // clicks armed in the old time base are dropped
+    expect(transport.isCountingIn()).toBe(true);
+    expect(onDiscontinuity).toHaveBeenCalledTimes(1);
+    expect(onDiscontinuity.mock.calls[0][0].seconds).toBe(0.031); // getCurrentTime()'s hold, not the count-in clock
+    expect(transport.getCurrentFrame()).toBe(1488); // the count-in hold in frames (0.031 × 48000)
+    transport.stop();
+  });
+
+  it('getCurrentFrame mirrors the loop-start clamp with a non-frame-aligned loop start', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx, { tempo: 97 }); // 1 tick = 30.928 frames
+    transport.setLoop(true, 1 as Tick, 2000 as Tick);
+    const rate = 48000;
+    transport.seek(0); // before loopStart: both views clamp
+    expect(transport.getCurrentFrame()).toBe(Math.round(transport.getCurrentTime() * rate));
+    transport.seek(transport.tickToTime(1 as Tick));
+    expect(transport.getCurrentFrame()).toBe(Math.round(transport.getCurrentTime() * rate));
+    transport.seek(transport.tickToTime(1000 as Tick));
+    expect(transport.getCurrentFrame()).toBe(Math.round(transport.getCurrentTime() * rate));
+  });
+
+  it('a discontinuity with no subscriber is warned once per transport', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.2;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.4;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    (ctx as any).currentTime = 0.1;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    const mine = warn.mock.calls.filter((c) => String(c[0]).includes('discontinuity'));
+    expect(mine).toHaveLength(1);
+    expect(String(mine[0][0])).toMatch(/0\.3/); // the shift is in the message
+    expect(transport.rebaseCount).toBe(2);
+    warn.mockRestore();
+    transport.stop();
+  });
+
+  it('seek(NaN) throws before touching playback', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0 })])]);
+    transport.play();
+    (ctx as any).currentTime = 0.1;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS); // the first window arms the clip at tick 0
+    const create = ctx.createBufferSource as Mock;
+    expect(create.mock.results.length).toBe(1);
+    expect(() => transport.seek(NaN)).toThrow(/finite/);
+    expect(transport.isPlaying()).toBe(true);
+    expect(create.mock.results[0].value.stop).not.toHaveBeenCalled(); // not silenced
+    expect(transport.getCurrentTime()).toBeCloseTo(0.1, 6); // position untouched
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(transport.getCurrentTime()).toBeCloseTo(0.5, 6); // the timer is still running
+    expect(() => transport.play(Infinity)).toThrow(/finite/);
+    transport.stop();
+  });
+
+  it('getCurrentSample is the timeline-rate view of getCurrentFrame', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx, { sampleRate: 44100 });
+    transport.seek(1);
+    expect(transport.getCurrentFrame()).toBe(48000);
+    expect(transport.getCurrentSample()).toBe(44100);
+  });
+
+  it('rejects an AudioContext without a sampleRate, naming the context (not the option)', () => {
+    expect(() => new Transport({ currentTime: 0 } as unknown as AudioContext)).toThrow(
+      /AudioContext.*sampleRate/
+    );
+    // The option only sets the SampleTimeline's rate; it cannot stand in for the context's.
+    expect(
+      () => new Transport({ currentTime: 0 } as unknown as AudioContext, { sampleRate: 48000 })
+    ).toThrow(/AudioContext.*sampleRate/);
+    expect(() => new Transport(mockAudioContext(), { sampleRate: 0 })).toThrow(
+      /options\.sampleRate/
+    );
+  });
+
+  it('getCurrentFrame mirrors getCurrentTime in context frames (#636)', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    expect(transport.getCurrentFrame()).toBe(24000);
+    expect(transport.getCurrentTime()).toBe(0.5);
+    transport.stop();
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
