@@ -212,24 +212,55 @@ describe('createWamTransportBridge', () => {
     expect(lastEvent(node).data.timeSigDenominator).toBe(8);
   });
 
-  it('rebroadcasts on loop wrap and on a clock discontinuity (the position jumped)', () => {
+  it('rebroadcasts when a tick sees the position move backwards (loop wrap)', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+    transport._playing = true;
+    transport.emit('play'); // at 10 s
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
+
+    transport._seconds = 10.5;
+    tick(transport);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(1); // moving forward: nothing
+
+    // The transport wrapped: the real Transport emits no event for this, the
+    // position (getCurrentTime, loop-start clamped) just reads lower.
+    transport._seconds = 8;
+    tick(transport);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+    // bar 6 began at 8 s → began "now" in context time
+    expect(lastEvent(node).data.currentBarStarted).toBe(100);
+
+    transport._seconds = 8.1;
+    tick(transport);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('a backwards seek does not double-broadcast on the following tick', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+    transport._playing = true;
+    transport.emit('play'); // 10 s
+    transport._seconds = 2;
+    transport.emit('seek');
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+    tick(transport);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+  });
+
+  it('rebroadcasts on a clock discontinuity (the context-time anchor shifted)', () => {
     const transport = makeMockTransport();
     const node = makeMockNode();
     createWamTransportBridge(transport, () => [node]);
     transport._playing = true;
     transport.emit('play');
-    expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
-
-    transport._seconds = 8; // wrapped back to the loop start (bar 6 began at 8 s)
-    transport.emit('loop');
-    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
-    expect(lastEvent(node).data.currentBarStarted).toBe(100);
-
     transport.emit('discontinuity');
-    expect(node.scheduleEvents).toHaveBeenCalledTimes(3);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
   });
 
-  it('dispose unsubscribes tick, loop and discontinuity as well', () => {
+  it('dispose unsubscribes tick and discontinuity as well', () => {
     const transport = makeMockTransport();
     const node = makeMockNode();
     const bridge = createWamTransportBridge(transport, () => [node]);
@@ -238,11 +269,11 @@ describe('createWamTransportBridge', () => {
     bridge.dispose();
     const subscribed = (transport.on as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
     const unsubscribed = (transport.off as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
-    expect(subscribed).toEqual(expect.arrayContaining(['tick', 'loop', 'discontinuity']));
+    expect(subscribed).toEqual(expect.arrayContaining(['tick', 'discontinuity']));
     expect([...unsubscribed].sort()).toEqual([...subscribed].sort());
     transport._tempo = 50;
     tick(transport);
-    transport.emit('loop');
+    transport.emit('discontinuity');
     expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
   });
 });

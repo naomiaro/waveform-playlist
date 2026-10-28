@@ -222,7 +222,7 @@ The panel is unstyled-but-themable: it reads the dawcore CSS custom properties (
 
 ### Transport sync
 
-`createWamTransportBridge(transport, getPluginNodes)` broadcasts `wam-transport` events (`{ playing, tempo, timeSigNumerator, timeSigDenominator, currentBar, currentBarStarted }`) to all live plugin nodes so tempo-synced effects (delays, LFOs, arpeggiators) lock to the timeline. It rebroadcasts on play/pause/stop/seek and tempo/meter changes, plus a rAF watcher (active only while playing) that catches variable-tempo map boundary crossings, which emit no transport event.
+`createWamTransportBridge(transport, getPluginNodes)` broadcasts `wam-transport` events (`{ playing, tempo, timeSigNumerator, timeSigDenominator, currentBar, currentBarStarted }`) to all live plugin nodes so tempo-synced effects (delays, LFOs, arpeggiators) lock to the timeline. It rebroadcasts on play/pause/stop/seek, tempo/meter changes and clock discontinuities, and on every transport `tick` (`@dawcore/transport` ≥ 0.0.15; one per Worker-driven scheduler tick while playing, so it keeps working in a hidden tab) it rebroadcasts when the playhead crossed a tempo/meter-map boundary or moved backwards (a loop wrap) — neither emits a transport event. It never polls `requestAnimationFrame`.
 
 ```typescript
 import { createWamTransportBridge } from '@dawcore/wam';

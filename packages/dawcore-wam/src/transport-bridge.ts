@@ -48,25 +48,29 @@ export interface WamTransportBridge {
  * Broadcasts `wam-transport` events to all live plugin nodes so tempo-synced
  * effects (delays, LFOs, arpeggiators) lock to the timeline.
  *
- * Rebroadcast triggers: play, pause, stop, seek, loop, discontinuity,
- * tempochange, meterchange — plus the transport's `tick` event (one per
- * Worker-driven scheduler tick while playing), on which the bridge compares
- * tempo/meter at the playhead and rebroadcasts when a tempo/meter map
- * boundary was crossed (variable-tempo sessions emit no event for that).
- * Nothing here uses requestAnimationFrame: rAF stops in a hidden tab while
- * the transport keeps playing (#645).
+ * Rebroadcast triggers: play, pause, stop, seek, discontinuity, tempochange,
+ * meterchange — plus the transport's `tick` event (one per Worker-driven
+ * scheduler tick while playing), on which the bridge rebroadcasts when the
+ * playhead crossed a tempo/meter map boundary (variable-tempo sessions emit
+ * no event for that) or moved BACKWARDS (a loop wrap: the transport performs
+ * it without an event; the clamped position just reads lower). Nothing here
+ * uses requestAnimationFrame: rAF stops in a hidden tab while the transport
+ * keeps playing (#645).
  */
 export function createWamTransportBridge(
   transport: TransportQueryLike,
   getPluginNodes: () => WamTransportNode[]
 ): WamTransportBridge {
   let disposed = false;
+  /** Position at the last broadcast/tick; a lower reading means a wrap. */
+  let lastSeconds = -Infinity;
   let lastTempo: number | null = null;
   let lastNumerator: number | null = null;
   let lastDenominator: number | null = null;
 
   const computeData = (): WamTransportData => {
     const seconds = transport.getCurrentTime();
+    lastSeconds = seconds;
     const tick = transport.timeToTick(seconds);
     const tempo = transport.getTempo(tick);
     const meter = transport.getMeter(tick);
@@ -104,15 +108,19 @@ export function createWamTransportBridge(
     }
   };
 
-  // Per scheduler tick: catches tempo/meter map boundary crossings during
-  // playback, which fire no transport event. A tick can arrive after stop
-  // (one was in flight), so the playing check stays.
+  // Per scheduler tick: catches tempo/meter map boundary crossings and loop
+  // wraps during playback, neither of which fires a transport event. A tick
+  // can arrive after stop (one was in flight), so the playing check stays.
   const onTick = (): void => {
     if (disposed || !transport.isPlaying()) return;
-    const tick = transport.timeToTick(transport.getCurrentTime());
+    const seconds = transport.getCurrentTime();
+    const wrapped = seconds < lastSeconds;
+    lastSeconds = seconds;
+    const tick = transport.timeToTick(seconds);
     const tempo = transport.getTempo(tick);
     const meter = transport.getMeter(tick);
     if (
+      wrapped ||
       tempo !== lastTempo ||
       meter.numerator !== lastNumerator ||
       meter.denominator !== lastDenominator
@@ -130,7 +138,6 @@ export function createWamTransportBridge(
     ['pause', onChange],
     ['stop', onChange],
     ['seek', onChange],
-    ['loop', onChange],
     ['discontinuity', onChange],
     ['tempochange', onChange],
     ['meterchange', onChange],

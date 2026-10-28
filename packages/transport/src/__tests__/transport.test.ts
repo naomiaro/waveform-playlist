@@ -351,6 +351,24 @@ describe('Transport', () => {
       expect(onTick).toHaveBeenCalledTimes(2);
     });
 
+    it('reports the clamped position after a loop wrap (what getCurrentTime() returns)', () => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx);
+      const seen: number[] = [];
+      transport.on('tick', ({ seconds }) => seen.push(seconds));
+      transport.setLoop(true, 0 as Tick, 1920 as Tick); // [0, 1 s) at 120 bpm
+      transport.play(0);
+      (ctx as any).currentTime = 0.9; // the 200 ms lookahead crosses loopEnd → wrap
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(seen.length).toBe(2);
+      // The clock sits behind loopStart right after the wrap; the event must
+      // not leak that — it reports the same clamped value as getCurrentTime().
+      expect(seen[1]).toBe(transport.getCurrentTime());
+      expect(seen[1]).toBeGreaterThanOrEqual(0);
+      transport.stop();
+    });
+
     it('does not fire during a count-in, and not on the tick that ends bounded playback', () => {
       const ctx = mockAudioContext(10);
       const transport = new Transport(ctx);
