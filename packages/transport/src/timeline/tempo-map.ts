@@ -158,16 +158,29 @@ export class TempoMap {
     this._recomputeCache(i);
   }
 
-  ticksToSeconds(ticks: Tick): number {
+  /** Tick position → seconds. Accepts a fractional position (e.g. the value
+   *  secondsToTicksExact returned) as well as an integer Tick. */
+  ticksToSeconds(ticks: number): number {
     assertFiniteInput('ticks', ticks);
     return assertFiniteResult('ticks ' + ticks, this._ticksToSecondsInternal(ticks));
   }
 
+  /** Seconds → integer ticks, rounded once here at the `Tick` boundary.
+   *  Use secondsToTicksExact() for sub-tick placement. */
   secondsToTicks(seconds: number): Tick {
+    return Math.round(this.secondsToTicksExact(seconds)) as Tick;
+  }
+
+  /** Seconds → fractional tick position (unrounded). The integer producers
+   *  round this once at their own boundary (secondsToTicks,
+   *  SampleTimeline.samplesToTicks); sub-tick consumers (placing a recorded
+   *  note between ticks before quantising, continuous beat positions) use it
+   *  directly. Not clamped: negative seconds convert at the constant initial
+   *  tempo to negative ticks (whatever the first segment's interpolation),
+   *  and seconds past the last entry extrapolate the last tempo forwards. */
+  secondsToTicksExact(seconds: number): number {
     assertFiniteInput('seconds', seconds);
-    return Math.round(
-      assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds))
-    ) as Tick;
+    return assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds));
   }
 
   private _secondsToTicksRaw(seconds: number): number {
@@ -219,11 +232,12 @@ export class TempoMap {
   }
 
   beatsToSeconds(beats: number): number {
-    return this.ticksToSeconds((beats * this._ppqn) as Tick);
+    return this.ticksToSeconds(beats * this._ppqn);
   }
 
+  /** Continuous beat position (fractional) — not quantised to whole ticks. */
   secondsToBeats(seconds: number): number {
-    return this.secondsToTicks(seconds) / this._ppqn;
+    return this.secondsToTicksExact(seconds) / this._ppqn;
   }
 
   clearTempos(): void {
@@ -267,7 +281,7 @@ export class TempoMap {
     return entry.bpm;
   }
 
-  private _ticksToSecondsInternal(ticks: Tick): number {
+  private _ticksToSecondsInternal(ticks: number): number {
     if (ticks < 0) return (ticks * 60) / (this._entries[0].bpm * this._ppqn);
     const entryIndex = this._entryIndexAt(ticks);
     const entry = this._entries[entryIndex];
@@ -329,8 +343,8 @@ export class TempoMap {
    * then ticks = (bpmAtTick - bpm0) * T / deltaBpm
    *
    * Note: exp(log(x)) has ~1 ULP floating-point error, so integer round-trips
-   * rely on the rounding in secondsToTicks. Sufficient for all tested BPM
-   * ranges (10–300 BPM).
+   * rely on the rounding in secondsToTicks; secondsToTicksExact returns the
+   * raw value. Sufficient for all tested BPM ranges (10–300 BPM).
    */
   private _secondsToTicksLinear(
     seconds: number,
@@ -435,7 +449,7 @@ export class TempoMap {
     return { c, cB, cA: c * bpm0 - cB, base: (totalSegmentTicks * 60) / this._ppqn };
   }
 
-  private _entryIndexAt(tick: Tick): number {
+  private _entryIndexAt(tick: number): number {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {

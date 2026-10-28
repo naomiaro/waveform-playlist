@@ -557,13 +557,20 @@ export class Transport {
     return this._meterMap.tickToBar(tick);
   }
 
-  /** Convert transport time (seconds) to tick position, using the tempo map. */
+  /** Convert transport time (seconds) to an integer tick position, using the tempo map. */
   timeToTick(seconds: number): Tick {
     return this._tempoMap.secondsToTicks(seconds);
   }
 
-  /** Convert tick position to transport time (seconds), using the tempo map. */
-  tickToTime(tick: Tick): number {
+  /** Convert transport time (seconds) to a fractional tick position — for
+   *  sub-tick placement (e.g. a recorded note between ticks, before quantising). */
+  timeToTickExact(seconds: number): number {
+    return this._tempoMap.secondsToTicksExact(seconds);
+  }
+
+  /** Convert a tick position (integer Tick or the fractional value
+   *  timeToTickExact returned) to transport time (seconds). */
+  tickToTime(tick: number): number {
     return this._tempoMap.ticksToSeconds(tick);
   }
 

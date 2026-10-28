@@ -54,8 +54,10 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 ### Dual Coordinate System
 
-- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples). Also `ticksToSamples()` / `samplesToTicks()` via TempoMap (requires `setTempoMap()` before use).
-- **TempoMap** — converts between ticks and seconds. `secondsToTicks()` returns `Math.round()` (integer). `ticksToSeconds()` stays float for audio scheduling. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples). Also `ticksToSamples()` / `samplesToTicks()` via TempoMap (requires `setTempoMap()` before use); `samplesToTicksExact()` is the fractional variant.
+- **TempoMap** — converts between ticks and seconds. `secondsToTicksExact()` returns the fractional position; `secondsToTicks()` is `Math.round()` of it (integer `Tick`). `ticksToSeconds()` stays float for audio scheduling. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+
+**Rounding happens once, at the unit boundary (#636):** the math (`secondsToTicksExact`, `samplesToTicksExact`, `Transport.timeToTickExact`, `secondsToBeats`) is fractional; the integer-`Tick` producers round exactly once — `TempoMap.secondsToTicks` rounds the exact value, `SampleTimeline.samplesToTicks` mirrors that on the sample path, and `Transport.timeToTick` / the scheduler cursor just consume `secondsToTicks`. Rounding EXTERNAL tick input at an API boundary (`Scheduler.setLoop`'s `Math.round`) is fine — the rule is: never round inside the conversion math and again on its result. `ticksToSeconds`/`tickToTime` accept fractional positions, so an exact value converts back without a cast. `secondsToTicksExact` is NOT clamped (negative seconds convert at the constant initial tempo; past the last entry the last tempo is extrapolated). `NativePlayoutAdapter.secondsToTicksExact` and `TonePlayoutAdapter.secondsToTicksExact` (optional on the engine `PlayoutAdapter`) make the fractional path AVAILABLE to engine/dawcore consumers — none use it yet; both adapters' `secondsToTicks` round (Tone's used to return the fraction). Pattern after SoundCraft's `samples_to_ticks_f` / `samples_to_ticks` pair. New conversions follow the same shape: an `*Exact` fractional method plus a rounding wrapper — never round inside the math and again at the caller.
 - **MeterMap** — time signature entries at tick positions. See MeterMap section below.
 
 SampleTimeline converts between samples, seconds, and ticks (via TempoMap). The Scheduler works in integer ticks — seconds from the Clock are converted at the top of `advance()`. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples.
@@ -149,7 +151,7 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 Thin bridge to `PlaylistEngine`. Implements all `PlayoutAdapter` methods (required + optional: `addTrack`, `removeTrack`, `updateTrack`). `init()` resumes suspended AudioContext and waits for Safari warmup (see Patterns). `transport` getter exposes the Transport for direct access to tempo, metronome, and effects hooks.
 
-`setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` — delegate to the underlying Transport. These enable the engine to forward tempo changes and use the adapter's TempoMap for `startSample` cache recomputation.
+`setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` (integer), `secondsToTicksExact(seconds)` (fractional) — delegate to the underlying Transport. These enable the engine to forward tempo changes and use the adapter's TempoMap for `startSample` cache recomputation.
 
 ## Patterns
 

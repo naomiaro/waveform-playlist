@@ -138,7 +138,8 @@ export class Scheduler<T extends SchedulerEvent> {
     this._playEnd = endTick == null ? null : Math.round(endTick);
   }
 
-  /** Reset scheduling cursor. Takes seconds (from Clock), converts to ticks. */
+  /** Reset scheduling cursor. Takes seconds (from Clock), converts to integer
+   *  ticks — secondsToTicks rounds once here; the cursor is always whole ticks. */
   reset(timeSeconds: number): void {
     this._rightEdge = this._tempoMap.secondsToTicks(timeSeconds);
   }

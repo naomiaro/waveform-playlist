@@ -617,3 +617,87 @@ describe('TempoMap curve integration accuracy', () => {
     );
   });
 });
+
+describe('TempoMap fractional conversions (#636)', () => {
+  // 120 BPM × 960 PPQN = 1920 ticks per second → 0.0005 s is 0.96 ticks.
+  it('secondsToTicksExact returns the unrounded tick position', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicksExact(0.0005)).toBeCloseTo(0.96, 10);
+  });
+
+  it('secondsToTicks rounds that exact value once, at the integer-Tick boundary', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicks(0.0005)).toBe(1);
+    expect(tm.secondsToTicks(0.00025)).toBe(0); // 0.48 ticks
+  });
+
+  it('secondsToTicksExact round-trips fractional ticks through step, linear and curve segments', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    tm.setTempo(100, 7680 as Tick, { interpolation: 'linear' });
+    tm.setTempo(100, 11520 as Tick);
+    for (const tick of [1234.5, 5000.25, 9000.75, 12000.125]) {
+      const seconds = tm.ticksToSeconds(tick as Tick);
+      expect(tm.secondsToTicksExact(seconds)).toBeCloseTo(tick, 6);
+    }
+  });
+
+  it('secondsToBeats is continuous, not quantised to whole ticks', () => {
+    const tm = new TempoMap(960, 120);
+    // 0.96 ticks = 0.001 beats; the old integer path returned 1/960 ≈ 0.00104.
+    expect(tm.secondsToBeats(0.0005)).toBeCloseTo(0.001, 10);
+  });
+
+  it('secondsToTicksExact is continuous at a tempo-change boundary and beyond the last entry', () => {
+    // 120 BPM then 60 BPM from tick 3840 (2 s). The boundary must round-trip
+    // exactly, the instant before it must not overshoot into the next segment,
+    // and positions beyond the last entry extrapolate at the last tempo.
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick);
+    const boundarySeconds = tm.ticksToSeconds(3840 as Tick);
+    expect(boundarySeconds).toBeCloseTo(2, 12);
+    expect(tm.secondsToTicksExact(boundarySeconds)).toBeCloseTo(3840, 9);
+    expect(tm.secondsToTicksExact(boundarySeconds - 1e-9)).toBeLessThanOrEqual(3840);
+    expect(tm.secondsToTicksExact(boundarySeconds - 1e-9)).toBeCloseTo(3840 - 1e-9 * 1920, 6);
+    // Beyond the last entry: 60 BPM = 960 ticks/s
+    expect(tm.secondsToTicksExact(5)).toBeCloseTo(3840 + 3 * 960, 9);
+    expect(tm.secondsToTicksExact(5.0005)).toBeCloseTo(3840 + 3 * 960 + 0.48, 9);
+  });
+
+  it('ticksToSeconds is continuous and monotonic across a tempo boundary for fractional ticks', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick);
+    expect(tm.ticksToSeconds(3839.5)).toBeCloseTo(2 - 0.5 / 1920, 12);
+    expect(tm.ticksToSeconds(3840.5)).toBeCloseTo(2 + 0.5 / 960, 12);
+    expect(tm.ticksToSeconds(3839.999)).toBeLessThan(tm.ticksToSeconds(3840 as Tick));
+    expect(tm.ticksToSeconds(3840 as Tick)).toBeLessThan(tm.ticksToSeconds(3840.001));
+  });
+
+  it('beatsToSeconds and secondsToBeats are exact inverses on a multi-segment map', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick, { interpolation: 'linear' });
+    tm.setTempo(90, 7680 as Tick);
+    for (const seconds of [0.3, 2.7, 5.1]) {
+      expect(tm.beatsToSeconds(tm.secondsToBeats(seconds))).toBeCloseTo(seconds, 10);
+    }
+  });
+
+  it('negative fractional ticks convert back to the negative seconds they came from', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.ticksToSeconds(-19.2)).toBeCloseTo(-0.01, 12);
+  });
+
+  it('secondsToTicksExact extrapolates linearly for negative seconds (no clamping)', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicksExact(-0.01)).toBeCloseTo(-19.2, 9);
+    expect(tm.secondsToTicks(-0.01)).toBe(-19);
+  });
+
+  it('ticksToSeconds accepts a fractional tick position', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    const exact = tm.secondsToTicksExact(1.2345);
+    expect(Number.isInteger(exact)).toBe(false);
+    expect(tm.ticksToSeconds(exact)).toBeCloseTo(1.2345, 10);
+  });
+});

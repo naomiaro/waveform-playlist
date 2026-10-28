@@ -191,11 +191,16 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   ticksToSeconds(tick: number): number {
-    return this._transport.tickToTime(tick as Tick);
+    return this._transport.tickToTime(tick);
   }
 
   secondsToTicks(seconds: number): number {
     return this._transport.timeToTick(seconds) as number;
+  }
+
+  /** Fractional tick position (engine `PlayoutAdapter.secondsToTicksExact`). */
+  secondsToTicksExact(seconds: number): number {
+    return this._transport.timeToTickExact(seconds);
   }
 
   get masterOutputNode(): AudioNode {

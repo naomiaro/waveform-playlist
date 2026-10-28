@@ -43,10 +43,17 @@ export interface PlayoutAdapter {
   setTempo?(bpm: number, atTick?: number): boolean | void;
   /** Set time signature at a tick position. */
   setMeter?(numerator: number, denominator: number, atTick?: number): void;
-  /** Convert ticks to seconds using the adapter's tempo map. */
+  /** Convert ticks to seconds using the adapter's tempo map. Accepts a
+   *  fractional tick position (e.g. from secondsToTicksExact). */
   ticksToSeconds?(tick: number): number;
-  /** Convert seconds to ticks using the adapter's tempo map. */
+  /** Convert seconds to an integer tick using the adapter's tempo map. */
   secondsToTicks?(seconds: number): number;
+  /** Convert seconds to a fractional tick position using the adapter's tempo
+   *  map — for sub-tick placement (a recorded note between ticks, before
+   *  quantising). Optional; an adapter that cannot provide it leaves it out,
+   *  and a consumer that needs it should fall back to secondsToTicks (no
+   *  engine code path consumes it yet). */
+  secondsToTicksExact?(seconds: number): number;
   /** Register a worklet module URL on this adapter's AudioContext.
    *  Abstracts native vs standardized-audio-context differences. */
   addWorkletModule?(url: string): Promise<void>;
