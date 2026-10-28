@@ -791,6 +791,12 @@ describe('TempoMap immutability (#636)', () => {
     ).toThrow(/internal/);
   });
 
+  it('rejects a non-positive or fractional ppqn at construction', () => {
+    expect(() => new TempoMap(0, 120)).toThrow(/ppqn/);
+    expect(() => new TempoMap(-960, 120)).toThrow(/ppqn/);
+    expect(() => new TempoMap(1.5, 120)).toThrow(/ppqn/);
+  });
+
   it('a snapshot taken before an edit keeps converting with the old tempo', () => {
     const before = new TempoMap(960, 120);
     const after = before.withTempo(240, 0 as Tick);

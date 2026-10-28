@@ -224,7 +224,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' | { type: 'curve', slope } }`. Returns `boolean`: a defaulted `atTick` is the single-BPM convenience path and is refused (with a warning) when the tempo map has more than one entry — pass an explicit `atTick` to modify a tempo curve.
 - `removeTempo(atTick: Tick)` — remove the tempo entry at a tick (the tick-0 entry cannot be removed)
 - `clearTempos()` — remove all tempo entries
-- `tempoMap` (getter) — the current `TempoMap`. It is an immutable value: every tempo edit swaps in a new map, so a reference you hold keeps converting with the tempo it had. `TempoMap` itself exposes `withTempo(bpm, atTick?, options?)`, `withoutTempo(atTick)`, `withoutTempos()` (each returns a new map) and `entries` (frozen, tick-ordered, with cumulative `secondsAtTick`).
+- `tempoMap` (getter) — the current `TempoMap`. It is an immutable value: every edit that changes the map swaps in a new one, so a reference you hold keeps converting with the tempo it had. `TempoMap` itself exposes `withTempo(bpm, atTick?, options?)`, `withoutTempo(atTick)`, `withoutTempos()` (each returns a new map) and `entries` (frozen, tick-ordered, with cumulative `secondsAtTick`).
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`
 - `barToTick(bar): Tick` / `tickToBar(tick: Tick)`

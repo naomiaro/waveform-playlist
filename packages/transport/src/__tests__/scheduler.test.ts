@@ -491,6 +491,34 @@ describe('Scheduler (tick-based)', () => {
         [0, 960],
         [0, 288],
       ]);
+      // The swap must still re-anchor the cursor once the window is done:
+      // 288 ticks at 120 BPM is 0.15 s, which is 576 ticks at 240 BPM. The
+      // next window starts there — not at a stale 288 (which would regenerate
+      // 0.075 s of already-scheduled audio).
+      scheduler.advance(0.5);
+      expect(listener.generateRanges[2][0]).toBe(576);
+    });
+
+    it('raising the tempo while looping never leaves the cursor past loopEnd', () => {
+      // Loop [0, 3840) at 120 BPM; the edge sits at 1.9 s = 3648 ticks. At
+      // 140 BPM that same 1.9 s is 4256 ticks — past loopEnd. The next
+      // advance() must wrap (not run past the loop forever).
+      const loopCalls: number[] = [];
+      const scheduler = createScheduler(0.2, (start) => loopCalls.push(start));
+      const listener = createMockListener();
+      scheduler.addListener(listener);
+      scheduler.setLoop(true, 0 as Tick, 3840 as Tick);
+      scheduler.advance(1.7);
+      expect(loopCalls).toHaveLength(0);
+      scheduler.setTempoMap(new TempoMap(ppqn, 140));
+      scheduler.advance(1.8);
+      expect(loopCalls).toHaveLength(1);
+      for (let t = 1.9; t < 6; t += 0.1) scheduler.advance(t);
+      expect(loopCalls.length).toBeGreaterThan(1);
+      for (const [from, to] of listener.generateRanges) {
+        expect(from).toBeGreaterThanOrEqual(0);
+        expect(to).toBeLessThanOrEqual(3840);
+      }
     });
   });
 });

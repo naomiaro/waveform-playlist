@@ -397,4 +397,30 @@ describe('Transport Count-In', () => {
     warn.mockRestore();
     transport.stop();
   });
+
+  it('a tempo change during the count-in does not alter the count-in but applies afterwards (#636)', () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const click = {
+      duration: 0.04,
+      length: 1920,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+    transport.setMetronomeClickSounds(click, click);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    const onEnd = vi.fn();
+    transport.on('countInEnd', onEnd);
+    transport.play(0, 4);
+    transport.setTempo(240); // the count-in keeps its dedicated 120 BPM map
+    (ctx as any).currentTime = 11.5; // 1.5 s in: a 240 BPM bar would be over (1 s), a 120 BPM one is not
+    for (const cb of [...rafCallbacks]) cb(16);
+    expect(onEnd).not.toHaveBeenCalled();
+    (ctx as any).currentTime = 12.5;
+    for (const cb of [...rafCallbacks]) cb(32);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(transport.tempoMap.getTempo()).toBe(240);
+    transport.stop();
+  });
 });

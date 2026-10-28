@@ -89,7 +89,12 @@ export interface SetTempoOptions {
 /** Module-private token: the entries constructor form is only reachable from
  *  withTempo/withoutTempo (via _derive). A caller without the token gets a
  *  thrown error instead of a map built from unvalidated, unsealed entries. */
-const INTERNAL = Symbol('TempoMap.internal');
+const INTERNAL: unique symbol = Symbol('TempoMap.internal');
+/** The type of the module-private constructor token. Exported so the
+ *  constructor overload can name it in the published declarations; no value
+ *  of this type exists outside this module, so the overload is unusable
+ *  (not just guarded at runtime) from anywhere else. */
+export type TempoMapInternalToken = typeof INTERNAL;
 
 function freezeInterpolation(interpolation: TempoInterpolation): TempoInterpolation {
   return typeof interpolation === 'object'
@@ -132,10 +137,18 @@ export class TempoMap {
    *  form is internal: it is how withTempo/withoutTempo build their result
    *  (entries already validated, cached and sealed) and it requires a
    *  module-private token, so it cannot be used from outside. */
+  /** Defaults: 960 PPQN, 120 BPM. */
   constructor(ppqn?: number, initialBpm?: number);
   /** @internal */
-  constructor(ppqn: number, entries: readonly TempoEntry[], token: symbol);
-  constructor(ppqn: number = 960, init: number | readonly TempoEntry[] = 120, token?: symbol) {
+  constructor(ppqn: number, entries: readonly TempoEntry[], token: TempoMapInternalToken);
+  constructor(
+    ppqn: number = 960,
+    init: number | readonly TempoEntry[] = 120,
+    token?: TempoMapInternalToken
+  ) {
+    if (!Number.isInteger(ppqn) || ppqn <= 0) {
+      throw new Error('[waveform-playlist] TempoMap: ppqn must be a positive integer, got ' + ppqn);
+    }
     this._ppqn = ppqn;
     if (typeof init === 'number') {
       TempoMap._validateBpm(init);
@@ -180,8 +193,8 @@ export class TempoMap {
   }
 
   /** Return a new map with `bpm` at `atTick` (replacing an existing entry
-   *  there). Tick 0 is always 'step'. Throws on an invalid BPM or curve slope;
-   *  this map is never modified. */
+   *  there). Tick 0 is always 'step'. Throws on an invalid BPM, curve slope
+   *  or atTick (non-negative integer); this map is never modified. */
   withTempo(bpm: number, atTick: Tick = 0 as Tick, options?: SetTempoOptions): TempoMap {
     TempoMap._validateBpm(bpm);
     validateTick('atTick', atTick);
@@ -204,9 +217,8 @@ export class TempoMap {
       entries[0] = { ...entries[0], bpm, interpolation: 'step' };
       return this._derive(entries, 0);
     }
-    // Find insertion point
-    let i = entries.length - 1;
-    while (i > 0 && entries[i].tick > atTick) i--;
+    // Last entry at or before atTick (binary search)
+    let i = this._entryIndexAt(atTick);
 
     if (entries[i].tick === atTick) {
       entries[i] = { ...entries[i], bpm, interpolation };
@@ -220,7 +232,7 @@ export class TempoMap {
 
   /** Return a new map without the entry at exactly `atTick`. The tick-0 entry
    *  is permanent (a map must always have a tempo), and a tick with no entry
-   *  is a no-op — both return this same map. */
+   *  is a no-op — both return this same map. An invalid tick throws. */
   withoutTempo(atTick: Tick): TempoMap {
     validateTick('atTick', atTick);
     if (atTick === 0) return this;
