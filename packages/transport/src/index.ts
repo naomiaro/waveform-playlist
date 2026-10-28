@@ -21,7 +21,7 @@ export { Clock } from './core/clock';
 export { Scheduler, type SchedulerOptions } from './core/scheduler';
 export { Timer } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';
-export { TempoMap, type SetTempoOptions } from './timeline/tempo-map';
+export { TempoMap, type SetTempoOptions, type TempoMapInternalToken } from './timeline/tempo-map';
 export { MeterMap } from './timeline/meter-map';
 export {
   quantizeTick,

@@ -87,12 +87,34 @@ export class Scheduler<T extends SchedulerEvent> {
   private _onError: ((error: SchedulerListenerError) => void) | undefined;
   private readonly _errorLog = new ListenerErrorLog('[waveform-playlist] Scheduler: ');
   private _tempoMap: TempoMap;
+  /** The map an advance() in progress started with; null between calls. */
+  private _advancingWith: TempoMap | null = null;
 
   constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
     this._tempoMap = tempoMap;
     this._lookahead = options.lookahead ?? 0.2;
     this._onLoop = options.onLoop;
     this._onError = options.onError;
+  }
+
+  /** Swap in a new (immutable) TempoMap. The scheduling cursor is re-anchored
+   *  through seconds — the window already handed to listeners (in seconds)
+   *  stays covered, so the next advance() neither regenerates it nor stalls
+   *  until the clock catches up with the old edge's new tick value. If that
+   *  puts the cursor at or past loopEnd (a faster tempo while looping) it is
+   *  clamped to loopEnd and the next advance() wraps immediately. Loop bounds
+   *  stay in ticks (they are musical positions); a seconds-defined play end
+   *  is the Transport's to recompute. Called from inside advance() (a
+   *  listener's generate()/consume() swapping the map directly) the swap is
+   *  recorded and the re-anchor happens when that window completes — the
+   *  window in progress keeps the TEMPO map it started with (loop bounds and
+   *  the MeterMap are not snapshotted). Audio already scheduled in the
+   *  lookahead keeps its old-tempo timing. */
+  setTempoMap(tempoMap: TempoMap): void {
+    if (this._advancingWith === null) {
+      this._reanchorCursor(this._tempoMap, tempoMap);
+    }
+    this._tempoMap = tempoMap;
   }
 
   addListener(listener: SchedulerListener<T>): void {
@@ -146,25 +168,41 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Advance the scheduling window. Takes seconds (from Clock), converts to ticks. */
   advance(currentTimeSeconds: number): void {
-    const targetTick = this._tempoMap.secondsToTicks(currentTimeSeconds + this._lookahead);
+    // One map for the whole window: a listener callback may swap the map
+    // and must not change the conversions of the window already being
+    // generated. A swap made meanwhile is applied to the cursor on exit.
+    const tempoMap = this._tempoMap;
+    this._advancingWith = tempoMap;
+    try {
+      this._advanceWith(tempoMap, currentTimeSeconds);
+    } finally {
+      this._advancingWith = null;
+      if (this._tempoMap !== tempoMap) {
+        this._reanchorCursor(tempoMap, this._tempoMap);
+      }
+    }
+  }
+
+  private _advanceWith(tempoMap: TempoMap, currentTimeSeconds: number): void {
+    const targetTick = tempoMap.secondsToTicks(currentTimeSeconds + this._lookahead);
 
     if (this._loopEnabled && this._loopEnd > this._loopStart) {
-      const loopDuration = this._loopEnd - this._loopStart;
       let remaining = targetTick - this._rightEdge;
 
       while (remaining > 0) {
         const distToEnd = this._loopEnd - this._rightEdge;
-        if (distToEnd <= 0 || distToEnd > remaining) {
+        if (distToEnd > remaining) {
           this._generateAndConsume(this._rightEdge, this._rightEdge + remaining);
           this._rightEdge += remaining;
           break;
         }
-        // Generate up to loopEnd
-        this._generateAndConsume(this._rightEdge, this._loopEnd);
-        remaining -= distToEnd;
-        // Notify listeners of position jump (in ticks). A throwing listener
-        // must not abort the wrap: the cursor reset and clock seek below
-        // have to happen or the next window generates past loopEnd again.
+        if (distToEnd > 0) {
+          // Generate up to loopEnd …
+          this._generateAndConsume(this._rightEdge, this._loopEnd);
+          remaining -= distToEnd;
+        }
+        // … then wrap. A cursor already at loopEnd (clamped there after a
+        // tempo swap) wraps without generating anything first.
         for (const listener of this._listeners) {
           try {
             listener.onPositionJump(this._loopStart as Tick);
@@ -180,14 +218,11 @@ export class Scheduler<T extends SchedulerEvent> {
         // Seek clock — passes the currentTimeSeconds snapshot so Transport
         // uses the same clock reading as advance(), not a live re-read.
         this._onLoop?.(
-          this._tempoMap.ticksToSeconds(this._loopStart as Tick),
-          this._tempoMap.ticksToSeconds(this._loopEnd as Tick),
+          tempoMap.ticksToSeconds(this._loopStart as Tick),
+          tempoMap.ticksToSeconds(this._loopEnd as Tick),
           currentTimeSeconds
         );
         this._rightEdge = this._loopStart;
-
-        // Guard against infinite loop
-        if (loopDuration <= 0) break;
       }
       return;
     }
@@ -199,6 +234,19 @@ export class Scheduler<T extends SchedulerEvent> {
       this._generateAndConsume(this._rightEdge, bound);
       this._rightEdge = bound;
     }
+  }
+
+  /** Move the cursor from `previous`-map ticks to `next`-map ticks through
+   *  seconds, clamped to loopEnd so a faster tempo cannot strand it past the
+   *  loop (the next advance() then wraps). */
+  private _reanchorCursor(previous: TempoMap, next: TempoMap): void {
+    if (previous === next) return;
+    const edgeSeconds = previous.ticksToSeconds(this._rightEdge as Tick);
+    let edge: number = next.secondsToTicks(edgeSeconds);
+    if (this._loopEnabled && this._loopEnd > this._loopStart && edge > this._loopEnd) {
+      edge = this._loopEnd;
+    }
+    this._rightEdge = edge;
   }
 
   private _generateAndConsume(fromTick: number, toTick: number): void {

@@ -110,9 +110,7 @@ describe('SampleTimeline fractional ticks (#636)', () => {
   it('samplesToTicksExact follows a multi-segment tempo map', () => {
     // 120 BPM, then 60 BPM from tick 3840 (2 s = 96000 samples at 48 kHz).
     const st = new SampleTimeline(48000);
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 3840 as Tick);
-    st.setTempoMap(tm);
+    st.setTempoMap(new TempoMap(960, 120).withTempo(60, 3840 as Tick));
     expect(st.samplesToTicksExact(96000 as Sample)).toBeCloseTo(3840, 9);
     // 1 s into the 60 BPM segment = 960 ticks; +10 samples = 0.2 ticks
     expect(st.samplesToTicksExact(144010 as Sample)).toBeCloseTo(3840 + 960 + 0.2, 9);

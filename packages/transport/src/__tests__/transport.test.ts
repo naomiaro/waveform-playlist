@@ -472,6 +472,85 @@ describe('Transport', () => {
     expect(transport.quantizeTick(3400, 'bar', { mode: 'next' })).toBe(3360 + 2880);
   });
 
+  it('tempoMap exposes the current immutable map; earlier references keep their tempo (#636)', () => {
+    const transport = new Transport(mockAudioContext());
+    const before = transport.tempoMap;
+    transport.setTempo(240);
+    expect(transport.tempoMap).not.toBe(before);
+    expect(before.getTempo()).toBe(120);
+    expect(transport.tempoMap.getTempo()).toBe(240);
+    // Everything that converts time follows the swap
+    expect(transport.timeToTick(1)).toBe(3840);
+    expect(transport.tickToTime(3840 as Tick)).toBeCloseTo(1, 10);
+  });
+
+  it('setTempo during bounded playback recomputes the play-end bound in the new map', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    // Clip at tick 5000: beyond the 2 s end at 120 BPM (3840 ticks) but inside
+    // it at 240 BPM (7680 ticks). After the tempo change it must be scheduled.
+    transport.setTracks([makeTrack([makeClip({ startTick: 5000 as Tick, startSample: 120000 })])]);
+    transport.play(0, 2);
+    transport.setTempo(240);
+    (ctx as any).currentTime = 1.2; // window [1.2, 1.4 s) = ticks [4608, 5376) at 240 BPM
+    for (const cb of [...rafCallbacks]) cb(16);
+    expect((ctx.createBufferSource as Mock).mock.results.length).toBe(1);
+    // The clip player converts with the swapped map too: tick 5000 at 240 BPM
+    // is 1.302 s, not the 2.604 s the 120 BPM map would give (clock started at
+    // audio time 0, so audio time equals transport time here).
+    const source = (ctx.createBufferSource as Mock).mock.results[0].value;
+    expect(source.start.mock.calls[0][0]).toBeCloseTo(5000 / 3840, 6);
+    transport.stop();
+  });
+
+  it.each(['removeTempo', 'clearTempos'] as const)(
+    '%s during bounded playback re-anchors the scheduler and recomputes the play end',
+    (method) => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx, { tempo: 240 });
+      // At 240 BPM then 60 BPM from tick 960: tick 5000 sits at 0.25 s + 4.21 s,
+      // outside play(0, 2). Dropping the 60 BPM entry puts it at 1.302 s.
+      transport.setTempo(60, 960 as Tick);
+      transport.setTracks([
+        makeTrack([makeClip({ startTick: 5000 as Tick, startSample: 120000 })]),
+      ]);
+      transport.play(0, 2);
+      if (method === 'removeTempo') transport.removeTempo(960 as Tick);
+      else transport.clearTempos();
+      expect(transport.timeToTick(1)).toBe(3840);
+      (ctx as any).currentTime = 1.2;
+      for (const cb of [...rafCallbacks]) cb(16);
+      const create = ctx.createBufferSource as Mock;
+      expect(create.mock.results.length).toBe(1);
+      expect(create.mock.results[0].value.start.mock.calls[0][0]).toBeCloseTo(5000 / 3840, 6);
+      (ctx as any).currentTime = 1.25;
+      for (const cb of [...rafCallbacks]) cb(32);
+      expect(create.mock.results.length).toBe(1); // re-anchored cursor: no regeneration
+      transport.stop();
+    }
+  );
+
+  it('the loop-start clamp follows a tempo swap', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setLoop(true, 3840 as Tick, 7680 as Tick); // starts at 2 s at 120 BPM
+    transport.setTempo(240); // now 1 s
+    transport.play(1.5);
+    expect(transport.getCurrentTime()).toBeCloseTo(1.5, 10); // not clamped to the stale 2 s
+    transport.stop();
+  });
+
+  it('a rejected setTempo leaves the map and listeners untouched', () => {
+    const transport = new Transport(mockAudioContext());
+    const before = transport.tempoMap;
+    const onChange = vi.fn();
+    transport.on('tempochange', onChange);
+    expect(() => transport.setTempo(0)).toThrow(/bpm/);
+    expect(() => transport.setTempo(90, -1 as Tick)).toThrow(/tick/);
+    expect(transport.tempoMap).toBe(before);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

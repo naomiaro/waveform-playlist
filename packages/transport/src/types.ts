@@ -64,13 +64,16 @@ export interface MeterEntry {
 /** How to interpolate tempo from the previous entry to this one.
  *  'step' = instant jump (default). 'linear' = linear ramp.
  *  { type: 'curve', slope } = Möbius-Ease curve (slope 0-1 exclusive). */
-export type TempoInterpolation = 'step' | 'linear' | { type: 'curve'; slope: number };
+export type TempoInterpolation =
+  | 'step'
+  | 'linear'
+  | { readonly type: 'curve'; readonly slope: number };
 
 export interface TempoEntry {
   /** Tick position where this tempo starts */
-  tick: Tick;
+  readonly tick: Tick;
   /** Beats per minute */
-  bpm: number;
+  readonly bpm: number;
   /** How to arrive at this BPM from the previous entry */
   readonly interpolation: TempoInterpolation;
   /** Cached cumulative seconds up to this tick (for O(log n) lookup). Derived — do not set manually. */
