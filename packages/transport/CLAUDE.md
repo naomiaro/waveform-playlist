@@ -78,6 +78,10 @@ Parallel to TempoMap, stores time signature entries at tick positions. Each entr
 
 `MetronomePlayer.generate()` queries the MeterMap per beat to determine accent placement (beat 1 of each bar) and beat unit duration.
 
+### Grid snap (`quantizeTick`, #636)
+
+`quantizeTick(meterMap, tick, subdivision, { mode, strength })` in `timeline/quantize.ts` is a pure function over the MeterMap; `Transport.quantizeTick(tick, subdivision, options)` delegates. `subdivision` is a positive integer tick count, `'bar'` or `'beat'` (resolved from the meter at the tick's bar); `mode` is `'nearest'` (default, exact ties go UP) | `'next'` (ceil) | `'previous'` (floor); `strength` 0–1 scales the move. **Grid lines restart at each bar line** (same rule as SoundCraft's `GridValue::line_at_or_before` and the metronome's re-anchoring at meter entries), so in 7/8 a quarter-note grid is 0, 960, 1920, 2880, then the bar line at 3360 — never 3840; a subdivision longer than the bar leaves only bar lines. `tick` may be FRACTIONAL (pair with `timeToTickExact()` for recorded notes); the result is always an integer `Tick`. Invalid input (negative/non-finite tick, non-positive or fractional tick-count subdivision, strength outside 0–1) throws.
+
 ## Audio Layer
 
 ### TrackNode Signal Chain

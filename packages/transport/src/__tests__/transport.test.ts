@@ -461,6 +461,14 @@ describe('Transport', () => {
     expect(transport.tickToTime(exact)).toBeCloseTo(0.0005, 12);
   });
 
+  it('quantizeTick snaps on the transport meter map (#636)', () => {
+    const transport = new Transport(mockAudioContext());
+    transport.setMeter(7, 8); // bar = 3360 ticks at 960 PPQN
+    expect(transport.quantizeTick(3200 as Tick, 960, { mode: 'next' })).toBe(3360);
+    expect(transport.quantizeTick(400 as Tick, 480)).toBe(480);
+    expect(transport.quantizeTick(400 as Tick, 480, { strength: 0.5 })).toBe(440);
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);
