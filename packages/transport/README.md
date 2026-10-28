@@ -200,6 +200,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `stop()` — Stop and reset to beginning
 - `seek(time)` — Jump to a position (works during playback)
 - `getCurrentTime()` — Current transport position in seconds
+- `getCurrentFrame(): Sample` — the same position in whole AudioContext frames (the clock's native unit, kept on the 128-frame render lattice; seconds are derived from it)
 - `isPlaying()` — Whether transport is playing
 
 **Tracks:**

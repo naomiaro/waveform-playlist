@@ -68,7 +68,7 @@ Each layer is independently testable. The core layer knows nothing about audio. 
 Every timer tick (25 ms, from a Web Worker):
 
 ```
-Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() → Scheduler.advance(currentTime)
+Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() (a view of the clock's integer-frame position on the 128-frame render lattice) → Scheduler.advance(currentTime)
 ```
 
 The scheduler maintains a **sliding window** that expands forward as time advances. It only generates events for the *new* portion of the window (tracked by `rightEdge`), preventing duplicate work.

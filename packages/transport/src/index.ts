@@ -17,7 +17,7 @@ export type {
   SchedulerListenerError,
 } from './types';
 
-export { Clock } from './core/clock';
+export { Clock, RENDER_QUANTUM_FRAMES } from './core/clock';
 export { Scheduler, type SchedulerOptions } from './core/scheduler';
 export { Timer, DEFAULT_TIMER_INTERVAL_MS, type TimerOptions } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';

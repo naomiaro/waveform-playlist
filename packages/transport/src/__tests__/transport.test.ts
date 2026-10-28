@@ -655,6 +655,16 @@ describe('Transport', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('getCurrentFrame mirrors getCurrentTime in context frames (#636)', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    expect(transport.getCurrentFrame()).toBe(24000);
+    expect(transport.getCurrentTime()).toBe(0.5);
+    transport.stop();
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

@@ -14,7 +14,21 @@
 
 ### Clock
 
-Tracks elapsed time relative to `AudioContext.currentTime`. Pure calculation — safe to call from any frame at any frequency. `seekTo(time)` works both while running (resets reference point) and stopped (sets position for next start). `stop()` accumulates elapsed time so `start()` resumes from the paused position.
+Position lives in **integer context frames** (#636): `position = positionAtAnchor + (contextFrame − contextFrameAtAnchor)`, where `contextFrame` is `currentTime × sampleRate` snapped onto the 128-frame render-quantum lattice (`RENDER_QUANTUM_FRAMES`; a reading off the lattice by more than float noise — a mocked or non-conforming context — keeps its own integer frame instead of being moved up to 64 frames). Seconds are a derived view: `getTime() = getFrameExact() / sampleRate`. `getFrame(): Sample` rounds once at the Sample boundary; `getFrameExact()` keeps the sub-frame part a `seekTo(seconds)` can introduce (`seekToFrame(frame)` lands exactly). `Transport.getCurrentFrame()` mirrors `getCurrentTime()` (same loop-wrap clamp and count-in hold) in CONTEXT-rate frames. Pure calculation — safe to call from any frame at any frequency.
+
+**What anchors / re-bases the position (document any new one here):**
+
+| Event | Effect |
+| --- | --- |
+| `start()` | anchors the current position to the current context frame |
+| `seekTo()` / `seekToFrame()` while running | set the position, re-anchor to the current context frame |
+| `stop()` | folds elapsed frames into the position, detaches |
+| `reset()` | position 0, detached (the monotonic high-water mark is kept — the context clock did not change) |
+| context reading goes BACKWARDS (Chromium re-bases `currentTime` on some device changes) | the anchor moves with it so the position HOLDS; `rebaseCount++` |
+| context reading STALLS (suspend, device change) | position freezes — no audio renders, no transport time elapses; nothing to re-anchor |
+| context reading jumps FORWARD | taken at face value: the context rendered that audio |
+
+`toAudioTime()` while running is **anchor-based** (never re-reads `currentTime`), so sub-quantum noise in a reading cannot shift scheduled `source.start(when)` times; stopped, it maps relative to "now". This replaces the seconds-offset clock the issue called out (`clockTimeAtStart + (currentTime − audioTimeAtStart)`), whose every read re-derived from a raw float reading.
 
 ### Scheduler
 

@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Clock } from '../core/clock';
+import type { Sample } from '../types';
 
 function mockAudioContext(currentTime = 0): AudioContext {
-  return { currentTime } as any;
+  return { currentTime, sampleRate: 48000 } as any;
 }
 
 describe('Clock', () => {
@@ -101,5 +102,96 @@ describe('Clock', () => {
     expect(clock.isRunning()).toBe(true);
     clock.stop();
     expect(clock.isRunning()).toBe(false);
+  });
+});
+
+describe('Clock frame lattice (#636)', () => {
+  const RATE = 48000;
+  const QUANTUM = 128;
+  function ctxAt(frames: number): AudioContext {
+    return { currentTime: frames / RATE, sampleRate: RATE } as unknown as AudioContext;
+  }
+  function setFrames(ctx: AudioContext, frames: number): void {
+    (ctx as unknown as { currentTime: number }).currentTime = frames / RATE;
+  }
+
+  it('getFrame returns integer context frames and getTime is derived from them', () => {
+    const ctx = ctxAt(QUANTUM * 1000);
+    const clock = new Clock(ctx);
+    clock.start();
+    setFrames(ctx, QUANTUM * 1000 + QUANTUM * 375); // 48000 frames = 1 s later
+    expect(clock.getFrame()).toBe(48000);
+    expect(Number.isInteger(clock.getFrame())).toBe(true);
+    expect(clock.getTime()).toBe(1);
+  });
+
+  it('snaps a context reading to the 128-frame render quantum lattice', () => {
+    // currentTime is a quantum multiple by spec; float noise on the way in and
+    // out must not produce a fractional frame or an off-by-one.
+    const ctx = ctxAt(0);
+    const clock = new Clock(ctx);
+    clock.start();
+    (ctx as unknown as { currentTime: number }).currentTime = (QUANTUM * 3) / RATE + 1e-12;
+    expect(clock.getFrame()).toBe(QUANTUM * 3);
+    (ctx as unknown as { currentTime: number }).currentTime = (QUANTUM * 3) / RATE - 1e-12;
+    expect(clock.getFrame()).toBe(QUANTUM * 3);
+  });
+
+  it('seekToFrame places the position on an exact frame; getTime follows', () => {
+    const ctx = ctxAt(0);
+    const clock = new Clock(ctx);
+    clock.seekToFrame(12345 as Sample);
+    expect(clock.getFrame()).toBe(12345);
+    expect(clock.getTime()).toBeCloseTo(12345 / RATE, 15);
+    clock.start();
+    setFrames(ctx, QUANTUM * 10);
+    expect(clock.getFrame()).toBe(12345 + QUANTUM * 10);
+  });
+
+  it('seekTo keeps sub-frame precision in getTime while getFrame rounds', () => {
+    const ctx = ctxAt(0);
+    const clock = new Clock(ctx);
+    clock.seekTo(0.00001); // 0.48 frames
+    expect(clock.getTime()).toBeCloseTo(0.00001, 15);
+    expect(clock.getFrame()).toBe(0);
+    expect(clock.getFrameExact()).toBeCloseTo(0.48, 10);
+  });
+
+  it('a backward re-based context reading holds the position instead of jumping back', () => {
+    const ctx = ctxAt(QUANTUM * 1000);
+    const clock = new Clock(ctx);
+    clock.start();
+    setFrames(ctx, QUANTUM * 1000 + 24000); // +0.5 s
+    expect(clock.getTime()).toBeCloseTo(0.5, 12);
+    setFrames(ctx, QUANTUM * 1000 + 9600); // context re-based backwards by 0.3 s
+    expect(clock.getTime()).toBeCloseTo(0.5, 12); // held
+    expect(clock.rebaseCount).toBe(1);
+    setFrames(ctx, QUANTUM * 1000 + 14400); // advances 0.1 s from the re-based reading
+    expect(clock.getTime()).toBeCloseTo(0.6, 12);
+  });
+
+  it('a stalled context reading freezes the position (no drift, no jump)', () => {
+    const ctx = ctxAt(0);
+    const clock = new Clock(ctx);
+    clock.start();
+    setFrames(ctx, 48000);
+    expect(clock.getTime()).toBe(1);
+    expect(clock.getTime()).toBe(1);
+    expect(clock.getFrame()).toBe(48000);
+    expect(clock.rebaseCount).toBe(0);
+  });
+
+  it('toAudioTime is anchored, not re-read: raw currentTime noise cannot shift scheduled events', () => {
+    const ctx = ctxAt(QUANTUM * 100);
+    const clock = new Clock(ctx);
+    clock.start();
+    clock.seekTo(10);
+    const expected = clock.toAudioTime(11.5);
+    (ctx as unknown as { currentTime: number }).currentTime += 1e-9; // sub-quantum noise
+    expect(clock.toAudioTime(11.5)).toBe(expected);
+  });
+
+  it('exposes the context sample rate the lattice is measured in', () => {
+    expect(new Clock(ctxAt(0)).sampleRate).toBe(RATE);
   });
 });

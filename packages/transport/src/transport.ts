@@ -338,6 +338,22 @@ export class Transport {
     return t;
   }
 
+  /** Current position in whole AudioContext frames (the clock's native unit;
+   *  seconds are derived from it). Same loop-wrap clamp and count-in hold as
+   *  getCurrentTime(). Context-rate frames — see Clock. */
+  getCurrentFrame(): Sample {
+    const rate = this._clock.sampleRate;
+    if (this._countingIn) {
+      return Math.round(this._countInStartPosition * rate) as Sample;
+    }
+    const frame = this._clock.getFrame();
+    const loopStartFrame = Math.round(this._loopStartSeconds * rate);
+    if (this._loopEnabled && frame < loopStartFrame) {
+      return loopStartFrame as Sample;
+    }
+    return frame;
+  }
+
   isPlaying(): boolean {
     return this._playing;
   }
