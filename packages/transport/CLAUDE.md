@@ -30,6 +30,10 @@ Sliding window event generation. `advance(currentTime)` expands the window to `c
 
 **Loop APIs:** `setLoop(enabled, startTick, endTick)` is the primary tick-based API. `setLoopSeconds()` and `setLoopSamples()` are convenience methods that convert at the boundary. `NativePlayoutAdapter.setLoop()` calls `setLoopSeconds()` since the engine speaks seconds.
 
+**Invalid loop points THROW (#636):** `assertValidLoopRange()` (`core/loop-range.ts`) is shared by `Scheduler.setLoop/setLoopSeconds` and `Transport.setLoop/setLoopSeconds/setLoopSamples` — when `enabled`, a non-finite, empty or inverted range throws (same policy as `TempoMap._validateBpm`) and the previous loop stays in force; `enabled: false` is never validated. Transport validates BEFORE mutating `_loopEnabled`/`_loopStartTick` (the scheduler's own check would fire too late). **`NativePlayoutAdapter.setLoop` normalizes the engine path:** `PlaylistEngine` starts with `loopStart = loopEnd = 0` and forwards `setLoopEnabled(true)` before a region exists, and its `play()` already treats an un-loopable region as disabled — so the adapter sends `enabled && !degenerate` (finite `start >= end` → disabled) rather than throwing into a UI toggle. Non-finite values still propagate.
+
+**Listener errors surface, never swallowed (#636):** `Scheduler` takes `onError?(SchedulerListenerError)`; a `generate()` throw skips that listener for the window, a `consume()` throw skips that one event, the rest proceed. Transport wires both the main and count-in schedulers to `_emitError`, which emits the `error` event when a subscriber exists and otherwise `console.warn`s (`formatSchedulerListenerError`). Standalone `Scheduler` without `onError` warns the same way. Nothing is retried — the host decides.
+
 ### Timer
 
 Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeout` or `setInterval`. The scheduler's 200ms lookahead absorbs any frame timing jitter.

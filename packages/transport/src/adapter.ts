@@ -130,7 +130,15 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   setLoop(enabled: boolean, start: number, end: number): void {
-    this._transport.setLoopSeconds(enabled, start, end);
+    // Transport.setLoopSeconds throws on an empty or inverted enabled range.
+    // The engine legitimately reaches here with one: PlaylistEngine starts with
+    // loopStart = loopEnd = 0 and forwards setLoopEnabled(true) before any
+    // region is chosen, and its own play() path already treats a region the
+    // playhead can't loop in as disabled. Mirror that here rather than throw
+    // into a UI toggle. Non-finite values are a programming error and still
+    // propagate.
+    const degenerate = enabled && Number.isFinite(start) && Number.isFinite(end) && start >= end;
+    this._transport.setLoopSeconds(enabled && !degenerate, start, end);
   }
 
   setCountIn(enabled: boolean): void {

@@ -216,9 +216,9 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMasterVolume(volume)`
 
 **Loop:**
-- `setLoop(enabled, startTick: Tick, endTick: Tick)` — Set loop region in ticks (primary API)
-- `setLoopSeconds(enabled, start, end)` — Set loop region in seconds (convenience)
-- `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience)
+- `setLoop(enabled, startTick: Tick, endTick: Tick)` — Set loop region in ticks (primary API). Throws when `enabled` and the range is non-finite, empty or inverted; the previous loop stays in force.
+- `setLoopSeconds(enabled, start, end)` — Set loop region in seconds (convenience, same validation)
+- `setLoopSamples(enabled, startSample: Sample, endSample: Sample)` — Set loop region in samples (convenience, same validation)
 
 **Tempo & Meter:**
 - `setTempo(bpm, atTick?, options?)` / `getTempo(atTick?: Tick)` — options: `{ interpolation: 'step' | 'linear' | { type: 'curve', slope } }`. Returns `boolean`: a defaulted `atTick` is the single-BPM convenience path and is refused (with a warning) when the tempo map has more than one entry — pass an explicit `atTick` to modify a tempo curve.
@@ -249,11 +249,12 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
-- Events: `play`, `pause`, `stop`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`
+- Events: `play`, `pause`, `stop`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`, `error`
 - `seek` payload: `{ seconds: number }`
 - `tempochange` payload: `{ bpm: number, atTick: Tick }`
 - `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`
 - `countIn` payload: `{ beat: number, totalBeats: number }`
+- `error` payload: `SchedulerListenerError` — `{ phase: 'generate' | 'consume', listener, event?, error }`. A scheduler listener (clip player, metronome, count-in, or your own) threw; the scheduler skipped it and kept going. With no `error` subscriber the failure goes to `console.warn` instead.
 
 **Cleanup:**
 - `dispose()` — Stop playback, disconnect all nodes, remove listeners

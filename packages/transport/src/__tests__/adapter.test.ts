@@ -281,8 +281,28 @@ describe('NativePlayoutAdapter', () => {
   it('delegates loop', () => {
     const ctx = mockAudioContext();
     const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
     adapter.setLoop(true, 1, 5);
-    // Should not throw
+    expect(spy).toHaveBeenCalledWith(true, 1, 5);
+  });
+
+  it('setLoop with the engine default zero-length region disables the loop instead of throwing', () => {
+    // PlaylistEngine starts with loopStart = loopEnd = 0 and forwards
+    // setLoopEnabled(true) before any region is chosen. Transport.setLoop
+    // rejects a degenerate enabled range, so the adapter must translate it.
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    expect(() => adapter.setLoop(true, 0, 0)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 0, 0);
+  });
+
+  it('setLoop with an inverted region disables the loop instead of throwing', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    expect(() => adapter.setLoop(true, 5, 1)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 5, 1);
   });
 
   it('delegates dispose', () => {

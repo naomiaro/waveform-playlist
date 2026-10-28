@@ -14,6 +14,7 @@ export type {
   CountInEventData,
   TempoChangeEventData,
   MeterChangeEventData,
+  SchedulerListenerError,
 } from './types';
 
 export { Clock } from './core/clock';

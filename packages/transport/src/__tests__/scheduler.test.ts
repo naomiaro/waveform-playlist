@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Scheduler } from '../core/scheduler';
 import { TempoMap } from '../timeline/tempo-map';
-import type { SchedulerEvent, SchedulerListener, Tick } from '../types';
+import type { SchedulerEvent, SchedulerListener, SchedulerListenerError, Tick } from '../types';
 
 interface TestEvent extends SchedulerEvent {
   id: string;
@@ -119,12 +119,31 @@ describe('Scheduler (tick-based)', () => {
     expect(listener.jumpedTo.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('setLoop rejects start >= end', () => {
+  it('setLoop throws on start >= end', () => {
     const scheduler = createScheduler();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    scheduler.setLoop(true, 960 as Tick, 480 as Tick);
-    expect(warn).toHaveBeenCalled();
-    warn.mockRestore();
+    expect(() => scheduler.setLoop(true, 960 as Tick, 480 as Tick)).toThrow(/must be less than/);
+    expect(() => scheduler.setLoop(true, 960 as Tick, 960 as Tick)).toThrow(/must be less than/);
+  });
+
+  it('setLoop throws on non-finite ticks', () => {
+    const scheduler = createScheduler();
+    expect(() => scheduler.setLoop(true, NaN as Tick, 480 as Tick)).toThrow(/non-finite/);
+    expect(() => scheduler.setLoop(true, 0 as Tick, Infinity as Tick)).toThrow(/non-finite/);
+  });
+
+  it('setLoop(false) accepts a degenerate range (nothing to validate when disabled)', () => {
+    const scheduler = createScheduler();
+    expect(() => scheduler.setLoop(false, 0 as Tick, 0 as Tick)).not.toThrow();
+  });
+
+  it('rejected setLoop leaves the previous loop in force', () => {
+    const scheduler = createScheduler(0.3);
+    const listener = createMockListener();
+    scheduler.addListener(listener);
+    scheduler.setLoop(true, 0 as Tick, 960 as Tick);
+    expect(() => scheduler.setLoop(true, 960 as Tick, 480 as Tick)).toThrow();
+    scheduler.advance(0.35);
+    expect(listener.jumpedTo).toEqual([0]); // still wraps at the original loopEnd
   });
 
   it('setLoopSeconds converts seconds to ticks', () => {
@@ -189,5 +208,91 @@ describe('Scheduler (tick-based)', () => {
     scheduler.setPlayEnd(null);
     scheduler.advance(0);
     expect(listener.consumed.length).toBeGreaterThan(bounded); // generates past 960 again
+  });
+
+  describe('listener error surfacing (#636)', () => {
+    function throwingListener(opts: {
+      generate?: Error;
+      consumeAt?: number;
+      consumeError?: Error;
+    }): SchedulerListener<TestEvent> & { consumed: number[] } {
+      const consumed: number[] = [];
+      return {
+        consumed,
+        generate(fromTick, toTick) {
+          if (opts.generate) throw opts.generate;
+          const events: TestEvent[] = [];
+          for (let t = Math.ceil(fromTick / 480) * 480; t < toTick; t += 480) {
+            events.push({ tick: t as Tick, id: 'e-' + t });
+          }
+          return events;
+        },
+        consume(event) {
+          if (opts.consumeAt !== undefined && event.tick === opts.consumeAt) {
+            throw opts.consumeError ?? new Error('consume failed');
+          }
+          consumed.push(event.tick);
+        },
+        onPositionJump() {},
+        silence() {},
+      };
+    }
+
+    it('reports a generate() failure through onError with phase and listener', () => {
+      const errors: SchedulerListenerError[] = [];
+      const tempoMap = new TempoMap(ppqn, bpm);
+      const scheduler = new Scheduler<TestEvent>(tempoMap, {
+        lookahead: 0.6,
+        onError: (e) => errors.push(e),
+      });
+      const failure = new Error('generate failed');
+      const bad = throwingListener({ generate: failure });
+      const good = createMockListener();
+      scheduler.addListener(bad);
+      scheduler.addListener(good);
+
+      scheduler.advance(0);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].phase).toBe('generate');
+      expect(errors[0].listener).toBe(bad);
+      expect(errors[0].event).toBeUndefined();
+      expect(errors[0].error).toBe(failure);
+      // The other listener still got its window
+      expect(good.consumed.length).toBeGreaterThan(0);
+    });
+
+    it('reports a consume() failure with the offending event and keeps consuming the rest', () => {
+      const errors: SchedulerListenerError[] = [];
+      const tempoMap = new TempoMap(ppqn, bpm);
+      const scheduler = new Scheduler<TestEvent>(tempoMap, {
+        lookahead: 0.6, // 0.6s at 120 BPM = 1152 ticks → events at 0, 480, 960
+        onError: (e) => errors.push(e),
+      });
+      const failure = new Error('consume failed');
+      const listener = throwingListener({ consumeAt: 480, consumeError: failure });
+      scheduler.addListener(listener);
+
+      scheduler.advance(0);
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].phase).toBe('consume');
+      expect(errors[0].listener).toBe(listener);
+      expect(errors[0].event).toEqual({ tick: 480, id: 'e-480' });
+      expect(errors[0].error).toBe(failure);
+      expect(listener.consumed).toEqual([0, 960]);
+    });
+
+    it('falls back to console.warn when no onError handler is configured', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const scheduler = createScheduler(0.2);
+      scheduler.addListener(throwingListener({ generate: new Error('generate failed') }));
+
+      scheduler.advance(0);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('generate failed'));
+      warn.mockRestore();
+    });
   });
 });

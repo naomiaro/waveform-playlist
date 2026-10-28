@@ -118,3 +118,19 @@ export interface MeterChangeEventData {
   /** Tick position where the meter was set or removed */
   atTick: Tick;
 }
+
+/** Payload of the transport `error` event and the Scheduler `onError` option:
+ *  a scheduler listener (ClipPlayer, MetronomePlayer, CountInPlayer, or a
+ *  custom one) threw while generating or consuming events. The scheduler
+ *  skips the failing listener for that window (or that one event) and keeps
+ *  going; the host decides what to do with the failure. */
+export interface SchedulerListenerError {
+  /** Which listener method threw */
+  phase: 'generate' | 'consume';
+  /** The listener that threw */
+  listener: SchedulerListener<SchedulerEvent>;
+  /** The event being consumed — present only when `phase` is 'consume' */
+  event?: SchedulerEvent;
+  /** The thrown value, unchanged */
+  error: unknown;
+}

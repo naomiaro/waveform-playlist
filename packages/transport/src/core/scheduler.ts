@@ -1,5 +1,6 @@
-import type { Tick, SchedulerEvent, SchedulerListener } from '../types';
+import type { Tick, SchedulerEvent, SchedulerListener, SchedulerListenerError } from '../types';
 import type { TempoMap } from '../timeline/tempo-map';
+import { assertValidLoopRange } from './loop-range';
 
 export interface SchedulerOptions {
   lookahead?: number;
@@ -8,6 +9,19 @@ export interface SchedulerOptions {
    *  advance() so the Transport can compute the correct clock seek target
    *  without re-reading the live AudioContext.currentTime. */
   onLoop?: (loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void;
+  /** Called when a listener's generate() or consume() throws. The failing
+   *  listener is skipped for that window (consume: that event) and the
+   *  remaining listeners/events still run. Without a handler the failure is
+   *  reported with console.warn so it is never silent. */
+  onError?: (error: SchedulerListenerError) => void;
+}
+
+/** One-line description of a listener failure for the console fallback. */
+export function formatSchedulerListenerError(error: SchedulerListenerError): string {
+  const where = error.event ? ' at tick ' + error.event.tick : '';
+  return (
+    'scheduler listener threw during ' + error.phase + '()' + where + ': ' + String(error.error)
+  );
 }
 
 export class Scheduler<T extends SchedulerEvent> {
@@ -21,12 +35,14 @@ export class Scheduler<T extends SchedulerEvent> {
   private _onLoop:
     | ((loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void)
     | undefined;
+  private _onError: ((error: SchedulerListenerError) => void) | undefined;
   private _tempoMap: TempoMap;
 
   constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
     this._tempoMap = tempoMap;
     this._lookahead = options.lookahead ?? 0.2;
     this._onLoop = options.onLoop;
+    this._onError = options.onError;
   }
 
   addListener(listener: SchedulerListener<T>): void {
@@ -37,28 +53,10 @@ export class Scheduler<T extends SchedulerEvent> {
     this._listeners.delete(listener);
   }
 
-  /** Primary API — ticks as source of truth */
+  /** Primary API — ticks as source of truth. Throws on a non-finite or
+   *  inverted/empty range when `enabled`; the previous loop stays in force. */
   setLoop(enabled: boolean, startTick: Tick, endTick: Tick): void {
-    if (enabled && (!Number.isFinite(startTick) || !Number.isFinite(endTick))) {
-      console.warn(
-        '[waveform-playlist] Scheduler.setLoop: non-finite tick values (' +
-          startTick +
-          ', ' +
-          endTick +
-          ')'
-      );
-      return;
-    }
-    if (enabled && startTick >= endTick) {
-      console.warn(
-        '[waveform-playlist] Scheduler.setLoop: startTick (' +
-          startTick +
-          ') must be less than endTick (' +
-          endTick +
-          ')'
-      );
-      return;
-    }
+    assertValidLoopRange('Scheduler.setLoop', enabled, startTick, endTick, 'tick');
     this._loopEnabled = enabled;
     this._loopStart = Math.round(startTick);
     this._loopEnd = Math.round(endTick);
@@ -66,6 +64,7 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Convenience — converts seconds to ticks via TempoMap */
   setLoopSeconds(enabled: boolean, startSec: number, endSec: number): void {
+    assertValidLoopRange('Scheduler.setLoopSeconds', enabled, startSec, endSec, 'second');
     const startTick = this._tempoMap.secondsToTicks(startSec);
     const endTick = this._tempoMap.secondsToTicks(endSec);
     this.setLoop(enabled, startTick, endTick);
@@ -133,18 +132,28 @@ export class Scheduler<T extends SchedulerEvent> {
 
   private _generateAndConsume(fromTick: number, toTick: number): void {
     for (const listener of this._listeners) {
+      let events: T[];
       try {
-        const events = listener.generate(fromTick as Tick, toTick as Tick);
-        for (const event of events) {
-          try {
-            listener.consume(event);
-          } catch (err) {
-            console.warn('[waveform-playlist] Scheduler: error consuming event:', String(err));
-          }
-        }
+        events = listener.generate(fromTick as Tick, toTick as Tick);
       } catch (err) {
-        console.warn('[waveform-playlist] Scheduler: error generating events:', String(err));
+        this._reportError({ phase: 'generate', listener, error: err });
+        continue;
+      }
+      for (const event of events) {
+        try {
+          listener.consume(event);
+        } catch (err) {
+          this._reportError({ phase: 'consume', listener, event, error: err });
+        }
       }
     }
+  }
+
+  private _reportError(error: SchedulerListenerError): void {
+    if (this._onError) {
+      this._onError(error);
+      return;
+    }
+    console.warn('[waveform-playlist] Scheduler: ' + formatSchedulerListenerError(error));
   }
 }

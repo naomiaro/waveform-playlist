@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { Transport } from '../transport';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { Tick } from '../types';
+import type { Tick, Sample, SchedulerListenerError } from '../types';
 
 function createMockSource() {
   return {
@@ -629,6 +629,87 @@ describe('Transport', () => {
       transport.connectMasterOutput(createMockChainInput());
 
       expect(() => transport.dispose()).not.toThrow();
+    });
+  });
+
+  describe('error surfacing (#636)', () => {
+    it('setLoop throws on start >= end and leaves loop state untouched', () => {
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoop(true, 960 as Tick, 480 as Tick)).toThrow(/must be less than/);
+      expect(() => transport.setLoop(true, 960 as Tick, 960 as Tick)).toThrow(/must be less than/);
+      expect(onLoop).not.toHaveBeenCalled();
+    });
+
+    it('setLoop throws on non-finite ticks before touching any state', () => {
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoop(true, NaN as Tick, 960 as Tick)).toThrow(/non-finite/);
+      expect(() => transport.setLoop(true, 0 as Tick, Infinity as Tick)).toThrow(/non-finite/);
+      expect(onLoop).not.toHaveBeenCalled();
+    });
+
+    it('setLoopSeconds and setLoopSamples reject invalid ranges the same way', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoopSeconds(true, 3, 1)).toThrow(/must be less than/);
+      expect(() => transport.setLoopSeconds(true, NaN, 1)).toThrow(/non-finite/);
+      expect(() => transport.setLoopSamples(true, 96000 as Sample, 48000 as Sample)).toThrow(
+        /must be less than/
+      );
+      expect(() => transport.setLoopSamples(true, NaN as Sample, 48000 as Sample)).toThrow(
+        /non-finite/
+      );
+    });
+
+    it('disabling the loop never throws, whatever the range', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoop(false, 960 as Tick, 480 as Tick)).not.toThrow();
+      expect(() => transport.setLoopSeconds(false, 0, 0)).not.toThrow();
+    });
+
+    it('a listener failure during scheduling is emitted as an error event, not warned', () => {
+      const ctx = mockAudioContext();
+      const failure = new Error('createBufferSource exploded');
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip()])]);
+      const onError = vi.fn();
+      transport.on('error', onError);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw failure;
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      transport.stop();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      const event = onError.mock.calls[0][0] as SchedulerListenerError;
+      expect(event.phase).toBe('consume');
+      expect(event.error).toBe(failure);
+      expect(event.event?.tick).toBe(0);
+      expect(typeof event.listener.consume).toBe('function');
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('without an error listener a scheduling failure still reaches console.warn', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip()])]);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw new Error('createBufferSource exploded');
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      transport.stop();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('createBufferSource exploded'));
+      warn.mockRestore();
     });
   });
 });

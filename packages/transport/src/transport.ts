@@ -8,10 +8,12 @@ import type {
   CountInEventData,
   TempoChangeEventData,
   MeterChangeEventData,
+  SchedulerListenerError,
 } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
-import { Scheduler } from './core/scheduler';
+import { Scheduler, formatSchedulerListenerError } from './core/scheduler';
+import { assertValidLoopRange } from './core/loop-range';
 import { Timer } from './core/timer';
 import { SampleTimeline } from './timeline/sample-timeline';
 import { TempoMap } from './timeline/tempo-map';
@@ -33,6 +35,11 @@ export interface TransportEvents {
   meterchange: (event: MeterChangeEventData) => void;
   countIn: (event: CountInEventData) => void;
   countInEnd: () => void;
+  /** A scheduler listener threw while generating or consuming events. The
+   *  scheduler skipped it and kept going; the host decides what to do. With
+   *  no `error` listener registered the failure is reported via console.warn
+   *  instead, so it is never silent. */
+  error: (event: SchedulerListenerError) => void;
 }
 
 type TransportEventType = keyof TransportEvents;
@@ -109,6 +116,7 @@ export class Transport {
         const timeToBoundary = loopEndSeconds - currentTimeSeconds;
         this._clock.seekTo(loopStartSeconds - timeToBoundary);
       },
+      onError: (error) => this._emitError(error),
     });
     this._sampleTimeline.setTempoMap(this._tempoMap);
 
@@ -403,18 +411,14 @@ export class Transport {
 
   // --- Loop ---
 
-  /** Primary loop API — ticks as source of truth */
+  /** Primary loop API — ticks as source of truth. Throws when `enabled` and
+   *  the range is non-finite, empty or inverted; nothing is changed and no
+   *  `loop` event fires. (NativePlayoutAdapter translates the engine's
+   *  default empty region to a disabled loop before reaching here.) */
   setLoop(enabled: boolean, startTick: Tick, endTick: Tick): void {
-    if (enabled && startTick >= endTick) {
-      console.warn(
-        '[waveform-playlist] Transport.setLoop: startTick (' +
-          startTick +
-          ') must be less than endTick (' +
-          endTick +
-          ')'
-      );
-      return;
-    }
+    // Validate before touching any state — the scheduler would throw on the
+    // same input, but only after _loopEnabled/_loopStartTick were updated.
+    assertValidLoopRange('Transport.setLoop', enabled, startTick, endTick, 'tick');
     this._loopEnabled = enabled;
     this._loopStartTick = startTick;
     this._loopStartSeconds = this._tempoMap.ticksToSeconds(startTick);
@@ -423,35 +427,18 @@ export class Transport {
     this._emit('loop');
   }
 
-  /** Convenience — converts seconds to ticks */
+  /** Convenience — converts seconds to ticks. Same validation as setLoop,
+   *  applied in seconds so the error names the caller's unit. */
   setLoopSeconds(enabled: boolean, startSec: number, endSec: number): void {
+    assertValidLoopRange('Transport.setLoopSeconds', enabled, startSec, endSec, 'second');
     const startTick = this._tempoMap.secondsToTicks(startSec);
     const endTick = this._tempoMap.secondsToTicks(endSec);
     this.setLoop(enabled, startTick, endTick);
   }
 
-  /** Convenience — sets loop in samples */
+  /** Convenience — sets loop in samples. Same validation as setLoop. */
   setLoopSamples(enabled: boolean, startSample: Sample, endSample: Sample): void {
-    if (enabled && (!Number.isFinite(startSample) || !Number.isFinite(endSample))) {
-      console.warn(
-        '[waveform-playlist] Transport.setLoopSamples: non-finite sample values (' +
-          startSample +
-          ', ' +
-          endSample +
-          ')'
-      );
-      return;
-    }
-    if (enabled && startSample >= endSample) {
-      console.warn(
-        '[waveform-playlist] Transport.setLoopSamples: startSample (' +
-          startSample +
-          ') must be less than endSample (' +
-          endSample +
-          ')'
-      );
-      return;
-    }
+    assertValidLoopRange('Transport.setLoopSamples', enabled, startSample, endSample, 'sample');
     const startTick = this._sampleTimeline.samplesToTicks(startSample);
     const endTick = this._sampleTimeline.samplesToTicks(endSample);
     this._loopEnabled = enabled;
@@ -817,6 +804,7 @@ export class Transport {
 
     this._countInScheduler = new Scheduler(countInTempoMap, {
       lookahead: this._schedulerLookahead,
+      onError: (error) => this._emitError(error),
     });
 
     this._countInPlayer.configure({
@@ -882,6 +870,22 @@ export class Transport {
       // Explicit mute takes precedence — a track that is both soloed AND muted stays muted
       node.setMute(isExplicitlyMuted || isSoloMuted);
     }
+  }
+
+  /** Route a scheduler listener failure to `error` subscribers, or to
+   *  console.warn when nobody is listening — the failure must stay visible
+   *  either way. */
+  private _emitError(error: SchedulerListenerError): void {
+    const listeners = this._listeners.get('error');
+    if (listeners && listeners.size > 0) {
+      this._emit('error', error);
+      return;
+    }
+    console.warn(
+      '[waveform-playlist] Transport: ' +
+        formatSchedulerListenerError(error) +
+        ' (subscribe to the "error" event to handle this)'
+    );
   }
 
   private _emit<K extends TransportEventType>(
