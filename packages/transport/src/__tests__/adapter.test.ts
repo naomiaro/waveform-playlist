@@ -281,8 +281,76 @@ describe('NativePlayoutAdapter', () => {
   it('delegates loop', () => {
     const ctx = mockAudioContext();
     const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
     adapter.setLoop(true, 1, 5);
-    // Should not throw
+    expect(spy).toHaveBeenCalledWith(true, 1, 5);
+  });
+
+  it('setLoop with the engine default zero-length region disables the loop instead of throwing', () => {
+    // PlaylistEngine starts with loopStart = loopEnd = 0 and forwards
+    // setLoopEnabled(true) before any region is chosen. Transport.setLoop
+    // rejects a degenerate enabled range, so the adapter must translate it.
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    expect(() => adapter.setLoop(true, 0, 0)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 0, 0);
+  });
+
+  it('setLoop with an inverted region disables the loop with a warning instead of throwing', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => adapter.setLoop(true, 5, 1)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 5, 1);
+    // An inverted range is a caller bug worth a diagnostic; the empty default
+    // region (start === end) is not.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('inverted'));
+    warn.mockClear();
+    adapter.setLoop(true, 0, 0);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('setLoop with a region shorter than one tick disables the loop instead of throwing', () => {
+    // 0.5 s → 0.5002 s is 0.38 ticks at 120 BPM / 960 PPQN: non-empty in
+    // seconds, empty in ticks. A 1-px loop selection at high zoom does this.
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    expect(() => adapter.setLoop(true, 0.5, 0.5002)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 0.5, 0.5002);
+  });
+
+  it('setLoop decides sub-tick degeneracy with the live tempo', () => {
+    // 0.5 → 0.5004 s: 0.38 ticks at 60 BPM (both round to 480 → empty) but
+    // 0.77 ticks at 120 BPM (960 → 961 → a real loop).
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    adapter.setTempo(60);
+    adapter.setLoop(true, 0.5, 0.5004);
+    expect(spy).toHaveBeenLastCalledWith(false, 0.5, 0.5004);
+    adapter.setTempo(120);
+    adapter.setLoop(true, 0.5, 0.5004);
+    expect(spy).toHaveBeenLastCalledWith(true, 0.5, 0.5004);
+    warn.mockRestore();
+  });
+
+  it('setLoop warns for a user-made empty region but not for the engine default', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    adapter.setLoop(true, 0, 0);
+    expect(warn).not.toHaveBeenCalled();
+    adapter.setLoop(true, 3, 3); // a click without a drag, then loop toggled on
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('empty'));
+    warn.mockClear();
+    adapter.setLoop(true, 0.5, 0.5002); // sub-tick selection
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('shorter than one tick'));
+    warn.mockRestore();
   });
 
   it('delegates dispose', () => {

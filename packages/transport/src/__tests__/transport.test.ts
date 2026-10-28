@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { Transport } from '../transport';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { Tick } from '../types';
+import type { Tick, Sample, SchedulerListenerError } from '../types';
 
 function createMockSource() {
   return {
@@ -629,6 +629,220 @@ describe('Transport', () => {
       transport.connectMasterOutput(createMockChainInput());
 
       expect(() => transport.dispose()).not.toThrow();
+    });
+  });
+
+  describe('error surfacing (#636)', () => {
+    it('setLoop throws on start >= end and leaves loop state untouched', () => {
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoop(true, 960 as Tick, 480 as Tick)).toThrow(/must be less than/);
+      expect(() => transport.setLoop(true, 960 as Tick, 960 as Tick)).toThrow(/must be less than/);
+      expect(onLoop).not.toHaveBeenCalled();
+    });
+
+    it('setLoop throws on non-finite ticks before touching any state', () => {
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoop(true, NaN as Tick, 960 as Tick)).toThrow(/non-finite/);
+      expect(() => transport.setLoop(true, 0 as Tick, Infinity as Tick)).toThrow(/non-finite/);
+      expect(onLoop).not.toHaveBeenCalled();
+    });
+
+    it('setLoopSeconds and setLoopSamples reject invalid ranges the same way', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoopSeconds(true, 3, 1)).toThrow(/must be less than/);
+      expect(() => transport.setLoopSeconds(true, NaN, 1)).toThrow(/non-finite/);
+      expect(() => transport.setLoopSamples(true, 96000 as Sample, 48000 as Sample)).toThrow(
+        /must be less than/
+      );
+      expect(() => transport.setLoopSamples(true, NaN as Sample, 48000 as Sample)).toThrow(
+        /non-finite/
+      );
+    });
+
+    it('a sample range shorter than one tick throws before touching any state', () => {
+      // 48 kHz at 120 BPM / 960 PPQN: one tick is 25 samples. 100 and 110 both
+      // round to tick 4, so the sample-unit check passes but the loop is empty.
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoopSamples(true, 100 as Sample, 110 as Sample)).toThrow(
+        /shorter than one tick/
+      );
+      expect(onLoop).not.toHaveBeenCalled();
+      // The clip player must not have been given the half-applied loop either:
+      // a following valid loop works and is the first 'loop' event seen.
+      transport.setLoopSamples(true, 0 as Sample, 48000 as Sample);
+      expect(onLoop).toHaveBeenCalledTimes(1);
+    });
+
+    it('a seconds range shorter than one tick throws naming the caller unit', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoopSeconds(true, 1, 1.0001)).toThrow(
+        /setLoopSeconds: range \(1, 1\.0001 second\) is shorter than one tick/
+      );
+    });
+
+    it('setLoop rejects fractional ticks rather than rounding into an empty loop', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoop(true, 960.6 as Tick, 961.4 as Tick)).toThrow(/integer/);
+    });
+
+    it('disabling the loop never throws, whatever the range', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoop(false, 960 as Tick, 480 as Tick)).not.toThrow();
+      expect(() => transport.setLoopSeconds(false, 0, 0)).not.toThrow();
+    });
+
+    it('a listener failure during scheduling is emitted as an error event, not warned', async () => {
+      const ctx = mockAudioContext();
+      const failure = new Error('createBufferSource exploded');
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip()])]);
+      const onError = vi.fn();
+      transport.on('error', onError);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw failure;
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      // Delivered on a microtask, after the scheduler window completes, so a
+      // handler that calls stop()/setTracks() cannot re-enter the iteration.
+      expect(onError).not.toHaveBeenCalled();
+      await Promise.resolve();
+      transport.stop();
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      const event = onError.mock.calls[0][0] as SchedulerListenerError;
+      expect(event.phase).toBe('consume');
+      expect(event.error).toBe(failure);
+      expect(event.phase === 'consume' && event.event.tick).toBe(0);
+      expect(typeof event.listener.consume).toBe('function');
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('an error handler that stops the transport does not let the rest of the window play', async () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      // Two clips at tick 0 on two tracks: the first source creation throws,
+      // the handler stops the transport, and the second clip must NOT be
+      // scheduled afterwards.
+      transport.setTracks([
+        makeTrack([makeClip({ id: 'a' })], { id: 't1' }),
+        makeTrack([makeClip({ id: 'b' })], { id: 't2' }),
+      ]);
+      transport.on('error', () => transport.stop());
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const create = ctx.createBufferSource as Mock;
+      create.mockImplementationOnce(() => {
+        throw new Error('first source exploded');
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      await Promise.resolve();
+
+      expect(transport.isPlaying()).toBe(false);
+      // One failed attempt, one successful source for clip b — created BEFORE
+      // the handler ran (same window) and silenced by stop(); no source may be
+      // created after the stop.
+      const createdAfterStop = create.mock.results.length;
+      for (const cb of [...rafCallbacks]) cb(32);
+      expect(create.mock.results.length).toBe(createdAfterStop);
+      warn.mockRestore();
+    });
+
+    it('a failure whose subscriber is gone by delivery time still reaches console.warn', async () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip()])]);
+      const onError = vi.fn();
+      transport.on('error', onError);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw new Error('createBufferSource exploded');
+      });
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      transport.dispose(); // clears every listener before the microtask runs
+      await Promise.resolve();
+      expect(onError).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('createBufferSource exploded'));
+      warn.mockRestore();
+    });
+
+    function fakeClick(): AudioBuffer {
+      return {
+        duration: 0.04,
+        length: 1920,
+        sampleRate: 48000,
+        numberOfChannels: 1,
+      } as AudioBuffer;
+    }
+
+    it('without a subscriber a persistently failing metronome warns once, not once per beat', async () => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx);
+      transport.setMetronomeClickSounds(fakeClick(), fakeClick());
+      transport.setMetronomeEnabled(true);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw new Error('no clicks today');
+      });
+      transport.play();
+      for (const t of [0, 0.5, 1.0]) {
+        (ctx as any).currentTime = t;
+        for (const cb of [...rafCallbacks]) cb(16);
+      }
+      transport.stop();
+      await Promise.resolve(); // console fallback is decided at delivery time
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('no clicks today');
+      warn.mockRestore();
+    });
+
+    it('with a subscriber every failing beat is delivered — dedupe only applies to the console', async () => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx);
+      transport.setMetronomeClickSounds(fakeClick(), fakeClick());
+      transport.setMetronomeEnabled(true);
+      const onError = vi.fn();
+      transport.on('error', onError);
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw new Error('no clicks today');
+      });
+      transport.play();
+      for (const t of [0, 0.5, 1.0]) {
+        (ctx as any).currentTime = t;
+        for (const cb of [...rafCallbacks]) cb(16);
+      }
+      await Promise.resolve();
+      transport.stop();
+      expect(onError).toHaveBeenCalledTimes(3);
+    });
+
+    it('without an error listener a scheduling failure still reaches console.warn', async () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip()])]);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (ctx.createBufferSource as Mock).mockImplementation(() => {
+        throw new Error('createBufferSource exploded');
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      transport.stop();
+      await Promise.resolve();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('createBufferSource exploded'));
+      warn.mockRestore();
     });
   });
 });

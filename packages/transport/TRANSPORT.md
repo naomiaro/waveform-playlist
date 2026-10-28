@@ -302,6 +302,8 @@ CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as 
 - `countIn` — fires per beat with `{ beat: number, totalBeats: number }` for UI countdown
 - `countInEnd` — fires when count-in completes and playback begins
 
+**Error surfacing (#636):** both schedulers are constructed with an `onError` handler that forwards `SchedulerListenerError` (a union on `phase`: `generate` with `fromTick`/`toTick`, `consume` with `event`, `positionJump` with `tick`; all with `listener` and `error`) to the transport `error` event, delivered on a microtask after the window completes (the subscriber check happens at delivery, so an unsubscribe or dispose in between falls back to the console). A failing `generate()` skips that listener for the window; a failing `consume()` skips that one event; a failing `onPositionJump()` skips that listener's jump without aborting the loop wrap. Nothing is retried. With no `error` subscriber the transport falls back to `console.warn`, once per listener and phase, so the failure is never silent. Invalid loop points (`setLoop`/`setLoopSeconds`/`setLoopSamples` with `enabled` and a non-finite, empty or inverted range) throw instead of warning — `NativePlayoutAdapter.setLoop` translates the engine's empty default region (`loopStart = loopEnd = 0`) to a disabled loop before it gets there.
+
 **Why timer-driven, not callback-driven:** `onComplete` from `consume()` fires when the last beat is *scheduled* in the lookahead window (~200ms before it plays). Transitioning then would start the metronome before the last count-in click is heard. The timer tick checks elapsed time against the full bar duration, placing the transition exactly at the bar boundary.
 
 ## Solo Logic

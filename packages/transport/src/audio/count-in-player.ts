@@ -99,6 +99,9 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
   }
 
   consume(event: CountInEvent): void {
+    // Scheduling failures propagate to the scheduler, which reports them
+    // through the transport `error` event (or its deduped console fallback);
+    // the beat callback still fires so the count-in UI keeps counting.
     try {
       const source = this._audioContext.createBufferSource();
       source.buffer = event.buffer;
@@ -119,20 +122,9 @@ export class CountInPlayer implements SchedulerListener<CountInEvent> {
 
       const transportTime = this._tempoMap.ticksToSeconds(event.tick);
       source.start(this._toAudioTime(transportTime));
-    } catch (err) {
-      console.warn(
-        '[waveform-playlist] CountInPlayer.consume: failed to schedule beat ' +
-          event.beat +
-          '/' +
-          event.totalBeats +
-          ': ' +
-          String(err)
-      );
+    } finally {
+      this._onBeat?.(event.beat, event.totalBeats);
     }
-
-    // Beat callback stays outside try/catch so count-in events still
-    // fire even if one beat fails to schedule audio.
-    this._onBeat?.(event.beat, event.totalBeats);
   }
 
   onPositionJump(_newTick: Tick): void {

@@ -362,4 +362,39 @@ describe('Transport Count-In', () => {
 
     transport.stop();
   });
+
+  it('a count-in click that fails to schedule is surfaced on the error event and the count-in still completes (#636)', async () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const click = {
+      duration: 0.04,
+      length: 1920,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+    transport.setMetronomeClickSounds(click, click);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    const onError = vi.fn();
+    const onEnd = vi.fn();
+    transport.on('error', onError);
+    transport.on('countInEnd', onEnd);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    (ctx.createBufferSource as any).mockImplementation(() => {
+      throw new Error('count-in source exploded');
+    });
+
+    transport.play();
+    for (const cb of [...rafCallbacks]) cb(16);
+    await Promise.resolve();
+    expect(onError).toHaveBeenCalled();
+    expect(onError.mock.calls[0][0].phase).toBe('consume');
+    expect(warn).not.toHaveBeenCalled(); // routed to the subscriber, not warned per beat
+
+    (ctx as any).currentTime = 12.5; // past the 2 s count-in bar
+    for (const cb of [...rafCallbacks]) cb(32);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    transport.stop();
+  });
 });

@@ -130,7 +130,32 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   setLoop(enabled: boolean, start: number, end: number): void {
-    this._transport.setLoopSeconds(enabled, start, end);
+    // Transport.setLoopSeconds throws on an empty or inverted enabled range.
+    // The engine legitimately reaches here with one: PlaylistEngine starts with
+    // loopStart = loopEnd = 0 and forwards setLoopEnabled(true) before any
+    // region is chosen, and its own play() path already treats a region the
+    // playhead can't loop in as disabled. Mirror that here rather than throw
+    // into a UI toggle. Non-finite values are a programming error and still
+    // propagate.
+    // Decide in TICKS, the unit the transport validates in: a region that is
+    // non-empty in seconds but shorter than one tick (a 1-px loop selection at
+    // high zoom) would otherwise pass here and throw inside the transport.
+    const finite = Number.isFinite(start) && Number.isFinite(end);
+    const degenerate =
+      enabled && finite && this._transport.timeToTick(start) >= this._transport.timeToTick(end);
+    if (degenerate && !(start === 0 && end === 0)) {
+      // The engine's initial (0, 0) region is normal state before a region
+      // is chosen; anything else degenerate is a user- or caller-produced
+      // region the UI will show as looping while nothing loops — say so.
+      const why =
+        start > end
+          ? 'inverted loop region (' + start + ' > ' + end + ')'
+          : start === end
+            ? 'empty loop region (' + start + ')'
+            : 'loop region (' + start + ', ' + end + ') is shorter than one tick';
+      console.warn('[waveform-playlist] NativePlayoutAdapter.setLoop: ' + why + ' — loop disabled');
+    }
+    this._transport.setLoopSeconds(enabled && !degenerate, start, end);
   }
 
   setCountIn(enabled: boolean): void {
