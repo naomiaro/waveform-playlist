@@ -447,7 +447,9 @@ describe('TempoMap curve integration accuracy', () => {
   }
 
   const ONE_MICROSECOND = 1e-6;
-  const slopes = [0.05, 0.2, 0.45, 0.55, 0.8, 0.95];
+  // 0.4999991 / 0.5000009 sit just outside a 1e-6 linear window: the curve
+  // there differs from linear by ~1e-6 relative (0.38 ms on a 256-bar ramp).
+  const slopes = [0.05, 0.2, 0.45, 0.4999991, 0.5000009, 0.55, 0.8, 0.95];
   const ramps: Array<[number, number]> = [
     [60, 240],
     [200, 40],
@@ -484,15 +486,15 @@ describe('TempoMap curve integration accuracy', () => {
     }
   });
 
-  it('slope just outside the linear fast path stays within 1 µs of the exact linear integral', () => {
+  it('slope within 1e-6 of 0.5 integrates the curve itself, close to but not equal to linear', () => {
     const segment = 256 * BAR;
     const tmLinear = new TempoMap(ppqn, 120);
     tmLinear.setTempo(180, segment as Tick, { interpolation: 'linear' });
     const tmCurve = new TempoMap(ppqn, 120);
     tmCurve.setTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.500001 } });
     // At slope 0.500001 the curve differs from linear by ~1e-6 relative, so the
-    // two integrals agree to ~1e-6 × 365 s ≈ 0.4 ms at most; the reference
-    // comparison below pins the curve itself.
+    // two integrals agree to ~1e-6 × 365 s ≈ 0.4 ms; a linear shortcut would
+    // be wrong by that much. The reference comparison pins the curve itself.
     const expected = referenceSeconds(segment, 120, 180, segment, 0.500001);
     expect(Math.abs(tmCurve.ticksToSeconds(segment as Tick) - expected)).toBeLessThan(
       ONE_MICROSECOND
@@ -501,6 +503,50 @@ describe('TempoMap curve integration accuracy', () => {
       tmLinear.ticksToSeconds(segment as Tick),
       2
     );
+  });
+
+  it('ramp with bpm0 just off the curve offset (A/B ≈ 1e-8) stays within 1 µs', () => {
+    // Between A = 0 and |A/B| ≈ 1e-5 the plain (c·x − ln(bpm/bpm0))/(c·A) form
+    // cancels catastrophically (18 µs at 1e-8 on this ramp); the log1p form
+    // must take over there.
+    const segment = 256 * BAR;
+    const tm = new TempoMap(ppqn, 20.0000002);
+    tm.setTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.25 } });
+    for (const fraction of [0.5, 1]) {
+      const ticks = Math.round(segment * fraction);
+      const expected = referenceSeconds(ticks, 20.0000002, 180, segment, 0.25);
+      expect(Math.abs(tm.ticksToSeconds(ticks as Tick) - expected)).toBeLessThan(ONE_MICROSECOND);
+    }
+  });
+
+  it('closed-form inverse round-trips within 1 tick across extreme slopes, ratios and lengths', () => {
+    // Flat-then-jump curves (slope → 0) and their mirror (slope → 1) stress the
+    // inverse: forming e^(−c·x) as 1 + z loses 44 ticks at the far end of a
+    // 1024-bar 180 → 20 ramp; the product form keeps it exact.
+    const segment = 1024 * BAR;
+    const extremeSlopes = [1e-6, 0.05, 0.25, 0.4999991, 0.5000009, 0.8, 0.95, 1 - 1e-6];
+    const ramps: Array<[number, number]> = [
+      [10, 300],
+      [300, 10],
+      [180, 20],
+      [20, 180],
+      [20.0000002, 180],
+      [320, 20],
+    ];
+    for (const [bpm0, bpm1] of ramps) {
+      for (const slope of extremeSlopes) {
+        const tm = new TempoMap(ppqn, bpm0);
+        tm.setTempo(bpm1, segment as Tick, { interpolation: { type: 'curve', slope } });
+        for (const fraction of [0.001, 0.1, 0.5, 0.9, 0.999, 1]) {
+          const tick = Math.round(segment * fraction) as Tick;
+          const roundTrip = tm.secondsToTicks(tm.ticksToSeconds(tick));
+          expect(
+            Math.abs(roundTrip - tick),
+            `${bpm0}->${bpm1} slope=${slope} fraction=${fraction}`
+          ).toBeLessThanOrEqual(1);
+        }
+      }
+    }
   });
 
   it('ramp where bpm0 equals the curve offset (A = 0) stays finite and accurate', () => {

@@ -1,17 +1,11 @@
 import type { Tick, TempoInterpolation } from '../types';
 
 const CURVE_EPSILON = 1e-15;
-/** |slope − 0.5| below this is treated as a linear ramp. The curve
- *  coefficients diverge there (B → ∞, c → 0) and the curve is within ~1e-6
- *  of linear anyway, so the exact linear integral is the better answer. */
-const CURVE_LINEAR_SLOPE_EPSILON = 1e-6;
-/** |A| / |B| below this switches the curve integral to its pure-exponential
- *  series — the general antiderivative is 0/0 at A = 0 and loses precision
- *  nearby. */
-const CURVE_PURE_EXPONENTIAL_EPSILON = 1e-9;
-/** Bisection halvings for the curve inverse. Each probe is O(1), and 60
- *  halvings exhaust double precision from any segment length. */
-const CURVE_INVERSE_ITERATIONS = 60;
+/** |slope − 0.5| below this is treated as a linear ramp. The curve's exponent
+ *  rate c is exactly 0 at slope 0.5 (0/0 in the coefficients); the formulas
+ *  below are stable for every other slope, so the window only has to exclude
+ *  that point. At 1e-12 the curve differs from linear by < 1e-11 relative. */
+const CURVE_LINEAR_SLOPE_EPSILON = 1e-12;
 
 /** The Möbius-Ease curve written as an exponential: normalized value
  *  k·(r^(2x) − 1) = (p²/(1 − 2p))·(e^(c·x) − 1) with c = 2·ln((1 − p)/p). */
@@ -23,6 +17,15 @@ interface CurveCoefficients {
   cB: number;
 }
 
+/** Per-segment constants of bpm(x) = A + B·e^(c·x), carried as c·A and c·B,
+ *  plus base = T·60/ppqn (seconds of a segment at 1 BPM per tick-unit). */
+interface CurveSegment {
+  c: number;
+  cB: number;
+  cA: number;
+  base: number;
+}
+
 function isNearLinearSlope(slope: number): boolean {
   return Math.abs(slope - 0.5) < CURVE_LINEAR_SLOPE_EPSILON;
 }
@@ -30,9 +33,20 @@ function isNearLinearSlope(slope: number): boolean {
 function curveCoefficients(slope: number): CurveCoefficients {
   const p = Math.max(CURVE_EPSILON, Math.min(1 - CURVE_EPSILON, slope));
   const d = 1 - 2 * p;
-  // ln((1 − p)/p) = log1p((1 − 2p)/p): keeps precision when p ≈ 0.5
+  // ln((1 − p)/p) = log1p((1 − 2p)/p): keeps precision when p ≈ 0.5.
+  // (1 − 2p is exact: Sterbenz subtraction of two doubles within 2× of each other.)
   const c = 2 * Math.log1p(d / p);
   return { c, cB: (c * p * p) / d };
+}
+
+/** log1p(y)/y with the removable singularity filled in (→ 1 as y → 0). */
+function log1pOverY(y: number): number {
+  return y === 0 ? 1 : Math.log1p(y) / y;
+}
+
+/** (1 − e^(−k))/k with the removable singularity filled in (→ 1 as k → 0). */
+function expm1NegOverK(k: number): number {
+  return k === 0 ? 1 : -Math.expm1(-k) / k;
 }
 
 /**
@@ -304,15 +318,22 @@ export class TempoMap {
 
   /**
    * Exact integration for a Möbius-Ease tempo curve.
-   * With x = ticks / T the BPM is bpm0 + Δ·(p²/(1 − 2p))·(e^(c·x) − 1), which
-   * is A + B·e^(c·x) for A = bpm0 − B, B = Δ·p²/(1 − 2p). Its reciprocal has
-   * the antiderivative u/A − ln(A + B·e^(c·u))/(c·A), so
-   *   seconds = (T·60/ppqn) · (c·x − ln(bpm(x)/bpm0)) / (c·A).
-   * Everything is carried as c·A and c·B so the slope → 0.5 limit stays
-   * finite; |slope − 0.5| < CURVE_LINEAR_SLOPE_EPSILON uses the linear
-   * integral instead. Error is floating-point only (≈1e-15 relative),
-   * independent of segment length — the previous 64-step trapezoid drifted
-   * by ~5e-4 relative, i.e. 0.7 ms per bar at steep slopes.
+   * With x = ticks / T the BPM is bpm0 + Δ·(p²/(1 − 2p))·(e^(c·x) − 1), i.e.
+   * A + B·e^(c·x) for B = Δ·p²/(1 − 2p), A = bpm0 − B. Its reciprocal has the
+   * antiderivative u/A − ln(A + B·e^(c·u))/(c·A), so
+   *   seconds = base · (c·x − ln(bpm(x)/bpm0)) / (c·A),   base = T·60/ppqn.
+   * Everything is carried as c·A and c·B so the slope → 0.5 limit (B → ∞,
+   * c → 0) stays finite. Two algebraically equal forms are used, chosen per
+   * call so neither one cancels:
+   *   - log1p form: base · (1 − e^(−c·x))/(c·bpm0) · log1p(y)/y with
+   *     y = (A/bpm0)·(e^(−c·x) − 1). Exact as A → 0 (the plain form is 0/0
+   *     there) and as c → 0. Used while 1 + y = bpm(x)·e^(−c·x)/bpm0 > 0.5.
+   *   - plain form, when 1 + y ≤ 0.5 (steep concave ramps near their end,
+   *     where forming 1 + y loses digits). That regime implies A ≥ bpm0/2, so
+   *     the division by c·A is safe.
+   * Error is floating-point only (≈1e-15 relative), independent of segment
+   * length — the previous 64-step trapezoid drifted by ~5e-4 relative, i.e.
+   * 0.7 ms per bar at steep slopes.
    */
   private _ticksToSecondsCurve(
     ticks: number,
@@ -325,27 +346,28 @@ export class TempoMap {
     if (isNearLinearSlope(slope)) {
       return this._ticksToSecondsLinear(ticks, bpm0, bpm1, totalSegmentTicks);
     }
-    const { c, cB: cBNormalized } = curveCoefficients(slope);
-    const cB = cBNormalized * (bpm1 - bpm0);
-    const cA = c * bpm0 - cB;
+    const { c, cB, cA, base } = this._curveSegment(bpm0, bpm1, totalSegmentTicks, slope);
     const x = ticks / totalSegmentTicks;
-    const base = (totalSegmentTicks * 60) / this._ppqn;
-
-    if (Math.abs(cA) <= CURVE_PURE_EXPONENTIAL_EPSILON * Math.abs(cB)) {
-      // A ≈ 0: bpm(x) = B·e^(c·x). Expand 1/(A + B·e^(c·u)) to first order in
-      // A/B: ∫ = (1 − e^(−c·x))/(B·c) − (A/B²)·(1 − e^(−2c·x))/(2c).
-      return base * (-Math.expm1(-c * x) / cB + (cA / (2 * cB * cB)) * Math.expm1(-2 * c * x));
+    const expm1NegCx = Math.expm1(-c * x); // e^(−c·x) − 1
+    const y = (cA / (c * bpm0)) * expm1NegCx;
+    if (1 + y > 0.5) {
+      return base * (-expm1NegCx / (c * bpm0)) * log1pOverY(y);
     }
-    // ln(bpm(x)/bpm0) = log1p((B/bpm0)·(e^(c·x) − 1)): precise for small c·x
-    const logRatio = Math.log1p((cB / (c * bpm0)) * Math.expm1(c * x));
+    const logRatio = Math.log1p((cB / (c * bpm0)) * Math.expm1(c * x)); // ln(bpm(x)/bpm0)
     return (base * (c * x - logRatio)) / cA;
   }
 
   /**
-   * Inverse of _ticksToSecondsCurve: given seconds into a curved segment,
-   * return (fractional) ticks. There is no closed-form inverse, but seconds(ticks)
-   * is smooth and strictly increasing (derivative 60/(ppqn·bpm) > 0), so
-   * bisection converges to double precision; each probe is O(1).
+   * Closed-form inverse of _ticksToSecondsCurve. Solving the log1p form for x:
+   *   K = seconds·c·A/base
+   *   z = e^(−c·x) − 1 = −(bpm0·seconds·c/base) · (1 − e^(−K))/K
+   *   x = −log1p(z)/c
+   * (1 − e^(−K))/K → 1 as K → 0, so this is exact as A → 0 and as c → 0.
+   * When e^(−c·x) is small (z ≤ −0.5: a steep concave ramp near its end) and
+   * |B| < |A|/2, forming it as 1 + z loses digits; there the equal product
+   * form e^(−c·x) = (c·bpm0·e^(−K) − c·B)/(c·A) is used — its own cancellation
+   * is bounded by |B|/|A|, hence the guard. Returns fractional ticks; callers
+   * round at their unit boundary.
    */
   private _secondsToTicksCurve(
     seconds: number,
@@ -358,18 +380,25 @@ export class TempoMap {
     if (isNearLinearSlope(slope)) {
       return this._secondsToTicksLinear(seconds, bpm0, bpm1, totalSegmentTicks);
     }
-    let lo = 0;
-    let hi = totalSegmentTicks;
-    for (let i = 0; i < CURVE_INVERSE_ITERATIONS; i++) {
-      const mid = (lo + hi) / 2;
-      const midSeconds = this._ticksToSecondsCurve(mid, bpm0, bpm1, totalSegmentTicks, slope);
-      if (midSeconds < seconds) {
-        lo = mid;
-      } else {
-        hi = mid;
-      }
+    const { c, cB, cA, base } = this._curveSegment(bpm0, bpm1, totalSegmentTicks, slope);
+    const k = (seconds * cA) / base;
+    const z = -((bpm0 * seconds * c) / base) * expm1NegOverK(k);
+    if (z > -0.5 || Math.abs(cB) >= 0.5 * Math.abs(cA)) {
+      return (-Math.log1p(z) / c) * totalSegmentTicks;
     }
-    return (lo + hi) / 2;
+    const expNegCx = (c * bpm0 * Math.exp(-k) - cB) / cA;
+    return (-Math.log(expNegCx) / c) * totalSegmentTicks;
+  }
+
+  private _curveSegment(
+    bpm0: number,
+    bpm1: number,
+    totalSegmentTicks: number,
+    slope: number
+  ): CurveSegment {
+    const { c, cB: cBNormalized } = curveCoefficients(slope);
+    const cB = cBNormalized * (bpm1 - bpm0);
+    return { c, cB, cA: c * bpm0 - cB, base: (totalSegmentTicks * 60) / this._ppqn };
   }
 
   private _entryIndexAt(tick: Tick): number {
