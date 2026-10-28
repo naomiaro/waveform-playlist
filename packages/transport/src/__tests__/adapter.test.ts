@@ -208,13 +208,15 @@ describe('NativePlayoutAdapter', () => {
       return Promise.resolve();
     });
     const adapter = new NativePlayoutAdapter(ctx);
-    const initPromise = adapter.init();
+    // Attach the rejection handler BEFORE the poll rejects, or vitest reports
+    // an unhandled rejection for the window between the two.
+    const rejection = expect(adapter.init()).rejects.toThrow(/closed/);
     await Promise.resolve();
     await Promise.resolve();
     await vi.advanceTimersByTimeAsync(16);
     (ctx as any).state = 'closed';
     await vi.advanceTimersByTimeAsync(16);
-    await expect(initPromise).rejects.toThrow(/closed/);
+    await rejection;
     expect(vi.getTimerCount()).toBe(0);
   });
 
