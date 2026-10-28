@@ -879,7 +879,7 @@ describe('Transport', () => {
         throw new Error('createBufferSource exploded');
       });
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       transport.dispose(); // clears every listener before the microtask runs
       await Promise.resolve();
       expect(onError).not.toHaveBeenCalled();
@@ -908,7 +908,7 @@ describe('Transport', () => {
       transport.play();
       for (const t of [0, 0.5, 1.0]) {
         (ctx as any).currentTime = t;
-        for (const cb of [...rafCallbacks]) cb(16);
+        vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       }
       transport.stop();
       await Promise.resolve(); // console fallback is decided at delivery time
@@ -930,7 +930,7 @@ describe('Transport', () => {
       transport.play();
       for (const t of [0, 0.5, 1.0]) {
         (ctx as any).currentTime = t;
-        for (const cb of [...rafCallbacks]) cb(16);
+        vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       }
       await Promise.resolve();
       transport.stop();

@@ -361,14 +361,14 @@ describe('Transport Count-In', () => {
     });
 
     transport.play();
-    for (const cb of [...rafCallbacks]) cb(16);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     await Promise.resolve();
     expect(onError).toHaveBeenCalled();
     expect(onError.mock.calls[0][0].phase).toBe('consume');
     expect(warn).not.toHaveBeenCalled(); // routed to the subscriber, not warned per beat
 
     (ctx as any).currentTime = 12.5; // past the 2 s count-in bar
-    for (const cb of [...rafCallbacks]) cb(32);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     expect(onEnd).toHaveBeenCalledTimes(1);
     warn.mockRestore();
     transport.stop();
