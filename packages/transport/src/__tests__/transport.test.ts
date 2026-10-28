@@ -663,13 +663,36 @@ describe('Transport', () => {
       );
     });
 
+    it('a sample range shorter than one tick throws before touching any state', () => {
+      // 48 kHz at 120 BPM / 960 PPQN: one tick is 25 samples. 100 and 110 both
+      // round to tick 4, so the sample-unit check passes but the loop is empty.
+      const transport = new Transport(mockAudioContext());
+      const onLoop = vi.fn();
+      transport.on('loop', onLoop);
+      expect(() => transport.setLoopSamples(true, 100 as Sample, 110 as Sample)).toThrow(
+        /shorter than one tick/
+      );
+      expect(onLoop).not.toHaveBeenCalled();
+      // The clip player must not have been given the half-applied loop either:
+      // a following valid loop works and is the first 'loop' event seen.
+      transport.setLoopSamples(true, 0 as Sample, 48000 as Sample);
+      expect(onLoop).toHaveBeenCalledTimes(1);
+    });
+
+    it('a seconds range shorter than one tick throws naming the caller unit', () => {
+      const transport = new Transport(mockAudioContext());
+      expect(() => transport.setLoopSeconds(true, 1, 1.0001)).toThrow(
+        /setLoopSeconds: range \(1, 1\.0001 second\) is shorter than one tick/
+      );
+    });
+
     it('disabling the loop never throws, whatever the range', () => {
       const transport = new Transport(mockAudioContext());
       expect(() => transport.setLoop(false, 960 as Tick, 480 as Tick)).not.toThrow();
       expect(() => transport.setLoopSeconds(false, 0, 0)).not.toThrow();
     });
 
-    it('a listener failure during scheduling is emitted as an error event, not warned', () => {
+    it('a listener failure during scheduling is emitted as an error event, not warned', async () => {
       const ctx = mockAudioContext();
       const failure = new Error('createBufferSource exploded');
       const transport = new Transport(ctx);
@@ -683,6 +706,10 @@ describe('Transport', () => {
 
       transport.play();
       for (const cb of [...rafCallbacks]) cb(16);
+      // Delivered on a microtask, after the scheduler window completes, so a
+      // handler that calls stop()/setTracks() cannot re-enter the iteration.
+      expect(onError).not.toHaveBeenCalled();
+      await Promise.resolve();
       transport.stop();
 
       expect(onError).toHaveBeenCalledTimes(1);
@@ -692,6 +719,37 @@ describe('Transport', () => {
       expect(event.event?.tick).toBe(0);
       expect(typeof event.listener.consume).toBe('function');
       expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('an error handler that stops the transport does not let the rest of the window play', async () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      // Two clips at tick 0 on two tracks: the first source creation throws,
+      // the handler stops the transport, and the second clip must NOT be
+      // scheduled afterwards.
+      transport.setTracks([
+        makeTrack([makeClip({ id: 'a' })], { id: 't1' }),
+        makeTrack([makeClip({ id: 'b' })], { id: 't2' }),
+      ]);
+      transport.on('error', () => transport.stop());
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const create = ctx.createBufferSource as Mock;
+      create.mockImplementationOnce(() => {
+        throw new Error('first source exploded');
+      });
+
+      transport.play();
+      for (const cb of [...rafCallbacks]) cb(16);
+      await Promise.resolve();
+
+      expect(transport.isPlaying()).toBe(false);
+      // One failed attempt, one successful source for clip b — created BEFORE
+      // the handler ran (same window) and silenced by stop(); no source may be
+      // created after the stop.
+      const createdAfterStop = create.mock.results.length;
+      for (const cb of [...rafCallbacks]) cb(32);
+      expect(create.mock.results.length).toBe(createdAfterStop);
       warn.mockRestore();
     });
 

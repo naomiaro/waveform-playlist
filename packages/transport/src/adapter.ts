@@ -137,7 +137,23 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     // playhead can't loop in as disabled. Mirror that here rather than throw
     // into a UI toggle. Non-finite values are a programming error and still
     // propagate.
-    const degenerate = enabled && Number.isFinite(start) && Number.isFinite(end) && start >= end;
+    // Decide in TICKS, the unit the transport validates in: a region that is
+    // non-empty in seconds but shorter than one tick (a 1-px loop selection at
+    // high zoom) would otherwise pass here and throw inside the transport.
+    const finite = Number.isFinite(start) && Number.isFinite(end);
+    const degenerate =
+      enabled && finite && this._transport.timeToTick(start) >= this._transport.timeToTick(end);
+    if (degenerate && start > end) {
+      // The empty default region (start === end) is normal engine state; an
+      // inverted one is a caller bug worth a diagnostic.
+      console.warn(
+        '[waveform-playlist] NativePlayoutAdapter.setLoop: inverted loop region (' +
+          start +
+          ' > ' +
+          end +
+          ') — loop disabled'
+      );
+    }
     this._transport.setLoopSeconds(enabled && !degenerate, start, end);
   }
 

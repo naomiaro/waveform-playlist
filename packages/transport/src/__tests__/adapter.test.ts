@@ -297,12 +297,30 @@ describe('NativePlayoutAdapter', () => {
     expect(spy).toHaveBeenCalledWith(false, 0, 0);
   });
 
-  it('setLoop with an inverted region disables the loop instead of throwing', () => {
+  it('setLoop with an inverted region disables the loop with a warning instead of throwing', () => {
     const ctx = mockAudioContext();
     const adapter = new NativePlayoutAdapter(ctx);
     const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     expect(() => adapter.setLoop(true, 5, 1)).not.toThrow();
     expect(spy).toHaveBeenCalledWith(false, 5, 1);
+    // An inverted range is a caller bug worth a diagnostic; the empty default
+    // region (start === end) is not.
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('inverted'));
+    warn.mockClear();
+    adapter.setLoop(true, 0, 0);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('setLoop with a region shorter than one tick disables the loop instead of throwing', () => {
+    // 0.5 s → 0.5002 s is 0.38 ticks at 120 BPM / 960 PPQN: non-empty in
+    // seconds, empty in ticks. A 1-px loop selection at high zoom does this.
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const spy = vi.spyOn(adapter.transport, 'setLoopSeconds');
+    expect(() => adapter.setLoop(true, 0.5, 0.5002)).not.toThrow();
+    expect(spy).toHaveBeenCalledWith(false, 0.5, 0.5002);
   });
 
   it('delegates dispose', () => {

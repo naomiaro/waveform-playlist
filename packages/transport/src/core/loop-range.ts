@@ -45,3 +45,34 @@ export function assertValidLoopRange(
     );
   }
 }
+
+/**
+ * After converting a seconds/samples range to ticks: a range that is
+ * non-empty in the caller's unit can still collapse to one tick. Throw in the
+ * caller's unit before any state is touched — the tick-level assert in
+ * setLoop would otherwise fire after the sample/seconds bookkeeping ran.
+ */
+export function assertLoopRangeSpansATick(
+  source: string,
+  enabled: boolean,
+  start: number,
+  end: number,
+  unit: LoopRangeUnit,
+  startTick: number,
+  endTick: number
+): void {
+  if (!enabled || startTick < endTick) return;
+  throw new Error(
+    '[waveform-playlist] ' +
+      source +
+      ': range (' +
+      start +
+      ', ' +
+      end +
+      ' ' +
+      unit +
+      ') is shorter than one tick (both round to tick ' +
+      startTick +
+      ')'
+  );
+}

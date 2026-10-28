@@ -126,7 +126,7 @@ export interface MeterChangeEventData {
  *  going; the host decides what to do with the failure. */
 export interface SchedulerListenerError {
   /** Which listener method threw */
-  phase: 'generate' | 'consume';
+  phase: 'generate' | 'consume' | 'positionJump';
   /** The listener that threw */
   listener: SchedulerListener<SchedulerEvent>;
   /** The event being consumed — present only when `phase` is 'consume' */

@@ -12,8 +12,8 @@ import type {
 } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
-import { Scheduler, formatSchedulerListenerError } from './core/scheduler';
-import { assertValidLoopRange } from './core/loop-range';
+import { Scheduler, ListenerErrorLog } from './core/scheduler';
+import { assertValidLoopRange, assertLoopRangeSpansATick } from './core/loop-range';
 import { Timer } from './core/timer';
 import { SampleTimeline } from './timeline/sample-timeline';
 import { TempoMap } from './timeline/tempo-map';
@@ -82,6 +82,7 @@ export class Transport {
   private _accentBuffer: AudioBuffer | null = null;
   private _normalBuffer: AudioBuffer | null = null;
   private _schedulerLookahead: number = 0.2;
+  private readonly _errorLog = new ListenerErrorLog('[waveform-playlist] Transport: ');
   private _ppqn: number = 960;
 
   constructor(audioContext: AudioContext, options: TransportOptions = {}) {
@@ -433,6 +434,15 @@ export class Transport {
     assertValidLoopRange('Transport.setLoopSeconds', enabled, startSec, endSec, 'second');
     const startTick = this._tempoMap.secondsToTicks(startSec);
     const endTick = this._tempoMap.secondsToTicks(endSec);
+    assertLoopRangeSpansATick(
+      'Transport.setLoopSeconds',
+      enabled,
+      startSec,
+      endSec,
+      'second',
+      startTick,
+      endTick
+    );
     this.setLoop(enabled, startTick, endTick);
   }
 
@@ -441,6 +451,16 @@ export class Transport {
     assertValidLoopRange('Transport.setLoopSamples', enabled, startSample, endSample, 'sample');
     const startTick = this._sampleTimeline.samplesToTicks(startSample);
     const endTick = this._sampleTimeline.samplesToTicks(endSample);
+    // Both ends can round to the same tick; check before any state changes.
+    assertLoopRangeSpansATick(
+      'Transport.setLoopSamples',
+      enabled,
+      startSample,
+      endSample,
+      'sample',
+      startTick,
+      endTick
+    );
     this._loopEnabled = enabled;
     this._loopStartTick = startTick;
     this._loopStartSeconds = this._tempoMap.ticksToSeconds(startTick);
@@ -873,19 +893,18 @@ export class Transport {
   }
 
   /** Route a scheduler listener failure to `error` subscribers, or to
-   *  console.warn when nobody is listening — the failure must stay visible
-   *  either way. */
+   *  console.warn (once per listener and phase) when nobody is listening —
+   *  the failure must stay visible either way. Subscribers are called on a
+   *  microtask, after the scheduler window that produced the failure has
+   *  completed: a handler that reacts with stop()/setTracks()/off() must not
+   *  re-enter the listener iteration that is still running. */
   private _emitError(error: SchedulerListenerError): void {
     const listeners = this._listeners.get('error');
     if (listeners && listeners.size > 0) {
-      this._emit('error', error);
+      queueMicrotask(() => this._emit('error', error));
       return;
     }
-    console.warn(
-      '[waveform-playlist] Transport: ' +
-        formatSchedulerListenerError(error) +
-        ' (subscribe to the "error" event to handle this)'
-    );
+    this._errorLog.warnOnce(error);
   }
 
   private _emit<K extends TransportEventType>(

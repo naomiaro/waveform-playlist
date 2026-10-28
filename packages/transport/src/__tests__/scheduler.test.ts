@@ -283,6 +283,43 @@ describe('Scheduler (tick-based)', () => {
       expect(listener.consumed).toEqual([0, 960]);
     });
 
+    it('reports an onPositionJump() failure and still completes the loop wrap', () => {
+      const errors: SchedulerListenerError[] = [];
+      const loopCalls: number[] = [];
+      const tempoMap = new TempoMap(ppqn, bpm);
+      const scheduler = new Scheduler<TestEvent>(tempoMap, {
+        lookahead: 0.3,
+        onLoop: (start) => loopCalls.push(start),
+        onError: (e) => errors.push(e),
+      });
+      scheduler.setLoop(true, 0 as Tick, 960 as Tick); // [0, 0.5 s)
+      const failure = new Error('jump failed');
+      const bad = {
+        ...throwingListener({}),
+        onPositionJump() {
+          throw failure;
+        },
+      };
+      const good = createMockListener();
+      scheduler.addListener(bad);
+      scheduler.addListener(good);
+
+      scheduler.advance(0.35); // crosses loopEnd once
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].phase).toBe('positionJump');
+      expect(errors[0].listener).toBe(bad);
+      expect(errors[0].error).toBe(failure);
+      // The wrap finished: the other listener jumped, the clock was re-seeked,
+      // and the cursor restarted from loopStart (next window begins at 288).
+      expect(good.jumpedTo).toEqual([0]);
+      expect(loopCalls).toEqual([0]);
+      expect(good.generateRanges).toEqual([
+        [0, 960],
+        [0, 288],
+      ]);
+    });
+
     it('falls back to console.warn when no onError handler is configured', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const scheduler = createScheduler(0.2);
@@ -292,6 +329,16 @@ describe('Scheduler (tick-based)', () => {
 
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('generate failed'));
+      warn.mockRestore();
+    });
+
+    it('the console fallback warns once per listener and phase, not once per tick', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const scheduler = createScheduler(0.2);
+      scheduler.addListener(throwingListener({ generate: new Error('generate failed') }));
+      for (let i = 0; i < 50; i++) scheduler.advance(i * 0.05);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('further failures of this kind are not logged');
       warn.mockRestore();
     });
   });

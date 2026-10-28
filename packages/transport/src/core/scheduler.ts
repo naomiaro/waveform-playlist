@@ -9,10 +9,11 @@ export interface SchedulerOptions {
    *  advance() so the Transport can compute the correct clock seek target
    *  without re-reading the live AudioContext.currentTime. */
   onLoop?: (loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void;
-  /** Called when a listener's generate() or consume() throws. The failing
-   *  listener is skipped for that window (consume: that event) and the
-   *  remaining listeners/events still run. Without a handler the failure is
-   *  reported with console.warn so it is never silent. */
+  /** Called when a listener's generate(), consume() or onPositionJump()
+   *  throws. The failing listener is skipped for that window (consume: that
+   *  event; positionJump: that jump) and the remaining listeners/events still
+   *  run. Without a handler the failure is reported with console.warn, once
+   *  per listener and phase, so it is never silent. */
   onError?: (error: SchedulerListenerError) => void;
 }
 
@@ -22,6 +23,32 @@ export function formatSchedulerListenerError(error: SchedulerListenerError): str
   return (
     'scheduler listener threw during ' + error.phase + '()' + where + ': ' + String(error.error)
   );
+}
+
+/**
+ * Console fallback for listener failures when no handler is subscribed. A
+ * listener that fails on every window would otherwise log ~40 lines a second
+ * for the whole playback, so each (listener, phase) pair is reported once.
+ */
+export class ListenerErrorLog {
+  private readonly _seen = new WeakMap<object, Set<SchedulerListenerError['phase']>>();
+
+  constructor(private readonly _prefix: string) {}
+
+  warnOnce(error: SchedulerListenerError): void {
+    let phases = this._seen.get(error.listener);
+    if (!phases) {
+      phases = new Set();
+      this._seen.set(error.listener, phases);
+    }
+    if (phases.has(error.phase)) return;
+    phases.add(error.phase);
+    console.warn(
+      this._prefix +
+        formatSchedulerListenerError(error) +
+        ' (further failures of this kind are not logged; subscribe to the "error" event to handle them)'
+    );
+  }
 }
 
 export class Scheduler<T extends SchedulerEvent> {
@@ -36,6 +63,7 @@ export class Scheduler<T extends SchedulerEvent> {
     | ((loopStartSeconds: number, loopEndSeconds: number, currentTimeSeconds: number) => void)
     | undefined;
   private _onError: ((error: SchedulerListenerError) => void) | undefined;
+  private readonly _errorLog = new ListenerErrorLog('[waveform-playlist] Scheduler: ');
   private _tempoMap: TempoMap;
 
   constructor(tempoMap: TempoMap, options: SchedulerOptions = {}) {
@@ -102,9 +130,15 @@ export class Scheduler<T extends SchedulerEvent> {
         // Generate up to loopEnd
         this._generateAndConsume(this._rightEdge, this._loopEnd);
         remaining -= distToEnd;
-        // Notify listeners of position jump (in ticks)
+        // Notify listeners of position jump (in ticks). A throwing listener
+        // must not abort the wrap: the cursor reset and clock seek below
+        // have to happen or the next window generates past loopEnd again.
         for (const listener of this._listeners) {
-          listener.onPositionJump(this._loopStart as Tick);
+          try {
+            listener.onPositionJump(this._loopStart as Tick);
+          } catch (err) {
+            this._reportError({ phase: 'positionJump', listener, error: err });
+          }
         }
         // Seek clock — passes the currentTimeSeconds snapshot so Transport
         // uses the same clock reading as advance(), not a live re-read.
@@ -154,6 +188,6 @@ export class Scheduler<T extends SchedulerEvent> {
       this._onError(error);
       return;
     }
-    console.warn('[waveform-playlist] Scheduler: ' + formatSchedulerListenerError(error));
+    this._errorLog.warnOnce(error);
   }
 }

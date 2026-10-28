@@ -254,7 +254,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `tempochange` payload: `{ bpm: number, atTick: Tick }`
 - `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`
 - `countIn` payload: `{ beat: number, totalBeats: number }`
-- `error` payload: `SchedulerListenerError` — `{ phase: 'generate' | 'consume', listener, event?, error }`. A scheduler listener (clip player, metronome, count-in, or your own) threw; the scheduler skipped it and kept going. With no `error` subscriber the failure goes to `console.warn` instead.
+- `error` payload: `SchedulerListenerError` — `{ phase: 'generate' | 'consume' | 'positionJump', listener, event?, error }`. A scheduler listener (clip player, metronome, count-in, or your own) threw; the scheduler skipped it and kept going. Delivered on a microtask after the scheduler window completes. With no `error` subscriber the failure goes to `console.warn` instead (once per listener and phase).
 
 **Cleanup:**
 - `dispose()` — Stop playback, disconnect all nodes, remove listeners
