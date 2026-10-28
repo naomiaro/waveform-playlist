@@ -163,11 +163,20 @@ export class TempoMap {
     return assertFiniteResult('ticks ' + ticks, this._ticksToSecondsInternal(ticks));
   }
 
+  /** Seconds → integer ticks, rounded once here at the `Tick` boundary.
+   *  Use secondsToTicksExact() for sub-tick placement. */
   secondsToTicks(seconds: number): Tick {
+    return Math.round(this.secondsToTicksExact(seconds)) as Tick;
+  }
+
+  /** Seconds → fractional tick position (unrounded). Callers that need an
+   *  integer `Tick` round at their own boundary (secondsToTicks,
+   *  SampleTimeline.samplesToTicks, the scheduler cursor); sub-tick consumers
+   *  (placing a recorded note between ticks before quantising, continuous
+   *  beat positions) use this directly. */
+  secondsToTicksExact(seconds: number): number {
     assertFiniteInput('seconds', seconds);
-    return Math.round(
-      assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds))
-    ) as Tick;
+    return assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds));
   }
 
   private _secondsToTicksRaw(seconds: number): number {
@@ -222,8 +231,9 @@ export class TempoMap {
     return this.ticksToSeconds((beats * this._ppqn) as Tick);
   }
 
+  /** Continuous beat position (fractional) — not quantised to whole ticks. */
   secondsToBeats(seconds: number): number {
-    return this.secondsToTicks(seconds) / this._ppqn;
+    return this.secondsToTicksExact(seconds) / this._ppqn;
   }
 
   clearTempos(): void {
@@ -329,8 +339,8 @@ export class TempoMap {
    * then ticks = (bpmAtTick - bpm0) * T / deltaBpm
    *
    * Note: exp(log(x)) has ~1 ULP floating-point error, so integer round-trips
-   * rely on the rounding in secondsToTicks. Sufficient for all tested BPM
-   * ranges (10–300 BPM).
+   * rely on the rounding in secondsToTicks; secondsToTicksExact returns the
+   * raw value. Sufficient for all tested BPM ranges (10–300 BPM).
    */
   private _secondsToTicksLinear(
     seconds: number,

@@ -26,24 +26,26 @@ export class SampleTimeline {
   }
 
   ticksToSamples(ticks: Tick): Sample {
-    if (!this._tempoMap) {
-      throw new Error(
-        '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
-      );
-    }
-    return Math.round(this._tempoMap.ticksToSeconds(ticks) * this._sampleRate) as Sample;
+    return Math.round(this._requireTempoMap().ticksToSeconds(ticks) * this._sampleRate) as Sample;
   }
 
+  /** Samples → integer ticks. The integer `Tick` contract belongs to THIS
+   *  boundary: exactly one rounding, applied to the fractional position. */
   samplesToTicks(samples: Sample): Tick {
+    return Math.round(this.samplesToTicksExact(samples)) as Tick;
+  }
+
+  /** Samples → fractional tick position (unrounded), for sub-tick placement. */
+  samplesToTicksExact(samples: Sample): number {
+    return this._requireTempoMap().secondsToTicksExact(samples / this._sampleRate);
+  }
+
+  private _requireTempoMap(): TempoMap {
     if (!this._tempoMap) {
       throw new Error(
         '[waveform-playlist] SampleTimeline: tempoMap not set — call setTempoMap() first'
       );
     }
-    // Round explicitly rather than relying on secondsToTicks' internal
-    // rounding — the integer Tick contract belongs to THIS boundary, and
-    // a TempoMap refactor returning float ticks must not silently break
-    // the Sample → Tick path. Mirrors the rounding in ticksToSamples.
-    return Math.round(this._tempoMap.secondsToTicks(samples / this._sampleRate)) as Tick;
+    return this._tempoMap;
   }
 }

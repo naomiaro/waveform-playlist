@@ -227,7 +227,8 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `setMeter(numerator, denominator, atTick?: Tick)` / `getMeter(atTick?: Tick)`
 - `removeMeter(atTick: Tick)` / `clearMeters()`
 - `barToTick(bar): Tick` / `tickToBar(tick: Tick)`
-- `timeToTick(seconds): Tick` / `tickToTime(tick: Tick)`
+- `timeToTick(seconds): Tick` / `tickToTime(tick: Tick)` — integer ticks (rounded once at this boundary)
+- `timeToTickExact(seconds): number` — fractional tick position, for sub-tick placement (e.g. a recorded note between ticks before quantising)
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`

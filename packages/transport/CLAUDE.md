@@ -54,8 +54,10 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 ### Dual Coordinate System
 
-- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples). Also `ticksToSamples()` / `samplesToTicks()` via TempoMap (requires `setTempoMap()` before use).
-- **TempoMap** — converts between ticks and seconds. `secondsToTicks()` returns `Math.round()` (integer). `ticksToSeconds()` stays float for audio scheduling. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+- **SampleTimeline** — absolute positions in samples. `samplesToSeconds()` / `secondsToSamples()` (with `Math.round` for integer samples). Also `ticksToSamples()` / `samplesToTicks()` via TempoMap (requires `setTempoMap()` before use); `samplesToTicksExact()` is the fractional variant.
+- **TempoMap** — converts between ticks and seconds. `secondsToTicksExact()` returns the fractional position; `secondsToTicks()` is `Math.round()` of it (integer `Tick`). `ticksToSeconds()` stays float for audio scheduling. Supports multiple tempo entries with cached cumulative seconds for O(log n) lookups.
+
+**Rounding happens once, at the unit boundary (#636):** the math (`secondsToTicksExact`, `samplesToTicksExact`, `Transport.timeToTickExact`, `secondsToBeats`) is fractional; the integer-`Tick` producers (`secondsToTicks`, `samplesToTicks`, `timeToTick`, the scheduler cursor) each apply exactly one `Math.round` on top. Pattern after SoundCraft's `samples_to_ticks_f` / `samples_to_ticks` pair. New conversions follow the same shape: an `*Exact` fractional method plus a rounding wrapper — never round inside the math and again at the caller.
 - **MeterMap** — time signature entries at tick positions. See MeterMap section below.
 
 SampleTimeline converts between samples, seconds, and ticks (via TempoMap). The Scheduler works in integer ticks — seconds from the Clock are converted at the top of `advance()`. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples.

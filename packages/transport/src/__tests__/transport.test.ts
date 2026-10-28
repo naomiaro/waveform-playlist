@@ -449,6 +449,12 @@ describe('Transport', () => {
     expect(transport.tickToBar(3840 as Tick)).toBe(2);
   });
 
+  it('timeToTickExact returns fractional ticks while timeToTick rounds (#636)', () => {
+    const transport = new Transport(mockAudioContext()); // 120 BPM × 960 PPQN = 1920 ticks/s
+    expect(transport.timeToTickExact(0.0005)).toBeCloseTo(0.96, 10);
+    expect(transport.timeToTick(0.0005)).toBe(1);
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

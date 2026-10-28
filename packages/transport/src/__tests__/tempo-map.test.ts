@@ -617,3 +617,34 @@ describe('TempoMap curve integration accuracy', () => {
     );
   });
 });
+
+describe('TempoMap fractional conversions (#636)', () => {
+  // 120 BPM × 960 PPQN = 1920 ticks per second → 0.0005 s is 0.96 ticks.
+  it('secondsToTicksExact returns the unrounded tick position', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicksExact(0.0005)).toBeCloseTo(0.96, 10);
+  });
+
+  it('secondsToTicks rounds that exact value once, at the integer-Tick boundary', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicks(0.0005)).toBe(1);
+    expect(tm.secondsToTicks(0.00025)).toBe(0); // 0.48 ticks
+  });
+
+  it('secondsToTicksExact round-trips fractional ticks through step, linear and curve segments', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    tm.setTempo(100, 7680 as Tick, { interpolation: 'linear' });
+    tm.setTempo(100, 11520 as Tick);
+    for (const tick of [1234.5, 5000.25, 9000.75, 12000.125]) {
+      const seconds = tm.ticksToSeconds(tick as Tick);
+      expect(tm.secondsToTicksExact(seconds)).toBeCloseTo(tick, 6);
+    }
+  });
+
+  it('secondsToBeats is continuous, not quantised to whole ticks', () => {
+    const tm = new TempoMap(960, 120);
+    // 0.96 ticks = 0.001 beats; the old integer path returned 1/960 ≈ 0.00104.
+    expect(tm.secondsToBeats(0.0005)).toBeCloseTo(0.001, 10);
+  });
+});
