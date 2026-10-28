@@ -485,7 +485,7 @@ describe('Transport', () => {
     transport.play(0, 2);
     transport.setTempo(240);
     (ctx as any).currentTime = 1.2; // window [1.2, 1.4 s) = ticks [4608, 5376) at 240 BPM
-    for (const cb of [...rafCallbacks]) cb(16);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     expect((ctx.createBufferSource as Mock).mock.results.length).toBe(1);
     // The clip player converts with the swapped map too: tick 5000 at 240 BPM
     // is 1.302 s, not the 2.604 s the 120 BPM map would give (clock started at
