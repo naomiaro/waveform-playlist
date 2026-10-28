@@ -1,8 +1,39 @@
 import type { Tick, TempoInterpolation } from '../types';
 
 const CURVE_EPSILON = 1e-15;
-/** Number of subdivisions for trapezoidal integration over curved segments */
-const CURVE_SUBDIVISIONS = 64;
+/** |slope − 0.5| below this is treated as a linear ramp. The curve
+ *  coefficients diverge there (B → ∞, c → 0) and the curve is within ~1e-6
+ *  of linear anyway, so the exact linear integral is the better answer. */
+const CURVE_LINEAR_SLOPE_EPSILON = 1e-6;
+/** |A| / |B| below this switches the curve integral to its pure-exponential
+ *  series — the general antiderivative is 0/0 at A = 0 and loses precision
+ *  nearby. */
+const CURVE_PURE_EXPONENTIAL_EPSILON = 1e-9;
+/** Bisection halvings for the curve inverse. Each probe is O(1), and 60
+ *  halvings exhaust double precision from any segment length. */
+const CURVE_INVERSE_ITERATIONS = 60;
+
+/** The Möbius-Ease curve written as an exponential: normalized value
+ *  k·(r^(2x) − 1) = (p²/(1 − 2p))·(e^(c·x) − 1) with c = 2·ln((1 − p)/p). */
+interface CurveCoefficients {
+  /** Exponent rate c. Negative for slope > 0.5, zero at slope 0.5. */
+  c: number;
+  /** Amplitude pre-multiplied by c: c·p²/(1 − 2p). The amplitude and 1/c
+   *  both diverge as slope → 0.5 while this product stays finite (→ 1). */
+  cB: number;
+}
+
+function isNearLinearSlope(slope: number): boolean {
+  return Math.abs(slope - 0.5) < CURVE_LINEAR_SLOPE_EPSILON;
+}
+
+function curveCoefficients(slope: number): CurveCoefficients {
+  const p = Math.max(CURVE_EPSILON, Math.min(1 - CURVE_EPSILON, slope));
+  const d = 1 - 2 * p;
+  // ln((1 − p)/p) = log1p((1 − 2p)/p): keeps precision when p ≈ 0.5
+  const c = 2 * Math.log1p(d / p);
+  return { c, cB: (c * p * p) / d };
+}
 
 /**
  * Möbius-Ease curve: maps x in [0,1] to [0,1] with shape controlled by slope.
@@ -10,9 +41,10 @@ const CURVE_SUBDIVISIONS = 64;
  * Reference: http://werner.yellowcouch.org/Papers/fastenv12/index.html
  */
 function curveNormalizedAt(x: number, slope: number): number {
-  if (slope > 0.499999 && slope < 0.500001) return x;
-  const p = Math.max(CURVE_EPSILON, Math.min(1 - CURVE_EPSILON, slope));
-  return ((p * p) / (1 - p * 2)) * (Math.pow((1 - p) / p, 2 * x) - 1);
+  if (isNearLinearSlope(slope)) return x;
+  const { c, cB } = curveCoefficients(slope);
+  // (p²/(1 − 2p))·(e^(c·x) − 1), via expm1 so small c·x keeps precision
+  return (cB / c) * Math.expm1(c * x);
 }
 
 /** Mutable internal version of TempoEntry (exported interface has readonly fields) */
@@ -271,9 +303,16 @@ export class TempoMap {
   }
 
   /**
-   * Subdivided trapezoidal integration for a Möbius-Ease tempo curve.
-   * The BPM at progress p is: bpm0 + curveNormalizedAt(p, slope) * (bpm1 - bpm0).
-   * We subdivide into CURVE_SUBDIVISIONS intervals and apply trapezoidal rule.
+   * Exact integration for a Möbius-Ease tempo curve.
+   * With x = ticks / T the BPM is bpm0 + Δ·(p²/(1 − 2p))·(e^(c·x) − 1), which
+   * is A + B·e^(c·x) for A = bpm0 − B, B = Δ·p²/(1 − 2p). Its reciprocal has
+   * the antiderivative u/A − ln(A + B·e^(c·u))/(c·A), so
+   *   seconds = (T·60/ppqn) · (c·x − ln(bpm(x)/bpm0)) / (c·A).
+   * Everything is carried as c·A and c·B so the slope → 0.5 limit stays
+   * finite; |slope − 0.5| < CURVE_LINEAR_SLOPE_EPSILON uses the linear
+   * integral instead. Error is floating-point only (≈1e-15 relative),
+   * independent of segment length — the previous 64-step trapezoid drifted
+   * by ~5e-4 relative, i.e. 0.7 ms per bar at steep slopes.
    */
   private _ticksToSecondsCurve(
     ticks: number,
@@ -283,23 +322,30 @@ export class TempoMap {
     slope: number
   ): number {
     if (totalSegmentTicks === 0 || ticks === 0) return 0;
-    const n = CURVE_SUBDIVISIONS;
-    const dt = ticks / n;
-    let seconds = 0;
-    let prevBpm = bpm0;
-    for (let i = 1; i <= n; i++) {
-      const progress = (dt * i) / totalSegmentTicks;
-      const curBpm = bpm0 + curveNormalizedAt(progress, slope) * (bpm1 - bpm0);
-      // Trapezoidal rule for this subdivision
-      seconds += (((dt * 60) / this._ppqn) * (1 / prevBpm + 1 / curBpm)) / 2;
-      prevBpm = curBpm;
+    if (isNearLinearSlope(slope)) {
+      return this._ticksToSecondsLinear(ticks, bpm0, bpm1, totalSegmentTicks);
     }
-    return seconds;
+    const { c, cB: cBNormalized } = curveCoefficients(slope);
+    const cB = cBNormalized * (bpm1 - bpm0);
+    const cA = c * bpm0 - cB;
+    const x = ticks / totalSegmentTicks;
+    const base = (totalSegmentTicks * 60) / this._ppqn;
+
+    if (Math.abs(cA) <= CURVE_PURE_EXPONENTIAL_EPSILON * Math.abs(cB)) {
+      // A ≈ 0: bpm(x) = B·e^(c·x). Expand 1/(A + B·e^(c·u)) to first order in
+      // A/B: ∫ = (1 − e^(−c·x))/(B·c) − (A/B²)·(1 − e^(−2c·x))/(2c).
+      return base * (-Math.expm1(-c * x) / cB + (cA / (2 * cB * cB)) * Math.expm1(-2 * c * x));
+    }
+    // ln(bpm(x)/bpm0) = log1p((B/bpm0)·(e^(c·x) − 1)): precise for small c·x
+    const logRatio = Math.log1p((cB / (c * bpm0)) * Math.expm1(c * x));
+    return (base * (c * x - logRatio)) / cA;
   }
 
   /**
    * Inverse of _ticksToSecondsCurve: given seconds into a curved segment,
-   * return ticks. Uses binary search since there's no closed-form inverse.
+   * return (fractional) ticks. There is no closed-form inverse, but seconds(ticks)
+   * is smooth and strictly increasing (derivative 60/(ppqn·bpm) > 0), so
+   * bisection converges to double precision; each probe is O(1).
    */
   private _secondsToTicksCurve(
     seconds: number,
@@ -309,13 +355,12 @@ export class TempoMap {
     slope: number
   ): number {
     if (totalSegmentTicks === 0 || seconds === 0) return 0;
-    // Binary search: find ticks such that _ticksToSecondsCurve(ticks) ≈ seconds.
-    // Need totalSegmentTicks / 2^N < 0.5 for Math.round() to land on the right
-    // tick. Iterations = ceil(log2(2 * totalSegmentTicks)), clamped to [1, 40].
-    const iterations = Math.min(40, Math.max(1, Math.ceil(Math.log2(2 * totalSegmentTicks))));
+    if (isNearLinearSlope(slope)) {
+      return this._secondsToTicksLinear(seconds, bpm0, bpm1, totalSegmentTicks);
+    }
     let lo = 0;
     let hi = totalSegmentTicks;
-    for (let i = 0; i < iterations; i++) {
+    for (let i = 0; i < CURVE_INVERSE_ITERATIONS; i++) {
       const mid = (lo + hi) / 2;
       const midSeconds = this._ticksToSecondsCurve(mid, bpm0, bpm1, totalSegmentTicks, slope);
       if (midSeconds < seconds) {

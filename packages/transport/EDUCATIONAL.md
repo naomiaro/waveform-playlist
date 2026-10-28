@@ -144,19 +144,28 @@ Both directions are closed-form and exact — no iterative approximation needed.
 
 ### Variable Tempo (Curves)
 
-For non-linear tempo changes (e.g., exponential ease-in/ease-out), the integral `∫ 1/bpm(t) dt` may not have a closed-form solution. In this case, numerical integration is used.
-
-The **trapezoidal rule** subdivides the interval into `N` equal steps and approximates the integral as the sum of trapezoids:
+For non-linear tempo changes the integral `∫ 1/bpm(t) dt` looks like it needs numerical integration, but the Möbius-Ease curve (below) is an exponential in disguise, and `1/(A + B × e^(c·x))` has a closed-form antiderivative. Writing the curve as
 
 ```
-seconds ≈ Σᵢ (Δt × 60 / PPQN) × (1/bpmᵢ + 1/bpmᵢ₊₁) / 2
+bpm(x) = A + B × e^(c·x)          where x = t / T
+  c = 2 × ln((1 - p) / p)
+  B = (bpm₁ - bpm₀) × p² / (1 - 2p)
+  A = bpm₀ - B
 ```
 
-where `bpmᵢ` is the BPM at step `i` and `Δt` is the tick width of each step. The trapezoidal rule converges as O(1/N²) — 64 subdivisions typically gives sub-millisecond accuracy for musical tempo curves.
+gives
 
-The inverse (seconds → ticks) uses binary search: repeatedly halve the tick range and evaluate the forward integral until the target seconds value is bracketed to within one tick.
+```
+seconds(t) = (T × 60 / PPQN) × (c·x - ln(bpm(x) / bpm₀)) / (c × A)
+```
 
-> **Reference:** The trapezoidal rule is a foundational numerical integration method. See Atkinson, K.E., *An Introduction to Numerical Analysis*, 2nd ed., Wiley, 1989 — Chapter 5 covers composite quadrature rules including trapezoidal and Simpson's. For a free online treatment, see [Wikipedia — Trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule). The convergence rate O(1/N²) follows from the Euler-Maclaurin formula.
+So the curved case is exact like the linear one: the only error is floating-point rounding (~1e-15 relative), independent of segment length. An earlier version used a 64-step trapezoid; its error grew with segment length (~5e-4 relative at steep slopes — 0.7 ms per bar, 184 ms over a 256-bar ramp), which is why the closed form replaced it.
+
+Two limits need care. As `slope → 0.5`, `B → ∞` and `c → 0` while `c × B` stays finite, so the implementation carries `c × A` and `c × B` rather than `A` and `B`, and routes `|slope - 0.5| < 1e-6` to the linear formula. When `A = 0` (e.g. 20 → 180 BPM at slope 0.25, where `bpm₀ = B`) the curve is a pure exponential and the general formula is `0/0`; a first-order series in `A/B` covers that neighbourhood.
+
+The inverse (seconds → ticks) has no closed form, but `seconds(t)` is smooth and strictly increasing, so bisection on the O(1) forward formula converges to double precision in 60 halvings.
+
+> **Reference:** `∫ dx / (A + B × e^(cx)) = x/A − ln(A + B × e^(cx)) / (c × A)` — differentiate to verify, or see [Wikipedia — List of integrals of exponential functions](https://en.wikipedia.org/wiki/List_of_integrals_of_exponential_functions). Evaluating `ln(bpm(x)/bpm₀)` as `log1p((B/bpm₀) × expm1(c·x))` avoids cancellation when `c·x` is small; see Goldberg, D., *"What Every Computer Scientist Should Know About Floating-Point Arithmetic"*, ACM Computing Surveys 23(1), 1991.
 
 #### The Möbius-Ease Curve
 
@@ -261,8 +270,8 @@ These have zero runtime cost (the brand exists only in the type system). Convers
 - MIDI 1.0 Specification — [midi.org](https://www.midi.org/specifications) (integer tick timing, PPQN)
 
 ### Numerical Methods
-- Atkinson, K.E., *An Introduction to Numerical Analysis*, 2nd ed., Wiley, 1989 — Chapter 5 (trapezoidal rule, composite quadrature)
-- [Wikipedia — Trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule) (convergence, error bounds, Euler-Maclaurin formula)
+- [Wikipedia — List of integrals of exponential functions](https://en.wikipedia.org/wiki/List_of_integrals_of_exponential_functions) (`∫ dx / (a + b × e^(cx))`, the curved tempo segment's antiderivative)
+- Goldberg, D., *"What Every Computer Scientist Should Know About Floating-Point Arithmetic"*, ACM Computing Surveys 23(1), 1991 (cancellation, why `log1p`/`expm1` exist)
 
 ### Tempo Curves
 - Werner Van Belle, *"Fast Envelope Generation"*, Proc. of the Linux Audio Conference, 2012 — [Paper](http://werner.yellowcouch.org/Papers/fastenv12/index.html) (Möbius-Ease curve formula, efficient iterative `v[i+1] = m×v[i] + q` form)
