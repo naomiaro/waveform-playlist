@@ -19,7 +19,7 @@ export type {
 
 export { Clock } from './core/clock';
 export { Scheduler, type SchedulerOptions } from './core/scheduler';
-export { Timer } from './core/timer';
+export { Timer, DEFAULT_TIMER_INTERVAL_MS, type TimerOptions } from './core/timer';
 export { SampleTimeline } from './timeline/sample-timeline';
 export { TempoMap, type SetTempoOptions, type TempoMapInternalToken } from './timeline/tempo-map';
 export { MeterMap } from './timeline/meter-map';

@@ -14,7 +14,7 @@ import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
 import { Scheduler, ListenerErrorLog } from './core/scheduler';
 import { assertValidLoopRange, assertLoopRangeSpansATick } from './core/loop-range';
-import { Timer } from './core/timer';
+import { Timer, DEFAULT_TIMER_INTERVAL_MS } from './core/timer';
 import { SampleTimeline } from './timeline/sample-timeline';
 import { TempoMap } from './timeline/tempo-map';
 import { MeterMap } from './timeline/meter-map';
@@ -40,6 +40,12 @@ export interface TransportEvents {
   meterchange: (event: MeterChangeEventData) => void;
   countIn: (event: CountInEventData) => void;
   countInEnd: () => void;
+  /** A bounded play(start, end) reached `end` and the transport stopped
+   *  itself. Fires right AFTER the `stop` event, so a handler sees a stopped
+   *  transport and may restart it (loop-on-end); never for a consumer
+   *  stop()/pause()/seek(). (NativePlayoutAdapter forwards this to the
+   *  engine's onPlaybackEnded hook.) */
+  ended: () => void;
   /** A scheduler listener threw while generating or consuming events. The
    *  scheduler skipped it and kept going; the host decides what to do. With
    *  no `error` listener registered the failure is reported via console.warn
@@ -66,6 +72,7 @@ export class Transport {
   private _soloedTrackIds: Set<string> = new Set();
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
+  private _disposed = false;
   private _endTime: number | undefined;
   private _loopEnabled = false;
   private _loopStartTick: Tick = 0 as Tick;
@@ -99,11 +106,20 @@ export class Transport {
     const numerator = options.numerator ?? 4;
     const denominator = options.denominator ?? 4;
     const lookahead = options.schedulerLookahead ?? 0.2;
+    const timerIntervalMs = options.timerIntervalMs ?? DEFAULT_TIMER_INTERVAL_MS;
 
     this._ppqn = ppqn;
     this._schedulerLookahead = lookahead;
 
-    Transport._validateOptions(sampleRate, ppqn, tempo, numerator, denominator, lookahead);
+    Transport._validateOptions(
+      sampleRate,
+      ppqn,
+      tempo,
+      numerator,
+      denominator,
+      lookahead,
+      timerIntervalMs
+    );
 
     this._clock = new Clock(audioContext);
     this._sampleTimeline = new SampleTimeline(sampleRate);
@@ -129,7 +145,23 @@ export class Transport {
     this._initAudioGraph(audioContext);
     this._initCountIn(audioContext, options);
 
-    this._timer = new Timer(() => {
+    this._timer = new Timer(
+      () => {
+        try {
+          this._tick();
+        } catch (err) {
+          this._onTickFailure(err);
+        }
+      },
+      { intervalMs: timerIntervalMs }
+    );
+  }
+
+  /** One scheduling tick. Anything thrown here is a transport-internal
+   *  fault (not a listener failure — those are caught by the scheduler); the
+   *  wrapper above stops the transport rather than retrying it 40×/s. */
+  private _tick(): void {
+    {
       const time = this._clock.getTime();
       if (this._countingIn) {
         this._countInScheduler?.advance(time);
@@ -143,10 +175,31 @@ export class Transport {
       }
       if (this._endTime !== undefined && time >= this._endTime) {
         this.stop();
+        this._emit('ended');
         return;
       }
       this._scheduler.advance(time);
-    });
+    }
+  }
+
+  /** A tick threw: warn once and stop, so the engine sees a `stop` and no
+   *  one is left looking at a "playing" transport that renders silence. */
+  private _onTickFailure(err: unknown): void {
+    console.warn(
+      '[waveform-playlist] Transport: stopping — the scheduling tick threw: ' +
+        (err instanceof Error
+          ? err.name + ': ' + err.message + (err.stack ? '\n' + err.stack : '')
+          : String(err))
+    );
+    try {
+      this.stop();
+    } catch (stopErr) {
+      console.warn(
+        '[waveform-playlist] Transport: stop() after a tick failure also threw: ' + String(stopErr)
+      );
+      this._timer.stop();
+      this._playing = false;
+    }
   }
 
   get audioContext(): AudioContext {
@@ -166,6 +219,7 @@ export class Transport {
   // --- Playback ---
 
   play(startTime?: number, endTime?: number): void {
+    if (this._refuseIfDisposed('play')) return;
     if (this._playing) return;
 
     if (startTime !== undefined) {
@@ -239,6 +293,7 @@ export class Transport {
   }
 
   seek(time: number): void {
+    if (this._refuseIfDisposed('seek')) return;
     const wasPlaying = this._playing;
     const wasCountingIn = this._countingIn;
 
@@ -713,11 +768,13 @@ export class Transport {
 
   dispose(): void {
     this.stop();
+    this._disposed = true;
     for (const node of this._trackNodes.values()) {
       node.dispose();
     }
     this._trackNodes.clear();
     this._masterNode.dispose();
+    this._timer.dispose();
     this._listeners.clear();
   }
 
@@ -729,7 +786,8 @@ export class Transport {
     tempo: number,
     numerator: number,
     denominator: number,
-    lookahead: number
+    lookahead: number,
+    timerIntervalMs: number
   ): void {
     if (sampleRate <= 0) {
       throw new Error(
@@ -757,6 +815,14 @@ export class Transport {
     if (lookahead <= 0) {
       throw new Error(
         '[waveform-playlist] Transport: schedulerLookahead must be positive, got ' + lookahead
+      );
+    }
+    if (!(timerIntervalMs > 0) || timerIntervalMs >= lookahead * 1000) {
+      throw new Error(
+        '[waveform-playlist] Transport: timerIntervalMs must be positive and shorter than the lookahead (' +
+          lookahead * 1000 +
+          ' ms), got ' +
+          timerIntervalMs
       );
     }
   }
@@ -869,7 +935,7 @@ export class Transport {
     this._countInScheduler.reset(0);
     this._clock.seekTo(0);
     this._clock.start();
-    // Use the main timer to drive the count-in scheduler (avoids spawning a second rAF chain)
+    // Use the main timer to drive the count-in scheduler (one Worker tick source, not two)
     this._timer.start();
   }
 
@@ -915,6 +981,16 @@ export class Transport {
     if (this._endTime !== undefined) {
       this._scheduler.setPlayEnd(next.secondsToTicks(this._endTime));
     }
+  }
+
+  /** A disposed transport has no timer or audio graph; a late play()/seek()
+   *  must not report "playing" with nothing ticking. */
+  private _refuseIfDisposed(what: string): boolean {
+    if (!this._disposed) return false;
+    console.warn(
+      '[waveform-playlist] Transport: ' + what + '() on a disposed transport is ignored'
+    );
+    return true;
   }
 
   private _silenceAll(): void {

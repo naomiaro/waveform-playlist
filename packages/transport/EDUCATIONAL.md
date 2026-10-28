@@ -46,13 +46,13 @@ The solution: **schedule audio before it's needed.** A typical lookahead is 100â
               clock time    clock + lookahead
 ```
 
-On every animation frame (~16ms at 60fps), the transport:
+On every timer tick (25 ms, from a Web Worker), the transport:
 1. Reads the current clock time
 2. Computes the target: `clockTime + lookahead`
 3. Generates audio events for any new portion of the window
 4. Schedules them on the audio hardware using precise `source.start(when)` timestamps
 
-The 200ms buffer absorbs timing jitter from `requestAnimationFrame`. The audio thread plays samples at the exact scheduled time regardless of when the JavaScript ran.
+The 200ms buffer absorbs timing jitter from the Worker tick (25 ms cadence, delivered as a message to the main thread). The audio thread plays samples at the exact scheduled time regardless of when the JavaScript ran.
 
 > **Key insight:** The lookahead introduces no perceptible latency. `source.start(when)` schedules audio at the exact correct hardware time â€” the 200ms is scheduling headroom, not output delay.
 
@@ -232,10 +232,10 @@ When a time signature changes mid-song, the new meter must start on a bar bounda
 
 ## The Scheduling Loop
 
-Putting it all together, the transport's main loop runs on every animation frame:
+Putting it all together, the transport's main loop runs on every Worker timer tick:
 
 ```
-1. timer fires (requestAnimationFrame)
+1. timer fires (Worker `setTimeout` tick, 25 ms)
 2. read clockTime from Clock (seconds, from AudioContext.currentTime)
 3. convert to ticks: targetTick = tempoMap.secondsToTicks(clockTime + lookahead)
 4. for each new tick in [rightEdge, targetTick):

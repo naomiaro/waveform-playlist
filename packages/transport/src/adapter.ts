@@ -7,9 +7,17 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   private _transport: Transport;
   private _audioContext: AudioContext;
 
+  private _onPlaybackEnded: (() => void) | null = null;
+
   constructor(audioContext: AudioContext, options?: TransportOptions) {
     this._audioContext = audioContext;
     this._transport = new Transport(audioContext, options);
+    // Bounded playback (#608 parity): the transport emits 'ended' (then 'stop')
+    // when play(start, end) reaches end inside its timer tick. Only that
+    // reaches the engine's onPlaybackEnded hook — a stop() the consumer
+    // issues, through this adapter OR directly on adapter.transport, is not
+    // a completion and the engine must not treat it as one.
+    this._transport.on('ended', () => this._onPlaybackEnded?.());
   }
 
   get audioContext(): AudioContext {
@@ -39,15 +47,19 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
       const warmupTarget = Math.max(MIN_WARMUP, this._audioContext.outputLatency ?? MIN_WARMUP);
       if (this._audioContext.currentTime < warmupTarget) {
         const MAX_WARMUP_MS = 2000;
-        await new Promise<void>((resolve) => {
+        const WARMUP_POLL_MS = 16;
+        await new Promise<void>((resolve, reject) => {
           const startMs = performance.now();
           const check = () => {
             if (this._audioContext.currentTime >= warmupTarget) {
               resolve();
-            } else if (
-              this._audioContext.state === 'closed' ||
-              performance.now() - startMs > MAX_WARMUP_MS
-            ) {
+            } else if (this._audioContext.state === 'closed') {
+              // Same outcome as a context that was already closed at entry:
+              // nothing can play, so init() must not succeed.
+              reject(
+                new Error('[waveform-playlist] Cannot init: AudioContext closed during warmup')
+              );
+            } else if (performance.now() - startMs > MAX_WARMUP_MS) {
               console.warn(
                 '[waveform-playlist] AudioContext warmup timed out' +
                   ' (currentTime=' +
@@ -60,10 +72,12 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
               );
               resolve();
             } else {
-              requestAnimationFrame(check);
+              // setTimeout, not rAF: rAF freezes in a hidden tab and would
+              // hang init() (and its 2 s timeout) until the tab is shown.
+              setTimeout(check, WARMUP_POLL_MS);
             }
           };
-          requestAnimationFrame(check);
+          setTimeout(check, WARMUP_POLL_MS);
         });
       }
     }
@@ -95,6 +109,14 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
 
   stop(): void {
     this._transport.stop();
+  }
+
+  /** Engine hook: adapter-initiated completion of a bounded play(start, end)
+   *  (the transport's `ended` event). Never fired for a consumer
+   *  stop()/pause()/seek()/dispose(), whether issued through this adapter or
+   *  directly on `adapter.transport`. */
+  onPlaybackEnded(callback: (() => void) | null): void {
+    this._onPlaybackEnded = callback;
   }
 
   seek(time: number): void {
@@ -208,6 +230,7 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   dispose(): void {
+    this._onPlaybackEnded = null;
     this._transport.dispose();
   }
 }

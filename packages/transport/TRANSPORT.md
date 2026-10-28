@@ -27,7 +27,7 @@ This transport uses native Web Audio exclusively, receiving the `AudioContext` f
 │  │  Core Layer                                           │   │
 │  │  ┌─────────┐  ┌───────────┐  ┌─────────┐            │   │
 │  │  │  Clock   │  │ Scheduler │  │  Timer  │            │   │
-│  │  │ elapsed  │  │  sliding  │  │  rAF    │            │   │
+│  │  │ elapsed  │  │  sliding  │  │ Worker  │            │   │
 │  │  │  time    │  │  window   │  │  loop   │            │   │
 │  │  └─────────┘  └───────────┘  └─────────┘            │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -65,10 +65,10 @@ Each layer is independently testable. The core layer knows nothing about audio. 
 
 ### The Core Loop
 
-Every animation frame:
+Every timer tick (25 ms, from a Web Worker):
 
 ```
-Timer (rAF) → reads Clock.getTime() → Scheduler.advance(currentTime)
+Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() → Scheduler.advance(currentTime)
 ```
 
 The scheduler maintains a **sliding window** that expands forward as time advances. It only generates events for the *new* portion of the window (tracked by `rightEdge`), preventing duplicate work.
@@ -79,7 +79,7 @@ The scheduler runs 200ms ahead of real-time audio. This means:
 
 1. At clock time `T`, the scheduler generates events up to `T + 200ms`
 2. Events are scheduled on the audio hardware with precise `AudioContext.currentTime` timestamps
-3. The 200ms buffer absorbs frame timing jitter from `requestAnimationFrame`
+3. The 200ms buffer absorbs tick jitter from the Worker timer (25 ms cadence; rAF is never used — it stops in hidden tabs, Worker timers do not)
 
 ### Listener Contract
 
@@ -230,7 +230,7 @@ Key design choices:
 2. Reset scheduler to current position
 3. Start clock (captures `AudioContext.currentTime` reference)
 4. Call `clipPlayer.onPositionJump()` to create mid-clip sources
-5. Start rAF timer loop
+5. Start the Worker timer loop
 
 ### Pause
 
@@ -301,6 +301,7 @@ CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as 
 **Events:**
 - `countIn` — fires per beat with `{ beat: number, totalBeats: number }` for UI countdown
 - `countInEnd` — fires when count-in completes and playback begins
+- `ended` — a bounded `play(start, end)` reached `end`; the transport stops itself (`stop` then `ended`, so an `ended` handler may restart playback). Consumer stops emit only `stop`. `NativePlayoutAdapter` forwards `ended` to the engine's `onPlaybackEnded` hook.
 
 **Error surfacing (#636):** both schedulers are constructed with an `onError` handler that forwards `SchedulerListenerError` (a union on `phase`: `generate` with `fromTick`/`toTick`, `consume` with `event`, `positionJump` with `tick`; all with `listener` and `error`) to the transport `error` event, delivered on a microtask after the window completes (the subscriber check happens at delivery, so an unsubscribe or dispose in between falls back to the console). A failing `generate()` skips that listener for the window; a failing `consume()` skips that one event; a failing `onPositionJump()` skips that listener's jump without aborting the loop wrap. Nothing is retried. With no `error` subscriber the transport falls back to `console.warn`, once per listener and phase, so the failure is never silent. Invalid loop points (`setLoop`/`setLoopSeconds`/`setLoopSamples` with `enabled` and a non-finite, empty or inverted range) throw instead of warning — `NativePlayoutAdapter.setLoop` translates the engine's empty default region (`loopStart = loopEnd = 0`) to a disabled loop before it gets there.
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { Transport } from '../transport';
+import { DEFAULT_TIMER_INTERVAL_MS } from '../core/timer';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { Tick, Sample, SchedulerListenerError } from '../types';
 
@@ -35,9 +36,6 @@ function createMockPannerNode() {
     disconnect: vi.fn(),
   };
 }
-
-let rafCallbacks: Array<(time: number) => void>;
-let rafId: number;
 
 function mockAudioContext(currentTime = 0): AudioContext {
   return {
@@ -88,20 +86,14 @@ function makeTrack(clips: AudioClip[], overrides: Partial<ClipTrack> = {}): Clip
 }
 
 describe('Transport', () => {
+  // No Worker in Node → the Timer takes its setTimeout fallback; fake timers
+  // drive it. One advance of DEFAULT_TIMER_INTERVAL_MS = one scheduler tick.
   beforeEach(() => {
-    rafCallbacks = [];
-    rafId = 0;
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((cb: (time: number) => void) => {
-        rafCallbacks.push(cb);
-        return ++rafId;
-      })
-    );
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    vi.useFakeTimers();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -262,6 +254,118 @@ describe('Transport', () => {
     transport.off('play', onPlay);
     transport.play();
     expect(onPlay).not.toHaveBeenCalled();
+  });
+
+  it("'ended' fires only when a bounded play reaches its end, right before 'stop'", () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const order: string[] = [];
+    transport.on('ended', () => order.push('ended'));
+    transport.on('stop', () => order.push('stop'));
+    transport.play(0, 1);
+    (ctx as any).currentTime = 1.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    // 'stop' first, so an 'ended' handler sees a stopped transport and may
+    // restart it (loop-on-end); the engine's hook is deferred anyway.
+    expect(order).toEqual(['stop', 'ended']);
+    // Consumer stop: no 'ended'
+    transport.play(0, 10);
+    transport.stop();
+    expect(order).toEqual(['stop', 'ended', 'stop']);
+  });
+
+  it("an 'ended' handler can restart playback (loop-on-end)", () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    let restarts = 0;
+    transport.on('ended', () => {
+      if (restarts++ === 0) transport.play(0, 1);
+    });
+    transport.play(0, 1);
+    (ctx as any).currentTime = 1.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(restarts).toBe(1);
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+  });
+
+  it("'ended' never fires during a count-in and the bound survives the transition", () => {
+    const ctx = mockAudioContext(10);
+    const transport = new Transport(ctx);
+    const click = {
+      duration: 0.04,
+      length: 1920,
+      sampleRate: 48000,
+      numberOfChannels: 1,
+    } as AudioBuffer;
+    transport.setMetronomeClickSounds(click, click);
+    transport.setCountIn(true);
+    transport.setCountInMode('always');
+    const order: string[] = [];
+    for (const name of ['ended', 'countInEnd', 'play', 'stop'] as const) {
+      transport.on(name, () => order.push(name));
+    }
+    transport.play(0, 1); // the count-in bar (2 s) is longer than the 1 s bound
+    (ctx as any).currentTime = 12.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(order).toEqual(['countInEnd', 'play']);
+    (ctx as any).currentTime = 14; // 1.5 s into playback: past the 1 s bound
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(order).toEqual(['countInEnd', 'play', 'stop', 'ended']);
+  });
+
+  it('with a loop enabled, an endTime beyond loopEnd never ends and one inside it does', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const ended = vi.fn();
+    transport.on('ended', ended);
+    transport.setLoop(true, 0 as Tick, 1920 as Tick); // [0, 1 s)
+    transport.play(0, 5);
+    (ctx as any).currentTime = 2.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).not.toHaveBeenCalled();
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+    transport.play(0, 0.5); // the clock re-anchors at currentTime 2.5
+    (ctx as any).currentTime = 3.1; // 0.6 s later: past the 0.5 s bound inside the loop
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(ended).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tick that keeps throwing stops the transport instead of flooding the console', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const onStop = vi.fn();
+    transport.on('stop', onStop);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    transport.play();
+    Object.defineProperty(ctx, 'currentTime', {
+      get() {
+        throw new Error('context gone');
+      },
+    });
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 10);
+    expect(transport.isPlaying()).toBe(false);
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('context gone'))).toBe(true);
+    warn.mockRestore();
+  });
+
+  it('play() and seek() after dispose() are warned no-ops', () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const onPlay = vi.fn();
+    transport.on('play', onPlay);
+    transport.dispose();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    transport.play();
+    transport.seek(1);
+    expect(transport.isPlaying()).toBe(false);
+    expect(onPlay).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('disposed'));
+    warn.mockRestore();
   });
 
   it('seek emits a seek event with the target position', () => {
@@ -493,7 +597,7 @@ describe('Transport', () => {
     transport.play(0, 2);
     transport.setTempo(240);
     (ctx as any).currentTime = 1.2; // window [1.2, 1.4 s) = ticks [4608, 5376) at 240 BPM
-    for (const cb of [...rafCallbacks]) cb(16);
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
     expect((ctx.createBufferSource as Mock).mock.results.length).toBe(1);
     // The clip player converts with the swapped map too: tick 5000 at 240 BPM
     // is 1.302 s, not the 2.604 s the 120 BPM map would give (clock started at
@@ -519,12 +623,12 @@ describe('Transport', () => {
       else transport.clearTempos();
       expect(transport.timeToTick(1)).toBe(3840);
       (ctx as any).currentTime = 1.2;
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       const create = ctx.createBufferSource as Mock;
       expect(create.mock.results.length).toBe(1);
       expect(create.mock.results[0].value.start.mock.calls[0][0]).toBeCloseTo(5000 / 3840, 6);
       (ctx as any).currentTime = 1.25;
-      for (const cb of [...rafCallbacks]) cb(32);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       expect(create.mock.results.length).toBe(1); // re-anchored cursor: no regeneration
       transport.stop();
     }
@@ -812,7 +916,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       // Delivered on a microtask, after the scheduler window completes, so a
       // handler that calls stop()/setTracks() cannot re-enter the iteration.
       expect(onError).not.toHaveBeenCalled();
@@ -847,7 +951,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       await Promise.resolve();
 
       expect(transport.isPlaying()).toBe(false);
@@ -855,7 +959,7 @@ describe('Transport', () => {
       // the handler ran (same window) and silenced by stop(); no source may be
       // created after the stop.
       const createdAfterStop = create.mock.results.length;
-      for (const cb of [...rafCallbacks]) cb(32);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 2);
       expect(create.mock.results.length).toBe(createdAfterStop);
       warn.mockRestore();
     });
@@ -871,7 +975,7 @@ describe('Transport', () => {
         throw new Error('createBufferSource exploded');
       });
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       transport.dispose(); // clears every listener before the microtask runs
       await Promise.resolve();
       expect(onError).not.toHaveBeenCalled();
@@ -900,7 +1004,7 @@ describe('Transport', () => {
       transport.play();
       for (const t of [0, 0.5, 1.0]) {
         (ctx as any).currentTime = t;
-        for (const cb of [...rafCallbacks]) cb(16);
+        vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       }
       transport.stop();
       await Promise.resolve(); // console fallback is decided at delivery time
@@ -922,7 +1026,7 @@ describe('Transport', () => {
       transport.play();
       for (const t of [0, 0.5, 1.0]) {
         (ctx as any).currentTime = t;
-        for (const cb of [...rafCallbacks]) cb(16);
+        vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       }
       await Promise.resolve();
       transport.stop();
@@ -939,7 +1043,7 @@ describe('Transport', () => {
       });
 
       transport.play();
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       transport.stop();
       await Promise.resolve();
 
