@@ -229,7 +229,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `barToTick(bar): Tick` / `tickToBar(tick: Tick)`
 - `timeToTick(seconds): Tick` / `tickToTime(tick: number)` — `timeToTick` is the integer tick (`TempoMap.secondsToTicks` rounds the exact value once); `tickToTime` accepts an integer or fractional tick position
 - `timeToTickExact(seconds): number` — fractional tick position, for sub-tick placement (e.g. a recorded note between ticks before quantising); `tickToTime` accepts it back. The same pairing exists one layer down: `TempoMap.secondsToTicks` / `secondsToTicksExact`, `SampleTimeline.samplesToTicks` / `samplesToTicksExact` (rounding happens once, in the integer variant), and `TempoMap.secondsToBeats` is continuous.
-- `quantizeTick(tick, subdivision, { mode?, strength? }): Tick` — snap a (possibly fractional) tick to the meter grid. `subdivision`: tick count, `'bar'` or `'beat'`; `mode`: `'nearest'` (default) | `'next'` | `'previous'`; `strength` 0–1. Grid lines restart at each bar line, so odd meters stay aligned. Also exported standalone as `quantizeTick(meterMap, …)`.
+- `quantizeTick(tick, subdivision, { mode?, strength? }): Tick` — snap a (possibly fractional) tick to the meter grid. `subdivision`: tick count, `'bar'` or `'beat'`; `mode`: `'nearest'` (default, ties go up) | `'next'` (ceiling) | `'previous'` (floor) — all idempotent, a tick already on a line stays (unlike Tone's strict `nextSubdivision`; pass `tick + 1` with `'next'` for the following line); `strength` 0–1. A fractional tick within 1e-6 of a line counts as on it. Grid lines restart at each bar line, so odd meters stay aligned. Also exported standalone as `quantizeTick(meterMap, …)`.
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`

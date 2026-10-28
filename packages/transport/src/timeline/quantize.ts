@@ -5,8 +5,10 @@ import type { MeterMap } from './meter-map';
  *  beat length of the meter in force at the tick's bar. */
 export type GridSubdivision = number | 'bar' | 'beat';
 
-/** 'nearest' (exact ties go up), 'next' (ceil), 'previous' (floor). A tick
- *  already on a grid line stays put in every mode. */
+/** 'nearest' (exact ties go up), 'next' (ceiling), 'previous' (floor). All
+ *  three are idempotent: a tick already on a grid line stays put. This differs
+ *  from Tone's `nextSubdivision`, which is strictly after the current time —
+ *  for "the line after this one" pass `tick + 1` with 'next'. */
 export type QuantizeMode = 'nearest' | 'next' | 'previous';
 
 export interface QuantizeOptions {
@@ -17,6 +19,12 @@ export interface QuantizeOptions {
 }
 
 const MODES: readonly QuantizeMode[] = ['nearest', 'next', 'previous'];
+
+/** A fractional tick this close to a grid line is treated as on it. Exact
+ *  positions from timeToTickExact() carry ~1e-13 of float noise (e.g.
+ *  1920.0000000000002 for a note on the beat); without this, 'previous' and
+ *  'next' would jump a whole step away from a line the tick is already on. */
+const ON_LINE_EPSILON = 1e-6;
 
 /**
  * Snap a tick to a meter-aware grid. Pure: reads the MeterMap, mutates nothing.
@@ -39,21 +47,30 @@ export function quantizeTick(
   const strength = options.strength ?? 1;
   validateQuantizeInput(tick, subdivision, mode, strength);
 
-  const bar = meterMap.tickToBar(tick as Tick);
-  const barStart = meterMap.barToTick(bar);
-  const nextBarStart = meterMap.barToTick(bar + 1);
-  const step = resolveStep(meterMap, subdivision, barStart);
+  // MeterMap keeps every entry on a bar boundary of the preceding meter, so
+  // the bar containing `tick` is plain arithmetic from the entry in force —
+  // one lookup, no bar-number round trip.
+  const entry = meterMap.getEntryAt(tick as Tick);
+  const ticksPerBar = meterMap.ticksPerBar(entry.tick);
+  const barStart = entry.tick + Math.floor((tick - entry.tick) / ticksPerBar) * ticksPerBar;
+  const nextBarStart = barStart + ticksPerBar;
+  const step =
+    subdivision === 'bar'
+      ? ticksPerBar
+      : subdivision === 'beat'
+        ? meterMap.ticksPerBeat(entry.tick)
+        : subdivision;
 
   const previous = barStart + Math.floor((tick - barStart) / step) * step;
-  const next = previous === tick ? tick : Math.min(previous + step, nextBarStart);
-  const target = pickLine(mode, tick, previous, next);
+  const candidateNext = Math.min(previous + step, nextBarStart);
+  const onLine =
+    Math.abs(tick - previous) < ON_LINE_EPSILON || Math.abs(tick - candidateNext) < ON_LINE_EPSILON;
+  if (onLine) {
+    const line = Math.abs(tick - previous) < ON_LINE_EPSILON ? previous : candidateNext;
+    return Math.round(tick + (line - tick) * strength) as Tick;
+  }
+  const target = pickLine(mode, tick, previous, candidateNext);
   return Math.round(tick + (target - tick) * strength) as Tick;
-}
-
-function resolveStep(meterMap: MeterMap, subdivision: GridSubdivision, barStart: Tick): number {
-  if (subdivision === 'bar') return meterMap.ticksPerBar(barStart);
-  if (subdivision === 'beat') return meterMap.ticksPerBeat(barStart);
-  return subdivision;
 }
 
 function pickLine(mode: QuantizeMode, tick: number, previous: number, next: number): number {
@@ -73,11 +90,13 @@ function validateQuantizeInput(
       '[waveform-playlist] quantizeTick: tick must be a finite number >= 0, got ' + tick
     );
   }
-  if (typeof subdivision === 'number' && (!Number.isInteger(subdivision) || subdivision <= 0)) {
+  const validTickCount =
+    typeof subdivision === 'number' && Number.isInteger(subdivision) && subdivision > 0;
+  if (!validTickCount && subdivision !== 'bar' && subdivision !== 'beat') {
     throw new Error(
       '[waveform-playlist] quantizeTick: subdivision must be a positive integer tick count, ' +
         "'bar' or 'beat', got " +
-        subdivision
+        String(subdivision)
     );
   }
   if (!MODES.includes(mode)) {

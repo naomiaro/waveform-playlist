@@ -80,6 +80,31 @@ describe('quantizeTick', () => {
     expect(result).toBe(425); // 401 + 0.3 × 79 = 424.7
   });
 
+  it('a tick within float noise of a grid line counts as on the line', () => {
+    // timeToTickExact() at 120 BPM yields values like 1920.0000000000002 for a
+    // note exactly on a beat; 'next'/'previous' must not jump a whole step.
+    expect(quantizeTick(fourFour(), 959.9999999999999, EIGHTH, { mode: 'previous' })).toBe(960);
+    expect(quantizeTick(fourFour(), 960.0000000000001, EIGHTH, { mode: 'next' })).toBe(960);
+    expect(quantizeTick(fourFour(), 1920.0000000000002, EIGHTH, { mode: 'next' })).toBe(1920);
+    expect(quantizeTick(fourFour(), 1919.9999999999998, EIGHTH, { mode: 'previous' })).toBe(1920);
+  });
+
+  it('rejects a subdivision that is neither a tick count nor bar/beat', () => {
+    expect(() => quantizeTick(fourFour(), 100 as Tick, '8n' as never)).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, undefined as never)).toThrow(/subdivision/);
+    expect(() => quantizeTick(fourFour(), 100 as Tick, null as never)).toThrow(/subdivision/);
+  });
+
+  it('a meter change mid-bar-count anchors the grid at the new entry', () => {
+    // 4/4 for one bar (3840), then 3/4: bar 2 starts at 3840 and is 2880 long,
+    // so a quarter grid in bar 2 is 3840, 4800, 5760, then bar 3 at 6720.
+    const map = new MeterMap(PPQN, 4, 4);
+    map.setMeter(3, 4, 3840 as Tick);
+    expect(quantizeTick(map, 6000 as Tick, QUARTER, { mode: 'previous' })).toBe(5760);
+    expect(quantizeTick(map, 6000 as Tick, QUARTER, { mode: 'next' })).toBe(6720);
+    expect(quantizeTick(map, 6000 as Tick, 'bar', { mode: 'next' })).toBe(6720);
+  });
+
   it('rejects invalid input instead of guessing', () => {
     expect(() => quantizeTick(fourFour(), -1 as Tick, EIGHTH)).toThrow(/tick/);
     expect(() => quantizeTick(fourFour(), NaN as Tick, EIGHTH)).toThrow(/tick/);
