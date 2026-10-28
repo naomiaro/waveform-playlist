@@ -647,4 +647,34 @@ describe('TempoMap fractional conversions (#636)', () => {
     // 0.96 ticks = 0.001 beats; the old integer path returned 1/960 ≈ 0.00104.
     expect(tm.secondsToBeats(0.0005)).toBeCloseTo(0.001, 10);
   });
+
+  it('secondsToTicksExact is continuous at a tempo-change boundary and beyond the last entry', () => {
+    // 120 BPM then 60 BPM from tick 3840 (2 s). The boundary must round-trip
+    // exactly, the instant before it must not overshoot into the next segment,
+    // and positions beyond the last entry extrapolate at the last tempo.
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(60, 3840 as Tick);
+    const boundarySeconds = tm.ticksToSeconds(3840 as Tick);
+    expect(boundarySeconds).toBeCloseTo(2, 12);
+    expect(tm.secondsToTicksExact(boundarySeconds)).toBeCloseTo(3840, 9);
+    expect(tm.secondsToTicksExact(boundarySeconds - 1e-9)).toBeLessThanOrEqual(3840);
+    expect(tm.secondsToTicksExact(boundarySeconds - 1e-9)).toBeCloseTo(3840 - 1e-9 * 1920, 6);
+    // Beyond the last entry: 60 BPM = 960 ticks/s
+    expect(tm.secondsToTicksExact(5)).toBeCloseTo(3840 + 3 * 960, 9);
+    expect(tm.secondsToTicksExact(5.0005)).toBeCloseTo(3840 + 3 * 960 + 0.48, 9);
+  });
+
+  it('secondsToTicksExact extrapolates linearly for negative seconds (no clamping)', () => {
+    const tm = new TempoMap(960, 120);
+    expect(tm.secondsToTicksExact(-0.01)).toBeCloseTo(-19.2, 9);
+    expect(tm.secondsToTicks(-0.01)).toBe(-19);
+  });
+
+  it('ticksToSeconds accepts a fractional tick position', () => {
+    const tm = new TempoMap(960, 120);
+    tm.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    const exact = tm.secondsToTicksExact(1.2345);
+    expect(Number.isInteger(exact)).toBe(false);
+    expect(tm.ticksToSeconds(exact)).toBeCloseTo(1.2345, 10);
+  });
 });

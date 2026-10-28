@@ -158,7 +158,9 @@ export class TempoMap {
     this._recomputeCache(i);
   }
 
-  ticksToSeconds(ticks: Tick): number {
+  /** Tick position → seconds. Accepts a fractional position (e.g. the value
+   *  secondsToTicksExact returned) as well as an integer Tick. */
+  ticksToSeconds(ticks: number): number {
     assertFiniteInput('ticks', ticks);
     return assertFiniteResult('ticks ' + ticks, this._ticksToSecondsInternal(ticks));
   }
@@ -169,11 +171,13 @@ export class TempoMap {
     return Math.round(this.secondsToTicksExact(seconds)) as Tick;
   }
 
-  /** Seconds → fractional tick position (unrounded). Callers that need an
-   *  integer `Tick` round at their own boundary (secondsToTicks,
-   *  SampleTimeline.samplesToTicks, the scheduler cursor); sub-tick consumers
-   *  (placing a recorded note between ticks before quantising, continuous
-   *  beat positions) use this directly. */
+  /** Seconds → fractional tick position (unrounded). The integer producers
+   *  round this once at their own boundary (secondsToTicks,
+   *  SampleTimeline.samplesToTicks); sub-tick consumers (placing a recorded
+   *  note between ticks before quantising, continuous beat positions) use it
+   *  directly. Not clamped: negative seconds extrapolate the first tempo
+   *  backwards to negative ticks, and seconds past the last entry extrapolate
+   *  the last tempo forwards. */
   secondsToTicksExact(seconds: number): number {
     assertFiniteInput('seconds', seconds);
     return assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds));
@@ -277,7 +281,7 @@ export class TempoMap {
     return entry.bpm;
   }
 
-  private _ticksToSecondsInternal(ticks: Tick): number {
+  private _ticksToSecondsInternal(ticks: number): number {
     if (ticks < 0) return (ticks * 60) / (this._entries[0].bpm * this._ppqn);
     const entryIndex = this._entryIndexAt(ticks);
     const entry = this._entries[entryIndex];
@@ -445,7 +449,7 @@ export class TempoMap {
     return { c, cB, cA: c * bpm0 - cB, base: (totalSegmentTicks * 60) / this._ppqn };
   }
 
-  private _entryIndexAt(tick: Tick): number {
+  private _entryIndexAt(tick: number): number {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {

@@ -228,7 +228,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `removeMeter(atTick: Tick)` / `clearMeters()`
 - `barToTick(bar): Tick` / `tickToBar(tick: Tick)`
 - `timeToTick(seconds): Tick` / `tickToTime(tick: Tick)` — integer ticks (rounded once at this boundary)
-- `timeToTickExact(seconds): number` — fractional tick position, for sub-tick placement (e.g. a recorded note between ticks before quantising)
+- `timeToTickExact(seconds): number` — fractional tick position, for sub-tick placement (e.g. a recorded note between ticks before quantising); `tickToTime` accepts it back. The same pairing exists one layer down: `TempoMap.secondsToTicks` / `secondsToTicksExact`, `SampleTimeline.samplesToTicks` / `samplesToTicksExact` (rounding happens once, in the integer variant), and `TempoMap.secondsToBeats` is continuous.
 
 **Metronome:**
 - `setMetronomeEnabled(enabled)`
@@ -272,7 +272,7 @@ Implements `PlayoutAdapter` from `@waveform-playlist/engine`. All methods delega
 - `adapter.ppqn` — Tick resolution, read by the engine on construction
 - `adapter.masterOutputNode` — Master gain node for parallel taps (analyzers, recorders)
 - `adapter.init()` — Resumes a suspended AudioContext and waits for the hardware pipeline to warm up (Safari needs this before clips scheduled at time 0 play on time)
-- `setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)` — tempo/meter surface the engine uses for tick-based timeline math
+- `setTempo(bpm, atTick?)`, `setMeter(numerator, denominator, atTick?)`, `ticksToSeconds(tick)`, `secondsToTicks(seconds)`, `secondsToTicksExact(seconds)` — tempo/meter surface the engine uses for tick-based timeline math
 
 ### Advanced (Low-Level Building Blocks)
 

@@ -537,6 +537,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       return (seconds * _bpm * _ppqn) / 60;
     },
 
+    /** Fractional tick position (engine `PlayoutAdapter.secondsToTicksExact`).
+     *  Single-tempo, so the same formula as secondsToTicks. */
+    secondsToTicksExact(seconds: number): number {
+      return (seconds * _bpm * _ppqn) / 60;
+    },
+
     // --- Cross-context worklet support ---
     // Tone.js wraps standardized-audio-context. Native AudioWorkletNode constructor
     // rejects it ("parameter 1 is not of type 'BaseAudioContext'").

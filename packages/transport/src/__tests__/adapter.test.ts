@@ -391,6 +391,13 @@ describe('NativePlayoutAdapter', () => {
     expect(adapter.secondsToTicks(0.5)).toBe(960);
   });
 
+  it('secondsToTicksExact exposes the fractional position through the adapter', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    expect(adapter.secondsToTicksExact(0.0005)).toBeCloseTo(0.96, 10);
+    expect(adapter.secondsToTicks(0.0005)).toBe(1);
+  });
+
   it('setMeter delegates to transport', () => {
     const ctx = mockAudioContext();
     const adapter = new NativePlayoutAdapter(ctx);

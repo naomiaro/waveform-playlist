@@ -735,6 +735,12 @@ describe('createToneAdapter', () => {
       expect(adapter.secondsToTicks!(1.0)).toBeCloseTo(384);
     });
 
+    it('secondsToTicksExact returns the fractional tick position', () => {
+      const adapter = createToneAdapter();
+      // 120 BPM × 192 PPQN = 384 ticks/s → 0.0005 s is 0.192 ticks
+      expect(adapter.secondsToTicksExact!(0.0005)).toBeCloseTo(0.192, 10);
+    });
+
     it('ticksToSeconds reflects updated BPM', () => {
       const adapter = createToneAdapter();
       adapter.setTempo!(60);

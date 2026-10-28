@@ -455,6 +455,12 @@ describe('Transport', () => {
     expect(transport.timeToTick(0.0005)).toBe(1);
   });
 
+  it('tickToTime accepts the fractional position timeToTickExact returns', () => {
+    const transport = new Transport(mockAudioContext());
+    const exact = transport.timeToTickExact(0.0005); // 0.96 ticks
+    expect(transport.tickToTime(exact)).toBeCloseTo(0.0005, 12);
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

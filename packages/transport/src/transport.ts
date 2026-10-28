@@ -568,8 +568,9 @@ export class Transport {
     return this._tempoMap.secondsToTicksExact(seconds);
   }
 
-  /** Convert tick position to transport time (seconds), using the tempo map. */
-  tickToTime(tick: Tick): number {
+  /** Convert a tick position (integer Tick or the fractional value
+   *  timeToTickExact returned) to transport time (seconds). */
+  tickToTime(tick: number): number {
     return this._tempoMap.ticksToSeconds(tick);
   }
 
