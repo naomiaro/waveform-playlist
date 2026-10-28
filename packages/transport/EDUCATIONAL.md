@@ -144,19 +144,47 @@ Both directions are closed-form and exact — no iterative approximation needed.
 
 ### Variable Tempo (Curves)
 
-For non-linear tempo changes (e.g., exponential ease-in/ease-out), the integral `∫ 1/bpm(t) dt` may not have a closed-form solution. In this case, numerical integration is used.
-
-The **trapezoidal rule** subdivides the interval into `N` equal steps and approximates the integral as the sum of trapezoids:
+For non-linear tempo changes the integral `∫ 1/bpm(t) dt` looks like it needs numerical integration, but the Möbius-Ease curve (below) is an exponential in disguise, and `1/(A + B × e^(c·x))` has a closed-form antiderivative. Writing the curve as
 
 ```
-seconds ≈ Σᵢ (Δt × 60 / PPQN) × (1/bpmᵢ + 1/bpmᵢ₊₁) / 2
+bpm(x) = A + B × e^(c·x)          where x = t / T
+  c = 2 × ln((1 - p) / p)
+  B = (bpm₁ - bpm₀) × p² / (1 - 2p)
+  A = bpm₀ - B
 ```
 
-where `bpmᵢ` is the BPM at step `i` and `Δt` is the tick width of each step. The trapezoidal rule converges as O(1/N²) — 64 subdivisions typically gives sub-millisecond accuracy for musical tempo curves.
+gives
 
-The inverse (seconds → ticks) uses binary search: repeatedly halve the tick range and evaluate the forward integral until the target seconds value is bracketed to within one tick.
+```
+seconds(t) = (T × 60 / PPQN) × (c·x - ln(bpm(x) / bpm₀)) / (c × A)
+```
 
-> **Reference:** The trapezoidal rule is a foundational numerical integration method. See Atkinson, K.E., *An Introduction to Numerical Analysis*, 2nd ed., Wiley, 1989 — Chapter 5 covers composite quadrature rules including trapezoidal and Simpson's. For a free online treatment, see [Wikipedia — Trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule). The convergence rate O(1/N²) follows from the Euler-Maclaurin formula.
+So the curved case is exact like the linear one: the only error is floating-point rounding (~1e-15 relative), independent of segment length. An earlier version used a 64-step trapezoid; its error grew with segment length (up to ~2e-3 relative at steep slopes — 2.8 ms per bar, 0.7 s over a 256-bar ramp), which is why the closed form replaced it.
+
+Getting full precision out of that formula takes some care, because it has two removable singularities:
+
+- **`slope → 0.5`:** `B → ∞` and `c → 0` while `c × B` stays finite (→ `bpm₁ − bpm₀`). The implementation therefore carries `c × A` and `c × B` rather than `A` and `B`, and sends only `|slope − 0.5| < 1e-12` to the linear formula (at exactly 0.5, `c` is 0 and the coefficients are 0/0).
+- **`A → 0`** (e.g. 20 → 180 BPM at slope 0.25, where `bpm₀ = B`): the curve is a pure exponential and `(c·x − ln(bpm(x)/bpm₀)) / (c × A)` is `0/0`. Rewriting `c·x − ln(bpm(x)/bpm₀)` as `−log1p(y)` with `y = (A/bpm₀)(e^(−c·x) − 1)` gives
+
+  ```
+  seconds(t) = (T × 60 / PPQN) × (1 − e^(−c·x)) / (c × bpm₀) × log1p(y) / y
+  ```
+
+  where `log1p(y)/y → 1` as `y → 0`, so nothing divides by `A`. This form is exact for small `A` and small `c`, and is the one normally used.
+
+The two forms are algebraically identical, but they cancel in different places: the `log1p` form loses digits when `1 + y = bpm(x) × e^(−c·x) / bpm₀` is tiny (a very steep concave ramp near its end, or a convex descending ramp), and the plain form loses digits when `A ≈ 0`. Those regimes are disjoint: when `1 + y ≤ 0.5` the plain form's numerator `−ln(1 + y)` is at least `ln 2` in magnitude, and `A = 0` would force `1 + y = 1`, so nothing cancels there. The implementation picks the plain form exactly when `1 + y ≤ 0.5` and the `log1p` form otherwise.
+
+The inverse (seconds → ticks) also has a closed form, obtained by solving the `log1p` form for `x`:
+
+```
+K = seconds × c × A / base            base = T × 60 / PPQN
+z = e^(−c·x) − 1 = −(bpm₀ × seconds × c / base) × (1 − e^(−K)) / K
+x = −log1p(z) / c
+```
+
+with `(1 − e^(−K))/K → 1` as `K → 0` making `A → 0` exact, and `c → 0` exact because `z ∝ c` and `log1p(z)/c` keeps the ratio. When `e^(−c·x)` is small and `|B| < |A|/2`, forming it as `1 + z` loses digits and the equal product form `e^(−c·x) = (c·bpm₀·e^(−K) − c·B) / (c·A)` is used instead. Both directions are O(1); the previous implementation bisected the forward integral.
+
+> **Reference:** `∫ dx / (A + B × e^(cx)) = x/A − ln(A + B × e^(cx)) / (c × A)` — differentiate to verify, or see [Wikipedia — List of integrals of exponential functions](https://en.wikipedia.org/wiki/List_of_integrals_of_exponential_functions). Evaluating `ln(bpm(x)/bpm₀)` as `log1p((B/bpm₀) × expm1(c·x))` avoids cancellation when `c·x` is small; see Goldberg, D., *"What Every Computer Scientist Should Know About Floating-Point Arithmetic"*, ACM Computing Surveys 23(1), 1991.
 
 #### The Möbius-Ease Curve
 
@@ -261,8 +289,8 @@ These have zero runtime cost (the brand exists only in the type system). Convers
 - MIDI 1.0 Specification — [midi.org](https://www.midi.org/specifications) (integer tick timing, PPQN)
 
 ### Numerical Methods
-- Atkinson, K.E., *An Introduction to Numerical Analysis*, 2nd ed., Wiley, 1989 — Chapter 5 (trapezoidal rule, composite quadrature)
-- [Wikipedia — Trapezoidal rule](https://en.wikipedia.org/wiki/Trapezoidal_rule) (convergence, error bounds, Euler-Maclaurin formula)
+- [Wikipedia — List of integrals of exponential functions](https://en.wikipedia.org/wiki/List_of_integrals_of_exponential_functions) (`∫ dx / (a + b × e^(cx))`, the curved tempo segment's antiderivative)
+- Goldberg, D., *"What Every Computer Scientist Should Know About Floating-Point Arithmetic"*, ACM Computing Surveys 23(1), 1991 (cancellation, why `log1p`/`expm1` exist)
 
 ### Tempo Curves
 - Werner Van Belle, *"Fast Envelope Generation"*, Proc. of the Linux Audio Conference, 2012 — [Paper](http://werner.yellowcouch.org/Papers/fastenv12/index.html) (Möbius-Ease curve formula, efficient iterative `v[i+1] = m×v[i] + q` form)
