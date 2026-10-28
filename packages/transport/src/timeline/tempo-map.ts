@@ -175,10 +175,9 @@ export class TempoMap {
    *  round this once at their own boundary (secondsToTicks,
    *  SampleTimeline.samplesToTicks); sub-tick consumers (placing a recorded
    *  note between ticks before quantising, continuous beat positions) use it
-   *  directly. Not clamped: negative seconds extrapolate the first segment's
-   *  tempo function backwards to negative ticks (a constant for a step first
-   *  segment, the ramp formula for a linear/curve one), and seconds past the
-   *  last entry extrapolate the last tempo forwards. */
+   *  directly. Not clamped: negative seconds convert at the constant initial
+   *  tempo to negative ticks (whatever the first segment's interpolation),
+   *  and seconds past the last entry extrapolate the last tempo forwards. */
   secondsToTicksExact(seconds: number): number {
     assertFiniteInput('seconds', seconds);
     return assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds));
