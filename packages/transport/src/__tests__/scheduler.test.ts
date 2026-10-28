@@ -131,6 +131,18 @@ describe('Scheduler (tick-based)', () => {
     expect(() => scheduler.setLoop(true, 0 as Tick, Infinity as Tick)).toThrow(/non-finite/);
   });
 
+  it('setLoop rejects fractional ticks instead of rounding them into an empty loop', () => {
+    const scheduler = createScheduler();
+    expect(() => scheduler.setLoop(true, 960.6 as Tick, 961.4 as Tick)).toThrow(/integer/);
+  });
+
+  it('setLoopSeconds throws in seconds for a range shorter than one tick', () => {
+    const scheduler = createScheduler();
+    expect(() => scheduler.setLoopSeconds(true, 1, 1.0001)).toThrow(
+      /setLoopSeconds: range \(1, 1\.0001 second\) is shorter than one tick/
+    );
+  });
+
   it('setLoop(false) accepts a degenerate range (nothing to validate when disabled)', () => {
     const scheduler = createScheduler();
     expect(() => scheduler.setLoop(false, 0 as Tick, 0 as Tick)).not.toThrow();
@@ -256,7 +268,7 @@ describe('Scheduler (tick-based)', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].phase).toBe('generate');
       expect(errors[0].listener).toBe(bad);
-      expect(errors[0].event).toBeUndefined();
+      expect('event' in errors[0]).toBe(false);
       expect(errors[0].error).toBe(failure);
       // The other listener still got its window
       expect(good.consumed.length).toBeGreaterThan(0);
@@ -278,7 +290,7 @@ describe('Scheduler (tick-based)', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].phase).toBe('consume');
       expect(errors[0].listener).toBe(listener);
-      expect(errors[0].event).toEqual({ tick: 480, id: 'e-480' });
+      expect(errors[0].phase === 'consume' && errors[0].event).toEqual({ tick: 480, id: 'e-480' });
       expect(errors[0].error).toBe(failure);
       expect(listener.consumed).toEqual([0, 960]);
     });
@@ -320,6 +332,54 @@ describe('Scheduler (tick-based)', () => {
       ]);
     });
 
+    it('an onPositionJump() failure in the LAST listener still completes the loop wrap', () => {
+      const loopCalls: number[] = [];
+      const tempoMap = new TempoMap(ppqn, bpm);
+      const scheduler = new Scheduler<TestEvent>(tempoMap, {
+        lookahead: 0.3,
+        onLoop: (start) => loopCalls.push(start),
+        onError: () => {},
+      });
+      scheduler.setLoop(true, 0 as Tick, 960 as Tick);
+      const good = createMockListener();
+      const bad = {
+        ...throwingListener({}),
+        onPositionJump() {
+          throw new Error('jump failed');
+        },
+      };
+      scheduler.addListener(good);
+      scheduler.addListener(bad);
+      scheduler.advance(0.35);
+      expect(loopCalls).toEqual([0]);
+      expect(good.generateRanges).toEqual([
+        [0, 960],
+        [0, 288],
+      ]);
+    });
+
+    it('generate and positionJump failures carry their window and target tick', () => {
+      const errors: SchedulerListenerError[] = [];
+      const tempoMap = new TempoMap(ppqn, bpm);
+      const scheduler = new Scheduler<TestEvent>(tempoMap, {
+        lookahead: 0.3,
+        onError: (e) => errors.push(e),
+      });
+      scheduler.setLoop(true, 0 as Tick, 960 as Tick);
+      const bad = {
+        ...throwingListener({ generate: new Error('generate failed') }),
+        onPositionJump() {
+          throw new Error('jump failed');
+        },
+      };
+      scheduler.addListener(bad);
+      scheduler.advance(0.35);
+      const gen = errors.find((e) => e.phase === 'generate');
+      const jump = errors.find((e) => e.phase === 'positionJump');
+      expect(gen && gen.phase === 'generate' && [gen.fromTick, gen.toTick]).toEqual([0, 960]);
+      expect(jump && jump.phase === 'positionJump' && jump.tick).toBe(0);
+    });
+
     it('falls back to console.warn when no onError handler is configured', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const scheduler = createScheduler(0.2);
@@ -329,6 +389,37 @@ describe('Scheduler (tick-based)', () => {
 
       expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('generate failed'));
+      warn.mockRestore();
+    });
+
+    it('the console fallback warns again for a different failure of the same listener and phase', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const scheduler = createScheduler(0.2);
+      let message = 'first failure';
+      scheduler.addListener({
+        ...throwingListener({}),
+        generate() {
+          throw new Error(message);
+        },
+      });
+      scheduler.advance(0);
+      scheduler.advance(0.05);
+      message = 'a different failure';
+      scheduler.advance(0.1);
+      scheduler.advance(0.15);
+      expect(warn).toHaveBeenCalledTimes(2);
+      expect(warn.mock.calls[1][0]).toContain('a different failure');
+      warn.mockRestore();
+    });
+
+    it('the console fallback is keyed per listener: two failing listeners warn twice', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const scheduler = createScheduler(0.2);
+      scheduler.addListener(throwingListener({ generate: new Error('generate failed') }));
+      scheduler.addListener(throwingListener({ generate: new Error('generate failed') }));
+      scheduler.advance(0);
+      scheduler.advance(0.05);
+      expect(warn).toHaveBeenCalledTimes(2);
       warn.mockRestore();
     });
 

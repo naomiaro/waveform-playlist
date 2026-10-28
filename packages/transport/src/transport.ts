@@ -893,18 +893,23 @@ export class Transport {
   }
 
   /** Route a scheduler listener failure to `error` subscribers, or to
-   *  console.warn (once per listener and phase) when nobody is listening —
+   *  console.warn (once per listener and failure kind) when nobody is listening —
    *  the failure must stay visible either way. Subscribers are called on a
    *  microtask, after the scheduler window that produced the failure has
    *  completed: a handler that reacts with stop()/setTracks()/off() must not
    *  re-enter the listener iteration that is still running. */
   private _emitError(error: SchedulerListenerError): void {
-    const listeners = this._listeners.get('error');
-    if (listeners && listeners.size > 0) {
-      queueMicrotask(() => this._emit('error', error));
-      return;
-    }
-    this._errorLog.warnOnce(error);
+    // Decide at DELIVERY time: a subscriber that unsubscribed or disposed the
+    // transport between the failure and the microtask must not make the
+    // failure vanish.
+    queueMicrotask(() => {
+      const listeners = this._listeners.get('error');
+      if (listeners && listeners.size > 0) {
+        this._emit('error', error);
+      } else {
+        this._errorLog.warnOnce(error);
+      }
+    });
   }
 
   private _emit<K extends TransportEventType>(

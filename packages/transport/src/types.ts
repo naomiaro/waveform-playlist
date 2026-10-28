@@ -121,16 +121,32 @@ export interface MeterChangeEventData {
 
 /** Payload of the transport `error` event and the Scheduler `onError` option:
  *  a scheduler listener (ClipPlayer, MetronomePlayer, CountInPlayer, or a
- *  custom one) threw while generating or consuming events. The scheduler
- *  skips the failing listener for that window (or that one event) and keeps
- *  going; the host decides what to do with the failure. */
-export interface SchedulerListenerError {
-  /** Which listener method threw */
-  phase: 'generate' | 'consume' | 'positionJump';
+ *  custom one) threw. The scheduler skipped the failing unit of work — that
+ *  listener's window (`generate`), that one event (`consume`) or that one
+ *  jump (`positionJump`) — and kept going; the host decides what to do.
+ *  Discriminated on `phase`, so the context each phase carries is required,
+ *  not optional. */
+export type SchedulerListenerError =
+  | (SchedulerListenerErrorBase & {
+      readonly phase: 'generate';
+      /** The window [fromTick, toTick) that generate() was asked for */
+      readonly fromTick: Tick;
+      readonly toTick: Tick;
+    })
+  | (SchedulerListenerErrorBase & {
+      readonly phase: 'consume';
+      /** The event being consumed */
+      readonly event: SchedulerEvent;
+    })
+  | (SchedulerListenerErrorBase & {
+      readonly phase: 'positionJump';
+      /** The tick the scheduler jumped to (the loop start) */
+      readonly tick: Tick;
+    });
+
+interface SchedulerListenerErrorBase {
   /** The listener that threw */
-  listener: SchedulerListener<SchedulerEvent>;
-  /** The event being consumed — present only when `phase` is 'consume' */
-  event?: SchedulerEvent;
+  readonly listener: SchedulerListener<SchedulerEvent>;
   /** The thrown value, unchanged */
-  error: unknown;
+  readonly error: unknown;
 }

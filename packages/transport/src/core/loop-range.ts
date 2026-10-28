@@ -6,6 +6,8 @@
  * loop silently in force (#636). Validation only applies when `enabled` is
  * true: disabling a loop carries no range to validate.
  */
+import type { Tick } from '../types';
+
 export type LoopRangeUnit = 'tick' | 'second' | 'sample';
 
 export function assertValidLoopRange(
@@ -27,6 +29,14 @@ export function assertValidLoopRange(
         ', ' +
         end +
         ')'
+    );
+  }
+  // Ticks are integers by contract; a fractional pair that straddles one
+  // integer (960.6, 961.4) would otherwise pass here and round into an
+  // empty loop one layer down.
+  if (unit === 'tick' && (!Number.isInteger(start) || !Number.isInteger(end))) {
+    throw new Error(
+      '[waveform-playlist] ' + source + ': ticks must be integers, got (' + start + ', ' + end + ')'
     );
   }
   if (start >= end) {
@@ -58,8 +68,8 @@ export function assertLoopRangeSpansATick(
   start: number,
   end: number,
   unit: LoopRangeUnit,
-  startTick: number,
-  endTick: number
+  startTick: Tick,
+  endTick: Tick
 ): void {
   if (!enabled || startTick < endTick) return;
   throw new Error(

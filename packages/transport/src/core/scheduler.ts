@@ -1,6 +1,6 @@
 import type { Tick, SchedulerEvent, SchedulerListener, SchedulerListenerError } from '../types';
 import type { TempoMap } from '../timeline/tempo-map';
-import { assertValidLoopRange } from './loop-range';
+import { assertValidLoopRange, assertLoopRangeSpansATick } from './loop-range';
 
 export interface SchedulerOptions {
   lookahead?: number;
@@ -13,36 +13,58 @@ export interface SchedulerOptions {
    *  throws. The failing listener is skipped for that window (consume: that
    *  event; positionJump: that jump) and the remaining listeners/events still
    *  run. Without a handler the failure is reported with console.warn, once
-   *  per listener and phase, so it is never silent. */
+   *  per listener and failure kind, so it is never silent. */
   onError?: (error: SchedulerListenerError) => void;
 }
 
 /** One-line description of a listener failure for the console fallback. */
 export function formatSchedulerListenerError(error: SchedulerListenerError): string {
-  const where = error.event ? ' at tick ' + error.event.tick : '';
+  const where =
+    error.phase === 'consume'
+      ? ' at tick ' + error.event.tick
+      : error.phase === 'generate'
+        ? ' for ticks [' + error.fromTick + ', ' + error.toTick + ')'
+        : ' jumping to tick ' + error.tick;
   return (
-    'scheduler listener threw during ' + error.phase + '()' + where + ': ' + String(error.error)
+    'scheduler listener threw during ' +
+    error.phase +
+    '()' +
+    where +
+    ': ' +
+    describeError(error.error)
   );
 }
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.name + ': ' + error.message : String(error);
+}
+
+/** Distinct failure kinds reported per listener before the log goes quiet
+ *  for that listener — enough to see a progression of different faults,
+ *  bounded so a listener that throws a fresh message every tick cannot flood. */
+const MAX_LOGGED_KINDS_PER_LISTENER = 16;
 
 /**
  * Console fallback for listener failures when no handler is subscribed. A
  * listener that fails on every window would otherwise log ~40 lines a second
- * for the whole playback, so each (listener, phase) pair is reported once.
+ * for the whole playback, so each distinct failure (listener, phase, error
+ * name + message) is reported once; a NEW kind of failure from the same
+ * listener is still reported.
  */
 export class ListenerErrorLog {
-  private readonly _seen = new WeakMap<object, Set<SchedulerListenerError['phase']>>();
+  private readonly _seen = new WeakMap<object, Set<string>>();
 
   constructor(private readonly _prefix: string) {}
 
   warnOnce(error: SchedulerListenerError): void {
-    let phases = this._seen.get(error.listener);
-    if (!phases) {
-      phases = new Set();
-      this._seen.set(error.listener, phases);
+    let kinds = this._seen.get(error.listener);
+    if (!kinds) {
+      kinds = new Set();
+      this._seen.set(error.listener, kinds);
     }
-    if (phases.has(error.phase)) return;
-    phases.add(error.phase);
+    const kind = error.phase + '|' + describeError(error.error);
+    if (kinds.has(kind) || kinds.size >= MAX_LOGGED_KINDS_PER_LISTENER) return;
+    kinds.add(kind);
     console.warn(
       this._prefix +
         formatSchedulerListenerError(error) +
@@ -95,6 +117,15 @@ export class Scheduler<T extends SchedulerEvent> {
     assertValidLoopRange('Scheduler.setLoopSeconds', enabled, startSec, endSec, 'second');
     const startTick = this._tempoMap.secondsToTicks(startSec);
     const endTick = this._tempoMap.secondsToTicks(endSec);
+    assertLoopRangeSpansATick(
+      'Scheduler.setLoopSeconds',
+      enabled,
+      startSec,
+      endSec,
+      'second',
+      startTick,
+      endTick
+    );
     this.setLoop(enabled, startTick, endTick);
   }
 
@@ -137,7 +168,12 @@ export class Scheduler<T extends SchedulerEvent> {
           try {
             listener.onPositionJump(this._loopStart as Tick);
           } catch (err) {
-            this._reportError({ phase: 'positionJump', listener, error: err });
+            this._reportError({
+              phase: 'positionJump',
+              listener,
+              tick: this._loopStart as Tick,
+              error: err,
+            });
           }
         }
         // Seek clock — passes the currentTimeSeconds snapshot so Transport
@@ -170,7 +206,13 @@ export class Scheduler<T extends SchedulerEvent> {
       try {
         events = listener.generate(fromTick as Tick, toTick as Tick);
       } catch (err) {
-        this._reportError({ phase: 'generate', listener, error: err });
+        this._reportError({
+          phase: 'generate',
+          listener,
+          fromTick: fromTick as Tick,
+          toTick: toTick as Tick,
+          error: err,
+        });
         continue;
       }
       for (const event of events) {
