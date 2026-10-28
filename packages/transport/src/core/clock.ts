@@ -1,8 +1,10 @@
 import type { ContextFrame } from '../types';
 
-/** Web Audio renders in blocks of 128 frames; `AudioContext.currentTime`
- *  advances by exactly this many frames per render, so a context reading is
- *  always on this lattice (up to float noise). */
+/** Web Audio renders in blocks of 128 frames (the spec default; a context
+ *  created with a non-default `renderSizeHint` renders in other block sizes),
+ *  so `AudioContext.currentTime` normally advances by exactly this many frames
+ *  per render and a reading sits on this lattice up to float noise. A context
+ *  off the lattice simply keeps its raw integer frame (see LATTICE_SNAP_FRAMES). */
 export const RENDER_QUANTUM_FRAMES = 128;
 
 /** How far (in frames) a context reading may sit off the quantum lattice and
@@ -12,27 +14,37 @@ export const RENDER_QUANTUM_FRAMES = 128;
 const LATTICE_SNAP_FRAMES = 1e-3;
 
 /**
- * Transport position, kept in integer context frames (#636).
+ * Transport position, with elapsed time counted in integer context frames
+ * (#636).
  *
- * The position is `positionAtAnchor + (contextFrame − contextFrameAtAnchor)`,
- * where contextFrame is `currentTime × sampleRate` snapped to the render
- * quantum lattice, so elapsed time is counted in whole frames. A seconds seek
- * remembers its exact seconds (`secondsAtAnchor`) so `getTime()` returns the
- * seek target bit-exactly instead of `(t × rate) / rate`; `getFrame()` rounds
- * once at the ContextFrame boundary and `getFrameExact()` keeps the fraction
- * — the same round-once rule as the tick conversions.
+ * The position is `seekPosition + elapsedFrames`, where `elapsedFrames` is
+ * ONE integer accumulator: whole frames elapsed in earlier runs since the last
+ * seek (`_elapsedBeforeAnchor`) plus, while running, the frames since the
+ * current anchor (`contextFrame − contextFrameAtAnchor`). `contextFrame` is
+ * `currentTime × sampleRate` snapped to the render-quantum lattice. The seek
+ * position is kept in BOTH units — `_seekFrames` (fractional after a seconds
+ * seek) and `_seekSeconds` (the exact seconds a caller passed) — so
+ * `getTime()` returns a seek target bit-exactly (`(t × rate) / rate` differs
+ * from `t` for roughly one millisecond position in seven at 44.1 kHz) and the
+ * two views cannot drift apart across pause/resume cycles: both add the same
+ * integer. `getFrame()` rounds once at the ContextFrame boundary;
+ * `getFrameExact()` keeps the fraction — the round-once rule of the tick
+ * conversions.
  *
- * Anchoring events (what re-reads the context and re-bases the position):
- * - `start()` anchors the current position to the current context frame.
+ * Anchoring events (the full table, including `reset()`, is in
+ * packages/transport/CLAUDE.md — keep the two in step):
+ * - `start()` anchors the current position to the current context frame. It
+ *   reads the context BEFORE setting `_running`, so a context that moved
+ *   backwards while stopped re-anchors silently instead of counting a re-base.
  * - `seekTo()`/`seekToFrame()` while running re-anchor to the current frame.
- * - `stop()` folds elapsed frames into the position and detaches.
- * - A context reading that goes BACKWARDS moves the anchor with it so the
- *   position holds instead of jumping back. The spec makes currentTime
- *   monotonic and #636 describes Chromium STALLING it on device changes, so
- *   this is a defensive path — but whoever reads first absorbs it (reads are
- *   idempotent: the outcome does not depend on which reader saw it), and
- *   `takeDiscontinuity()` tells the Transport to re-create sources that were
- *   armed in the old time base. `rebaseCount` counts those.
+ * - `stop()` folds the frames elapsed in this run into the accumulator.
+ * - A context reading that goes BACKWARDS while running moves the anchor with
+ *   it so the position holds instead of jumping back. The spec makes
+ *   currentTime monotonic and #636 describes Chromium STALLING it on device
+ *   changes, so this is a defensive path. Whoever reads first absorbs it —
+ *   reads are idempotent (the outcome does not depend on which reader saw it)
+ *   — and `rebaseCount` / `lastRebaseFrames` let the Transport notice on its
+ *   next tick and re-create the sources it armed in the old time base.
  * - A STALLED reading (suspend, device change) simply freezes the position:
  *   no audio is rendering, so no transport time elapses. Nothing to re-anchor.
  * Forward jumps are taken at face value — the context rendered that audio.
@@ -45,18 +57,19 @@ export class Clock {
   private readonly _audioContext: AudioContext;
   private readonly _sampleRate: number;
   private _running = false;
-  /** Snapped context frame when the position was last anchored. */
+  /** Snapped context frame when the current run was anchored. */
   private _contextFrameAtAnchor = 0;
-  /** Transport position (frames, may be fractional after a seconds seek) at the anchor. */
-  private _positionAtAnchor = 0;
-  /** The same position in seconds — the exact seek target after seekTo(seconds). */
-  private _secondsAtAnchor = 0;
+  /** Position at the last seek, in frames (fractional after a seconds seek). */
+  private _seekFrames = 0;
+  /** The same position in seconds — bit-exactly what seekTo(seconds) got. */
+  private _seekSeconds = 0;
+  /** Whole frames elapsed in earlier runs since the last seek. */
+  private _elapsedBeforeAnchor = 0;
   /** The PREVIOUS snapped context reading (not a high-water mark): a lower
-   *  reading than this one is a re-base. */
+   *  reading than this one, while running, is a re-base. */
   private _lastContextFrame = -Infinity;
   private _rebaseCount = 0;
-  /** Set by a re-base while running; consumed by `takeDiscontinuity()`. */
-  private _discontinuityPending = false;
+  private _lastRebaseFrames = 0;
 
   constructor(audioContext: AudioContext) {
     const rate = audioContext.sampleRate;
@@ -75,18 +88,16 @@ export class Clock {
     return this._sampleRate;
   }
 
-  /** How many times a backward context reading was absorbed (diagnostics). */
+  /** How many backward context readings were absorbed while running. The
+   *  Transport diffs this against its own cursor each tick to re-create
+   *  sources armed in the old time base; observers may read it freely. */
   get rebaseCount(): number {
     return this._rebaseCount;
   }
 
-  /** True once after a backward reading was absorbed while running: audio
-   *  already scheduled through `toAudioTime()` is in the old time base and
-   *  must be re-created from the (held) position. Consuming it clears it. */
-  takeDiscontinuity(): boolean {
-    const pending = this._discontinuityPending;
-    this._discontinuityPending = false;
-    return pending;
+  /** Size (frames) of the most recently absorbed backward reading. */
+  get lastRebaseFrames(): number {
+    return this._lastRebaseFrames;
   }
 
   /** Seconds → whole context frames, rounded once here. */
@@ -94,33 +105,36 @@ export class Clock {
     return Math.round(seconds * this._sampleRate) as ContextFrame;
   }
 
+  /** Whole context frames → seconds (the inverse view). */
+  frameToSeconds(frame: ContextFrame): number {
+    return frame / this._sampleRate;
+  }
+
   start(): void {
     if (this._running) return;
+    // Read before `_running` is set: a backward reading while stopped is a
+    // fresh anchor, not a re-base (nothing was scheduled against the old one).
     this._contextFrameAtAnchor = this._readContextFrame();
     this._running = true;
   }
 
   stop(): void {
     if (!this._running) return;
-    const elapsed = this._elapsedFrames();
-    this._positionAtAnchor += elapsed;
-    this._secondsAtAnchor += elapsed / this._sampleRate;
+    this._elapsedBeforeAnchor += this._elapsedFrames();
     this._running = false;
   }
 
   reset(): void {
     this._running = false;
-    this._positionAtAnchor = 0;
-    this._secondsAtAnchor = 0;
+    this._seekFrames = 0;
+    this._seekSeconds = 0;
+    this._elapsedBeforeAnchor = 0;
     this._contextFrameAtAnchor = 0;
   }
 
   /** Position in seconds: the exact seek target plus whole elapsed frames. */
   getTime(): number {
-    if (this._running) {
-      return this._secondsAtAnchor + this._elapsedFrames() / this._sampleRate;
-    }
-    return this._secondsAtAnchor;
+    return this._seekSeconds + this._totalElapsedFrames() / this._sampleRate;
   }
 
   /** Position in whole context frames (rounded once, here). */
@@ -130,50 +144,56 @@ export class Clock {
 
   /** Position in frames, keeping any sub-frame part a seconds seek introduced. */
   getFrameExact(): number {
-    if (this._running) {
-      return this._positionAtAnchor + this._elapsedFrames();
-    }
-    return this._positionAtAnchor;
+    return this._seekFrames + this._totalElapsedFrames();
   }
 
   seekTo(time: number): void {
     assertFinite('seekTo', time);
-    this._seekToAnchor(time * this._sampleRate, time);
+    this._seekToPosition(time * this._sampleRate, time);
   }
 
+  /** A fractional frame is rounded here, at the API boundary. */
   seekToFrame(frame: ContextFrame): void {
     assertFinite('seekToFrame', frame);
-    this._seekToAnchor(frame, frame / this._sampleRate);
+    const whole = Math.round(frame);
+    this._seekToPosition(whole, whole / this._sampleRate);
   }
 
   /**
    * Convert transport time to AudioContext.currentTime space, for
-   * AudioBufferSourceNode.start(when). While running this is anchor-based —
-   * it never re-reads currentTime, so sub-quantum noise in a reading cannot
-   * shift scheduled events; stopped, it maps relative to the same SNAPPED
-   * "now" the running branch will anchor to, so a `when` computed just before
-   * `start()` and one computed just after agree.
+   * AudioBufferSourceNode.start(when). Anchor-based in both states: while
+   * running it never re-reads currentTime, so sub-quantum noise in a reading
+   * cannot shift scheduled events; stopped, the anchor is the same snapped
+   * "now" that start() is about to capture, so a `when` computed just before
+   * start() and one computed just after are identical.
    */
   toAudioTime(transportTime: number): number {
     const positionFrames = transportTime * this._sampleRate;
-    if (this._running) {
-      return (
-        (this._contextFrameAtAnchor + (positionFrames - this._positionAtAnchor)) / this._sampleRate
-      );
-    }
-    return this._snappedContextFrame() / this._sampleRate + (transportTime - this.getTime());
+    const anchorFrame = this._running ? this._contextFrameAtAnchor : this._snappedContextFrame();
+    return (anchorFrame + (positionFrames - this._positionAtAnchorFrames())) / this._sampleRate;
   }
 
   isRunning(): boolean {
     return this._running;
   }
 
-  private _seekToAnchor(frames: number, seconds: number): void {
-    this._positionAtAnchor = frames;
-    this._secondsAtAnchor = seconds;
+  private _seekToPosition(frames: number, seconds: number): void {
+    this._seekFrames = frames;
+    this._seekSeconds = seconds;
+    this._elapsedBeforeAnchor = 0;
     if (this._running) {
       this._contextFrameAtAnchor = this._readContextFrame();
     }
+  }
+
+  /** Position (frames) at the start of the current run. */
+  private _positionAtAnchorFrames(): number {
+    return this._seekFrames + this._elapsedBeforeAnchor;
+  }
+
+  /** Whole frames elapsed since the last seek, across runs. */
+  private _totalElapsedFrames(): number {
+    return this._elapsedBeforeAnchor + (this._running ? this._elapsedFrames() : 0);
   }
 
   /** Whole frames elapsed since the anchor (running only). */
@@ -195,9 +215,10 @@ export class Clock {
     const frame = this._snappedContextFrame();
     if (frame < this._lastContextFrame && this._running) {
       // Re-based backwards: carry the anchor along so the position holds.
-      this._contextFrameAtAnchor -= this._lastContextFrame - frame;
+      const shift = this._lastContextFrame - frame;
+      this._contextFrameAtAnchor -= shift;
+      this._lastRebaseFrames = shift;
       this._rebaseCount++;
-      this._discontinuityPending = true;
     }
     this._lastContextFrame = frame;
     return frame;

@@ -29,6 +29,8 @@ Transport time starts at 0 when you press play. Hardware time is a monotonically
 audioTime = hardwareNow + (transportTime - clockElapsed)
 ```
 
+(That is the concept. The real `Clock` anchors in whole AudioContext frames instead of re-reading `hardwareNow` on every conversion — see the Clock section of CLAUDE.md — but the arithmetic is the same.)
+
 This maps "where on the timeline" to "when on the hardware." Without this, all sounds in the lookahead window would fire immediately at the current hardware time.
 
 > **Reference:** The Web Audio API specification defines `AudioContext.currentTime` as a double-precision floating-point number representing the hardware output time in seconds. See [W3C Web Audio API — BaseAudioContext](https://webaudio.github.io/web-audio-api/#dom-baseaudiocontext-currenttime).

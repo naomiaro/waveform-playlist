@@ -176,8 +176,11 @@ describe('Clock frame lattice (#636)', () => {
     clock.start();
     setFrames(ctx, 48000);
     expect(clock.getTime()).toBe(1);
+    const when = clock.toAudioTime(2.5);
+    // The context stalls: reads keep returning the same frame.
     expect(clock.getTime()).toBe(1);
     expect(clock.getFrame()).toBe(48000);
+    expect(clock.toAudioTime(2.5)).toBe(when); // a stall is not a re-base: nothing is re-anchored
     expect(clock.rebaseCount).toBe(0);
   });
 
@@ -263,8 +266,47 @@ describe('Clock frame lattice (#636)', () => {
     expect(a).toBeCloseTo(0.5, 12);
     expect(b).toBe(24000);
     expect(clock.rebaseCount).toBe(1);
-    expect(clock.takeDiscontinuity()).toBe(true);
-    expect(clock.takeDiscontinuity()).toBe(false); // consumed
+    expect(clock.lastRebaseFrames).toBe(14400); // 0.3 s at 48 kHz
+  });
+
+  it('the seconds and frame views stay consistent across many pause/resume cycles', () => {
+    // One integer accumulator for elapsed frames: getTime() is the exact seek
+    // target plus (total elapsed) / rate, not a thousand accumulated float adds.
+    const RATE44 = 44100;
+    const ctx = { currentTime: 0, sampleRate: RATE44 } as unknown as AudioContext;
+    const clock = new Clock(ctx);
+    clock.seekTo(0.031);
+    let frames = 0;
+    for (let i = 0; i < 1000; i++) {
+      clock.start();
+      frames += QUANTUM;
+      (ctx as unknown as { currentTime: number }).currentTime = frames / RATE44;
+      clock.stop();
+    }
+    expect(clock.getFrameExact()).toBe(0.031 * RATE44 + 128000);
+    expect(clock.getTime()).toBe(0.031 + 128000 / RATE44);
+  });
+
+  it('seekToFrame rounds a fractional frame at the boundary', () => {
+    const clock = new Clock(ctxAt(0));
+    clock.seekToFrame(12345.4 as ContextFrame);
+    expect(clock.getFrameExact()).toBe(12345);
+    expect(clock.getTime()).toBe(12345 / RATE);
+  });
+
+  it('frameToSeconds is the inverse view of secondsToFrame', () => {
+    const clock = new Clock(ctxAt(0));
+    expect(clock.frameToSeconds(24000 as ContextFrame)).toBe(0.5);
+    expect(clock.frameToSeconds(clock.secondsToFrame(1.25))).toBe(1.25);
+  });
+
+  it('a when computed just before start() equals one computed just after', () => {
+    const ctx = ctxAt(QUANTUM * 100);
+    const clock = new Clock(ctx);
+    clock.seekTo(0.031);
+    const before = clock.toAudioTime(1);
+    clock.start();
+    expect(clock.toAudioTime(1)).toBe(before);
   });
 
   it('exposes the context sample rate the lattice is measured in', () => {

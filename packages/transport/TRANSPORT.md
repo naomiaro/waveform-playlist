@@ -68,7 +68,7 @@ Each layer is independently testable. The core layer knows nothing about audio. 
 Every timer tick (25 ms, from a Web Worker):
 
 ```
-Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() (a view of the clock's integer-frame position on the 128-frame render lattice) → Scheduler.advance(currentTime)
+Timer (Worker setTimeout, 25 ms) → reads Clock.getTime() (seconds derived from the clock's frame position; context readings are snapped to the 128-frame render lattice) → Scheduler.advance(currentTime)
 ```
 
 The scheduler maintains a **sliding window** that expands forward as time advances. It only generates events for the *new* portion of the window (tracked by `rightEdge`), preventing duplicate work.
@@ -125,10 +125,11 @@ The transport operates in two time coordinate systems:
 | **Transport time** | 0.0, 0.5, 1.0... | Timeline position (seconds from start) |
 | **AudioContext time** | 100.5, 101.0... | Hardware scheduling (`source.start(when)`) |
 
-`Clock.toAudioTime(transportTime)` converts between them:
+`Clock.toAudioTime(transportTime)` converts between them. It is anchor-based: the clock captured the snapped context frame when the current run started, and never re-reads `currentTime` while running (see the Clock section of CLAUDE.md):
 
 ```
-audioContextTime = audioContext.currentTime + (transportTime - clock.getTime())
+running: audioContextTime = (contextFrameAtAnchor + (transportTime × rate − positionAtAnchorFrames)) / rate
+stopped: the same formula with the current snapped context frame as the anchor — what start() is about to capture
 ```
 
 This conversion happens inside `consume()` — events carry transport time, and the player converts to AudioContext time right before scheduling the `AudioBufferSourceNode`.
@@ -228,7 +229,7 @@ Key design choices:
 
 1. Seek clock to `startTime` (if provided)
 2. Reset scheduler to current position
-3. Start clock (captures `AudioContext.currentTime` reference)
+3. Start clock (captures the snapped context frame as the anchor)
 4. Call `clipPlayer.onPositionJump()` to create mid-clip sources
 5. Start the Worker timer loop
 
@@ -302,7 +303,7 @@ CountInPlayer implements `SchedulerListener<CountInEvent>` — same contract as 
 - `countIn` — fires per beat with `{ beat: number, totalBeats: number }` for UI countdown
 - `countInEnd` — fires when count-in completes and playback begins
 - `ended` — a bounded `play(start, end)` reached `end`; the transport stops itself (`stop` then `ended`, so an `ended` handler may restart playback). Consumer stops emit only `stop`. `NativePlayoutAdapter` forwards `ended` to the engine's `onPlaybackEnded` hook.
-- `discontinuity` — `{ seconds }`: the AudioContext's `currentTime` was read lower than before while playing. The clock held the position, the transport re-created every scheduled source from it (sources armed through the old anchor would have fired late), and this reports it. Defensive path; nothing for a consumer to do.
+- `discontinuity` — `{ seconds, shiftSeconds }`: the AudioContext's `currentTime` was read lower than before while playing. The clock held the position (`seconds` is what `getCurrentTime()` reports); outside a count-in the transport re-created every scheduled source from it, clamped to the loop start (sources armed through the old anchor hold absolute context times and would have fired late by `shiftSeconds`), during a count-in it dropped the already-armed clicks. Defensive path; nothing for a consumer to do. With no subscriber the first occurrence is warned to the console, and `transport.rebaseCount` keeps the tally.
 
 **Error surfacing (#636):** both schedulers are constructed with an `onError` handler that forwards `SchedulerListenerError` (a union on `phase`: `generate` with `fromTick`/`toTick`, `consume` with `event`, `positionJump` with `tick`; all with `listener` and `error`) to the transport `error` event, delivered on a microtask after the window completes (the subscriber check happens at delivery, so an unsubscribe or dispose in between falls back to the console). A failing `generate()` skips that listener for the window; a failing `consume()` skips that one event; a failing `onPositionJump()` skips that listener's jump without aborting the loop wrap. Nothing is retried. With no `error` subscriber the transport falls back to `console.warn`, once per listener and phase, so the failure is never silent. Invalid loop points (`setLoop`/`setLoopSeconds`/`setLoopSamples` with `enabled` and a non-finite, empty or inverted range) throw instead of warning — `NativePlayoutAdapter.setLoop` translates the engine's empty default region (`loopStart = loopEnd = 0`) to a disabled loop before it gets there.
 
