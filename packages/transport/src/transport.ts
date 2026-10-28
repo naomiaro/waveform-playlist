@@ -47,6 +47,16 @@ export interface TransportEvents {
    *  stop()/pause()/seek(). (NativePlayoutAdapter forwards this to the
    *  engine's onPlaybackEnded hook.) */
   ended: () => void;
+  /** One scheduler tick advanced the timeline: fires every
+   *  `timerIntervalMs` (default 25 ms) while playing, AFTER the scheduler
+   *  consumed the tick, with the position the tick observed. Driven by the
+   *  Worker timer, so it keeps its cadence in a hidden tab where
+   *  requestAnimationFrame stops. Not emitted during a count-in (the position
+   *  is held) nor on the tick that ends a bounded play (`stop`/`ended` fire
+   *  instead). Meant for consumers that poll the playhead for state the
+   *  transport does not announce (e.g. a tempo-map boundary crossed during
+   *  playback); UI position updates should still use rAF. */
+  tick: (event: { seconds: number }) => void;
   /** The AudioContext's clock was read lower than before while playing (a
    *  defensive path — the spec makes `currentTime` monotonic). The position
    *  was held: `seconds` is what getCurrentTime() reports (the loop-start
@@ -206,6 +216,7 @@ export class Transport {
         return;
       }
       this._scheduler.advance(time);
+      this._emit('tick', { seconds: time });
     }
   }
 

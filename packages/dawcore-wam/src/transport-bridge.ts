@@ -48,17 +48,19 @@ export interface WamTransportBridge {
  * Broadcasts `wam-transport` events to all live plugin nodes so tempo-synced
  * effects (delays, LFOs, arpeggiators) lock to the timeline.
  *
- * Rebroadcast triggers: play, pause, stop, seek, tempochange, meterchange —
- * plus a rAF watcher active only while playing, which catches tempo/meter
- * map boundary crossings that emit no transport event (variable-tempo
- * sessions).
+ * Rebroadcast triggers: play, pause, stop, seek, loop, discontinuity,
+ * tempochange, meterchange — plus the transport's `tick` event (one per
+ * Worker-driven scheduler tick while playing), on which the bridge compares
+ * tempo/meter at the playhead and rebroadcasts when a tempo/meter map
+ * boundary was crossed (variable-tempo sessions emit no event for that).
+ * Nothing here uses requestAnimationFrame: rAF stops in a hidden tab while
+ * the transport keeps playing (#645).
  */
 export function createWamTransportBridge(
   transport: TransportQueryLike,
   getPluginNodes: () => WamTransportNode[]
 ): WamTransportBridge {
   let disposed = false;
-  let rafId: number | null = null;
   let lastTempo: number | null = null;
   let lastNumerator: number | null = null;
   let lastDenominator: number | null = null;
@@ -102,10 +104,10 @@ export function createWamTransportBridge(
     }
   };
 
-  // Watcher: catches tempo/meter map boundary crossings during playback,
-  // which fire no transport event. Active only while playing.
-  const watch = (): void => {
-    rafId = null;
+  // Per scheduler tick: catches tempo/meter map boundary crossings during
+  // playback, which fire no transport event. A tick can arrive after stop
+  // (one was in flight), so the playing check stays.
+  const onTick = (): void => {
     if (disposed || !transport.isPlaying()) return;
     const tick = transport.timeToTick(transport.getCurrentTime());
     const tempo = transport.getTempo(tick);
@@ -117,45 +119,31 @@ export function createWamTransportBridge(
     ) {
       broadcast();
     }
-    rafId = requestAnimationFrame(watch);
   };
 
-  const startWatcher = (): void => {
-    if (rafId === null) {
-      rafId = requestAnimationFrame(watch);
-    }
-  };
-
-  const stopWatcher = (): void => {
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-  };
-
-  const onPlay = (): void => {
-    broadcast();
-    startWatcher();
-  };
-  const onHalt = (): void => {
-    stopWatcher();
-    broadcast();
-  };
   const onChange = (): void => {
     broadcast();
   };
 
-  transport.on('play', onPlay);
-  transport.on('pause', onHalt);
-  transport.on('stop', onHalt);
-  transport.on('seek', onChange);
-  transport.on('tempochange', onChange);
-  transport.on('meterchange', onChange);
+  const subscriptions: ReadonlyArray<[string, () => void]> = [
+    ['play', onChange],
+    ['pause', onChange],
+    ['stop', onChange],
+    ['seek', onChange],
+    ['loop', onChange],
+    ['discontinuity', onChange],
+    ['tempochange', onChange],
+    ['meterchange', onChange],
+    ['tick', onTick],
+  ];
+  for (const [event, cb] of subscriptions) {
+    transport.on(event, cb);
+  }
 
   // The bridge is created lazily (first plugin added) — if playback already
-  // started, the play event that would have armed the watcher has passed.
+  // started, the play event that would have synced the plugins has passed.
   if (transport.isPlaying()) {
-    onPlay();
+    broadcast();
   }
 
   return {
@@ -170,13 +158,9 @@ export function createWamTransportBridge(
     dispose(): void {
       if (disposed) return;
       disposed = true;
-      stopWatcher();
-      transport.off('play', onPlay);
-      transport.off('pause', onHalt);
-      transport.off('stop', onHalt);
-      transport.off('seek', onChange);
-      transport.off('tempochange', onChange);
-      transport.off('meterchange', onChange);
+      for (const [event, cb] of subscriptions) {
+        transport.off(event, cb);
+      }
     },
   };
 }

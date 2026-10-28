@@ -39,18 +39,15 @@ function makeMockNode() {
   return { scheduleEvents: vi.fn() };
 }
 
-let rafCallbacks: Array<(t: number) => void>;
-
+// The bridge must never poll on requestAnimationFrame (frozen in hidden
+// tabs, #645): it rides the transport's Worker-driven `tick` event instead.
 beforeEach(() => {
-  rafCallbacks = [];
   vi.stubGlobal(
     'requestAnimationFrame',
-    vi.fn((cb: (t: number) => void) => {
-      rafCallbacks.push(cb);
-      return rafCallbacks.length;
+    vi.fn(() => {
+      throw new Error('bridge must not use requestAnimationFrame');
     })
   );
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 
 afterEach(() => {
@@ -58,10 +55,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function pumpFrame() {
-  const snapshot = [...rafCallbacks];
-  rafCallbacks = [];
-  for (const cb of snapshot) cb(performance.now());
+/** One transport scheduler tick (what the Worker timer delivers ~40×/s). */
+function tick(transport: ReturnType<typeof makeMockTransport>) {
+  transport.emit('tick');
 }
 
 function lastEvent(node: ReturnType<typeof makeMockNode>) {
@@ -134,7 +130,7 @@ describe('createWamTransportBridge', () => {
     expect(lastEvent(added).type).toBe('wam-transport');
   });
 
-  it('detects a tempo-map boundary crossing during playback and rebroadcasts', () => {
+  it('detects a tempo-map boundary crossing on a transport tick and rebroadcasts', () => {
     const transport = makeMockTransport();
     const node = makeMockNode();
     createWamTransportBridge(transport, () => [node]);
@@ -146,13 +142,13 @@ describe('createWamTransportBridge', () => {
     // Playback crosses into a 90bpm segment — no transport event fires,
     // only the playing watcher can notice.
     transport._tempo = 90;
-    pumpFrame();
+    tick(transport);
 
     expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
     expect(lastEvent(node).data.tempo).toBe(90);
 
     // No further change → no further broadcast.
-    pumpFrame();
+    tick(transport);
     expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
   });
 
@@ -167,7 +163,7 @@ describe('createWamTransportBridge', () => {
 
     // ...and the boundary watcher is live.
     transport._tempo = 75;
-    pumpFrame();
+    tick(transport);
     expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
     expect(lastEvent(node).data.tempo).toBe(75);
   });
@@ -184,7 +180,7 @@ describe('createWamTransportBridge', () => {
     const countAfterStop = node.scheduleEvents.mock.calls.length;
 
     transport._tempo = 80;
-    pumpFrame();
+    tick(transport);
     expect(node.scheduleEvents).toHaveBeenCalledTimes(countAfterStop);
 
     bridge.dispose();
@@ -192,5 +188,61 @@ describe('createWamTransportBridge', () => {
     transport.emit('tempochange');
     expect(node.scheduleEvents).toHaveBeenCalledTimes(countAfterStop);
     expect(transport.off).toHaveBeenCalled();
+  });
+
+  it('a tick while NOT playing never broadcasts (stale tick after stop)', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+    transport._tempo = 99;
+    tick(transport);
+    expect(node.scheduleEvents).not.toHaveBeenCalled();
+  });
+
+  it('a meter-map boundary crossing on a tick rebroadcasts too', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+    transport._playing = true;
+    transport.emit('play');
+    transport._meter = { numerator: 7, denominator: 8 };
+    tick(transport);
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+    expect(lastEvent(node).data.timeSigNumerator).toBe(7);
+    expect(lastEvent(node).data.timeSigDenominator).toBe(8);
+  });
+
+  it('rebroadcasts on loop wrap and on a clock discontinuity (the position jumped)', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    createWamTransportBridge(transport, () => [node]);
+    transport._playing = true;
+    transport.emit('play');
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
+
+    transport._seconds = 8; // wrapped back to the loop start (bar 6 began at 8 s)
+    transport.emit('loop');
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(2);
+    expect(lastEvent(node).data.currentBarStarted).toBe(100);
+
+    transport.emit('discontinuity');
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(3);
+  });
+
+  it('dispose unsubscribes tick, loop and discontinuity as well', () => {
+    const transport = makeMockTransport();
+    const node = makeMockNode();
+    const bridge = createWamTransportBridge(transport, () => [node]);
+    transport._playing = true;
+    transport.emit('play');
+    bridge.dispose();
+    const subscribed = (transport.on as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    const unsubscribed = (transport.off as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(subscribed).toEqual(expect.arrayContaining(['tick', 'loop', 'discontinuity']));
+    expect([...unsubscribed].sort()).toEqual([...subscribed].sort());
+    transport._tempo = 50;
+    tick(transport);
+    transport.emit('loop');
+    expect(node.scheduleEvents).toHaveBeenCalledTimes(1);
   });
 });
