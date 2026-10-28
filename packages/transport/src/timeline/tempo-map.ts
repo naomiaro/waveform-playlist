@@ -171,6 +171,9 @@ export class TempoMap {
   }
 
   private _secondsToTicksRaw(seconds: number): number {
+    // Before tick 0 the tempo is the initial tempo: a ramp's formula is
+    // undefined past its asymptote when extrapolated backwards.
+    if (seconds < 0) return (seconds * this._entries[0].bpm * this._ppqn) / 60;
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
@@ -265,6 +268,7 @@ export class TempoMap {
   }
 
   private _ticksToSecondsInternal(ticks: Tick): number {
+    if (ticks < 0) return (ticks * 60) / (this._entries[0].bpm * this._ppqn);
     const entryIndex = this._entryIndexAt(ticks);
     const entry = this._entries[entryIndex];
     const ticksIntoSegment = ticks - entry.tick;

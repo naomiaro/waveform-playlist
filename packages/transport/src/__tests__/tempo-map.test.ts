@@ -574,17 +574,25 @@ describe('TempoMap curve integration accuracy', () => {
     expect(curve.secondsToTicks(curve.ticksToSeconds(1920 as Tick))).toBe(1920);
   });
 
-  it('negative seconds into a curve first segment extrapolate like the linear and step paths', () => {
-    const curve = new TempoMap(960, 120);
-    curve.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+  it('positions before tick 0 convert at the constant initial tempo, whatever the first segment is', () => {
+    // Before the timeline starts the tempo is the tick-0 tempo. Extrapolating
+    // a ramp backwards instead is undefined past its asymptote (a convex
+    // decreasing curve went to NaN at −1 s) and dawcore drags do reach
+    // negative seconds before they clamp.
+    const step = new TempoMap(960, 120);
+    step.setTempo(180, 3840 as Tick);
     const linear = new TempoMap(960, 120);
     linear.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
-    const c = curve.secondsToTicks(-0.5);
-    const l = linear.secondsToTicks(-0.5);
-    expect(Number.isFinite(c)).toBe(true);
-    expect(c).toBeLessThan(0);
-    expect(Math.sign(c)).toBe(Math.sign(l));
-    expect(curve.secondsToTicks(-0.25)).toBeGreaterThan(c);
+    const curve = new TempoMap(960, 120);
+    curve.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    for (const tm of [step, linear, curve]) {
+      expect(tm.secondsToTicks(-0.5)).toBe(-960); // 120 BPM × 960 PPQN = 1920 ticks/s
+      expect(tm.ticksToSeconds(-960 as Tick)).toBeCloseTo(-0.5, 12);
+    }
+    const convexDown = new TempoMap(960, 180);
+    convexDown.setTempo(60, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.9 } });
+    expect(convexDown.secondsToTicks(-1)).toBe(-2880);
+    expect(Number.isFinite(convexDown.secondsToTicks(-1e4))).toBe(true);
   });
 
   it('non-finite input is rejected instead of leaking NaN into the scheduler', () => {
@@ -593,9 +601,7 @@ describe('TempoMap curve integration accuracy', () => {
     expect(() => tm.secondsToTicks(NaN)).toThrow(/finite/);
     expect(() => tm.secondsToTicks(Infinity)).toThrow(/finite/);
     expect(() => tm.ticksToSeconds(NaN as Tick)).toThrow(/finite/);
-    // Far outside the curve's domain the ramp formula overflows; that is an
-    // error, not a silently non-finite position.
-    expect(() => tm.secondsToTicks(-1e4)).toThrow(/finite|domain/);
+    expect(() => tm.ticksToSeconds(-Infinity as Tick)).toThrow(/finite/);
   });
 
   it('ramp where bpm0 equals the curve offset (A = 0) stays finite and accurate', () => {
