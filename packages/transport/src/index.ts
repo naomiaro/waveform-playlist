@@ -2,6 +2,7 @@
 export type {
   Tick,
   Sample,
+  ContextFrame,
   SchedulerEvent,
   SchedulerListener,
   TransportOptions,

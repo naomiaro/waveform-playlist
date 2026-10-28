@@ -655,6 +655,39 @@ describe('Transport', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('a backward re-based context reading re-creates scheduled sources and emits discontinuity', () => {
+    // Sources already armed through the old anchor's toAudioTime() are in
+    // the wrong time base after a re-base; holding the position is not
+    // enough — they must be re-created from the held position.
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    transport.setTracks([makeTrack([makeClip({ startTick: 0 as Tick, startSample: 0 })])]);
+    const onDiscontinuity = vi.fn();
+    transport.on('discontinuity', onDiscontinuity);
+    transport.play();
+    (ctx as any).currentTime = 0.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    const create = ctx.createBufferSource as Mock;
+    const before = create.mock.results.length;
+    expect(before).toBeGreaterThan(0);
+    const firstSource = create.mock.results[0].value;
+    (ctx as any).currentTime = 0.2; // re-based backwards by 0.3 s
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(transport.getCurrentTime()).toBeCloseTo(0.5, 6); // held
+    expect(firstSource.stop).toHaveBeenCalled();
+    expect(create.mock.results.length).toBeGreaterThan(before); // re-created
+    expect(onDiscontinuity).toHaveBeenCalledTimes(1);
+    expect(onDiscontinuity.mock.calls[0][0].seconds).toBeCloseTo(0.5, 6);
+    expect(transport.isPlaying()).toBe(true);
+    transport.stop();
+  });
+
+  it('rejects an AudioContext without a sampleRate with a clear error', () => {
+    expect(() => new Transport({ currentTime: 0 } as unknown as AudioContext)).toThrow(
+      /sampleRate/
+    );
+  });
+
   it('getCurrentFrame mirrors getCurrentTime in context frames (#636)', () => {
     const ctx = mockAudioContext(0);
     const transport = new Transport(ctx);

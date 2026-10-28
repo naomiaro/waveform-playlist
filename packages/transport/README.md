@@ -200,7 +200,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `stop()` — Stop and reset to beginning
 - `seek(time)` — Jump to a position (works during playback)
 - `getCurrentTime()` — Current transport position in seconds
-- `getCurrentFrame(): Sample` — the same position in whole AudioContext frames (the clock's native unit, kept on the 128-frame render lattice; seconds are derived from it)
+- `getCurrentFrame(): ContextFrame` — the same position in whole AudioContext frames (the clock's native unit, kept on the 128-frame render lattice). `ContextFrame` is branded separately from `Sample` because the SampleTimeline may run at a different `sampleRate` than the context
 - `isPlaying()` — Whether transport is playing
 
 **Tracks:**
@@ -255,6 +255,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `on(event, callback)` / `off(event, callback)`
 - Events: `play`, `pause`, `stop`, `ended`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`, `error`
 - `ended` — a bounded `play(start, end)` reached `end` and the transport stopped itself; fires right after `stop` (so a handler may restart playback), never for a consumer `stop()`/`pause()`/`seek()`
+- `discontinuity` — `{ seconds }`: the AudioContext clock went backwards while playing (defensive; the spec makes it monotonic). The position was held and scheduled audio re-created from it. Diagnostics only
 - `seek` payload: `{ seconds: number }`
 - `tempochange` payload: `{ bpm: number, atTick: Tick }`
 - `meterchange` payload: `{ numerator: number, denominator: number, atTick: Tick }`

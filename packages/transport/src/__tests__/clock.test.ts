@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Clock } from '../core/clock';
-import type { Sample } from '../types';
+import type { ContextFrame, Sample } from '../types';
 
 function mockAudioContext(currentTime = 0): AudioContext {
   return { currentTime, sampleRate: 48000 } as any;
@@ -140,7 +140,7 @@ describe('Clock frame lattice (#636)', () => {
   it('seekToFrame places the position on an exact frame; getTime follows', () => {
     const ctx = ctxAt(0);
     const clock = new Clock(ctx);
-    clock.seekToFrame(12345 as Sample);
+    clock.seekToFrame(12345 as ContextFrame);
     expect(clock.getFrame()).toBe(12345);
     expect(clock.getTime()).toBeCloseTo(12345 / RATE, 15);
     clock.start();
@@ -189,6 +189,82 @@ describe('Clock frame lattice (#636)', () => {
     const expected = clock.toAudioTime(11.5);
     (ctx as unknown as { currentTime: number }).currentTime += 1e-9; // sub-quantum noise
     expect(clock.toAudioTime(11.5)).toBe(expected);
+  });
+
+  it('rejects a context without a finite positive sampleRate at construction', () => {
+    // A `{ currentTime }`-only mock used to work (the Clock never read the
+    // rate); now every position would be NaN and bounded playback never ends.
+    expect(() => new Clock({ currentTime: 0 } as unknown as AudioContext)).toThrow(/sampleRate/);
+    expect(() => new Clock({ currentTime: 0, sampleRate: 0 } as unknown as AudioContext)).toThrow(
+      /sampleRate/
+    );
+  });
+
+  it.each([NaN, Infinity, -Infinity])('rejects a non-finite seek (%s)', (bad) => {
+    const clock = new Clock(ctxAt(0));
+    expect(() => clock.seekTo(bad)).toThrow(/finite/);
+    expect(() => clock.seekToFrame(bad as ContextFrame)).toThrow(/finite/);
+    expect(clock.getTime()).toBe(0);
+  });
+
+  it('a seconds seek round-trips bit-exactly through getTime, stopped and running', () => {
+    // (0.031 × 44100) / 44100 !== 0.031 in doubles (about 12% of millisecond
+    // positions at 44.1 kHz); the seconds a caller compares with >= / ===
+    // elsewhere must come back unchanged.
+    const t = 0.031;
+    expect((t * 44100) / 44100).not.toBe(t); // the premise
+    const ctx = { currentTime: 0, sampleRate: 44100 } as unknown as AudioContext;
+    const clock = new Clock(ctx);
+    clock.seekTo(t);
+    expect(clock.getTime()).toBe(t);
+    clock.start();
+    expect(clock.getTime()).toBe(t);
+    clock.stop();
+    expect(clock.getTime()).toBe(t);
+    clock.start();
+    (ctx as unknown as { currentTime: number }).currentTime = QUANTUM / 44100;
+    expect(clock.getTime()).toBeCloseTo(t + QUANTUM / 44100, 15);
+  });
+
+  it('secondsToFrame rounds once at the ContextFrame boundary', () => {
+    const clock = new Clock(ctxAt(0));
+    expect(clock.secondsToFrame(0.5)).toBe(24000);
+    expect(clock.secondsToFrame(0.00001)).toBe(0); // 0.48 frames
+    expect(clock.secondsToFrame(0.0000105)).toBe(1); // 0.504 frames
+  });
+
+  it('context frames are a distinct brand from timeline Samples', () => {
+    const clock = new Clock(ctxAt(0));
+    const timelineSample = 5 as Sample;
+    // @ts-expect-error — a SampleTimeline sample (option rate) is not a context frame
+    clock.seekToFrame(timelineSample);
+    const frame: ContextFrame = clock.getFrame();
+    // @ts-expect-error — and a context frame is not a timeline sample
+    const asSample: Sample = frame;
+    expect(asSample).toBe(5);
+  });
+
+  it('stopped toAudioTime uses the same snapped reading as the running branch', () => {
+    const ctx = ctxAt(QUANTUM * 3);
+    const clock = new Clock(ctx);
+    (ctx as unknown as { currentTime: number }).currentTime = (QUANTUM * 3) / RATE + 1e-12;
+    expect(clock.toAudioTime(1)).toBe((QUANTUM * 3) / RATE + 1);
+  });
+
+  it('a backward reading is absorbed once, whichever reader sees it first', () => {
+    const ctx = ctxAt(QUANTUM * 1000);
+    const clock = new Clock(ctx);
+    clock.start();
+    setFrames(ctx, QUANTUM * 1000 + 24000);
+    clock.getFrame();
+    setFrames(ctx, QUANTUM * 1000 + 9600);
+    const a = clock.getTime(); // "UI" reader
+    const b = clock.getFrameExact(); // "timer" reader
+    expect(a).toBeCloseTo(0.5, 12);
+    expect(b).toBe(24000);
+    expect(clock.rebaseCount).toBe(1);
+    expect(clock.takeDiscontinuity()).toBe(true);
+    expect(clock.takeDiscontinuity()).toBe(false); // consumed
   });
 
   it('exposes the context sample rate the lattice is measured in', () => {

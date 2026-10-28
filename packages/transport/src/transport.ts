@@ -9,6 +9,7 @@ import type {
   TempoChangeEventData,
   MeterChangeEventData,
   SchedulerListenerError,
+  ContextFrame,
 } from './types';
 import type { SetTempoOptions } from './timeline/tempo-map';
 import { Clock } from './core/clock';
@@ -46,6 +47,11 @@ export interface TransportEvents {
    *  stop()/pause()/seek(). (NativePlayoutAdapter forwards this to the
    *  engine's onPlaybackEnded hook.) */
   ended: () => void;
+  /** The AudioContext's clock was re-based backwards while playing (a
+   *  defensive path — the spec makes `currentTime` monotonic). The position
+   *  was held and every scheduled source re-created from it; `seconds` is
+   *  that held position. Diagnostics only — nothing for a consumer to do. */
+  discontinuity: (event: { seconds: number }) => void;
   /** A scheduler listener threw while generating or consuming events. The
    *  scheduler skipped it and kept going; the host decides what to do. With
    *  no `error` listener registered the failure is reported via console.warn
@@ -163,6 +169,7 @@ export class Transport {
   private _tick(): void {
     {
       const time = this._clock.getTime();
+      if (this._clock.takeDiscontinuity()) this._resyncAfterDiscontinuity(time);
       if (this._countingIn) {
         this._countInScheduler?.advance(time);
         // Transition when the full bar duration has elapsed — not when the
@@ -180,6 +187,20 @@ export class Transport {
       }
       this._scheduler.advance(time);
     }
+  }
+
+  /** The clock absorbed a backward context re-base: sources armed through
+   *  the old anchor's toAudioTime() are in the wrong time base. Re-create
+   *  them from the held position (the seek-while-playing path, minus the
+   *  move). During a count-in only the clicks are scheduled; they finish
+   *  under the held clock, so nothing is re-created. */
+  private _resyncAfterDiscontinuity(time: number): void {
+    if (!this._countingIn) {
+      this._silenceAll();
+      this._scheduler.reset(time);
+      this._clipPlayer.onPositionJump(this._tempoMap.secondsToTicks(time));
+    }
+    this._emit('discontinuity', { seconds: time });
   }
 
   /** A tick threw: warn once and stop, so the engine sees a `stop` and no
@@ -341,15 +362,14 @@ export class Transport {
   /** Current position in whole AudioContext frames (the clock's native unit;
    *  seconds are derived from it). Same loop-wrap clamp and count-in hold as
    *  getCurrentTime(). Context-rate frames — see Clock. */
-  getCurrentFrame(): Sample {
-    const rate = this._clock.sampleRate;
+  getCurrentFrame(): ContextFrame {
     if (this._countingIn) {
-      return Math.round(this._countInStartPosition * rate) as Sample;
+      return this._clock.secondsToFrame(this._countInStartPosition);
     }
     const frame = this._clock.getFrame();
-    const loopStartFrame = Math.round(this._loopStartSeconds * rate);
+    const loopStartFrame = this._clock.secondsToFrame(this._loopStartSeconds);
     if (this._loopEnabled && frame < loopStartFrame) {
-      return loopStartFrame as Sample;
+      return loopStartFrame;
     }
     return frame;
   }
@@ -805,9 +825,11 @@ export class Transport {
     lookahead: number,
     timerIntervalMs: number
   ): void {
-    if (sampleRate <= 0) {
+    if (!(Number.isFinite(sampleRate) && sampleRate > 0)) {
       throw new Error(
-        '[waveform-playlist] Transport: sampleRate must be positive, got ' + sampleRate
+        '[waveform-playlist] Transport: sampleRate must be a positive finite number, got ' +
+          sampleRate +
+          ' (pass options.sampleRate or an AudioContext with one)'
       );
     }
     if (ppqn <= 0 || !Number.isInteger(ppqn)) {
