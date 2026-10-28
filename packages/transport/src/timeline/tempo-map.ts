@@ -8,7 +8,8 @@ const CURVE_EPSILON = 1e-15;
 const CURVE_LINEAR_SLOPE_EPSILON = 1e-12;
 
 /** The Möbius-Ease curve written as an exponential: normalized value
- *  k·(r^(2x) − 1) = (p²/(1 − 2p))·(e^(c·x) − 1) with c = 2·ln((1 − p)/p). */
+ *  k·(r^(2x) − 1) = (p²/(1 − 2p))·(e^(c·x) − 1) with r = (1 − p)/p and
+ *  c = 2·ln r. */
 interface CurveCoefficients {
   /** Exponent rate c. Negative for slope > 0.5, zero at slope 0.5. */
   c: number;
@@ -18,7 +19,7 @@ interface CurveCoefficients {
 }
 
 /** Per-segment constants of bpm(x) = A + B·e^(c·x), carried as c·A and c·B,
- *  plus base = T·60/ppqn (seconds of a segment at 1 BPM per tick-unit). */
+ *  plus base = T·60/ppqn (the seconds the whole segment would take at 1 BPM). */
 interface CurveSegment {
   c: number;
   cB: number;
@@ -34,7 +35,7 @@ function curveCoefficients(slope: number): CurveCoefficients {
   const p = Math.max(CURVE_EPSILON, Math.min(1 - CURVE_EPSILON, slope));
   const d = 1 - 2 * p;
   // ln((1 − p)/p) = log1p((1 − 2p)/p): keeps precision when p ≈ 0.5.
-  // (1 − 2p is exact: Sterbenz subtraction of two doubles within 2× of each other.)
+  // (1 − 2p is exact for p ≥ 0.25 — Sterbenz subtraction — which covers the p ≈ 0.5 regime.)
   const c = 2 * Math.log1p(d / p);
   return { c, cB: (c * p * p) / d };
 }
@@ -67,6 +68,26 @@ interface MutableTempoEntry {
   bpm: number;
   interpolation: TempoInterpolation;
   secondsAtTick: number;
+}
+
+function assertFiniteInput(what: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new Error('[waveform-playlist] TempoMap: ' + what + ' must be finite, got ' + value);
+  }
+}
+
+/** A finite input far outside a ramp's domain (e.g. −10 000 s into a curved
+ *  first segment) overflows the ramp formula; surface that rather than hand
+ *  NaN/±Infinity to the scheduler, where it stalls scheduling silently. */
+function assertFiniteResult(input: string, value: number): number {
+  if (!Number.isFinite(value)) {
+    throw new Error(
+      '[waveform-playlist] TempoMap: ' +
+        input +
+        ' is outside the domain of the tempo map (result not finite)'
+    );
+  }
+  return value;
 }
 
 export interface SetTempoOptions {
@@ -138,10 +159,18 @@ export class TempoMap {
   }
 
   ticksToSeconds(ticks: Tick): number {
-    return this._ticksToSecondsInternal(ticks);
+    assertFiniteInput('ticks', ticks);
+    return assertFiniteResult('ticks ' + ticks, this._ticksToSecondsInternal(ticks));
   }
 
   secondsToTicks(seconds: number): Tick {
+    assertFiniteInput('seconds', seconds);
+    return Math.round(
+      assertFiniteResult('seconds ' + seconds, this._secondsToTicksRaw(seconds))
+    ) as Tick;
+  }
+
+  private _secondsToTicksRaw(seconds: number): number {
     let lo = 0;
     let hi = this._entries.length - 1;
     while (lo < hi) {
@@ -157,33 +186,33 @@ export class TempoMap {
 
     const nextEntry = lo < this._entries.length - 1 ? this._entries[lo + 1] : null;
     if (nextEntry && nextEntry.interpolation === 'linear') {
-      return Math.round(
+      return (
         entry.tick +
-          this._secondsToTicksLinear(
-            secondsIntoSegment,
-            entry.bpm,
-            nextEntry.bpm,
-            nextEntry.tick - entry.tick
-          )
-      ) as Tick;
+        this._secondsToTicksLinear(
+          secondsIntoSegment,
+          entry.bpm,
+          nextEntry.bpm,
+          nextEntry.tick - entry.tick
+        )
+      );
     }
 
     if (nextEntry && typeof nextEntry.interpolation === 'object') {
-      return Math.round(
+      return (
         entry.tick +
-          this._secondsToTicksCurve(
-            secondsIntoSegment,
-            entry.bpm,
-            nextEntry.bpm,
-            nextEntry.tick - entry.tick,
-            nextEntry.interpolation.slope
-          )
-      ) as Tick;
+        this._secondsToTicksCurve(
+          secondsIntoSegment,
+          entry.bpm,
+          nextEntry.bpm,
+          nextEntry.tick - entry.tick,
+          nextEntry.interpolation.slope
+        )
+      );
     }
 
     // Step: constant BPM
     const ticksPerSecond = (entry.bpm / 60) * this._ppqn;
-    return Math.round(entry.tick + secondsIntoSegment * ticksPerSecond) as Tick;
+    return entry.tick + secondsIntoSegment * ticksPerSecond;
   }
 
   beatsToSeconds(beats: number): number {
@@ -295,10 +324,9 @@ export class TempoMap {
    * Closed-form via exponential: bpmAtTick = bpm0 * exp(seconds * deltaBpm * ppqn / (60 * T))
    * then ticks = (bpmAtTick - bpm0) * T / deltaBpm
    *
-   * Note: exp(log(x)) has ~1 ULP floating-point error, so round-trips depend on
-   * Math.round() in the caller (secondsToTicks). This is sufficient for all tested
-   * BPM ranges (10–300 BPM) but is not algebraically exact like the previous
-   * trapezoidal/quadratic approach was.
+   * Note: exp(log(x)) has ~1 ULP floating-point error, so integer round-trips
+   * rely on the rounding in secondsToTicks. Sufficient for all tested BPM
+   * ranges (10–300 BPM).
    */
   private _secondsToTicksLinear(
     seconds: number,
@@ -328,12 +356,13 @@ export class TempoMap {
    *   - log1p form: base · (1 − e^(−c·x))/(c·bpm0) · log1p(y)/y with
    *     y = (A/bpm0)·(e^(−c·x) − 1). Exact as A → 0 (the plain form is 0/0
    *     there) and as c → 0. Used while 1 + y = bpm(x)·e^(−c·x)/bpm0 > 0.5.
-   *   - plain form, when 1 + y ≤ 0.5 (steep concave ramps near their end,
-   *     where forming 1 + y loses digits). That regime implies A ≥ bpm0/2, so
-   *     the division by c·A is safe.
+   *   - plain form, when 1 + y ≤ 0.5 (steep concave ramps near their end, or
+   *     convex descending ramps, where forming 1 + y loses digits). There the
+   *     numerator −ln(1 + y) is at least ln 2 in magnitude, and A ≠ 0 (A = 0
+   *     forces 1 + y = 1), so nothing cancels.
    * Error is floating-point only (≈1e-15 relative), independent of segment
-   * length — the previous 64-step trapezoid drifted by ~5e-4 relative, i.e.
-   * 0.7 ms per bar at steep slopes.
+   * length — the previous 64-step trapezoid drifted by up to ~2e-3 relative
+   * (2.8 ms per bar, 0.7 s over a 256-bar ramp at steep slopes).
    */
   private _ticksToSecondsCurve(
     ticks: number,
@@ -362,12 +391,13 @@ export class TempoMap {
    *   K = seconds·c·A/base
    *   z = e^(−c·x) − 1 = −(bpm0·seconds·c/base) · (1 − e^(−K))/K
    *   x = −log1p(z)/c
-   * (1 − e^(−K))/K → 1 as K → 0, so this is exact as A → 0 and as c → 0.
-   * When e^(−c·x) is small (z ≤ −0.5: a steep concave ramp near its end) and
-   * |B| < |A|/2, forming it as 1 + z loses digits; there the equal product
-   * form e^(−c·x) = (c·bpm0·e^(−K) − c·B)/(c·A) is used — its own cancellation
-   * is bounded by |B|/|A|, hence the guard. Returns fractional ticks; callers
-   * round at their unit boundary.
+   * (1 − e^(−K))/K → 1 as K → 0 makes A → 0 exact; c → 0 is exact because
+   * z ∝ c and log1p(z)/c keeps the ratio. When e^(−c·x) is small (z ≤ −0.5: a
+   * steep concave ramp near its end) and |B| < |A|/2, forming it as 1 + z
+   * loses digits; there the equal product form
+   * e^(−c·x) = (c·bpm0·e^(−K) − c·B)/(c·A) is used — its digit loss is
+   * |B|/|A| times the 1 + z form's, so the guard makes it the better choice by
+   * at least 2×. Returns fractional ticks; callers round at their unit boundary.
    */
   private _secondsToTicksCurve(
     seconds: number,

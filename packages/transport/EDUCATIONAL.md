@@ -159,11 +159,11 @@ gives
 seconds(t) = (T × 60 / PPQN) × (c·x - ln(bpm(x) / bpm₀)) / (c × A)
 ```
 
-So the curved case is exact like the linear one: the only error is floating-point rounding (~1e-15 relative), independent of segment length. An earlier version used a 64-step trapezoid; its error grew with segment length (~5e-4 relative at steep slopes — 0.7 ms per bar, 184 ms over a 256-bar ramp), which is why the closed form replaced it.
+So the curved case is exact like the linear one: the only error is floating-point rounding (~1e-15 relative), independent of segment length. An earlier version used a 64-step trapezoid; its error grew with segment length (up to ~2e-3 relative at steep slopes — 2.8 ms per bar, 0.7 s over a 256-bar ramp), which is why the closed form replaced it.
 
 Getting full precision out of that formula takes some care, because it has two removable singularities:
 
-- **`slope → 0.5`:** `B → ∞` and `c → 0` while `c × B` stays finite (→ `bpm₁ − bpm₀`). The implementation therefore carries `c × A` and `c × B` rather than `A` and `B`, and sends only `|slope − 0.5| < 1e-12` (where `c` is exactly 0) to the linear formula.
+- **`slope → 0.5`:** `B → ∞` and `c → 0` while `c × B` stays finite (→ `bpm₁ − bpm₀`). The implementation therefore carries `c × A` and `c × B` rather than `A` and `B`, and sends only `|slope − 0.5| < 1e-12` to the linear formula (at exactly 0.5, `c` is 0 and the coefficients are 0/0).
 - **`A → 0`** (e.g. 20 → 180 BPM at slope 0.25, where `bpm₀ = B`): the curve is a pure exponential and `(c·x − ln(bpm(x)/bpm₀)) / (c × A)` is `0/0`. Rewriting `c·x − ln(bpm(x)/bpm₀)` as `−log1p(y)` with `y = (A/bpm₀)(e^(−c·x) − 1)` gives
 
   ```
@@ -172,7 +172,7 @@ Getting full precision out of that formula takes some care, because it has two r
 
   where `log1p(y)/y → 1` as `y → 0`, so nothing divides by `A`. This form is exact for small `A` and small `c`, and is the one normally used.
 
-The two forms are algebraically identical, but they cancel in different places: the `log1p` form loses digits when `1 + y = bpm(x) × e^(−c·x) / bpm₀` is tiny (a very steep concave ramp near its end), and the plain form loses digits when `A ≈ 0`. Those regimes are disjoint — `1 + y ≤ 0.5` implies `A ≥ bpm₀/2` — so the implementation picks the plain form exactly when `1 + y ≤ 0.5` and the `log1p` form otherwise.
+The two forms are algebraically identical, but they cancel in different places: the `log1p` form loses digits when `1 + y = bpm(x) × e^(−c·x) / bpm₀` is tiny (a very steep concave ramp near its end, or a convex descending ramp), and the plain form loses digits when `A ≈ 0`. Those regimes are disjoint: when `1 + y ≤ 0.5` the plain form's numerator `−ln(1 + y)` is at least `ln 2` in magnitude, and `A = 0` would force `1 + y = 1`, so nothing cancels there. The implementation picks the plain form exactly when `1 + y ≤ 0.5` and the `log1p` form otherwise.
 
 The inverse (seconds → ticks) also has a closed form, obtained by solving the `log1p` form for `x`:
 
@@ -182,7 +182,7 @@ z = e^(−c·x) − 1 = −(bpm₀ × seconds × c / base) × (1 − e^(−K)) /
 x = −log1p(z) / c
 ```
 
-with `(1 − e^(−K))/K → 1` as `K → 0`, so it is exact as `A → 0` and `c → 0`. When `e^(−c·x)` is small and `|B| < |A|/2`, forming it as `1 + z` loses digits and the equal product form `e^(−c·x) = (c·bpm₀·e^(−K) − c·B) / (c·A)` is used instead. Both directions are O(1); the previous implementation bisected the forward integral.
+with `(1 − e^(−K))/K → 1` as `K → 0` making `A → 0` exact, and `c → 0` exact because `z ∝ c` and `log1p(z)/c` keeps the ratio. When `e^(−c·x)` is small and `|B| < |A|/2`, forming it as `1 + z` loses digits and the equal product form `e^(−c·x) = (c·bpm₀·e^(−K) − c·B) / (c·A)` is used instead. Both directions are O(1); the previous implementation bisected the forward integral.
 
 > **Reference:** `∫ dx / (A + B × e^(cx)) = x/A − ln(A + B × e^(cx)) / (c × A)` — differentiate to verify, or see [Wikipedia — List of integrals of exponential functions](https://en.wikipedia.org/wiki/List_of_integrals_of_exponential_functions). Evaluating `ln(bpm(x)/bpm₀)` as `log1p((B/bpm₀) × expm1(c·x))` avoids cancellation when `c·x` is small; see Goldberg, D., *"What Every Computer Scientist Should Know About Floating-Point Arithmetic"*, ACM Computing Surveys 23(1), 1991.
 
