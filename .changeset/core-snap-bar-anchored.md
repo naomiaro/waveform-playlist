@@ -1,0 +1,5 @@
+---
+'@waveform-playlist/core': patch
+---
+
+`snapTickToGrid` now restarts its grid at each bar line instead of counting subdivisions from the meter entry, so odd meters stay aligned: in 7/8 at 960 PPQN a quarter-note grid is 0, 960, 1920, 2880 and then the bar line at 3360 — never 3840 — matching `@dawcore/transport`'s `quantizeTick` (#643). A subdivision longer than the bar leaves only the bar lines; an exact tie snaps up; a tick on a line (including an odd-meter bar line, which previously snapped away) stays put. `computeMusicalTicks` draws its bar/beat/eighth/sixteenth levels with the same rule, so eighth lines in 7/16 no longer cross a bar line; the coarse level is unchanged. Results are identical wherever the bar is a multiple of the step — all of 4/4, but not the half-note and triplet grids of 3/4, 6/8, 5/4 or 12/8, which now cap at the bar line. The next line is also capped at the following meter entry (for hand-built maps whose entries are off the bar grid), and a degenerate entry with numerator 0 falls back to a plain entry-anchored snap instead of returning NaN.

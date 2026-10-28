@@ -5,7 +5,7 @@ import {
   computeMusicalTicks,
   ticksToBarBeat,
 } from '../utils/musicalTicks';
-import type { MusicalTickParams } from '../utils/musicalTicks';
+import type { MeterEntry, MusicalTickParams, SnapTo, ZoomLevel } from '../utils/musicalTicks';
 
 const PPQN = 960;
 
@@ -206,6 +206,166 @@ describe('snapTickToGrid', () => {
     // Tick 3839 is in the 4/4 region. 3839/3840 ≈ 1 → rounds to 1 → 3840
     expect(snapTickToGrid(3839, 'bar', multiMeter, PPQN)).toBe(3840);
   });
+});
+
+// ---------------------------------------------------------------------------
+// snapTickToGrid — odd meters: grid lines restart at each bar line (#643)
+// ---------------------------------------------------------------------------
+describe('snapTickToGrid in odd meters restarts the grid at each bar line', () => {
+  // 7/8 at 960 PPQN: bar = 3360, beat (eighth) = 480. A quarter-note grid is
+  // 0, 960, 1920, 2880, then the BAR LINE at 3360 — never 3840 (the same rule
+  // as @dawcore/transport's quantizeTick).
+  const meter78 = [{ tick: 0, numerator: 7, denominator: 8 }];
+
+  it('a tick just past the bar line snaps back to it, not forward to 3840', () => {
+    expect(snapTickToGrid(3500, '1/4', meter78, PPQN)).toBe(3360);
+  });
+
+  it('the line after the last whole subdivision of a bar is the bar line (capped)', () => {
+    // 3200: previous line 2880, next line capped at the bar (3360) — nearer.
+    expect(snapTickToGrid(3200, '1/4', meter78, PPQN)).toBe(3360);
+  });
+
+  it('a subdivision longer than the remainder of the bar still caps at the bar line', () => {
+    // half-note grid in 7/8: 0, 1920, then the bar line at 3360 (not 3840)
+    expect(snapTickToGrid(3000, '1/2', meter78, PPQN)).toBe(3360);
+  });
+
+  it('lines in the second bar are counted from that bar, not from the meter entry', () => {
+    // bar 2 starts at 3360: quarter lines 3360, 4320, ... — 3860 → 4320 (460 away vs 500)
+    expect(snapTickToGrid(3860, '1/4', meter78, PPQN)).toBe(4320);
+  });
+
+  it('a tick on an odd-meter bar line is a fixed point', () => {
+    expect(snapTickToGrid(3360, '1/4', meter78, PPQN)).toBe(3360);
+    expect(snapTickToGrid(6720, '1/2', meter78, PPQN)).toBe(6720);
+  });
+
+  it('an exact tie snaps up, like quantizeTick', () => {
+    // 480 is halfway between the quarter lines 0 and 960
+    expect(snapTickToGrid(480, '1/4', meter78, PPQN)).toBe(960);
+  });
+
+  it('a later meter entry re-anchors the bars (4/4 → 7/8)', () => {
+    const map = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 3840, numerator: 7, denominator: 8 },
+    ];
+    // 7/8 bar 2 starts at 3840 + 3360 = 7200; quarter lines before it: 6720 → cap 7200
+    expect(snapTickToGrid(7000, '1/4', map, PPQN)).toBe(7200);
+    expect(snapTickToGrid(7300, '1/4', map, PPQN)).toBe(7200);
+  });
+});
+
+describe('snapTickToGrid: meters whose bar is not a multiple of the step', () => {
+  // 3/4 at 960 PPQN: bar = 2880. A half-note grid is 0, 1920, then the bar
+  // line at 2880 — not 3840 (which the meter-anchored snap used to offer).
+  const meter34 = [{ tick: 0, numerator: 3, denominator: 4 }];
+
+  it("3/4 '1/2': the line after 1920 is the bar line at 2880", () => {
+    expect(snapTickToGrid(2800, '1/2', meter34, PPQN)).toBe(2880);
+    expect(snapTickToGrid(2400, '1/2', meter34, PPQN)).toBe(2880); // tie → up
+  });
+
+  it("3/4 '1/4T' never crosses the bar line", () => {
+    // 1/4T = 640: lines 0, 640, 1280, 1920, 2560, then the bar at 2880
+    expect(snapTickToGrid(3100, '1/4T', meter34, PPQN)).toBe(2880);
+  });
+
+  it('a degenerate meter entry (numerator 0) still returns a finite tick', () => {
+    const broken = [{ tick: 0, numerator: 0, denominator: 4 }];
+    expect(snapTickToGrid(100, 'beat', broken, PPQN)).toBe(0);
+    expect(snapTickToGrid(700, 'beat', broken, PPQN)).toBe(960);
+  });
+
+  it('the next line is capped at the following meter entry when entries are off the bar grid', () => {
+    // 4/4 → 7/8 at 2000 (not a 4/4 bar boundary; detectMeterChanges never
+    // builds such a map, but consumers may hand one in). The drawn grid ends
+    // the 4/4 segment at 2000, so the snap must not offer 3840 there.
+    const offGrid = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 2000, numerator: 7, denominator: 8 },
+    ];
+    expect(snapTickToGrid(1999, 'bar', offGrid, PPQN)).toBe(2000);
+    expect(snapTickToGrid(1500, '1/2', offGrid, PPQN)).toBe(1920);
+    expect(snapTickToGrid(1990, '1/2', offGrid, PPQN)).toBe(2000);
+  });
+});
+
+describe('computeMusicalTicks restarts non-coarse grid lines at each bar line', () => {
+  it('7/16 at eighth zoom: eighths within the bar, then the bar line — never 1920', () => {
+    const data = computeMusicalTicks({
+      meterEntries: [{ tick: 0, numerator: 7, denominator: 16 }], // bar = 1680
+      ticksPerPixel: 48,
+      startPixel: 0,
+      endPixel: 3360 / 48,
+      ppqn: PPQN,
+    });
+    expect(data.zoomLevel).toBe('eighth');
+    const ticks = data.ticks.map((t) => Math.round(t.pixel * 48));
+    expect(ticks).toEqual([0, 480, 960, 1440, 1680, 2160, 2640, 3120, 3360]);
+    const barTwo = data.ticks[4];
+    expect(barTwo.type).toBe('major');
+    expect(barTwo.label).toBe('2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// snapTickToGrid agrees with the drawn grid (computeMusicalTicks)
+// ---------------------------------------------------------------------------
+describe('snapTickToGrid lands on a drawn grid line at every zoom level', () => {
+  // pixelsPerQuarterNote (= PPQN / ticksPerPixel) selects the zoom level:
+  // bar [2, 8), beat [8, 16), eighth [16, 32), sixteenth [32, ∞)
+  const zooms: Array<{ zoom: ZoomLevel; ticksPerPixel: number; snapTo: SnapTo }> = [
+    { zoom: 'bar', ticksPerPixel: 240, snapTo: 'bar' },
+    { zoom: 'beat', ticksPerPixel: 96, snapTo: 'beat' },
+    { zoom: 'eighth', ticksPerPixel: 48, snapTo: '1/8' },
+    { zoom: 'sixteenth', ticksPerPixel: 10, snapTo: '1/16' },
+  ];
+  const meters: Array<{ name: string; entries: MeterEntry[] }> = [
+    { name: '7/8', entries: [{ tick: 0, numerator: 7, denominator: 8 }] },
+    { name: '5/4', entries: [{ tick: 0, numerator: 5, denominator: 4 }] },
+    { name: '7/16', entries: [{ tick: 0, numerator: 7, denominator: 16 }] },
+    {
+      name: '4/4 → 7/8',
+      entries: [
+        { tick: 0, numerator: 4, denominator: 4 },
+        { tick: 7680, numerator: 7, denominator: 8 },
+      ],
+    },
+  ];
+  const endTick = 4 * 3840;
+  // Draw two 5/4 bars past the sweep so a snap to "the next bar line" near
+  // the end of the sweep still has its line in the drawn set.
+  const drawnEndTick = endTick + 2 * 4800;
+
+  for (const { name, entries } of meters) {
+    for (const { zoom, ticksPerPixel, snapTo } of zooms) {
+      it(`${name} at ${zoom} zoom: snap '${snapTo}' ↔ drawn lines`, () => {
+        const data = computeMusicalTicks({
+          meterEntries: entries,
+          ticksPerPixel,
+          startPixel: 0,
+          endPixel: drawnEndTick / ticksPerPixel,
+          ppqn: PPQN,
+        });
+        expect(data.zoomLevel).toBe(zoom);
+        const drawn = new Set(data.ticks.map((t) => Math.round(t.pixel * ticksPerPixel)));
+        expect(drawn.size).toBeGreaterThan(4);
+        // Every drawn line is a fixed point of the snap…
+        for (const line of drawn) {
+          expect(snapTickToGrid(line, snapTo, entries, PPQN)).toBe(line);
+        }
+        // …and every snap result is a drawn line.
+        for (let tick = 0; tick <= endTick; tick += 37) {
+          const snapped = snapTickToGrid(tick, snapTo, entries, PPQN);
+          expect(drawn.has(snapped), `tick ${tick} snapped to ${snapped}, which is not drawn`).toBe(
+            true
+          );
+        }
+      });
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
