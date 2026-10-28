@@ -44,7 +44,7 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 ## Tempo Automation
 
-`TempoInterpolation` type: `'step'` (instant, default), `'linear'` (exact logarithmic integral, exponential inverse), `{ type: 'curve', slope }` (Möbius-Ease, slope 0-1 exclusive, exact closed-form integral AND inverse — see below). `setTempo(bpm, atTick, { interpolation })` third param is optional for backwards compat. First entry is always `'step'` (no previous to ramp from). `_recomputeCache` accounts for interpolation type per segment.
+`TempoInterpolation` type: `'step'` (instant, default), `'linear'` (exact logarithmic integral, exponential inverse), `{ type: 'curve', slope }` (Möbius-Ease, slope 0-1 exclusive, exact closed-form integral AND inverse — see below). `Transport.setTempo(bpm, atTick, { interpolation })` / `TempoMap.withTempo(...)` third param is optional. First entry is always `'step'` (no previous to ramp from). `_derive`/`_segmentSeconds` account for interpolation type per segment when building the successor map.
 
 **Curve math is closed-form in both directions (#636):** the Möbius-Ease curve is `A + B·e^(c·x)`, so `1/bpm` has an analytic antiderivative; `_ticksToSecondsCurve`/`_secondsToTicksCurve` are O(1) and accurate to ~1e-15 relative regardless of segment length. Coefficients are carried as `c·A`/`c·B` (finite as slope → 0.5) and each direction picks between two algebraically equal forms per call to dodge cancellation (log1p form unless `1 + y ≤ 0.5`; inverse uses a product form for `e^(−c·x)` when it is small and `|B| < |A|/2`). The linear fast path is only `|slope − 0.5| < 1e-12` (exactly 0.5 is 0/0). **Don't "simplify" to a single form or widen the linear window** — the adversarial grid in `tempo-map.test.ts` ("curve integration accuracy") encodes the regimes that broke: slopes within 1e-6 of 0.5 on long ramps (0.38 ms with a 1e-6 window), `|A/B| ≈ 1e-8` (plain form cancels), slope 1e-6 near the end of a 1024-bar ramp (naive 1 + z inverse off by tens of ticks). Validate any change with an independent Simpson reference, not round-trips alone.
 
@@ -62,9 +62,13 @@ Drives the scheduler via `requestAnimationFrame` exclusively — never `setTimeo
 
 SampleTimeline converts between samples, seconds, and ticks (via TempoMap). The Scheduler works in integer ticks — seconds from the Clock are converted at the top of `advance()`. MetronomePlayer receives ticks directly; ClipPlayer converts ticks to samples.
 
-### TempoMap Cache Invalidation
+### TempoMap Is an Immutable Value (#636)
 
-`setTempo(bpm, atTick)` recomputes `secondsAtTick` from the insertion point forward. For single-tempo use (typical), this is a no-op — one entry at tick 0.
+`TempoMap` never mutates: `withTempo(bpm, atTick, options)`, `withoutTempo(atTick)` and `withoutTempos()` return a NEW map (the old `setTempo`/`removeTempo`/`clearTempos` mutators are gone — the rename makes every stale call site a compile error instead of a silent no-op). `entries` is a frozen, tick-ordered snapshot with cumulative `secondsAtTick`; `_derive` recomputes the cache from the edit point into a fresh sealed array. `withoutTempo` of tick 0 or of an absent tick returns the same map. Pattern after SoundCraft's `TempoMap` (a plain `Clone` value the engine owns).
+
+**Transport owns and swaps the map:** `Transport.setTempo/removeTempo/clearTempos` call `_replaceTempoMap(next)`, which installs it in every holder — `Scheduler.setTempoMap`, `SampleTimeline.setTempoMap`, `ClipPlayer.setTempoMap`, `MetronomePlayer.setTempoMap`. `Transport.tempoMap` exposes the current map (a reference you captured earlier keeps its old tempo). The count-in player is NOT on the swap list: `configure({ tempoMap })` gives it a dedicated single-BPM map at each count-in start. **When adding a new holder of a TempoMap reference, add it to `_replaceTempoMap`** — otherwise it silently keeps converting with a stale tempo after the next edit.
+
+**One map per scheduler window:** `Scheduler.advance()` captures `this._tempoMap` into a local at the top and uses it for the whole call, so a re-entrant swap from inside a listener callback (a host `countIn`/`error` handler calling `setTempo`) cannot change the window already being generated. Listeners' own `consume()` conversions read the swapped map immediately — that is intended (the new tempo applies to what they schedule next). `MeterMap` still mutates in place (splice) — same class of issue, left for a follow-up.
 
 ### MeterMap
 

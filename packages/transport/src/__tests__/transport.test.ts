@@ -472,6 +472,18 @@ describe('Transport', () => {
     expect(transport.quantizeTick(3400, 'bar', { mode: 'next' })).toBe(3360 + 2880);
   });
 
+  it('tempoMap exposes the current immutable map; earlier references keep their tempo (#636)', () => {
+    const transport = new Transport(mockAudioContext());
+    const before = transport.tempoMap;
+    transport.setTempo(240);
+    expect(transport.tempoMap).not.toBe(before);
+    expect(before.getTempo()).toBe(120);
+    expect(transport.tempoMap.getTempo()).toBe(240);
+    // Everything that converts time follows the swap
+    expect(transport.timeToTick(1)).toBe(3840);
+    expect(transport.tickToTime(3840 as Tick)).toBeCloseTo(1, 10);
+  });
+
   it('timeToTick and tickToTime round-trip', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

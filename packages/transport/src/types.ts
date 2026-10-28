@@ -68,9 +68,9 @@ export type TempoInterpolation = 'step' | 'linear' | { type: 'curve'; slope: num
 
 export interface TempoEntry {
   /** Tick position where this tempo starts */
-  tick: Tick;
+  readonly tick: Tick;
   /** Beats per minute */
-  bpm: number;
+  readonly bpm: number;
   /** How to arrive at this BPM from the previous entry */
   readonly interpolation: TempoInterpolation;
   /** Cached cumulative seconds up to this tick (for O(log n) lookup). Derived — do not set manually. */

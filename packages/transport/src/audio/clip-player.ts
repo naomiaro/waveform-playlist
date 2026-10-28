@@ -52,6 +52,11 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     this._toAudioTime = toAudioTime;
   }
 
+  /** Swap in a new (immutable) TempoMap (Transport does this on every tempo edit). */
+  setTempoMap(tempoMap: TempoMap): void {
+    this._tempoMap = tempoMap;
+  }
+
   setTracks(tracks: ClipTrack[], trackNodes: Map<string, TrackNode>): void {
     this._tracks.clear();
     this._trackNodes = trackNodes;

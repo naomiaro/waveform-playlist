@@ -439,4 +439,45 @@ describe('Scheduler (tick-based)', () => {
       warn.mockRestore();
     });
   });
+
+  describe('tempo map swapping (#636)', () => {
+    it('setTempoMap makes later windows convert with the new map', () => {
+      const scheduler = createScheduler(0.5);
+      const listener = createMockListener();
+      scheduler.addListener(listener);
+      scheduler.advance(0); // 0.5 s at 120 BPM = 960 ticks → events 0, 480
+      expect(listener.consumed.map((e) => e.tick)).toEqual([0, 480]);
+      scheduler.setTempoMap(new TempoMap(ppqn, 240)); // 0.5 s is now 1920 ticks
+      scheduler.advance(0.5); // window [960, 3840)
+      expect(listener.consumed.map((e) => e.tick)).toEqual([
+        0, 480, 960, 1440, 1920, 2400, 2880, 3360,
+      ]);
+    });
+
+    it('a swap during a listener callback does not change the in-progress window', () => {
+      const loopCalls: Array<[number, number]> = [];
+      const scheduler = createScheduler(0.3, (start, end) => loopCalls.push([start, end]));
+      // Loop [0, 960) ticks = [0, 0.5 s) at 120 BPM. The first consume swaps
+      // to 240 BPM mid-advance; this advance must still report the loop
+      // boundary in 120-BPM seconds and generate the same 120-BPM window.
+      scheduler.setLoop(true, 0 as Tick, 960 as Tick);
+      const listener = createMockListener();
+      const original = listener.consume.bind(listener);
+      let swapped = false;
+      listener.consume = (event) => {
+        original(event);
+        if (!swapped) {
+          swapped = true;
+          scheduler.setTempoMap(new TempoMap(ppqn, 240));
+        }
+      };
+      scheduler.addListener(listener);
+      scheduler.advance(0.35); // target = 0.65 s = 1248 ticks at 120 BPM → one wrap
+      expect(loopCalls).toEqual([[0, 0.5]]);
+      expect(listener.generateRanges).toEqual([
+        [0, 960],
+        [0, 288],
+      ]);
+    });
+  });
 });

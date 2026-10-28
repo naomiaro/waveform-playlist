@@ -95,6 +95,12 @@ export class Scheduler<T extends SchedulerEvent> {
     this._onError = options.onError;
   }
 
+  /** Swap in a new (immutable) TempoMap. Takes effect from the next advance();
+   *  an advance() already in progress keeps the map it started with. */
+  setTempoMap(tempoMap: TempoMap): void {
+    this._tempoMap = tempoMap;
+  }
+
   addListener(listener: SchedulerListener<T>): void {
     this._listeners.add(listener);
   }
@@ -146,7 +152,11 @@ export class Scheduler<T extends SchedulerEvent> {
 
   /** Advance the scheduling window. Takes seconds (from Clock), converts to ticks. */
   advance(currentTimeSeconds: number): void {
-    const targetTick = this._tempoMap.secondsToTicks(currentTimeSeconds + this._lookahead);
+    // One map for the whole window: a listener callback may swap the map
+    // (re-entrant setTempo from a countIn/error handler) and must not change
+    // the conversions of the window already being generated.
+    const tempoMap = this._tempoMap;
+    const targetTick = tempoMap.secondsToTicks(currentTimeSeconds + this._lookahead);
 
     if (this._loopEnabled && this._loopEnd > this._loopStart) {
       const loopDuration = this._loopEnd - this._loopStart;
@@ -180,8 +190,8 @@ export class Scheduler<T extends SchedulerEvent> {
         // Seek clock — passes the currentTimeSeconds snapshot so Transport
         // uses the same clock reading as advance(), not a live re-read.
         this._onLoop?.(
-          this._tempoMap.ticksToSeconds(this._loopStart as Tick),
-          this._tempoMap.ticksToSeconds(this._loopEnd as Tick),
+          tempoMap.ticksToSeconds(this._loopStart as Tick),
+          tempoMap.ticksToSeconds(this._loopEnd as Tick),
           currentTimeSeconds
         );
         this._rightEdge = this._loopStart;

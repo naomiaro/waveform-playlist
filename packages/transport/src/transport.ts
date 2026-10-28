@@ -157,6 +157,12 @@ export class Transport {
     return this._ppqn;
   }
 
+  /** The current tempo map. Immutable: every tempo edit swaps in a new map,
+   *  so a reference you hold keeps converting with the tempo it had. */
+  get tempoMap(): TempoMap {
+    return this._tempoMap;
+  }
+
   // --- Playback ---
 
   play(startTime?: number, endTime?: number): void {
@@ -490,7 +496,7 @@ export class Transport {
       );
       return false;
     }
-    this._tempoMap.setTempo(bpm, atTick, options);
+    this._replaceTempoMap(this._tempoMap.withTempo(bpm, atTick, options));
     // Recompute cached loop start — tempo change invalidates tick→seconds mapping
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
@@ -535,7 +541,7 @@ export class Transport {
   }
 
   clearTempos(): void {
-    this._tempoMap.clearTempos();
+    this._replaceTempoMap(this._tempoMap.withoutTempos());
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
@@ -547,7 +553,7 @@ export class Transport {
    *  invalidation and event; the emitted bpm is the tempo now in force at
    *  the removed position. */
   removeTempo(atTick: Tick): void {
-    this._tempoMap.removeTempo(atTick);
+    this._replaceTempoMap(this._tempoMap.withoutTempo(atTick));
     if (this._loopEnabled) {
       this._loopStartSeconds = this._tempoMap.ticksToSeconds(this._loopStartTick);
     }
@@ -893,6 +899,17 @@ export class Transport {
     this._countingIn = false;
     // Stop the main timer (which was driving the count-in scheduler)
     this._timer.stop();
+  }
+
+  /** Install a new immutable TempoMap everywhere one is held. The count-in
+   *  player is configured with its own dedicated map at each count-in start,
+   *  so it is not on this list. */
+  private _replaceTempoMap(next: TempoMap): void {
+    this._tempoMap = next;
+    this._scheduler.setTempoMap(next);
+    this._sampleTimeline.setTempoMap(next);
+    this._clipPlayer.setTempoMap(next);
+    this._metronomePlayer.setTempoMap(next);
   }
 
   private _silenceAll(): void {

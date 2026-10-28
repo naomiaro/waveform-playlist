@@ -1,0 +1,5 @@
+---
+'@dawcore/transport': patch
+---
+
+`TempoMap` is now an immutable value. `setTempo`, `removeTempo` and `clearTempos` are replaced by `withTempo(bpm, atTick?, options?)`, `withoutTempo(atTick)` and `withoutTempos()`, each returning a new map and leaving the original untouched; `entries` exposes a frozen, tick-ordered snapshot with cumulative `secondsAtTick`. `Transport.setTempo/removeTempo/clearTempos` are unchanged in signature: the transport owns the current map (new `transport.tempoMap` getter) and swaps it into the scheduler, sample timeline, clip player and metronome on every edit (`Scheduler.setTempoMap`, `ClipPlayer.setTempoMap`, `MetronomePlayer.setTempoMap` added). `Scheduler.advance()` captures the map once per call, so a tempo edit made from inside a listener callback cannot change the window already being generated.

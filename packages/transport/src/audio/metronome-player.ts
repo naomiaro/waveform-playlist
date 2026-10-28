@@ -32,6 +32,11 @@ export class MetronomePlayer implements SchedulerListener<MetronomeEvent> {
     this._toAudioTime = toAudioTime;
   }
 
+  /** Swap in a new (immutable) TempoMap (Transport does this on every tempo edit). */
+  setTempoMap(tempoMap: TempoMap): void {
+    this._tempoMap = tempoMap;
+  }
+
   setEnabled(enabled: boolean): void {
     this._enabled = enabled;
     if (!enabled) {

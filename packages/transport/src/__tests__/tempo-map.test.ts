@@ -28,17 +28,17 @@ describe('TempoMap', () => {
     expect(tm.getTempo()).toBe(120);
   });
 
-  it('setTempo changes conversion', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60);
+  it('withTempo changes conversion', () => {
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(60);
     // 1 beat = 960 ticks = 1.0s at 60 BPM
     expect(tm.ticksToSeconds(960 as Tick)).toBeCloseTo(1.0);
   });
 
   it('multiple tempos: second region uses new tempo', () => {
-    const tm = new TempoMap(960, 120);
+    let tm = new TempoMap(960, 120);
     // At tick 1920 (1s at 120BPM), switch to 60 BPM
-    tm.setTempo(60, 1920 as Tick);
+    tm = tm.withTempo(60, 1920 as Tick);
     // First 1920 ticks at 120 BPM = 1.0s
     expect(tm.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.0);
     // Next 960 ticks at 60 BPM = 1.0s (total: 2.0s)
@@ -46,8 +46,8 @@ describe('TempoMap', () => {
   });
 
   it('secondsToTicks with multiple tempos', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 1920 as Tick);
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(60, 1920 as Tick);
     expect(tm.secondsToTicks(1.0)).toBe(1920);
     expect(tm.secondsToTicks(2.0)).toBe(2880);
   });
@@ -61,9 +61,9 @@ describe('TempoMap', () => {
 
 describe('TempoMap linear interpolation', () => {
   it('linear ramp: ticksToSeconds uses exact logarithmic formula', () => {
-    const tm = new TempoMap(960, 120);
+    let tm = new TempoMap(960, 120);
     // Ramp from 120 to 140 BPM over 1 bar (3840 ticks)
-    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    tm = tm.withTempo(140, 3840 as Tick, { interpolation: 'linear' });
 
     // At tick 0: 0 seconds
     expect(tm.ticksToSeconds(0 as Tick)).toBe(0);
@@ -75,8 +75,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: secondsToTicks round-trips', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 3840 as Tick, { interpolation: 'linear' });
 
     // Round-trip at midpoint of ramp
     const midTick = 1920 as Tick;
@@ -85,8 +85,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: getTempo returns interpolated BPM', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 3840 as Tick, { interpolation: 'linear' });
 
     // Start of ramp
     expect(tm.getTempo(0 as Tick)).toBe(120);
@@ -97,8 +97,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: partial segment ticksToSeconds', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(60, 3840 as Tick, { interpolation: 'linear' });
 
     // Midpoint: 1920 ticks into a 120→60 ramp over 3840 ticks
     // BPM at midpoint: 120 + (60 - 120) * (1920/3840) = 90
@@ -108,10 +108,10 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: mixed step + linear', () => {
-    const tm = new TempoMap(960, 120);
+    let tm = new TempoMap(960, 120);
     // Step to 100 at bar 2, then linear ramp to 160 at bar 4
-    tm.setTempo(100, 3840 as Tick);
-    tm.setTempo(160, 7680 as Tick, { interpolation: 'linear' });
+    tm = tm.withTempo(100, 3840 as Tick);
+    tm = tm.withTempo(160, 7680 as Tick, { interpolation: 'linear' });
 
     // At bar 2 (tick 3840): step segment at 120 BPM
     const secondsAtBar2 = (3840 * 60) / (120 * 960);
@@ -123,8 +123,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: degenerate (same BPM) falls back to step', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(120, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(120, 3840 as Tick, { interpolation: 'linear' });
 
     // 120→120 linear = same as step
     const expected = (3840 * 60) / (120 * 960);
@@ -132,8 +132,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('linear ramp: secondsToTicks round-trips at multiple points', () => {
-    const tm = new TempoMap(960, 100);
-    tm.setTempo(180, (3840 * 4) as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 100);
+    tm = tm.withTempo(180, (3840 * 4) as Tick, { interpolation: 'linear' });
 
     // Test round-trip at 25%, 50%, 75% through the ramp
     for (const fraction of [0.25, 0.5, 0.75]) {
@@ -146,32 +146,32 @@ describe('TempoMap linear interpolation', () => {
   it('curve slope validation rejects out-of-range values', () => {
     const tm = new TempoMap(960, 120);
     expect(() =>
-      tm.setTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: 0 } })
+      tm.withTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: 0 } })
     ).toThrow('between 0 and 1');
     expect(() =>
-      tm.setTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: 1 } })
+      tm.withTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: 1 } })
     ).toThrow('between 0 and 1');
     expect(() =>
-      tm.setTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: -0.5 } })
+      tm.withTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: -0.5 } })
     ).toThrow('between 0 and 1');
     expect(() =>
-      tm.setTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: NaN } })
+      tm.withTempo(140, 3840 as Tick, { interpolation: { type: 'curve', slope: NaN } })
     ).toThrow('between 0 and 1');
   });
 
-  it('setTempo without options defaults to step', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 3840 as Tick);
+  it('withTempo without options defaults to step', () => {
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 3840 as Tick);
 
     // Should behave as step — constant 120 BPM until tick 3840
     const expected = (3840 * 60) / (120 * 960);
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
   });
 
-  it('clearTempos resets after linear entries', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
-    tm.clearTempos();
+  it('withoutTempos resets after linear entries', () => {
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    tm = tm.withoutTempos();
 
     // Should revert to constant 120 BPM
     expect(tm.getTempo(0 as Tick)).toBe(120);
@@ -180,9 +180,9 @@ describe('TempoMap linear interpolation', () => {
     expect(tm.ticksToSeconds(3840 as Tick)).toBeCloseTo(expected);
   });
 
-  it('setTempo at tick 0 with linear is coerced to step', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 0 as Tick, { interpolation: 'linear' });
+  it('withTempo at tick 0 with linear is coerced to step', () => {
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 0 as Tick, { interpolation: 'linear' });
 
     // First entry is always step — no previous entry to ramp from
     expect(tm.getTempo(0 as Tick)).toBe(140);
@@ -191,8 +191,8 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('extreme ramp ratio round-trips (10 to 300 BPM)', () => {
-    const tm = new TempoMap(960, 10);
-    tm.setTempo(300, (3840 * 4) as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 10);
+    tm = tm.withTempo(300, (3840 * 4) as Tick, { interpolation: 'linear' });
 
     for (const fraction of [0.1, 0.25, 0.5, 0.75, 0.9]) {
       const tick = Math.round(3840 * 4 * fraction) as Tick;
@@ -202,18 +202,18 @@ describe('TempoMap linear interpolation', () => {
   });
 
   it('getTempo beyond last linear entry returns that entry BPM', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 3840 as Tick, { interpolation: 'linear' });
 
     // Beyond the ramp: should return 140 (the last entry's BPM)
     expect(tm.getTempo(7680 as Tick)).toBe(140);
   });
 
   it('overwrite linear entry with step at same tick', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(140, 3840 as Tick, { interpolation: 'linear' });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(140, 3840 as Tick, { interpolation: 'linear' });
     // Overwrite with step
-    tm.setTempo(140, 3840 as Tick);
+    tm = tm.withTempo(140, 3840 as Tick);
 
     // Should now be step — constant 120 BPM until tick 3840
     expect(tm.getTempo(1920 as Tick)).toBe(120);
@@ -224,11 +224,13 @@ describe('TempoMap linear interpolation', () => {
 
 describe('TempoMap curve interpolation', () => {
   it('curve with slope 0.5 behaves like linear', () => {
-    const tmLinear = new TempoMap(960, 120);
-    tmLinear.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    let tmLinear = new TempoMap(960, 120);
+    tmLinear = tmLinear.withTempo(180, 3840 as Tick, { interpolation: 'linear' });
 
-    const tmCurve = new TempoMap(960, 120);
-    tmCurve.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.5 } });
+    let tmCurve = new TempoMap(960, 120);
+    tmCurve = tmCurve.withTempo(180, 3840 as Tick, {
+      interpolation: { type: 'curve', slope: 0.5 },
+    });
 
     // At midpoint, both should give ~150 BPM
     expect(tmCurve.getTempo(1920 as Tick)).toBeCloseTo(tmLinear.getTempo(1920 as Tick), 1);
@@ -241,8 +243,8 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('curve round-trips via the closed-form inverse', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
 
     for (const fraction of [0.25, 0.5, 0.75]) {
       const tick = Math.round(3840 * 4 * fraction) as Tick;
@@ -254,8 +256,8 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('concave curve (slope < 0.5): slow start, fast end', () => {
-    const tm = new TempoMap(960, 100);
-    tm.setTempo(200, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.2 } });
+    let tm = new TempoMap(960, 100);
+    tm = tm.withTempo(200, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.2 } });
 
     // At midpoint, concave curve should be below linear midpoint (150)
     const midBpm = tm.getTempo(1920 as Tick);
@@ -264,8 +266,8 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('convex curve (slope > 0.5): fast start, slow end', () => {
-    const tm = new TempoMap(960, 100);
-    tm.setTempo(200, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
+    let tm = new TempoMap(960, 100);
+    tm = tm.withTempo(200, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
 
     // At midpoint, convex curve should be above linear midpoint (150)
     const midBpm = tm.getTempo(1920 as Tick);
@@ -274,16 +276,16 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('curve getTempo at boundaries returns exact entry BPM', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
 
     expect(tm.getTempo(0 as Tick)).toBe(120);
     expect(tm.getTempo(3840 as Tick)).toBe(180);
   });
 
   it('descending curve round-trips (bpm0 > bpm1)', () => {
-    const tm = new TempoMap(960, 180);
-    tm.setTempo(80, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 180);
+    tm = tm.withTempo(80, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
 
     for (const fraction of [0.25, 0.5, 0.75]) {
       const tick = Math.round(3840 * 4 * fraction) as Tick;
@@ -293,8 +295,8 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('convex curve round-trips (slope > 0.5)', () => {
-    const tm = new TempoMap(960, 100);
-    tm.setTempo(200, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
+    let tm = new TempoMap(960, 100);
+    tm = tm.withTempo(200, (3840 * 4) as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
 
     for (const fraction of [0.25, 0.5, 0.75]) {
       const tick = Math.round(3840 * 4 * fraction) as Tick;
@@ -304,10 +306,10 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('mixed curve + linear + step segments', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
-    tm.setTempo(100, 7680 as Tick, { interpolation: 'linear' });
-    tm.setTempo(100, 11520 as Tick); // step (stays at 100)
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    tm = tm.withTempo(100, 7680 as Tick, { interpolation: 'linear' });
+    tm = tm.withTempo(100, 11520 as Tick); // step (stays at 100)
 
     // Round-trips within each segment type
     for (const tick of [1920, 5760, 9600] as Tick[]) {
@@ -317,18 +319,20 @@ describe('TempoMap curve interpolation', () => {
   });
 
   it('degenerate curve (same BPM) matches step', () => {
-    const tmCurve = new TempoMap(960, 120);
-    tmCurve.setTempo(120, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tmCurve = new TempoMap(960, 120);
+    tmCurve = tmCurve.withTempo(120, 3840 as Tick, {
+      interpolation: { type: 'curve', slope: 0.3 },
+    });
 
-    const tmStep = new TempoMap(960, 120);
-    tmStep.setTempo(120, 3840 as Tick);
+    let tmStep = new TempoMap(960, 120);
+    tmStep = tmStep.withTempo(120, 3840 as Tick);
 
     expect(tmCurve.ticksToSeconds(3840 as Tick)).toBeCloseTo(tmStep.ticksToSeconds(3840 as Tick));
   });
 
   it('curve duration bounded by constant-BPM extremes', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
 
     const curveSec = tm.ticksToSeconds(3840 as Tick);
     const fastSec = (3840 * 60) / (180 * 960); // all at fastest BPM
@@ -339,15 +343,15 @@ describe('TempoMap curve interpolation', () => {
 });
 
 describe('TempoMap BPM validation', () => {
-  it('rejects zero, negative, and non-finite BPM in setTempo', () => {
+  it('rejects zero, negative, and non-finite BPM in withTempo', () => {
     const map = new TempoMap(960, 120);
     // bpm <= 0 poisons the secondsAtTick cache (Infinity / non-monotonic
     // values that break the secondsToTicks binary search) — reject at the
     // boundary like curve-slope validation already does.
-    expect(() => map.setTempo(0)).toThrow(/finite positive/);
-    expect(() => map.setTempo(-120, 960 as Tick)).toThrow(/finite positive/);
-    expect(() => map.setTempo(NaN)).toThrow(/finite positive/);
-    expect(() => map.setTempo(Infinity)).toThrow(/finite positive/);
+    expect(() => map.withTempo(0)).toThrow(/finite positive/);
+    expect(() => map.withTempo(-120, 960 as Tick)).toThrow(/finite positive/);
+    expect(() => map.withTempo(NaN)).toThrow(/finite positive/);
+    expect(() => map.withTempo(Infinity)).toThrow(/finite positive/);
   });
 
   it('rejects an invalid initial BPM in the constructor', () => {
@@ -356,9 +360,9 @@ describe('TempoMap BPM validation', () => {
   });
 
   it('a rejected setTempo leaves the map unchanged', () => {
-    const map = new TempoMap(960, 120);
-    map.setTempo(140, 960 as Tick);
-    expect(() => map.setTempo(0, 1920 as Tick)).toThrow();
+    let map = new TempoMap(960, 120);
+    map = map.withTempo(140, 960 as Tick);
+    expect(() => map.withTempo(0, 1920 as Tick)).toThrow();
     expect(map.getTempo(1920 as Tick)).toBe(140); // still the prior tempo
     expect(map.ticksToSeconds(960 as Tick)).toBeCloseTo(0.5, 12);
   });
@@ -366,13 +370,13 @@ describe('TempoMap BPM validation', () => {
 
 describe('TempoMap.removeTempo', () => {
   it('removes an entry and recomputes the seconds cache for later entries', () => {
-    const map = new TempoMap(960, 120);
-    map.setTempo(60, 960 as Tick); // beat 2 onward at 60 BPM
-    map.setTempo(240, 1920 as Tick); // beat 3 onward at 240 BPM
+    let map = new TempoMap(960, 120);
+    map = map.withTempo(60, 960 as Tick); // beat 2 onward at 60 BPM
+    map = map.withTempo(240, 1920 as Tick); // beat 3 onward at 240 BPM
     // With the 60 BPM entry: t(1920) = 0.5 + 1.0 = 1.5s
     expect(map.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.5, 12);
 
-    map.removeTempo(960 as Tick);
+    map = map.withoutTempo(960 as Tick);
     // Now 120 BPM holds until tick 1920: t(1920) = 1.0s, and the 240 BPM
     // entry's cached secondsAtTick must have been recomputed.
     expect(map.ticksToSeconds(1920 as Tick)).toBeCloseTo(1.0, 12);
@@ -381,10 +385,10 @@ describe('TempoMap.removeTempo', () => {
   });
 
   it('treats tick 0 as permanent and unknown ticks as no-ops', () => {
-    const map = new TempoMap(960, 120);
-    map.setTempo(60, 960 as Tick);
-    map.removeTempo(0 as Tick); // permanent
-    map.removeTempo(480 as Tick); // no entry there
+    let map = new TempoMap(960, 120);
+    map = map.withTempo(60, 960 as Tick);
+    map = map.withoutTempo(0 as Tick); // permanent
+    map = map.withoutTempo(480 as Tick); // no entry there
     expect(map.getTempo(0 as Tick)).toBe(120);
     expect(map.getTempo(960 as Tick)).toBe(60);
   });
@@ -397,21 +401,21 @@ describe('TempoMap.entryCount', () => {
   });
 
   it('increments when an entry is added at a later tick', () => {
-    const map = new TempoMap();
-    map.setTempo(140, 960 as Tick);
+    let map = new TempoMap();
+    map = map.withTempo(140, 960 as Tick);
     expect(map.entryCount).toBe(2);
   });
 
   it('stays 1 when the tick-0 entry is overwritten', () => {
-    const map = new TempoMap();
-    map.setTempo(90);
+    let map = new TempoMap();
+    map = map.withTempo(90);
     expect(map.entryCount).toBe(1);
   });
 
   it('decrements when an entry is removed', () => {
-    const map = new TempoMap();
-    map.setTempo(140, 960 as Tick);
-    map.removeTempo(960 as Tick);
+    let map = new TempoMap();
+    map = map.withTempo(140, 960 as Tick);
+    map = map.withoutTempo(960 as Tick);
     expect(map.entryCount).toBe(1);
   });
 });
@@ -465,8 +469,8 @@ describe('TempoMap curve integration accuracy', () => {
     const segment = bars * BAR;
     for (const [bpm0, bpm1] of ramps) {
       for (const slope of slopes) {
-        const tm = new TempoMap(ppqn, bpm0);
-        tm.setTempo(bpm1, segment as Tick, { interpolation: { type: 'curve', slope } });
+        let tm = new TempoMap(ppqn, bpm0);
+        tm = tm.withTempo(bpm1, segment as Tick, { interpolation: { type: 'curve', slope } });
         for (const fraction of [0.1, 0.5, 0.999, 1]) {
           const ticks = Math.round(segment * fraction);
           const expected = referenceSeconds(ticks, bpm0, bpm1, segment, slope);
@@ -482,8 +486,8 @@ describe('TempoMap curve integration accuracy', () => {
 
   it('long curved ramp round-trips secondsToTicks within 1 tick', () => {
     const segment = 256 * BAR;
-    const tm = new TempoMap(ppqn, 60);
-    tm.setTempo(240, segment as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
+    let tm = new TempoMap(ppqn, 60);
+    tm = tm.withTempo(240, segment as Tick, { interpolation: { type: 'curve', slope: 0.8 } });
     for (const fraction of [0.01, 0.25, 0.5, 0.75, 0.99]) {
       const tick = Math.round(segment * fraction) as Tick;
       const roundTrip = tm.secondsToTicks(tm.ticksToSeconds(tick));
@@ -493,10 +497,12 @@ describe('TempoMap curve integration accuracy', () => {
 
   it('slope inside a 1e-6 window of 0.5 integrates the curve itself, not the linear approximation', () => {
     const segment = 256 * BAR;
-    const tmLinear = new TempoMap(ppqn, 120);
-    tmLinear.setTempo(180, segment as Tick, { interpolation: 'linear' });
-    const tmCurve = new TempoMap(ppqn, 120);
-    tmCurve.setTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.5000005 } });
+    let tmLinear = new TempoMap(ppqn, 120);
+    tmLinear = tmLinear.withTempo(180, segment as Tick, { interpolation: 'linear' });
+    let tmCurve = new TempoMap(ppqn, 120);
+    tmCurve = tmCurve.withTempo(180, segment as Tick, {
+      interpolation: { type: 'curve', slope: 0.5000005 },
+    });
     // 0.5000005 is inside a 1e-6 window. There the curve differs from linear
     // by ~5e-7 relative (≈0.06 ms on this 415 s ramp) — a linear shortcut
     // would miss the 1 µs bar. The reference comparison pins the curve itself.
@@ -515,8 +521,8 @@ describe('TempoMap curve integration accuracy', () => {
     // cancels catastrophically (18 µs at 1e-8 on this ramp); the log1p form
     // must take over there.
     const segment = 256 * BAR;
-    const tm = new TempoMap(ppqn, 20.0000002);
-    tm.setTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.25 } });
+    let tm = new TempoMap(ppqn, 20.0000002);
+    tm = tm.withTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.25 } });
     for (const fraction of [0.5, 1]) {
       const ticks = Math.round(segment * fraction);
       const expected = referenceSeconds(ticks, 20.0000002, 180, segment, 0.25);
@@ -541,8 +547,8 @@ describe('TempoMap curve integration accuracy', () => {
     ];
     for (const [bpm0, bpm1] of ramps) {
       for (const slope of extremeSlopes) {
-        const tm = new TempoMap(ppqn, bpm0);
-        tm.setTempo(bpm1, segment as Tick, { interpolation: { type: 'curve', slope } });
+        let tm = new TempoMap(ppqn, bpm0);
+        tm = tm.withTempo(bpm1, segment as Tick, { interpolation: { type: 'curve', slope } });
         for (const fraction of [0.001, 0.1, 0.5, 0.9, 0.999, 1]) {
           const tick = Math.round(segment * fraction) as Tick;
           const roundTrip = tm.secondsToTicks(tm.ticksToSeconds(tick));
@@ -558,18 +564,18 @@ describe('TempoMap curve integration accuracy', () => {
   it('curveNormalizedAt matches the published pow form, not just the expm1 rewrite', () => {
     // getTempo at 37% of a 120 → 180 ramp at slope 0.3, against
     // (p²/(1−2p))·(((1−p)/p)^(2x) − 1) written out literally.
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
     const x = 1421 / 3840;
     const expected = 120 + 60 * ((0.09 / 0.4) * (Math.pow(7 / 3, 2 * x) - 1));
     expect(tm.getTempo(1421 as Tick)).toBeCloseTo(expected, 10);
   });
 
   it('slope exactly 0.5 is the linear path, bit for bit, in both directions', () => {
-    const linear = new TempoMap(960, 120);
-    linear.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
-    const curve = new TempoMap(960, 120);
-    curve.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.5 } });
+    let linear = new TempoMap(960, 120);
+    linear = linear.withTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    let curve = new TempoMap(960, 120);
+    curve = curve.withTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.5 } });
     expect(curve.ticksToSeconds(1920 as Tick)).toBe(linear.ticksToSeconds(1920 as Tick));
     expect(curve.secondsToTicks(curve.ticksToSeconds(1920 as Tick))).toBe(1920);
   });
@@ -579,25 +585,25 @@ describe('TempoMap curve integration accuracy', () => {
     // a ramp backwards instead is undefined past its asymptote (a convex
     // decreasing curve went to NaN at −1 s) and dawcore drags do reach
     // negative seconds before they clamp.
-    const step = new TempoMap(960, 120);
-    step.setTempo(180, 3840 as Tick);
-    const linear = new TempoMap(960, 120);
-    linear.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
-    const curve = new TempoMap(960, 120);
-    curve.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    const step = new TempoMap(960, 120).withTempo(180, 3840 as Tick);
+    const linear = new TempoMap(960, 120).withTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    const curve = new TempoMap(960, 120).withTempo(180, 3840 as Tick, {
+      interpolation: { type: 'curve', slope: 0.3 },
+    });
     for (const tm of [step, linear, curve]) {
       expect(tm.secondsToTicks(-0.5)).toBe(-960); // 120 BPM × 960 PPQN = 1920 ticks/s
       expect(tm.ticksToSeconds(-960 as Tick)).toBeCloseTo(-0.5, 12);
     }
-    const convexDown = new TempoMap(960, 180);
-    convexDown.setTempo(60, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.9 } });
+    const convexDown = new TempoMap(960, 180).withTempo(60, 3840 as Tick, {
+      interpolation: { type: 'curve', slope: 0.9 },
+    });
     expect(convexDown.secondsToTicks(-1)).toBe(-2880);
     expect(Number.isFinite(convexDown.secondsToTicks(-1e4))).toBe(true);
   });
 
   it('non-finite input is rejected instead of leaking NaN into the scheduler', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(180, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
     expect(() => tm.secondsToTicks(NaN)).toThrow(/finite/);
     expect(() => tm.secondsToTicks(Infinity)).toThrow(/finite/);
     expect(() => tm.ticksToSeconds(NaN as Tick)).toThrow(/finite/);
@@ -608,8 +614,8 @@ describe('TempoMap curve integration accuracy', () => {
     // bpm(x) = bpm0 + Δ·k·(r^2x − 1) with k = p²/(1−2p); at slope 0.25, k = 1/8,
     // so bpm0 = Δ/8 (20 → 180) makes the constant term vanish — a pure exponential.
     const segment = 4 * BAR;
-    const tm = new TempoMap(ppqn, 20);
-    tm.setTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.25 } });
+    let tm = new TempoMap(ppqn, 20);
+    tm = tm.withTempo(180, segment as Tick, { interpolation: { type: 'curve', slope: 0.25 } });
     const actual = tm.ticksToSeconds(segment as Tick);
     expect(Number.isFinite(actual)).toBe(true);
     expect(Math.abs(actual - referenceSeconds(segment, 20, 180, segment, 0.25))).toBeLessThan(
@@ -632,10 +638,10 @@ describe('TempoMap fractional conversions (#636)', () => {
   });
 
   it('secondsToTicksExact round-trips fractional ticks through step, linear and curve segments', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
-    tm.setTempo(100, 7680 as Tick, { interpolation: 'linear' });
-    tm.setTempo(100, 11520 as Tick);
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(160, 3840 as Tick, { interpolation: { type: 'curve', slope: 0.3 } });
+    tm = tm.withTempo(100, 7680 as Tick, { interpolation: 'linear' });
+    tm = tm.withTempo(100, 11520 as Tick);
     for (const tick of [1234.5, 5000.25, 9000.75, 12000.125]) {
       const seconds = tm.ticksToSeconds(tick as Tick);
       expect(tm.secondsToTicksExact(seconds)).toBeCloseTo(tick, 6);
@@ -652,8 +658,7 @@ describe('TempoMap fractional conversions (#636)', () => {
     // 120 BPM then 60 BPM from tick 3840 (2 s). The boundary must round-trip
     // exactly, the instant before it must not overshoot into the next segment,
     // and positions beyond the last entry extrapolate at the last tempo.
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 3840 as Tick);
+    const tm = new TempoMap(960, 120).withTempo(60, 3840 as Tick);
     const boundarySeconds = tm.ticksToSeconds(3840 as Tick);
     expect(boundarySeconds).toBeCloseTo(2, 12);
     expect(tm.secondsToTicksExact(boundarySeconds)).toBeCloseTo(3840, 9);
@@ -665,8 +670,8 @@ describe('TempoMap fractional conversions (#636)', () => {
   });
 
   it('ticksToSeconds is continuous and monotonic across a tempo boundary for fractional ticks', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 3840 as Tick);
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(60, 3840 as Tick);
     expect(tm.ticksToSeconds(3839.5)).toBeCloseTo(2 - 0.5 / 1920, 12);
     expect(tm.ticksToSeconds(3840.5)).toBeCloseTo(2 + 0.5 / 960, 12);
     expect(tm.ticksToSeconds(3839.999)).toBeLessThan(tm.ticksToSeconds(3840 as Tick));
@@ -674,9 +679,9 @@ describe('TempoMap fractional conversions (#636)', () => {
   });
 
   it('beatsToSeconds and secondsToBeats are exact inverses on a multi-segment map', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(60, 3840 as Tick, { interpolation: 'linear' });
-    tm.setTempo(90, 7680 as Tick);
+    let tm = new TempoMap(960, 120);
+    tm = tm.withTempo(60, 3840 as Tick, { interpolation: 'linear' });
+    tm = tm.withTempo(90, 7680 as Tick);
     for (const seconds of [0.3, 2.7, 5.1]) {
       expect(tm.beatsToSeconds(tm.secondsToBeats(seconds))).toBeCloseTo(seconds, 10);
     }
@@ -694,10 +699,53 @@ describe('TempoMap fractional conversions (#636)', () => {
   });
 
   it('ticksToSeconds accepts a fractional tick position', () => {
-    const tm = new TempoMap(960, 120);
-    tm.setTempo(180, 3840 as Tick, { interpolation: 'linear' });
+    const tm = new TempoMap(960, 120).withTempo(180, 3840 as Tick, { interpolation: 'linear' });
     const exact = tm.secondsToTicksExact(1.2345);
     expect(Number.isInteger(exact)).toBe(false);
     expect(tm.ticksToSeconds(exact)).toBeCloseTo(1.2345, 10);
+  });
+});
+
+describe('TempoMap immutability (#636)', () => {
+  it('withTempo returns a new map and leaves the original unchanged', () => {
+    const original = new TempoMap(960, 120);
+    const next = original.withTempo(180, 3840 as Tick);
+    expect(next).not.toBe(original);
+    expect(original.entryCount).toBe(1);
+    expect(original.getTempo(3840 as Tick)).toBe(120);
+    expect(next.entryCount).toBe(2);
+    expect(next.getTempo(3840 as Tick)).toBe(180);
+  });
+
+  it('withoutTempo and withoutTempos return new maps and leave the original unchanged', () => {
+    const base = new TempoMap(960, 120).withTempo(180, 3840 as Tick).withTempo(90, 7680 as Tick);
+    const removed = base.withoutTempo(3840 as Tick);
+    const cleared = base.withoutTempos();
+    expect(base.entryCount).toBe(3);
+    expect(removed.entryCount).toBe(2);
+    expect(removed.getTempo(3840 as Tick)).toBe(120);
+    expect(cleared.entryCount).toBe(1);
+    expect(cleared.getTempo(7680 as Tick)).toBe(120);
+  });
+
+  it('a rejected withTempo throws and leaves the map untouched', () => {
+    const map = new TempoMap(960, 120);
+    expect(() => map.withTempo(0, 3840 as Tick)).toThrow(/bpm/);
+    expect(map.entryCount).toBe(1);
+  });
+
+  it('entries is a frozen snapshot with cumulative seconds', () => {
+    const map = new TempoMap(960, 120).withTempo(60, 3840 as Tick);
+    expect(map.entries.map((e) => e.tick)).toEqual([0, 3840]);
+    expect(map.entries[1].secondsAtTick).toBeCloseTo(2, 10);
+    expect(Object.isFrozen(map.entries)).toBe(true);
+    expect(Object.isFrozen(map.entries[0])).toBe(true);
+  });
+
+  it('a snapshot taken before an edit keeps converting with the old tempo', () => {
+    const before = new TempoMap(960, 120);
+    const after = before.withTempo(240, 0 as Tick);
+    expect(before.ticksToSeconds(960 as Tick)).toBeCloseTo(0.5, 10);
+    expect(after.ticksToSeconds(960 as Tick)).toBeCloseTo(0.25, 10);
   });
 });
