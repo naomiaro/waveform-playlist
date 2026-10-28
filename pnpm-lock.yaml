@@ -409,6 +409,9 @@ importers:
         specifier: 0.0.12
         version: 0.0.12
     devDependencies:
+      '@dawcore/transport':
+        specifier: workspace:^
+        version: link:../transport
       happy-dom:
         specifier: ^20.10.2
         version: 20.10.2

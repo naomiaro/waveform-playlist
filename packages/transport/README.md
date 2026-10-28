@@ -255,7 +255,8 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 
 **Events:**
 - `on(event, callback)` / `off(event, callback)`
-- Events: `play`, `pause`, `stop`, `ended`, `seek`, `loop`, `tempochange`, `meterchange`, `countIn`, `countInEnd`, `error`
+- Events: `play`, `pause`, `stop`, `ended`, `seek`, `loop`, `tick`, `tempochange`, `meterchange`, `countIn`, `countInEnd`, `discontinuity`, `error`
+- `tick` — `{ seconds }`: one scheduler tick advanced the timeline (every `timerIntervalMs`, default 25 ms, while playing; driven by the Worker timer so it keeps its cadence in a hidden tab). For consumers that must poll the playhead for state the transport does not announce (e.g. a tempo-map boundary crossed mid-playback); UI position updates should still use `requestAnimationFrame`
 - `ended` — a bounded `play(start, end)` reached `end` and the transport stopped itself; fires right after `stop` (so a handler may restart playback), never for a consumer `stop()`/`pause()`/`seek()`
 - `discontinuity` — `{ seconds, shiftSeconds }`: the AudioContext clock went backwards while playing (defensive; the spec makes it monotonic). The position was held (`seconds` is what `getCurrentTime()` reports) and, outside a count-in, scheduled audio re-created from it; during a count-in the already-armed clicks are dropped. Diagnostics only — with no subscriber the first occurrence is warned to the console
 - `seek` payload: `{ seconds: number }`

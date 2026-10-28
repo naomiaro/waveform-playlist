@@ -332,6 +332,75 @@ describe('Transport', () => {
     expect(ended).toHaveBeenCalledTimes(1);
   });
 
+  describe("'tick' event", () => {
+    it('fires once per scheduler tick while playing, with the transport position', () => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx);
+      const onTick = vi.fn();
+      transport.on('tick', onTick);
+      transport.play(0);
+      expect(onTick).not.toHaveBeenCalled();
+      (ctx as any).currentTime = 0.5;
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(onTick).toHaveBeenCalledTimes(1);
+      expect(onTick).toHaveBeenCalledWith({ seconds: 0.5 });
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(onTick).toHaveBeenCalledTimes(2);
+      transport.stop();
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS * 4);
+      expect(onTick).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports the clamped position after a loop wrap (what getCurrentTime() returns)', () => {
+      const ctx = mockAudioContext(0);
+      const transport = new Transport(ctx);
+      const seen: number[] = [];
+      transport.on('tick', ({ seconds }) => seen.push(seconds));
+      transport.setLoop(true, 0 as Tick, 1920 as Tick); // [0, 1 s) at 120 bpm
+      transport.play(0);
+      (ctx as any).currentTime = 0.9; // the 200 ms lookahead crosses loopEnd → wrap
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(seen.length).toBe(2);
+      // The clock sits behind loopStart right after the wrap; the event must
+      // not leak that — it reports the same clamped value as getCurrentTime().
+      expect(seen[1]).toBe(transport.getCurrentTime());
+      expect(seen[1]).toBeGreaterThanOrEqual(0);
+      transport.stop();
+    });
+
+    it('does not fire during a count-in, and not on the tick that ends bounded playback', () => {
+      const ctx = mockAudioContext(10);
+      const transport = new Transport(ctx);
+      const click = {
+        duration: 0.04,
+        length: 1920,
+        sampleRate: 48000,
+        numberOfChannels: 1,
+      } as AudioBuffer;
+      transport.setMetronomeClickSounds(click, click);
+      transport.setCountIn(true);
+      transport.setCountInMode('always');
+      const order: string[] = [];
+      for (const name of ['tick', 'countInEnd', 'ended'] as const) {
+        transport.on(name, () => order.push(name));
+      }
+      transport.play(0, 1);
+      (ctx as any).currentTime = 11; // mid count-in (the bar is 2 s)
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(order).toEqual([]);
+      (ctx as any).currentTime = 12.5; // count-in over → playback
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(order).toEqual(['countInEnd']);
+      (ctx as any).currentTime = 12.75;
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(order).toEqual(['countInEnd', 'tick']);
+      (ctx as any).currentTime = 14; // past the 1 s bound
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+      expect(order).toEqual(['countInEnd', 'tick', 'ended']);
+    });
+  });
+
   it('a tick that keeps throwing stops the transport instead of flooding the console', () => {
     const ctx = mockAudioContext(0);
     const transport = new Transport(ctx);
