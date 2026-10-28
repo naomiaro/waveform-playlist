@@ -40,6 +40,11 @@ export interface TransportEvents {
   meterchange: (event: MeterChangeEventData) => void;
   countIn: (event: CountInEventData) => void;
   countInEnd: () => void;
+  /** A bounded play(start, end) reached `end` and the transport stopped
+   *  itself. Fires right before the `stop` event; never for a consumer
+   *  stop()/pause()/seek(). (NativePlayoutAdapter forwards this to the
+   *  engine's onPlaybackEnded hook.) */
+  ended: () => void;
   /** A scheduler listener threw while generating or consuming events. The
    *  scheduler skipped it and kept going; the host decides what to do. With
    *  no `error` listener registered the failure is reported via console.warn
@@ -142,6 +147,7 @@ export class Transport {
         return;
       }
       if (this._endTime !== undefined && time >= this._endTime) {
+        this._emit('ended');
         this.stop();
         return;
       }
@@ -870,7 +876,7 @@ export class Transport {
     this._countInScheduler.reset(0);
     this._clock.seekTo(0);
     this._clock.start();
-    // Use the main timer to drive the count-in scheduler (avoids spawning a second rAF chain)
+    // Use the main timer to drive the count-in scheduler (one Worker tick source, not two)
     this._timer.start();
   }
 

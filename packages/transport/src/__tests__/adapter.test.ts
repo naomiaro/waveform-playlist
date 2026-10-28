@@ -432,6 +432,14 @@ describe('NativePlayoutAdapter', () => {
       adapter.stop();
     });
 
+    it('a direct transport.stop() by the consumer is not reported as playback ended', () => {
+      // examples and hosts hold adapter.transport and call stop() on it directly
+      const { adapter, ended } = playingAdapter();
+      adapter.play(0, 10);
+      adapter.transport.stop();
+      expect(ended).not.toHaveBeenCalled();
+    });
+
     it('unsubscribes with null and never fires after dispose', () => {
       const { ctx, adapter, ended } = playingAdapter();
       adapter.onPlaybackEnded(null);

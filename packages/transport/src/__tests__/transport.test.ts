@@ -256,6 +256,22 @@ describe('Transport', () => {
     expect(onPlay).not.toHaveBeenCalled();
   });
 
+  it("'ended' fires only when a bounded play reaches its end, right before 'stop'", () => {
+    const ctx = mockAudioContext(0);
+    const transport = new Transport(ctx);
+    const order: string[] = [];
+    transport.on('ended', () => order.push('ended'));
+    transport.on('stop', () => order.push('stop'));
+    transport.play(0, 1);
+    (ctx as any).currentTime = 1.5;
+    vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
+    expect(order).toEqual(['ended', 'stop']);
+    // Consumer stop: no 'ended'
+    transport.play(0, 10);
+    transport.stop();
+    expect(order).toEqual(['ended', 'stop', 'stop']);
+  });
+
   it('seek emits a seek event with the target position', () => {
     const ctx = mockAudioContext();
     const transport = new Transport(ctx);

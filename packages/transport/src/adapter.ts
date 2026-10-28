@@ -8,19 +8,16 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   private _audioContext: AudioContext;
 
   private _onPlaybackEnded: (() => void) | null = null;
-  /** > 0 while a stop originates from this adapter's stop()/dispose(). */
-  private _consumerStopDepth = 0;
 
   constructor(audioContext: AudioContext, options?: TransportOptions) {
     this._audioContext = audioContext;
     this._transport = new Transport(audioContext, options);
-    // Bounded playback (#608 parity): the transport stops itself when
-    // play(start, end) reaches end (inside its timer tick). Report that to the
-    // engine's onPlaybackEnded hook — but not a stop the consumer initiated
-    // through this adapter, which the engine already knows about.
-    this._transport.on('stop', () => {
-      if (this._consumerStopDepth === 0) this._onPlaybackEnded?.();
-    });
+    // Bounded playback (#608 parity): the transport emits 'ended' (then 'stop')
+    // when play(start, end) reaches end inside its timer tick. Only that
+    // reaches the engine's onPlaybackEnded hook — a stop() the consumer
+    // issues, through this adapter OR directly on adapter.transport, is not
+    // a completion and the engine must not treat it as one.
+    this._transport.on('ended', () => this._onPlaybackEnded?.());
   }
 
   get audioContext(): AudioContext {
@@ -108,16 +105,13 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
   }
 
   stop(): void {
-    this._consumerStopDepth++;
-    try {
-      this._transport.stop();
-    } finally {
-      this._consumerStopDepth--;
-    }
+    this._transport.stop();
   }
 
-  /** Engine hook: adapter-initiated completion of a bounded play(start, end).
-   *  Never fired for consumer stop()/pause()/seek()/dispose(). */
+  /** Engine hook: adapter-initiated completion of a bounded play(start, end)
+   *  (the transport's `ended` event). Never fired for a consumer
+   *  stop()/pause()/seek()/dispose(), whether issued through this adapter or
+   *  directly on `adapter.transport`. */
   onPlaybackEnded(callback: (() => void) | null): void {
     this._onPlaybackEnded = callback;
   }
@@ -234,11 +228,6 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
 
   dispose(): void {
     this._onPlaybackEnded = null;
-    this._consumerStopDepth++;
-    try {
-      this._transport.dispose();
-    } finally {
-      this._consumerStopDepth--;
-    }
+    this._transport.dispose();
   }
 }

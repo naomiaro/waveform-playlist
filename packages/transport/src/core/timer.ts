@@ -9,9 +9,12 @@
  * seek during playback costs no Worker spin-up.
  *
  * Fallback: a main-thread setTimeout loop, used when there is no Worker/Blob
- * URL support (Node, SSR) or constructing the Worker is refused (a CSP without
- * `worker-src blob:`). Correct while the tab is visible or audible; a hidden,
- * silent tab may throttle it to ~1 Hz, which exceeds the 200 ms lookahead.
+ * URL support (Node, SSR), when constructing the Worker is refused (a CSP
+ * without `worker-src blob:` — synchronously or via the Worker's error
+ * event), or when a running Worker dies. Correct while the tab is visible or
+ * audible; a hidden, silent tab may throttle it to ~1 Hz, which exceeds the
+ * 200 ms lookahead. The refusal verdict is remembered per page, so the probe
+ * and its warning happen once, not once per Timer.
  *
  * requestAnimationFrame is never used — it belongs to UI position updates.
  */
@@ -46,10 +49,30 @@ const TIMER_WORKER_SCRIPT =
   '  }\n' +
   '};\n';
 
+/** Page-wide memo: once a Worker was refused (constructor threw or the
+ *  Worker errored), every later Timer skips the probe and the warning. */
+let workerRefusedOnThisPage = false;
+
+/** Test hook: forget the page-wide refusal verdict. */
+export function _resetTimerWorkerVerdictForTests(): void {
+  workerRefusedOnThisPage = false;
+}
+
+function hasWorkerPlatform(): boolean {
+  return (
+    typeof Worker !== 'undefined' &&
+    typeof Blob !== 'undefined' &&
+    typeof URL !== 'undefined' &&
+    typeof URL.createObjectURL === 'function'
+  );
+}
+
 export class Timer {
   private readonly _onTick: () => void;
   private readonly _intervalMs: number;
   private _running = false;
+  private _disposed = false;
+  private _warnedDisposed = false;
   private _worker: Worker | null = null;
   private _workerUrl: string | null = null;
   /** Set once the Worker path has been ruled out for this Timer. */
@@ -68,12 +91,20 @@ export class Timer {
   }
 
   start(): void {
+    if (this._disposed) {
+      if (!this._warnedDisposed) {
+        this._warnedDisposed = true;
+        console.warn('[waveform-playlist] Timer: start() on a disposed Timer is ignored');
+      }
+      return;
+    }
     if (this._running) return;
     this._running = true;
     const worker = this._ensureWorker();
     if (worker) {
-      this._post(worker, { type: 'start', intervalMs: this._intervalMs });
-    } else {
+      worker.postMessage({ type: 'start', intervalMs: this._intervalMs } as TimerWorkerMessage);
+    } else if (this._timeoutId === null) {
+      // (a synchronous Worker refusal inside _ensureWorker already scheduled it)
       this._scheduleTimeout();
     }
   }
@@ -82,7 +113,7 @@ export class Timer {
     if (!this._running) return;
     this._running = false;
     if (this._worker) {
-      this._post(this._worker, { type: 'stop' });
+      this._worker.postMessage({ type: 'stop' } as TimerWorkerMessage);
     }
     if (this._timeoutId !== null) {
       clearTimeout(this._timeoutId);
@@ -90,19 +121,13 @@ export class Timer {
     }
   }
 
-  /** Stop and release the Worker. The Timer cannot be restarted afterwards
-   *  without creating a new Worker, which start() does on demand. */
+  /** Stop and release the Worker. A disposed Timer cannot be restarted —
+   *  start() becomes a warned no-op, so a late play() on a disposed transport
+   *  cannot leak a fresh Worker. */
   dispose(): void {
     this.stop();
-    if (this._worker) {
-      this._worker.onmessage = null;
-      this._worker.terminate();
-      this._worker = null;
-    }
-    if (this._workerUrl !== null) {
-      URL.revokeObjectURL(this._workerUrl);
-      this._workerUrl = null;
-    }
+    this._disposed = true;
+    this._releaseWorker();
   }
 
   private _handleTick(): void {
@@ -119,25 +144,49 @@ export class Timer {
     this._timeoutId = setTimeout(() => {
       this._timeoutId = null;
       this._handleTick();
-      // _onTick() may have called stop()
-      if (this._running) this._scheduleTimeout();
+      // Reschedule only if the tick left nothing scheduled: _onTick() may have
+      // called stop() (then _running is false) or stop()+start() (then start()
+      // already created the next timeout — a second chain here would double
+      // the tick rate on every such restart).
+      if (this._running && this._timeoutId === null) this._scheduleTimeout();
     }, this._intervalMs);
   }
 
-  private _post(worker: Worker, message: TimerWorkerMessage): void {
-    worker.postMessage(message);
+  private _releaseWorker(): void {
+    if (this._worker) {
+      this._worker.onmessage = null;
+      this._worker.onerror = null;
+      this._worker.onmessageerror = null;
+      this._worker.terminate();
+      this._worker = null;
+    }
+    if (this._workerUrl !== null) {
+      URL.revokeObjectURL(this._workerUrl);
+      this._workerUrl = null;
+    }
+  }
+
+  /** The Worker path failed (constructor threw, or the Worker errored later):
+   *  remember it for the page, warn once, and keep ticking on setTimeout. */
+  private _fallBackFromWorker(reason: string): void {
+    this._useTimeoutFallback = true;
+    this._releaseWorker();
+    if (!workerRefusedOnThisPage) {
+      workerRefusedOnThisPage = true;
+      console.warn(
+        '[waveform-playlist] Timer: could not run a Worker ticker (' +
+          reason +
+          '); falling back to a main-thread setTimeout loop, which browsers may throttle in a hidden tab'
+      );
+    }
+    if (this._running && this._timeoutId === null) this._scheduleTimeout();
   }
 
   private _ensureWorker(): Worker | null {
     if (this._worker) return this._worker;
-    if (this._useTimeoutFallback) return null;
-    if (
-      typeof Worker === 'undefined' ||
-      typeof Blob === 'undefined' ||
-      typeof URL === 'undefined' ||
-      typeof URL.createObjectURL !== 'function'
-    ) {
-      // No Worker platform at all (Node, SSR): nothing surprising to report.
+    if (this._useTimeoutFallback || workerRefusedOnThisPage || !hasWorkerPlatform()) {
+      // No Worker platform at all (Node, SSR) is nothing to report; a refusal
+      // was reported when it happened.
       this._useTimeoutFallback = true;
       return null;
     }
@@ -145,16 +194,17 @@ export class Timer {
       const url = URL.createObjectURL(new Blob([TIMER_WORKER_SCRIPT], { type: 'text/javascript' }));
       const worker = new Worker(url);
       worker.onmessage = () => this._handleTick();
+      // Some engines surface a CSP violation (or a later crash) here instead
+      // of throwing from the constructor; a Worker that never ticks would
+      // otherwise leave the transport silent with no fallback.
+      worker.onerror = (event) =>
+        this._fallBackFromWorker('worker error: ' + String((event as ErrorEvent).message ?? event));
+      worker.onmessageerror = () => this._fallBackFromWorker('worker message error');
       this._worker = worker;
       this._workerUrl = url;
       return worker;
     } catch (err) {
-      this._useTimeoutFallback = true;
-      console.warn(
-        '[waveform-playlist] Timer: could not start a Worker ticker (' +
-          String(err) +
-          '); falling back to a main-thread setTimeout loop, which browsers may throttle in a hidden tab'
-      );
+      this._fallBackFromWorker(String(err));
       return null;
     }
   }

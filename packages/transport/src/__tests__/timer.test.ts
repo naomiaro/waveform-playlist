@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Timer, DEFAULT_TIMER_INTERVAL_MS } from '../core/timer';
+import { Timer, DEFAULT_TIMER_INTERVAL_MS, _resetTimerWorkerVerdictForTests } from '../core/timer';
 
 /** A stand-in for the browser Worker: records the script and messages, and
  *  lets a test deliver a tick message as the real Worker would. */
@@ -7,6 +7,7 @@ class FakeWorker {
   static instances: FakeWorker[] = [];
   static failConstruction = false;
   onmessage: ((event: { data: unknown }) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
   readonly posted: unknown[] = [];
   terminated = false;
   constructor(readonly url: string) {
@@ -28,6 +29,7 @@ class FakeWorker {
 const blobScripts: string[] = [];
 
 function installWorkerGlobals(): void {
+  _resetTimerWorkerVerdictForTests();
   FakeWorker.instances = [];
   FakeWorker.failConstruction = false;
   blobScripts.length = 0;
@@ -143,6 +145,7 @@ describe('Timer (Worker-driven)', () => {
 
 describe('Timer (setTimeout fallback)', () => {
   beforeEach(() => {
+    _resetTimerWorkerVerdictForTests();
     vi.useFakeTimers();
   });
   afterEach(() => {
@@ -191,6 +194,71 @@ describe('Timer (setTimeout fallback)', () => {
     vi.advanceTimersByTime(25);
     expect(onTick).toHaveBeenCalledTimes(2);
     timer.dispose();
+  });
+
+  it('a Worker that fails asynchronously falls back to setTimeout and keeps ticking', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start();
+    const worker = FakeWorker.instances[0];
+    worker.onerror?.({ message: 'blob: worker refused by CSP' });
+    expect(worker.terminated).toBe(true);
+    vi.advanceTimersByTime(50);
+    expect(onTick).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('setTimeout'));
+    warn.mockRestore();
+    timer.dispose();
+  });
+
+  it('start() after dispose() is a no-op that creates no Worker and no timeout', () => {
+    installWorkerGlobals();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onTick = vi.fn();
+    const timer = new Timer(onTick, { intervalMs: 25 });
+    timer.start();
+    timer.dispose();
+    timer.start();
+    expect(FakeWorker.instances).toHaveLength(1); // no second Worker
+    vi.advanceTimersByTime(100);
+    expect(onTick).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('disposed'));
+    warn.mockRestore();
+  });
+
+  it('the fallback does not double its chain when a tick stops and restarts the timer', () => {
+    vi.stubGlobal('Worker', undefined);
+    const ticks: number[] = [];
+    const timer: Timer = new Timer(
+      () => {
+        ticks.push(Date.now());
+        timer.stop();
+        timer.start(); // loop-on-end style restart from inside the tick
+      },
+      { intervalMs: 25 }
+    );
+    timer.start();
+    vi.advanceTimersByTime(100);
+    expect(ticks).toHaveLength(4); // 25, 50, 75, 100 — not 7 or 15
+    expect(vi.getTimerCount()).toBe(1);
+    timer.dispose();
+  });
+
+  it('a CSP refusal is probed and warned once per page, not once per Timer', () => {
+    installWorkerGlobals();
+    FakeWorker.failConstruction = true;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const a = new Timer(vi.fn(), { intervalMs: 25 });
+    const b = new Timer(vi.fn(), { intervalMs: 25 });
+    a.start();
+    b.start();
+    expect(warn).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(25);
+    a.dispose();
+    b.dispose();
+    warn.mockRestore();
   });
 
   it('a tick that calls stop() schedules nothing further', () => {
