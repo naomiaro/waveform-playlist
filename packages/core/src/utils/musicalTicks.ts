@@ -24,7 +24,8 @@ export type SnapTo =
  * Straight subdivisions (1/2, 1/4, 1/8, 1/16, 1/32) are always expressed as
  * fractions of a quarter note (ppqn), independent of the time signature
  * denominator.  Triplet subdivisions use × 2/3 of the corresponding straight
- * value.  'bar' and 'beat' depend on the first meter entry's time signature.
+ * value.  'bar' and 'beat' depend on the `timeSignature` argument (the
+ * caller passes the meter entry active at the position).
  * 'off' returns 0.
  */
 export function snapToTicks(snapTo: SnapTo, timeSignature: [number, number], ppqn = 960): number {
@@ -218,8 +219,9 @@ export function computeMusicalTicks(params: MusicalTickParams): MusicalTickData 
       stepTicks = tpSixteenth;
     }
 
-    // Find first step within this segment that is >= startTick
-    // Steps are aligned to segmentStartTick
+    // Visible tick range of this segment. The first emitted step may sit
+    // before segmentTickStart (its bar/segment anchor is off-screen); the
+    // pixel guard below skips it.
     const segmentTickStart = Math.max(segmentStartTick, startTick);
     const segmentTickEnd = Math.min(segmentEndTick - 1, endTick);
 
@@ -363,7 +365,12 @@ export function ticksToBarBeat(
  * the drawn ruler grid), so odd meters stay aligned — in 7/8 at 960 PPQN a
  * quarter-note grid is 0, 960, 1920, 2880 and then the bar line at 3360,
  * never 3840. A subdivision longer than the bar leaves only the bar lines.
- * An exact tie snaps up; a tick already on a line stays put.
+ * An exact tie snaps up; a tick already on a line stays put. Unlike
+ * `quantizeTick`, the result is not rounded (a fractional grid size at an
+ * unusual PPQN gives a fractional tick), triplet steps use the rounded
+ * `snapToTicks` value, negative ticks are accepted (the lattice extends
+ * backwards) and meter entries need not sit on bar boundaries of the
+ * preceding meter (the next line is capped at the following entry).
  *
  * Returns the original tick unchanged when `snapTo` is 'off'.
  */
@@ -375,12 +382,14 @@ export function snapTickToGrid(
 ): number {
   if (snapTo === 'off') return tick;
 
-  // Find the active meter entry for this tick
+  // Find the active meter entry for this tick, and where the next one starts
   let meter = meterEntries[0] ?? { tick: 0, numerator: 4, denominator: 4 };
+  let nextEntryTick = Infinity;
   for (const entry of meterEntries) {
     if (entry.tick <= tick) {
       meter = entry;
     } else {
+      nextEntryTick = entry.tick;
       break;
     }
   }
@@ -389,11 +398,19 @@ export function snapTickToGrid(
   const gridSize = snapToTicks(snapTo, ts, ppqn);
   if (gridSize <= 0) return tick;
 
-  // Snap within the bar containing the tick; the line after the bar's last
-  // whole subdivision is the next bar line.
   const barLength = ticksPerBar(ts, ppqn);
+  if (!(barLength > 0)) {
+    // Degenerate entry (numerator 0): no bars to anchor to — plain snap from
+    // the entry rather than a NaN that would flow into clip positions.
+    return meter.tick + Math.round((tick - meter.tick) / gridSize) * gridSize;
+  }
+
+  // Snap within the bar containing the tick; the line after the bar's last
+  // whole subdivision is the next bar line — or the next meter entry, when
+  // a hand-built map puts one off the bar grid (the drawn grid ends the
+  // segment there too).
   const barStart = meter.tick + Math.floor((tick - meter.tick) / barLength) * barLength;
   const previous = barStart + Math.floor((tick - barStart) / gridSize) * gridSize;
-  const next = Math.min(previous + gridSize, barStart + barLength);
+  const next = Math.min(previous + gridSize, barStart + barLength, nextEntryTick);
   return tick - previous < next - tick ? previous : next;
 }

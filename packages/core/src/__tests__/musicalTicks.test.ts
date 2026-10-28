@@ -257,6 +257,59 @@ describe('snapTickToGrid in odd meters restarts the grid at each bar line', () =
   });
 });
 
+describe('snapTickToGrid: meters whose bar is not a multiple of the step', () => {
+  // 3/4 at 960 PPQN: bar = 2880. A half-note grid is 0, 1920, then the bar
+  // line at 2880 — not 3840 (which the meter-anchored snap used to offer).
+  const meter34 = [{ tick: 0, numerator: 3, denominator: 4 }];
+
+  it("3/4 '1/2': the line after 1920 is the bar line at 2880", () => {
+    expect(snapTickToGrid(2800, '1/2', meter34, PPQN)).toBe(2880);
+    expect(snapTickToGrid(2400, '1/2', meter34, PPQN)).toBe(2880); // tie → up
+  });
+
+  it("3/4 '1/4T' never crosses the bar line", () => {
+    // 1/4T = 640: lines 0, 640, 1280, 1920, 2560, then the bar at 2880
+    expect(snapTickToGrid(3100, '1/4T', meter34, PPQN)).toBe(2880);
+  });
+
+  it('a degenerate meter entry (numerator 0) still returns a finite tick', () => {
+    const broken = [{ tick: 0, numerator: 0, denominator: 4 }];
+    expect(snapTickToGrid(100, 'beat', broken, PPQN)).toBe(0);
+    expect(snapTickToGrid(700, 'beat', broken, PPQN)).toBe(960);
+  });
+
+  it('the next line is capped at the following meter entry when entries are off the bar grid', () => {
+    // 4/4 → 7/8 at 2000 (not a 4/4 bar boundary; detectMeterChanges never
+    // builds such a map, but consumers may hand one in). The drawn grid ends
+    // the 4/4 segment at 2000, so the snap must not offer 3840 there.
+    const offGrid = [
+      { tick: 0, numerator: 4, denominator: 4 },
+      { tick: 2000, numerator: 7, denominator: 8 },
+    ];
+    expect(snapTickToGrid(1999, 'bar', offGrid, PPQN)).toBe(2000);
+    expect(snapTickToGrid(1500, '1/2', offGrid, PPQN)).toBe(1920);
+    expect(snapTickToGrid(1990, '1/2', offGrid, PPQN)).toBe(2000);
+  });
+});
+
+describe('computeMusicalTicks restarts non-coarse grid lines at each bar line', () => {
+  it('7/16 at eighth zoom: eighths within the bar, then the bar line — never 1920', () => {
+    const data = computeMusicalTicks({
+      meterEntries: [{ tick: 0, numerator: 7, denominator: 16 }], // bar = 1680
+      ticksPerPixel: 48,
+      startPixel: 0,
+      endPixel: 3360 / 48,
+      ppqn: PPQN,
+    });
+    expect(data.zoomLevel).toBe('eighth');
+    const ticks = data.ticks.map((t) => Math.round(t.pixel * 48));
+    expect(ticks).toEqual([0, 480, 960, 1440, 1680, 2160, 2640, 3120, 3360]);
+    const barTwo = data.ticks[4];
+    expect(barTwo.type).toBe('major');
+    expect(barTwo.label).toBe('2');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // snapTickToGrid agrees with the drawn grid (computeMusicalTicks)
 // ---------------------------------------------------------------------------
