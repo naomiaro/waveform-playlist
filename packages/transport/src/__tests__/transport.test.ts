@@ -527,12 +527,12 @@ describe('Transport', () => {
       else transport.clearTempos();
       expect(transport.timeToTick(1)).toBe(3840);
       (ctx as any).currentTime = 1.2;
-      for (const cb of [...rafCallbacks]) cb(16);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       const create = ctx.createBufferSource as Mock;
       expect(create.mock.results.length).toBe(1);
       expect(create.mock.results[0].value.start.mock.calls[0][0]).toBeCloseTo(5000 / 3840, 6);
       (ctx as any).currentTime = 1.25;
-      for (const cb of [...rafCallbacks]) cb(32);
+      vi.advanceTimersByTime(DEFAULT_TIMER_INTERVAL_MS);
       expect(create.mock.results.length).toBe(1); // re-anchored cursor: no regeneration
       transport.stop();
     }
