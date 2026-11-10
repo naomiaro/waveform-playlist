@@ -237,6 +237,14 @@ describe('scalePeakByGain', () => {
     expect(scalePeakByGain({ min: -0.5, max: 0.75 }, 7)).toEqual({ min: -1, max: 1 });
   });
 
+  it('clamps one-sided peaks too (a bar whose min is positive, or max negative)', () => {
+    // Zoomed in on a low-frequency swell, a whole bar sits above (or below)
+    // the centre line. Both values must stay inside the channel.
+    expect(scalePeakByGain({ min: 0.6, max: 0.9 }, 2)).toEqual({ min: 1, max: 1 });
+    expect(scalePeakByGain({ min: -0.9, max: -0.6 }, 2)).toEqual({ min: -1, max: -1 });
+    expect(scalePeakByGain({ min: 0.2, max: 0.4 }, 2)).toEqual({ min: 0.4, max: 0.8 });
+  });
+
   it('draws silence at zero gain', () => {
     const silent = scalePeakByGain({ min: -0.5, max: 0.5 }, 0);
     // toBeCloseTo: min is -0, which draws identically to 0.

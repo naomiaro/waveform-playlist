@@ -64,6 +64,10 @@ export function aggregatePeaks(
   return { min: minPeak, max: maxPeak };
 }
 
+function clampToFullScale(value: number): number {
+  return Math.max(-1, Math.min(1, value));
+}
+
 /**
  * Scales a drawn peak by a linear gain (a clip's gain), clamped to full
  * scale so a boosted bar never leaves its channel. Display-only: the
@@ -78,9 +82,12 @@ export function scalePeakByGain(peak: AggregatedPeak, gain: number): AggregatedP
     return peak;
   }
   const factor = Math.abs(gain);
+  // Clamp BOTH values on BOTH sides. Zoomed in on low-frequency content a
+  // bar's min is often positive (or its max negative): {min: 0.6, max: 0.9}
+  // at gain 2 would otherwise leave min at 1.2, outside the channel.
   return {
-    min: Math.max(-1, peak.min * factor),
-    max: Math.min(1, peak.max * factor),
+    min: clampToFullScale(peak.min * factor),
+    max: clampToFullScale(peak.max * factor),
   };
 }
 
