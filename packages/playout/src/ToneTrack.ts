@@ -9,10 +9,26 @@ import {
 } from 'tone';
 import { Track, gainToDb, applyFadeIn, applyFadeOut, type Fade } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
+import { followInsertChannelLayout, restoreSourceChannelLayout } from './trackInsert';
 
+/**
+ * Wires a track's effects, PRE-FADER (#660): connect `trackInput` through
+ * your effects and into `faderInput`. The track's volume, pan and mute come
+ * after, so the fader never changes how hard a compressor or distortion
+ * works.
+ *
+ * The chain MUST end at `faderInput`. Anything connected elsewhere (the
+ * master bus, `toDestination()`) bypasses the track's volume, pan, mute and
+ * solo.
+ *
+ * @param trackInput - Where the track's clips/notes arrive (unity gain)
+ * @param faderInput - The track's volume stage; connect the chain's end here
+ * @param isOffline - Whether rendering offline (for export)
+ * @returns Optional cleanup function called when the track is disposed
+ */
 export type TrackEffectsFunction = (
-  graphEnd: Gain,
-  masterGainNode: ToneAudioNode,
+  trackInput: Gain,
+  faderInput: ToneAudioNode,
   isOffline: boolean
 ) => void | (() => void);
 
@@ -46,14 +62,18 @@ interface ScheduledClip {
 export class ToneTrack {
   private scheduledClips: ScheduledClip[];
   private activeSources: Set<AudioBufferSourceNode> = new Set();
+  /** Pre-fader summing point: clip sources → inputGain → [effects] → volume. */
+  private inputGain: Gain;
   private volumeNode: Volume;
   private panNode: Panner;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
-  private _destination: ToneAudioNode;
   private _hasClosureEffects: boolean;
-  private _effectsChainNode: AudioNode | null = null;
+  private _sourceChannelCount: number;
+  private _effectsChain: { input: AudioNode; output: AudioNode } | null = null;
+  /** Whether the panner was switched to follow a hook chain's layout. */
+  private _pannerFollowsInsert = false;
   // Guard against ghost tick schedule callbacks. After stop/start cycles with
   // loops, stale Clock._lastUpdate causes ticks from the previous cycle to fire
   // Transport.schedule() callbacks at past positions (e.g., time 0 clips fire
@@ -66,27 +86,31 @@ export class ToneTrack {
     this.track = options.track;
 
     // Create shared track-level Tone.js nodes
+    this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
     // Match channelCount to source — Tone.js Panner defaults to 1 (stereo→mono downmix).
+    this._sourceChannelCount = options.channelCount ?? 1;
     this.panNode = new Panner({
       pan: options.track.stereoPan,
-      channelCount: options.channelCount ?? 1,
+      channelCount: this._sourceChannelCount,
     });
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
-    // Chain shared Tone.js nodes: Volume → Pan → MuteGain
+    // Chain shared Tone.js nodes: Volume → Pan → MuteGain → destination
     this.volumeNode.chain(this.panNode, this.muteGain);
+    this.muteGain.connect(options.destination || getDestination());
 
-    // Connect to destination or apply effects chain
-    this._destination = options.destination || getDestination();
+    // Pre-fader insert (#660): inputGain → [effects] → Volume. The fader,
+    // pan and mute all come after the effects.
     this._hasClosureEffects = Boolean(options.effects);
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, this._destination, false);
+      followInsertChannelLayout(this.panNode);
+      const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
     } else {
-      this.muteGain.connect(this._destination);
+      this.inputGain.connect(this.volumeNode);
     }
 
     // Create clips array - support both legacy single buffer and modern clips array
@@ -109,17 +133,16 @@ export class ToneTrack {
     const transport = getTransport();
     const rawContext = getContext().rawContext as AudioContext;
 
-    // Get the native AudioNode input of the Volume for native→Tone connection.
-    // Volume.input is a Tone.js Gain<"decibels"> whose .input is the native GainNode.
-    // Cast through unknown since Gain<"decibels"> and Gain<"gain"> don't overlap.
-    const volumeNativeInput = (this.volumeNode.input as unknown as Gain).input;
+    // Native AudioNode behind the track input, for native→Tone connection
+    // (plain Gain.input is the native GainNode).
+    const trackNativeInput = this.inputGain.input;
 
     // Schedule each clip via Transport.schedule() with native AudioBufferSourceNode
     this.scheduledClips = clipInfos.map((clipInfo) => {
       // Native GainNode for per-clip fade envelope — created once, reused across play cycles
       const fadeGainNode = rawContext.createGain();
       fadeGainNode.gain.value = clipInfo.gain;
-      fadeGainNode.connect(volumeNativeInput);
+      fadeGainNode.connect(trackNativeInput);
 
       // Schedule a permanent Transport event at the clip's absolute timeline position.
       // This callback fires on every play and every loop iteration when Transport
@@ -223,11 +246,9 @@ export class ToneTrack {
   addClip(clipInfo: ClipInfo): ScheduledClip {
     const transport = getTransport();
     const rawContext = getContext().rawContext as AudioContext;
-    const volumeNativeInput = (this.volumeNode.input as unknown as Gain).input;
-
     const fadeGainNode = rawContext.createGain();
     fadeGainNode.gain.value = clipInfo.gain;
-    fadeGainNode.connect(volumeNativeInput);
+    fadeGainNode.connect(this.inputGain.input);
 
     const absTransportTime = this.track.startTime + clipInfo.startTime;
     const scheduleId = transport.schedule((audioContextTime: number) => {
@@ -560,13 +581,21 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
+  /** Native node behind the Volume stage — where an external chain returns. */
+  private get _faderNativeInput(): AudioNode {
+    // Volume.input is a Tone.js Gain<"decibels"> whose .input is the native
+    // GainNode; cast through unknown (Gain<"decibels"> vs Gain<"gain">).
+    return (this.volumeNode.input as unknown as Gain).input;
+  }
+
   /**
-   * Insert an external effects chain: reroute muteGain → node instead of
-   * muteGain → destination. The caller wires the chain's output onward
-   * (dawcore's EffectsManager connects it to the master bus input).
-   * Mutually exclusive with the TrackEffectsFunction closure model.
+   * Insert an external effects chain PRE-FADER (#660):
+   * `inputGain → input … output → volume → pan → mute`. The track owns both
+   * edges; the caller only builds what lies between the two nodes (pass the
+   * same node twice for a single-node effect). Replaces any chain connected
+   * earlier. Mutually exclusive with the TrackEffectsFunction closure model.
    */
-  connectEffects(node: AudioNode): void {
+  connectEffects(input: AudioNode, output: AudioNode): void {
     if (this._hasClosureEffects) {
       throw new Error(
         '[waveform-playlist] Track "' +
@@ -575,14 +604,11 @@ export class ToneTrack {
           'closure effects are mutually exclusive.'
       );
     }
-    // Guard the disconnect (as disconnectEffects does) — a consumer may have
-    // disposed the old chain node externally; the rewire must proceed.
+    this._releaseEffectsChain();
+    // Guard the disconnect — the rewire must proceed even if the direct edge
+    // is already gone.
     try {
-      if (this._effectsChainNode) {
-        this.muteGain.disconnect(this._effectsChainNode);
-      } else {
-        this.muteGain.disconnect(this._destination);
-      }
+      this.inputGain.disconnect();
     } catch (err) {
       console.warn(
         '[waveform-playlist] connectEffects disconnect on track "' +
@@ -591,23 +617,46 @@ export class ToneTrack {
           String(err)
       );
     }
-    this.muteGain.connect(node);
-    this._effectsChainNode = node;
+    this._pannerFollowsInsert = followInsertChannelLayout(this.panNode);
+    this.inputGain.connect(input);
+    output.connect(this._faderNativeInput);
+    this._effectsChain = { input, output };
   }
 
-  /** Restore the direct muteGain → destination connection. Safe when nothing is connected. */
+  /** Restore the direct inputGain → volume connection. Safe when nothing is connected. */
   disconnectEffects(): void {
-    if (!this._effectsChainNode) return;
+    if (!this._effectsChain) return;
+    this._releaseEffectsChain();
     try {
-      this.muteGain.disconnect(this._effectsChainNode);
+      this.inputGain.disconnect();
     } catch (err) {
       console.warn(
         '[waveform-playlist] disconnectEffects: ' +
           (err instanceof Error ? err.message : String(err))
       );
     }
-    this.muteGain.connect(this._destination);
-    this._effectsChainNode = null;
+    if (this._pannerFollowsInsert) {
+      restoreSourceChannelLayout(this.panNode, this._sourceChannelCount);
+      this._pannerFollowsInsert = false;
+    }
+    this.inputGain.connect(this.volumeNode);
+  }
+
+  /** Targeted disconnect of the chain's return edge (output → volume); a
+   *  consumer may have disposed its chain first, so failures only warn. */
+  private _releaseEffectsChain(): void {
+    if (!this._effectsChain) return;
+    try {
+      this._effectsChain.output.disconnect(this._faderNativeInput);
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] effects chain was already disconnected from track "' +
+          this.track.id +
+          '": ' +
+          String(err)
+      );
+    }
+    this._effectsChain = null;
   }
 
   dispose(): void {
@@ -647,6 +696,16 @@ export class ToneTrack {
       }
     });
 
+    // Drop an external chain's return edge so it stops feeding (and
+    // retaining) this track's dead volume node.
+    this._releaseEffectsChain();
+    try {
+      this.inputGain.dispose();
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Error disposing inputGain on track "${this.id}":` + ' ' + String(err)
+      );
+    }
     try {
       this.volumeNode.dispose();
     } catch (err) {

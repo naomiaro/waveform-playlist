@@ -30,8 +30,9 @@ export interface ToneAdapterOptions {
  * a standardized-audio-context graph.
  */
 export interface ToneEffectsTransport {
-  connectTrackOutput(trackId: string, node: AudioNode): void;
-  disconnectTrackOutput(trackId: string): void;
+  /** Pre-fader track insert: clips → input … output → volume → pan → mute. */
+  connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void;
+  disconnectTrackEffects(trackId: string): void;
   connectMasterOutput(node: AudioNode): void;
   disconnectMasterOutput(): void;
   readonly masterOutputNode: AudioNode;
@@ -259,9 +260,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   }
 
   const effectsTransport: ToneEffectsTransport = {
-    connectTrackOutput: (trackId, node) =>
-      requireEffectsPlayout().connectTrackOutput(trackId, node),
-    disconnectTrackOutput: (trackId) => requireEffectsPlayout().disconnectTrackOutput(trackId),
+    connectTrackEffects: (trackId, input, output) =>
+      requireEffectsPlayout().connectTrackEffects(trackId, input, output),
+    disconnectTrackEffects: (trackId) => requireEffectsPlayout().disconnectTrackEffects(trackId),
     connectMasterOutput: (node) => requireEffectsPlayout().connectMasterOutput(node),
     disconnectMasterOutput: () => requireEffectsPlayout().disconnectMasterOutput(),
     get masterOutputNode(): AudioNode {

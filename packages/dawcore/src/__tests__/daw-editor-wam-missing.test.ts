@@ -29,8 +29,8 @@ function makeMockAdapter() {
     } as unknown as AudioContext,
     ppqn: 960,
     transport: {
-      connectTrackOutput: vi.fn(),
-      disconnectTrackOutput: vi.fn(),
+      connectTrackEffects: vi.fn(),
+      disconnectTrackEffects: vi.fn(),
       connectMasterOutput: vi.fn(),
       disconnectMasterOutput: vi.fn(),
       masterOutputNode: mockGainNode(),

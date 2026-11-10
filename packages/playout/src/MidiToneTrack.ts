@@ -16,6 +16,7 @@ import type { SynthOptions } from 'tone';
 import { Track, gainToDb, type MidiNoteData } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
+import { followInsertChannelLayout } from './trackInsert';
 
 /**
  * Shared interface for tracks managed by TonePlayout.
@@ -100,6 +101,8 @@ export class MidiToneTrack implements PlayableTrack {
   private snareSynth: NoiseSynth; // No pitch param, can't wrap in PolySynth
   private cymbalSynth: PolySynth<MetalSynth>;
   private tomSynth: PolySynth<MembraneSynth>;
+  /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
+  private inputGain: Gain;
   private volumeNode: Volume;
   private panNode: Panner;
   private muteGain: Gain;
@@ -110,6 +113,7 @@ export class MidiToneTrack implements PlayableTrack {
     this.track = options.track;
 
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
+    this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
     this.panNode = new Panner(options.track.stereoPan);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
@@ -117,7 +121,7 @@ export class MidiToneTrack implements PlayableTrack {
 
     // Melodic: PolySynth with basic Synth voice
     this.synth = new PolySynth(Synth, options.synthOptions);
-    this.synth.connect(this.volumeNode);
+    this.synth.connect(this.inputGain);
 
     // Percussion: PolySynth wrappers for polyphonic playback
     this.kickSynth = new PolySynth(MembraneSynth, {
@@ -151,20 +155,23 @@ export class MidiToneTrack implements PlayableTrack {
       },
     } as never);
 
-    this.kickSynth.connect(this.volumeNode);
-    this.snareSynth.connect(this.volumeNode);
-    this.cymbalSynth.connect(this.volumeNode);
-    this.tomSynth.connect(this.volumeNode);
+    this.kickSynth.connect(this.inputGain);
+    this.snareSynth.connect(this.inputGain);
+    this.cymbalSynth.connect(this.inputGain);
+    this.tomSynth.connect(this.inputGain);
 
-    // Connect to destination or apply effects chain
+    // Connect to destination; effects (if any) are inserted pre-fader
     const destination = options.destination || getDestination();
+    this.muteGain.connect(destination);
+    // Pre-fader insert (#660): inputGain → [effects] → Volume → Pan → Mute.
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, destination, false);
+      followInsertChannelLayout(this.panNode);
+      const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
     } else {
-      this.muteGain.connect(destination);
+      this.inputGain.connect(this.volumeNode);
     }
 
     // Create a Tone.Part for each clip, scheduling notes relative to Transport
@@ -431,6 +438,15 @@ export class MidiToneTrack implements PlayableTrack {
             String(err)
         );
       }
+    }
+    try {
+      this.inputGain.dispose();
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Error disposing inputGain on MIDI track "${this.id}":` +
+          ' ' +
+          String(err)
+      );
     }
     try {
       this.volumeNode.dispose();

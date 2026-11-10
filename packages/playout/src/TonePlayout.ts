@@ -358,25 +358,28 @@ export class TonePlayout {
     return (this.masterVolume.input as unknown as Gain).input;
   }
 
-  /** Insert an external chain on a track: muteGain → node (caller wires node onward). */
-  connectTrackOutput(trackId: string, node: AudioNode): void {
+  /**
+   * Insert an external chain on a track, PRE-FADER (#660): clips → input …
+   * output → volume → pan → mute. The track wires both edges.
+   */
+  connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void {
     const track = this.tracks.get(trackId);
     if (!track) {
-      throw new Error('[waveform-playlist] connectTrackOutput: unknown track "' + trackId + '"');
+      throw new Error('[waveform-playlist] connectTrackEffects: unknown track "' + trackId + '"');
     }
     if (!(track instanceof ToneTrack)) {
       throw new Error(
-        '[waveform-playlist] connectTrackOutput: per-track effects chains are not supported ' +
+        '[waveform-playlist] connectTrackEffects: per-track effects chains are not supported ' +
           'for MIDI tracks on the Tone adapter (track "' +
           trackId +
           '")'
       );
     }
-    track.connectEffects(node);
+    track.connectEffects(input, output);
   }
 
   /** Restore a track's direct connection. No-op for unknown or MIDI tracks. */
-  disconnectTrackOutput(trackId: string): void {
+  disconnectTrackEffects(trackId: string): void {
     const track = this.tracks.get(trackId);
     if (track instanceof ToneTrack) {
       track.disconnectEffects();

@@ -36,8 +36,8 @@ function makeMockAdapter() {
     close: vi.fn().mockResolvedValue(undefined),
   };
   const transport = {
-    connectTrackOutput: vi.fn(),
-    disconnectTrackOutput: vi.fn(),
+    connectTrackEffects: vi.fn(),
+    disconnectTrackEffects: vi.fn(),
     connectMasterOutput: vi.fn(),
     disconnectMasterOutput: vi.fn(),
     masterOutputNode: mockGainNode(),
@@ -163,15 +163,19 @@ describe('<daw-editor> master effects API', () => {
 });
 
 describe('<daw-track> effects API', () => {
-  it('addEffect wires the track chain via connectTrackOutput and routes to the master bus', async () => {
+  it('addEffect wires the track chain as a pre-fader insert via connectTrackEffects (#660)', async () => {
     const track = await appendTrack();
     const id = track.addEffect('native-gain');
 
     expect(typeof id).toBe('string');
-    expect(adapter.transport.connectTrackOutput).toHaveBeenCalledWith(
-      track.trackId,
-      expect.anything()
-    );
+    expect(adapter.transport.connectTrackEffects).toHaveBeenCalledTimes(1);
+    const [trackId, chainInput, chainOutput] = adapter.transport.connectTrackEffects.mock.calls[0];
+    expect(trackId).toBe(track.trackId);
+    // Both ends of the chain go to the transport, which returns the output
+    // into the track ahead of volume/pan. The manager must NOT also route the
+    // chain to the master bus — that would bypass the fader, pan and mute.
+    expect(chainInput).not.toBe(chainOutput);
+    expect(chainOutput.connect).not.toHaveBeenCalledWith(adapter.transport.masterOutputNode);
     expect(track.effects).toHaveLength(1);
     expect(track.effects[0].type).toBe('native-gain');
     // Master chain untouched
@@ -227,6 +231,36 @@ describe('<daw-track> effects API', () => {
     expect((onAdd.mock.calls[0][0] as any).target).toBe(editor);
   });
 
+  it('rewiring after a structural change hands the same chain ends back to the transport', async () => {
+    const track = await appendTrack();
+    track.addEffect('native-gain');
+    const [, chainInput, chainOutput] = adapter.transport.connectTrackEffects.mock.calls[0];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._effectsManager.rewireTrackChains();
+
+    expect(adapter.transport.connectTrackEffects).toHaveBeenLastCalledWith(
+      track.trackId,
+      chainInput,
+      chainOutput
+    );
+    expect(chainOutput.connect).not.toHaveBeenCalledWith(adapter.transport.masterOutputNode);
+  });
+
+  it('an adapter that only has the old post-fader hook is refused with an upgrade hint', async () => {
+    const old = makeMockAdapter();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transport = old.transport as any;
+    transport.connectTrackOutput = vi.fn();
+    delete transport.connectTrackEffects;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any).adapter = old;
+    const track = await appendTrack();
+
+    expect(() => track.addEffect('native-gain')).toThrow(/pre-fader[\s\S]*connectTrackEffects/);
+    expect(transport.connectTrackOutput).not.toHaveBeenCalled();
+  });
+
   it('removing the track disposes its chain and disconnects the transport hook', async () => {
     const track = await appendTrack();
     track.addEffect('native-gain');
@@ -234,7 +268,7 @@ describe('<daw-track> effects API', () => {
     track.remove();
     await flush();
 
-    expect(adapter.transport.disconnectTrackOutput).toHaveBeenCalledWith(track.trackId);
+    expect(adapter.transport.disconnectTrackEffects).toHaveBeenCalledWith(track.trackId);
   });
 
   it('disconnecting the editor disconnects the master chain', () => {
@@ -257,7 +291,7 @@ describe('<daw-track> effects API', () => {
     // Chains were wired into the OLD adapter's transport — they must be
     // severed there, not on the new adapter (which never saw them).
     expect(adapter.transport.disconnectMasterOutput).toHaveBeenCalled();
-    expect(adapter.transport.disconnectTrackOutput).toHaveBeenCalledWith(track.trackId);
+    expect(adapter.transport.disconnectTrackEffects).toHaveBeenCalledWith(track.trackId);
     expect(next.transport.disconnectMasterOutput).not.toHaveBeenCalled();
     expect(editor.effects).toHaveLength(0);
     expect(track.effects).toHaveLength(0);

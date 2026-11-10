@@ -7,8 +7,10 @@ const PREFIX = '[waveform-playlist] ';
 
 /** The transport surface the effects system needs — satisfied by @dawcore/transport's Transport. */
 export interface EffectsTransportLike {
-  connectTrackOutput(trackId: string, node: AudioNode): void;
-  disconnectTrackOutput(trackId: string): void;
+  /** PRE-FADER track insert (#660): clips → input … output → volume → pan →
+   *  mute. The transport wires both edges, including the chain's return. */
+  connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void;
+  disconnectTrackEffects(trackId: string): void;
   connectMasterOutput(node: AudioNode): void;
   disconnectMasterOutput(): void;
   readonly masterOutputNode: AudioNode;
@@ -48,7 +50,9 @@ function makeGuiRecord(
 
 /**
  * Owns all effect chains for one editor: the master chain plus one chain per
- * track. Wires chains into the adapter's transport hooks and dispatches the
+ * track. Track chains are PRE-FADER inserts (clips → chain → volume → pan →
+ * mute); the master chain sits after the master gain. Wires chains into the
+ * adapter's transport hooks and dispatches the
  * daw-effect-* events from the owning element (track element for track
  * chains, the editor for the master chain) so they bubble track → editor.
  */
@@ -208,8 +212,9 @@ export class EffectsManager {
     const transport = this._getAdapter()?.transport;
     if (!transport) return;
     for (const [trackId, chain] of this._trackChains) {
-      transport.connectTrackOutput(trackId, chain.input);
-      chain.output.connect(transport.masterOutputNode);
+      // The transport owns the chain's return edge (output → fader) and
+      // released the old one when it disposed/replaced the track node.
+      transport.connectTrackEffects(trackId, chain.input, chain.output);
     }
   }
 
@@ -221,7 +226,7 @@ export class EffectsManager {
       this._destroyGui(entry.id);
     }
     try {
-      this._getAdapter()?.transport?.disconnectTrackOutput(trackId);
+      this._getAdapter()?.transport?.disconnectTrackEffects(trackId);
     } catch (err) {
       console.warn(PREFIX + 'EffectsManager: error disconnecting track output: ' + String(err));
     }
@@ -259,10 +264,17 @@ export class EffectsManager {
       );
     }
     const { audioContext, transport } = adapter;
-    if (!audioContext || !transport || typeof transport.connectTrackOutput !== 'function') {
+    if (!audioContext || !transport || typeof transport.connectTrackEffects !== 'function') {
+      const outdated =
+        typeof (transport as { connectTrackOutput?: unknown } | undefined)?.connectTrackOutput ===
+        'function';
       throw new Error(
         PREFIX +
-          'the current adapter does not expose effects hooks (transport.connectTrackOutput / connectMasterOutput).'
+          (outdated
+            ? 'the current adapter exposes the old post-fader effects hook (transport.connectTrackOutput). ' +
+              'Track effects are pre-fader inserts now — upgrade @dawcore/transport (>= 0.0.16) or ' +
+              '@waveform-playlist/playout (>= 13) for transport.connectTrackEffects.'
+            : 'the current adapter does not expose effects hooks (transport.connectTrackEffects / connectMasterOutput).')
       );
     }
     return { audioContext, transport };
@@ -477,8 +489,9 @@ export class EffectsManager {
     if (existing) return existing;
     const { audioContext, transport } = this._requireWiring();
     const chain = new EffectsChainController(audioContext);
-    transport.connectTrackOutput(trackId, chain.input);
-    chain.output.connect(transport.masterOutputNode);
+    // Pre-fader insert: the track's volume, pan and mute come AFTER the
+    // chain, so the fader never drives a compressor (#660).
+    transport.connectTrackEffects(trackId, chain.input, chain.output);
     this._trackChains.set(trackId, chain);
     return chain;
   }

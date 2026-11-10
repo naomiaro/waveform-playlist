@@ -57,11 +57,15 @@
 ```
 AudioBufferSourceNode (native, one-shot, created per play/loop)
   → GainNode (native, per-clip fade envelope)
-  → Volume.input (Tone.js, shared per-track)
+  → inputGain (Tone.js, shared per-track, unity)
+  → [effects — pre-fader insert, #660]
+  → Volume (Tone.js, shared per-track)
   → Panner (Tone.js, shared per-track)
   → muteGain (Tone.js, shared per-track)
-  → effects chain or destination
+  → destination
 ```
+
+**Pre-fader effects (#660).** All three track classes (`ToneTrack`, `MidiToneTrack`, `SoundFontToneTrack`) sum their sources into `inputGain` and insert effects between it and `Volume` — the `TrackEffectsFunction` closure is called as `effects(inputGain, volumeNode, false)`, and `ToneTrack.connectEffects(input, output)` (behind `TonePlayout.connectTrackEffects` / `adapter.transport.connectTrackEffects`) wires `inputGain → input … output → Volume`'s native input. Mute is last, so mute/solo cut effect tails. A closure that ignores its second argument and connects to the master or `toDestination()` now BYPASSES volume, pan, mute and solo — it must end at `faderInput`. **Panner layout:** Tone's `Panner` is `explicit` with a source-sized `channelCount`; once a chain feeds it, a mono track with a stereo effect would be downmixed to mono, so `followInsertChannelLayout(panNode)` (`src/trackInsert.ts`, exported for the browser's offline render) switches it to `clamped-max`/2 whenever a track has effects (closure at construction, or a hook chain — restored on `disconnectEffects`). Mono stays mono (same pan law and level), stereo stays stereo. Tracks without effects keep the `explicit` layout untouched. **NATIVE CONTEXT ONLY:** standardized-audio-context (Tone's default, the React default) locks a StereoPanner's `channelCountMode` to `'explicit'` and throws `NotSupportedError` on any change (its bug #105 — the Safari polyfill can't do clamped-max). The helper sets the MODE first inside try/catch and returns `false` there, leaving the source-sized panner alone: levels and pan law are unchanged, but a stereo effect on a MONO track is summed to mono before panning (measured: a left-only effect comes out L = R). Do NOT 'fix' that by forcing an explicit count of 2 — it re-laws every mono track with effects (+3 dB centre, +6 dB hard-panned), and `useTrackDynamicEffects` gives EVERY track a closure. Found only by a real-Tone browser probe; the unit mocks happily accepted the assignment. **Test mocks:** `inputGain` is built as `new Gain({ gain: 1 })` and `muteGain` as `new Gain(0 | 1)` — `ToneTrack.test.ts`'s `Gain` mock tells them apart by argument shape.
 
 **Key design:**
 - `Transport.schedule(callback, absTime)` creates permanent timeline events that re-fire on every loop iteration
@@ -75,7 +79,7 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
 
 **Schedule guard offset (`_scheduleGuardOffset`):** Ghost ticks from stale `Clock._lastUpdate` can fire `Transport.schedule()` callbacks at past positions (second manifestation of #1419). After a loop iteration resets ticks to ~0, ghost ticks include near-0 values, causing `Transport.schedule(cb, 0)` to fire even when starting at offset 1.5s. This creates duplicate `AudioBufferSourceNode`s alongside those from `startMidClipSources()`. Fix: `_scheduleGuardOffset` on ToneTrack suppresses schedule callbacks for clips before the play/loop offset. Set before `transport.start()` and in the loop handler. Complementary with `startMidClipSources`' strict `<` guard — no gaps, no overlap.
 
-**Native→Tone.js connection:** `fadeGainNode.connect((volumeNode.input as unknown as Gain).input)` — accesses the native GainNode backing Tone.js Volume's input Gain (double cast needed, see Type Gotchas below).
+**Native→Tone.js connection:** `fadeGainNode.connect(inputGain.input)` — a plain Tone `Gain`'s `.input` IS the native GainNode. An external effects chain returns into `(volumeNode.input as unknown as Gain).input`, the native GainNode backing Tone.js Volume's input Gain (double cast needed, see Type Gotchas below).
 
 **Loop property ordering:** `_processTick` checks `ticks >= _loopEnd` every tick. `_loopEnd` defaults to `0`, so `transport.loop = true` before updating `loopEnd` causes immediate wrap. **Always:** set `loopStart`/`loopEnd` BEFORE `transport.loop = enabled`.
 
@@ -155,8 +159,8 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 ```
 AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
   → GainNode (native, per-note ADSR volume envelope)
-  → Volume.input (Tone.js, shared per-track)
-  → Panner → muteGain → effects/destination
+  → inputGain (Tone.js, shared per-track) → [effects, pre-fader]
+  → Volume → Panner → muteGain → destination
 ```
 
 **SoundFontCache:** Fetches SF2 URL → parses with `soundfont2` library → caches `AudioBuffer` per sample index. `getAudioBuffer(midiNote, bank, preset)` returns `SoundFontSample` with `buffer`, `playbackRate`, loop points, and volume envelope. AudioBuffer is cached by sample index (shared across zones), but loop/envelope data is per-zone (extracted from generators on each lookup). Lazily converts `Int16Array` → `Float32Array` → `AudioBuffer` on first access.

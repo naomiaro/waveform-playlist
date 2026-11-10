@@ -7,15 +7,19 @@ import {
   type ClipTrack,
   type FadeType,
 } from '@waveform-playlist/core';
-import { getUnderlyingAudioParam, getGlobalAudioContext } from '@waveform-playlist/playout';
+import {
+  getUnderlyingAudioParam,
+  getGlobalAudioContext,
+  followInsertChannelLayout,
+} from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
 
 /** Function type for per-track effects (same as in @waveform-playlist/core) */
 export type TrackEffectsFunction = (
-  graphEnd: unknown,
-  destination: unknown,
+  trackInput: unknown,
+  faderInput: unknown,
   isOffline: boolean
 ) => void | (() => void);
 
@@ -33,10 +37,14 @@ export type OfflineEffectsFunction = (
   isOffline: boolean
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
-/** Per-track variant of OfflineEffectsFunction. */
+/**
+ * Per-track variant of OfflineEffectsFunction. Pre-fader, like the live
+ * TrackEffectsFunction: wire `trackInput` through the effects into
+ * `faderInput` (the track's volume stage) — never straight to the master.
+ */
 export type OfflineTrackEffectsFunction = (
-  graphEnd: Gain,
-  masterGainNode: ToneAudioNode,
+  trackInput: Gain,
+  faderInput: ToneAudioNode,
   isOffline: boolean
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
@@ -228,9 +236,11 @@ export function useExportWav(): UseExportWavReturn {
  * Render the playlist offline. Uses renderToneOffline — a hand-rolled
  * Tone.Offline variant that renders on a NATIVE OfflineAudioContext in
  * native-context mode so mixed Tone + WAM chains can be hosted (#536).
- * Mirrors the live playback graph: Player → fadeGain → trackVolume →
- * trackPan → trackMute → masterVolume → destination. Effects chains (master
- * and per-track) are conditionally inserted when provided; their cleanups
+ * Mirrors the live playback graph: Player → fadeGain → trackInput →
+ * [track effects] → trackVolume → trackPan → trackMute → masterVolume →
+ * destination. Track effects are pre-fader inserts (#660), as in live
+ * playback. Effects chains (master and per-track) are conditionally
+ * inserted when provided; their cleanups
  * (which destroy offline WAM clones) always run after the render.
  */
 async function renderOffline(
@@ -276,7 +286,8 @@ async function renderOffline(
         }
 
         for (const { track, state } of audibleTracks) {
-          // Track-level nodes mirror ToneTrack: volume → pan → mute
+          // Track-level nodes mirror ToneTrack: input → [effects] → volume → pan → mute
+          const trackInput = new Gain({ gain: 1 });
           const trackVolume = new Volume(gainToDb(state.volume));
           // Match channelCount to source material — Tone.js Panner defaults to 1
           // which forces stereo→mono downmix. Use 2 only for stereo sources.
@@ -284,15 +295,21 @@ async function renderOffline(
           const trackMute = new Gain(state.muted ? 0 : 1);
 
           // Conditionally insert per-track effects chain (may be async — WAM cloning)
+          // PRE-FADER: trackInput → effects → trackVolume, so volume and pan
+          // never change how hard the effects work (parity with ToneTrack).
           const trackEffects = createOfflineTrackEffects?.(track.id);
           if (trackEffects && applyEffects) {
-            const cleanup = await trackEffects(trackMute, masterVolume, true);
+            // The panner is now fed by the chain — let a stereo effect on a
+            // mono track stay stereo, exactly as live playback does.
+            followInsertChannelLayout(trackPan);
+            const cleanup = await trackEffects(trackInput, trackVolume, true);
             if (cleanup) cleanups.push(cleanup);
           } else {
-            trackMute.connect(masterVolume);
+            trackInput.connect(trackVolume);
           }
 
-          // Connect track chain: trackVolume → trackPan → trackMute
+          // Connect track chain: trackVolume → trackPan → trackMute → master
+          trackMute.connect(masterVolume);
           trackPan.connect(trackMute);
           trackVolume.connect(trackPan);
 
@@ -328,9 +345,9 @@ async function renderOffline(
             const player = new Player(toneBuffer);
             const fadeGain = new Gain(clipGain);
 
-            // Connect: player → fadeGain → trackVolume
+            // Connect: player → fadeGain → trackInput (pre-fader, pre-effects)
             player.connect(fadeGain);
-            fadeGain.connect(trackVolume);
+            fadeGain.connect(trackInput);
 
             // Apply fade automation via native AudioParam
             if (applyEffects) {

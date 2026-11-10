@@ -9,8 +9,8 @@ Native Web Audio transport for the dawcore family — multi-track scheduling, lo
 - **Dual timeline** — Sample-absolute positions for audio clips, PPQN tick positions for metronome/MIDI.
 - **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Default synthesized click sounds out of the box.
 - **Count-in (pre-roll)** — Configurable bars of click sounds before playback begins. Beat-by-beat events for UI countdown.
-- **Per-track signal chain** — Native GainNode (volume) → StereoPannerNode → GainNode (mute) → effects hook → master output.
-- **Effects plugin hook** — `connectTrackOutput(trackId, node)` and `connectMasterOutput(node)` insert any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes) per-track or on the master bus.
+- **Per-track signal chain** — clip sources → effects insert (pre-fader) → GainNode (volume) → StereoPannerNode → GainNode (mute) → master output.
+- **Effects plugin hook** — `connectTrackEffects(trackId, input, output)` (pre-fader track insert) and `connectMasterOutput(node)` insert any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes) per-track or on the master bus.
 - **Type-safe coordinates** — Branded `Tick` and `Sample` types prevent accidentally passing seconds where ticks or samples are expected. Zero runtime cost.
 - **PlayoutAdapter bridge** — `NativePlayoutAdapter` implements the `PlayoutAdapter` interface from `@waveform-playlist/engine`.
 
@@ -150,21 +150,26 @@ transport.setTempo(140, transport.barToTick(9), { interpolation: 'linear' });  /
 ### Effects
 
 ```typescript
-// Insert any AudioNode chain between track output and master
-const reverb = audioContext.createConvolver();
-reverb.buffer = impulseResponse;
-reverb.connect(transport.audioContext.destination);
+// Insert any AudioNode chain on a track, PRE-FADER:
+//   clips → input … output → volume → pan → mute → master
+// Pass the chain's first and last node; the transport wires both ends.
+const highpass = audioContext.createBiquadFilter();
+highpass.type = 'highpass';
+const compressor = audioContext.createDynamicsCompressor();
+highpass.connect(compressor);
 
-transport.connectTrackOutput('vocals', reverb);
+transport.connectTrackEffects('vocals', highpass, compressor);
+// A single-node effect is its own input and output:
+// transport.connectTrackEffects('vocals', reverb, reverb);
 
-// Remove effects — restores direct routing to master
-transport.disconnectTrackOutput('vocals');
+// Remove effects — restores the track's direct routing
+transport.disconnectTrackEffects('vocals');
 
 // Master bus effects — inserted between master gain and destination
-const compressor = audioContext.createDynamicsCompressor();
-compressor.connect(audioContext.destination);
+const limiter = audioContext.createDynamicsCompressor();
+limiter.connect(audioContext.destination);
 
-transport.connectMasterOutput(compressor);
+transport.connectMasterOutput(limiter);
 
 // Remove master effects — restores direct routing to destination.
 // Parallel taps on transport.masterOutputNode (analyzers, recorders)
@@ -172,7 +177,17 @@ transport.connectMasterOutput(compressor);
 transport.disconnectMasterOutput();
 ```
 
-**Note:** `ClipTrack.effects` (the Tone.js-oriented per-track effects function used by `@waveform-playlist/playout`) is not read by `NativePlayoutAdapter` — it's silently ignored. Use `connectTrackOutput`/`connectMasterOutput` for effects with the native transport, or use `TonePlayoutAdapter` if a track still relies on `ClipTrack.effects`.
+**Track effects are pre-fader inserts.** The chain sees the clips at their own level and channel layout; the track's volume, pan and mute come after it. So:
+
+- Moving the volume fader changes the track's level in the mix, not how hard a compressor, limiter or distortion works.
+- A mono clip reaches the chain as mono, at full level (not as two channels at −3 dB from a centred panner).
+- Do **not** connect the chain's output to `masterOutputNode` yourself — the transport returns it into the track. Routing it to the master would bypass the fader, pan, mute and solo.
+- Mute and solo silence a track including its effect tails.
+- The panner follows what the chain outputs: a mono chain is panned with the equal-power mono law, a stereo chain (a stereo reverb, most WAM plugins) with the stereo-balance law, which is about 3 dB louder at centre for the same mono source.
+
+`setTracks()` rebuilds every track node and drops these hookups — reconnect afterwards. (Before 0.0.16 the hook was `connectTrackOutput(trackId, node)`, post-fader, with the caller wiring the chain to the master.)
+
+**Note:** `ClipTrack.effects` (the Tone.js-oriented per-track effects function used by `@waveform-playlist/playout`) is not read by `NativePlayoutAdapter` — it's silently ignored. Use `connectTrackEffects`/`connectMasterOutput` for effects with the native transport, or use `TonePlayoutAdapter` if a track still relies on `ClipTrack.effects`.
 
 ## API
 
@@ -247,8 +262,8 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 - `isCountingIn()` — whether count-in is active
 
 **Effects:**
-- `connectTrackOutput(trackId, node)` — Insert per-track effects chain
-- `disconnectTrackOutput(trackId)` — Remove per-track effects chain
+- `connectTrackEffects(trackId, input, output)` — Insert a per-track effects chain, pre-fader (the transport wires `output` back into the track)
+- `disconnectTrackEffects(trackId)` — Remove the per-track effects chain
 - `connectMasterOutput(node)` — Insert master bus effects chain
 - `disconnectMasterOutput()` — Remove master bus effects chain
 - `masterOutputNode` (getter) — Master gain node, for parallel taps (analyzers, recorders) that should survive chain connect/disconnect

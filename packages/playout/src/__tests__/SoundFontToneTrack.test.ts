@@ -71,6 +71,7 @@ vi.mock('tone', () => ({
       connect: vi.fn(),
       dispose: vi.fn(),
       gain: { value: 1 },
+      input: {},
     };
   }),
   Part: vi.fn().mockImplementation(function (

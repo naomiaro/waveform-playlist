@@ -15,6 +15,7 @@ export {
 export type { SoundFontSample, PlaybackRateParams, LoopAndEnvelopeParams } from './SoundFontCache';
 export type { TonePlayoutOptions, EffectsFunction } from './TonePlayout';
 export type { ToneTrackOptions, TrackEffectsFunction } from './ToneTrack';
+export { followInsertChannelLayout } from './trackInsert';
 
 // Export global AudioContext manager
 export {

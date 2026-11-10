@@ -219,6 +219,19 @@ describe('MidiToneTrack', () => {
       createTrack({ effects: effectsFn });
       expect(effectsFn).toHaveBeenCalled();
     });
+
+    it('inserts effects pre-fader: the closure gets the track input and the volume stage (#660)', () => {
+      const effectsFn = vi.fn();
+      createTrack({ effects: effectsFn });
+
+      const [trackInput, faderInput, isOffline] = effectsFn.mock.calls[0];
+      // faderInput is the Volume mock (it has `chain`); trackInput is a Gain.
+      expect(typeof faderInput.chain).toBe('function');
+      expect(trackInput.gain).toBeDefined();
+      expect(isOffline).toBe(false);
+      // Synth voices feed the track input, so they pass through the effects.
+      expect(mockSynthConnect).toHaveBeenCalledWith(trackInput);
+    });
   });
 
   describe('trim offset filtering', () => {

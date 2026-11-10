@@ -1160,6 +1160,69 @@ describe('Transport', () => {
     });
   });
 
+  describe('track effects hook (#660)', () => {
+    function createMockNode() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return { connect: vi.fn(), disconnect: vi.fn() } as any;
+    }
+
+    it('connectTrackEffects takes the chain input AND output — the transport wires the return', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([], { id: 't1' })]);
+      const input = createMockNode();
+      const output = createMockNode();
+
+      transport.connectTrackEffects('t1', input, output);
+
+      // The chain output is returned INTO the track (pre-fader), never left
+      // for the caller to route to the master bus.
+      expect(output.connect).toHaveBeenCalledTimes(1);
+      const returnTarget = output.connect.mock.calls[0][0];
+      expect(returnTarget).not.toBe(transport.masterOutputNode);
+      expect(returnTarget.gain).toBeDefined();
+    });
+
+    it('disconnectTrackEffects releases the return edge', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([], { id: 't1' })]);
+      const input = createMockNode();
+      const output = createMockNode();
+      transport.connectTrackEffects('t1', input, output);
+      const returnTarget = output.connect.mock.calls[0][0];
+
+      transport.disconnectTrackEffects('t1');
+
+      expect(output.disconnect).toHaveBeenCalledWith(returnTarget);
+    });
+
+    it('warns and does nothing for an unknown track', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const transport = new Transport(mockAudioContext());
+        const input = createMockNode();
+        const output = createMockNode();
+
+        transport.connectTrackEffects('nope', input, output);
+        transport.disconnectTrackEffects('nope');
+
+        expect(input.connect).not.toHaveBeenCalled();
+        expect(output.connect).not.toHaveBeenCalled();
+        const hookWarnings = warn.mock.calls.filter((c) => String(c[0]).includes('TrackEffects'));
+        expect(hookWarnings).toHaveLength(2);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('the pre-#660 connectTrackOutput hook is gone (it meant post-fader)', () => {
+      const transport = new Transport(mockAudioContext());
+      expect('connectTrackOutput' in transport).toBe(false);
+      expect('disconnectTrackOutput' in transport).toBe(false);
+    });
+  });
+
   describe('error surfacing (#636)', () => {
     it('setLoop throws on start >= end and leaves loop state untouched', () => {
       const transport = new Transport(mockAudioContext());

@@ -38,8 +38,8 @@ vi.mock('../TonePlayout', () => {
         dispose: vi.fn(),
         setOnPlaybackComplete: vi.fn(),
         setLoop: vi.fn(),
-        connectTrackOutput: vi.fn(),
-        disconnectTrackOutput: vi.fn(),
+        connectTrackEffects: vi.fn(),
+        disconnectTrackEffects: vi.fn(),
         connectMasterOutput: vi.fn(),
         disconnectMasterOutput: vi.fn(),
         masterBusInputNode: { nodeType: 1 },
@@ -1197,8 +1197,8 @@ describe('createToneAdapter', () => {
       // Copied verbatim from packages/dawcore/src/effects/effects-manager.ts —
       // guards against the wrong-method-name trap (root CLAUDE.md pattern #11).
       interface EffectsTransportLike {
-        connectTrackOutput(trackId: string, node: AudioNode): void;
-        disconnectTrackOutput(trackId: string): void;
+        connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void;
+        disconnectTrackEffects(trackId: string): void;
         connectMasterOutput(node: AudioNode): void;
         disconnectMasterOutput(): void;
         readonly masterOutputNode: AudioNode;
@@ -1206,7 +1206,7 @@ describe('createToneAdapter', () => {
       vi.mocked(isNativeGlobalContext).mockReturnValue(true);
       const adapter = createToneAdapter();
       const t: EffectsTransportLike = adapter.transport; // compile-time check
-      expect(typeof t.connectTrackOutput).toBe('function');
+      expect(typeof t.connectTrackEffects).toBe('function');
     });
 
     it('delegates hooks to the playout when native mode is on', () => {
@@ -1216,17 +1216,18 @@ describe('createToneAdapter', () => {
         .value;
       const node = {} as AudioNode;
 
-      adapter.transport.connectTrackOutput('t1', node);
-      expect(mockInstance.connectTrackOutput).toHaveBeenCalledWith('t1', node);
+      const output = { name: 'out' } as unknown as AudioNode;
+      adapter.transport.connectTrackEffects('t1', node, output);
+      expect(mockInstance.connectTrackEffects).toHaveBeenCalledWith('t1', node, output);
 
       adapter.transport.connectMasterOutput(node);
       expect(mockInstance.connectMasterOutput).toHaveBeenCalledWith(node);
 
       expect(adapter.transport.masterOutputNode).toBe(mockInstance.masterBusInputNode);
 
-      adapter.transport.disconnectTrackOutput('t1');
+      adapter.transport.disconnectTrackEffects('t1');
       adapter.transport.disconnectMasterOutput();
-      expect(mockInstance.disconnectTrackOutput).toHaveBeenCalledWith('t1');
+      expect(mockInstance.disconnectTrackEffects).toHaveBeenCalledWith('t1');
       expect(mockInstance.disconnectMasterOutput).toHaveBeenCalled();
     });
 

@@ -90,8 +90,8 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     Map<
       string,
       {
-        graphEnd: Gain;
-        masterGainNode: ToneAudioNode;
+        trackInput: Gain;
+        faderInput: ToneAudioNode;
       }
     >
   >(new Map());
@@ -102,12 +102,12 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     const nodes = trackGraphNodesRef.current.get(trackId);
     if (!nodes) return;
 
-    const { graphEnd, masterGainNode } = nodes;
+    const { trackInput, faderInput } = nodes;
     const instancesMap = trackEffectInstancesRef.current.get(trackId);
 
     // Disconnect everything first
     try {
-      graphEnd.disconnect();
+      trackInput.disconnect();
     } catch (e) {
       console.warn(`[waveform-playlist] Error disconnecting track "${trackId}" effect chain:`, e);
     }
@@ -121,10 +121,10 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
 
     if (instances.length === 0) {
       // No effects - connect directly
-      graphEnd.connect(masterGainNode);
+      trackInput.connect(faderInput);
     } else {
-      // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-      let currentNode: ToneAudioNode | AudioNode = graphEnd;
+      // Connect: trackInput -> effect1 -> effect2 -> ... -> faderInput
+      let currentNode: ToneAudioNode | AudioNode = trackInput;
 
       instances.forEach((inst) => {
         try {
@@ -139,8 +139,8 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         currentNode = inst.effect;
       });
 
-      // Connect last effect to master
-      connect(currentNode, masterGainNode);
+      // Connect last effect to the track's fader (effects are pre-fader)
+      connect(currentNode, faderInput);
     }
   }, []);
 
@@ -383,11 +383,11 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   const getTrackEffectsFunction = useCallback(
     (trackId: string): TrackEffectsFunction | undefined => {
       // Return a function that connects effects when the track is loaded
-      return (graphEnd, masterGainNode, _isOffline) => {
+      return (trackInput, faderInput, _isOffline) => {
         // Store references for rebuilding chain
         trackGraphNodesRef.current.set(trackId, {
-          graphEnd,
-          masterGainNode,
+          trackInput,
+          faderInput,
         });
 
         // Read current state from ref (not stale closure)
@@ -403,18 +403,18 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
 
         if (instances.length === 0) {
           // No effects - connect directly
-          graphEnd.connect(masterGainNode);
+          trackInput.connect(faderInput);
         } else {
-          // Connect: graphEnd -> effect1 -> effect2 -> ... -> masterGainNode
-          let currentNode: ToneAudioNode | AudioNode = graphEnd;
+          // Connect: trackInput -> effect1 -> effect2 -> ... -> faderInput
+          let currentNode: ToneAudioNode | AudioNode = trackInput;
 
           instances.forEach((inst) => {
             connect(currentNode, inst.effect);
             currentNode = inst.effect;
           });
 
-          // Connect last effect to master
-          connect(currentNode, masterGainNode);
+          // Connect last effect to the track's fader (effects are pre-fader)
+          connect(currentNode, faderInput);
         }
 
         return function cleanup() {
@@ -462,7 +462,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
       }
       const hasWam = nonBypassed.some((e) => e.kind === 'wam');
 
-      return async (graphEnd: Gain, masterGainNode: ToneAudioNode, _isOffline: boolean) => {
+      return async (trackInput: Gain, faderInput: ToneAudioNode, _isOffline: boolean) => {
         if (hasWam && !isNativeGlobalContext()) {
           throw new Error(
             '[waveform-playlist] WAV export with WAM effects requires a native AudioContext. ' +
@@ -472,7 +472,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         }
         // Tone nodes inside the offline build are created on the current
         // (offline) global context — its rawContext must host the WAM clones.
-        const rawContext = graphEnd.context.rawContext as unknown as BaseAudioContext;
+        const rawContext = trackInput.context.rawContext as unknown as BaseAudioContext;
         const { instances, dispose } = await buildOfflineChain(
           nonBypassed,
           (instanceId) => {
@@ -483,7 +483,7 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
           },
           rawContext
         );
-        connectOfflineChain(graphEnd, instances, masterGainNode);
+        connectOfflineChain(trackInput, instances, faderInput);
         return dispose;
       };
     },

@@ -37,6 +37,7 @@ class MockOfflineContext {
   renderedBuffer = { duration: 1 } as unknown as AudioBuffer;
   sources: Array<ReturnType<typeof mockNode> & { start: ReturnType<typeof vi.fn> }> = [];
   gains: Array<ReturnType<typeof mockNode> & { gain: { value: number } }> = [];
+  panners: Array<ReturnType<typeof mockNode>> = [];
   startRendering = vi.fn(async () => this.renderedBuffer);
 
   constructor(options: { numberOfChannels: number; length: number; sampleRate: number }) {
@@ -53,7 +54,10 @@ class MockOfflineContext {
     return node as any;
   }
   createStereoPanner() {
-    return mockNode({ pan: mockParam(0) });
+    const node = mockNode({ pan: mockParam(0) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.panners.push(node as any);
+    return node;
   }
   createDynamicsCompressor() {
     return mockNode({
@@ -435,10 +439,88 @@ describe('exportAudioImpl — audit wave 3', () => {
     // (compressor) see, so the order must match live playback.
     expect(masterGain!.connect).toHaveBeenCalled();
     expect(masterGain!.connect).not.toHaveBeenCalledWith(ctx.destination);
-    // The track chain routes into the volume stage
-    const feedsMasterVolume = ctx.gains.some((g) =>
-      g.connect.mock.calls.some((call) => call[0] === masterGain)
+    // The track's panner (post-fader) routes into the master volume stage
+    const feedsMasterVolume = ctx.panners.some((p) =>
+      p.connect.mock.calls.some((call) => call[0] === masterGain)
     );
     expect(feedsMasterVolume).toBe(true);
+  });
+});
+
+// #660: track effects are PRE-FADER inserts, live and offline alike.
+describe('exportAudioImpl — track signal order (#660)', () => {
+  /** Follow connect() edges from `start`; returns node labels in path order. */
+  function pathFrom(start: { connect: ReturnType<typeof vi.fn> }, label: (n: unknown) => string) {
+    const path: string[] = [];
+    let node: { connect: ReturnType<typeof vi.fn> } | undefined = start;
+    const seen = new Set<unknown>();
+    while (node && !seen.has(node)) {
+      seen.add(node);
+      path.push(label(node));
+      node = node.connect.mock.calls[0]?.[0];
+    }
+    return path;
+  }
+
+  it('renders clip → effects chain → volume → pan → master', async () => {
+    const compressor = mockNode({
+      threshold: mockParam(-24),
+      knee: mockParam(30),
+      ratio: mockParam(12),
+      attack: mockParam(0.003),
+      release: mockParam(0.25),
+    });
+    const host = makeHost({
+      masterVolume: 0.9,
+      getTrackEffectsState: vi.fn(async () => [
+        { kind: 'native', type: 'native-compressor', params: {}, bypassed: false } as const,
+      ]),
+    });
+    // makeHost's track: volume 0.8, clip gain 0.5.
+    const original = MockOfflineContext.prototype.createDynamicsCompressor;
+    MockOfflineContext.prototype.createDynamicsCompressor = () => compressor;
+    try {
+      await exportAudioImpl(host);
+    } finally {
+      MockOfflineContext.prototype.createDynamicsCompressor = original;
+    }
+
+    const ctx = offlineInstances[0];
+    const label = (n: unknown): string => {
+      if (n === compressor) return 'compressor';
+      if (n === ctx.destination) return 'destination';
+      if (ctx.sources.includes(n as never)) return 'source';
+      if (ctx.panners.includes(n as never)) return 'pan';
+      const gain = ctx.gains.find((g) => g === n);
+      if (!gain) return '?';
+      if (gain.gain.value === 0.5) return 'clipGain';
+      if (gain.gain.value === 0.8) return 'trackVolume';
+      if (gain.gain.value === 0.9) return 'masterVolume';
+      return 'gain';
+    };
+
+    const path = pathFrom(ctx.sources[0], label);
+
+    // Unlabelled 'gain' nodes are chain input/output plumbing.
+    expect(path.filter((p) => p !== 'gain')).toEqual([
+      'source',
+      'clipGain',
+      'compressor',
+      'trackVolume',
+      'pan',
+      'masterVolume',
+      'destination',
+    ]);
+  });
+
+  it('a track without effects still passes through volume and pan', async () => {
+    const host = makeHost({ masterVolume: 0.9 });
+
+    await exportAudioImpl(host);
+
+    const ctx = offlineInstances[0];
+    const volume = ctx.gains.find((g) => g.gain.value === 0.8)!;
+    expect(ctx.panners).toHaveLength(1);
+    expect(volume.connect).toHaveBeenCalledWith(ctx.panners[0]);
   });
 });

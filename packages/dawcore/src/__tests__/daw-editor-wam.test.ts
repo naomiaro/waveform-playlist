@@ -59,8 +59,8 @@ function makeMockAdapter() {
     close: vi.fn().mockResolvedValue(undefined),
   };
   const transport = {
-    connectTrackOutput: vi.fn(),
-    disconnectTrackOutput: vi.fn(),
+    connectTrackEffects: vi.fn(),
+    disconnectTrackEffects: vi.fn(),
     connectMasterOutput: vi.fn(),
     disconnectMasterOutput: vi.fn(),
     masterOutputNode: mockGainNode(),

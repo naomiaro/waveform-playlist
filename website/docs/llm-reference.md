@@ -541,8 +541,9 @@ function isNativeGlobalContext(): boolean;
 /** Effects wiring hooks consumed by dawcore's EffectsManager. All hooks require
  *  native-context mode. */
 interface ToneEffectsTransport {
-  connectTrackOutput(trackId: string, node: AudioNode): void;
-  disconnectTrackOutput(trackId: string): void;
+  /** Pre-fader track insert: clips → input … output → volume → pan → mute. */
+  connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void;
+  disconnectTrackEffects(trackId: string): void;
   connectMasterOutput(node: AudioNode): void;
   disconnectMasterOutput(): void;
   readonly masterOutputNode: AudioNode;
@@ -1007,10 +1008,11 @@ type OfflineEffectsFunction = (
   isOffline: boolean
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
-/** Per-track variant of OfflineEffectsFunction. */
+/** Per-track variant of OfflineEffectsFunction. Pre-fader: wire trackInput
+ *  through the effects into faderInput (the track's volume stage). */
 type OfflineTrackEffectsFunction = (
-  graphEnd: Gain,
-  masterGainNode: ToneAudioNode,
+  trackInput: Gain,
+  faderInput: ToneAudioNode,
   isOffline: boolean
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
