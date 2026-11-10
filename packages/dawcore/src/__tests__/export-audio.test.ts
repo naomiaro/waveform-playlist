@@ -526,6 +526,32 @@ describe('exportAudioImpl — EffectDefinition.prepare (#657)', () => {
     expect(offlineInstances[0].startRendering).not.toHaveBeenCalled();
   });
 
+  it('skips a bypassed effect without a wet param before preparing it', async () => {
+    // Live, a disconnect-bypassed effect is out of the series. A worklet
+    // module that 404s must not fail an export the effect takes no part in.
+    const prepare = vi.fn(async () => {
+      throw new Error('module 404');
+    });
+    const create = vi.fn();
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare,
+      create,
+    });
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(async () => [
+        { kind: 'native', type: 'worklet-fx', params: {}, bypassed: true } as const,
+      ]),
+    });
+
+    await expect(exportAudioImpl(host)).resolves.toBeDefined();
+    expect(prepare).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it('does not prepare placeholder entries (they are skipped)', async () => {
     const log: string[] = [];
     registerWorkletEffect(log);

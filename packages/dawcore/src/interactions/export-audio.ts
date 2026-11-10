@@ -1,4 +1,8 @@
-import { createEffectInstance, prepareEffect } from '../effects/effect-registry';
+import {
+  createEffectInstance,
+  ensureEffectPrepared,
+  getEffectDefinitions,
+} from '../effects/effect-registry';
 import { loadWamModule, loadFaustModule } from '../effects/optional-modules';
 import type { SerializedEffectEntry } from '../effects/types';
 
@@ -231,16 +235,21 @@ async function buildOfflineChain(
         continue;
       }
       if (entry.kind === 'native') {
+        // Disconnect-style bypass (no wet param): the effect is out of the
+        // series, exactly as live — so do not prepare or create it. A
+        // bypassed worklet effect whose module fails to load must not fail
+        // an export it takes no part in. (Unknown types fall through to
+        // createEffectInstance, which reports them.)
+        const definition = getEffectDefinitions().get(entry.type);
+        if (entry.bypassed && definition && !definition.wetParam) {
+          continue;
+        }
         // Async per-context setup (#657) — e.g. an AudioWorklet module must be
         // added to THIS offline context, which only the export ever holds.
         // Shared across chains: one run per type per export.
-        await prepareEffect(entry.type, ctx);
+        await ensureEffectPrepared(entry.type, ctx);
         const created = createEffectInstance(entry.type, ctx, entry.params);
-        if (entry.bypassed) {
-          if (!created.wetParam) {
-            created.instance.dispose?.();
-            continue; // disconnect-style bypass: out of the series
-          }
+        if (entry.bypassed && created.wetParam) {
           created.instance.applyParams({ [created.wetParam]: 0 });
         }
         if (created.instance.dispose) {

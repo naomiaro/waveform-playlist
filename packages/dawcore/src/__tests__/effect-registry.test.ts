@@ -4,6 +4,8 @@ import {
   getEffectDefinitions,
   createEffectInstance,
   prepareEffect,
+  needsPrepare,
+  ensureEffectPrepared,
   _resetEffectRegistryForTests,
 } from '../effects/effect-registry';
 
@@ -223,6 +225,66 @@ describe('prepareEffect (EffectDefinition.prepare)', () => {
     expect(() => createEffectInstance('worklet-fx', mockAudioContext())).toThrow(
       /prepareEffect\('worklet-fx'[\s\S]*not defined in AudioWorkletGlobalScope/
     );
+  });
+
+  it('the prepare hint keeps the original error as its cause', () => {
+    const original = new DOMException(
+      'not defined in AudioWorkletGlobalScope',
+      'InvalidStateError'
+    );
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare: async () => {},
+      create: () => {
+        throw original;
+      },
+    });
+
+    let thrown: (Error & { cause?: unknown }) | undefined;
+    try {
+      createEffectInstance('worklet-fx', mockAudioContext());
+    } catch (err) {
+      thrown = err as Error & { cause?: unknown };
+    }
+    expect(thrown?.cause).toBe(original);
+  });
+
+  it('needsPrepare is true only until the current definition has prepared on that context', async () => {
+    registerWorkletEffect(async () => {});
+    const ctx = mockAudioContext();
+
+    expect(needsPrepare('native-gain', ctx)).toBe(false);
+    expect(needsPrepare('does-not-exist', ctx)).toBe(false);
+    expect(needsPrepare('worklet-fx', ctx)).toBe(true);
+    await prepareEffect('worklet-fx', ctx);
+    expect(needsPrepare('worklet-fx', ctx)).toBe(false);
+    expect(needsPrepare('worklet-fx', mockAudioContext())).toBe(true);
+  });
+
+  it('ensureEffectPrepared covers a type re-registered while the old definition was preparing', async () => {
+    let releaseFirst: () => void = () => {};
+    const first = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFirst = resolve;
+        })
+    );
+    const second = vi.fn(async () => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ctx = mockAudioContext();
+
+    registerWorkletEffect(first);
+    const ensured = ensureEffectPrepared('worklet-fx', ctx);
+    registerWorkletEffect(second); // re-registered mid-flight
+    releaseFirst();
+    await ensured;
+
+    // create() will run the NEW definition — it must be the one prepared.
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(needsPrepare('worklet-fx', ctx)).toBe(false);
   });
 
   it('create failing AFTER a successful prepare rethrows the original error', async () => {
