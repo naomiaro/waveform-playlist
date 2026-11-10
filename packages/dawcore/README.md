@@ -350,8 +350,17 @@ const result = await editor.loadFiles(fileList);
     // e.preventDefault(); // skip automatic clip creation
     console.log('recorded:', e.detail.audioBuffer);
   });
+
+  // Fires once the take's clip exists — address it by id
+  editor.addEventListener('daw-recording-clip-add', (e) => {
+    const { trackId, clipId } = e.detail;
+    editor.updateClip(trackId, clipId, { gain: 2, name: 'Take 1' });
+    // editor.removeClip(trackId, clipId) to discard the take
+  });
 </script>
 ```
+
+A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`), which `updateClip()` / `removeClip()` keep in sync.
 
 During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), transiently mutes the recorded track (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub — the track's Mute control is untouched and the previous state is restored when the session ends), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
 
@@ -534,6 +543,8 @@ editor.addEventListener('daw-recording-complete', (e) => {
   // e.preventDefault() to skip automatic clip creation
   console.log(e.detail.audioBuffer);
 });
+// The take's clip now exists: detail is { trackId, clipId }
+editor.addEventListener('daw-recording-clip-add', (e) => console.log(e.detail));
 
 // Effects (track events bubble up to the editor)
 editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));

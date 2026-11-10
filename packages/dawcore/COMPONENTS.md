@@ -38,40 +38,41 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 
 **Methods:**
 
-| Method                    | Returns                    | Description                       |
-| ------------------------- | -------------------------- | --------------------------------- |
-| `loadFiles(files)`        | `Promise<LoadFilesResult>` | Load audio files as new tracks    |
-| `startRecording(stream?)` | `Promise<void>`            | Start recording on selected track |
-| `stopRecording()`         | `void`                     | Stop recording                    |
-| `pauseRecording()`        | `void`                     | Pause recording                   |
-| `resumeRecording()`       | `void`                     | Resume recording                  |
-| `reorderTrack(trackId, toIndex)` | `void`              | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable. |
+| Method                           | Returns                    | Description                                                                                                                                                                                                                                    |
+| -------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadFiles(files)`               | `Promise<LoadFilesResult>` | Load audio files as new tracks                                                                                                                                                                                                                 |
+| `startRecording(stream?)`        | `Promise<void>`            | Start recording on selected track                                                                                                                                                                                                              |
+| `stopRecording()`                | `void`                     | Stop recording                                                                                                                                                                                                                                 |
+| `pauseRecording()`               | `void`                     | Pause recording                                                                                                                                                                                                                                |
+| `resumeRecording()`              | `void`                     | Resume recording                                                                                                                                                                                                                               |
+| `reorderTrack(trackId, toIndex)` | `void`                     | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable. |
 
 **Events:**
 
-| Event                    | Detail                                        | Description                                     |
-| ------------------------ | --------------------------------------------- | ----------------------------------------------- |
-| `daw-play`               | —                                             | Playback started                                |
-| `daw-pause`              | —                                             | Playback paused                                 |
-| `daw-stop`               | —                                             | Playback stopped                                |
-| `daw-seek`               | `{ time: number }`                            | Cursor position changed                         |
-| `daw-selection`          | `{ start, end }`                              | Selection region changed                        |
-| `daw-track-select`       | `{ trackId }`                                 | Track selected                                  |
-| `daw-track-connected`    | `{ trackId }`                                 | Track element connected to DOM                  |
-| `daw-track-ready`        | `{ trackId }`                                 | Track audio loaded and peaks rendered           |
-| `daw-track-error`        | `{ trackId, error }`                          | Track failed to load                            |
-| `daw-track-control`      | `{ trackId, property, value }`                | Track control changed (volume, pan, mute, solo) |
-| `daw-track-remove`       | `{ trackId }`                                 | Track removed                                   |
-| `daw-track-reorder`      | `{ trackId, fromIndex, toIndex }`             | Move up/down button clicked on `<daw-track-controls>` (bubbles to the editor, which calls `reorderTrack`) |
-| `daw-track-reorder-grab` | `{ trackId, pointerEvent, gripElement }`      | Drag grip pointerdown on `<daw-track-controls>` (bubbles to the editor, which starts the pointer-drag handler) |
-| `daw-clip-move`          | `{ clipId, trackId, deltaSamples }`           | Clip moved                                      |
-| `daw-clip-trim`          | `{ clipId, trackId, boundary, deltaSamples }` | Clip boundary trimmed                           |
-| `daw-clip-split`         | `{ originalClipId, leftClipId, rightClipId }` | Clip split at playhead                          |
-| `daw-error`              | `{ operation, error }`                        | Playback or engine error                        |
-| `daw-recording-start`    | `{ trackId }`                                 | Recording started                               |
-| `daw-recording-complete` | `{ trackId, audioBuffer, channelCount }`      | Recording finished (cancelable)                 |
-| `daw-recording-error`    | `{ trackId, error }`                          | Recording failed                                |
-| `daw-files-load-error`   | `{ file, error }`                             | File drop failed for a specific file            |
+| Event                    | Detail                                                                  | Description                                                                                                    |
+| ------------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `daw-play`               | —                                                                       | Playback started                                                                                               |
+| `daw-pause`              | —                                                                       | Playback paused                                                                                                |
+| `daw-stop`               | —                                                                       | Playback stopped                                                                                               |
+| `daw-seek`               | `{ time: number }`                                                      | Cursor position changed                                                                                        |
+| `daw-selection`          | `{ start, end }`                                                        | Selection region changed                                                                                       |
+| `daw-track-select`       | `{ trackId }`                                                           | Track selected                                                                                                 |
+| `daw-track-connected`    | `{ trackId }`                                                           | Track element connected to DOM                                                                                 |
+| `daw-track-ready`        | `{ trackId }`                                                           | Track audio loaded and peaks rendered                                                                          |
+| `daw-track-error`        | `{ trackId, error }`                                                    | Track failed to load                                                                                           |
+| `daw-track-control`      | `{ trackId, property, value }`                                          | Track control changed (volume, pan, mute, solo)                                                                |
+| `daw-track-remove`       | `{ trackId }`                                                           | Track removed                                                                                                  |
+| `daw-track-reorder`      | `{ trackId, fromIndex, toIndex }`                                       | Move up/down button clicked on `<daw-track-controls>` (bubbles to the editor, which calls `reorderTrack`)      |
+| `daw-track-reorder-grab` | `{ trackId, pointerEvent, gripElement }`                                | Drag grip pointerdown on `<daw-track-controls>` (bubbles to the editor, which starts the pointer-drag handler) |
+| `daw-clip-move`          | `{ clipId, trackId, deltaSamples }`                                     | Clip moved                                                                                                     |
+| `daw-clip-trim`          | `{ clipId, trackId, boundary, deltaSamples }`                           | Clip boundary trimmed                                                                                          |
+| `daw-clip-split`         | `{ originalClipId, leftClipId, rightClipId }`                           | Clip split at playhead                                                                                         |
+| `daw-error`              | `{ operation, error }`                                                  | Playback or engine error                                                                                       |
+| `daw-recording-start`    | `{ trackId }`                                                           | Recording started                                                                                              |
+| `daw-recording-complete` | `{ trackId, audioBuffer, startSample, durationSamples, offsetSamples }` | Recording finished, before the clip exists (cancelable)                                                        |
+| `daw-recording-clip-add` | `{ trackId, clipId }`                                                   | The take's clip is in the engine — address it with `updateClip` / `removeClip`                                 |
+| `daw-recording-error`    | `{ trackId, error }`                                                    | Recording failed                                                                                               |
+| `daw-files-load-error`   | `{ file, error }`                                                       | File drop failed for a specific file                                                                           |
 
 ---
 
@@ -265,7 +266,7 @@ Per-track control panel showing track name, volume slider, pan knob, mute/solo b
 **JS Properties (set by `<daw-editor>`, not attributes):**
 
 | Property      | Type      | Default | Description                                                                                    |
-| ------------- | --------- | ------- | ------------------------------------------------------------------------------------------------ |
+| ------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
 | `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons |
 | `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                        |
 | `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)  |

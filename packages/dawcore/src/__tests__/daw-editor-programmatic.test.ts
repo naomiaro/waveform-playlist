@@ -291,6 +291,84 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
   });
 });
 
+// #659: element-less clips that carry an engine clip id on their descriptor
+// (recorded takes) must stay in sync with editor.tracks when edited by id.
+describe('descriptor sync for element-less clips addressed by id (#659)', () => {
+  function seedRecordedTake(editor: ReturnType<typeof setupEditor>) {
+    const trackId = 'rec-track';
+    const clip = {
+      id: 'take-1',
+      startSample: 0,
+      durationSamples: 96000,
+      offsetSamples: 0,
+      gain: 1,
+      name: 'Recording',
+      sampleRate: 48000,
+    };
+    const other = { ...clip, id: 'take-2', startSample: 96000 };
+    const desc = (clipId: string, start: number) => ({
+      kind: 'drop',
+      clipId,
+      src: '',
+      peaksSrc: '',
+      start,
+      duration: 2,
+      offset: 0,
+      gain: 1,
+      name: 'Recording',
+      fadeIn: 0,
+      fadeOut: 0,
+      fadeType: 'linear',
+      midiNotes: null,
+      midiChannel: null,
+      midiProgram: null,
+    });
+    editor._engineTracks = new Map([[trackId, { id: trackId, clips: [clip, other], name: 'T' }]]);
+    editor._tracks = new Map([
+      [
+        trackId,
+        {
+          name: 'T',
+          src: '',
+          volume: 1,
+          pan: 0,
+          muted: false,
+          soloed: false,
+          renderMode: 'waveform',
+          clips: [desc('take-1', 0), desc('take-2', 2)],
+        },
+      ],
+    ]);
+    return trackId;
+  }
+
+  it('updateClip by engine id updates the descriptor editor.tracks returns', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+
+    editor.updateClip(trackId, 'take-1', { gain: 2, name: 'Lead', start: 0.5 });
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips[0]).toMatchObject({ clipId: 'take-1', gain: 2, name: 'Lead', start: 0.5 });
+    expect(clips[1]).toMatchObject({ clipId: 'take-2', gain: 1, name: 'Recording', start: 2 });
+    editor.remove();
+  });
+
+  it('removeClip by engine id drops the descriptor too', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+
+    editor.removeClip(trackId, 'take-1');
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
+    expect(editor._engineTracks.get(trackId).clips.map((c: { id: string }) => c.id)).toEqual([
+      'take-2',
+    ]);
+    editor.remove();
+  });
+});
+
 describe('Phase 1 regression fixes', () => {
   it('addClip rejects synchronously when config.src is missing', async () => {
     const editor = setupEditor();

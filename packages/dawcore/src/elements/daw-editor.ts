@@ -2060,9 +2060,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (desc) {
       this._tracks = new Map(this._tracks).set(trackId, {
         ...desc,
-        // Only DOM-sourced clips have an id to match; drop-sourced clips are
-        // filtered through unchanged (their identity is the descriptor itself).
-        clips: desc.clips.filter((c) => !(isDomClip(c) && c.clipId === clipId)),
+        // Descriptors without an id (file drops, the <daw-track src>
+        // shorthand) are kept — their identity is the descriptor itself.
+        clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
     }
     this._commitTrackChange(trackId, updatedTrack);
@@ -2918,6 +2918,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     updatedClips[idx] = updatedClip;
     const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
     this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+    // Keep editor.tracks truthful for element-less clips that carry their
+    // engine id (recorded takes, #659) — no <daw-clip> element re-reads them.
+    const desc = this._tracks.get(trackId);
+    if (desc?.clips.some((c) => c.clipId === clipId)) {
+      this._tracks = new Map(this._tracks).set(trackId, {
+        ...desc,
+        clips: desc.clips.map((c) =>
+          c.clipId === clipId
+            ? {
+                ...c,
+                start: updatedClip.startSample / sr,
+                duration: updatedClip.durationSamples / sr,
+                offset: updatedClip.offsetSamples / sr,
+                ...(partial.gain !== undefined && { gain: partial.gain }),
+                ...(partial.name !== undefined && { name: partial.name }),
+              }
+            : c
+        ),
+      });
+    }
     this._commitTrackChange(trackId, updatedTrack);
   }
   private _buildClipElement(config: ClipConfig): DawClipElement {

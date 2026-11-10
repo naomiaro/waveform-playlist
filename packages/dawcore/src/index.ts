@@ -110,6 +110,7 @@ export type {
   DawTrackRemoveDetail,
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
+  DawRecordingClipAddDetail,
   DawRecordingErrorDetail,
   DawClipConnectedDetail,
   DawClipUpdateDetail,
