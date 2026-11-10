@@ -48,6 +48,64 @@ My Lowpass:2 : ERROR : undefined symbol : lowpasss
 
 See [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree/main/examples/dawcore-wam) — the "Faust (compile in browser)" section is a runnable textarea-to-plugin demo (`pnpm example:dawcore-wam`).
 
+## Production builds
+
+**The Faust compiler must not have its identifiers mangled.** `@grame/faustwasm` (bundled inside `@shren/faust2wam`) assembles its AudioWorklet processor source from `Class.toString()`, so a minifier that renames identifiers leaves that text referring to names that no longer exist. It works on a dev server and in an unminified build, and fails in a default production build with:
+
+```text
+InvalidStateError: Failed to construct 'AudioWorkletNode': AudioWorkletNode cannot be created:
+The node name 'fr.grame.faust.…' is not defined in AudioWorkletGlobalScope.
+```
+
+`compileFaustToWam` recognises that error (by Chromium's wording — the only engine it has been verified on; other browsers may surface their own unregistered-processor error unchanged) and rethrows it with this explanation, keeping the original as `error.cause`. The fix is in your bundler config — turn identifier mangling off (whitespace removal and compression stay on):
+
+```js
+// vite.config.js — Vite 8 (Rolldown / Oxc minifier)
+export default {
+  build: { rolldownOptions: { output: { minify: { mangle: false } } } },
+};
+```
+
+```js
+// vite.config.js — Vite 7 and earlier (esbuild minifier)
+export default {
+  esbuild: { minifyIdentifiers: false },
+};
+```
+
+`keepNames` does **not** fix it — it preserves `.name`, but the references inside the stringified class bodies are still mangled.
+
+To keep full minification for the rest of your app, serve the compiler as an untouched asset instead, with a build-only alias:
+
+```js
+// faust2wam-raw.js
+import url from './node_modules/@shren/faust2wam/dist/index.js?url';
+const mod = await import(/* @vite-ignore */ url);
+export default mod.default;
+```
+
+```js
+// vite.config.js
+import { fileURLToPath } from 'node:url';
+
+export default ({ command }) => ({
+  resolve: {
+    // Build only — applied on the dev server, the dep optimizer chokes on the ?url import.
+    alias:
+      command === 'build'
+        ? [
+            {
+              find: /^@shren\/faust2wam$/,
+              replacement: fileURLToPath(new URL('./faust2wam-raw.js', import.meta.url)),
+            },
+          ]
+        : [],
+  },
+});
+```
+
+Other bundlers need the equivalent setting (for example terser's `mangle: false`). This is an upstream limitation of how faustwasm generates worklet code; pre-compiled plugins loaded with `addWamPlugin(url)` are not affected.
+
 ## Standalone usage
 
 ```typescript
@@ -74,7 +132,7 @@ Notes:
 - The generated plugin is a standard WAM 2.0 effect — everything in [`@dawcore/wam`'s README](https://www.npmjs.com/package/@dawcore/wam) about Faust-generated plugins (flat parameter-map state, auto-generated GUI, descriptor shape) applies.
 - Factory-created instances have no `url` and cannot be cloned with `cloneInstanceInto` — recompile the DSP on the target context instead (this is what dawcore's offline export does).
 - Effects only — Faust polyphonic instruments are out of scope.
-- Prefer ahead-of-time compilation? The `faust2wam` CLI (`npm i -D @shren/faust2wam`, then `npx faust2wam lowpass.dsp out/lowpass`) produces a static WAM bundle loadable via plain `addWamPlugin(url)` with zero compiler bytes shipped — see [`@dawcore/wam`'s "Custom effects with Faust"](https://www.npmjs.com/package/@dawcore/wam#custom-effects-with-faust).
+- Prefer ahead-of-time compilation? The `faust2wam` CLI (`npm i -D @shren/faust2wam`, then `npx faust2wam lowpass.dsp out/lowpass`) produces a static WAM bundle (the output directory's parent must already exist — `mkdir -p out` first) loadable via plain `addWamPlugin(url)` with zero compiler bytes shipped — see [`@dawcore/wam`'s "Custom effects with Faust"](https://www.npmjs.com/package/@dawcore/wam#custom-effects-with-faust).
 
 ## Under the hood: `@shren/faust2wam`
 
