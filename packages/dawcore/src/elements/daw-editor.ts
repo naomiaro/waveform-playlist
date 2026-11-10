@@ -1497,9 +1497,64 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       next ??= new Map(this._tracks);
       next.delete(trackId);
     }
+    // Element-less clips that carry their engine id (recorded takes, #659)
+    // have no <daw-clip> to re-read them, and the engine changes them on its
+    // own: undo removes a take, a split replaces it with two new ids, a
+    // punch-in carves it away, a drag moves or trims it. Follow the engine —
+    // a descriptor whose id is gone would otherwise be a ghost that even
+    // removeClip() cannot reach.
+    for (const track of tracks) {
+      const desc = (next ?? this._tracks).get(track.id);
+      if (!desc || !desc.clips.some((c) => !isDomClip(c) && c.clipId !== undefined)) continue;
+      const reconciled = this._reconcileIdentifiedDropClips(desc.clips, track);
+      if (reconciled === desc.clips) continue;
+      next ??= new Map(this._tracks);
+      next.set(track.id, { ...desc, clips: reconciled });
+    }
     if (next) {
       this._tracks = next;
     }
+  }
+  /** Prune id-bearing drop descriptors the engine no longer has, and refresh
+   *  the rest from their engine clip. Returns the SAME array when nothing
+   *  changed, so an unchanged track never triggers a re-render. */
+  private _reconcileIdentifiedDropClips(
+    clips: ClipDescriptor[],
+    track: ClipTrack
+  ): ClipDescriptor[] {
+    const engineClips = new Map(track.clips.map((c) => [c.id, c]));
+    let changed = false;
+    const result: ClipDescriptor[] = [];
+    for (const desc of clips) {
+      if (isDomClip(desc) || desc.clipId === undefined) {
+        result.push(desc);
+        continue;
+      }
+      const clip = engineClips.get(desc.clipId);
+      if (!clip) {
+        changed = true;
+        continue;
+      }
+      const sr = clip.sampleRate ?? this.effectiveSampleRate;
+      const start = clip.startSample / sr;
+      const duration = clip.durationSamples / sr;
+      const offset = clip.offsetSamples / sr;
+      const gain = clip.gain ?? desc.gain;
+      const name = clip.name ?? desc.name;
+      if (
+        desc.start === start &&
+        desc.duration === duration &&
+        desc.offset === offset &&
+        desc.gain === gain &&
+        desc.name === name
+      ) {
+        result.push(desc);
+        continue;
+      }
+      changed = true;
+      result.push({ ...desc, start, duration, offset, gain, name });
+    }
+    return changed ? result : clips;
   }
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
   private _onTrackControl = (e: CustomEvent) => {

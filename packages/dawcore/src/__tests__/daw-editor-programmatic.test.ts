@@ -367,6 +367,92 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
     ]);
     editor.remove();
   });
+  it('a take the engine dropped on its own (undo, covering punch-in) loses its descriptor', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+    const engineTrack = editor._engineTracks.get(trackId);
+
+    // Engine state after undoing take-1: only take-2 remains.
+    editor._reconcileDescriptorsWithEngineTracks([
+      { ...engineTrack, clips: engineTrack.clips.filter((c: { id: string }) => c.id !== 'take-1') },
+    ]);
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
+    editor.remove();
+  });
+
+  it('a split take leaves no stale descriptor behind (its id is gone from the engine)', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+    const engineTrack = editor._engineTracks.get(trackId);
+    const [take1, take2] = engineTrack.clips;
+
+    editor._reconcileDescriptorsWithEngineTracks([
+      {
+        ...engineTrack,
+        clips: [
+          { ...take1, id: 'left-half', durationSamples: 48000 },
+          { ...take1, id: 'right-half', startSample: 48000, durationSamples: 48000 },
+          take2,
+        ],
+      },
+    ]);
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
+    editor.remove();
+  });
+
+  it('a take moved or trimmed by the engine has its descriptor refreshed', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+    const engineTrack = editor._engineTracks.get(trackId);
+    const [take1, take2] = engineTrack.clips;
+
+    editor._reconcileDescriptorsWithEngineTracks([
+      {
+        ...engineTrack,
+        clips: [
+          { ...take1, startSample: 24000, durationSamples: 48000, offsetSamples: 12000 },
+          take2,
+        ],
+      },
+    ]);
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips[0]).toMatchObject({ clipId: 'take-1', start: 0.5, duration: 1, offset: 0.25 });
+    editor.remove();
+  });
+
+  it('reconciling an unchanged track keeps the same descriptor map (no re-render per mixer frame)', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+    const engineTrack = editor._engineTracks.get(trackId);
+    const before = editor._tracks;
+
+    editor._reconcileDescriptorsWithEngineTracks([engineTrack]);
+
+    expect(editor._tracks).toBe(before);
+    editor.remove();
+  });
+
+  it('descriptors without an id (file drops) are never pruned by the reconcile', () => {
+    const editor = setupEditor();
+    const trackId = seedRecordedTake(editor);
+    const desc = editor._tracks.get(trackId);
+    const fileDrop = { ...desc.clips[0] };
+    delete fileDrop.clipId;
+    editor._tracks = new Map([[trackId, { ...desc, clips: [fileDrop, desc.clips[1]] }]]);
+    const engineTrack = editor._engineTracks.get(trackId);
+
+    editor._reconcileDescriptorsWithEngineTracks([{ ...engineTrack, clips: [] }]);
+
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
+    expect(clips).toHaveLength(1);
+    expect(clips[0].clipId).toBeUndefined();
+    editor.remove();
+  });
 });
 
 describe('Phase 1 regression fixes', () => {

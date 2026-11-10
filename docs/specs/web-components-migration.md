@@ -425,7 +425,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-stop'; // Playback stopped
 'daw-recording-start'; // Recording started on a track: detail: {trackId, stream}
 'daw-recording-complete'; // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
-'daw-recording-clip-add'; // The take's clip now exists (not fired when daw-recording-complete was cancelled): detail: {trackId, clipId} — clipId is the engine clip id for updateClip()/removeClip()
+'daw-recording-clip-add'; // The take's clip now exists (skipped when daw-recording-complete was cancelled, when the take's peak generation failed, or when the track was removed meanwhile): detail: {trackId, clipId} — clipId is the engine clip id for updateClip()/removeClip()
 'daw-recording-error'; // Recording failed: detail: {trackId, error}
 'daw-recording-pause'; // Worklet capture paused: detail: {trackId}
 'daw-recording-resume'; // Worklet capture resumed: detail: {trackId}

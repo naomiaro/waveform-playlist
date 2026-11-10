@@ -82,7 +82,11 @@ export interface DawRecordingCompleteDetail {
 }
 
 /** Follows `daw-recording-complete` once the take's clip is in the engine.
- *  Not dispatched when the consumer cancelled `daw-recording-complete`. */
+ *  NOT guaranteed after every complete — it is skipped when the consumer
+ *  cancelled `daw-recording-complete`, when peak generation for the take
+ *  failed (`daw-error` with `operation: 'recording-peaks'` fires instead),
+ *  when the track was removed meanwhile, and on a disconnected editor.
+ *  Don't await it without a fallback. */
 export interface DawRecordingClipAddDetail {
   trackId: string;
   /** Engine clip id — pass to `editor.updateClip()` / `removeClip()`. */

@@ -360,7 +360,9 @@ const result = await editor.loadFiles(fileList);
 </script>
 ```
 
-A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`), which `updateClip()` / `removeClip()` keep in sync.
+A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). That entry follows the engine: `updateClip()`, drags and trims refresh it, and it is dropped when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take replaces it with two new clips, which have no entry of their own.
+
+`daw-recording-clip-add` is not guaranteed after every `daw-recording-complete`: it is skipped when you cancel the complete event, when peak generation for the take fails (`daw-error` with `operation: 'recording-peaks'`), and when the track was removed in the meantime.
 
 During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), transiently mutes the recorded track (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub — the track's Mute control is untouched and the previous state is restored when the session ends), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
 
