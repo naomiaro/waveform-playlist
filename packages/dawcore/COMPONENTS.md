@@ -10,23 +10,24 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 
 **Attributes:**
 
-| Attribute             | Type    | Default | Description                                                                                                                                                    |
-| --------------------- | ------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `samples-per-pixel`   | number  | `1024`  | Zoom level (lower = more zoomed in)                                                                                                                            |
-| `wave-height`         | number  | `128`   | Track height in pixels                                                                                                                                         |
-| `timescale`           | boolean | `false` | Show time ruler above tracks                                                                                                                                   |
-| `mono`                | boolean | `false` | Merge channels to mono display                                                                                                                                 |
-| `bar-width`           | number  | `1`     | Waveform bar width in pixels                                                                                                                                   |
-| `bar-gap`             | number  | `0`     | Gap between waveform bars                                                                                                                                      |
-| `rounded-bars`        | boolean | `false` | Pill-shaped bar caps (radius bar-width/2)                                                                                                                      |
-| `file-drop`           | boolean | `false` | Enable drag-and-drop file loading                                                                                                                              |
-| `clip-headers`        | boolean | `false` | Show clip name headers                                                                                                                                         |
-| `clip-header-height`  | number  | `20`    | Height of clip headers in pixels                                                                                                                               |
-| `interactive-clips`   | boolean | `false` | Enable clip move/trim/split interactions                                                                                                                       |
-| `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport`. Recording sessions suppress the auto-stop automatically |
-| `fill-viewport`       | boolean | `false` | Timeline fills the visible viewport even when audio is shorter (layout only)                                                                                   |
-| `sample-rate`         | number  | `48000` | Sample rate hint for AudioContext and peaks matching                                                                                                           |
-| `track-reordering`    | boolean | `false` | Show a drag grip + move up/down buttons on `<daw-track-controls>` for vertical track reordering (drag and buttons both undoable)                               |
+| Attribute               | Type    | Default | Description                                                                                                                                                    |
+| ----------------------- | ------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `samples-per-pixel`     | number  | `1024`  | Zoom level (lower = more zoomed in)                                                                                                                            |
+| `wave-height`           | number  | `128`   | Track height in pixels                                                                                                                                         |
+| `timescale`             | boolean | `false` | Show time ruler above tracks                                                                                                                                   |
+| `mono`                  | boolean | `false` | Merge channels to mono display                                                                                                                                 |
+| `bar-width`             | number  | `1`     | Waveform bar width in pixels                                                                                                                                   |
+| `bar-gap`               | number  | `0`     | Gap between waveform bars                                                                                                                                      |
+| `rounded-bars`          | boolean | `false` | Pill-shaped bar caps (radius bar-width/2)                                                                                                                      |
+| `gain-scaled-waveforms` | boolean | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height) instead of at source level                                                      |
+| `file-drop`             | boolean | `false` | Enable drag-and-drop file loading                                                                                                                              |
+| `clip-headers`          | boolean | `false` | Show clip name headers                                                                                                                                         |
+| `clip-header-height`    | number  | `20`    | Height of clip headers in pixels                                                                                                                               |
+| `interactive-clips`     | boolean | `false` | Enable clip move/trim/split interactions                                                                                                                       |
+| `indefinite-playback`   | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport`. Recording sessions suppress the auto-stop automatically |
+| `fill-viewport`         | boolean | `false` | Timeline fills the visible viewport even when audio is shorter (layout only)                                                                                   |
+| `sample-rate`           | number  | `48000` | Sample rate hint for AudioContext and peaks matching                                                                                                           |
+| `track-reordering`      | boolean | `false` | Show a drag grip + move up/down buttons on `<daw-track-controls>` for vertical track reordering (drag and buttons both undoable)                               |
 
 **JS Properties:**
 
