@@ -4,6 +4,7 @@ import type { Peaks, Bits } from '@waveform-playlist/core';
 import {
   addBarToPath,
   aggregatePeaks,
+  scalePeakByGain,
   calculateBarRects,
   type BarRect,
 } from '../utils/peak-rendering';
@@ -31,6 +32,7 @@ const LAYOUT_PROPS = new Set([
   'barGap',
   'roundedBars',
   'segments',
+  'gain',
 ]);
 
 /**
@@ -111,6 +113,10 @@ export class DawWaveformElement extends LitElement {
   @property({ type: Number, attribute: false }) barGap = 0;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
   @property({ type: Boolean, attribute: false }) roundedBars = false;
+  /** Linear gain applied to the DRAWN bars (clamped to the channel height).
+   *  Display-only — peaks are untouched, so changing it never regenerates
+   *  them. The editor feeds it a clip's gain under `gain-scaled-waveforms`. */
+  @property({ type: Number, attribute: false }) gain = 1;
   /** Visible viewport start in pixels (relative to timeline origin). */
   @property({ type: Number, attribute: false }) visibleStart = -Infinity;
   /** Visible viewport end in pixels (relative to timeline origin). */
@@ -253,8 +259,9 @@ export class DawWaveformElement extends LitElement {
     if (barRadius !== null) ctx.beginPath();
 
     for (let bar = Math.max(0, firstBar); bar < regionEnd; bar += step) {
-      const peak = aggregatePeaks(this._peaks, bits, bar, bar + step);
-      if (!peak) continue;
+      const source = aggregatePeaks(this._peaks, bits, bar, bar + step);
+      if (!source) continue;
+      const peak = scalePeakByGain(source, this.gain);
       const rects = calculateBarRects(
         bar - globalOffset,
         this.barWidth,
@@ -327,8 +334,9 @@ export class DawWaveformElement extends LitElement {
         const peakPos = seg.peakStart + pxInSeg * peaksPerPixel;
         const peakEnd = peakPos + step * peaksPerPixel;
 
-        const peak = aggregatePeaks(this._peaks, bits, Math.floor(peakPos), Math.ceil(peakEnd));
-        if (!peak) continue;
+        const source = aggregatePeaks(this._peaks, bits, Math.floor(peakPos), Math.ceil(peakEnd));
+        if (!source) continue;
+        const peak = scalePeakByGain(source, this.gain);
 
         const rects = calculateBarRects(
           px,

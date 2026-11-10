@@ -240,8 +240,12 @@ Per-track and master effect chains (requires `@dawcore/transport` >= 0.0.13). `<
 ```javascript
 const track = document.querySelector('daw-track');
 
-// Built-in native-* effects: native-gain, native-filter, native-compressor,
-// native-stereo-panner, native-delay
+// Built-in native-* effects: native-gain, native-compressor,
+// native-stereo-panner, native-delay, and one type per biquad filter shape:
+// native-filter (lowpass), native-highpass, native-bandpass, native-notch
+// (frequency + q — for lowpass/highpass q is resonance in dB, -3 = flat;
+// for the others it is the linear quality factor), native-peaking (frequency + q + gain in dB),
+// native-lowshelf, native-highshelf (frequency + gain in dB)
 const filterId = track.addEffect('native-filter', { frequency: 800 });
 const compressorId = editor.addEffect('native-compressor'); // master chain
 
@@ -260,6 +264,28 @@ editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
 ```
 
 Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()` (exports from `@dawcore/components`).
+
+An effect backed by an `AudioWorkletNode` needs its module added to every context it is created on — including the `OfflineAudioContext` that `exportAudio()` builds internally. Give the definition an async `prepare` hook; it runs once per context:
+
+```javascript
+registerEffect('my-limiter', {
+  label: 'Limiter',
+  category: 'dynamics',
+  defaults: { ceiling: -1 },
+  params: { ceiling: { min: -24, max: 0, unit: 'dB' } },
+  prepare: (ctx) => ctx.audioWorklet.addModule('/limiter.worklet.js'),
+  create: (ctx) => {
+    const node = new AudioWorkletNode(ctx, 'my-limiter');
+    return { input: node, output: node, applyParams: (p) => { /* ... */ } };
+  },
+});
+
+await editor.prepareEffect('my-limiter'); // live context — addEffect is synchronous
+track.addEffect('my-limiter');
+await editor.exportAudio();               // prepares the offline context itself
+```
+
+`setEffectsState()` also awaits `prepare`, so a restored chain needs no extra call.
 
 ### WAM Plugins
 
@@ -350,8 +376,19 @@ const result = await editor.loadFiles(fileList);
     // e.preventDefault(); // skip automatic clip creation
     console.log('recorded:', e.detail.audioBuffer);
   });
+
+  // Fires once the take's clip exists — address it by id
+  editor.addEventListener('daw-recording-clip-add', (e) => {
+    const { trackId, clipId } = e.detail;
+    editor.updateClip(trackId, clipId, { gain: 2, name: 'Take 1' });
+    // editor.removeClip(trackId, clipId) to discard the take
+  });
 </script>
 ```
+
+A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). That entry follows the engine: `updateClip()`, drags and trims refresh it, and it is dropped when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take replaces it with two new clips, which have no entry of their own.
+
+`daw-recording-clip-add` is not guaranteed after every `daw-recording-complete`: it is skipped when you cancel the complete event, when peak generation for the take fails (`daw-error` with `operation: 'recording-peaks'`), and when the track was removed in the meantime.
 
 During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), transiently mutes the recorded track (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub — the track's Mute control is untouched and the previous state is restored when the session ends), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
 
@@ -444,6 +481,7 @@ Core orchestrator. Attributes:
 | `mono` | boolean | `false` | Merge stereo to mono display |
 | `bar-width` / `bar-gap` | number | `1` / `0` | Waveform bar rendering style |
 | `rounded-bars` | boolean | `false` | Pill-shaped bar caps (radius `bar-width / 2`) |
+| `gain-scaled-waveforms` | boolean | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height) instead of at source level |
 | `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport` |
 | `fill-viewport` | boolean | `false` | Keep ruler/timeline filling the viewport even when audio is shorter (layout only) |
 | `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |
@@ -534,6 +572,8 @@ editor.addEventListener('daw-recording-complete', (e) => {
   // e.preventDefault() to skip automatic clip creation
   console.log(e.detail.audioBuffer);
 });
+// The take's clip now exists: detail is { trackId, clipId }
+editor.addEventListener('daw-recording-clip-add', (e) => console.log(e.detail));
 
 // Effects (track events bubble up to the editor)
 editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));

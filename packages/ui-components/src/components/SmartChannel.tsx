@@ -14,6 +14,9 @@ export interface SmartChannelProps {
   isSelected?: boolean; // Whether this channel's track is selected
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
+  /** Linear gain applied to the drawn waveform bars (see `ChannelProps.gain`).
+   *  Waveform rendering only — spectrogram and piano-roll ignore it. */
+  gain?: number;
   /** Render mode: waveform, spectrogram, or both */
   renderMode?: RenderMode;
   /** Samples per pixel at current zoom level */

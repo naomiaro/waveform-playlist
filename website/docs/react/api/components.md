@@ -41,6 +41,7 @@ The main visualization component that renders tracks and handles interactions.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `showClipHeaders` | `boolean` | `false` | Show clip name headers above waveforms |
+| `gainScaledWaveforms` | `boolean` | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height), so clips levelled with clip gain look the way they sound. Draw-time only — peaks are not regenerated |
 | `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips (requires @dnd-kit/react DragDropProvider setup) |
 | `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
 | `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |

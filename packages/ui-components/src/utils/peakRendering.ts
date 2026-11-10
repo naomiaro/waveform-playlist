@@ -63,6 +63,33 @@ export function aggregatePeaks(
   return { min: minPeak, max: maxPeak };
 }
 
+function clampToFullScale(value: number): number {
+  return Math.max(-1, Math.min(1, value));
+}
+
+/**
+ * Scales a drawn peak by a linear gain (a clip's gain), clamped to full
+ * scale so a boosted bar never leaves its channel. Display-only: the
+ * underlying peak data is untouched, so a gain change needs no peak
+ * regeneration. A negative (phase-inverting) gain scales by magnitude; a
+ * non-finite gain is ignored.
+ *
+ * @returns the same object at unity gain (the hot path allocates nothing)
+ */
+export function scalePeakByGain(peak: AggregatedPeak, gain: number): AggregatedPeak {
+  if (gain === 1 || !Number.isFinite(gain)) {
+    return peak;
+  }
+  const factor = Math.abs(gain);
+  // Clamp BOTH values on BOTH sides. Zoomed in on low-frequency content a
+  // bar's min is often positive (or its max negative): {min: 0.6, max: 0.9}
+  // at gain 2 would otherwise leave min at 1.2, outside the channel.
+  return {
+    min: clampToFullScale(peak.min * factor),
+    max: clampToFullScale(peak.max * factor),
+  };
+}
+
 /**
  * Computes canvas fillRect parameters for a single waveform bar.
  *

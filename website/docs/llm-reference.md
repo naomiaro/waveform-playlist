@@ -361,6 +361,8 @@ interface ClipPeaks {
   sampleRate?: number;
   /** Offset into the source audio in samples. */
   offsetSamples?: number;
+  /** The clip's linear gain — drawn into the waveform under `<Waveform gainScaledWaveforms />`. */
+  gain?: number;
 }
 
 type TrackClipPeaks = ClipPeaks[];
@@ -1080,6 +1082,7 @@ interface WaveformProps {
   scrollActiveContainer?: 'nearest' | 'all';
   className?: string;
   showClipHeaders?: boolean;      // Default: false
+  gainScaledWaveforms?: boolean;  // Default: false. Draw each clip's waveform scaled by clip.gain (clamped)
   interactiveClips?: boolean;     // Default: false
   showFades?: boolean;
   touchOptimized?: boolean;
