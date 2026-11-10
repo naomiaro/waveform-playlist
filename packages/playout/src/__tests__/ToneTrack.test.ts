@@ -496,7 +496,6 @@ describe('ToneTrack', () => {
       // Mute still reaches the destination — it is after the effects now.
       expect(mockMuteGain.connect).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe('connectEffects / disconnectEffects', () => {
