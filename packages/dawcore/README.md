@@ -240,8 +240,12 @@ Per-track and master effect chains (requires `@dawcore/transport` >= 0.0.13). `<
 ```javascript
 const track = document.querySelector('daw-track');
 
-// Built-in native-* effects: native-gain, native-filter, native-compressor,
-// native-stereo-panner, native-delay
+// Built-in native-* effects: native-gain, native-compressor,
+// native-stereo-panner, native-delay, and one type per biquad filter shape:
+// native-filter (lowpass), native-highpass, native-bandpass, native-notch
+// (frequency + q — for lowpass/highpass q is resonance in dB, -3 = flat;
+// for the others it is the linear quality factor), native-peaking (frequency + q + gain in dB),
+// native-lowshelf, native-highshelf (frequency + gain in dB)
 const filterId = track.addEffect('native-filter', { frequency: 800 });
 const compressorId = editor.addEffect('native-compressor'); // master chain
 
@@ -260,6 +264,28 @@ editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
 ```
 
 Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()` (exports from `@dawcore/components`).
+
+An effect backed by an `AudioWorkletNode` needs its module added to every context it is created on — including the `OfflineAudioContext` that `exportAudio()` builds internally. Give the definition an async `prepare` hook; it runs once per context:
+
+```javascript
+registerEffect('my-limiter', {
+  label: 'Limiter',
+  category: 'dynamics',
+  defaults: { ceiling: -1 },
+  params: { ceiling: { min: -24, max: 0, unit: 'dB' } },
+  prepare: (ctx) => ctx.audioWorklet.addModule('/limiter.worklet.js'),
+  create: (ctx) => {
+    const node = new AudioWorkletNode(ctx, 'my-limiter');
+    return { input: node, output: node, applyParams: (p) => { /* ... */ } };
+  },
+});
+
+await editor.prepareEffect('my-limiter'); // live context — addEffect is synchronous
+track.addEffect('my-limiter');
+await editor.exportAudio();               // prepares the offline context itself
+```
+
+`setEffectsState()` also awaits `prepare`, so a restored chain needs no extra call.
 
 ### WAM Plugins
 

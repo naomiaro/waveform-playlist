@@ -139,6 +139,7 @@ export {
   registerEffect,
   getEffectDefinitions,
   createEffectInstance,
+  prepareEffect,
 } from './effects/effect-registry';
 export type {
   EffectDefinition,

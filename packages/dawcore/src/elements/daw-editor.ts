@@ -499,6 +499,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._effectsManager;
   }
 
+  /**
+   * Run a registered effect type's async `prepare` hook (e.g. an
+   * `audioWorklet.addModule`) on this editor's audio context. Await it before
+   * the synchronous `addEffect`/`addTrackEffect` for effect types that define
+   * one; `setEffectsState()` and `exportAudio()` run it themselves. Idempotent
+   * per context, and a no-op for types without a hook.
+   */
+  prepareEffect(type: string): Promise<void> {
+    return this._effects.prepareEffect(type);
+  }
+
   /** Master effects chain — inserted between the master bus and the destination. */
   addEffect(type: string, params?: Record<string, number>): string {
     return this._effects.addMasterEffect(type, params);
