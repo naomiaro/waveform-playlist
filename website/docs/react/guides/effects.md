@@ -300,7 +300,7 @@ Waveform Playlist pans every track with its own small pan stage (`createPanStage
 
 The pan stage uses the same two pan laws as `StereoPannerNode`, so levels and pan positions are the ones you would expect, but it picks the law from the track's audio (mono or stereo clips) instead of from the effects' output, and it always keeps a stereo signal stereo. The same stage is used for playback and WAV export, with the Tone.js engine and with the native `@dawcore/transport`.
 
-A track that mixes mono and stereo clips is panned with the stereo law.
+A track that mixes mono and stereo clips is panned with the stereo law, so its mono clips play 3 dB louder at centre than on a mono-only track. Keep mono and stereo material on separate tracks if you want a track's level to stay put when clips are added or removed.
 
 You can still use `Panner`, `AutoPanner` or a `StereoPannerNode` as an **effect** inside a track's chain.
 

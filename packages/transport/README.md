@@ -197,7 +197,7 @@ The pan stage implements the same two laws — its output matches a `StereoPanne
 
 - Mono track: equal-power pan. The stage never mixes the two channels, so a stereo effect stays stereo.
 - Stereo track: the stereo law — centre passes both channels at unity; panning left folds the right channel into the left, and vice versa.
-- A track with both mono and stereo clips uses the stereo law for all of them, so its mono clips play 3 dB louder at centre than they would on a mono-only track. (Before 0.0.16 the law depended on which clips happened to be sounding.)
+- A track with both mono and stereo clips uses the stereo law for all of them, so its mono clips play 3 dB louder at centre than they would on a mono-only track. Adding the first stereo clip to a mono track (or removing the last one) therefore shifts the track's mono clips by 3 dB at centre. (Before 0.0.16 the law depended on which clips happened to be sounding.)
 
 The Tone.js adapter (`@waveform-playlist/playout`) and both offline renderers use the same stage, so pan positions and levels match across backends and between playback and export.
 

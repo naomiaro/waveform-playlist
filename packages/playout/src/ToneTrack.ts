@@ -302,6 +302,16 @@ export class ToneTrack {
   }
 
   /**
+   * Select the pan law from the track's source material: 1 = mono law,
+   * 2+ = stereo law. Call when the track's clips change — a stereo clip
+   * joining a mono track moves it to the stereo law (same rule as the
+   * native transport and the offline export).
+   */
+  setSourceChannelCount(sourceChannelCount: number): void {
+    this.panStage.setSourceChannelCount(sourceChannelCount);
+  }
+
+  /**
    * Replace clips on this track. Diffs old vs new by buffer + timing —
    * unchanged clips keep their active sources playing (no audible interruption).
    * Changed/added/removed clips are rescheduled. Disconnecting a removed clip's

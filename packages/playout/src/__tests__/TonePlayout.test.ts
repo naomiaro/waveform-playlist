@@ -74,6 +74,8 @@ vi.mock('../ToneTrack', () => {
     this.setSolo = vi.fn();
     this.setVolume = vi.fn();
     this.setPan = vi.fn();
+    this.replaceClips = vi.fn();
+    this.setSourceChannelCount = vi.fn();
   });
   return { ToneTrack };
 });
@@ -390,6 +392,36 @@ describe('TonePlayout', () => {
 
       // mockVolume.input.input is the native GainNode stand-in in this file's mocks
       expect(playout.masterBusInputNode).toBe(mockVolume.input.input);
+    });
+  });
+
+  describe('replaceTrackClips', () => {
+    it('replaces the clips and re-selects the pan law (#669)', () => {
+      const playout = new TonePlayout();
+      const track = playout.addTrack({ clips: [], track: makeTrack('t1') }) as unknown as {
+        replaceClips: ReturnType<typeof vi.fn>;
+        setSourceChannelCount: ReturnType<typeof vi.fn>;
+      };
+
+      expect(playout.replaceTrackClips('t1', [], 0, 2)).toBe(true);
+
+      expect(track.replaceClips).toHaveBeenCalledWith([], 0);
+      expect(track.setSourceChannelCount).toHaveBeenCalledWith(2);
+    });
+
+    it('leaves the pan law alone when no channel count is given', () => {
+      const playout = new TonePlayout();
+      const track = playout.addTrack({ clips: [], track: makeTrack('t1') }) as unknown as {
+        setSourceChannelCount: ReturnType<typeof vi.fn>;
+      };
+
+      playout.replaceTrackClips('t1', []);
+
+      expect(track.setSourceChannelCount).not.toHaveBeenCalled();
+    });
+
+    it('returns false for an unknown track', () => {
+      expect(new TonePlayout().replaceTrackClips('nope', [], 0, 2)).toBe(false);
     });
   });
 

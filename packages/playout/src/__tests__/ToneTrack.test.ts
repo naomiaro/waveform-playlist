@@ -469,6 +469,12 @@ describe('ToneTrack', () => {
       expect(mockPanStage.setPan).toHaveBeenCalledWith(-0.4);
     });
 
+    it('setSourceChannelCount switches the pan law', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      track.setSourceChannelCount(2);
+      expect(mockPanStage.setSourceChannelCount).toHaveBeenCalledWith(2);
+    });
+
     it('routes input → volume and mute → destination when there are no effects', () => {
       new ToneTrack({ clips: [], track: makeTrack() });
 
