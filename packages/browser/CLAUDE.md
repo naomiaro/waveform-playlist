@@ -96,7 +96,7 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Why single path:** Previously had a native `OfflineAudioContext` path (no effects) and a `Tone.Offline` path (with effects). The dual paths diverged — the native path used `StereoPannerNode` (correct stereo) while the Tone path used `Panner` without `channelCount: 2` (stereo→mono downmix). Unifying prevents this class of bug.
 
-**Pan law from source:** pass `trackChannelCount(track)` from core to `createTrackPanStage` — it selects the mono or stereo pan law. Hardcoding `2` gives mono tracks the stereo law (+3 dB at centre); hardcoding `1` gives stereo tracks the balance law (−3 dB at centre).
+**Pan law from source:** pass `trackChannelCount(track)` from core to core's `createPanStage(context.rawContext, pan, count)` (native nodes on the raw offline context; `connect(stage.output, toneNode)` from `tone` makes the native → Tone edge) — it selects the mono or stereo pan law. Hardcoding `2` gives mono tracks the stereo law (+3 dB at centre); hardcoding `1` gives stereo tracks the balance law (−3 dB at centre).
 
 **Output channels from source:** `Offline()` output channel count is derived from `trackChannelCount` across all rendered tracks — not hardcoded to 2.
 

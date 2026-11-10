@@ -8,7 +8,7 @@
 
 **Testing:** vitest unit tests in `src/__tests__/`. Run with `cd packages/transport && npx vitest run`.
 
-**Zero dependencies.** No peer deps. `@waveform-playlist/core` and `@waveform-playlist/engine` are devDependencies only (all imports are `import type`, erased at build time).
+**One runtime dependency: `@waveform-playlist/core`** (regular `workspace:*` dep since #669 — the shared pan stage; published as an exact pin, so every core release republishes transport, which changesets computes). `@waveform-playlist/engine` stays a devDependency (`import type` only). No peer deps.
 
 ## Core Layer
 
@@ -107,10 +107,10 @@ Parallel to TempoMap, stores time signature entries at tick positions. Each entr
 ### TrackNode Signal Chain
 
 ```
-clip source → GainNode (input, unity) → [effects insert] → GainNode (volume) → StereoPannerNode → GainNode (mute) → output
+clip source → GainNode (input, unity) → [effects insert] → GainNode (volume) → pan stage (core `createPanStage`) → GainNode (mute) → output
 ```
 
-Mute uses a separate GainNode (0/1) so volume and mute are independent. **Effects are PRE-FADER inserts (#660):** `connectEffects(input, output)` routes `input node → input … output → volume`. The TrackNode owns BOTH edges and releases the return edge (`output.disconnect(volume)`, targeted — taps on the chain output survive) on `disconnectEffects()`, on a replacing `connectEffects()`, and on `dispose()` (otherwise a rebuilt track leaves the chain feeding a dead volume node). A chain the consumer already tore down only warns. Consequences worth knowing before touching the order: the fader no longer drives level-dependent effects; a mono clip reaches the chain mono at full level; mute/solo cut effect tails; and the panner's law follows the CHAIN's output layout (`StereoPannerNode` is `clamped-max`: mono in → equal-power mono law, stereo in → balance law, ~3 dB louder at centre for a dual-mono signal).
+Mute uses a separate GainNode (0/1) so volume and mute are independent. **Effects are PRE-FADER inserts (#660):** `connectEffects(input, output)` routes `input node → input … output → volume`. The TrackNode owns BOTH edges and releases the return edge (`output.disconnect(volume)`, targeted — taps on the chain output survive) on `disconnectEffects()`, on a replacing `connectEffects()`, and on `dispose()` (otherwise a rebuilt track leaves the chain feeding a dead volume node). A chain the consumer already tore down only warns. Consequences worth knowing before touching the order: the fader no longer drives level-dependent effects; a mono clip reaches the chain mono at full level; mute/solo cut effect tails; and pan is core's gain-matrix stage, NOT a `StereoPannerNode` (#669) — a panner is `clamped-max`, so its law followed the CHAIN's output layout (stereo effect on a mono track: +3.01 dB at centre, measured). `TrackNode(id, ctx, sourceChannelCount = 1)` builds the stage with the track's source channel count; `Transport` passes `trackChannelCount(track)` at `setTracks`/`addTrack` and calls `node.setSourceChannelCount()` in `updateTrack` (clips can change). A track with mixed mono + stereo clips gets the stereo law for all of them (max channel count, same rule as the Tone adapter). Verified in Chromium on `OfflineAudioContext`s: stage vs `StereoPannerNode` fed the raw source differs by 1e-8 at five pans × mono/stereo; live graph vs `exportAudioImpl` differs by exactly 0. **Test mocks:** contexts need `createChannelSplitter`/`createChannelMerger`; `track-node.test.ts` stubs core's `createPanStage` as one opaque node so graph assertions stay about the track's wiring.
 
 ### ClipPlayer
 

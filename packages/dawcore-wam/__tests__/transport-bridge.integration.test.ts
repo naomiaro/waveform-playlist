@@ -26,7 +26,8 @@ function createMockAudioContext(): AudioContext {
     state: 'running',
     destination: { connect: vi.fn(), disconnect: vi.fn() },
     createGain: vi.fn(node),
-    createStereoPanner: vi.fn(node),
+    createChannelSplitter: vi.fn(node),
+    createChannelMerger: vi.fn(node),
     createBufferSource: vi.fn(node),
     createBuffer: vi.fn((channels: number, length: number, sampleRate: number) => ({
       duration: length / sampleRate,

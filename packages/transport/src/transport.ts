@@ -1,4 +1,4 @@
-import type { ClipTrack } from '@waveform-playlist/core';
+import { trackChannelCount, type ClipTrack } from '@waveform-playlist/core';
 import type {
   Tick,
   Sample,
@@ -482,7 +482,7 @@ export class Transport {
 
     // Create track nodes
     for (const track of tracks) {
-      const trackNode = new TrackNode(track.id, this._audioContext);
+      const trackNode = new TrackNode(track.id, this._audioContext, trackChannelCount(track));
       trackNode.setVolume(track.volume);
       trackNode.setPan(track.pan);
       trackNode.connectOutput(this._masterNode.input);
@@ -501,7 +501,7 @@ export class Transport {
   }
 
   addTrack(track: ClipTrack): void {
-    const trackNode = new TrackNode(track.id, this._audioContext);
+    const trackNode = new TrackNode(track.id, this._audioContext, trackChannelCount(track));
     trackNode.setVolume(track.volume);
     trackNode.setPan(track.pan);
     trackNode.connectOutput(this._masterNode.input);
@@ -539,6 +539,9 @@ export class Transport {
     if (node) {
       node.setVolume(track.volume);
       node.setPan(track.pan);
+      // Clips may have changed (a stereo take on a mono track): the pan
+      // law follows the track's source material.
+      node.setSourceChannelCount(trackChannelCount(track));
     }
 
     // Update mute/solo

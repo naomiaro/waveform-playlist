@@ -1,3 +1,4 @@
+import { createPanStage, trackChannelCount } from '@waveform-playlist/core';
 import {
   createEffectInstance,
   ensureEffectPrepared,
@@ -119,11 +120,13 @@ export async function exportAudioImpl(
       // compressor works. Order matters for every nonlinear effect.
       const volume = ctx.createGain();
       volume.gain.value = track.volume;
-      const panner = ctx.createStereoPanner();
-      panner.pan.value = track.pan;
+      // Same pan stage as live (#669): the law comes from the clips' channel
+      // count, not from whatever layout the effects chain outputs.
+      const panStage = createPanStage(ctx, track.pan, trackChannelCount(track));
+      cleanups.push(panStage.dispose);
       chain.output.connect(volume);
-      volume.connect(panner);
-      panner.connect(masterVolume);
+      volume.connect(panStage.input);
+      panStage.output.connect(masterVolume);
 
       for (const clip of track.clips) {
         scheduleClip(ctx, clip, startTime, duration, chain.input);

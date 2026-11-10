@@ -60,6 +60,8 @@ function makeMockAdapter() {
       disconnect: vi.fn(),
       delayTime: { value: 0 },
     })),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createChannelMerger: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
     createStereoPanner: vi.fn(() => ({
       connect: vi.fn(),
       disconnect: vi.fn(),

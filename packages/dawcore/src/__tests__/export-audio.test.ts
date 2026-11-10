@@ -21,6 +21,25 @@ vi.mock('@dawcore/wam', () => ({
 
 vi.mock('@dawcore/faust', () => ({ compileFaustToWam }));
 
+// The pan stage has its own unit tests in core and is verified against real
+// audio in a browser; here it is one opaque node per track.
+const panStages: Array<{
+  node: ReturnType<typeof mockNode>;
+  pan: number;
+  sourceChannelCount: number;
+  dispose: ReturnType<typeof vi.fn>;
+}> = [];
+
+vi.mock('@waveform-playlist/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
+  createPanStage: vi.fn((_ctx: unknown, pan: number, sourceChannelCount: number) => {
+    const node = mockNode();
+    const dispose = vi.fn();
+    panStages.push({ node, pan, sourceChannelCount, dispose });
+    return { input: node, output: node, setPan: vi.fn(), setSourceChannelCount: vi.fn(), dispose };
+  }),
+}));
+
 function mockParam(value = 0) {
   return { value };
 }
@@ -38,7 +57,6 @@ class MockOfflineContext {
   renderedBuffer = { duration: 1 } as unknown as AudioBuffer;
   sources: Array<ReturnType<typeof mockNode> & { start: ReturnType<typeof vi.fn> }> = [];
   gains: Array<ReturnType<typeof mockNode> & { gain: { value: number } }> = [];
-  panners: Array<ReturnType<typeof mockNode>> = [];
   startRendering = vi.fn(async () => this.renderedBuffer);
 
   constructor(options: { numberOfChannels: number; length: number; sampleRate: number }) {
@@ -53,12 +71,6 @@ class MockOfflineContext {
     this.gains.push(node as any);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return node as any;
-  }
-  createStereoPanner() {
-    const node = mockNode({ pan: mockParam(0) });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.panners.push(node as any);
-    return node;
   }
   createDynamicsCompressor() {
     return mockNode({
@@ -125,6 +137,7 @@ function makeHost(overrides: Partial<ExportAudioHost> = {}): ExportAudioHost {
 beforeEach(() => {
   _resetEffectRegistryForTests();
   offlineInstances.length = 0;
+  panStages.length = 0;
   ensureWamHost.mockReset().mockResolvedValue({ hostGroupId: 'off-group', hostGroupKey: 'k' });
   createWamInstance.mockReset();
   createWamInstanceFromFactory.mockReset();
@@ -442,8 +455,8 @@ describe('exportAudioImpl — audit wave 3', () => {
     expect(masterGain!.connect).toHaveBeenCalled();
     expect(masterGain!.connect).not.toHaveBeenCalledWith(ctx.destination);
     // The track's panner (post-fader) routes into the master volume stage
-    const feedsMasterVolume = ctx.panners.some((p) =>
-      p.connect.mock.calls.some((call) => call[0] === masterGain)
+    const feedsMasterVolume = panStages.some((p) =>
+      p.node.connect.mock.calls.some((call) => call[0] === masterGain)
     );
     expect(feedsMasterVolume).toBe(true);
   });
@@ -492,7 +505,7 @@ describe('exportAudioImpl — track signal order (#660)', () => {
       if (n === compressor) return 'compressor';
       if (n === ctx.destination) return 'destination';
       if (ctx.sources.includes(n as never)) return 'source';
-      if (ctx.panners.includes(n as never)) return 'pan';
+      if (panStages.some((p) => p.node === n)) return 'pan';
       const gain = ctx.gains.find((g) => g === n);
       if (!gain) return '?';
       if (gain.gain.value === 0.5) return 'clipGain';
@@ -522,8 +535,44 @@ describe('exportAudioImpl — track signal order (#660)', () => {
 
     const ctx = offlineInstances[0];
     const volume = ctx.gains.find((g) => g.gain.value === 0.8)!;
-    expect(ctx.panners).toHaveLength(1);
-    expect(volume.connect).toHaveBeenCalledWith(ctx.panners[0]);
+    expect(panStages).toHaveLength(1);
+    expect(volume.connect).toHaveBeenCalledWith(panStages[0].node);
+  });
+});
+
+// #669: the offline render pans with the same stage and law as live playback.
+describe('exportAudioImpl — pan stage (#669)', () => {
+  const stereoBuffer = { duration: 4, sampleRate: 48000, numberOfChannels: 2 };
+  const monoBuffer = { duration: 4, sampleRate: 48000, numberOfChannels: 1 };
+  function hostWith(clips: unknown[], pan = 0) {
+    return makeHost({
+      tracks: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { id: 't', volume: 1, pan, muted: false, soloed: false, clips: clips as any },
+      ],
+    });
+  }
+
+  it('passes the track pan to the stage', async () => {
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })], -0.25));
+    expect(panStages[0].pan).toBe(-0.25);
+  });
+
+  it('a track of mono clips gets the mono law', async () => {
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })]));
+    expect(panStages[0].sourceChannelCount).toBe(1);
+  });
+
+  it('a track with any stereo clip gets the stereo law', async () => {
+    await exportAudioImpl(
+      hostWith([makeClip({ audioBuffer: monoBuffer }), makeClip({ audioBuffer: stereoBuffer })])
+    );
+    expect(panStages[0].sourceChannelCount).toBe(2);
+  });
+
+  it('releases the stage after rendering', async () => {
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })]));
+    expect(panStages[0].dispose).toHaveBeenCalledTimes(1);
   });
 });
 

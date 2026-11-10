@@ -28,15 +28,6 @@ function createMockGainNode() {
   };
 }
 
-function createMockPannerNode() {
-  return {
-    pan: { value: 0 },
-    channelCount: 1,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
-}
-
 function mockAudioContext(currentTime = 0): AudioContext {
   return {
     sampleRate: 48000,
@@ -44,7 +35,8 @@ function mockAudioContext(currentTime = 0): AudioContext {
     state: 'running',
     destination: { connect: vi.fn(), disconnect: vi.fn() },
     createGain: vi.fn(() => createMockGainNode()),
-    createStereoPanner: vi.fn(() => createMockPannerNode()),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createChannelMerger: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
     createBufferSource: vi.fn(() => createMockSource()),
     resume: vi.fn(() => Promise.resolve()),
   } as unknown as AudioContext;
@@ -992,6 +984,51 @@ describe('Transport', () => {
     const track = makeTrack([makeClip()]);
     transport.addTrack(track);
     // Should not throw
+  });
+
+  describe('pan law follows the track source channel count (#669)', () => {
+    // Real core pan stage on the mock context: a centred MONO-law stage holds
+    // two gains at cos(π/4); a centred STEREO-law stage holds none.
+    function monoLawGains(ctx: AudioContext): number {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (ctx.createGain as any).mock.results.filter(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (r: any) => Math.abs(r.value.gain.value - Math.SQRT1_2) < 1e-9
+      ).length;
+    }
+    const monoBuffer = { numberOfChannels: 1 } as unknown as AudioBuffer;
+
+    it('setTracks: a mono track gets the mono law, a stereo track the stereo law', () => {
+      const monoCtx = mockAudioContext();
+      new Transport(monoCtx).setTracks([makeTrack([makeClip({ audioBuffer: monoBuffer })])]);
+      expect(monoLawGains(monoCtx)).toBe(2);
+
+      const stereoCtx = mockAudioContext();
+      new Transport(stereoCtx).setTracks([makeTrack([makeClip()])]);
+      expect(monoLawGains(stereoCtx)).toBe(0);
+    });
+
+    it('addTrack uses the track source channel count', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([]);
+      transport.addTrack(makeTrack([makeClip()]));
+      expect(monoLawGains(ctx)).toBe(0);
+    });
+
+    it('updateTrack switches the law when a stereo clip joins a mono track', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const monoClip = makeClip({ audioBuffer: monoBuffer });
+      transport.setTracks([makeTrack([monoClip])]);
+      expect(monoLawGains(ctx)).toBe(2);
+
+      transport.updateTrack('track-1', makeTrack([monoClip, makeClip({ id: 'clip-2' })]));
+      expect(monoLawGains(ctx)).toBe(0);
+
+      transport.updateTrack('track-1', makeTrack([monoClip]));
+      expect(monoLawGains(ctx)).toBe(2);
+    });
   });
 
   it('removeTrack removes a track', () => {

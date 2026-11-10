@@ -611,10 +611,11 @@ importers:
         version: 5.0.3(@types/node@24.19.1)(jsdom@28.1.0)(vite@8.3.3)
 
   packages/transport:
-    devDependencies:
+    dependencies:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine

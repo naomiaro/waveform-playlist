@@ -9,7 +9,7 @@ Native Web Audio transport for the dawcore family — multi-track scheduling, lo
 - **Dual timeline** — Sample-absolute positions for audio clips, PPQN tick positions for metronome/MIDI.
 - **Built-in metronome** — Beat-grid click scheduling with accent on beat 1. Default synthesized click sounds out of the box.
 - **Count-in (pre-roll)** — Configurable bars of click sounds before playback begins. Beat-by-beat events for UI countdown.
-- **Per-track signal chain** — clip sources → effects insert (pre-fader) → GainNode (volume) → StereoPannerNode → GainNode (mute) → master output.
+- **Per-track signal chain** — clip sources → effects insert (pre-fader) → GainNode (volume) → pan stage (a gain matrix, not a `StereoPannerNode` — see [Panning](#panning)) → GainNode (mute) → master output.
 - **Effects plugin hook** — `connectTrackEffects(trackId, input, output)` (pre-fader track insert) and `connectMasterOutput(node)` insert any `AudioNode` chain (Tone.js effects, WAM plugins, native nodes) per-track or on the master bus.
 - **Type-safe coordinates** — Branded `Tick` and `Sample` types prevent accidentally passing seconds where ticks or samples are expected. Zero runtime cost.
 - **PlayoutAdapter bridge** — `NativePlayoutAdapter` implements the `PlayoutAdapter` interface from `@waveform-playlist/engine`.
@@ -20,7 +20,7 @@ Native Web Audio transport for the dawcore family — multi-track scheduling, lo
 npm install @dawcore/transport
 ```
 
-No runtime dependencies. When using `NativePlayoutAdapter` (bridge to `@waveform-playlist/engine`), install `@waveform-playlist/core` and `@waveform-playlist/engine` alongside.
+One runtime dependency, installed automatically: `@waveform-playlist/core` (dependency-free itself; the transport uses its shared pan stage). When using `NativePlayoutAdapter` (bridge to `@waveform-playlist/engine`), install `@waveform-playlist/engine` alongside.
 
 ## Quick Start
 
@@ -183,9 +183,23 @@ transport.disconnectMasterOutput();
 - A mono clip reaches the chain as mono, at full level (not as two channels at −3 dB from a centred panner).
 - Do **not** connect the chain's output to `masterOutputNode` yourself — the transport returns it into the track. Routing it to the master would bypass the fader, pan, mute and solo.
 - Mute and solo silence a track including its effect tails.
-- The panner follows what the chain outputs: a mono chain is panned with the equal-power mono law, a stereo chain (a stereo reverb, most WAM plugins) with the stereo-balance law, which is about 3 dB louder at centre for the same mono source.
+- Pan is unaffected by what the chain outputs: the pan law follows the track's clips, not the chain. A stereo reverb on a mono track stays stereo and sits at the same centre level as the dry track (see [Panning](#panning)).
 
 `setTracks()` rebuilds every track node and drops these hookups — reconnect afterwards. (Before 0.0.16 the hook was `connectTrackOutput(trackId, node)`, post-fader, with the caller wiring the chain to the master.)
+
+### Panning
+
+A track is panned by a small gain matrix (`createPanStage` from `@waveform-playlist/core`), **not** by a Web Audio `StereoPannerNode`.
+
+Why: a `StereoPannerNode` chooses its pan law from the signal it _receives_ — the equal-power law for mono input (−3 dB per side at centre), the stereo law for stereo input (unity at centre). With pre-fader effects the panner is fed by the effects chain, so the law would follow the chain's output instead of the track: a mono track with a stereo reverb or a typical WAM plugin would jump about 3 dB at centre and get a different pan curve the moment the effect was added.
+
+The pan stage implements the same two laws — its output matches a `StereoPannerNode` fed the raw clip to within float rounding — but takes the law from the track's **source material**: the highest channel count among the track's clips (`trackChannelCount(track)`), re-evaluated on `setTracks`, `addTrack` and `updateTrack`.
+
+- Mono track: equal-power pan. The stage never mixes the two channels, so a stereo effect stays stereo.
+- Stereo track: the stereo law — centre passes both channels at unity; panning left folds the right channel into the left, and vice versa.
+- A track with both mono and stereo clips uses the stereo law for all of them, so its mono clips play 3 dB louder at centre than they would on a mono-only track. (Before 0.0.16 the law depended on which clips happened to be sounding.)
+
+The Tone.js adapter (`@waveform-playlist/playout`) and both offline renderers use the same stage, so pan positions and levels match across backends and between playback and export.
 
 **Note:** `ClipTrack.effects` (the Tone.js-oriented per-track effects function used by `@waveform-playlist/playout`) is not read by `NativePlayoutAdapter` — it's silently ignored. Use `connectTrackEffects`/`connectMasterOutput` for effects with the native transport, or use `TonePlayoutAdapter` if a track still relies on `ClipTrack.effects`.
 

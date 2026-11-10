@@ -1,3 +1,5 @@
+import { createPanStage, type PanStage } from '@waveform-playlist/core';
+
 const PREFIX = '[waveform-playlist] ';
 
 /**
@@ -10,29 +12,34 @@ const PREFIX = '[waveform-playlist] ';
  * and pan only place the processed track in the mix — they never change
  * how hard a compressor or distortion works. Mute sits last, so a muted
  * (or un-soloed) track is silent including its effect tails.
+ *
+ * Pan is core's gain-matrix stage, not a `StereoPannerNode` (#669): a
+ * panner picks its law from the layout it RECEIVES, which pre-fader is the
+ * effects chain's output — a stereo reverb on a mono track would sit ~3 dB
+ * louder at centre. The stage takes its law from `sourceChannelCount`, the
+ * max channel count of the track's clips, whatever the chain outputs.
  */
 export class TrackNode {
   readonly id: string;
   private _inputNode: GainNode;
   private _volumeNode: GainNode;
-  private _panNode: StereoPannerNode;
+  private _panStage: PanStage;
   private _muteNode: GainNode;
   private _effects: { input: AudioNode; output: AudioNode } | null = null;
 
-  constructor(id: string, audioContext: AudioContext) {
+  constructor(id: string, audioContext: AudioContext, sourceChannelCount = 1) {
     this.id = id;
     // Unity-gain summing point for the track's clip sources — the stable
     // node an effects chain is inserted after.
     this._inputNode = audioContext.createGain();
     this._volumeNode = audioContext.createGain();
-    this._panNode = audioContext.createStereoPanner();
-    this._panNode.channelCount = 2;
+    this._panStage = createPanStage(audioContext, 0, sourceChannelCount);
     this._muteNode = audioContext.createGain();
 
     // Wire: input → volume → pan → mute (caller connects output via connectOutput)
     this._inputNode.connect(this._volumeNode);
-    this._volumeNode.connect(this._panNode);
-    this._panNode.connect(this._muteNode);
+    this._volumeNode.connect(this._panStage.input);
+    this._panStage.output.connect(this._muteNode);
   }
 
   /** Where clip sources connect (pre-fader, pre-effects). */
@@ -50,7 +57,13 @@ export class TrackNode {
   }
 
   setPan(value: number): void {
-    this._panNode.pan.value = value;
+    this._panStage.setPan(value);
+  }
+
+  /** Select the pan law from the track's source material: 1 = mono law
+   *  (−3 dB per side at centre), 2+ = stereo law (unity at centre). */
+  setSourceChannelCount(sourceChannelCount: number): void {
+    this._panStage.setSourceChannelCount(sourceChannelCount);
   }
 
   setMute(muted: boolean): void {
@@ -88,13 +101,14 @@ export class TrackNode {
     // this dead track's volume node.
     this._releaseEffectsReturn();
     this._effects = null;
-    for (const node of [this._inputNode, this._volumeNode, this._panNode, this._muteNode]) {
+    for (const node of [this._inputNode, this._volumeNode, this._muteNode]) {
       try {
         node.disconnect();
       } catch (err) {
         console.warn(PREFIX + 'TrackNode.dispose: error disconnecting node:', String(err));
       }
     }
+    this._panStage.dispose();
   }
 
   /** Targeted disconnect of `effectsOutput → volume` — other consumers of

@@ -1,4 +1,4 @@
-import type { AudioClip, ClipTrack } from './types';
+import type { AudioClip } from './types';
 
 /** Clip start position in seconds */
 export function clipStartTime(clip: AudioClip): number {
@@ -20,11 +20,17 @@ export function clipDurationTime(clip: AudioClip): number {
   return clip.durationSamples / clip.sampleRate;
 }
 
+/** The part of a track `trackChannelCount` reads — `ClipTrack` satisfies it. */
+export interface TrackChannelSource {
+  clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }>;
+}
+
 /**
- * Max audio channel count across a track's clips.
- * Used to set Panner channelCount and offline render output channels.
+ * Max audio channel count across a track's clips (1 for a track with no
+ * decoded audio). Selects the track's pan law (`createPanStage`) and the
+ * offline render's output channels.
  */
-export function trackChannelCount(track: ClipTrack): number {
+export function trackChannelCount(track: TrackChannelSource): number {
   return track.clips.reduce(
     (max, clip) => Math.max(max, clip.audioBuffer?.numberOfChannels ?? 1),
     1

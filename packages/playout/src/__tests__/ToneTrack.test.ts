@@ -55,19 +55,18 @@ const mockMuteGain = {
   dispose: vi.fn(),
 };
 
-// The pan stage has its own unit tests (trackPan.test.ts) and is verified
-// against the real Tone graph in a browser; here it is a stub.
+// The pan stage has its own unit tests in core (panStage.test.ts) and is
+// verified against the real Tone graph in a browser; here it is a stub.
 const mockPanStage = {
   input: { name: 'pan-in' },
   output: { name: 'pan-out', connect: vi.fn() },
   setPan: vi.fn(),
+  setSourceChannelCount: vi.fn(),
   dispose: vi.fn(),
 };
-vi.mock('../trackPan', () => ({
-  createTrackPanStage: vi.fn(() => mockPanStage),
-}));
-
 vi.mock('tone', () => ({
+  // Tone's connect(src, dst) helper — used for the native → Tone edge.
+  connect: vi.fn((src: { connect: (dst: unknown) => void }, dst: unknown) => src.connect(dst)),
   Volume: vi.fn(function () {
     return mockVolume;
   }),
@@ -88,6 +87,7 @@ vi.mock('@waveform-playlist/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
   applyFadeIn: vi.fn(),
   applyFadeOut: vi.fn(),
+  createPanStage: vi.fn(() => mockPanStage),
 }));
 
 vi.mock('../fades', () => ({
@@ -447,13 +447,18 @@ describe('ToneTrack', () => {
     });
 
     it('builds the pan stage from the source channel count and wires volume → pan → mute', async () => {
-      const { createTrackPanStage } = await import('../trackPan');
+      const { createPanStage } = await import('@waveform-playlist/core');
       mockVolume.connect.mockClear();
       mockPanStage.output.connect.mockClear();
 
       new ToneTrack({ clips: [], track: makeTrack(), channelCount: 2 });
 
-      expect(createTrackPanStage).toHaveBeenLastCalledWith(makeTrack().stereoPan, 2);
+      // Built from native nodes on Tone's RAW context, never Tone nodes.
+      expect(createPanStage).toHaveBeenLastCalledWith(
+        mockContext.rawContext,
+        makeTrack().stereoPan,
+        2
+      );
       expect(mockVolume.connect).toHaveBeenCalledWith(mockPanStage.input);
       expect(mockPanStage.output.connect).toHaveBeenCalledWith(mockMuteGain);
     });

@@ -1,8 +1,7 @@
-import { Volume, Gain, Part, ToneAudioNode, getDestination, getContext } from 'tone';
-import { Track, gainToDb } from '@waveform-playlist/core';
+import { Volume, Gain, Part, ToneAudioNode, connect, getDestination, getContext } from 'tone';
+import { Track, gainToDb, createPanStage, type PanStage } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
-import { createTrackPanStage, type TrackPanStage } from './trackPan';
 import type { PlayableTrack, MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 
@@ -79,7 +78,7 @@ export class SoundFontToneTrack implements PlayableTrack {
   /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
   private inputGain: Gain;
   private volumeNode: Volume;
-  private panStage: TrackPanStage;
+  private panStage: PanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -95,10 +94,14 @@ export class SoundFontToneTrack implements PlayableTrack {
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
     // Notes are summed mono: the balance stage keeps a stereo effect stereo.
-    this.panStage = createTrackPanStage(options.track.stereoPan, 1);
+    this.panStage = createPanStage(
+      getContext().rawContext as BaseAudioContext,
+      options.track.stereoPan,
+      1
+    );
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
     this.volumeNode.connect(this.panStage.input);
-    this.panStage.output.connect(this.muteGain);
+    connect(this.panStage.output, this.muteGain);
 
     // Connect to destination; effects (if any) are inserted pre-fader
     const destination = options.destination || getDestination();
