@@ -59,6 +59,17 @@ const BIQUAD_PARAM_DEFS: Record<BiquadParam, EffectParamDef> = {
   gain: { min: -24, max: 24, step: 0.5, unit: 'dB' },
 };
 
+/**
+ * Web Audio gives `Q` two meanings. For bandpass, notch and peaking it is
+ * the usual linear quality factor. For LOWPASS and HIGHPASS it is the
+ * resonance peak in DECIBELS at the cutoff (Q_linear = 10^(Q/20)): 0 dB is a
+ * slight bump, about -3 dB is a flat Butterworth response, and a linear-style
+ * 0.707 would actually be +0.7 dB of resonance.
+ */
+const RESONANCE_DB_PARAM_DEF: EffectParamDef = { min: -12, max: 24, step: 0.1, unit: 'dB' };
+/** Flat (Butterworth) response: 20·log10(1/√2). */
+const BUTTERWORTH_RESONANCE_DB = -3;
+
 interface BiquadFilterSpec {
   label: string;
   biquadType: BiquadFilterType;
@@ -66,6 +77,8 @@ interface BiquadFilterSpec {
    *  ignores Q on shelves and gain on everything but peaking/shelves) — a
    *  generic parameter panel must not render dead sliders. */
   defaults: Partial<Record<BiquadParam, number>>;
+  /** Per-type overrides of the shared param metadata. */
+  paramDefs?: Partial<Record<BiquadParam, EffectParamDef>>;
 }
 
 /**
@@ -75,6 +88,9 @@ interface BiquadFilterSpec {
  * (lowpass) meaning so persisted chains restore unchanged.
  */
 const BIQUAD_FILTERS: Record<string, BiquadFilterSpec> = {
+  // Unchanged since before #661 — including its q range, which predates the
+  // dB reading above (q here is also resonance in dB; persisted chains rely
+  // on these exact defaults and bounds).
   'native-filter': {
     label: 'Lowpass Filter',
     biquadType: 'lowpass',
@@ -83,7 +99,8 @@ const BIQUAD_FILTERS: Record<string, BiquadFilterSpec> = {
   'native-highpass': {
     label: 'Highpass Filter',
     biquadType: 'highpass',
-    defaults: { frequency: 80, q: 0.7 },
+    defaults: { frequency: 80, q: BUTTERWORTH_RESONANCE_DB },
+    paramDefs: { q: RESONANCE_DB_PARAM_DEF },
   },
   'native-bandpass': {
     label: 'Bandpass Filter',
@@ -118,7 +135,9 @@ function biquadDefinition(spec: BiquadFilterSpec): EffectDefinition {
     label: spec.label,
     category: 'filter',
     defaults: { ...spec.defaults } as Record<string, number>,
-    params: Object.fromEntries(names.map((name) => [name, BIQUAD_PARAM_DEFS[name]])),
+    params: Object.fromEntries(
+      names.map((name) => [name, spec.paramDefs?.[name] ?? BIQUAD_PARAM_DEFS[name]])
+    ),
     create: (ctx) => {
       const node = ctx.createBiquadFilter();
       node.type = spec.biquadType;

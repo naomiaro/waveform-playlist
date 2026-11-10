@@ -243,7 +243,8 @@ const track = document.querySelector('daw-track');
 // Built-in native-* effects: native-gain, native-compressor,
 // native-stereo-panner, native-delay, and one type per biquad filter shape:
 // native-filter (lowpass), native-highpass, native-bandpass, native-notch
-// (frequency + q), native-peaking (frequency + q + gain in dB),
+// (frequency + q — for lowpass/highpass q is resonance in dB, -3 = flat;
+// for the others it is the linear quality factor), native-peaking (frequency + q + gain in dB),
 // native-lowshelf, native-highshelf (frequency + gain in dB)
 const filterId = track.addEffect('native-filter', { frequency: 800 });
 const compressorId = editor.addEffect('native-compressor'); // master chain
