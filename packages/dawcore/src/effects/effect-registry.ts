@@ -1,4 +1,4 @@
-import type { CreatedEffect, EffectDefinition } from './types';
+import type { CreatedEffect, EffectDefinition, EffectParamDef } from './types';
 
 const MAX_DELAY_SECONDS = 10;
 
@@ -51,6 +51,107 @@ function singleNode(
   return { input: node, output: node, applyParams };
 }
 
+type BiquadParam = 'frequency' | 'q' | 'gain';
+
+const BIQUAD_PARAM_DEFS: Record<BiquadParam, EffectParamDef> = {
+  frequency: { min: 20, max: 20000, step: 1, unit: 'Hz' },
+  q: { min: 0.1, max: 20, step: 0.1 },
+  gain: { min: -24, max: 24, step: 0.5, unit: 'dB' },
+};
+
+/**
+ * Web Audio gives `Q` two meanings. For bandpass, notch and peaking it is
+ * the usual linear quality factor. For LOWPASS and HIGHPASS it is the
+ * resonance peak in DECIBELS at the cutoff (Q_linear = 10^(Q/20)): 0 dB is a
+ * slight bump, about -3 dB is a flat Butterworth response, and a linear-style
+ * 0.707 would actually be +0.7 dB of resonance.
+ */
+const RESONANCE_DB_PARAM_DEF: EffectParamDef = { min: -12, max: 24, step: 0.1, unit: 'dB' };
+/** Flat (Butterworth) response: 20·log10(1/√2). */
+const BUTTERWORTH_RESONANCE_DB = -3;
+
+interface BiquadFilterSpec {
+  label: string;
+  biquadType: BiquadFilterType;
+  /** Only the params this biquad shape actually uses (the Web Audio spec
+   *  ignores Q on shelves and gain on everything but peaking/shelves) — a
+   *  generic parameter panel must not render dead sliders. */
+  defaults: Partial<Record<BiquadParam, number>>;
+  /** Per-type overrides of the shared param metadata. */
+  paramDefs?: Partial<Record<BiquadParam, EffectParamDef>>;
+}
+
+/**
+ * One registry type per biquad shape (#661). Effect params are numeric
+ * (`Record<string, number>`), so the shape cannot be a param — sibling types
+ * fit the model with no API change. `native-filter` keeps its original
+ * (lowpass) meaning so persisted chains restore unchanged.
+ */
+const BIQUAD_FILTERS: Record<string, BiquadFilterSpec> = {
+  // Unchanged since before #661 — including its q range, which predates the
+  // dB reading above (q here is also resonance in dB; persisted chains rely
+  // on these exact defaults and bounds).
+  'native-filter': {
+    label: 'Lowpass Filter',
+    biquadType: 'lowpass',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-highpass': {
+    label: 'Highpass Filter',
+    biquadType: 'highpass',
+    defaults: { frequency: 80, q: BUTTERWORTH_RESONANCE_DB },
+    paramDefs: { q: RESONANCE_DB_PARAM_DEF },
+  },
+  'native-bandpass': {
+    label: 'Bandpass Filter',
+    biquadType: 'bandpass',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-notch': {
+    label: 'Notch Filter',
+    biquadType: 'notch',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-peaking': {
+    label: 'Peaking EQ',
+    biquadType: 'peaking',
+    defaults: { frequency: 1000, q: 1, gain: 0 },
+  },
+  'native-lowshelf': {
+    label: 'Low Shelf',
+    biquadType: 'lowshelf',
+    defaults: { frequency: 200, gain: 0 },
+  },
+  'native-highshelf': {
+    label: 'High Shelf',
+    biquadType: 'highshelf',
+    defaults: { frequency: 4000, gain: 0 },
+  },
+};
+
+function biquadDefinition(spec: BiquadFilterSpec): EffectDefinition {
+  const names = Object.keys(spec.defaults) as BiquadParam[];
+  return {
+    label: spec.label,
+    category: 'filter',
+    defaults: { ...spec.defaults } as Record<string, number>,
+    params: Object.fromEntries(
+      names.map((name) => [name, spec.paramDefs?.[name] ?? BIQUAD_PARAM_DEFS[name]])
+    ),
+    create: (ctx) => {
+      const node = ctx.createBiquadFilter();
+      node.type = spec.biquadType;
+      return singleNode(node, (p) => {
+        if (names.includes('frequency') && p.frequency !== undefined) {
+          node.frequency.value = p.frequency;
+        }
+        if (names.includes('q') && p.q !== undefined) node.Q.value = p.q;
+        if (names.includes('gain') && p.gain !== undefined) node.gain.value = p.gain;
+      });
+    },
+  };
+}
+
 function registerBuiltIns(): void {
   registry.set('native-gain', {
     label: 'Gain',
@@ -65,23 +166,9 @@ function registerBuiltIns(): void {
     },
   });
 
-  registry.set('native-filter', {
-    label: 'Lowpass Filter',
-    category: 'filter',
-    defaults: { frequency: 1000, q: 1 },
-    params: {
-      frequency: { min: 20, max: 20000, step: 1, unit: 'Hz' },
-      q: { min: 0.1, max: 20, step: 0.1 },
-    },
-    create: (ctx) => {
-      const node = ctx.createBiquadFilter();
-      node.type = 'lowpass';
-      return singleNode(node, (p) => {
-        if (p.frequency !== undefined) node.frequency.value = p.frequency;
-        if (p.q !== undefined) node.Q.value = p.q;
-      });
-    },
-  });
+  for (const [type, definition] of Object.entries(BIQUAD_FILTERS)) {
+    registry.set(type, biquadDefinition(definition));
+  }
 
   registry.set('native-compressor', {
     label: 'Compressor',

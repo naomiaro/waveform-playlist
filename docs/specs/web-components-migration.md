@@ -936,13 +936,23 @@ Chain state round-trips via `getEffectsState()` / `setEffectsState()` — native
 
 Built-ins use a `native-` prefix and plain Web Audio nodes:
 
-| Type                   | Label          | Category |
-| ---------------------- | -------------- | -------- |
-| `native-gain`          | Gain           | dynamics |
-| `native-filter`        | Lowpass Filter | filter   |
-| `native-compressor`    | Compressor     | dynamics |
-| `native-stereo-panner` | Stereo Panner  | spatial  |
-| `native-delay`         | Delay          | delay    |
+| Type                   | Label           | Category | Params                                            |
+| ---------------------- | --------------- | -------- | ------------------------------------------------- |
+| `native-gain`          | Gain            | dynamics | `gain`                                            |
+| `native-filter`        | Lowpass Filter  | filter   | `frequency`, `q`                                  |
+| `native-highpass`      | Highpass Filter | filter   | `frequency`, `q`                                  |
+| `native-bandpass`      | Bandpass Filter | filter   | `frequency`, `q`                                  |
+| `native-notch`         | Notch Filter    | filter   | `frequency`, `q`                                  |
+| `native-peaking`       | Peaking EQ      | filter   | `frequency`, `q`, `gain` (dB)                     |
+| `native-lowshelf`      | Low Shelf       | filter   | `frequency`, `gain` (dB)                          |
+| `native-highshelf`     | High Shelf      | filter   | `frequency`, `gain` (dB)                          |
+| `native-compressor`    | Compressor      | dynamics | `threshold`, `knee`, `ratio`, `attack`, `release` |
+| `native-stereo-panner` | Stereo Panner   | spatial  | `pan`                                             |
+| `native-delay`         | Delay           | delay    | `delayTime`, `feedback`, `wet`                    |
+
+As in Web Audio, `q` means two things: for `native-filter` (lowpass) and `native-highpass` it is the resonance peak at the cutoff in dB (about −3 is a flat Butterworth response, the `native-highpass` default); for bandpass, notch and peaking it is the linear quality factor.
+
+Each biquad shape is its own type because effect params are numeric — a filter `type` param would not fit `Record<string, number>` or the generic parameter panel. Each type exposes only the params its shape uses (Web Audio ignores `Q` on shelves and `gain` on everything but peaking/shelves).
 
 ### WAM & Faust Plugins
 
