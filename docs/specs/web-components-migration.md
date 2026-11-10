@@ -256,6 +256,11 @@ editor.addEventListener('daw-recording-complete', (e) => {
   // Cancelable — preventDefault() to skip automatic clip creation
 });
 
+// The take has no <daw-clip> element — this is where its clip id arrives
+editor.addEventListener('daw-recording-clip-add', (e) => {
+  editor.updateClip(e.detail.trackId, e.detail.clipId, { gain: 2 });
+});
+
 // Pause/resume during recording (Audacity-style: also pauses Transport when overdubbing)
 editor.addEventListener('daw-recording-pause', (e) => {
   console.log('Paused track:', e.detail.trackId);
@@ -421,6 +426,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-stop'; // Playback stopped
 'daw-recording-start'; // Recording started on a track: detail: {trackId, stream}
 'daw-recording-complete'; // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
+'daw-recording-clip-add'; // The take's clip now exists (skipped when daw-recording-complete was cancelled, when the take's peak generation failed, or when the track was removed meanwhile): detail: {trackId, clipId} — clipId is the engine clip id for updateClip()/removeClip()
 'daw-recording-error'; // Recording failed: detail: {trackId, error}
 'daw-recording-pause'; // Worklet capture paused: detail: {trackId}
 'daw-recording-resume'; // Worklet capture resumed: detail: {trackId}
@@ -937,13 +943,23 @@ Chain state round-trips via `getEffectsState()` / `setEffectsState()` — native
 
 Built-ins use a `native-` prefix and plain Web Audio nodes:
 
-| Type                   | Label          | Category |
-| ---------------------- | -------------- | -------- |
-| `native-gain`          | Gain           | dynamics |
-| `native-filter`        | Lowpass Filter | filter   |
-| `native-compressor`    | Compressor     | dynamics |
-| `native-stereo-panner` | Stereo Panner  | spatial  |
-| `native-delay`         | Delay          | delay    |
+| Type                   | Label           | Category | Params                                            |
+| ---------------------- | --------------- | -------- | ------------------------------------------------- |
+| `native-gain`          | Gain            | dynamics | `gain`                                            |
+| `native-filter`        | Lowpass Filter  | filter   | `frequency`, `q`                                  |
+| `native-highpass`      | Highpass Filter | filter   | `frequency`, `q`                                  |
+| `native-bandpass`      | Bandpass Filter | filter   | `frequency`, `q`                                  |
+| `native-notch`         | Notch Filter    | filter   | `frequency`, `q`                                  |
+| `native-peaking`       | Peaking EQ      | filter   | `frequency`, `q`, `gain` (dB)                     |
+| `native-lowshelf`      | Low Shelf       | filter   | `frequency`, `gain` (dB)                          |
+| `native-highshelf`     | High Shelf      | filter   | `frequency`, `gain` (dB)                          |
+| `native-compressor`    | Compressor      | dynamics | `threshold`, `knee`, `ratio`, `attack`, `release` |
+| `native-stereo-panner` | Stereo Panner   | spatial  | `pan`                                             |
+| `native-delay`         | Delay           | delay    | `delayTime`, `feedback`, `wet`                    |
+
+As in Web Audio, `q` means two things: for `native-filter` (lowpass) and `native-highpass` it is the resonance peak at the cutoff in dB (about −3 is a flat Butterworth response, the `native-highpass` default); for bandpass, notch and peaking it is the linear quality factor.
+
+Each biquad shape is its own type because effect params are numeric — a filter `type` param would not fit `Record<string, number>` or the generic parameter panel. Each type exposes only the params its shape uses (Web Audio ignores `Q` on shelves and `gain` on everything but peaking/shelves).
 
 ### WAM & Faust Plugins
 
@@ -1041,6 +1057,8 @@ interface EffectDefinition {
   defaults: Record<string, number>;
   params: Record<string, EffectParamDef>;
   wetParam?: string; // Name of the wet/dry param, when the effect has one
+  // Optional async per-context setup (e.g. audioWorklet.addModule) — see below:
+  prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   // Must work on any BaseAudioContext so the same definitions serve offline rendering:
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => EffectInstance;
 }
@@ -1061,6 +1079,12 @@ interface EffectParamDef {
 ```
 
 The built-ins use this same shape internally — `registerEffect` adds to the same map. Calling `addEffect('unknown-type')` throws with a clear error listing available types.
+
+**Async preparation (`prepare`, #657).** An `AudioWorkletNode`-backed effect needs `audioWorklet.addModule(url)` to have resolved on the same context before `create` runs — and `exportAudio()` renders on an `OfflineAudioContext` the consumer never sees. A definition's optional `prepare(audioContext)` hook runs once per context (memoized per type; a failed run is retried on the next call):
+
+- `exportAudio()` awaits it on the offline context before the first `create` of that type.
+- `setEffectsState()` awaits it on the live context (a failure becomes a placeholder, like any failed native restore).
+- `addEffect()` / `addTrackEffect()` are synchronous and cannot — call `await editor.prepareEffect(type)` first (or the exported `prepareEffect(type, audioContext)`). Without it, the error thrown by `create` is rewrapped with that hint.
 
 ### Usage
 

@@ -14,6 +14,8 @@ const { ensureWamHost, createWamInstance, createWamTransportBridge } = vi.hoiste
 
 vi.mock('@dawcore/wam', () => ({ ensureWamHost, createWamInstance, createWamTransportBridge }));
 
+import { registerEffect } from '../effects/effect-registry';
+
 beforeAll(async () => {
   await import('../elements/daw-editor');
   await import('../elements/daw-track');
@@ -343,5 +345,128 @@ describe('setEffectsState placeholder validation (audit wave 3)', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ] as any)
     ).rejects.toThrow(/placeholder must be true/);
+  });
+});
+
+// #657: restore is the one LIVE path that is already async, so it can run a
+// definition's prepare hook itself; the sync addEffect() cannot.
+describe('EffectDefinition.prepare on the live context (#657)', () => {
+  function registerWorkletEffect(type: string, prepare: (ctx: BaseAudioContext) => Promise<void>) {
+    let prepared = false;
+    registerEffect(type, {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: { amount: 1 },
+      params: { amount: { min: 0, max: 2 } },
+      prepare: async (ctx) => {
+        await prepare(ctx);
+        prepared = true;
+      },
+      create: (ctx) => {
+        if (!prepared) throw new Error('not defined in AudioWorkletGlobalScope');
+        const node = ctx.createGain();
+        return { input: node, output: node, applyParams: () => {} };
+      },
+    });
+  }
+
+  it('setEffectsState awaits prepare on the adapter context before creating the effect', async () => {
+    const prepare = vi.fn(async () => {});
+    registerWorkletEffect('worklet-fx-restore', prepare);
+
+    await editor.setEffectsState([
+      { kind: 'native', type: 'native-gain', params: { gain: 0.5 }, bypassed: false },
+      { kind: 'native', type: 'worklet-fx-restore', params: { amount: 2 }, bypassed: false },
+    ]);
+
+    expect(prepare).toHaveBeenCalledWith(adapter.audioContext);
+    expect(editor.effects.map((e) => [e.type, e.error])).toEqual([
+      ['native-gain', undefined],
+      ['worklet-fx-restore', undefined],
+    ]);
+  });
+
+  it('a chain with nothing to prepare still restores synchronously within the call', () => {
+    // Regression guard: awaiting unconditionally would yield before the first
+    // entry, so an effect added right after an un-awaited restore would land
+    // AHEAD of the restored ones, and `effects` would read empty.
+    void editor.setEffectsState([
+      { kind: 'native', type: 'native-gain', params: { gain: 0.5 }, bypassed: false },
+      { kind: 'native', type: 'native-compressor', params: {}, bypassed: true },
+    ]);
+    editor.addEffect('native-delay');
+
+    expect(editor.effects.map((e) => e.type)).toEqual([
+      'native-gain',
+      'native-compressor',
+      'native-delay',
+    ]);
+  });
+
+  it('an already-prepared effect type restores synchronously too', async () => {
+    registerWorkletEffect('worklet-fx-warm', async () => {});
+    await editor.prepareEffect('worklet-fx-warm');
+
+    void editor.setEffectsState([
+      { kind: 'native', type: 'worklet-fx-warm', params: {}, bypassed: false },
+    ]);
+
+    expect(editor.effects.map((e) => e.type)).toEqual(['worklet-fx-warm']);
+  });
+
+  it('a failing prepare restores that entry as a placeholder and continues', async () => {
+    registerWorkletEffect('worklet-fx-broken', async () => {
+      throw new Error('module 404');
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errors: CustomEvent[] = [];
+    editor.addEventListener('daw-effect-error', ((e: CustomEvent) => {
+      errors.push(e);
+    }) as EventListener);
+
+    await editor.setEffectsState([
+      { kind: 'native', type: 'worklet-fx-broken', params: { amount: 2 }, bypassed: false },
+      { kind: 'native', type: 'native-gain', params: { gain: 0.5 }, bypassed: false },
+    ]);
+
+    expect(editor.effects.map((e) => e.type)).toEqual(['worklet-fx-broken', 'native-gain']);
+    expect(editor.effects[0].error).toContain('module 404');
+    expect(errors).toHaveLength(1);
+  });
+
+  it('a newer restore supersedes one still waiting on prepare', async () => {
+    let release: () => void = () => {};
+    const prepare = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        })
+    );
+    registerWorkletEffect('worklet-fx-slow', prepare);
+
+    const stale = editor.setEffectsState([
+      { kind: 'native', type: 'worklet-fx-slow', params: {}, bypassed: false },
+    ]);
+    await vi.waitFor(() => expect(prepare).toHaveBeenCalled());
+    await editor.setEffectsState([
+      { kind: 'native', type: 'native-gain', params: { gain: 0.25 }, bypassed: false },
+    ]);
+    release();
+    await stale;
+
+    expect(editor.effects.map((e) => e.type)).toEqual(['native-gain']);
+  });
+
+  it('editor.prepareEffect(type) prepares on the adapter context so addEffect can stay sync', async () => {
+    const prepare = vi.fn(async () => {});
+    registerWorkletEffect('worklet-fx-live', prepare);
+
+    expect(() => editor.addEffect('worklet-fx-live')).toThrow(/prepareEffect/);
+    await editor.prepareEffect('worklet-fx-live');
+    const id = editor.addEffect('worklet-fx-live');
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare).toHaveBeenCalledWith(adapter.audioContext);
+    expect(editor.effects.find((e) => e.id === id)?.error).toBeUndefined();
   });
 });

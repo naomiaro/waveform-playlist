@@ -81,6 +81,18 @@ export interface DawRecordingCompleteDetail {
   offsetSamples: number;
 }
 
+/** Follows `daw-recording-complete` once the take's clip is in the engine.
+ *  NOT guaranteed after every complete — it is skipped when the consumer
+ *  cancelled `daw-recording-complete`, when peak generation for the take
+ *  failed (`daw-error` with `operation: 'recording-peaks'` fires instead),
+ *  when the track was removed meanwhile, and on a disconnected editor.
+ *  Don't await it without a fallback. */
+export interface DawRecordingClipAddDetail {
+  trackId: string;
+  /** Engine clip id — pass to `editor.updateClip()` / `removeClip()`. */
+  clipId: string;
+}
+
 export interface DawRecordingErrorDetail {
   trackId: string;
   error: unknown;
@@ -249,6 +261,7 @@ export interface DawEventMap {
   'daw-track-remove': CustomEvent<DawTrackRemoveDetail>;
   'daw-recording-start': CustomEvent<DawRecordingStartDetail>;
   'daw-recording-complete': CustomEvent<DawRecordingCompleteDetail>;
+  'daw-recording-clip-add': CustomEvent<DawRecordingClipAddDetail>;
   'daw-recording-error': CustomEvent<DawRecordingErrorDetail>;
   'daw-recording-pause': CustomEvent<DawRecordingPauseDetail>;
   'daw-recording-resume': CustomEvent<DawRecordingResumeDetail>;

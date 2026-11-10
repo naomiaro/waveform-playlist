@@ -503,6 +503,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._effectsManager;
   }
 
+  /**
+   * Run a registered effect type's async `prepare` hook (e.g. an
+   * `audioWorklet.addModule`) on this editor's audio context. Await it before
+   * the synchronous `addEffect`/`addTrackEffect` for effect types that define
+   * one; `setEffectsState()` and `exportAudio()` run it themselves. Idempotent
+   * per context, and a no-op for types without a hook.
+   */
+  prepareEffect(type: string): Promise<void> {
+    return this._effects.prepareEffect(type);
+  }
+
   /** Master effects chain — inserted between the master bus and the destination. */
   addEffect(type: string, params?: Record<string, number>): string {
     return this._effects.addMasterEffect(type, params);
@@ -1501,9 +1512,64 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       next ??= new Map(this._tracks);
       next.delete(trackId);
     }
+    // Element-less clips that carry their engine id (recorded takes, #659)
+    // have no <daw-clip> to re-read them, and the engine changes them on its
+    // own: undo removes a take, a split replaces it with two new ids, a
+    // punch-in carves it away, a drag moves or trims it. Follow the engine —
+    // a descriptor whose id is gone would otherwise be a ghost that even
+    // removeClip() cannot reach.
+    for (const track of tracks) {
+      const desc = (next ?? this._tracks).get(track.id);
+      if (!desc || !desc.clips.some((c) => !isDomClip(c) && c.clipId !== undefined)) continue;
+      const reconciled = this._reconcileIdentifiedDropClips(desc.clips, track);
+      if (reconciled === desc.clips) continue;
+      next ??= new Map(this._tracks);
+      next.set(track.id, { ...desc, clips: reconciled });
+    }
     if (next) {
       this._tracks = next;
     }
+  }
+  /** Prune id-bearing drop descriptors the engine no longer has, and refresh
+   *  the rest from their engine clip. Returns the SAME array when nothing
+   *  changed, so an unchanged track never triggers a re-render. */
+  private _reconcileIdentifiedDropClips(
+    clips: ClipDescriptor[],
+    track: ClipTrack
+  ): ClipDescriptor[] {
+    const engineClips = new Map(track.clips.map((c) => [c.id, c]));
+    let changed = false;
+    const result: ClipDescriptor[] = [];
+    for (const desc of clips) {
+      if (isDomClip(desc) || desc.clipId === undefined) {
+        result.push(desc);
+        continue;
+      }
+      const clip = engineClips.get(desc.clipId);
+      if (!clip) {
+        changed = true;
+        continue;
+      }
+      const sr = clip.sampleRate ?? this.effectiveSampleRate;
+      const start = clip.startSample / sr;
+      const duration = clip.durationSamples / sr;
+      const offset = clip.offsetSamples / sr;
+      const gain = clip.gain ?? desc.gain;
+      const name = clip.name ?? desc.name;
+      if (
+        desc.start === start &&
+        desc.duration === duration &&
+        desc.offset === offset &&
+        desc.gain === gain &&
+        desc.name === name
+      ) {
+        result.push(desc);
+        continue;
+      }
+      changed = true;
+      result.push({ ...desc, start, duration, offset, gain, name });
+    }
+    return changed ? result : clips;
   }
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
   private _onTrackControl = (e: CustomEvent) => {
@@ -2064,9 +2130,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (desc) {
       this._tracks = new Map(this._tracks).set(trackId, {
         ...desc,
-        // Only DOM-sourced clips have an id to match; drop-sourced clips are
-        // filtered through unchanged (their identity is the descriptor itself).
-        clips: desc.clips.filter((c) => !(isDomClip(c) && c.clipId === clipId)),
+        // Descriptors without an id (file drops, the <daw-track src>
+        // shorthand) are kept — their identity is the descriptor itself.
+        clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
     }
     this._commitTrackChange(trackId, updatedTrack);
@@ -2922,6 +2988,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     updatedClips[idx] = updatedClip;
     const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
     this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
+    // Keep editor.tracks truthful for element-less clips that carry their
+    // engine id (recorded takes, #659) — no <daw-clip> element re-reads them.
+    const desc = this._tracks.get(trackId);
+    if (desc?.clips.some((c) => c.clipId === clipId)) {
+      this._tracks = new Map(this._tracks).set(trackId, {
+        ...desc,
+        clips: desc.clips.map((c) =>
+          c.clipId === clipId
+            ? {
+                ...c,
+                start: updatedClip.startSample / sr,
+                duration: updatedClip.durationSamples / sr,
+                offset: updatedClip.offsetSamples / sr,
+                ...(partial.gain !== undefined && { gain: partial.gain }),
+                ...(partial.name !== undefined && { name: partial.name }),
+              }
+            : c
+        ),
+      });
+    }
     this._commitTrackChange(trackId, updatedTrack);
   }
   private _buildClipElement(config: ClipConfig): DawClipElement {

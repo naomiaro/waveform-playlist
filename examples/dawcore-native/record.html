@@ -260,6 +260,12 @@
           ' channels=' + d.audioBuffer.numberOfChannels
       );
     });
+    editor.addEventListener('daw-recording-clip-add', (e) => {
+      addLog(
+        'recording-clip-add: track=' + e.detail.trackId.slice(0, 8) + '…' +
+          ' clip=' + e.detail.clipId.slice(0, 8) + '…'
+      );
+    });
     editor.addEventListener('daw-recording-error', (e) => {
       addLog('recording-error: ' + e.detail.error);
     });

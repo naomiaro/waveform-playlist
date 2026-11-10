@@ -59,12 +59,17 @@ export interface DomClipDescriptor extends BaseClipDescriptor {
 
 /**
  * A clip descriptor synthesized from a non-DOM source — file drops, the
- * `<daw-track src>` shorthand fallback, or recording-clip insertion. No
- * `clipId` because there's no DOM element to align with; the engine
- * generates its own id at clip-creation time.
+ * `<daw-track src>` shorthand fallback, or recording-clip insertion. There
+ * is no DOM element to align with; the engine generates its own id at
+ * clip-creation time.
+ *
+ * `clipId` is that engine clip id when the editor knows it at descriptor
+ * creation — currently recorded takes (#659). Pass it to
+ * `editor.updateClip()` / `removeClip()` to address the clip.
  */
 export interface DropClipDescriptor extends BaseClipDescriptor {
   kind: 'drop';
+  clipId?: string;
 }
 
 export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;
