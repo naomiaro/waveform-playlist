@@ -57,7 +57,7 @@ InvalidStateError: Failed to construct 'AudioWorkletNode': AudioWorkletNode cann
 The node name 'fr.grame.faust.…' is not defined in AudioWorkletGlobalScope.
 ```
 
-`compileFaustToWam` catches that error and rethrows it with this explanation. The fix is in your bundler config — turn identifier mangling off (whitespace removal and compression stay on):
+`compileFaustToWam` recognises that error (by Chromium's wording — the only engine it has been verified on; other browsers may surface their own unregistered-processor error unchanged) and rethrows it with this explanation, keeping the original as `error.cause`. The fix is in your bundler config — turn identifier mangling off (whitespace removal and compression stay on):
 
 ```js
 // vite.config.js — Vite 8 (Rolldown / Oxc minifier)
