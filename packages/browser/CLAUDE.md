@@ -80,6 +80,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Pattern:** Effects are created via factory, chained in series, support real-time parameter updates without rebuilding the chain.
 
+**Effects must be built on the shared context.** `createEffectInstance` (`effectFactory.ts`) calls playout's `getGlobalContext()` before constructing the Tone effect. Tone nodes belong to whatever context is current at construction, and playout's global context only replaces Tone's default one when first requested — which the provider does after its engine loads. An effect added before that (a default effect on mount, as the effects example does) was built on Tone's default context and could never be wired to a track: `InvalidAccessError: cannot connect to an AudioNode belonging to a different AudioContext`, playlist stuck in `loading`. Any new code that constructs Tone nodes ahead of the provider needs the same call first.
+
 **Bypass Pattern:** When bypassing, store original wet value and set to 0. On re-enable, restore original wet value (not always 1).
 
 **Track chains end at the track's fader (#660), not the master.** `getTrackEffectsFunction`'s closure wires `trackInput → effects → faderInput`; its cleanup disconnects every instance from that `faderInput` (targeted — instances outlive the track and are reused when the adapter rebuilds it, so without this each `setTracks` left one more edge into a dead fader) and only unregisters the track's nodes if they are still the ones it registered (a rebuilt track may have registered its own first).

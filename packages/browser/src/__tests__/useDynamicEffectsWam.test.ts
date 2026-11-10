@@ -34,6 +34,8 @@ const isNativeGlobalContext = vi.fn(() => true);
 vi.mock('@waveform-playlist/playout', () => ({
   isNativeGlobalContext: () => isNativeGlobalContext(),
   getGlobalAudioContext: () => ({ sampleRate: 48000 }),
+  // effectFactory establishes the shared context before building a Tone effect
+  getGlobalContext: vi.fn(),
 }));
 
 // The hook's import graph evaluates effectFactory at module load, which reads

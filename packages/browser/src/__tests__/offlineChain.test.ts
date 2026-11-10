@@ -14,6 +14,10 @@ vi.mock('../effects/loadWam', () => ({
 
 // effectFactory reads all 20 effect constructors from 'tone' at module load —
 // every one must exist on the mock (same guard as the other WAM test files).
+// effectFactory establishes playout's shared context before building a Tone
+// effect; the real one would construct a Tone Context the mock doesn't have.
+vi.mock('@waveform-playlist/playout', () => ({ getGlobalContext: vi.fn() }));
+
 vi.mock('tone', () => {
   const toneEffectStub = () => ({
     dispose: vi.fn(),
