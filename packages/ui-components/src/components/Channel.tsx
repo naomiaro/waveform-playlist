@@ -14,6 +14,7 @@ import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
 import {
   addBarToPath,
   aggregatePeaks,
+  scalePeakByGain,
   calculateBarRects,
   calculateFirstBarPosition,
 } from '../utils/peakRendering';
@@ -114,6 +115,12 @@ export interface ChannelProps {
    * mode leaves them transparent). Default: false
    */
   roundedBars?: boolean;
+  /**
+   * Linear gain applied to the DRAWN bars (clamped to the channel height) —
+   * pass a clip's gain so a levelled clip looks the way it sounds.
+   * Display-only: peak data is untouched. Default: 1 (source level)
+   */
+  gain?: number;
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
   /**
@@ -138,6 +145,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     barWidth = 1,
     barGap = 0,
     roundedBars = false,
+    gain = 1,
     transparentBackground = false,
     drawMode = 'inverted',
   } = props;
@@ -164,7 +172,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // all chunks need redrawing. When only visibleChunkIndices changes,
   // existing chunks can be skipped (only new mounts need drawing).
   const drawVersion =
-    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${roundedBars}` +
+    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${roundedBars}-${gain}` +
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {
@@ -235,9 +243,10 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
           if (x + barWidth <= 0) continue;
 
           const peakEnd = Math.min(barGlobal + step, length);
-          const peak = aggregatePeaks(data, bits, barGlobal, peakEnd);
+          const sourcePeak = aggregatePeaks(data, bits, barGlobal, peakEnd);
 
-          if (peak) {
+          if (sourcePeak) {
+            const peak = scalePeakByGain(sourcePeak, gain);
             const rects = calculateBarRects(x, barWidth, h2, peak.min, peak.max, rectMode);
             for (const rect of rects) {
               if (roundedBars) {
@@ -270,6 +279,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     barWidth,
     barGap,
     roundedBars,
+    gain,
     drawVersion,
     drawMode,
     visibleChunkIndices,

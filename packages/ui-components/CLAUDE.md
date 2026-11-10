@@ -239,3 +239,7 @@ Adding a new field to `PlayheadProps` is a soft-breaking change for custom playh
 ## Error Boundary
 
 `PlaylistErrorBoundary` from `@waveform-playlist/ui-components` catches render errors. Uses plain CSS (no styled-components) so it works without `ThemeProvider`.
+
+## Clip-Gain Waveform Scaling (#662)
+
+`Channel`'s optional `gain` prop (default 1) scales the aggregated peak at draw time via `scalePeakByGain` (`utils/peakRendering.ts`: gain magnitude, clamped to ±1, the same object back at unity so the hot path allocates nothing). It is part of `drawVersion`, so a gain change redraws without new peak data. `SmartChannel` forwards it through `...props`; spectrogram and piano-roll ignore it. The browser package opts in with `<Waveform gainScaledWaveforms />` (off by default) and reads each clip's value from `ClipPeaks.gain`. dawcore carries the same helper in its own `utils/peak-rendering.ts` (no cross-package re-exports) — keep the two in step.

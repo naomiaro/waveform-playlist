@@ -147,6 +147,8 @@ export interface PlaylistVisualizationProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
   className?: string;
   showClipHeaders?: boolean;
+  /** Draw each clip's waveform scaled by its gain. Default: false. */
+  gainScaledWaveforms?: boolean;
   interactiveClips?: boolean;
   showFades?: boolean;
   /**
@@ -401,6 +403,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   getAnnotationBoxLabel,
   className,
   showClipHeaders = false,
+  gainScaledWaveforms = false,
   interactiveClips = false,
   showFades = false,
   touchOptimized = false,
@@ -959,6 +962,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
                                   bits={peaksData.bits}
                                   length={width}
                                   isSelected={track.id === selectedTrackId}
+                                  gain={gainScaledWaveforms ? (clip.gain ?? 1) : 1}
                                   clipStartSample={clip.startSample}
                                   clipDurationSamples={clip.durationSamples}
                                   renderMode={clip.midiNotes ? 'piano-roll' : effectiveRenderMode}

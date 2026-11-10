@@ -110,6 +110,7 @@ export type {
   DawTrackRemoveDetail,
   DawRecordingStartDetail,
   DawRecordingCompleteDetail,
+  DawRecordingClipAddDetail,
   DawRecordingErrorDetail,
   DawClipConnectedDetail,
   DawClipUpdateDetail,
@@ -138,6 +139,7 @@ export {
   registerEffect,
   getEffectDefinitions,
   createEffectInstance,
+  prepareEffect,
 } from './effects/effect-registry';
 export type {
   EffectDefinition,

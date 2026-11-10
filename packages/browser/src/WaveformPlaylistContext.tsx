@@ -57,6 +57,9 @@ export interface ClipPeaks {
   midiNotes?: MidiNoteData[];
   sampleRate?: number;
   offsetSamples?: number;
+  /** The clip's linear gain — drawn into the waveform when `<Waveform
+   *  gainScaledWaveforms />` is set. */
+  gain?: number;
 }
 
 export type TrackClipPeaks = ClipPeaks[];
@@ -1248,6 +1251,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           midiNotes: clip.midiNotes,
           sampleRate: clip.sampleRate,
           offsetSamples: clip.offsetSamples,
+          gain: clip.gain,
         };
       });
 

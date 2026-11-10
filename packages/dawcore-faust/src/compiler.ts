@@ -16,7 +16,11 @@ type FaustGenerateFn = (code: string, name?: string) => Promise<unknown>;
  * `createWamInstanceFromFactory` with no Faust-specific handling.
  */
 export interface FaustWamFactory {
-  createInstance(hostGroupId: string, audioContext: BaseAudioContext): Promise<unknown>;
+  createInstance(
+    hostGroupId: string,
+    audioContext: BaseAudioContext,
+    initialState?: unknown
+  ): Promise<unknown>;
 }
 
 /** Result of an in-browser Faust compile. */
@@ -115,7 +119,51 @@ export async function compileFaustToWam(
     );
   }
 
-  return { factory: factory as FaustWamFactory, name, dspCode };
+  return { factory: withMinificationHint(factory as FaustWamFactory), name, dspCode };
+}
+
+const UNREGISTERED_PROCESSOR = 'is not defined in AudioWorkletGlobalScope';
+
+/**
+ * faustwasm assembles its AudioWorklet processor source from
+ * `Class.toString()` + `Class.name`. A bundler that mangles identifiers
+ * (default `vite build`, esbuild, terser) leaves that text referring to
+ * names that no longer exist, so the worklet module throws a ReferenceError
+ * on load. `audioWorklet.addModule()` still RESOLVES, `registerProcessor`
+ * never runs, and the only visible failure is `new AudioWorkletNode` saying
+ * the node name is not defined (#658). `keepNames` does not help — the
+ * references inside the stringified bodies are still mangled.
+ *
+ * That error names neither the cause nor the fix, so translate it. Every
+ * other failure passes through untouched.
+ */
+function withMinificationHint(generated: FaustWamFactory): FaustWamFactory {
+  return {
+    createInstance: async (hostGroupId, audioContext, ...rest) => {
+      try {
+        // Called as a method: the generated class's static createInstance
+        // relies on `this`.
+        return await generated.createInstance(hostGroupId, audioContext, ...rest);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!message.includes(UNREGISTERED_PROCESSOR)) {
+          throw err;
+        }
+        const explained = new Error(
+          PREFIX +
+            'the Faust AudioWorklet processor never registered. This is what happens when a ' +
+            'bundler minifies the Faust compiler (@shren/faust2wam): its worklet code is built ' +
+            'from Function.toString(), which identifier mangling breaks. Turn mangling off in ' +
+            'your production build — Vite 8: build.rolldownOptions.output.minify = ' +
+            '{ mangle: false }; Vite 7 and earlier: esbuild: { minifyIdentifiers: false } — ' +
+            'see "Production builds" in the @dawcore/faust README. Original error: ' +
+            message
+        ) as Error & { cause?: unknown };
+        explained.cause = err;
+        throw explained;
+      }
+    },
+  };
 }
 
 /** Test-only: drop the cached compiler module loads. */

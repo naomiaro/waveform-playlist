@@ -1,4 +1,4 @@
-import type { CreatedEffect, EffectDefinition } from './types';
+import type { CreatedEffect, EffectDefinition, EffectInstance, EffectParamDef } from './types';
 
 const MAX_DELAY_SECONDS = 10;
 
@@ -18,6 +18,90 @@ export function getEffectDefinitions(): Map<string, EffectDefinition> {
   return new Map(registry);
 }
 
+interface PreparedRecord {
+  /** The definition this preparation ran for — a re-registered type must
+   *  prepare again with its new definition. */
+  definition: EffectDefinition;
+  promise: Promise<void>;
+  settled: boolean;
+}
+
+/** Per-context preparation state. Weak: an OfflineAudioContext (one per
+ *  export) must not be kept alive by the registry. */
+const prepared = new WeakMap<BaseAudioContext, Map<string, PreparedRecord>>();
+
+/**
+ * Run a registered effect's `prepare` hook for one context, once. Concurrent
+ * and later calls share the same run; a failed run is forgotten so the next
+ * call retries. Resolves immediately for definitions without a hook, and for
+ * unknown types (creating the effect reports those).
+ */
+export function prepareEffect(type: string, audioContext: BaseAudioContext): Promise<void> {
+  const definition = registry.get(type);
+  if (!definition?.prepare) {
+    return Promise.resolve();
+  }
+  const forContext = prepared.get(audioContext) ?? new Map<string, PreparedRecord>();
+  prepared.set(audioContext, forContext);
+  const existing = forContext.get(type);
+  if (existing && existing.definition === definition) {
+    return existing.promise;
+  }
+
+  const prepare = definition.prepare;
+  const record: PreparedRecord = {
+    definition,
+    settled: false,
+    // The async wrapper turns a synchronous throw into a rejection.
+    promise: (async () => prepare(audioContext))().then(
+      () => {
+        record.settled = true;
+      },
+      (err: unknown) => {
+        if (forContext.get(type) === record) {
+          forContext.delete(type);
+        }
+        throw err;
+      }
+    ),
+  };
+  forContext.set(type, record);
+  return record.promise;
+}
+
+function isPrepared(
+  type: string,
+  definition: EffectDefinition,
+  audioContext: BaseAudioContext
+): boolean {
+  const record = prepared.get(audioContext)?.get(type);
+  return record !== undefined && record.definition === definition && record.settled;
+}
+
+/**
+ * Whether `type` has a prepare hook that has not completed on this context
+ * for its CURRENT definition. Synchronous, so async callers can skip the
+ * await (and stay synchronous) for the common case of effects without one.
+ */
+export function needsPrepare(type: string, audioContext: BaseAudioContext): boolean {
+  const definition = registry.get(type);
+  return definition?.prepare !== undefined && !isPrepared(type, definition, audioContext);
+}
+
+/**
+ * Await a type's preparation until it holds for the definition registered
+ * NOW. A type re-registered while its old definition was preparing would
+ * otherwise reach `create` unprepared. Rejects with the hook's own error.
+ */
+export async function ensureEffectPrepared(
+  type: string,
+  audioContext: BaseAudioContext
+): Promise<void> {
+  while (needsPrepare(type, audioContext)) {
+    await prepareEffect(type, audioContext);
+  }
+}
+
 export function createEffectInstance(
   type: string,
   audioContext: BaseAudioContext,
@@ -33,7 +117,31 @@ export function createEffectInstance(
     );
   }
   const merged = { ...definition.defaults, ...params };
-  const instance = definition.create(audioContext, merged);
+  let instance: EffectInstance;
+  try {
+    instance = definition.create(audioContext, merged);
+  } catch (err) {
+    if (!definition.prepare || isPrepared(type, definition, audioContext)) {
+      throw err;
+    }
+    // The likeliest cause by far: an AudioWorklet module that was never
+    // added to THIS context. Name the fix; keep the original message.
+    const hinted = new Error(
+      '[waveform-playlist] effect "' +
+        type +
+        '" has a prepare() step that has not completed on this audio context — ' +
+        "await editor.prepareEffect('" +
+        type +
+        "') (or prepareEffect('" +
+        type +
+        "', audioContext)) before adding it. Original error: " +
+        (err instanceof Error ? err.message : String(err))
+    ) as Error & { cause?: unknown };
+    // Keep the original (its name, type and stack) reachable: the hint is a
+    // guess at the cause, and `create` may have thrown for a real bug.
+    hinted.cause = err;
+    throw hinted;
+  }
   instance.applyParams(merged);
   return { instance, params: merged, wetParam: definition.wetParam };
 }
@@ -51,6 +159,107 @@ function singleNode(
   return { input: node, output: node, applyParams };
 }
 
+type BiquadParam = 'frequency' | 'q' | 'gain';
+
+const BIQUAD_PARAM_DEFS: Record<BiquadParam, EffectParamDef> = {
+  frequency: { min: 20, max: 20000, step: 1, unit: 'Hz' },
+  q: { min: 0.1, max: 20, step: 0.1 },
+  gain: { min: -24, max: 24, step: 0.5, unit: 'dB' },
+};
+
+/**
+ * Web Audio gives `Q` two meanings. For bandpass, notch and peaking it is
+ * the usual linear quality factor. For LOWPASS and HIGHPASS it is the
+ * resonance peak in DECIBELS at the cutoff (Q_linear = 10^(Q/20)): 0 dB is a
+ * slight bump, about -3 dB is a flat Butterworth response, and a linear-style
+ * 0.707 would actually be +0.7 dB of resonance.
+ */
+const RESONANCE_DB_PARAM_DEF: EffectParamDef = { min: -12, max: 24, step: 0.1, unit: 'dB' };
+/** Flat (Butterworth) response: 20·log10(1/√2). */
+const BUTTERWORTH_RESONANCE_DB = -3;
+
+interface BiquadFilterSpec {
+  label: string;
+  biquadType: BiquadFilterType;
+  /** Only the params this biquad shape actually uses (the Web Audio spec
+   *  ignores Q on shelves and gain on everything but peaking/shelves) — a
+   *  generic parameter panel must not render dead sliders. */
+  defaults: Partial<Record<BiquadParam, number>>;
+  /** Per-type overrides of the shared param metadata. */
+  paramDefs?: Partial<Record<BiquadParam, EffectParamDef>>;
+}
+
+/**
+ * One registry type per biquad shape (#661). Effect params are numeric
+ * (`Record<string, number>`), so the shape cannot be a param — sibling types
+ * fit the model with no API change. `native-filter` keeps its original
+ * (lowpass) meaning so persisted chains restore unchanged.
+ */
+const BIQUAD_FILTERS: Record<string, BiquadFilterSpec> = {
+  // Unchanged since before #661 — including its q range, which predates the
+  // dB reading above (q here is also resonance in dB; persisted chains rely
+  // on these exact defaults and bounds).
+  'native-filter': {
+    label: 'Lowpass Filter',
+    biquadType: 'lowpass',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-highpass': {
+    label: 'Highpass Filter',
+    biquadType: 'highpass',
+    defaults: { frequency: 80, q: BUTTERWORTH_RESONANCE_DB },
+    paramDefs: { q: RESONANCE_DB_PARAM_DEF },
+  },
+  'native-bandpass': {
+    label: 'Bandpass Filter',
+    biquadType: 'bandpass',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-notch': {
+    label: 'Notch Filter',
+    biquadType: 'notch',
+    defaults: { frequency: 1000, q: 1 },
+  },
+  'native-peaking': {
+    label: 'Peaking EQ',
+    biquadType: 'peaking',
+    defaults: { frequency: 1000, q: 1, gain: 0 },
+  },
+  'native-lowshelf': {
+    label: 'Low Shelf',
+    biquadType: 'lowshelf',
+    defaults: { frequency: 200, gain: 0 },
+  },
+  'native-highshelf': {
+    label: 'High Shelf',
+    biquadType: 'highshelf',
+    defaults: { frequency: 4000, gain: 0 },
+  },
+};
+
+function biquadDefinition(spec: BiquadFilterSpec): EffectDefinition {
+  const names = Object.keys(spec.defaults) as BiquadParam[];
+  return {
+    label: spec.label,
+    category: 'filter',
+    defaults: { ...spec.defaults } as Record<string, number>,
+    params: Object.fromEntries(
+      names.map((name) => [name, spec.paramDefs?.[name] ?? BIQUAD_PARAM_DEFS[name]])
+    ),
+    create: (ctx) => {
+      const node = ctx.createBiquadFilter();
+      node.type = spec.biquadType;
+      return singleNode(node, (p) => {
+        if (names.includes('frequency') && p.frequency !== undefined) {
+          node.frequency.value = p.frequency;
+        }
+        if (names.includes('q') && p.q !== undefined) node.Q.value = p.q;
+        if (names.includes('gain') && p.gain !== undefined) node.gain.value = p.gain;
+      });
+    },
+  };
+}
+
 function registerBuiltIns(): void {
   registry.set('native-gain', {
     label: 'Gain',
@@ -65,23 +274,9 @@ function registerBuiltIns(): void {
     },
   });
 
-  registry.set('native-filter', {
-    label: 'Lowpass Filter',
-    category: 'filter',
-    defaults: { frequency: 1000, q: 1 },
-    params: {
-      frequency: { min: 20, max: 20000, step: 1, unit: 'Hz' },
-      q: { min: 0.1, max: 20, step: 0.1 },
-    },
-    create: (ctx) => {
-      const node = ctx.createBiquadFilter();
-      node.type = 'lowpass';
-      return singleNode(node, (p) => {
-        if (p.frequency !== undefined) node.frequency.value = p.frequency;
-        if (p.q !== undefined) node.Q.value = p.q;
-      });
-    },
-  });
+  for (const [type, definition] of Object.entries(BIQUAD_FILTERS)) {
+    registry.set(type, biquadDefinition(definition));
+  }
 
   registry.set('native-compressor', {
     label: 'Compressor',

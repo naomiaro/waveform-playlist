@@ -1,6 +1,12 @@
 import { EffectsChainController } from './effects-chain-controller';
 import { loadWamModule, loadFaustModule } from './optional-modules';
-import { createEffectInstance, getEffectDefinitions } from './effect-registry';
+import {
+  createEffectInstance,
+  ensureEffectPrepared,
+  getEffectDefinitions,
+  needsPrepare,
+  prepareEffect,
+} from './effect-registry';
 import type { EffectChainItem, EffectState, SerializedEffectEntry } from './types';
 
 const PREFIX = '[waveform-playlist] ';
@@ -115,6 +121,12 @@ export class EffectsManager {
   async setMasterEffectsState(entries: SerializedEffectEntry[]): Promise<void> {
     validateSerializedEntries(entries);
     await this._restoreChain(this._ensureMasterChain(), this._masterTarget, entries);
+  }
+
+  /** Run a registered effect's async `prepare` hook on the adapter's
+   *  context, so the synchronous addEffect() can create it. */
+  async prepareEffect(type: string): Promise<void> {
+    await prepareEffect(type, this._requireWiring().audioContext);
   }
 
   // --- Track chains ---
@@ -730,6 +742,17 @@ export class EffectsManager {
       if (superseded()) return;
       if (entry.kind === 'native') {
         try {
+          // Restore is already async, so it can run the definition's
+          // per-context setup itself (#657). A failure lands in the
+          // placeholder path below like any other native restore failure.
+          // Only await when there IS something to prepare: a chain of plain
+          // natives must still restore synchronously within this call, as it
+          // always has (callers read `effects` / add effects right after).
+          const liveContext = this._requireWiring().audioContext;
+          if (needsPrepare(entry.type, liveContext)) {
+            await ensureEffectPrepared(entry.type, liveContext);
+            if (superseded() || chain.disposed) return;
+          }
           const id = this._addToChain(chain, target, entry.type, entry.params);
           if (entry.bypassed) {
             this._runOp(chain, target, 'setBypassed', id, true);
