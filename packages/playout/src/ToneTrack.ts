@@ -1,15 +1,7 @@
-import {
-  Volume,
-  Gain,
-  Panner,
-  ToneAudioNode,
-  getDestination,
-  getTransport,
-  getContext,
-} from 'tone';
+import { Volume, Gain, ToneAudioNode, getDestination, getTransport, getContext } from 'tone';
 import { Track, gainToDb, applyFadeIn, applyFadeOut, type Fade } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
-import { followInsertChannelLayout, restoreSourceChannelLayout } from './trackInsert';
+import { createTrackPanStage, type TrackPanStage } from './trackPan';
 
 /**
  * Wires a track's effects, PRE-FADER (#660): connect `trackInput` through
@@ -48,7 +40,7 @@ export interface ToneTrackOptions {
   track: Track;
   effects?: TrackEffectsFunction;
   destination?: ToneAudioNode;
-  /** Max channel count across clips — sets Panner channelCount. Default: 1 */
+  /** Max channel count across clips — selects the pan stage (see trackPan.ts). Default: 1 */
   channelCount?: number;
 }
 
@@ -65,15 +57,12 @@ export class ToneTrack {
   /** Pre-fader summing point: clip sources → inputGain → [effects] → volume. */
   private inputGain: Gain;
   private volumeNode: Volume;
-  private panNode: Panner;
+  private panStage: TrackPanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
   private _hasClosureEffects: boolean;
-  private _sourceChannelCount: number;
   private _effectsChain: { input: AudioNode; output: AudioNode } | null = null;
-  /** Whether the panner was switched to follow a hook chain's layout. */
-  private _pannerFollowsInsert = false;
   // Guard against ghost tick schedule callbacks. After stop/start cycles with
   // loops, stale Clock._lastUpdate causes ticks from the previous cycle to fire
   // Transport.schedule() callbacks at past positions (e.g., time 0 clips fire
@@ -88,23 +77,21 @@ export class ToneTrack {
     // Create shared track-level Tone.js nodes
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    // Match channelCount to source — Tone.js Panner defaults to 1 (stereo→mono downmix).
-    this._sourceChannelCount = options.channelCount ?? 1;
-    this.panNode = new Panner({
-      pan: options.track.stereoPan,
-      channelCount: this._sourceChannelCount,
-    });
+    // Sized from the source: stereo sources keep Tone's Panner, mono sources
+    // get an equal-power balance stage that lets a stereo effect stay stereo
+    // (see trackPan.ts).
+    this.panStage = createTrackPanStage(options.track.stereoPan, options.channelCount ?? 1);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
     // Chain shared Tone.js nodes: Volume → Pan → MuteGain → destination
-    this.volumeNode.chain(this.panNode, this.muteGain);
+    this.volumeNode.connect(this.panStage.input);
+    this.panStage.output.connect(this.muteGain);
     this.muteGain.connect(options.destination || getDestination());
 
     // Pre-fader insert (#660): inputGain → [effects] → Volume. The fader,
     // pan and mute all come after the effects.
     this._hasClosureEffects = Boolean(options.effects);
     if (options.effects) {
-      followInsertChannelLayout(this.panNode);
       const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
@@ -561,7 +548,7 @@ export class ToneTrack {
 
   setPan(pan: number): void {
     this.track.stereoPan = pan;
-    this.panNode.pan.value = pan;
+    this.panStage.setPan(pan);
   }
 
   setMute(muted: boolean): void {
@@ -617,7 +604,6 @@ export class ToneTrack {
           String(err)
       );
     }
-    this._pannerFollowsInsert = followInsertChannelLayout(this.panNode);
     this.inputGain.connect(input);
     output.connect(this._faderNativeInput);
     this._effectsChain = { input, output };
@@ -634,10 +620,6 @@ export class ToneTrack {
         '[waveform-playlist] disconnectEffects: ' +
           (err instanceof Error ? err.message : String(err))
       );
-    }
-    if (this._pannerFollowsInsert) {
-      restoreSourceChannelLayout(this.panNode, this._sourceChannelCount);
-      this._pannerFollowsInsert = false;
     }
     this.inputGain.connect(this.volumeNode);
   }
@@ -714,7 +696,7 @@ export class ToneTrack {
       );
     }
     try {
-      this.panNode.dispose();
+      this.panStage.dispose();
     } catch (err) {
       console.warn(
         `[waveform-playlist] Error disposing panNode on track "${this.id}":` + ' ' + String(err)

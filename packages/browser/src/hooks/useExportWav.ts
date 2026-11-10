@@ -10,7 +10,7 @@ import {
 import {
   getUnderlyingAudioParam,
   getGlobalAudioContext,
-  followInsertChannelLayout,
+  createTrackPanStage,
 } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
@@ -255,7 +255,7 @@ async function renderOffline(
     | undefined,
   onProgress: (progress: number) => void
 ): Promise<AudioBuffer> {
-  const { Volume, Gain, Panner, Player, ToneAudioBuffer } = await import('tone');
+  const { Volume, Gain, Player, ToneAudioBuffer } = await import('tone');
 
   onProgress(0.1);
 
@@ -289,9 +289,10 @@ async function renderOffline(
           // Track-level nodes mirror ToneTrack: input → [effects] → volume → pan → mute
           const trackInput = new Gain({ gain: 1 });
           const trackVolume = new Volume(gainToDb(state.volume));
-          // Match channelCount to source material — Tone.js Panner defaults to 1
-          // which forces stereo→mono downmix. Use 2 only for stereo sources.
-          const trackPan = new Panner({ pan: state.pan, channelCount: trackChannelCount(track) });
+          // Same pan stage as live playback (playout's trackPan): the law is
+          // chosen by the source's channel count, and a stereo effect on a mono
+          // track stays stereo.
+          const trackPan = createTrackPanStage(state.pan, trackChannelCount(track));
           const trackMute = new Gain(state.muted ? 0 : 1);
 
           // Conditionally insert per-track effects chain (may be async — WAM cloning)
@@ -299,9 +300,6 @@ async function renderOffline(
           // never change how hard the effects work (parity with ToneTrack).
           const trackEffects = createOfflineTrackEffects?.(track.id);
           if (trackEffects && applyEffects) {
-            // The panner is now fed by the chain — let a stereo effect on a
-            // mono track stay stereo, exactly as live playback does.
-            followInsertChannelLayout(trackPan);
             const cleanup = await trackEffects(trackInput, trackVolume, true);
             if (cleanup) cleanups.push(cleanup);
           } else {
@@ -310,8 +308,8 @@ async function renderOffline(
 
           // Connect track chain: trackVolume → trackPan → trackMute → master
           trackMute.connect(masterVolume);
-          trackPan.connect(trackMute);
-          trackVolume.connect(trackPan);
+          trackPan.output.connect(trackMute);
+          trackVolume.connect(trackPan.input);
 
           // Schedule each clip
           for (const clip of track.clips) {

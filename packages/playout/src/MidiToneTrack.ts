@@ -1,7 +1,6 @@
 import {
   Volume,
   Gain,
-  Panner,
   PolySynth,
   Synth,
   MembraneSynth,
@@ -16,7 +15,7 @@ import type { SynthOptions } from 'tone';
 import { Track, gainToDb, type MidiNoteData } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
-import { followInsertChannelLayout } from './trackInsert';
+import { createTrackPanStage, type TrackPanStage } from './trackPan';
 
 /**
  * Shared interface for tracks managed by TonePlayout.
@@ -104,7 +103,7 @@ export class MidiToneTrack implements PlayableTrack {
   /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
   private inputGain: Gain;
   private volumeNode: Volume;
-  private panNode: Panner;
+  private panStage: TrackPanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -115,9 +114,11 @@ export class MidiToneTrack implements PlayableTrack {
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    this.panNode = new Panner(options.track.stereoPan);
+    // Synth voices are mono: the balance stage keeps a stereo effect stereo.
+    this.panStage = createTrackPanStage(options.track.stereoPan, 1);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
-    this.volumeNode.chain(this.panNode, this.muteGain);
+    this.volumeNode.connect(this.panStage.input);
+    this.panStage.output.connect(this.muteGain);
 
     // Melodic: PolySynth with basic Synth voice
     this.synth = new PolySynth(Synth, options.synthOptions);
@@ -165,7 +166,6 @@ export class MidiToneTrack implements PlayableTrack {
     this.muteGain.connect(destination);
     // Pre-fader insert (#660): inputGain → [effects] → Volume → Pan → Mute.
     if (options.effects) {
-      followInsertChannelLayout(this.panNode);
       const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
@@ -377,7 +377,7 @@ export class MidiToneTrack implements PlayableTrack {
 
   setPan(pan: number): void {
     this.track.stereoPan = pan;
-    this.panNode.pan.value = pan;
+    this.panStage.setPan(pan);
   }
 
   setMute(muted: boolean): void {
@@ -458,7 +458,7 @@ export class MidiToneTrack implements PlayableTrack {
       );
     }
     try {
-      this.panNode.dispose();
+      this.panStage.dispose();
     } catch (err) {
       console.warn(
         `[waveform-playlist] Error disposing panNode on MIDI track "${this.id}":` +
