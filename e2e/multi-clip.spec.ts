@@ -189,11 +189,9 @@ test.describe('Multi-Clip Example', () => {
       const clipContainer = page.locator('[data-clip-container]').first();
       await expect(clipContainer).toBeVisible();
 
-      const pointerEvents = await clipContainer.evaluate((el) => {
-        return window.getComputedStyle(el).pointerEvents;
-      });
-
-      expect(pointerEvents).toBe('none');
+      // Retrying assertion: a one-shot getComputedStyle can read '' while
+      // the clip is being re-rendered (styles not applied yet).
+      await expect(clipContainer).toHaveCSS('pointer-events', 'none');
     });
   });
 

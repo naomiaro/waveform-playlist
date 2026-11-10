@@ -26,6 +26,7 @@ import {
   connect,
 } from 'tone';
 import type { InputNode } from 'tone';
+import { getGlobalContext } from '@waveform-playlist/playout';
 import type { EffectDefinition } from './effectDefinitions';
 
 // Type for effect instance with common methods
@@ -98,6 +99,18 @@ export function createEffectInstance(
     const value = initialParams?.[param.name] ?? param.default;
     options[param.name] = value;
   });
+
+  // Tone nodes are created on whatever context is current AT CONSTRUCTION.
+  // The playlist's tracks live on playout's global context, which replaces
+  // Tone's default one the first time it is requested — and the provider
+  // only requests it once its engine has loaded. An effect added before that
+  // (e.g. a default effect added on mount) was built on Tone's throwaway
+  // default context, and wiring it to a track then failed with
+  // "cannot connect to an AudioNode belonging to a different AudioContext",
+  // leaving the playlist stuck loading. Establish the shared context first.
+  // (A no-op once it exists — in particular it does not disturb the offline
+  // context a WAV export temporarily installs as Tone's current one.)
+  getGlobalContext();
 
   // Create the effect instance
   const effect = new Constructor(options);

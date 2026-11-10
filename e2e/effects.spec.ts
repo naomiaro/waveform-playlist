@@ -95,20 +95,19 @@ test.describe('Effects Example', () => {
     });
 
     test('can adjust effect parameter', async ({ page }) => {
-      // Find the Mix slider (second slider in the Reverb effect)
-      const mixSlider = page.locator('input[type="range"][max="1"][min="0"]').first();
+      // Address the Reverb's Mix slider by name. A positional selector
+      // (`input[type=range][min=0][max=1]`.first()) also matches the track
+      // volume sliders, and which one is first depends on whether the effect
+      // panel has mounted yet — the test used to fill one slider and read
+      // another (8 failures in 10 runs).
+      const mixSlider = page.getByRole('slider', { name: 'Reverb Mix' });
       await expect(mixSlider).toBeVisible();
+      await expect(mixSlider).not.toHaveValue('0.75');
 
-      // Get initial value
-      const initialValue = await mixSlider.inputValue();
-
-      // Change the value
       await mixSlider.fill('0.75');
 
-      // Verify value changed
-      const newValue = await mixSlider.inputValue();
-      expect(newValue).toBe('0.75');
-      expect(newValue).not.toBe(initialValue);
+      // Retrying assertion: the value round-trips through React state.
+      await expect(mixSlider).toHaveValue('0.75');
     });
 
     test('bypass button toggles effect', async ({ page }) => {

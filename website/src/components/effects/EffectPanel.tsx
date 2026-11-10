@@ -205,6 +205,7 @@ export const EffectPanel: React.FC<EffectPanelProps> = ({
               </ParameterLabel>
               <Slider
                 type="range"
+                aria-label={effect.definition.name + ' ' + param.label}
                 min={param.min}
                 max={param.max}
                 step={param.step}

@@ -1,17 +1,14 @@
 /**
  * dawcore spectrogram render-mode e2e.
  *
- * **Prerequisite:** these tests run against the dawcore-native Vite dev server,
- * not the Docusaurus site. Start it in another terminal before running:
- *
- *   pnpm example:dawcore-native    # → http://localhost:5173
- *
- * Override via env var if Vite picked a different port:
- *   DAWCORE_NATIVE_URL=http://localhost:5174 pnpm -w run test e2e/dawcore-spectrogram.spec.ts
+ * These tests run against the dawcore-native Vite example, not the
+ * Docusaurus site. `playwright.config.ts` starts that server itself (on
+ * port 5273 by default) and passes its URL in `DAWCORE_NATIVE_URL`; set that
+ * variable, or `DAWCORE_NATIVE_PORT`, to point at a different one.
  */
 import { test, expect } from '@playwright/test';
 
-const BASE = process.env.DAWCORE_NATIVE_URL ?? 'http://localhost:5173';
+const BASE = process.env.DAWCORE_NATIVE_URL ?? 'http://localhost:5273';
 
 test.describe('dawcore spectrogram render-mode', () => {
   test.beforeEach(async ({ page }) => {
