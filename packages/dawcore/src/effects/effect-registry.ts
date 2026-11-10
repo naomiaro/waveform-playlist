@@ -78,6 +78,30 @@ function isPrepared(
   return record !== undefined && record.definition === definition && record.settled;
 }
 
+/**
+ * Whether `type` has a prepare hook that has not completed on this context
+ * for its CURRENT definition. Synchronous, so async callers can skip the
+ * await (and stay synchronous) for the common case of effects without one.
+ */
+export function needsPrepare(type: string, audioContext: BaseAudioContext): boolean {
+  const definition = registry.get(type);
+  return definition?.prepare !== undefined && !isPrepared(type, definition, audioContext);
+}
+
+/**
+ * Await a type's preparation until it holds for the definition registered
+ * NOW. A type re-registered while its old definition was preparing would
+ * otherwise reach `create` unprepared. Rejects with the hook's own error.
+ */
+export async function ensureEffectPrepared(
+  type: string,
+  audioContext: BaseAudioContext
+): Promise<void> {
+  while (needsPrepare(type, audioContext)) {
+    await prepareEffect(type, audioContext);
+  }
+}
+
 export function createEffectInstance(
   type: string,
   audioContext: BaseAudioContext,
@@ -102,7 +126,7 @@ export function createEffectInstance(
     }
     // The likeliest cause by far: an AudioWorklet module that was never
     // added to THIS context. Name the fix; keep the original message.
-    throw new Error(
+    const hinted = new Error(
       '[waveform-playlist] effect "' +
         type +
         '" has a prepare() step that has not completed on this audio context — ' +
@@ -112,7 +136,11 @@ export function createEffectInstance(
         type +
         "', audioContext)) before adding it. Original error: " +
         (err instanceof Error ? err.message : String(err))
-    );
+    ) as Error & { cause?: unknown };
+    // Keep the original (its name, type and stack) reachable: the hint is a
+    // guess at the cause, and `create` may have thrown for a real bug.
+    hinted.cause = err;
+    throw hinted;
   }
   instance.applyParams(merged);
   return { instance, params: merged, wetParam: definition.wetParam };

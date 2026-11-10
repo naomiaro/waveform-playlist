@@ -386,6 +386,34 @@ describe('EffectDefinition.prepare on the live context (#657)', () => {
     ]);
   });
 
+  it('a chain with nothing to prepare still restores synchronously within the call', () => {
+    // Regression guard: awaiting unconditionally would yield before the first
+    // entry, so an effect added right after an un-awaited restore would land
+    // AHEAD of the restored ones, and `effects` would read empty.
+    void editor.setEffectsState([
+      { kind: 'native', type: 'native-gain', params: { gain: 0.5 }, bypassed: false },
+      { kind: 'native', type: 'native-compressor', params: {}, bypassed: true },
+    ]);
+    editor.addEffect('native-delay');
+
+    expect(editor.effects.map((e) => e.type)).toEqual([
+      'native-gain',
+      'native-compressor',
+      'native-delay',
+    ]);
+  });
+
+  it('an already-prepared effect type restores synchronously too', async () => {
+    registerWorkletEffect('worklet-fx-warm', async () => {});
+    await editor.prepareEffect('worklet-fx-warm');
+
+    void editor.setEffectsState([
+      { kind: 'native', type: 'worklet-fx-warm', params: {}, bypassed: false },
+    ]);
+
+    expect(editor.effects.map((e) => e.type)).toEqual(['worklet-fx-warm']);
+  });
+
   it('a failing prepare restores that entry as a placeholder and continues', async () => {
     registerWorkletEffect('worklet-fx-broken', async () => {
       throw new Error('module 404');

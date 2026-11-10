@@ -47,6 +47,9 @@ export interface EffectDefinition {
    * themselves (export on its own OfflineAudioContext, which the consumer
    * never sees). `addEffect()` is synchronous and cannot — call
    * `editor.prepareEffect(type)` first.
+   *
+   * Must be safe to run more than once on the same context: it runs again
+   * after a failed attempt and when the type is re-registered.
    */
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => EffectInstance;
