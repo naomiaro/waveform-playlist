@@ -1,7 +1,6 @@
 import {
   Volume,
   Gain,
-  Panner,
   PolySynth,
   Synth,
   MembraneSynth,
@@ -16,6 +15,7 @@ import type { SynthOptions } from 'tone';
 import { Track, gainToDb, type MidiNoteData } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
+import { createTrackPanStage, type TrackPanStage } from './trackPan';
 
 /**
  * Shared interface for tracks managed by TonePlayout.
@@ -100,8 +100,10 @@ export class MidiToneTrack implements PlayableTrack {
   private snareSynth: NoiseSynth; // No pitch param, can't wrap in PolySynth
   private cymbalSynth: PolySynth<MetalSynth>;
   private tomSynth: PolySynth<MembraneSynth>;
+  /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
+  private inputGain: Gain;
   private volumeNode: Volume;
-  private panNode: Panner;
+  private panStage: TrackPanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -110,14 +112,17 @@ export class MidiToneTrack implements PlayableTrack {
     this.track = options.track;
 
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
+    this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    this.panNode = new Panner(options.track.stereoPan);
+    // Synth voices are mono: the balance stage keeps a stereo effect stereo.
+    this.panStage = createTrackPanStage(options.track.stereoPan, 1);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
-    this.volumeNode.chain(this.panNode, this.muteGain);
+    this.volumeNode.connect(this.panStage.input);
+    this.panStage.output.connect(this.muteGain);
 
     // Melodic: PolySynth with basic Synth voice
     this.synth = new PolySynth(Synth, options.synthOptions);
-    this.synth.connect(this.volumeNode);
+    this.synth.connect(this.inputGain);
 
     // Percussion: PolySynth wrappers for polyphonic playback
     this.kickSynth = new PolySynth(MembraneSynth, {
@@ -151,20 +156,22 @@ export class MidiToneTrack implements PlayableTrack {
       },
     } as never);
 
-    this.kickSynth.connect(this.volumeNode);
-    this.snareSynth.connect(this.volumeNode);
-    this.cymbalSynth.connect(this.volumeNode);
-    this.tomSynth.connect(this.volumeNode);
+    this.kickSynth.connect(this.inputGain);
+    this.snareSynth.connect(this.inputGain);
+    this.cymbalSynth.connect(this.inputGain);
+    this.tomSynth.connect(this.inputGain);
 
-    // Connect to destination or apply effects chain
+    // Connect to destination; effects (if any) are inserted pre-fader
     const destination = options.destination || getDestination();
+    this.muteGain.connect(destination);
+    // Pre-fader insert (#660): inputGain → [effects] → Volume → Pan → Mute.
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, destination, false);
+      const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
     } else {
-      this.muteGain.connect(destination);
+      this.inputGain.connect(this.volumeNode);
     }
 
     // Create a Tone.Part for each clip, scheduling notes relative to Transport
@@ -370,7 +377,7 @@ export class MidiToneTrack implements PlayableTrack {
 
   setPan(pan: number): void {
     this.track.stereoPan = pan;
-    this.panNode.pan.value = pan;
+    this.panStage.setPan(pan);
   }
 
   setMute(muted: boolean): void {
@@ -433,6 +440,15 @@ export class MidiToneTrack implements PlayableTrack {
       }
     }
     try {
+      this.inputGain.dispose();
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Error disposing inputGain on MIDI track "${this.id}":` +
+          ' ' +
+          String(err)
+      );
+    }
+    try {
       this.volumeNode.dispose();
     } catch (err) {
       console.warn(
@@ -442,7 +458,7 @@ export class MidiToneTrack implements PlayableTrack {
       );
     }
     try {
-      this.panNode.dispose();
+      this.panStage.dispose();
     } catch (err) {
       console.warn(
         `[waveform-playlist] Error disposing panNode on MIDI track "${this.id}":` +

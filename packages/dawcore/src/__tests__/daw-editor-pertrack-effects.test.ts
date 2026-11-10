@@ -36,8 +36,8 @@ function makeMockAdapter() {
     close: vi.fn().mockResolvedValue(undefined),
   };
   const transport = {
-    connectTrackOutput: vi.fn(),
-    disconnectTrackOutput: vi.fn(),
+    connectTrackEffects: vi.fn(),
+    disconnectTrackEffects: vi.fn(),
     connectMasterOutput: vi.fn(),
     disconnectMasterOutput: vi.fn(),
     masterOutputNode: mockGainNode(),
@@ -96,8 +96,9 @@ describe('<daw-editor> per-track effects API (by trackId)', () => {
     const id = editor.addTrackEffect(track.trackId, 'native-gain', { gain: 0.5 });
 
     expect(typeof id).toBe('string');
-    expect(adapter.transport.connectTrackOutput).toHaveBeenCalledWith(
+    expect(adapter.transport.connectTrackEffects).toHaveBeenCalledWith(
       track.trackId,
+      expect.anything(),
       expect.anything()
     );
     expect(editor.trackEffects(track.trackId)).toHaveLength(1);

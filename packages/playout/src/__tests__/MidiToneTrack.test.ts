@@ -27,6 +27,7 @@ const mockPartInstances: Array<{
 }> = [];
 
 const mockVolumeChain = vi.fn();
+const mockVolumeConnect = vi.fn();
 const mockVolumeDispose = vi.fn();
 const mockGainDispose = vi.fn();
 const mockPannerDispose = vi.fn();
@@ -36,6 +37,18 @@ const mockConnect = vi.fn();
 
 // Track which PolySynth gets which voice class to differentiate melodic vs percussion
 let polySynthCallCount = 0;
+
+// The pan stage has its own unit tests (trackPan.test.ts) and is verified
+// against the real Tone graph in a browser; here it is a stub.
+const mockPanStage = {
+  input: { name: 'pan-in' },
+  output: { name: 'pan-out', connect: vi.fn() },
+  setPan: vi.fn(),
+  dispose: vi.fn(),
+};
+vi.mock('../trackPan', () => ({
+  createTrackPanStage: vi.fn(() => mockPanStage),
+}));
 
 vi.mock('tone', () => ({
   PolySynth: vi.fn().mockImplementation(function () {
@@ -82,6 +95,7 @@ vi.mock('tone', () => ({
   Volume: vi.fn().mockImplementation(function () {
     return {
       chain: mockVolumeChain,
+      connect: mockVolumeConnect,
       dispose: mockVolumeDispose,
       volume: { value: 0 },
     };
@@ -169,7 +183,9 @@ describe('MidiToneTrack', () => {
       // Percussion synths connect (kick, snare, cymbal, tom)
       expect(mockPercConnect).toHaveBeenCalled();
       expect(mockNoiseConnect).toHaveBeenCalled();
-      expect(mockVolumeChain).toHaveBeenCalled();
+      // Volume → pan stage → mute
+      expect(mockVolumeConnect).toHaveBeenCalledWith(mockPanStage.input);
+      expect(mockPanStage.output.connect).toHaveBeenCalled();
     });
 
     it('creates a Part for each clip', () => {
@@ -218,6 +234,19 @@ describe('MidiToneTrack', () => {
       const effectsFn = vi.fn().mockReturnValue(() => {});
       createTrack({ effects: effectsFn });
       expect(effectsFn).toHaveBeenCalled();
+    });
+
+    it('inserts effects pre-fader: the closure gets the track input and the volume stage (#660)', () => {
+      const effectsFn = vi.fn();
+      createTrack({ effects: effectsFn });
+
+      const [trackInput, faderInput, isOffline] = effectsFn.mock.calls[0];
+      // faderInput is the Volume mock (it has `chain`); trackInput is a Gain.
+      expect(typeof faderInput.chain).toBe('function');
+      expect(trackInput.gain).toBeDefined();
+      expect(isOffline).toBe(false);
+      // Synth voices feed the track input, so they pass through the effects.
+      expect(mockSynthConnect).toHaveBeenCalledWith(trackInput);
     });
   });
 
@@ -376,7 +405,7 @@ describe('MidiToneTrack', () => {
       expect(mockNoiseDispose).toHaveBeenCalled();
       // Audio nodes
       expect(mockVolumeDispose).toHaveBeenCalled();
-      expect(mockPannerDispose).toHaveBeenCalled();
+      expect(mockPanStage.dispose).toHaveBeenCalled();
       expect(mockGainDispose).toHaveBeenCalled();
     });
 

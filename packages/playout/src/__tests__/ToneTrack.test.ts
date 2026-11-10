@@ -31,15 +31,20 @@ const mockContext = {
   sampleRate: 48000,
 };
 
+const faderNativeInput = { name: 'fader-native-input' };
 const mockVolume = {
-  input: { input: { nodeType: 1 } }, // native GainNode mock
-  chain: vi.fn(),
+  input: { input: faderNativeInput }, // native GainNode mock
+  connect: vi.fn(),
   dispose: vi.fn(),
   volume: { value: 0 },
 };
 
-const mockPanner = {
-  pan: { value: 0 },
+// The pre-fader track input (#660): clip sources → inputGain → [effects] → volume.
+const trackNativeInput = { name: 'track-native-input' };
+const mockInputGain = {
+  input: trackNativeInput,
+  connect: vi.fn(),
+  disconnect: vi.fn(),
   dispose: vi.fn(),
 };
 
@@ -50,15 +55,26 @@ const mockMuteGain = {
   dispose: vi.fn(),
 };
 
+// The pan stage has its own unit tests (trackPan.test.ts) and is verified
+// against the real Tone graph in a browser; here it is a stub.
+const mockPanStage = {
+  input: { name: 'pan-in' },
+  output: { name: 'pan-out', connect: vi.fn() },
+  setPan: vi.fn(),
+  dispose: vi.fn(),
+};
+vi.mock('../trackPan', () => ({
+  createTrackPanStage: vi.fn(() => mockPanStage),
+}));
+
 vi.mock('tone', () => ({
   Volume: vi.fn(function () {
     return mockVolume;
   }),
-  Panner: vi.fn(function () {
-    return mockPanner;
-  }),
-  Gain: vi.fn(function () {
-    return mockMuteGain;
+  // ToneTrack builds its input as `new Gain({ gain: 1 })` and its mute as
+  // `new Gain(0 | 1)` — the argument shape tells the two apart.
+  Gain: vi.fn(function (arg: unknown) {
+    return typeof arg === 'object' ? mockInputGain : mockMuteGain;
   }),
   getTransport: vi.fn(() => mockTransport),
   getContext: vi.fn(() => mockContext),
@@ -422,48 +438,160 @@ describe('ToneTrack', () => {
     });
   });
 
-  describe('connectEffects / disconnectEffects', () => {
-    it('reroutes muteGain from destination to the chain input', () => {
-      const track = new ToneTrack({ clips: [], track: makeTrack() });
-      const chainInput = { name: 'chain-in' } as unknown as AudioNode;
-      mockMuteGain.connect.mockClear();
-      track.connectEffects(chainInput);
-      expect(mockMuteGain.disconnect).toHaveBeenCalledTimes(1);
-      expect(mockMuteGain.connect).toHaveBeenCalledWith(chainInput);
-    });
-
-    it('disconnectEffects restores the destination connection', () => {
-      const track = new ToneTrack({ clips: [], track: makeTrack() });
-      const chainInput = { name: 'chain-in' } as unknown as AudioNode;
-      track.connectEffects(chainInput);
+  describe('pre-fader signal path (#660)', () => {
+    beforeEach(() => {
+      mockInputGain.connect.mockClear();
+      mockInputGain.disconnect.mockClear();
       mockMuteGain.connect.mockClear();
       mockMuteGain.disconnect.mockClear();
+    });
+
+    it('builds the pan stage from the source channel count and wires volume → pan → mute', async () => {
+      const { createTrackPanStage } = await import('../trackPan');
+      mockVolume.connect.mockClear();
+      mockPanStage.output.connect.mockClear();
+
+      new ToneTrack({ clips: [], track: makeTrack(), channelCount: 2 });
+
+      expect(createTrackPanStage).toHaveBeenLastCalledWith(makeTrack().stereoPan, 2);
+      expect(mockVolume.connect).toHaveBeenCalledWith(mockPanStage.input);
+      expect(mockPanStage.output.connect).toHaveBeenCalledWith(mockMuteGain);
+    });
+
+    it('setPan drives the pan stage', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      track.setPan(-0.4);
+      expect(mockPanStage.setPan).toHaveBeenCalledWith(-0.4);
+    });
+
+    it('routes input → volume and mute → destination when there are no effects', () => {
+      new ToneTrack({ clips: [], track: makeTrack() });
+
+      expect(mockInputGain.connect).toHaveBeenCalledWith(mockVolume);
+      expect(mockMuteGain.connect).toHaveBeenCalledTimes(1);
+    });
+
+    it('clip sources feed the track input, not the volume stage', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const scheduled = track.addClip({
+        buffer: { duration: 1 } as AudioBuffer,
+        startTime: 0,
+        duration: 1,
+        offset: 0,
+        gain: 1,
+      });
+
+      expect(scheduled.fadeGainNode.connect).toHaveBeenCalledWith(trackNativeInput);
+      expect(scheduled.fadeGainNode.connect).not.toHaveBeenCalledWith(faderNativeInput);
+    });
+
+    it('hands a closure the track input and the FADER as its destination', () => {
+      const effects = vi.fn();
+      new ToneTrack({ clips: [], track: makeTrack(), effects });
+
+      expect(effects).toHaveBeenCalledWith(mockInputGain, mockVolume, false);
+      // The closure owns input → … → fader; the track must not also wire it
+      // directly (that would bypass the effects).
+      expect(mockInputGain.connect).not.toHaveBeenCalled();
+      // Mute still reaches the destination — it is after the effects now.
+      expect(mockMuteGain.connect).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('connectEffects / disconnectEffects', () => {
+    const chain = () => ({
+      input: { name: 'chain-in' } as unknown as AudioNode,
+      output: { name: 'chain-out', connect: vi.fn(), disconnect: vi.fn() },
+    });
+
+    beforeEach(() => {
+      mockInputGain.connect.mockClear();
+      mockInputGain.disconnect.mockClear();
+      mockMuteGain.connect.mockClear();
+      mockMuteGain.disconnect.mockClear();
+    });
+
+    it('inserts the chain between the track input and the fader', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const { input, output } = chain();
+      mockInputGain.connect.mockClear();
+
+      track.connectEffects(input, output as unknown as AudioNode);
+
+      expect(mockInputGain.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockInputGain.connect).toHaveBeenCalledWith(input);
+      expect(output.connect).toHaveBeenCalledWith(faderNativeInput);
+      // Post-fader nodes are untouched: mute keeps feeding the destination.
+      expect(mockMuteGain.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('disconnectEffects restores input → volume and releases the chain return', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const { input, output } = chain();
+      track.connectEffects(input, output as unknown as AudioNode);
+      mockInputGain.connect.mockClear();
+      mockInputGain.disconnect.mockClear();
+
       track.disconnectEffects();
-      expect(mockMuteGain.disconnect).toHaveBeenCalledWith(chainInput);
-      expect(mockMuteGain.connect).toHaveBeenCalledTimes(1); // back to destination
+
+      expect(output.disconnect).toHaveBeenCalledWith(faderNativeInput);
+      expect(mockInputGain.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockInputGain.connect).toHaveBeenCalledWith(mockVolume);
     });
 
     it('disconnectEffects is a no-op when nothing is connected', () => {
       const track = new ToneTrack({ clips: [], track: makeTrack() });
-      mockMuteGain.disconnect.mockClear();
+      mockInputGain.disconnect.mockClear();
       track.disconnectEffects();
-      expect(mockMuteGain.disconnect).not.toHaveBeenCalled();
+      expect(mockInputGain.disconnect).not.toHaveBeenCalled();
     });
 
     it('throws when the track was built with an effects closure', () => {
       const track = new ToneTrack({ clips: [], track: makeTrack(), effects: () => undefined });
-      expect(() => track.connectEffects({} as AudioNode)).toThrow(/TrackEffectsFunction/);
+      expect(() => track.connectEffects({} as AudioNode, {} as AudioNode)).toThrow(
+        /TrackEffectsFunction/
+      );
     });
 
-    it('swaps chain nodes when connectEffects is called twice', () => {
+    it('swaps chains when connectEffects is called twice', () => {
       const track = new ToneTrack({ clips: [], track: makeTrack() });
-      const a = { name: 'a' } as unknown as AudioNode;
-      const b = { name: 'b' } as unknown as AudioNode;
-      track.connectEffects(a);
-      mockMuteGain.disconnect.mockClear();
-      track.connectEffects(b);
-      expect(mockMuteGain.disconnect).toHaveBeenCalledWith(a);
-      expect(mockMuteGain.connect).toHaveBeenCalledWith(b);
+      const a = chain();
+      const b = chain();
+      track.connectEffects(a.input, a.output as unknown as AudioNode);
+
+      track.connectEffects(b.input, b.output as unknown as AudioNode);
+
+      expect(a.output.disconnect).toHaveBeenCalledWith(faderNativeInput);
+      expect(mockInputGain.connect).toHaveBeenLastCalledWith(b.input);
+      expect(b.output.connect).toHaveBeenCalledWith(faderNativeInput);
+    });
+
+    it('still restores routing when the consumer disposed its chain first', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const track = new ToneTrack({ clips: [], track: makeTrack() });
+        const { input, output } = chain();
+        track.connectEffects(input, output as unknown as AudioNode);
+        output.disconnect.mockImplementation(() => {
+          throw new Error('not connected');
+        });
+        mockInputGain.connect.mockClear();
+
+        expect(() => track.disconnectEffects()).not.toThrow();
+        expect(mockInputGain.connect).toHaveBeenCalledWith(mockVolume);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('dispose releases a connected chain return edge', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+      const { input, output } = chain();
+      track.connectEffects(input, output as unknown as AudioNode);
+
+      track.dispose();
+
+      expect(output.disconnect).toHaveBeenCalledWith(faderNativeInput);
     });
   });
 

@@ -334,34 +334,39 @@ describe('TonePlayout', () => {
   });
 
   describe('effects transport hooks', () => {
-    it('connectTrackOutput delegates to the ToneTrack', () => {
+    it('connectTrackEffects hands the chain input AND output to the ToneTrack', () => {
       const playout = new TonePlayout();
       const track = playout.addTrack({ clips: [], track: makeTrack('t1') });
       const spy = vi.spyOn(track, 'connectEffects');
-      const node = {} as AudioNode;
+      const input = { name: 'in' } as unknown as AudioNode;
+      const output = { name: 'out' } as unknown as AudioNode;
 
-      playout.connectTrackOutput('t1', node);
+      playout.connectTrackEffects('t1', input, output);
 
-      expect(spy).toHaveBeenCalledWith(node);
+      expect(spy).toHaveBeenCalledWith(input, output);
     });
 
-    it('connectTrackOutput throws for unknown track ids', () => {
+    it('connectTrackEffects throws for unknown track ids', () => {
       const playout = new TonePlayout();
 
-      expect(() => playout.connectTrackOutput('nope', {} as AudioNode)).toThrow(/unknown track/);
+      expect(() => playout.connectTrackEffects('nope', {} as AudioNode, {} as AudioNode)).toThrow(
+        /unknown track/
+      );
     });
 
-    it('connectTrackOutput throws for MIDI tracks', () => {
+    it('connectTrackEffects throws for MIDI tracks', () => {
       const playout = new TonePlayout();
       playout.addMidiTrack({ clips: [], track: makeTrack('m1') });
 
-      expect(() => playout.connectTrackOutput('m1', {} as AudioNode)).toThrow(/MIDI/);
+      expect(() => playout.connectTrackEffects('m1', {} as AudioNode, {} as AudioNode)).toThrow(
+        /MIDI/
+      );
     });
 
-    it('disconnectTrackOutput is a no-op for unknown ids', () => {
+    it('disconnectTrackEffects is a no-op for unknown ids', () => {
       const playout = new TonePlayout();
 
-      expect(() => playout.disconnectTrackOutput('nope')).not.toThrow();
+      expect(() => playout.disconnectTrackEffects('nope')).not.toThrow();
     });
 
     it('connectMasterOutput reroutes the master tap; disconnectMasterOutput restores it', () => {

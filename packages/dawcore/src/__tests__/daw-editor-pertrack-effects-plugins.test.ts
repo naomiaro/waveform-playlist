@@ -74,8 +74,8 @@ function makeMockAdapter() {
     close: vi.fn().mockResolvedValue(undefined),
   };
   const transport = {
-    connectTrackOutput: vi.fn(),
-    disconnectTrackOutput: vi.fn(),
+    connectTrackEffects: vi.fn(),
+    disconnectTrackEffects: vi.fn(),
     connectMasterOutput: vi.fn(),
     disconnectMasterOutput: vi.fn(),
     masterOutputNode: mockGainNode(),
@@ -158,8 +158,9 @@ describe('<daw-editor> per-track WAM/Faust/GUI API (by trackId)', () => {
     const id = await editor.addTrackWamPlugin(track.trackId, PLUGIN_URL);
 
     expect(typeof id).toBe('string');
-    expect(adapter.transport.connectTrackOutput).toHaveBeenCalledWith(
+    expect(adapter.transport.connectTrackEffects).toHaveBeenCalledWith(
       track.trackId,
+      expect.anything(),
       expect.anything()
     );
     expect(editor.trackEffects(track.trackId)).toHaveLength(1);

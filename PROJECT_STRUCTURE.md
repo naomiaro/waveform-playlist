@@ -642,7 +642,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Effects Chain (`src/effects/`):**
   - `effects-chain-controller.ts` — `EffectsChainController`, an ordered effect chain wired between owned input/output gain nodes; chain operations (add/remove/move/bypass) are kind-agnostic (`'native' | 'wam'`)
   - `effect-registry.ts` — `registerEffect` / `getEffectDefinitions` / `createEffectInstance` with five `native-*` built-in effects (BaseAudioContext nodes)
-  - `effects-manager.ts` — `EffectsManager`, per-editor ownership of the master chain + per-track chains, wiring into the transport's `connectTrackOutput` / `connectMasterOutput` hooks, GUI lifecycle cache, persistence (`getEffectsState()` / `setEffectsState()`), and the WAM transport bridge
+  - `effects-manager.ts` — `EffectsManager`, per-editor ownership of the master chain + per-track chains, wiring into the transport's `connectTrackEffects` (pre-fader track insert) / `connectMasterOutput` hooks, GUI lifecycle cache, persistence (`getEffectsState()` / `setEffectsState()`), and the WAM transport bridge
   - `optional-modules.ts` — dynamic imports of the optional `@dawcore/wam` / `@dawcore/faust` peers with install-hint rethrow (the `@dawcore/midi` pattern)
   - Element API: `addEffect` / `addWamPlugin(url)` / `addFaustEffect(dspCode)` / `removeEffect` / `setEffectParams` / `setEffectBypassed` / `moveEffect` / `openEffectGui` / `closeEffectGui` on `<daw-editor>` (master chain) and `<daw-track>` (delegates to the editor); `daw-effect-*` events
 - **Offline Export (`interactions/export-audio.ts`):** `editor.exportAudio({sampleRate?, startTime?, duration?, channels?})` renders through all effect chains on an `OfflineAudioContext` — clips scheduled statically (no Transport), chains rebuilt from persisted state
@@ -654,7 +654,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (consumer-side, optional).
 - **Architecture:** Layered — core (clock/scheduler/timer) → timeline (samples/ticks/tempo: `TempoMap`, `MeterMap`, branded `Tick`/`Sample` types) → audio (track nodes, `ClipPlayer`, metronome) → transport (orchestrator) → adapter (`NativePlayoutAdapter`, the `PlayoutAdapter` bridge for `PlaylistEngine`)
 - **Scheduler:** Sliding-window event generation driven by a Web Worker `setTimeout` tick (25 ms; keeps its cadence in a hidden tab) with ~200ms lookahead; integer-tick loop boundaries (no float drift at loop wrap)
-- **Effects insertion hooks:** `connectTrackOutput(trackId, node)` inserts any AudioNode chain (native, WAM, Tone.js) into a track's output path; `connectMasterOutput(node)` / `disconnectMasterOutput()` do the same between the master gain and `audioContext.destination`. The transport has zero knowledge of plugin types.
+- **Effects insertion hooks:** `connectTrackEffects(trackId, input, output)` inserts any AudioNode chain (native, WAM, Tone.js) on a track as a pre-fader insert (clips → chain → volume → pan → mute); `connectMasterOutput(node)` / `disconnectMasterOutput()` do the same between the master gain and `audioContext.destination`. The transport has zero knowledge of plugin types.
 - **Events:** `seek(time)` emits a `seek` event (`{ seconds }`) — consumed by the WAM transport bridge among others
 - **Dependencies:** None (zero runtime deps; `@waveform-playlist/core`/`engine` are type-only devDeps)
 - **Location:** `packages/transport/`
@@ -1093,10 +1093,12 @@ Per-track and master effect chains insert into the native transport's signal pat
 ```
 Clip source (AudioBufferSourceNode)
     ↓
-TrackNode (volume → pan → mute)
+TrackNode input (unity)
     ↓
-Per-track EffectsChainController        ← transport.connectTrackOutput(trackId, chain)
-    (ordered entries: native-* | wam)
+Per-track EffectsChainController        ← transport.connectTrackEffects(trackId, chain.input, chain.output)
+    (ordered entries: native-* | wam)       pre-fader insert
+    ↓
+TrackNode (volume → pan → mute)
     ↓
 Master gain
     ↓

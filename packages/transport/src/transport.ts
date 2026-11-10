@@ -834,19 +834,31 @@ export class Transport {
 
   // --- Effects Hook ---
 
-  connectTrackOutput(trackId: string, node: AudioNode): void {
+  /**
+   * Insert an effects chain on a track, PRE-FADER: clip sources → `input` …
+   * `output` → volume → pan → mute → master. Accepts any AudioNode chain
+   * (native nodes, WAM plugins, Tone.js effects) — pass the same node twice
+   * for a single-node effect. The transport owns both edges; do NOT connect
+   * `output` to the master bus yourself (that would bypass the fader, pan
+   * and mute). Calling again replaces the previous chain.
+   *
+   * `setTracks()` rebuilds every track node, dropping these hookups —
+   * reconnect afterwards.
+   */
+  connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void {
     const trackNode = this._trackNodes.get(trackId);
     if (!trackNode) {
-      console.warn('[waveform-playlist] connectTrackOutput: unknown trackId "' + trackId + '"');
+      console.warn('[waveform-playlist] connectTrackEffects: unknown trackId "' + trackId + '"');
       return;
     }
-    trackNode.connectEffects(node);
+    trackNode.connectEffects(input, output);
   }
 
-  disconnectTrackOutput(trackId: string): void {
+  /** Remove a track's effects chain and restore its direct routing. */
+  disconnectTrackEffects(trackId: string): void {
     const trackNode = this._trackNodes.get(trackId);
     if (!trackNode) {
-      console.warn('[waveform-playlist] disconnectTrackOutput: unknown trackId "' + trackId + '"');
+      console.warn('[waveform-playlist] disconnectTrackEffects: unknown trackId "' + trackId + '"');
       return;
     }
     trackNode.disconnectEffects();

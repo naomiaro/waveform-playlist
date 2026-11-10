@@ -1,7 +1,8 @@
-import { Volume, Gain, Panner, Part, ToneAudioNode, getDestination, getContext } from 'tone';
+import { Volume, Gain, Part, ToneAudioNode, getDestination, getContext } from 'tone';
 import { Track, gainToDb } from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
+import { createTrackPanStage, type TrackPanStage } from './trackPan';
 import type { PlayableTrack, MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 
@@ -75,8 +76,10 @@ export class SoundFontToneTrack implements PlayableTrack {
   private soundFontCache: SoundFontCache;
   private programNumber: number;
   private bankNumber: number;
+  /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
+  private inputGain: Gain;
   private volumeNode: Volume;
-  private panNode: Panner;
+  private panStage: TrackPanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -89,20 +92,25 @@ export class SoundFontToneTrack implements PlayableTrack {
     this.bankNumber = options.isPercussion ? 128 : 0;
 
     // Create shared track-level Tone.js nodes (same chain as ToneTrack)
+    this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    this.panNode = new Panner(options.track.stereoPan);
+    // Notes are summed mono: the balance stage keeps a stereo effect stereo.
+    this.panStage = createTrackPanStage(options.track.stereoPan, 1);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
-    this.volumeNode.chain(this.panNode, this.muteGain);
+    this.volumeNode.connect(this.panStage.input);
+    this.panStage.output.connect(this.muteGain);
 
-    // Connect to destination or apply effects chain
+    // Connect to destination; effects (if any) are inserted pre-fader
     const destination = options.destination || getDestination();
+    this.muteGain.connect(destination);
+    // Pre-fader insert (#660): inputGain → [effects] → Volume → Pan → Mute.
     if (options.effects) {
-      const cleanup = options.effects(this.muteGain, destination, false);
+      const cleanup = options.effects(this.inputGain, this.volumeNode, false);
       if (cleanup) {
         this.effectsCleanup = cleanup;
       }
     } else {
-      this.muteGain.connect(destination);
+      this.inputGain.connect(this.volumeNode);
     }
 
     // Create a Tone.Part for each clip, scheduling notes relative to Transport
@@ -252,9 +260,9 @@ export class SoundFontToneTrack implements PlayableTrack {
     // Release from wherever the envelope was at note-off
     gainNode.gain.linearRampToValueAtTime(0, noteOff + releaseVolEnv);
 
-    // Connect: source → gainNode → Volume.input (Tone.js)
+    // Connect: source → gainNode → track input (pre-fader, pre-effects)
     source.connect(gainNode);
-    gainNode.connect((this.volumeNode.input as unknown as Gain).input);
+    gainNode.connect(this.inputGain.input);
 
     // Track active sources for stopAllSources()
     this.activeSources.add(source);
@@ -344,7 +352,7 @@ export class SoundFontToneTrack implements PlayableTrack {
 
   setPan(pan: number): void {
     this.track.stereoPan = pan;
-    this.panNode.pan.value = pan;
+    this.panStage.setPan(pan);
   }
 
   setMute(muted: boolean): void {
@@ -388,6 +396,15 @@ export class SoundFontToneTrack implements PlayableTrack {
     });
 
     try {
+      this.inputGain.dispose();
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Error disposing inputGain on SoundFont track "${this.id}":` +
+          ' ' +
+          String(err)
+      );
+    }
+    try {
       this.volumeNode.dispose();
     } catch (err) {
       console.warn(
@@ -397,7 +414,7 @@ export class SoundFontToneTrack implements PlayableTrack {
       );
     }
     try {
-      this.panNode.dispose();
+      this.panStage.dispose();
     } catch (err) {
       console.warn(
         `[waveform-playlist] Error disposing panNode on SoundFont track "${this.id}":` +

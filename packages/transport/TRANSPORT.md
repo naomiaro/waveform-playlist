@@ -205,13 +205,15 @@ clip AudioBufferSourceNode
           ↓
     GainNode (per-clip gain + fades)
           ↓
+    GainNode (track input, unity)
+          ↓
+    [effects insert] ← connectTrackEffects(trackId, input, output)
+          ↓
     GainNode (track volume)
           ↓
     StereoPannerNode (pan, channelCount: 2)
           ↓
     GainNode (mute: 0 or 1)
-          ↓
-    [effects hook] ← connectTrackOutput(trackId, node)
           ↓
     MasterNode (master volume)
           ↓
@@ -221,7 +223,7 @@ clip AudioBufferSourceNode
 Key design choices:
 - **Separate mute GainNode** — Volume and mute are independent. Unmuting restores the original volume.
 - **`channelCount: 2` on panner** — Prevents stereo→mono downmix (Web Audio `StereoPannerNode` defaults to `channelCount: 1`).
-- **Effects hook** — `connectEffects(node)` reroutes the signal through any `AudioNode` chain without the transport knowing what's in it.
+- **Pre-fader effects insert** — `connectEffects(input, output)` routes the track input through any `AudioNode` chain and returns it ahead of the volume stage, without the transport knowing what's in it. The fader, pan and mute act on the processed signal, so the fader never changes how hard a level-dependent effect works.
 
 ## Playback Lifecycle
 
@@ -328,7 +330,7 @@ adapter.seek(5);
 // Access Transport for features beyond PlayoutAdapter
 adapter.transport.setTempo(140);
 adapter.transport.setMetronomeEnabled(true);
-adapter.transport.connectTrackOutput('vocals', reverbNode);
+adapter.transport.connectTrackEffects('vocals', reverbNode, reverbNode);
 ```
 
 The `transport` getter exposes the full Transport API for tempo, metronome, and effects — features that don't exist in the `PlayoutAdapter` interface.

@@ -21,6 +21,7 @@
 ## Correctness Invariants (audit 2026-07-09, PRs #598/#599)
 
 - **Mixed audio+MIDI tracks are TWO playout tracks** (`id` + `id:midi`). EVERY per-track adapter operation must address both halves — the control setters blind-forward to `trackId + ':midi'` (no-op for unknown ids, same pattern as removeTrack), and `updateTrack` removes the stale companion when MIDI clips drop to zero. New per-track adapter surface MUST handle the companion or mixed tracks silently break (e.g. soloing a mixed track used to mute its own MIDI half).
+- **A mixed track has ONE effects chain and ONE channel strip (#660).** With pre-fader effects a chain returns into a strip, so the two halves must not both run `track.effects`: the shared chain's output would land on both faders and the track would play twice (+6 dB — found in review, the adapter tests mock TonePlayout and never saw it). `midiHalfEffects` gives the closure to the audio half only; the `:midi` half gets `mixedTrackMidiEffects` (`src/mixedTrackEffects.ts`), which sums its voices into the audio half's `trackInput` (trimmed 1/√2 when the audio half is stereo, to keep the mono voices' centre level under the stereo pan law). The `:midi` half's own volume/pan/mute then carry no signal. A MIDI-only track runs the closure itself. Hook chains (`connectTrackEffects`, dawcore on the Tone adapter) still attach to the audio half only.
 - **TonePlayout owns solo-aware muting** — manual mute changes store `manualMuteState` and route through `updateSoloMuting()`; never call `track.setMute()` directly for a manual toggle, or a non-soloed track becomes audible during an active solo.
 - **Tone.js catches NOTHING in the tick chain** — `ToneEvent._tick → Transport._processTick → Clock._loop` are all unguarded (verified in 15.1.22 source). Every `Part`/`Transport.schedule` callback must contain its own failures in try/catch, or one throw aborts every other same-tick event across ALL tracks.
 - **MediaStream has no `ended`/`inactive` events** — `ended` is track-level and fires only on remote end/device removal; a local `track.stop()` fires NO event (per spec). `getMediaStreamSource` auto-cleanup covers remote ends only; local teardown requires `releaseMediaStreamSource()`.
@@ -54,16 +55,22 @@
 3. **No `_param` on fade GainNodes** — native `GainNode.gain` is already an `AudioParam` (no Tone.js Signal wrapper)
 
 **Audio graph (per clip):**
+
 ```
 AudioBufferSourceNode (native, one-shot, created per play/loop)
   → GainNode (native, per-clip fade envelope)
-  → Volume.input (Tone.js, shared per-track)
-  → Panner (Tone.js, shared per-track)
+  → inputGain (Tone.js, shared per-track, unity)
+  → [effects — pre-fader insert, #660]
+  → Volume (Tone.js, shared per-track)
+  → pan stage (trackPan.ts gain matrix — NOT a Tone Panner)
   → muteGain (Tone.js, shared per-track)
-  → effects chain or destination
+  → destination
 ```
 
+**Pre-fader effects (#660).** All three track classes (`ToneTrack`, `MidiToneTrack`, `SoundFontToneTrack`) sum their sources into `inputGain` and insert effects between it and `Volume` — the `TrackEffectsFunction` closure is called as `effects(inputGain, volumeNode, false)`, and `ToneTrack.connectEffects(input, output)` (behind `TonePlayout.connectTrackEffects` / `adapter.transport.connectTrackEffects`) wires `inputGain → input … output → Volume`'s native input. Mute is last, so mute/solo cut effect tails. A closure that ignores its second argument and connects to the master or `toDestination()` now BYPASSES volume, pan, mute and solo — it must end at `faderInput`. **Pan stage — no Tone `Panner` (`src/trackPan.ts`).** Tone's `Panner` pins `channelCountMode: 'explicit'` with a fixed, source-sized `channelCount`, and standardized-audio-context (Tone's default, the React default) throws `NotSupportedError` on any attempt to change it (its bug #105 — the Safari StereoPanner polyfill can't do `clamped-max`, so every browser is pinned). Once a chain feeds the panner, a mono track's stereo effect was summed to mono (measured: a left-only effect came out L = R). `createTrackPanStage(pan, sourceChannelCount)` replaces it in all three track classes and in the browser's offline render: an explicit-stereo input gain → `Split` → a 2×2 gain matrix → `Merge`, nodes no context restricts. `panMatrix()` holds the two Web Audio `StereoPannerNode` laws, chosen by the SOURCE channel count: mono = equal-power balance (L·cos θ, R·sin θ, θ = (pan+1)·π/4 — exactly the mono law for a dual-mono signal, and it never mixes channels, so a stereo effect stays stereo at the dry signal's centre level); stereo = the fold-over stereo law (centre unity). Verified against the real `Tone.Panner` in Chromium at five pan positions × mono/stereo × both context modes (max RMS difference 0.002 = measurement noise). The unit mocks can't see any of this — they accepted the `channelCountMode` assignment that throws on a real standardized context; only a real-Tone browser probe did. Don't reintroduce `Panner` in a track's signal path. **Test mocks:** `inputGain` is built as `new Gain({ gain: 1 })` and `muteGain` as `new Gain(0 | 1)` — `ToneTrack.test.ts`'s `Gain` mock tells them apart by argument shape; all three track test files stub `../trackPan` (the stage has its own `trackPan.test.ts`).
+
 **Key design:**
+
 - `Transport.schedule(callback, absTime)` creates permanent timeline events that re-fire on every loop iteration
 - Each callback creates a fresh `AudioBufferSourceNode` (one-shot), connects to the persistent per-clip `GainNode`, and starts it
 - `activeSources: Set<AudioBufferSourceNode>` tracks live sources (own Set, not Player internals)
@@ -75,13 +82,13 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
 
 **Schedule guard offset (`_scheduleGuardOffset`):** Ghost ticks from stale `Clock._lastUpdate` can fire `Transport.schedule()` callbacks at past positions (second manifestation of #1419). After a loop iteration resets ticks to ~0, ghost ticks include near-0 values, causing `Transport.schedule(cb, 0)` to fire even when starting at offset 1.5s. This creates duplicate `AudioBufferSourceNode`s alongside those from `startMidClipSources()`. Fix: `_scheduleGuardOffset` on ToneTrack suppresses schedule callbacks for clips before the play/loop offset. Set before `transport.start()` and in the loop handler. Complementary with `startMidClipSources`' strict `<` guard — no gaps, no overlap.
 
-**Native→Tone.js connection:** `fadeGainNode.connect((volumeNode.input as unknown as Gain).input)` — accesses the native GainNode backing Tone.js Volume's input Gain (double cast needed, see Type Gotchas below).
+**Native→Tone.js connection:** `fadeGainNode.connect(inputGain.input)` — a plain Tone `Gain`'s `.input` IS the native GainNode. An external effects chain returns into `(volumeNode.input as unknown as Gain).input`, the native GainNode backing Tone.js Volume's input Gain (double cast needed, see Type Gotchas below).
 
 **Loop property ordering:** `_processTick` checks `ticks >= _loopEnd` every tick. `_loopEnd` defaults to `0`, so `transport.loop = true` before updating `loopEnd` causes immediate wrap. **Always:** set `loopStart`/`loopEnd` BEFORE `transport.loop = enabled`.
 
 **Ghost tick loop wrap (root cause + fix):** After stop/start cycles, `Clock._lastUpdate` is stale (set by the previous context tick). `Clock._loop()` processes ticks from `[_lastUpdate, now()]`. In the gap `[_lastUpdate, startTime)`, the TickSource is still "started" from the PREVIOUS play cycle with its old tick offset — those accumulated ticks can exceed `_loopEnd`, causing `_processTick` to wrap immediately to loopStart. **Fix:** Advance `(transport as any)._clock._lastUpdate = startTime` after `transport.start()`. The next `Clock._loop()` only processes `[startTime, now()]` — ticks from the current play cycle with the correct offset. This eliminates the need for deferred loop enable via `setTimeout(0)`. See [Tone.js #1419](https://github.com/Tonejs/Tone.js/issues/1419).
 
-**Tone.js source location (pnpm):** `node_modules/.pnpm/tone@15.1.22/node_modules/tone/build/esm/core/clock/` — Clock.js, TickSource.js, Transport.js. Note: `Clock` pre-binds `_processTick` in its constructor (`this._processTick.bind(this)`), so monkey-patching Transport._processTick at runtime has no effect.
+**Tone.js source location (pnpm):** `node_modules/.pnpm/tone@15.1.22/node_modules/tone/build/esm/core/clock/` — Clock.js, TickSource.js, Transport.js. Note: `Clock` pre-binds `_processTick` in its constructor (`this._processTick.bind(this)`), so monkey-patching Transport.\_processTick at runtime has no effect.
 
 **Cached loop state:** `TonePlayout` caches loop state (`_loopEnabled`, `_loopStart`, `_loopEnd`) from `setLoop()`. In `play()`, these cached values set `loopStart`/`loopEnd` on the Transport before `transport.start()`. Engine calls `adapter.setLoop()` before `adapter.play()` so the cached state is up-to-date when `play()` applies it.
 
@@ -149,19 +156,21 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 
 **Architecture:** Opt-in replacement for `MidiToneTrack`. When `soundFontCache` is provided to `TonePlayoutAdapter`, MIDI clips route to `SoundFontToneTrack` instead of `MidiToneTrack`. Falls back to PolySynth when no SoundFont loaded.
 
-**Late load / swap (`ToneAdapter.setSoundFontCache`):** `createToneAdapter` returns `ToneAdapter` (extends engine `PlayoutAdapter`) with `setSoundFontCache(cache | undefined)`. The adapter snapshots its tracks (`_currentTracks`, kept fresh by the volume/mute/solo/pan setters via immutable copies) and records what each MIDI playout track was built with (`_midiTrackBuild: Map<midiTrackId, SoundFontCache | null>`). A swap rebuilds only MIDI tracks whose *effective* routing (`cache?.isLoaded ? cache : null`) differs from their build record — the guard compares against what each track was built with, not against the previous `setSoundFontCache` argument, because the same cache object flips `isLoaded` after a late `load()`. Per-track try/catch isolates Tone.js graph failures (warn + continue); calling with an unloaded cache warns and leaves routing unchanged. Audio tracks are untouched; `resumeTrackMidPlayback` handles swap-during-playback. `isToneAdapter(adapter)` (exported from playout) is the capability guard for narrowing a generic `PlayoutAdapter` before calling `setSoundFontCache` — structural check, still exported for external callers. Browser's `soundFontSync.ts` now uses its own local `supportsSoundFont` structural check (to keep the core barrel engine-free; avoids importing from playout).
+**Late load / swap (`ToneAdapter.setSoundFontCache`):** `createToneAdapter` returns `ToneAdapter` (extends engine `PlayoutAdapter`) with `setSoundFontCache(cache | undefined)`. The adapter snapshots its tracks (`_currentTracks`, kept fresh by the volume/mute/solo/pan setters via immutable copies) and records what each MIDI playout track was built with (`_midiTrackBuild: Map<midiTrackId, SoundFontCache | null>`). A swap rebuilds only MIDI tracks whose _effective_ routing (`cache?.isLoaded ? cache : null`) differs from their build record — the guard compares against what each track was built with, not against the previous `setSoundFontCache` argument, because the same cache object flips `isLoaded` after a late `load()`. Per-track try/catch isolates Tone.js graph failures (warn + continue); calling with an unloaded cache warns and leaves routing unchanged. Audio tracks are untouched; `resumeTrackMidPlayback` handles swap-during-playback. `isToneAdapter(adapter)` (exported from playout) is the capability guard for narrowing a generic `PlayoutAdapter` before calling `setSoundFontCache` — structural check, still exported for external callers. Browser's `soundFontSync.ts` now uses its own local `supportsSoundFont` structural check (to keep the core barrel engine-free; avoids importing from playout).
 
 **Audio graph per note:**
+
 ```
 AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
   → GainNode (native, per-note ADSR volume envelope)
-  → Volume.input (Tone.js, shared per-track)
-  → Panner → muteGain → effects/destination
+  → inputGain (Tone.js, shared per-track) → [effects, pre-fader]
+  → Volume → pan stage (trackPan.ts) → muteGain → destination
 ```
 
 **SoundFontCache:** Fetches SF2 URL → parses with `soundfont2` library → caches `AudioBuffer` per sample index. `getAudioBuffer(midiNote, bank, preset)` returns `SoundFontSample` with `buffer`, `playbackRate`, loop points, and volume envelope. AudioBuffer is cached by sample index (shared across zones), but loop/envelope data is per-zone (extracted from generators on each lookup). Lazily converts `Int16Array` → `Float32Array` → `AudioBuffer` on first access.
 
 **SF2 Pitch Resolution (critical gotcha):** Many SF2 files use the `OverridingRootKey` generator, NOT `sample.header.originalPitch`, for the actual root pitch. Using only `originalPitch` causes badly out-of-tune playback. Full generator chain:
+
 1. `OverridingRootKey` generator (most specific, per-zone)
 2. `sample.header.originalPitch` (sample header, skip if 255 = "unpitched")
 3. Fallback to MIDI note 60 (middle C)
@@ -247,18 +256,18 @@ const analyser = context.createAnalyser();
 ```
 
 **Key Files:**
+
 - `src/audioContext.ts` - Context management (`getGlobalContext()`)
 - `packages/recording/src/hooks/useRecording.ts` - Uses Tone.js Context methods
 - `packages/recording/src/hooks/useMicrophoneLevel.ts` - Uses Tone.js Context methods
 
 **References:**
+
 - [Tone.js Issue #681](https://github.com/Tonejs/Tone.js/issues/681) - AudioListener Firefox error
 
 ## Tone.js Panner Stereo Downmix Gotcha
 
-**Critical:** `new Panner(pan)` defaults to `channelCount: 1` + `channelCountMode: "explicit"` (for standardized-audio-context compat). This forces stereo→mono downmix at 1/√2 gain before panning. Stereo recordings play back ~3dB quieter with identical L/R channels.
-
-**Fix:** `ToneTrackOptions.channelCount` sets `Panner({ channelCount })`. Callers use `trackChannelCount(track)` from core. MidiToneTrack/SoundFontToneTrack use mono synth sources, so default `channelCount: 1` is correct there.
+`new Panner(pan)` defaults to `channelCount: 1` + `channelCountMode: "explicit"` — a forced stereo→mono downmix at 1/√2 before panning. Track signal paths no longer use `Panner` at all (see "Pan stage" above); `ToneTrackOptions.channelCount` (callers pass `trackChannelCount(track)` from core) now selects the pan LAW in `createTrackPanStage`. MidiToneTrack/SoundFontToneTrack pass 1 (mono voices). The gotcha still applies to any `Panner` you create yourself, e.g. as an effect.
 
 ## Native AudioContext for sampleRate Control
 

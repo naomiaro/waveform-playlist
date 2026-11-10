@@ -54,10 +54,23 @@ const { mockPartInstances, createdGainNodes, mockRawContext } = vi.hoisted(() =>
   };
 });
 
+// The pan stage has its own unit tests (trackPan.test.ts) and is verified
+// against the real Tone graph in a browser; here it is a stub.
+const mockPanStage = {
+  input: { name: 'pan-in' },
+  output: { name: 'pan-out', connect: vi.fn() },
+  setPan: vi.fn(),
+  dispose: vi.fn(),
+};
+vi.mock('../trackPan', () => ({
+  createTrackPanStage: vi.fn(() => mockPanStage),
+}));
+
 vi.mock('tone', () => ({
   Volume: vi.fn().mockImplementation(function () {
     return {
       chain: vi.fn(),
+      connect: vi.fn(),
       dispose: vi.fn(),
       volume: { value: 0 },
       input: { input: {} },
@@ -71,6 +84,7 @@ vi.mock('tone', () => ({
       connect: vi.fn(),
       dispose: vi.fn(),
       gain: { value: 1 },
+      input: {},
     };
   }),
   Part: vi.fn().mockImplementation(function (

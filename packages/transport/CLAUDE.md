@@ -107,10 +107,10 @@ Parallel to TempoMap, stores time signature entries at tick positions. Each entr
 ### TrackNode Signal Chain
 
 ```
-clip source → GainNode (volume) → StereoPannerNode → GainNode (mute) → [effects hook] → output
+clip source → GainNode (input, unity) → [effects insert] → GainNode (volume) → StereoPannerNode → GainNode (mute) → output
 ```
 
-Mute uses a separate GainNode (0/1) so volume and mute are independent. `connectEffects(node)` inserts any AudioNode chain between mute and output.
+Mute uses a separate GainNode (0/1) so volume and mute are independent. **Effects are PRE-FADER inserts (#660):** `connectEffects(input, output)` routes `input node → input … output → volume`. The TrackNode owns BOTH edges and releases the return edge (`output.disconnect(volume)`, targeted — taps on the chain output survive) on `disconnectEffects()`, on a replacing `connectEffects()`, and on `dispose()` (otherwise a rebuilt track leaves the chain feeding a dead volume node). A chain the consumer already tore down only warns. Consequences worth knowing before touching the order: the fader no longer drives level-dependent effects; a mono clip reaches the chain mono at full level; mute/solo cut effect tails; and the panner's law follows the CHAIN's output layout (`StereoPannerNode` is `clamped-max`: mono in → equal-power mono law, stereo in → balance law, ~3 dB louder at centre for a dual-mono signal).
 
 ### ClipPlayer
 
@@ -165,7 +165,7 @@ When any track is soloed, all non-soloed tracks are muted via `TrackNode.setMute
 
 ### Effects Hook
 
-`connectTrackOutput(trackId, node)` accepts any AudioNode chain (Tone.js effects, WAM plugins, native nodes). The transport has zero knowledge of Tone.js.
+`connectTrackEffects(trackId, input, output)` accepts any AudioNode chain (Tone.js effects, WAM plugins, native nodes) as a pre-fader insert; `disconnectTrackEffects(trackId)` removes it. The transport has zero knowledge of Tone.js. The pre-#660 `connectTrackOutput(trackId, node)` (post-fader, caller wired the chain to the master) is REMOVED, not aliased — a renamed method fails loudly, where a kept one would silently double-route (chain → master AND chain → fader). `setTracks()` rebuilds TrackNodes and drops hookups.
 
 `seek(time)` emits a `seek` event (`{ seconds }`) — added for the wam-transport bridge (#425); generic, no plugin types.
 
@@ -259,7 +259,7 @@ When a clip starts before `loopEnd` and extends past it, `generate()` clamps `du
 
 ### Effects Compatibility
 
-`ClipTrack.effects` (`TrackEffectsFunction`) is a Tone.js-oriented API and is **not supported** by `NativePlayoutAdapter`. Use `transport.connectTrackOutput(trackId, effectsInputNode)` instead. Consumers using `ClipTrack.effects` must switch to the `connectTrackOutput` API or continue using `TonePlayoutAdapter`.
+`ClipTrack.effects` (`TrackEffectsFunction`) is a Tone.js-oriented API and is **not supported** by `NativePlayoutAdapter`. Use `transport.connectTrackEffects(trackId, input, output)` instead. Consumers using `ClipTrack.effects` must switch to the `connectTrackEffects` API or continue using `TonePlayoutAdapter`.
 
 ### Offline Rendering (WAV Export)
 

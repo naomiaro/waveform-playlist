@@ -113,16 +113,20 @@ export async function exportAudioImpl(
       const chain = await buildOfflineChain(ctx, await host.getTrackEffectsState(track.id));
       cleanups.push(chain.dispose);
 
+      // Live track order (TrackNode, #660): clips → effects → volume → pan.
+      // The chain is a PRE-FADER insert — it sees the clips' own level and
+      // channel layout, so the fader and pan never change how hard a
+      // compressor works. Order matters for every nonlinear effect.
       const volume = ctx.createGain();
       volume.gain.value = track.volume;
       const panner = ctx.createStereoPanner();
       panner.pan.value = track.pan;
+      chain.output.connect(volume);
       volume.connect(panner);
-      panner.connect(chain.input);
-      chain.output.connect(masterVolume);
+      panner.connect(masterVolume);
 
       for (const clip of track.clips) {
-        scheduleClip(ctx, clip, startTime, duration, volume);
+        scheduleClip(ctx, clip, startTime, duration, chain.input);
       }
     }
 

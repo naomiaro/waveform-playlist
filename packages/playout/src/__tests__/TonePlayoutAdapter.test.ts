@@ -38,8 +38,8 @@ vi.mock('../TonePlayout', () => {
         dispose: vi.fn(),
         setOnPlaybackComplete: vi.fn(),
         setLoop: vi.fn(),
-        connectTrackOutput: vi.fn(),
-        disconnectTrackOutput: vi.fn(),
+        connectTrackEffects: vi.fn(),
+        disconnectTrackEffects: vi.fn(),
         connectMasterOutput: vi.fn(),
         disconnectMasterOutput: vi.fn(),
         masterBusInputNode: { nodeType: 1 },
@@ -446,6 +446,55 @@ describe('createToneAdapter', () => {
           makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
         ]);
       }
+
+      // #660: one effects chain per track. Both halves running the closure
+      // would return the chain into two faders — the track would play twice.
+      it('only the audio half runs the track effects closure; the MIDI half feeds its input', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const audioHalfInput = { name: 'audio-half-input' };
+        instance.getTrack = vi.fn((id: string) =>
+          id === 't1' ? { trackInput: audioHalfInput } : undefined
+        );
+        const effects = vi.fn();
+
+        adapter.setTracks([{ ...mixedTrack(), effects }]);
+
+        expect(instance.addTrack.mock.lastCall![0].effects).toBe(effects);
+        const midiEffects = instance.addMidiTrack.mock.lastCall![0].effects;
+        expect(midiEffects).toBeTypeOf('function');
+        expect(midiEffects).not.toBe(effects);
+
+        const midiInput = { connect: vi.fn() };
+        const midiFader = { connect: vi.fn() };
+        midiEffects(midiInput, midiFader, false);
+        // mixedTrack() has mono audio: no trim, straight into the audio input.
+        expect(midiInput.connect).toHaveBeenCalledWith(audioHalfInput);
+        expect(midiInput.connect).not.toHaveBeenCalledWith(midiFader);
+        expect(effects).not.toHaveBeenCalled(); // TonePlayout is mocked; the audio ToneTrack calls it
+      });
+
+      it('a MIDI-only track runs the track effects closure itself', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const effects = vi.fn();
+        const midiOnly = { ...mixedTrack(), effects };
+        midiOnly.clips = midiOnly.clips.filter((c) => c.midiNotes);
+
+        adapter.setTracks([midiOnly]);
+
+        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBe(effects);
+      });
+
+      it('a mixed track without effects passes none to either half', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+        adapter.setTracks([mixedTrack()]);
+
+        expect(instance.addTrack.mock.lastCall![0].effects).toBeUndefined();
+        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBeUndefined();
+      });
 
       it('setTrackMute also mutes the :midi companion', () => {
         const adapter = createToneAdapter();
@@ -1197,8 +1246,8 @@ describe('createToneAdapter', () => {
       // Copied verbatim from packages/dawcore/src/effects/effects-manager.ts —
       // guards against the wrong-method-name trap (root CLAUDE.md pattern #11).
       interface EffectsTransportLike {
-        connectTrackOutput(trackId: string, node: AudioNode): void;
-        disconnectTrackOutput(trackId: string): void;
+        connectTrackEffects(trackId: string, input: AudioNode, output: AudioNode): void;
+        disconnectTrackEffects(trackId: string): void;
         connectMasterOutput(node: AudioNode): void;
         disconnectMasterOutput(): void;
         readonly masterOutputNode: AudioNode;
@@ -1206,7 +1255,7 @@ describe('createToneAdapter', () => {
       vi.mocked(isNativeGlobalContext).mockReturnValue(true);
       const adapter = createToneAdapter();
       const t: EffectsTransportLike = adapter.transport; // compile-time check
-      expect(typeof t.connectTrackOutput).toBe('function');
+      expect(typeof t.connectTrackEffects).toBe('function');
     });
 
     it('delegates hooks to the playout when native mode is on', () => {
@@ -1216,17 +1265,18 @@ describe('createToneAdapter', () => {
         .value;
       const node = {} as AudioNode;
 
-      adapter.transport.connectTrackOutput('t1', node);
-      expect(mockInstance.connectTrackOutput).toHaveBeenCalledWith('t1', node);
+      const output = { name: 'out' } as unknown as AudioNode;
+      adapter.transport.connectTrackEffects('t1', node, output);
+      expect(mockInstance.connectTrackEffects).toHaveBeenCalledWith('t1', node, output);
 
       adapter.transport.connectMasterOutput(node);
       expect(mockInstance.connectMasterOutput).toHaveBeenCalledWith(node);
 
       expect(adapter.transport.masterOutputNode).toBe(mockInstance.masterBusInputNode);
 
-      adapter.transport.disconnectTrackOutput('t1');
+      adapter.transport.disconnectTrackEffects('t1');
       adapter.transport.disconnectMasterOutput();
-      expect(mockInstance.disconnectTrackOutput).toHaveBeenCalledWith('t1');
+      expect(mockInstance.disconnectTrackEffects).toHaveBeenCalledWith('t1');
       expect(mockInstance.disconnectMasterOutput).toHaveBeenCalled();
     });
 

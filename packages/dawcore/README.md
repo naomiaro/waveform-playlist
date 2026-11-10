@@ -230,12 +230,12 @@ adapter.transport.setCountInMode('always');
 adapter.transport.on('countIn', ({ beat, totalBeats }) => {
   console.log('Count-in: ' + beat + '/' + totalBeats);
 });
-adapter.transport.connectTrackOutput('track-id', reverbNode);
+adapter.transport.connectTrackEffects('track-id', reverbNode, reverbNode);
 ```
 
 ## Effects
 
-Per-track and master effect chains (requires `@dawcore/transport` >= 0.0.13). `<daw-track>` owns its track chain; `<daw-editor>` owns the master chain — same API on both:
+Per-track and master effect chains (requires `@dawcore/transport` >= 0.0.16). Track chains are **pre-fader inserts** — clips → effects → volume → pan → mute — so a track's volume fader sets its level in the mix without changing how hard a compressor or limiter works, and a mono clip reaches the chain as mono at full level. `exportAudio()` renders the same order. `<daw-track>` owns its track chain; `<daw-editor>` owns the master chain — same API on both:
 
 ```javascript
 const track = document.querySelector('daw-track');
