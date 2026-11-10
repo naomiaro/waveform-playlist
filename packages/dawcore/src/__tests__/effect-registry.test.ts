@@ -19,7 +19,12 @@ function mockAudioContext() {
     createGain: vi.fn(() => mockNode({ gain: mockParam(1) })),
     createDelay: vi.fn(() => mockNode({ delayTime: mockParam(0) })),
     createBiquadFilter: vi.fn(() =>
-      mockNode({ type: 'lowpass', frequency: mockParam(350), Q: mockParam(1) })
+      mockNode({
+        type: 'lowpass',
+        frequency: mockParam(350),
+        Q: mockParam(1),
+        gain: mockParam(0),
+      })
     ),
     createDynamicsCompressor: vi.fn(() =>
       mockNode({
@@ -48,12 +53,59 @@ describe('effect registry', () => {
     for (const type of [
       'native-gain',
       'native-filter',
+      'native-highpass',
+      'native-bandpass',
+      'native-notch',
+      'native-peaking',
+      'native-lowshelf',
+      'native-highshelf',
       'native-compressor',
       'native-delay',
       'native-stereo-panner',
     ]) {
       expect(defs.has(type), type + ' should be registered').toBe(true);
     }
+  });
+
+  // #661: native-filter is lowpass-only; the other biquad shapes are siblings
+  // so they fit the numeric-params model (no string `type` param).
+  it.each([
+    ['native-highpass', 'highpass', ['frequency', 'q']],
+    ['native-bandpass', 'bandpass', ['frequency', 'q']],
+    ['native-notch', 'notch', ['frequency', 'q']],
+    ['native-peaking', 'peaking', ['frequency', 'q', 'gain']],
+    ['native-lowshelf', 'lowshelf', ['frequency', 'gain']],
+    ['native-highshelf', 'highshelf', ['frequency', 'gain']],
+  ])('%s is a %s biquad exposing exactly the params that shape uses', (type, biquad, params) => {
+    const def = getEffectDefinitions().get(type);
+    expect(def, type + ' should be registered').toBeDefined();
+    expect(def!.category).toBe('filter');
+    expect(Object.keys(def!.params).sort()).toEqual([...params].sort());
+    expect(Object.keys(def!.defaults).sort()).toEqual([...params].sort());
+
+    const ctx = mockAudioContext();
+    const overrides: Record<string, number> = { frequency: 123 };
+    if (params.includes('q')) overrides.q = 2.5;
+    if (params.includes('gain')) overrides.gain = -6;
+    createEffectInstance(type, ctx, overrides);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const node = (ctx.createBiquadFilter as any).mock.results[0].value;
+    expect(node.type).toBe(biquad);
+    expect(node.frequency.value).toBe(123);
+    // Params a shape ignores stay at the node's own defaults.
+    expect(node.Q.value).toBe(params.includes('q') ? 2.5 : 1);
+    expect(node.gain.value).toBe(params.includes('gain') ? -6 : 0);
+  });
+
+  it('native-filter stays a lowpass with its existing params', () => {
+    const ctx = mockAudioContext();
+    createEffectInstance('native-filter', ctx, { frequency: 800, q: 3 });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const node = (ctx.createBiquadFilter as any).mock.results[0].value;
+    expect(node.type).toBe('lowpass');
+    expect(node.frequency.value).toBe(800);
+    expect(node.Q.value).toBe(3);
   });
 
   it('registerEffect adds a custom definition', () => {
