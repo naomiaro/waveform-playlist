@@ -1180,7 +1180,10 @@ describe('Transport', () => {
       expect(output.connect).toHaveBeenCalledTimes(1);
       const returnTarget = output.connect.mock.calls[0][0];
       expect(returnTarget).not.toBe(transport.masterOutputNode);
-      expect(returnTarget.gain).toBeDefined();
+      // …and specifically into the FADER: the node the track volume drives.
+      // (A post-fader return would land on a node the volume does not move.)
+      transport.setTrackVolume('t1', 0.37);
+      expect(returnTarget.gain.value).toBe(0.37);
     });
 
     it('disconnectTrackEffects releases the return edge', () => {

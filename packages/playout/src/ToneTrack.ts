@@ -77,13 +77,12 @@ export class ToneTrack {
     // Create shared track-level Tone.js nodes
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    // Sized from the source: stereo sources keep Tone's Panner, mono sources
-    // get an equal-power balance stage that lets a stereo effect stay stereo
-    // (see trackPan.ts).
+    // The pan LAW is chosen by the source's channel count (see trackPan.ts).
     this.panStage = createTrackPanStage(options.track.stereoPan, options.channelCount ?? 1);
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
-    // Chain shared Tone.js nodes: Volume → Pan → MuteGain → destination
+    // Every source goes through the gain-matrix pan stage (never a Tone
+    // Panner — see trackPan.ts): Volume → Pan → MuteGain → destination
     this.volumeNode.connect(this.panStage.input);
     this.panStage.output.connect(this.muteGain);
     this.muteGain.connect(options.destination || getDestination());
@@ -566,6 +565,15 @@ export class ToneTrack {
 
   setSolo(soloed: boolean): void {
     this.track.soloed = soloed;
+  }
+
+  /**
+   * The pre-fader track input (clip sources arrive here, ahead of the
+   * effects). The MIDI half of a mixed audio+MIDI track sums its voices into
+   * it so both halves share one effects chain and one channel strip.
+   */
+  get trackInput(): Gain {
+    return this.inputGain;
   }
 
   /** Native node behind the Volume stage — where an external chain returns. */

@@ -9,7 +9,8 @@ import {
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { TonePlayout } from './TonePlayout';
 import type { EffectsFunction } from './TonePlayout';
-import type { ClipInfo } from './ToneTrack';
+import type { ClipInfo, TrackEffectsFunction } from './ToneTrack';
+import { mixedTrackMidiEffects } from './mixedTrackEffects';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
@@ -135,6 +136,29 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     });
   }
 
+  function midiHalfEffects(p: TonePlayout, track: ClipTrack): TrackEffectsFunction | undefined {
+    const trackEffects = track.effects as TrackEffectsFunction | undefined;
+    if (!trackEffects || midiPlayoutTrackId(track) === track.id) {
+      return trackEffects;
+    }
+    // Structural check (the audio half is a ToneTrack): only it exposes the
+    // pre-fader input the MIDI voices are summed into.
+    const audioHalfInput = (
+      p.getTrack(track.id) as
+        | { trackInput?: Parameters<typeof mixedTrackMidiEffects>[0] }
+        | undefined
+    )?.trackInput;
+    if (!audioHalfInput) {
+      console.warn(
+        '[waveform-playlist] mixed track "' +
+          track.id +
+          '": audio half not found — its MIDI clips will play without the track effects.'
+      );
+      return undefined;
+    }
+    return mixedTrackMidiEffects(audioHalfInput, trackChannelCount(track) >= 2);
+  }
+
   function addMidiTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
     const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
     if (midiClips.length === 0) return;
@@ -155,6 +179,12 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       endTime,
     };
 
+    // A mixed track's halves share ONE effects chain: the audio half runs
+    // the closure, the MIDI half feeds its voices into the audio half's
+    // pre-fader input (see mixedTrackEffects.ts). A MIDI-only track runs the
+    // closure itself.
+    const effects = midiHalfEffects(p, track);
+
     const midiClipInfos: MidiClipInfo[] = midiClips.map((clip) => ({
       notes: clip.midiNotes!,
       startTime: clipStartTime(clip) - startTime,
@@ -174,7 +204,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
         soundFontCache: _soundFontCache,
         programNumber,
         isPercussion,
-        effects: track.effects,
+        effects,
       });
       _midiTrackBuild.set(trackId, _soundFontCache);
     } else {
@@ -186,7 +216,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       p.addMidiTrack({
         clips: midiClipInfos,
         track: trackObj,
-        effects: track.effects,
+        effects,
       });
       _midiTrackBuild.set(trackId, null);
     }

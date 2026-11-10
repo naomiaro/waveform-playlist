@@ -215,6 +215,68 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     expect(connect).toHaveBeenCalledWith(mockGraphEnd, fakeAudioNode);
   });
 
+  // #660: the chain's tail connects to the TRACK's fader now, not to the
+  // persistent master. Effect instances outlive the track, so tearing a
+  // track down must release that edge or every rebuild leaves one more
+  // connection into a dead fader.
+  it("the track effects cleanup disconnects the chain from that track's fader", async () => {
+    const tone = await import('tone');
+    const { result } = renderHook(() => useTrackDynamicEffects());
+    await act(async () => {
+      await result.current.addWamEffectToTrack('t1', 'https://example.com/p/index.js');
+    });
+    const trackInput = { connect: vi.fn(), disconnect: vi.fn() };
+    const faderInput = { name: 'fader' };
+    let teardown: void | (() => void) = undefined;
+    act(() => {
+      teardown = result.current.getTrackEffectsFunction('t1')?.(
+        trackInput as never,
+        faderInput as never,
+        false
+      );
+    });
+    vi.mocked(tone.disconnect).mockClear();
+
+    (teardown as unknown as () => void)();
+
+    expect(tone.disconnect).toHaveBeenCalledWith(fakeAudioNode, faderInput);
+  });
+
+  it("a late cleanup does not unregister a rebuilt track's nodes", async () => {
+    const tone = await import('tone');
+    const { result } = renderHook(() => useTrackDynamicEffects());
+    await act(async () => {
+      await result.current.addWamEffectToTrack('t1', 'https://example.com/p/index.js');
+    });
+    const wire = (fader: unknown) =>
+      result.current.getTrackEffectsFunction('t1')?.(
+        { connect: vi.fn(), disconnect: vi.fn() } as never,
+        fader as never,
+        false
+      );
+    const oldFader = { name: 'old' };
+    const newFader = { name: 'new' };
+    let oldTeardown: void | (() => void) = undefined;
+    act(() => {
+      oldTeardown = wire(oldFader);
+      wire(newFader); // the track was rebuilt before the old one's cleanup ran
+    });
+    (oldTeardown as unknown as () => void)();
+    vi.mocked(tone.connect).mockClear();
+
+    // The rebuilt track is still registered: a bypass toggle rewires INTO it.
+    const instanceId = result.current.trackEffectsState.get('t1')![0].instanceId;
+    act(() => {
+      result.current.toggleBypass('t1', instanceId);
+    });
+    act(() => {
+      result.current.toggleBypass('t1', instanceId);
+    });
+
+    expect(tone.connect).toHaveBeenCalledWith(fakeAudioNode, newFader);
+    expect(tone.connect).not.toHaveBeenCalledWith(fakeAudioNode, oldFader);
+  });
+
   it('createOfflineTrackEffectsFunction clones wam entries onto the offline context, wires and cleans up', async () => {
     const cloneDestroy = vi.fn();
     const cloneNode = { ctx: 'offline' };

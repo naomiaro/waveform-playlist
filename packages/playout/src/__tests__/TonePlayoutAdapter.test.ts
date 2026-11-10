@@ -447,6 +447,55 @@ describe('createToneAdapter', () => {
         ]);
       }
 
+      // #660: one effects chain per track. Both halves running the closure
+      // would return the chain into two faders — the track would play twice.
+      it('only the audio half runs the track effects closure; the MIDI half feeds its input', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const audioHalfInput = { name: 'audio-half-input' };
+        instance.getTrack = vi.fn((id: string) =>
+          id === 't1' ? { trackInput: audioHalfInput } : undefined
+        );
+        const effects = vi.fn();
+
+        adapter.setTracks([{ ...mixedTrack(), effects }]);
+
+        expect(instance.addTrack.mock.lastCall![0].effects).toBe(effects);
+        const midiEffects = instance.addMidiTrack.mock.lastCall![0].effects;
+        expect(midiEffects).toBeTypeOf('function');
+        expect(midiEffects).not.toBe(effects);
+
+        const midiInput = { connect: vi.fn() };
+        const midiFader = { connect: vi.fn() };
+        midiEffects(midiInput, midiFader, false);
+        // mixedTrack() has mono audio: no trim, straight into the audio input.
+        expect(midiInput.connect).toHaveBeenCalledWith(audioHalfInput);
+        expect(midiInput.connect).not.toHaveBeenCalledWith(midiFader);
+        expect(effects).not.toHaveBeenCalled(); // TonePlayout is mocked; the audio ToneTrack calls it
+      });
+
+      it('a MIDI-only track runs the track effects closure itself', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const effects = vi.fn();
+        const midiOnly = { ...mixedTrack(), effects };
+        midiOnly.clips = midiOnly.clips.filter((c) => c.midiNotes);
+
+        adapter.setTracks([midiOnly]);
+
+        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBe(effects);
+      });
+
+      it('a mixed track without effects passes none to either half', () => {
+        const adapter = createToneAdapter();
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+        adapter.setTracks([mixedTrack()]);
+
+        expect(instance.addTrack.mock.lastCall![0].effects).toBeUndefined();
+        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBeUndefined();
+      });
+
       it('setTrackMute also mutes the :midi companion', () => {
         const adapter = createToneAdapter();
         adapter.setTracks([mixedTrack()]);

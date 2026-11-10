@@ -21,6 +21,7 @@
 ## Correctness Invariants (audit 2026-07-09, PRs #598/#599)
 
 - **Mixed audio+MIDI tracks are TWO playout tracks** (`id` + `id:midi`). EVERY per-track adapter operation must address both halves — the control setters blind-forward to `trackId + ':midi'` (no-op for unknown ids, same pattern as removeTrack), and `updateTrack` removes the stale companion when MIDI clips drop to zero. New per-track adapter surface MUST handle the companion or mixed tracks silently break (e.g. soloing a mixed track used to mute its own MIDI half).
+- **A mixed track has ONE effects chain and ONE channel strip (#660).** With pre-fader effects a chain returns into a strip, so the two halves must not both run `track.effects`: the shared chain's output would land on both faders and the track would play twice (+6 dB — found in review, the adapter tests mock TonePlayout and never saw it). `midiHalfEffects` gives the closure to the audio half only; the `:midi` half gets `mixedTrackMidiEffects` (`src/mixedTrackEffects.ts`), which sums its voices into the audio half's `trackInput` (trimmed 1/√2 when the audio half is stereo, to keep the mono voices' centre level under the stereo pan law). The `:midi` half's own volume/pan/mute then carry no signal. A MIDI-only track runs the closure itself. Hook chains (`connectTrackEffects`, dawcore on the Tone adapter) still attach to the audio half only.
 - **TonePlayout owns solo-aware muting** — manual mute changes store `manualMuteState` and route through `updateSoloMuting()`; never call `track.setMute()` directly for a manual toggle, or a non-soloed track becomes audible during an active solo.
 - **Tone.js catches NOTHING in the tick chain** — `ToneEvent._tick → Transport._processTick → Clock._loop` are all unguarded (verified in 15.1.22 source). Every `Part`/`Transport.schedule` callback must contain its own failures in try/catch, or one throw aborts every other same-tick event across ALL tracks.
 - **MediaStream has no `ended`/`inactive` events** — `ended` is track-level and fires only on remote end/device removal; a local `track.stop()` fires NO event (per spec). `getMediaStreamSource` auto-cleanup covers remote ends only; local teardown requires `releaseMediaStreamSource()`.
@@ -61,7 +62,7 @@ AudioBufferSourceNode (native, one-shot, created per play/loop)
   → inputGain (Tone.js, shared per-track, unity)
   → [effects — pre-fader insert, #660]
   → Volume (Tone.js, shared per-track)
-  → Panner (Tone.js, shared per-track)
+  → pan stage (trackPan.ts gain matrix — NOT a Tone Panner)
   → muteGain (Tone.js, shared per-track)
   → destination
 ```
@@ -163,7 +164,7 @@ Without `Tone.start()`, `Tone.now()` returns null → RangeError in scheduling.
 AudioBufferSourceNode (native, one-shot, pitch-shifted via playbackRate)
   → GainNode (native, per-note ADSR volume envelope)
   → inputGain (Tone.js, shared per-track) → [effects, pre-fader]
-  → Volume → Panner → muteGain → destination
+  → Volume → pan stage (trackPan.ts) → muteGain → destination
 ```
 
 **SoundFontCache:** Fetches SF2 URL → parses with `soundfont2` library → caches `AudioBuffer` per sample index. `getAudioBuffer(midiNote, bank, preset)` returns `SoundFontSample` with `buffer`, `playbackRate`, loop points, and volume envelope. AudioBuffer is cached by sample index (shared across zones), but loop/envelope data is per-zone (extracted from generators on each lookup). Lazily converts `Int16Array` → `Float32Array` → `AudioBuffer` on first access.

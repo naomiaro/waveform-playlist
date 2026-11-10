@@ -82,6 +82,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Bypass Pattern:** When bypassing, store original wet value and set to 0. On re-enable, restore original wet value (not always 1).
 
+**Track chains end at the track's fader (#660), not the master.** `getTrackEffectsFunction`'s closure wires `trackInput → effects → faderInput`; its cleanup disconnects every instance from that `faderInput` (targeted — instances outlive the track and are reused when the adapter rebuilds it, so without this each `setTracks` left one more edge into a dead fader) and only unregisters the track's nodes if they are still the ones it registered (a rebuilt track may have registered its own first).
+
 **Offline Rendering:** Both hooks provide `createOffline*EffectsFunction()` (`createOfflineEffectsFunction` / `createOfflineTrackEffectsFunction`) for WAV export. The returned function may be async — native effects are re-created synchronously on the offline context, while WAM entries are re-instantiated via `cloneInstanceInto` with the live instance's `getState()` transferred. Bypassed WAM entries are excluded (disconnection bypass, parity with live). A WAM clone failure fails the export rather than silently rendering without it (fail-loud).
 
 **Documentation:** `website/docs/effects.md`

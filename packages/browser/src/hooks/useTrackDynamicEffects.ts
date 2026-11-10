@@ -12,7 +12,7 @@ import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamE
 import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
 import type { OfflineTrackEffectsFunction } from './useExportWav';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
-import { Gain, ToneAudioNode, connect } from 'tone';
+import { Gain, ToneAudioNode, connect, disconnect } from 'tone';
 
 export interface TrackActiveEffect {
   instanceId: string;
@@ -418,7 +418,24 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         }
 
         return function cleanup() {
-          trackGraphNodesRef.current.delete(trackId);
+          // The chain's tail still feeds this track's fader, which is being
+          // disposed. Effect instances outlive the track (they are reused
+          // when it is rebuilt), so without this each rebuild would leave one
+          // more edge into a dead fader. Targeted: a rebuilt track's own
+          // connections are untouched.
+          const liveInstances = trackEffectInstancesRef.current.get(trackId);
+          liveInstances?.forEach((inst) => {
+            try {
+              disconnect(inst.effect, faderInput);
+            } catch {
+              // Expected for every instance but the tail: disconnecting an
+              // edge that does not exist throws.
+            }
+          });
+          // A rebuilt track may already have registered its own nodes.
+          if (trackGraphNodesRef.current.get(trackId)?.faderInput === faderInput) {
+            trackGraphNodesRef.current.delete(trackId);
+          }
         };
       };
     },
