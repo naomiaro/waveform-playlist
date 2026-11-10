@@ -3,6 +3,7 @@ import {
   registerEffect,
   getEffectDefinitions,
   createEffectInstance,
+  prepareEffect,
   _resetEffectRegistryForTests,
 } from '../effects/effect-registry';
 
@@ -118,5 +119,127 @@ describe('effect registry', () => {
     const defs = getEffectDefinitions();
     defs.delete('native-gain');
     expect(getEffectDefinitions().has('native-gain')).toBe(true);
+  });
+});
+
+// #657: AudioWorklet-backed effects need an async step (audioWorklet.addModule)
+// on EVERY context they are created on — including the OfflineAudioContext
+// exportAudio() builds internally, which the consumer never sees.
+describe('prepareEffect (EffectDefinition.prepare)', () => {
+  function registerWorkletEffect(prepare: (ctx: BaseAudioContext) => Promise<void>) {
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare,
+      create: (ctx) => {
+        const node = ctx.createGain();
+        return { input: node, output: node, applyParams: () => {} };
+      },
+    });
+  }
+
+  it('resolves immediately for definitions without a prepare hook', async () => {
+    await expect(prepareEffect('native-gain', mockAudioContext())).resolves.toBeUndefined();
+  });
+
+  it('resolves for an unknown type — create reports unknown types', async () => {
+    await expect(prepareEffect('does-not-exist', mockAudioContext())).resolves.toBeUndefined();
+  });
+
+  it('runs prepare once per context, sharing concurrent and later calls', async () => {
+    const prepare = vi.fn(async () => {});
+    registerWorkletEffect(prepare);
+    const ctx = mockAudioContext();
+
+    await Promise.all([prepareEffect('worklet-fx', ctx), prepareEffect('worklet-fx', ctx)]);
+    await prepareEffect('worklet-fx', ctx);
+
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(prepare).toHaveBeenCalledWith(ctx);
+  });
+
+  it('prepares again on a different context (worklet modules are context-bound)', async () => {
+    const prepare = vi.fn<(ctx: BaseAudioContext) => Promise<void>>(async () => {});
+    registerWorkletEffect(prepare);
+    const live = mockAudioContext();
+    const offline = mockAudioContext();
+
+    await prepareEffect('worklet-fx', live);
+    await prepareEffect('worklet-fx', offline);
+
+    expect(prepare.mock.calls.map((c) => c[0])).toEqual([live, offline]);
+  });
+
+  it('a failed prepare rejects with the original error and is retried next time', async () => {
+    const boom = new Error('module 404');
+    const prepare = vi
+      .fn<(ctx: BaseAudioContext) => Promise<void>>()
+      .mockRejectedValueOnce(boom)
+      .mockResolvedValue(undefined);
+    registerWorkletEffect(prepare);
+    const ctx = mockAudioContext();
+
+    await expect(prepareEffect('worklet-fx', ctx)).rejects.toBe(boom);
+    await expect(prepareEffect('worklet-fx', ctx)).resolves.toBeUndefined();
+    expect(prepare).toHaveBeenCalledTimes(2);
+  });
+
+  it('a prepare that throws synchronously rejects instead of throwing', async () => {
+    registerWorkletEffect(() => {
+      throw new Error('sync boom');
+    });
+    await expect(prepareEffect('worklet-fx', mockAudioContext())).rejects.toThrow('sync boom');
+  });
+
+  it('re-registering a type prepares the NEW definition', async () => {
+    const first = vi.fn(async () => {});
+    const second = vi.fn(async () => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ctx = mockAudioContext();
+
+    registerWorkletEffect(first);
+    await prepareEffect('worklet-fx', ctx);
+    registerWorkletEffect(second);
+    await prepareEffect('worklet-fx', ctx);
+
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('create failing on an unprepared context says to prepare first', () => {
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare: async () => {},
+      create: () => {
+        throw new Error('not defined in AudioWorkletGlobalScope');
+      },
+    });
+
+    expect(() => createEffectInstance('worklet-fx', mockAudioContext())).toThrow(
+      /prepareEffect\('worklet-fx'[\s\S]*not defined in AudioWorkletGlobalScope/
+    );
+  });
+
+  it('create failing AFTER a successful prepare rethrows the original error', async () => {
+    const boom = new Error('real bug');
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare: async () => {},
+      create: () => {
+        throw boom;
+      },
+    });
+    const ctx = mockAudioContext();
+    await prepareEffect('worklet-fx', ctx);
+
+    expect(() => createEffectInstance('worklet-fx', ctx)).toThrow(boom);
   });
 });

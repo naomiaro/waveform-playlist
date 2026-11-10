@@ -1,4 +1,4 @@
-import type { CreatedEffect, EffectDefinition } from './types';
+import type { CreatedEffect, EffectDefinition, EffectInstance } from './types';
 
 const MAX_DELAY_SECONDS = 10;
 
@@ -18,6 +18,66 @@ export function getEffectDefinitions(): Map<string, EffectDefinition> {
   return new Map(registry);
 }
 
+interface PreparedRecord {
+  /** The definition this preparation ran for — a re-registered type must
+   *  prepare again with its new definition. */
+  definition: EffectDefinition;
+  promise: Promise<void>;
+  settled: boolean;
+}
+
+/** Per-context preparation state. Weak: an OfflineAudioContext (one per
+ *  export) must not be kept alive by the registry. */
+const prepared = new WeakMap<BaseAudioContext, Map<string, PreparedRecord>>();
+
+/**
+ * Run a registered effect's `prepare` hook for one context, once. Concurrent
+ * and later calls share the same run; a failed run is forgotten so the next
+ * call retries. Resolves immediately for definitions without a hook, and for
+ * unknown types (creating the effect reports those).
+ */
+export function prepareEffect(type: string, audioContext: BaseAudioContext): Promise<void> {
+  const definition = registry.get(type);
+  if (!definition?.prepare) {
+    return Promise.resolve();
+  }
+  const forContext = prepared.get(audioContext) ?? new Map<string, PreparedRecord>();
+  prepared.set(audioContext, forContext);
+  const existing = forContext.get(type);
+  if (existing && existing.definition === definition) {
+    return existing.promise;
+  }
+
+  const prepare = definition.prepare;
+  const record: PreparedRecord = {
+    definition,
+    settled: false,
+    // The async wrapper turns a synchronous throw into a rejection.
+    promise: (async () => prepare(audioContext))().then(
+      () => {
+        record.settled = true;
+      },
+      (err: unknown) => {
+        if (forContext.get(type) === record) {
+          forContext.delete(type);
+        }
+        throw err;
+      }
+    ),
+  };
+  forContext.set(type, record);
+  return record.promise;
+}
+
+function isPrepared(
+  type: string,
+  definition: EffectDefinition,
+  audioContext: BaseAudioContext
+): boolean {
+  const record = prepared.get(audioContext)?.get(type);
+  return record !== undefined && record.definition === definition && record.settled;
+}
+
 export function createEffectInstance(
   type: string,
   audioContext: BaseAudioContext,
@@ -33,7 +93,27 @@ export function createEffectInstance(
     );
   }
   const merged = { ...definition.defaults, ...params };
-  const instance = definition.create(audioContext, merged);
+  let instance: EffectInstance;
+  try {
+    instance = definition.create(audioContext, merged);
+  } catch (err) {
+    if (!definition.prepare || isPrepared(type, definition, audioContext)) {
+      throw err;
+    }
+    // The likeliest cause by far: an AudioWorklet module that was never
+    // added to THIS context. Name the fix; keep the original message.
+    throw new Error(
+      '[waveform-playlist] effect "' +
+        type +
+        '" has a prepare() step that has not completed on this audio context — ' +
+        "await editor.prepareEffect('" +
+        type +
+        "') (or prepareEffect('" +
+        type +
+        "', audioContext)) before adding it. Original error: " +
+        (err instanceof Error ? err.message : String(err))
+    );
+  }
   instance.applyParams(merged);
   return { instance, params: merged, wetParam: definition.wetParam };
 }

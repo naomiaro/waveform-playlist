@@ -261,6 +261,28 @@ editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
 
 Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()` (exports from `@dawcore/components`).
 
+An effect backed by an `AudioWorkletNode` needs its module added to every context it is created on — including the `OfflineAudioContext` that `exportAudio()` builds internally. Give the definition an async `prepare` hook; it runs once per context:
+
+```javascript
+registerEffect('my-limiter', {
+  label: 'Limiter',
+  category: 'dynamics',
+  defaults: { ceiling: -1 },
+  params: { ceiling: { min: -24, max: 0, unit: 'dB' } },
+  prepare: (ctx) => ctx.audioWorklet.addModule('/limiter.worklet.js'),
+  create: (ctx) => {
+    const node = new AudioWorkletNode(ctx, 'my-limiter');
+    return { input: node, output: node, applyParams: (p) => { /* ... */ } };
+  },
+});
+
+await editor.prepareEffect('my-limiter'); // live context — addEffect is synchronous
+track.addEffect('my-limiter');
+await editor.exportAudio();               // prepares the offline context itself
+```
+
+`setEffectsState()` also awaits `prepare`, so a restored chain needs no extra call.
+
 ### WAM Plugins
 
 [Web Audio Modules 2.0](https://www.webaudiomodules.com/) plugins load into the same chains via the optional `@dawcore/wam` peer (`npm install @dawcore/wam`):

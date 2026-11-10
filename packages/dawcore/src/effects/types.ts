@@ -39,6 +39,16 @@ export interface EffectDefinition {
    *  (storing the original); effects without one are bypassed by
    *  disconnection. */
   wetParam?: string;
+  /**
+   * Optional async setup that must finish before `create` can run on a given
+   * context — typically `audioContext.audioWorklet.addModule(url)` for an
+   * AudioWorklet-backed effect. Worklet modules are context-bound, so this
+   * runs once per context: `exportAudio()` and `setEffectsState()` await it
+   * themselves (export on its own OfflineAudioContext, which the consumer
+   * never sees). `addEffect()` is synchronous and cannot — call
+   * `editor.prepareEffect(type)` first.
+   */
+  prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => EffectInstance;
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exportAudioImpl, type ExportAudioHost } from '../interactions/export-audio';
 import type { SerializedEffectEntry } from '../effects/types';
+import { registerEffect, _resetEffectRegistryForTests } from '../effects/effect-registry';
 
 const { ensureWamHost, createWamInstance, createWamInstanceFromFactory } = vi.hoisted(() => ({
   ensureWamHost: vi.fn(),
@@ -118,6 +119,7 @@ function makeHost(overrides: Partial<ExportAudioHost> = {}): ExportAudioHost {
 }
 
 beforeEach(() => {
+  _resetEffectRegistryForTests();
   offlineInstances.length = 0;
   ensureWamHost.mockReset().mockResolvedValue({ hostGroupId: 'off-group', hostGroupKey: 'k' });
   createWamInstance.mockReset();
@@ -440,5 +442,108 @@ describe('exportAudioImpl — audit wave 3', () => {
       g.connect.mock.calls.some((call) => call[0] === masterGain)
     );
     expect(feedsMasterVolume).toBe(true);
+  });
+});
+
+// #657: a registered effect backed by an AudioWorklet needs its module added
+// to the OfflineAudioContext, which only exportAudio ever holds.
+describe('exportAudioImpl — EffectDefinition.prepare (#657)', () => {
+  function registerWorkletEffect(log: string[]) {
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare: vi.fn(async (ctx: BaseAudioContext) => {
+        await Promise.resolve();
+        log.push('prepare:' + offlineInstances.indexOf(ctx as unknown as MockOfflineContext));
+      }),
+      create: (ctx) => {
+        log.push('create');
+        const node = ctx.createGain();
+        return { input: node, output: node, applyParams: () => {} };
+      },
+    });
+  }
+
+  it('awaits prepare on the offline context before create, once per type', async () => {
+    const log: string[] = [];
+    registerWorkletEffect(log);
+    const entry: SerializedEffectEntry = {
+      kind: 'native',
+      type: 'worklet-fx',
+      params: {},
+      bypassed: false,
+    };
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(async () => [entry]),
+      getTrackEffectsState: vi.fn(async () => [entry, entry]),
+    });
+
+    await exportAudioImpl(host);
+
+    // One prepare (on THE offline context, index 0) ahead of all three creates.
+    expect(log).toEqual(['prepare:0', 'create', 'create', 'create']);
+  });
+
+  it('prepares again for each export — every export has a fresh context', async () => {
+    const log: string[] = [];
+    registerWorkletEffect(log);
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(async () => [
+        { kind: 'native', type: 'worklet-fx', params: {}, bypassed: false } as const,
+      ]),
+    });
+
+    await exportAudioImpl(host);
+    await exportAudioImpl(host);
+
+    expect(log).toEqual(['prepare:0', 'create', 'prepare:1', 'create']);
+  });
+
+  it('a failing prepare fails the export with the original error', async () => {
+    const boom = new Error('module 404');
+    registerEffect('worklet-fx', {
+      label: 'Worklet FX',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      prepare: async () => {
+        throw boom;
+      },
+      create: (ctx) => {
+        const node = ctx.createGain();
+        return { input: node, output: node, applyParams: () => {} };
+      },
+    });
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(async () => [
+        { kind: 'native', type: 'worklet-fx', params: {}, bypassed: false } as const,
+      ]),
+    });
+
+    await expect(exportAudioImpl(host)).rejects.toBe(boom);
+    expect(offlineInstances[0].startRendering).not.toHaveBeenCalled();
+  });
+
+  it('does not prepare placeholder entries (they are skipped)', async () => {
+    const log: string[] = [];
+    registerWorkletEffect(log);
+    const host = makeHost({
+      getMasterEffectsState: vi.fn(async () => [
+        {
+          kind: 'native',
+          type: 'worklet-fx',
+          params: {},
+          bypassed: false,
+          placeholder: true,
+        } as const,
+      ]),
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await exportAudioImpl(host);
+
+    expect(log).toEqual([]);
   });
 });
