@@ -1,4 +1,4 @@
-import { createEffectInstance } from '../effects/effect-registry';
+import { createEffectInstance, prepareEffect } from '../effects/effect-registry';
 import { loadWamModule, loadFaustModule } from '../effects/optional-modules';
 import type { SerializedEffectEntry } from '../effects/types';
 
@@ -58,7 +58,8 @@ interface OfflineChain {
  * No Transport involved: clips are known upfront, so sources are scheduled
  * statically on an OfflineAudioContext. Effect chains rebuild from their
  * persisted form (#424) — natives via the registry (definitions take
- * BaseAudioContext for exactly this), WAM plugins re-instantiated on the
+ * BaseAudioContext for exactly this; a definition's async `prepare` hook is
+ * awaited on the offline context first), WAM plugins re-instantiated on the
  * offline context with their saved state (worklets are context-bound, the
  * wam-studio cloneInto pattern). All offline plugin instances are destroyed
  * after rendering, success or failure.
@@ -230,6 +231,10 @@ async function buildOfflineChain(
         continue;
       }
       if (entry.kind === 'native') {
+        // Async per-context setup (#657) — e.g. an AudioWorklet module must be
+        // added to THIS offline context, which only the export ever holds.
+        // Shared across chains: one run per type per export.
+        await prepareEffect(entry.type, ctx);
         const created = createEffectInstance(entry.type, ctx, entry.params);
         if (entry.bypassed) {
           if (!created.wetParam) {
