@@ -256,6 +256,11 @@ editor.addEventListener('daw-recording-complete', (e) => {
   // Cancelable — preventDefault() to skip automatic clip creation
 });
 
+// The take has no <daw-clip> element — this is where its clip id arrives
+editor.addEventListener('daw-recording-clip-add', (e) => {
+  editor.updateClip(e.detail.trackId, e.detail.clipId, { gain: 2 });
+});
+
 // Pause/resume during recording (Audacity-style: also pauses Transport when overdubbing)
 editor.addEventListener('daw-recording-pause', (e) => {
   console.log('Paused track:', e.detail.trackId);
@@ -420,6 +425,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 'daw-stop'; // Playback stopped
 'daw-recording-start'; // Recording started on a track: detail: {trackId, stream}
 'daw-recording-complete'; // Recording finalized: detail: {trackId, audioBuffer, startSample, durationSamples, offsetSamples} — cancelable; preventDefault() skips automatic clip creation
+'daw-recording-clip-add'; // The take's clip now exists (skipped when daw-recording-complete was cancelled, when the take's peak generation failed, or when the track was removed meanwhile): detail: {trackId, clipId} — clipId is the engine clip id for updateClip()/removeClip()
 'daw-recording-error'; // Recording failed: detail: {trackId, error}
 'daw-recording-pause'; // Worklet capture paused: detail: {trackId}
 'daw-recording-resume'; // Worklet capture resumed: detail: {trackId}

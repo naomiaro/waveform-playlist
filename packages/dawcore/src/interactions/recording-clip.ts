@@ -6,7 +6,7 @@
 import type { ClipTrack, PeakData } from '@waveform-playlist/core';
 import { carveClipRange, createClip } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
-import type { DawErrorDetail } from '../events';
+import type { DawErrorDetail, DawRecordingClipAddDetail } from '../events';
 import type { TrackDescriptor, ClipDescriptor } from '../types';
 
 export interface RecordingClipHost {
@@ -104,6 +104,9 @@ export function addRecordedClip(
         const sr = host.effectiveSampleRate;
         const clipDesc: ClipDescriptor = {
           kind: 'drop',
+          // The take has no <daw-clip> element — the engine id is the only
+          // handle updateClip()/removeClip() can address it by (#659).
+          clipId: clip.id,
           src: '',
           peaksSrc: '',
           start: startSample / sr,
@@ -129,6 +132,18 @@ export function addRecordedClip(
         host._engine.updateTrack(trackId, updatedTrack);
       } else {
         host._engine?.setTracks([...host._engineTracks.values()]);
+      }
+      // daw-recording-complete fires BEFORE the clip exists (it is
+      // cancelable), so it cannot carry the id. This follow-up fires once
+      // the clip is in the engine and addressable (#659).
+      if (host.isConnected) {
+        host.dispatchEvent(
+          new CustomEvent<DawRecordingClipAddDetail>('daw-recording-clip-add', {
+            bubbles: true,
+            composed: true,
+            detail: { trackId, clipId: clip.id },
+          })
+        );
       }
     })
     .catch((err) => {
