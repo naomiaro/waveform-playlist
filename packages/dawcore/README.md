@@ -444,6 +444,7 @@ Core orchestrator. Attributes:
 | `mono` | boolean | `false` | Merge stereo to mono display |
 | `bar-width` / `bar-gap` | number | `1` / `0` | Waveform bar rendering style |
 | `rounded-bars` | boolean | `false` | Pill-shaped bar caps (radius `bar-width / 2`) |
+| `gain-scaled-waveforms` | boolean | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height) instead of at source level |
 | `indefinite-playback` | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport` |
 | `fill-viewport` | boolean | `false` | Keep ruler/timeline filling the viewport even when audio is shorter (layout only) |
 | `scale-mode` | string | `'temporal'` | `'temporal'` (seconds) or `'beats'` (tick-linear grid) |

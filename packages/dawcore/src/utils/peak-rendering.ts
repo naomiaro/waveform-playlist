@@ -65,6 +65,26 @@ export function aggregatePeaks(
 }
 
 /**
+ * Scales a drawn peak by a linear gain (a clip's gain), clamped to full
+ * scale so a boosted bar never leaves its channel. Display-only: the
+ * underlying peak data is untouched, so a gain change needs no peak
+ * regeneration. A negative (phase-inverting) gain scales by magnitude; a
+ * non-finite gain is ignored.
+ *
+ * @returns the same object at unity gain (the hot path allocates nothing)
+ */
+export function scalePeakByGain(peak: AggregatedPeak, gain: number): AggregatedPeak {
+  if (gain === 1 || !Number.isFinite(gain)) {
+    return peak;
+  }
+  const factor = Math.abs(gain);
+  return {
+    min: Math.max(-1, peak.min * factor),
+    max: Math.min(1, peak.max * factor),
+  };
+}
+
+/**
  * Computes canvas fillRect parameters for a single waveform bar.
  *
  * @param x - Bar x position in canvas coordinates

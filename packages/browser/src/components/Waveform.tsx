@@ -40,6 +40,10 @@ export interface WaveformProps {
   scrollActiveContainer?: 'nearest' | 'all';
   className?: string;
   showClipHeaders?: boolean; // Show headers on clips for visual organization
+  /** Draw each clip's waveform scaled by its `gain` (clamped to the channel
+   *  height) so levelled clips look the way they sound. Default: false —
+   *  waveforms show source level. Draw-time only; peaks are not regenerated. */
+  gainScaledWaveforms?: boolean;
   interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (auto-enabled by ClipInteractionProvider)
   showFades?: boolean; // Show fade in/out overlays on clips
   /**
@@ -91,6 +95,7 @@ export const Waveform: React.FC<WaveformProps> = ({
   scrollActiveContainer = 'nearest',
   className,
   showClipHeaders = false,
+  gainScaledWaveforms = false,
   interactiveClips = false,
   showFades = false,
   touchOptimized = false,
@@ -117,6 +122,7 @@ export const Waveform: React.FC<WaveformProps> = ({
         getAnnotationBoxLabel={getAnnotationBoxLabel}
         className={className}
         showClipHeaders={showClipHeaders}
+        gainScaledWaveforms={gainScaledWaveforms}
         interactiveClips={effectiveInteractiveClips}
         showFades={showFades}
         touchOptimized={touchOptimized}

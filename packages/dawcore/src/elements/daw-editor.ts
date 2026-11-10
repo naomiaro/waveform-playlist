@@ -235,6 +235,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ type: Boolean, attribute: 'rounded-bars' }) roundedBars = false;
   @property({ type: Boolean, attribute: 'file-drop' }) fileDrop = false;
   @property({ type: Boolean, attribute: 'clip-headers' }) clipHeaders = false;
+  /** Scale each clip's drawn waveform by its `gain` (clamped to the channel
+   *  height), so levelled clips look the way they sound. Off by default:
+   *  waveforms show source level. Draw-time only — no peak regeneration. */
+  @property({ type: Boolean, attribute: 'gain-scaled-waveforms' }) gainScaledWaveforms = false;
   @property({ type: Number, attribute: 'clip-header-height' }) clipHeaderHeight = 20;
   @property({ type: Boolean, attribute: 'interactive-clips' }) interactiveClips = false;
   /**
@@ -3789,6 +3793,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                                   .barWidth=${this.barWidth}
                                   .barGap=${this.barGap}
                                   .roundedBars=${this.roundedBars}
+                                  .gain=${this.gainScaledWaveforms ? (clip.gain ?? 1) : 1}
                                   .visibleStart=${this._viewport.visibleStart}
                                   .visibleEnd=${this._viewport.visibleEnd}
                                   .originX=${clipLeft}

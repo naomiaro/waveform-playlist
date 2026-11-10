@@ -321,6 +321,7 @@ fill-viewport        Boolean   false    Fill viewport when shorter than visible 
 bar-width            Number    1        Waveform bar width
 bar-gap              Number    0        Waveform bar gap
 rounded-bars         Boolean   false    Pill-shaped bar caps (radius bar-width/2)
+gain-scaled-waveforms Boolean  false    Draw each clip's waveform scaled by its gain (clamped to channel height; draw-time only, no peak regeneration)
 clip-headers         Boolean   false    Show clip name headers
 file-drop            Boolean   false    Accept dropped audio/MIDI files
 ```

@@ -3,6 +3,7 @@ import {
   aggregatePeaks,
   calculateBarRects,
   calculateFirstBarPosition,
+  scalePeakByGain,
 } from '../utils/peak-rendering';
 
 /**
@@ -217,5 +218,39 @@ describe('calculateFirstBarPosition', () => {
     // step=10, canvas starts at 3, barWidth=5
     // (3 - 5 + 10) / 10 = 8/10 = 0.8 → floor = 0 → 0
     expect(calculateFirstBarPosition(3, 5, 10)).toBe(0);
+  });
+});
+
+// #662: clip gain scales the DRAWN peak — peaks are never regenerated.
+describe('scalePeakByGain', () => {
+  it('returns the same peak object at unity gain', () => {
+    const peak = { min: -0.25, max: 0.5 };
+    expect(scalePeakByGain(peak, 1)).toBe(peak);
+  });
+
+  it('scales min and max linearly', () => {
+    expect(scalePeakByGain({ min: -0.25, max: 0.5 }, 2)).toEqual({ min: -0.5, max: 1 });
+    expect(scalePeakByGain({ min: -0.5, max: 0.5 }, 0.5)).toEqual({ min: -0.25, max: 0.25 });
+  });
+
+  it('clamps to full scale so a boosted bar never leaves the channel', () => {
+    expect(scalePeakByGain({ min: -0.5, max: 0.75 }, 7)).toEqual({ min: -1, max: 1 });
+  });
+
+  it('draws silence at zero gain', () => {
+    const silent = scalePeakByGain({ min: -0.5, max: 0.5 }, 0);
+    // toBeCloseTo: min is -0, which draws identically to 0.
+    expect(silent.min).toBeCloseTo(0);
+    expect(silent.max).toBeCloseTo(0);
+  });
+
+  it('treats a negative (phase-inverting) gain by magnitude', () => {
+    expect(scalePeakByGain({ min: -0.25, max: 0.5 }, -2)).toEqual({ min: -0.5, max: 1 });
+  });
+
+  it('falls back to unity for a non-finite gain', () => {
+    const peak = { min: -0.25, max: 0.5 };
+    expect(scalePeakByGain(peak, NaN)).toBe(peak);
+    expect(scalePeakByGain(peak, Infinity)).toBe(peak);
   });
 });
