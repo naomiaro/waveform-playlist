@@ -75,6 +75,7 @@ process = fi.lowpass(2, hslider("cutoff", 1000, 20, 20000, 1));
 
 ```bash
 npm install -D @shren/faust2wam
+mkdir -p out   # the CLI does not create missing parent directories
 npx faust2wam lowpass.dsp out/lowpass
 ```
 
