@@ -6,11 +6,11 @@
 
 Keyboard shortcuts no longer take a key that the focused control uses itself (#710). `handleKeyboardEvent` now skips a shortcut when:
 
-- the focused element is a text field, a `<select>` or `contenteditable` (`<select>` is new);
+- the focused element is a text field or `contenteditable`, or a `<select>` (new), slider or checkbox;
 - the key is `Escape` and a modal `<dialog>` or an `aria-modal="true"` container is open, so Escape closes the dialog instead of stopping playback. The spectrogram settings modal could not be closed from the keyboard;
 - the key is `Space` or `Enter` and the focused element is a `<button>`, a link or a `<summary>` that the user reached with the keyboard. Before, Space on a Mute button reached with Tab started playback and did not mute.
 
-A control that got focus from a pointer click or drag does not keep `Space` and `Enter`: after clicking a button, or dragging a volume slider, Space is still play/pause. For sliders and checkboxes this is new in the React packages, where a clicked slider used to block Space. Elements that only carry an ARIA role (`<div role="button">`) are not covered.
+One exception, for `Space` only: a control that got focus from a pointer click or drag does not keep it. After clicking a button, dragging a volume slider or picking a value from a dropdown, Space is still play/pause. `Enter` always goes to the focused control. For sliders and checkboxes this is new in the React packages, where a clicked slider used to block Space. Elements that only carry an ARIA role (`<div role="button">`) are not covered.
 
 The check reads the real target from the event's composed path, so it also covers controls inside shadow DOM. In `<daw-editor>` the existing text-field check never saw the range inputs and buttons inside `<daw-track-controls>`, and shortcuts fired while they had keyboard focus. `<daw-annotation-track keyboard-controls>` applies the same rule to its own shortcuts.
 

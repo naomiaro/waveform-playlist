@@ -231,11 +231,13 @@ function isKeyboardOperated(element: Element): boolean {
  * - Escape belongs to an open modal dialog, wherever focus is;
  * - Space and Enter belong to a focused `<button>`, link or `<summary>`, and
  *   every key belongs to a focused `<select>`, slider, checkbox or other
- *   non-text input, while the user is operating it from the keyboard. A
- *   control that was clicked keeps focus without having been navigated to, so
- *   Space and Enter stay shortcuts there: clicking Mute, dragging a volume
- *   slider or picking a value from a dropdown, and then pressing Space, still
- *   plays.
+ *   non-text input.
+ *
+ * One exception, for Space only: a control that got focus from a pointer click
+ * or drag keeps focus without the user having navigated to it, and Space is
+ * the transport key, so it stays a shortcut there. Clicking Mute, dragging a
+ * volume slider or picking a value from a dropdown, and then pressing Space,
+ * still plays. Enter always goes to the focused control.
  *
  * `handleKeyboardEvent` applies this itself. It is exported for listeners that
  * match keys on their own.
@@ -249,15 +251,15 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
     return true;
   }
 
-  const isActivationKey = event.key === ' ' || event.key === 'Enter';
-  // Sliders, checkboxes and dropdowns: theirs while keyboard-operated; after a
-  // click (a value picked from a dropdown, a slider dragged) Space and Enter
-  // are shortcuts again, the other keys stay with the control.
-  if (isNonTextInput(focused) || isDropdown(focused)) {
-    return !isActivationKey || isKeyboardOperated(focused);
-  }
+  // Space on a control the user only clicked or dragged stays a shortcut.
+  const isPointerSpace = event.key === ' ' && !isKeyboardOperated(focused);
+
+  // Sliders, checkboxes and dropdowns keep every key (except that Space).
+  if (isNonTextInput(focused) || isDropdown(focused)) return !isPointerSpace;
   if (ownsAllKeys(focused)) return true;
-  if (isActivationKey && isActivatable(focused)) return isKeyboardOperated(focused);
+  if ((event.key === ' ' || event.key === 'Enter') && isActivatable(focused)) {
+    return !isPointerSpace;
+  }
   return false;
 }
 

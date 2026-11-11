@@ -253,6 +253,16 @@ describe('handleKeyboardEvent', () => {
           expect(action).toHaveBeenCalledTimes(2);
         });
 
+        it('keeps Enter even when it was focused with the pointer', () => {
+          const el = make(kind);
+          focusWithPointer(el);
+          const enter = vi.fn();
+          const event = keydownOn(el, 'Enter');
+          handleKeyboardEvent(event, [...all, { key: 'Enter', action: enter }], true);
+          expect(enter).not.toHaveBeenCalled();
+          expect(event.defaultPrevented).toBe(false);
+        });
+
         it('does not keep other keys', () => {
           const el = make(kind);
           focusWithKeyboard(el);
@@ -308,6 +318,9 @@ describe('handleKeyboardEvent', () => {
           expect(action).toHaveBeenCalledTimes(1);
           handleKeyboardEvent(keydownOn(input, '0'), all, true);
           expect(zero).not.toHaveBeenCalled();
+          const enter = vi.fn();
+          handleKeyboardEvent(keydownOn(input, 'Enter'), [{ key: 'Enter', action: enter }], true);
+          expect(enter).not.toHaveBeenCalled();
         });
       });
 
@@ -320,9 +333,15 @@ describe('handleKeyboardEvent', () => {
         handleKeyboardEvent(event, all, true);
         expect(action).toHaveBeenCalledTimes(1);
         expect(event.defaultPrevented).toBe(true);
-        // Escape closes its list and typing a character selects an option.
-        handleKeyboardEvent(keydownOn(select, 'Escape'), all, true);
-        handleKeyboardEvent(keydownOn(select, '0'), all, true);
+        // Enter reopens it, Escape closes its list, a character selects an option.
+        const enter = vi.fn();
+        const withEnter = [...all, { key: 'Enter', action: enter }];
+        const enterEvent = keydownOn(select, 'Enter');
+        handleKeyboardEvent(enterEvent, withEnter, true);
+        handleKeyboardEvent(keydownOn(select, 'Escape'), withEnter, true);
+        handleKeyboardEvent(keydownOn(select, '0'), withEnter, true);
+        expect(enter).not.toHaveBeenCalled();
+        expect(enterEvent.defaultPrevented).toBe(false);
         expect(escape).not.toHaveBeenCalled();
         expect(zero).not.toHaveBeenCalled();
       });

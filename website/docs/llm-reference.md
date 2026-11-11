@@ -1076,7 +1076,7 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 //   - Escape while a modal <dialog> or [aria-modal="true"] is open
 //   - Space / Enter on a focused <button>, <a href> or <summary>, and every key on a
 //     focused <select> or non-text <input> (range, checkbox, ...) -- unless the control was focused
-//     by a pointer click or drag, in which case Space / Enter remain shortcuts
+//     by a pointer click or drag, in which case Space (only Space) remains a shortcut
 //   - elements with only an ARIA role (<div role="button">) are NOT covered
 ```
 
