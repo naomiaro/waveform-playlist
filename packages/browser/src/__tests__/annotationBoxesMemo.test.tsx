@@ -122,7 +122,9 @@ const ProbeChild: React.FC = () => {
 
 const ANNOTATION_LIST = { annotations: ANNOTATIONS };
 
-async function mount() {
+type LabelFn = React.ComponentProps<typeof AnnotationBoxesOverlay>['getAnnotationBoxLabel'];
+
+async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   boxRenders = {};
@@ -138,7 +140,7 @@ async function mount() {
         annotationList={ANNOTATION_LIST}
       >
         <ProbeChild />
-        <AnnotationBoxesOverlay width={2000} />
+        <AnnotationBoxesOverlay width={2000} getAnnotationBoxLabel={getLabel} />
       </WaveformPlaylistProvider>
     </AnnotationIntegrationContext.Provider>
   );
@@ -210,5 +212,46 @@ describe('annotation boxes (#740)', () => {
     expect(probe.activeAnnotationId).toBe('n3');
     expect(play.mock.lastCall?.[0]).toBe(2);
     expect(play.mock.lastCall?.[1]).toBeUndefined();
+  });
+
+  it('every box moves when the zoom changes', async () => {
+    await mount();
+    const before = lastProps.n3.startPosition;
+    const sppBefore = probe.data.samplesPerPixel;
+
+    await act(async () => {
+      probe.controls.zoomIn();
+    });
+
+    expect(probe.data.samplesPerPixel).not.toBe(sppBefore);
+    expect(lastProps.n3.startPosition).toBe((2 * SAMPLE_RATE) / probe.data.samplesPerPixel);
+    expect(lastProps.n3.startPosition).not.toBe(before);
+  });
+
+  it('every box follows the editable setting', async () => {
+    await mount();
+    expect(lastProps.n1.editable).toBe(false);
+
+    await act(async () => {
+      probe.controls.setAnnotationsEditable(true);
+    });
+
+    expect(lastProps.n1.editable).toBe(true);
+    expect(lastProps.n4.editable).toBe(true);
+  });
+
+  it('a box whose label changed renders even when its active state did not', async () => {
+    let prefix = 'A';
+    await mount({ getLabel: (annotation, index) => prefix + index + ':' + annotation.id });
+    expect(lastProps.n3.label).toBe('A2:n3');
+
+    prefix = 'B';
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+    });
+
+    // n3 is neither the old nor the new active box; the memo must not hide a
+    // changed label.
+    expect(lastProps.n3.label).toBe('B2:n3');
   });
 });

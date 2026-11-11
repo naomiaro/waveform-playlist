@@ -272,20 +272,17 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 
 ```tsx
 function SaveLoadState() {
-  const { tracks, cursorPosition, samplesPerPixel } = usePlaylistState();
-  const { setSamplesPerPixel, seek } = usePlaylistControls();
+  // trackStates: { name, muted, soloed, volume, pan } per track
+  const { trackStates } = usePlaylistData();
+  // The ref, not useCurrentTime(): the position is only read when Save is pressed
+  const { currentTimeRef } = usePlaybackAnimation();
+  const { seekTo, setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } =
+    usePlaylistControls();
 
   const saveState = () => {
     const state = {
-      cursorPosition,
-      samplesPerPixel,
-      trackStates: tracks.map((t) => ({
-        name: t.name,
-        muted: t.muted,
-        soloed: t.soloed,
-        volume: t.volume,
-        pan: t.pan,
-      })),
+      cursorPosition: currentTimeRef.current ?? 0,
+      trackStates,
     };
     localStorage.setItem('playlistState', JSON.stringify(state));
   };
@@ -294,9 +291,13 @@ function SaveLoadState() {
     const saved = localStorage.getItem('playlistState');
     if (saved) {
       const state = JSON.parse(saved);
-      seek(state.cursorPosition);
-      setSamplesPerPixel(state.samplesPerPixel);
-      // Restore track states...
+      seekTo(state.cursorPosition);
+      state.trackStates.forEach((t: (typeof trackStates)[number], index: number) => {
+        setTrackMute(index, t.muted);
+        setTrackSolo(index, t.soloed);
+        setTrackVolume(index, t.volume);
+        setTrackPan(index, t.pan);
+      });
     }
   };
 
@@ -313,8 +314,9 @@ function SaveLoadState() {
 
 ```tsx
 function ExternalTransport() {
-  const { play, pause, stop, seek } = usePlaylistControls();
-  const { cursorPosition, isPlaying, duration } = usePlaylistState();
+  const { play, pause, stop, seekTo } = usePlaylistControls();
+  // currentTimeRef follows playback; reading it needs no re-render
+  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
 
   // Expose controls globally
   useEffect(() => {
@@ -322,15 +324,15 @@ function ExternalTransport() {
       play,
       pause,
       stop,
-      seek,
-      getPosition: () => cursorPosition,
+      seekTo,
+      getPosition: () => currentTimeRef.current ?? 0,
       isPlaying: () => isPlaying,
     };
 
     return () => {
       delete window.waveformPlaylist;
     };
-  }, [play, pause, stop, seek, cursorPosition, isPlaying]);
+  }, [play, pause, stop, seekTo, currentTimeRef, isPlaying]);
 
   return null;
 }

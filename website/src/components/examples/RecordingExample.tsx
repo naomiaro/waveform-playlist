@@ -258,7 +258,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     isStartingRecordingRef.current = true;
     cancelRecordingStartRef.current = false;
     try {
-      // Read from ref to avoid stale closure (currentTime updates at 60fps)
+      // Read from the ref: it follows playback, the `currentTime` state does not
       recordStartTimeRef.current = currentTimeRef.current;
       // Arm the recorded track BEFORE starting playback: punch-in replaces
       // whatever the take overlaps, so its existing content is transiently

@@ -16,6 +16,7 @@ import { chromium, type FullConfig } from '@playwright/test';
 const ROUTES = [
   '/examples/annotations',
   '/examples/effects',
+  '/examples/flexible-api',
   '/examples/media-element',
   '/examples/midi',
   '/examples/mir-spectrogram',

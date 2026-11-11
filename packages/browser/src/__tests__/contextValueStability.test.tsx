@@ -407,6 +407,30 @@ describe('the resting cursor position lives in its own context (#740)', () => {
     expect(currentTimeProbe.currentTime).toBe(0.6);
   });
 
+  it('stop puts the resting position back where playback started', async () => {
+    const { adapter } = await mount();
+    await act(async () => {
+      probe.controls.seekTo(0.25);
+    });
+    expect(currentTimeProbe.currentTime).toBe(0.25);
+    // Starting from another position moves the ref only; the state keeps 0.25
+    // until playback stops.
+    await act(async () => {
+      await probe.controls.play(0.6);
+    });
+    expect(animationProbe.animation.isPlaying).toBe(true);
+    expect(currentTimeProbe.currentTime).toBe(0.25);
+    (adapter as unknown as { getCurrentTime: () => number }).getCurrentTime = () => 1.5;
+
+    await act(async () => {
+      probe.controls.stop();
+    });
+
+    expect(animationProbe.animation.isPlaying).toBe(false);
+    expect(animationProbe.animation.currentTimeRef.current).toBe(0.6);
+    expect(currentTimeProbe.currentTime).toBe(0.6);
+  });
+
   it('useCurrentTime throws outside the provider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<CurrentTimeProbeChild />)).toThrow(
