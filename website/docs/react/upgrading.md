@@ -54,12 +54,42 @@ A track's effects now run before its volume, pan and mute: `clips → effects �
 
 **What you will hear:** the volume fader no longer changes how hard a compressor, limiter or distortion on that track works. Mute and solo now silence effect tails too.
 
-**Find:** any function you pass as a track `effects` option (a `TrackEffectsFunction`), any `OfflineTrackEffectsFunction` passed to WAV export, and any call to `connectTrackOutput` / `disconnectTrackOutput`.
+### Track effects functions
+
+**Find:** every function passed as a track's `effects` option (a `TrackEffectsFunction` from `@waveform-playlist/playout`) and every `OfflineTrackEffectsFunction` passed to WAV export (`@waveform-playlist/browser`).
+
+The arguments were `(graphEnd, masterGainNode, isOffline)`. They are now `(trackInput, faderInput, isOffline)`: the shape is the same, but the second argument is the input of the track's own fader, not the master bus.
+
+**Replace with:** a chain that starts at the first argument and ends at the second.
+
+```tsx
+// Before: the chain ended at the master bus (or at the destination)
+const effects: TrackEffectsFunction = (graphEnd, masterGainNode) => {
+  const reverb = new Reverb(1.5);
+  graphEnd.connect(reverb);
+  reverb.connect(masterGainNode); // or reverb.toDestination()
+  return () => reverb.dispose();
+};
+
+// After: the chain ends at the track's fader input
+const effects: TrackEffectsFunction = (trackInput, faderInput) => {
+  const reverb = new Reverb(1.5);
+  trackInput.connect(reverb);
+  reverb.connect(faderInput);
+  return () => reverb.dispose();
+};
+```
+
+A function that already connected its last node to the second argument needs no code change, only the rename. A function that called `toDestination()` or connected to the master output must be changed: that path now bypasses the track's volume, pan, mute and solo.
+
+### Lower-level connection methods
+
+**Find:** calls to `connectTrackOutput` / `disconnectTrackOutput` on a `TonePlayout` or on `adapter.transport` (from `createToneAdapter`), and calls to `connectEffects` on a `ToneTrack`. All are in `@waveform-playlist/playout`; `@waveform-playlist/browser` has no such methods.
 
 **Replace with:**
 
-- A `TrackEffectsFunction` / `OfflineTrackEffectsFunction` is called as `(trackInput, faderInput, isOffline)`. Connect your chain from `trackInput` and end it at `faderInput`. Do not connect to the master output or call `toDestination()`: that bypasses the track's volume, pan, mute and solo.
-- `connectTrackOutput(trackId, node)` → `connectTrackEffects(trackId, input, output)`, passing the first and last node of the chain.
+- `connectTrackOutput(trackId, node)` → `connectTrackEffects(trackId, input, output)`, passing the first and last node of the chain. The track's output is returned into the track for you; do not connect the chain to the master yourself.
 - `disconnectTrackOutput(trackId)` → `disconnectTrackEffects(trackId)`.
+- `toneTrack.connectEffects(node)` → `toneTrack.connectEffects(input, output)`.
 
-See the [effects guide](./guides/effects.md) for complete examples.
+The [effects guide](./guides/effects.md#track-signal-chain-and-panning) describes the new signal chain.
