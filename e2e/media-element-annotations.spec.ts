@@ -49,11 +49,23 @@ test.describe('Media Element Annotations Example', () => {
   });
 
   test('with continuous play on, a clicked box keeps playing past its end', async ({ page }) => {
-    await expect(page.getByRole('checkbox', { name: 'Continuous play' })).toBeChecked();
+    const continuousPlay = page.getByRole('checkbox', { name: 'Continuous play' });
+    await expect(continuousPlay).toBeChecked();
+    const play = page.getByRole('button', { name: 'Play', exact: true });
     const pause = page.getByRole('button', { name: 'Pause', exact: true });
+    const box4 = page.locator('[data-scroll-container]').getByText('4', { exact: true });
+
+    // First show that time advances on this page: with continuous play off the
+    // same box stops by itself. Without this, "still playing" below would also
+    // hold for audio that never started.
+    await continuousPlay.uncheck();
+    await box4.click();
+    await expect(pause).toBeEnabled({ timeout: 10000 });
+    await expect(play).toBeEnabled({ timeout: 10000 });
 
     // Annotation 4 is 2.68 seconds long.
-    await page.locator('[data-scroll-container]').getByText('4', { exact: true }).click();
+    await continuousPlay.check();
+    await box4.click();
     await expect(pause).toBeEnabled({ timeout: 10000 });
     await page.waitForTimeout(4000);
 
@@ -65,12 +77,12 @@ test.describe('Media Element Annotations Example', () => {
     const handles = page.locator('[data-scroll-container] [aria-roledescription="draggable"]');
     const linkEndpoints = page.getByRole('checkbox', { name: 'Link endpoints' });
     await expect(linkEndpoints).toBeDisabled();
-    // The clip itself is a draggable too; count what Editable adds.
-    const before = await handles.count();
+    // The clip itself is a draggable too.
+    await expect(handles).toHaveCount(1);
 
     await page.getByRole('checkbox', { name: 'Editable' }).check();
 
-    await expect(handles).toHaveCount(before + 30);
+    await expect(handles).toHaveCount(31);
     await expect(linkEndpoints).toBeEnabled();
   });
 

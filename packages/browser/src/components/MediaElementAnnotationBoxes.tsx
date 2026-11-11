@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useContext } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
+import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
   useMediaElementState,
   useMediaElementControls,
@@ -39,6 +40,7 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
   linkEndpoints,
   onAnnotationUpdate,
 }) => {
+  const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations, activeAnnotationId } = useMediaElementState();
   const { play, setActiveAnnotationId, setAnnotations } = useMediaElementControls();
   const { duration, sampleRate, samplesPerPixel } = useMediaElementData();
@@ -79,7 +81,7 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
     linkEndpoints,
   });
 
-  if (annotations.length === 0) return null;
+  if (annotations.length === 0 || !annotationIntegration) return null;
 
   return (
     <DragDropProvider

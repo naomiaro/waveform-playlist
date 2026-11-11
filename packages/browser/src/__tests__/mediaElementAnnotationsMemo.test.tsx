@@ -8,12 +8,27 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
+vi.mock('../hooks/useAnnotationDragHandlers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useAnnotationDragHandlers')>();
+  return {
+    ...actual,
+    useAnnotationDragHandlers: (
+      options: Parameters<typeof actual.useAnnotationDragHandlers>[0]
+    ) => {
+      dragOptions.push(options);
+      return actual.useAnnotationDragHandlers(options);
+    },
+  };
+});
+
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 
 // Counts renders of the waveform channel: the proxy for "the waveform part of
 // the visualization rendered".
 const counts = vi.hoisted(() => ({ channel: 0 }));
+// The options the boxes hand to the boundary-drag hook, latest last.
+const dragOptions = vi.hoisted(() => [] as { sampleRate?: number; linkEndpoints?: boolean }[]);
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -42,9 +57,11 @@ import {
 import { MediaElementWaveform } from '../components/MediaElementWaveform';
 import { MediaElementAnnotationList } from '../components/MediaElementAnnotationList';
 
-const SAMPLE_RATE = 48000;
-const SOURCE_SCALE = 256;
-const SAMPLES_PER_PIXEL = 512;
+// Not 48000: that is the default the drag handlers fall back to, and the
+// track's own rate must reach them.
+const SAMPLE_RATE = 44100;
+const SOURCE_SCALE = 441;
+const SAMPLES_PER_PIXEL = 882;
 const SECONDS = 4;
 const LENGTH = (SECONDS * SAMPLE_RATE) / SOURCE_SCALE;
 
@@ -128,26 +145,29 @@ async function mount(children: React.ReactNode) {
   boxRenders = {};
   boxProps = {};
   listProps = [];
+  dragOptions.length = 0;
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
-  render(
+  const onAnnotationsChange = () => {};
+  const tree = (content: React.ReactNode) => (
     <AnnotationIntegrationContext.Provider value={INTEGRATION}>
       <MediaElementPlaylistProvider
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={createPlayout}
         annotationList={ANNOTATION_LIST}
-        onAnnotationsChange={() => {}}
+        onAnnotationsChange={onAnnotationsChange}
       >
         <ProbeChild />
-        {children}
+        {content}
       </MediaElementPlaylistProvider>
     </AnnotationIntegrationContext.Provider>
   );
+  const { rerender } = render(tree(children));
   await waitFor(() => expect(probe.data.duration).toBe(SECONDS));
   await waitFor(() => expect(probe.data.peaksDataArray.length).toBe(1));
   await act(async () => {});
-  return { playout };
+  return { playout, rerender: (content: React.ReactNode) => rerender(tree(content)) };
 }
 
 const lastList = () => listProps[listProps.length - 1];
@@ -222,6 +242,14 @@ describe('MediaElement annotation boxes (#744)', () => {
     expect(playout.play.mock.lastCall).toEqual([undefined, 2]);
   });
 
+  it('boundary drags are converted with the rate of the track', async () => {
+    await mount(<MediaElementWaveform editable linkEndpoints />);
+
+    const options = dragOptions[dragOptions.length - 1];
+    expect(options.sampleRate).toBe(SAMPLE_RATE);
+    expect(options.linkEndpoints).toBe(true);
+  });
+
   it('the boxes follow the editable prop and the label function', async () => {
     await mount(
       <MediaElementWaveform editable getAnnotationBoxLabel={(a, index) => index + ':' + a.id} />
@@ -246,6 +274,18 @@ describe('MediaElement annotation list (#744)', () => {
     expect(after).not.toBe(before);
     expect(after.activeAnnotationId).toBe('n2');
     expect(changedListProps(before, after)).toEqual(['activeAnnotationId']);
+  });
+
+  it('through MediaElementWaveform, a render of the parent keeps the options object', async () => {
+    const { rerender } = await mount(<MediaElementWaveform linkEndpoints />);
+    const before = lastList();
+
+    await act(async () => {
+      rerender(<MediaElementWaveform linkEndpoints />);
+    });
+
+    expect(lastList()).not.toBe(before);
+    expect(lastList().annotationListConfig).toBe(before.annotationListConfig);
   });
 
   it('standalone, an active-annotation change changes nothing else the list is given', async () => {

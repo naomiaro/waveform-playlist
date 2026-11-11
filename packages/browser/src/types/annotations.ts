@@ -9,9 +9,8 @@ export type { AnnotationData } from '@waveform-playlist/core';
  * Receives the annotation data and its index in the list, returns a string label.
  * Default behavior: displays annotation.id
  *
- * Called for every annotation each time the row of boxes renders (an
- * annotation, zoom or active-annotation change); a box is drawn again only
- * when the string returned for it differs from the last one.
+ * Called for every annotation whenever the row of boxes renders. Return the
+ * same string for an unchanged annotation, so that its box can skip the render.
  */
 export type GetAnnotationBoxLabelFn = (annotation: AnnotationData, index: number) => string;
 

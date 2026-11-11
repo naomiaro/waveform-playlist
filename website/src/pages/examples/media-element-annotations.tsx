@@ -34,7 +34,7 @@ export default function MediaElementAnnotationsExamplePage(): React.ReactElement
           Time-synced annotations with <code>MediaElementPlaylistProvider</code>: the audio is
           streamed by an <code>HTMLAudioElement</code> (no Tone.js, no decoding of the whole file)
           and the waveform comes from pre-computed peaks. The boxes under the waveform and the
-          text list follow playback; click either to play an annotation.
+          text list follow playback; click a box to play its annotation.
         </p>
 
         <LazyMediaElementAnnotationsExample />

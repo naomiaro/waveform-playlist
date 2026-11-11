@@ -2,7 +2,7 @@
 '@waveform-playlist/browser': patch
 ---
 
-`MediaElementPlaylistProvider`: when the active annotation changes, which happens at every annotation boundary during playback, only the annotation box and the list row that stop being active and the ones that become active render. Before, every box, every row and the whole waveform did.
+`MediaElementPlaylistProvider`: when the active annotation changes, which happens at every annotation boundary during playback, of the annotation boxes and list rows only the two that stop being active and the two that become active render, and the waveform does not render at all. Before, every box, every row and the whole waveform did.
 
 - `MediaElementPlaylist` no longer reads the annotations or the active annotation; a small inner component does, and renders the boxes through the same memoized box the `WaveformPlaylistProvider` visualization uses.
 - `MediaElementAnnotationList` and `MediaElementWaveform` no longer build a new `annotationListConfig` object on every render (it re-rendered every row). An `annotationListConfig` you pass to `MediaElementAnnotationList` yourself should keep its identity between renders for the same reason.

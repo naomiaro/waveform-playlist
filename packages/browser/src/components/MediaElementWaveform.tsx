@@ -44,6 +44,17 @@ export interface MediaElementWaveformProps {
 }
 
 /**
+ * The text list, only when there are annotations. It reads the provider state
+ * so that MediaElementWaveform does not: that state changes at every
+ * annotation boundary during playback (#744).
+ */
+const AnnotationListWhenPresent: React.FC<MediaElementAnnotationListProps> = (props) => {
+  const { annotations } = useMediaElementState();
+  if (annotations.length === 0) return null;
+  return <MediaElementAnnotationList {...props} />;
+};
+
+/**
  * Simplified Waveform component for MediaElementPlaylistProvider
  *
  * This is a stripped-down version of Waveform that works with the
@@ -55,17 +66,6 @@ export interface MediaElementWaveformProps {
  *
  * For multi-track editing, use the full Waveform with WaveformPlaylistProvider.
  */
-/**
- * The text list, only when there are annotations. It reads the provider state
- * so that MediaElementWaveform does not: that state changes at every
- * annotation boundary during playback (#744).
- */
-const AnnotationListWhenPresent: React.FC<MediaElementAnnotationListProps> = (props) => {
-  const { annotations } = useMediaElementState();
-  if (annotations.length === 0) return null;
-  return <MediaElementAnnotationList {...props} />;
-};
-
 export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   annotationTextHeight,
   getAnnotationBoxLabel,

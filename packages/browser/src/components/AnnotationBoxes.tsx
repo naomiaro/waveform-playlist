@@ -91,7 +91,6 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
   if (annotations.length === 0 || !annotationIntegration) return null;
 
   const { AnnotationBox, AnnotationBoxesWrapper } = annotationIntegration;
-  const pixelsPerSecond = sampleRate / samplesPerPixel;
 
   return (
     <AnnotationBoxesWrapper height={BOX_ROW_HEIGHT} width={width}>
@@ -101,8 +100,8 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
           AnnotationBox={AnnotationBox}
           annotation={annotation}
           index={index}
-          startPosition={annotation.start * pixelsPerSecond}
-          endPosition={annotation.end * pixelsPerSecond}
+          startPosition={(annotation.start * sampleRate) / samplesPerPixel}
+          endPosition={(annotation.end * sampleRate) / samplesPerPixel}
           label={getAnnotationBoxLabel ? getAnnotationBoxLabel(annotation, index) : annotation.id}
           isActive={annotation.id === activeAnnotationId}
           editable={editable}
