@@ -167,9 +167,9 @@ export interface SelectionContextValue {
 
 /**
  * Where the cursor rests, in seconds: the position playback starts from. It
- * changes on a seek, a pause, a stop and a selection whose start moves; it does
- * NOT advance during playback (read `currentTimeRef`, or register a frame
- * callback, for that). Apart from the animation context so that a component
+ * changes on a seek, a pause, a stop (including playback reaching the end) and
+ * a selection whose start moves; it does NOT advance during playback (read
+ * `currentTimeRef`, or register a frame callback, for that). Apart from the animation context so that a component
  * reading `isPlaying` or a ref is not re-rendered by every seek, nor by every
  * pointer move of a leftward selection drag (#740).
  */
@@ -309,7 +309,7 @@ export interface PlaylistDataContextValue {
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
-// Create the 5 separate contexts
+// Create the 7 separate contexts
 // Shared default so an omitted `controls` prop keeps one identity across
 // renders — a fresh object here would invalidate the data context every render.
 const DEFAULT_CONTROLS = { show: false, width: 0 };

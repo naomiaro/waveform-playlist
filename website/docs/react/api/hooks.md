@@ -375,7 +375,7 @@ Available inside `WaveformPlaylistProvider` only.
 
 ## useCurrentTime
 
-Where the cursor rests, in seconds: the position playback starts from. It changes on a seek, a pause, a stop and a selection whose start moves. It does **not** advance during playback; for a live position read `currentTimeRef` or register a frame callback, both from `usePlaybackAnimation()`.
+Where the cursor rests, in seconds: the position playback starts from. It changes on a seek (`seekTo`, `setCurrentTime`), a pause, a stop (including playback reaching the end) and a selection whose start moves. It does **not** advance during playback; for a live position read `currentTimeRef` or register a frame callback, both from `usePlaybackAnimation()`.
 
 It has its own context so that a component reading `isPlaying` or a ref from `usePlaybackAnimation()` is not re-rendered by every seek, nor by every pointer move of a selection drag to the left.
 

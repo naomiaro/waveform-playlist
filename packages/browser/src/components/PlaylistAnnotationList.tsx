@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type {
   AnnotationData,
   AnnotationAction,
@@ -64,7 +64,12 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   const integration = useAnnotationIntegration();
   const { setAnnotations } = usePlaylistControls();
 
-  const resolvedConfig = annotationListConfig ?? { linkEndpoints, continuousPlay };
+  // Memoized: it is a dependency of a handler given to every memoized row of
+  // the list, and this component renders at every annotation boundary.
+  const resolvedConfig = useMemo(
+    () => annotationListConfig ?? { linkEndpoints, continuousPlay },
+    [annotationListConfig, linkEndpoints, continuousPlay]
+  );
 
   const handleAnnotationUpdate = useCallback(
     (updatedAnnotations: AnnotationData[]) => {

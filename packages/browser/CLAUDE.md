@@ -179,12 +179,13 @@ Measured per move of a rightward drag (dev build, `probes/select733.cjs`, which 
 - A context subscription is to the whole value. Before the split, a component that read only `currentTimeRef` or `isPlaying` still rendered on every seek; changing the annotations example to read the ref alone did not change its render count at all. That is why the fix had to be in the provider and not in consumers.
 - `ClipProgress`, `AnimatedPlayhead`, `CustomPlayhead` and `AudioPosition` call `useCurrentTime()` for the re-render only. They position from `visualTimeRef` / `currentTimeRef` in an effect without dependencies, so without the call they would not move on a seek while stopped. Any new component that shows the resting position needs the same call (tests: "still follows a seek while stopped" in `visualizationMemoBoundaries.test.tsx`).
 - `useActiveAnnotation()` is called by `AnnotationBoxesOverlay`, `PlaylistAnnotationList` and `KeyboardShortcuts` only.
+- Both annotation renderers memoize their items, so an active-annotation change renders the item that stops being active and the one that becomes active, not all of them: `AnnotationBoxItem` in `VisualizationOverlays.tsx`, and `AnnotationListItem` inside `AnnotationText` (annotations package). The functions handed to an item must keep their identity when only the active annotation changes: the box click handler is a `useCallback`, the list's edit/control handlers are `useCallback`s over `annotations`, and `PlaylistAnnotationList` memoizes the `annotationListConfig` it passes (a fresh object there re-rendered every row). Tests: `annotationBoxesMemo.test.tsx` (browser), `annotationTextItems.test.tsx` (annotations).
 - `MediaElementPlaylistProvider` is unchanged: its `currentTime` and `activeAnnotationId` are still in its animation and state values. Not measured there.
 
 Measured (dev build, 4x CPU throttle, `probes/select740.cjs`, which charges each rendered component to the nearest rendered ancestor whose parent did not render):
 
 - Leftward selection drag, per move: annotations example 370 components / 21 to 24 ms React render before, 21 / 1.8 ms after; multi-clip 54 / 3.5 ms before, 37 / 2.3 ms after (26 of the 37 are the 13 `ClipProgress` and their styled child).
-- Active-annotation change during playback, per boundary: annotations example 369 components / 23 to 27 ms before, 265 / 16 to 22 ms after. What is left is the annotation list (168) and the annotation boxes (94): both re-render every item when the active one changes, because neither memoizes its items.
+- Active-annotation change during playback, per boundary: annotations example (15 annotations) 369 components / 23 to 27 ms before; 265 / 16 to 22 ms with the context split alone (the list, 168, and the boxes, 94, re-rendered every item); 48 / 5.3 to 6.8 ms with the items memoized.
 
 ## Playlist Loading Detection
 
