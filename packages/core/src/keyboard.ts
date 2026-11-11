@@ -87,6 +87,16 @@ function isNonTextInput(element: Element): boolean {
   );
 }
 
+/**
+ * A `<select>` shown as a dropdown. A list box (`multiple` or `size` > 1) has
+ * no popup and uses Space to toggle options, so it keeps every key.
+ */
+function isDropdown(element: Element): boolean {
+  if (element.tagName !== 'SELECT') return false;
+  const size = Number(element.getAttribute('size') ?? '1');
+  return !element.hasAttribute('multiple') && !(size > 1);
+}
+
 /** Controls that take text or use most keys themselves: no shortcut fires on them. */
 function ownsAllKeys(element: Element): boolean {
   const tag = element.tagName;
@@ -243,7 +253,7 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   // Sliders, checkboxes and dropdowns: theirs while keyboard-operated; after a
   // click (a value picked from a dropdown, a slider dragged) Space and Enter
   // are shortcuts again, the other keys stay with the control.
-  if (isNonTextInput(focused) || focused.tagName === 'SELECT') {
+  if (isNonTextInput(focused) || isDropdown(focused)) {
     return !isActivationKey || isKeyboardOperated(focused);
   }
   if (ownsAllKeys(focused)) return true;

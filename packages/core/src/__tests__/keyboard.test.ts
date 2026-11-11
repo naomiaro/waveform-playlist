@@ -327,6 +327,18 @@ describe('handleKeyboardEvent', () => {
         expect(zero).not.toHaveBeenCalled();
       });
 
+      it.each([
+        ['multiple', ''],
+        ['size', '4'],
+      ])('a list box (<select %s>) keeps Space even after a click', (attribute, value) => {
+        const select = document.createElement('select');
+        select.setAttribute(attribute, value);
+        host.appendChild(select);
+        focusWithPointer(select);
+        handleKeyboardEvent(keydownOn(select, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
+      });
+
       it('a <select> reached with the keyboard keeps every key', () => {
         const select = document.createElement('select');
         host.appendChild(select);
