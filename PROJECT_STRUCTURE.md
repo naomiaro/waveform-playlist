@@ -718,12 +718,16 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 User Interaction (React Events)
     ↓
 WaveformPlaylistProvider (Split Contexts for Performance)
-    ├─→ PlaybackAnimationContext (60fps updates)
-    │   └─→ isPlaying, currentTime, currentTimeRef
+    ├─→ PlaybackAnimationContext (playback start/stop; refs and frame callbacks for 60fps)
+    │   └─→ isPlaying, currentTimeRef, registerFrameCallback()
     ├─→ PlaylistStateContext (user interactions)
     │   └─→ loop, selectedTrackId, annotations, etc.
     ├─→ SelectionContext (every pointer move of a selection drag)
     │   └─→ selectionStart, selectionEnd
+    ├─→ CurrentTimeContext (seek, pause, stop, leftward selection drag)
+    │   └─→ currentTime (the resting cursor position)
+    ├─→ ActiveAnnotationContext (every annotation boundary during playback)
+    │   └─→ activeAnnotationId
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
     └─→ PlaylistDataContext (static/infrequent updates)
@@ -761,7 +765,7 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-The provider uses **5 separate contexts** to optimize performance by isolating different update frequencies:
+The provider uses **7 separate contexts** to optimize performance by isolating different update frequencies:
 
 1. **PlaybackAnimationContext** - High-frequency (60fps)
    - Only animation subscribers (Playhead, automatic scroll)
@@ -775,11 +779,19 @@ The provider uses **5 separate contexts** to optimize performance by isolating d
    - Changes on every pointer move of a selection drag
    - Only components that show or use the selection subscribe
 
-4. **PlaylistControlsContext** - Stable functions
+4. **CurrentTimeContext** - The resting cursor position (`useCurrentTime()`)
+   - Changes on a seek, a pause, a stop and a selection whose start moves; does not advance during playback
+   - Only components that show the resting position subscribe (playhead, clip progress, position readout)
+
+5. **ActiveAnnotationContext** - The active annotation (`useActiveAnnotation()`)
+   - Changes at every annotation boundary during playback
+   - Only the annotation list, the annotation boxes and the annotation shortcuts subscribe
+
+6. **PlaylistControlsContext** - Stable functions
    - Doesn't cause re-renders when accessed
    - All control functions
 
-5. **PlaylistDataContext** - Static/infrequent
+7. **PlaylistDataContext** - Static/infrequent
    - Audio buffers, duration, sample rate
    - Changes rarely after initialization
 
@@ -798,15 +810,14 @@ The provider uses **5 separate contexts** to optimize performance by isolating d
 
 ### Context Splitting for Performance (2025-01-21)
 
-The `WaveformPlaylistProvider` uses **5 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when high-frequency values (like `currentTime` at 60fps) update.
+The `WaveformPlaylistProvider` uses **7 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
 
 **Architecture:**
 
 ```typescript
-// 1. High-frequency updates (60fps) - Only animation subscribers
+// 1. Playback start/stop, plus refs and frame callbacks for 60fps reads
 export interface PlaybackAnimationContextValue {
   isPlaying: boolean;
-  currentTime: number;
   currentTimeRef: React.RefObject<number>;
   playbackStartTimeRef: React.RefObject<number>;   // context.currentTime when playback started
   audioStartPositionRef: React.RefObject<number>;   // Audio position when playback started
@@ -821,7 +832,6 @@ export interface PlaylistStateContextValue {
   isAutomaticScroll: boolean;
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
-  activeAnnotationId: string | null;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
@@ -834,6 +844,17 @@ export interface PlaylistStateContextValue {
 export interface SelectionContextValue {
   selectionStart: number;
   selectionEnd: number;
+}
+
+// 2c. The resting cursor position - changes on seek, pause, stop and a
+// leftward selection drag; does not advance during playback
+export interface CurrentTimeContextValue {
+  currentTime: number;
+}
+
+// 2d. The active annotation - changes at every annotation boundary during playback
+export interface ActiveAnnotationContextValue {
+  activeAnnotationId: string | null;
 }
 
 // 3. Control functions - Stable, don't cause re-renders
@@ -912,11 +933,12 @@ export interface PlaylistDataContextValue {
 Components subscribe only to the contexts they need:
 
 ```typescript
-// Animation component subscribes to high-frequency updates
+// Animation component: frame callbacks while playing, the resting position otherwise
 export const Playhead = () => {
-  const { currentTime } = usePlaybackAnimation(); // 60fps updates
+  const { isPlaying, registerFrameCallback, unregisterFrameCallback } = usePlaybackAnimation();
+  useCurrentTime(); // re-render on seek/pause/stop so the resting position is redrawn
   const { sampleRate, samplesPerPixel } = usePlaylistData(); // Static
-  // ... render playhead
+  // ... move the playhead element from the frame callback / an effect
 };
 
 // Control component subscribes to state and controls only
@@ -977,12 +999,17 @@ See `packages/browser/src/hooks/` for hook implementations.
 
 ### Component State (React useState)
 
-State lives in `WaveformPlaylistContext` and is distributed across the 5 split contexts:
+State lives in `WaveformPlaylistContext` and is distributed across the 7 split contexts:
 
 ```typescript
 // PlaybackAnimationContext
 const [isPlaying, setIsPlaying] = useState(false);
+
+// CurrentTimeContext
 const [currentTime, setCurrentTime] = useState(0);
+
+// ActiveAnnotationContext
+const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
 // PlaylistStateContext
 const [continuousPlay, setContinuousPlay] = useState(false);
@@ -1000,9 +1027,11 @@ const peaksDataArray = useMemo(/* derivePeaks(...) with a per-clip cache */);
 Access contexts using specialized hooks:
 
 ```typescript
-const { isPlaying, currentTime } = usePlaybackAnimation();
+const { isPlaying, currentTimeRef } = usePlaybackAnimation();
 const { continuousPlay, annotations } = usePlaylistState();
 const { selectionStart, selectionEnd } = useSelection();
+const { currentTime } = useCurrentTime();
+const { activeAnnotationId } = useActiveAnnotation();
 const { play, pause, setContinuousPlay } = usePlaylistControls();
 const { duration, tracks } = usePlaylistData();
 ```

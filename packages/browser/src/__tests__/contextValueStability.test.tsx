@@ -388,7 +388,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
   });
 
   it('play and pause still reach animation consumers, and pause sets the resting position', async () => {
-    await mount();
+    const { adapter } = await mount();
     const animationRendersBefore = animationProbe.renders;
 
     await act(async () => {
@@ -397,11 +397,14 @@ describe('the resting cursor position lives in its own context (#740)', () => {
     expect(animationProbe.animation.isPlaying).toBe(true);
     expect(animationProbe.renders).toBeGreaterThan(animationRendersBefore);
 
+    // The engine reports where playback got to; pause must publish it.
+    (adapter as unknown as { getCurrentTime: () => number }).getCurrentTime = () => 0.6;
     await act(async () => {
       probe.controls.pause();
     });
     expect(animationProbe.animation.isPlaying).toBe(false);
-    expect(currentTimeProbe.currentTime).toBe(animationProbe.animation.currentTimeRef.current);
+    expect(animationProbe.animation.currentTimeRef.current).toBe(0.6);
+    expect(currentTimeProbe.currentTime).toBe(0.6);
   });
 
   it('useCurrentTime throws outside the provider', () => {

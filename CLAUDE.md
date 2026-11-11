@@ -91,7 +91,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **API Source of Truth:**
 
 - Context types (hooks, state, controls): `packages/browser/src/WaveformPlaylistContext.tsx`
-- Context hooks: `usePlaybackAnimation`, `usePlaylistState`, `useSelection`, `usePlaylistControls`, `usePlaylistData`
+- Context hooks: `usePlaybackAnimation`, `usePlaylistState`, `useSelection`, `useCurrentTime`, `useActiveAnnotation`, `usePlaylistControls`, `usePlaylistData`
 - MediaElement context types: `packages/browser/src/MediaElementPlaylistContext.tsx`
 - AudioTrackConfig interface: `packages/browser/src/hooks/useAudioTracks.ts`
 - Effects hooks return types: `packages/browser/src/hooks/useDynamicEffects.ts`, `useTrackDynamicEffects.ts`

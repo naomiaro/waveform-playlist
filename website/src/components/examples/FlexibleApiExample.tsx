@@ -120,7 +120,7 @@ const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ dura
 
   return (
     <TimeDisplay>
-      <span ref={timeRef}>{formatTime(currentTimeRef.current ?? 0, format)}</span> / {formattedDuration}
+      <span ref={timeRef}>{formatTime(currentTime, format)}</span> / {formattedDuration}
     </TimeDisplay>
   );
 };
