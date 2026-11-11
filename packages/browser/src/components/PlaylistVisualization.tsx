@@ -32,6 +32,7 @@ import { useRecordingLayout } from '../hooks/useRecordingLayout';
 import type { AnnotationAction, RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
+import { trackRenderMode } from '../utils/trackRenderMode';
 import { TrackRows, type SpectrogramTrackHelpers } from './TrackRows';
 import { TrackControlsColumn } from './TrackControlsColumn';
 import {
@@ -173,11 +174,11 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const helpers = new Map<string, SpectrogramTrackHelpers>();
     if (!spectrogram) return helpers;
     tracks.forEach((track) => {
-      const mode =
-        spectrogram.trackSpectrogramOverrides.get(track.id)?.renderMode ??
-        track.renderMode ??
-        'waveform';
-      if (mode === 'waveform') return;
+      const mode = trackRenderMode(
+        track,
+        spectrogram.trackSpectrogramOverrides.get(track.id)?.renderMode
+      );
+      if (mode === 'waveform' || mode === 'piano-roll') return;
       const overrides = spectrogram.trackSpectrogramOverrides.get(track.id);
       const cm =
         overrides?.colorMap ??
@@ -194,17 +195,15 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     return helpers;
   }, [tracks, spectrogram]);
 
-  // Render mode per track: a spectrogram override, else the track's own mode,
-  // else piano roll for a track with MIDI notes.
+  // Render mode per track, from its kind (see trackRenderMode): a MIDI track
+  // is a piano roll; an audio track takes a spectrogram override, else its own
+  // mode, else a waveform.
   const renderModeById = useMemo(() => {
     const modes = new Map<string, RenderMode>();
     tracks.forEach((track) => {
-      const hasMidiNotes = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
       modes.set(
         track.id,
-        spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode ??
-          track.renderMode ??
-          (hasMidiNotes ? 'piano-roll' : 'waveform')
+        trackRenderMode(track, spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode)
       );
     });
     return modes;

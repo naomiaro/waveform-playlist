@@ -29,6 +29,8 @@
 
 ## Patterns
 
+- **`setTracks`, `addTrack` and `updateTrack(id, track)` throw on a track whose clips do not match its `kind` (#756)** — `assertTrackKind` from core, called FIRST: before `clearHistory()`, before the undo snapshot, before the adapter. A throw therefore leaves tracks, history and adapter exactly as they were (`trackKind.test.ts` asserts each). Keep the assertion ahead of any mutation when changing these methods. Undo/redo restore tracks that were already accepted and do not re-check.
+
 - **`play()` and `seek()` do not clamp to duration** — The Transport runs at any non-negative position, playing silence where there's no audio. This enables recording from cursor positions beyond existing clips. Only negative values are clamped to 0.
 - **Default sampleRate is 48000** — Changed from 44100 to match modern hardware. Consumers should still pass `AudioContext.sampleRate` explicitly when creating the engine.
 - All mutating methods (moveClip, trimClip, removeTrack, setZoomLevel) guard against no-op statechange emissions — bail early when constrained delta is 0, track not found, or zoom unchanged

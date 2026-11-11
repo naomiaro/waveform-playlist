@@ -131,12 +131,23 @@ export interface AudioClip {
   midiProgram?: number;
 }
 
+/** What a track holds: audio clips or MIDI clips. A track never holds both. */
+export type TrackKind = 'audio' | 'midi';
+
 /**
- * Represents a track containing multiple audio clips
+ * Represents a track containing multiple clips of one kind
  */
 export interface ClipTrack {
   /** Unique identifier for this track */
   id: string;
+
+  /**
+   * What the track holds. Every clip on an audio track is an audio clip and
+   * every clip on a MIDI track has `midiNotes`; the engine throws on a track
+   * that breaks this. An empty track has a kind too, which decides what may be
+   * recorded or added to it. A MIDI track is drawn as a piano roll.
+   */
+  kind: TrackKind;
 
   /** Display name for this track */
   name: string;
@@ -342,6 +353,8 @@ export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip 
  */
 export interface CreateTrackOptions {
   name: string;
+  /** What the track holds. Default: 'audio'. */
+  kind?: TrackKind;
   clips?: AudioClip[];
   muted?: boolean;
   soloed?: boolean;
@@ -505,6 +518,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
 export function createTrack(options: CreateTrackOptions): ClipTrack {
   const {
     name,
+    kind = 'audio',
     clips = [],
     muted = false,
     soloed = false,
@@ -518,6 +532,7 @@ export function createTrack(options: CreateTrackOptions): ClipTrack {
 
   return {
     id: generateId(),
+    kind,
     name,
     clips,
     muted,

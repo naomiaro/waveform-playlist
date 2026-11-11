@@ -13,7 +13,16 @@ describe('calculateDuration', () => {
 
   it('returns 0 for tracks with no clips', () => {
     const tracks = [
-      { id: '1', name: 'Track 1', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+      {
+        id: '1',
+        kind: 'audio' as const,
+        name: 'Track 1',
+        clips: [],
+        muted: false,
+        soloed: false,
+        volume: 1,
+        pan: 0,
+      },
     ];
     expect(calculateDuration(tracks)).toBe(0);
   });
@@ -22,6 +31,7 @@ describe('calculateDuration', () => {
     const tracks = [
       {
         id: '1',
+        kind: 'audio' as const,
         name: 'Track 1',
         muted: false,
         soloed: false,
@@ -56,6 +66,7 @@ describe('calculateDuration', () => {
     const tracks = [
       {
         id: '1',
+        kind: 'audio' as const,
         name: 'Track 1',
         muted: false,
         soloed: false,
@@ -75,6 +86,7 @@ describe('calculateDuration', () => {
       },
       {
         id: '2',
+        kind: 'audio' as const,
         name: 'Track 2',
         muted: false,
         soloed: false,

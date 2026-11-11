@@ -3,6 +3,7 @@ import type {
   MidiNoteData,
   RenderMode,
   SpectrogramConfig,
+  TrackKind,
 } from '@waveform-playlist/core';
 
 // Re-export RenderMode from core as TrackRenderMode for backward compatibility
@@ -17,9 +18,26 @@ export interface TrackDescriptor {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  /** What the track holds: audio clips or MIDI clips, never both (#756). */
+  kind: TrackKind;
+  /** How the track is drawn. Always `'piano-roll'` for a MIDI track and never
+   *  for an audio track: see `trackDescriptorRenderMode`. */
   renderMode: TrackRenderMode;
   spectrogramConfig?: SpectrogramConfig | null;
   clips: ClipDescriptor[];
+}
+
+/**
+ * The render mode a track descriptor carries, given its kind: a MIDI track is
+ * a piano roll, and an audio track asked for a piano roll is a waveform (the
+ * kind, not `render-mode`, is what makes a track MIDI).
+ */
+export function trackDescriptorRenderMode(
+  kind: TrackKind,
+  requested: TrackRenderMode
+): TrackRenderMode {
+  if (kind === 'midi') return 'piano-roll';
+  return requested === 'piano-roll' ? 'waveform' : requested;
 }
 
 /** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
@@ -93,14 +111,20 @@ export interface TrackConfig {
   pan?: number;
   muted?: boolean;
   soloed?: boolean;
+  /**
+   * What the track holds. Default `'audio'`, or `'midi'` when `midi` is given.
+   * Every clip must be of this kind: a clip of the other kind is not added and
+   * is reported through `daw-clip-error`. Creation-only: ignored by `updateTrack`.
+   */
+  kind?: TrackKind;
+  /** How an audio track is drawn. A MIDI track is always a piano roll. */
   renderMode?: TrackRenderMode;
   spectrogramConfig?: SpectrogramConfig | null;
   clips?: ClipConfig[];
   /**
-   * Convenience: creates a single piano-roll `<daw-clip>` child with these
-   * notes and sets `render-mode="piano-roll"` on the track. Equivalent to
-   * passing `{ renderMode: 'piano-roll', clips: [{ midiNotes, midiChannel, midiProgram }] }`.
-   * An explicit `renderMode` takes precedence over the inferred `'piano-roll'`.
+   * Convenience: makes the track a MIDI track (`kind: 'midi'`) with a single
+   * `<daw-clip>` child holding these notes. Equivalent to passing
+   * `{ kind: 'midi', clips: [{ midiNotes, midiChannel, midiProgram }] }`.
    *
    * Creation-only — ignored by `updateTrack`. To modify notes after the
    * track is built, use `editor.updateClip(trackId, clipId, { midiNotes })` or

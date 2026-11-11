@@ -82,7 +82,7 @@ React packages without a Web Components equivalent yet: the recording arming sur
 | Element                     | Wraps                                      | Responsibilities                                                                                                                                                                                                                                                            |
 | --------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<daw-editor>`              | PlaylistEngine + external `PlayoutAdapter` | Root element. Manages engine, tracks, state. Requires a consumer-provided adapter (`editor.adapter`) — it creates no AudioContext or adapter of its own (#378).                                                                                                             |
-| `<daw-track>`               | Track state                                | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`, `render-mode`. `src` is shorthand for a track with a single implicit clip.                                                        |
+| `<daw-track>`               | Track state                                | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device`, `kind`, `render-mode`. `src` is shorthand for a track with a single implicit clip.                                                        |
 | `<daw-clip>`                | AudioClip                                  | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer.                                         |
 | `<daw-waveform>`            | Canvas rendering                           | Waveform visualization. Renders peaks to canvas.                                                                                                                                                                                                                            |
 | `<daw-transport>`           | Transport controls container               | Groups transport buttons, links to an editor via `for` attribute.                                                                                                                                                                                                           |
@@ -303,7 +303,7 @@ Annotations are defined once as `<daw-annotation>` children. The `<daw-annotatio
 
 **`<daw-annotation-list time-display="bars">`:** shows each row's times span as `B.b – B.b` bar.beat ranges instead of clock times. Resolves the host editor via `this.track.closest('daw-editor')`; tick-based annotations use `startTick`/`endTick` directly, seconds-based annotations convert via `editor._secondsToTicks()`. Both edges are converted with `ticksToBarBeat(tick, editor._meterEntries, editor.ppqn)` from `@waveform-playlist/core` (1-based bar/beat, multi-meter aware). No host editor → falls back to time display and warns once.
 
-Spectrogram and piano-roll are render modes on `<daw-track>` (via the `render-mode` attribute), not standalone elements. See the [Spectrogram & Piano-Roll](#spectrogram--piano-roll) section.
+Spectrogram is a render mode on `<daw-track>` (the `render-mode` attribute) and a piano roll is how a MIDI track (`kind="midi"`) is drawn; neither is a standalone element. See the [Spectrogram & Piano-Roll](#spectrogram--piano-roll) section.
 
 ---
 
@@ -469,7 +469,8 @@ muted            Boolean   false    Track is muted
 soloed           Boolean   false    Track is soloed
 record-armed     Boolean   false    Track is armed for recording
 input-device     String    —        MediaDeviceInfo.deviceId for mic input
-render-mode      String    waveform 'waveform' | 'spectrogram' | 'split' | 'piano-roll'
+kind             String    audio    'audio' | 'midi'. What the track holds; every clip must be of this kind (#756)
+render-mode      String    waveform 'waveform' | 'spectrogram' | 'split'. Audio tracks only; a MIDI track is a piano roll
 ```
 
 **Properties (JS only):**
@@ -477,6 +478,7 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split' | 'pian
 ```typescript
 track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
+track.kind: 'audio' | 'midi'     // Reflects kind attribute; fixed once the track has loaded
 track.renderMode: string         // Reflects render-mode attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
@@ -1183,7 +1185,7 @@ const url = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
 
 ## Spectrogram & Piano-Roll
 
-Spectrogram and piano-roll are **render modes on `<daw-track>`**, not standalone elements. A track can display as waveform, spectrogram, split (spectrogram + waveform), or piano-roll.
+Spectrogram is a **render mode on `<daw-track>`**, not a standalone element: an audio track can display as waveform, spectrogram or split (spectrogram + waveform). A MIDI track (`kind="midi"`) is always drawn as a piano roll, and an audio track never is (#756).
 
 ### Render Modes
 
@@ -1197,8 +1199,8 @@ Spectrogram and piano-roll are **render modes on `<daw-track>`**, not standalone
 <!-- Split: spectrogram on top, waveform on bottom -->
 <daw-track src="/audio/vocals.mp3" name="Vocals" render-mode="split"></daw-track>
 
-<!-- Piano-roll (auto-set for tracks created by loadMidi) -->
-<daw-track name="Piano" render-mode="piano-roll"></daw-track>
+<!-- Piano roll: a MIDI track (kind="midi", set for tracks created by loadMidi) -->
+<daw-track name="Piano" kind="midi"></daw-track>
 ```
 
 `waveform`, `spectrogram`, and `piano-roll` are shipped. `split` is tracked in #491 — today it warns and falls back to `spectrogram`.
@@ -1290,7 +1292,7 @@ editor.timeSignature = timeSignature;
 await editor.loadMidi('/midi/bridge.mid', { startTime: 30.0 });
 ```
 
-Created tracks get `render-mode="piano-roll"` automatically. Each track's clip carries `midiNotes` data for the piano-roll renderer. Track names are derived from the MIDI file (instrument name, channel, or GM program name).
+Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. Each track's clip carries `midiNotes` data for the piano-roll renderer. Track names are derived from the MIDI file (instrument name, channel, or GM program name).
 
 **Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks before rejecting — the editor returns to its pre-call state. Documented limitation: an `AbortSignal` only cancels the fetch phase; aborts during the track-creation phase are a no-op (the in-flight `addTrack` calls run to completion).
 
@@ -1303,13 +1305,17 @@ Created tracks get `render-mode="piano-roll"` automatically. Each track's clip c
 For programmatic MIDI (no file), set `clip.midiNotes` directly:
 
 ```javascript
-const track = await editor.addTrack({ name: 'Synth Lead' });
-const clip = track.querySelector('daw-clip');
-clip.midiNotes = [
-  { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
-  { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
-];
-track.renderMode = 'piano-roll';
+const track = await editor.addTrack({
+  name: 'Synth Lead',
+  midi: {
+    notes: [
+      { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+      { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+    ],
+  },
+}); // a MIDI track: kind="midi"
+// Later: replace the notes on the clip
+track.querySelector('daw-clip').midiNotes = otherNotes;
 ```
 
 ### Piano-Roll Theming
@@ -1628,6 +1634,7 @@ const t = await editor.addTrack({
 // MIDI (no src, parsed notes provided directly)
 await editor.addTrack({
   name: 'Synth',
+  kind: 'midi',
   clips: [{ midiNotes: parsedNotes, start: 0, duration: 16 }],
 });
 ```
@@ -2255,7 +2262,7 @@ Create `@dawcore/components` package with core elements:
 - [x] Spectrogram render mode (`split` → #491)
 - [x] Spectrogram config — editor global + track override, lazy worker pool
 - [x] `editor.loadMidi()` — multi-track MIDI loading with cleanup-on-failure
-- [x] Piano-roll render mode — `render-mode="piano-roll"`, `clip.midiNotes`
+- [x] Piano-roll rendering — MIDI tracks (`kind="midi"`), `clip.midiNotes`
 - [x] Piano-roll theming via CSS custom properties
 - [ ] Loop region UI → #461
 

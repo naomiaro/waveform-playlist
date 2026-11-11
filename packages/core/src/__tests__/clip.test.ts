@@ -32,6 +32,7 @@ function makeClip(
 function makeTrack(clips: AudioClip[], name = 'Track 1'): ClipTrack {
   return {
     id: 'track-1',
+    kind: 'audio',
     name,
     clips,
     muted: false,

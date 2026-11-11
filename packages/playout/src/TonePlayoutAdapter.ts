@@ -5,12 +5,12 @@ import {
   clipOffsetTime,
   clipDurationTime,
   trackChannelCount,
+  trackKind,
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { TonePlayout } from './TonePlayout';
 import type { EffectsFunction } from './TonePlayout';
 import type { ClipInfo, TrackEffectsFunction } from './ToneTrack';
-import { mixedTrackMidiEffects } from './mixedTrackEffects';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
@@ -23,14 +23,9 @@ export interface ToneAdapterOptions {
    * Returns the effects function of a track, or `undefined` for none. Called
    * with the track's id each time the adapter builds that track's audio graph:
    * `setTracks`, `addTrack`, a SoundFont swap, and an `updateTrack` that
-   * builds rather than edits in place (a MIDI half, or a track that had no
-   * audio clips before). An `updateTrack` that only changes the clips of an
+   * builds rather than edits in place (a MIDI track, or an audio track that
+   * had no clips before). An `updateTrack` that only changes the clips of an
    * existing audio track keeps its graph and does not ask.
-   *
-   * Return the same function for the same id for as long as the track exists.
-   * A track with audio and MIDI clips can have its MIDI half rebuilt alone: if
-   * the answer has become `undefined` by then, that half plays without the
-   * chain the audio half still has.
    */
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** When provided, MIDI clips use SoundFont sample playback instead of PolySynth */
@@ -102,21 +97,22 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   // updateTrack/removeTrack and the per-track control setters. Used by
   // setSoundFontCache to rebuild MIDI tracks without an engine round-trip.
   const _currentTracks = new Map<string, ClipTrack>();
-  // What each MIDI playout track was built with (null = PolySynth). The
+  // What each MIDI track was built with (null = PolySynth), by track id. The
   // rebuild guard compares effective routing against this build record —
   // not against the previous setSoundFontCache argument — because the same
   // cache object can flip isLoaded after a late load().
   const _midiTrackBuild = new Map<string, SoundFontCache | null>();
 
-  // A track with both audio and MIDI clips becomes TWO playout tracks:
-  // audio under track.id, MIDI under track.id + ':midi'.
-  function midiPlayoutTrackId(track: ClipTrack): string {
-    const hasAudio = track.clips.some((c) => c.audioBuffer && !c.midiNotes);
-    return hasAudio ? `${track.id}:midi` : track.id;
+  // A track is ONE playout track under its own id, built from its kind
+  // (#756): audio clips for an audio track, MIDI clips for a MIDI track. The
+  // engine rejects a track whose clips do not match its kind, so the filters
+  // below only drop what cannot play yet (an undecoded clip, an empty note list).
+  function playableAudioClips(track: ClipTrack) {
+    return track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
   }
 
   function addAudioTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
-    const audioClips = track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
+    const audioClips = playableAudioClips(track);
     if (audioClips.length === 0) return;
 
     const startTime = Math.min(...audioClips.map(clipStartTime));
@@ -151,29 +147,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     });
   }
 
-  function midiHalfEffects(p: TonePlayout, track: ClipTrack): TrackEffectsFunction | undefined {
-    const trackEffects = options?.trackEffects?.(track.id);
-    if (!trackEffects || midiPlayoutTrackId(track) === track.id) {
-      return trackEffects;
-    }
-    // Structural check (the audio half is a ToneTrack): only it exposes the
-    // pre-fader input the MIDI voices are summed into.
-    const audioHalfInput = (
-      p.getTrack(track.id) as
-        | { trackInput?: Parameters<typeof mixedTrackMidiEffects>[0] }
-        | undefined
-    )?.trackInput;
-    if (!audioHalfInput) {
-      console.warn(
-        '[waveform-playlist] mixed track "' +
-          track.id +
-          '": audio half not found — its MIDI clips will play without the track effects.'
-      );
-      return undefined;
-    }
-    return mixedTrackMidiEffects(audioHalfInput, trackChannelCount(track) >= 2);
-  }
-
   function addMidiTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
     const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
     if (midiClips.length === 0) return;
@@ -181,7 +154,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     const startTime = Math.min(...midiClips.map(clipStartTime));
     const endTime = Math.max(...midiClips.map(clipEndTime));
 
-    const trackId = midiPlayoutTrackId(track);
+    const trackId = track.id;
 
     const trackObj: Track = {
       id: trackId,
@@ -194,11 +167,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       endTime,
     };
 
-    // A mixed track's halves share ONE effects chain: the audio half runs
-    // the closure, the MIDI half feeds its voices into the audio half's
-    // pre-fader input (see mixedTrackEffects.ts). A MIDI-only track runs the
-    // closure itself.
-    const effects = midiHalfEffects(p, track);
+    const effects = options?.trackEffects?.(track.id);
 
     const midiClipInfos: MidiClipInfo[] = midiClips.map((clip) => ({
       notes: clip.midiNotes!,
@@ -239,8 +208,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
   // Add a single ClipTrack to the playout (shared by buildPlayout and addTrack)
   function addTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
-    addAudioTrackToPlayout(p, track);
-    addMidiTrackToPlayout(p, track);
+    if (trackKind(track) === 'midi') {
+      addMidiTrackToPlayout(p, track);
+    } else {
+      addAudioTrackToPlayout(p, track);
+    }
   }
 
   // Recreates TonePlayout after dispose. The initial playout is created eagerly
@@ -354,7 +326,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       for (const track of tracks) {
         if (oldTrackIds.has(track.id)) {
           playout.removeTrack(track.id);
-          playout.removeTrack(track.id + ':midi');
         }
         addTrackToPlayout(playout, track);
       }
@@ -363,7 +334,6 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       if (_isPlaying) {
         for (const track of tracks) {
           playout.resumeTrackMidPlayback(track.id);
-          playout.resumeTrackMidPlayback(track.id + ':midi');
         }
       }
     },
@@ -373,8 +343,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
       if (!playout) return;
 
-      // Try clip-level update — preserves track audio graph (no glitch)
-      const audioClips = track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
+      // Audio track: try a clip-level update, which keeps the track's audio
+      // graph (no glitch). A MIDI track is always rebuilt.
+      const audioClips = trackKind(track) === 'midi' ? [] : playableAudioClips(track);
       if (audioClips.length > 0) {
         const startTime = Math.min(...audioClips.map(clipStartTime));
         const clipInfos: ClipInfo[] = audioClips.map((clip) => ({
@@ -395,45 +366,20 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
           startTime,
           trackChannelCount(track)
         );
-
-        // Also update companion MIDI track if present. Re-add only the MIDI
-        // half — the audio track was updated in-place by replaceTrackClips
-        // above, and TonePlayout.addTrack has no idempotency guard (a second
-        // add leaks the old ToneTrack and duplicates its Transport events).
-        const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
-        const midiTrackId = trackId + ':midi';
-        if (midiClips.length > 0) {
-          playout.removeTrack(midiTrackId);
-          addMidiTrackToPlayout(playout, track);
-          if (_isPlaying) {
-            playout.resumeTrackMidPlayback(midiTrackId);
-          }
-        } else {
-          // Last MIDI clip deleted — without this, the stale companion keeps
-          // its scheduled Part and the deleted MIDI plays as a ghost.
-          playout.removeTrack(midiTrackId);
-          _midiTrackBuild.delete(midiTrackId);
-        }
-
         if (audioUpdated) {
           playout.applyInitialSoloState();
           return;
         }
       }
 
-      // Fallback: full track remove+re-add (MIDI-only or no audio clips)
+      // Full remove and re-add: a MIDI track, or an audio track with no
+      // playout track yet (an empty placeholder getting its first clip).
       playout.removeTrack(trackId);
-      playout.removeTrack(trackId + ':midi');
-      // Drop both build-record keys — a shape change (mixed ↔ MIDI-only)
-      // flips the MIDI playout id between trackId and trackId + ':midi',
-      // and the re-add below only records the current one.
       _midiTrackBuild.delete(trackId);
-      _midiTrackBuild.delete(trackId + ':midi');
       addTrackToPlayout(playout, track);
       playout.applyInitialSoloState();
       if (_isPlaying) {
         playout.resumeTrackMidPlayback(trackId);
-        playout.resumeTrackMidPlayback(trackId + ':midi');
       }
     },
 
@@ -454,11 +400,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     removeTrack(trackId: string): void {
       _currentTracks.delete(trackId);
       _midiTrackBuild.delete(trackId);
-      _midiTrackBuild.delete(trackId + ':midi');
 
       if (!playout) return;
       playout.removeTrack(trackId);
-      playout.removeTrack(trackId + ':midi');
       playout.applyInitialSoloState();
     },
 
@@ -507,37 +451,28 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       playout?.setMasterGain(volume);
     },
 
-    // Runtime controls must reach BOTH playout halves of a mixed audio+MIDI
-    // track (trackId + trackId:midi) — otherwise muting a mixed track leaves
-    // its MIDI playing and soloing it silences its own MIDI half. The :midi
-    // calls no-op for audio-only and MIDI-only tracks (unknown playout id),
-    // same blind-forwarding pattern as removeTrack.
     setTrackVolume(trackId: string, volume: number): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, volume });
       playout?.getTrack(trackId)?.setVolume(volume);
-      playout?.getTrack(trackId + ':midi')?.setVolume(volume);
     },
 
     setTrackMute(trackId: string, muted: boolean): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, muted });
       playout?.setMute(trackId, muted);
-      playout?.setMute(trackId + ':midi', muted);
     },
 
     setTrackSolo(trackId: string, soloed: boolean): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, soloed });
       playout?.setSolo(trackId, soloed);
-      playout?.setSolo(trackId + ':midi', soloed);
     },
 
     setTrackPan(trackId: string, pan: number): void {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, pan });
       playout?.getTrack(trackId)?.setPan(pan);
-      playout?.getTrack(trackId + ':midi')?.setPan(pan);
     },
 
     setLoop(enabled: boolean, start: number, end: number): void {
@@ -640,10 +575,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       let changed = false;
 
       for (const track of _currentTracks.values()) {
-        const hasMidi = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
-        if (!hasMidi) continue;
+        if (trackKind(track) !== 'midi') continue;
+        const hasNotes = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
+        if (!hasNotes) continue;
 
-        const midiTrackId = midiPlayoutTrackId(track);
+        const midiTrackId = track.id;
         if (_midiTrackBuild.get(midiTrackId) === effective) continue;
 
         // Isolate per-track failures — a Tone.js graph error on one track

@@ -895,7 +895,7 @@ const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
 <WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
 ```
 
-**When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built, and a track with both audio and MIDI clips can have only its MIDI half rebuilt (a clip edit, a SoundFont arriving): if the answer has become `undefined` by then, the MIDI half plays without the chain the audio half still has. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
+**When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
 
 **With your own adapter:** the provider's `trackEffects` prop, like `effects`, reaches the default Tone.js adapter only. If you pass `createAdapter`, give the function to the adapter yourself:
 
@@ -914,6 +914,76 @@ Also removed:
 
 - The `TrackEffectsFunction` type exported from `@waveform-playlist/core` (it only typed the removed field). **Find:** `TrackEffectsFunction` imported from `@waveform-playlist/core`. **Replace with:** the same name from `@waveform-playlist/playout`.
 - The deprecated `WaveformTrack` type from `@waveform-playlist/browser`. **Replace with:** `ClipTrack` from `@waveform-playlist/core`.
+
+## A track has a kind: audio or MIDI, never both
+
+**Packages:** `@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/playout`, `@waveform-playlist/browser`, `@waveform-playlist/recording`, `@waveform-playlist/midi`.
+
+`ClipTrack` has a new required field, `kind: 'audio' | 'midi'`. Every clip on an audio track is an audio clip, and every clip on a MIDI track has `midiNotes`. Before, a track could hold both, and the kind was guessed from the clips.
+
+What sets it:
+
+- `createTrack({ name, clips })` makes an audio track; pass `kind: 'midi'` for a MIDI track.
+- `useAudioTracks` and `useDynamicTracks` make audio tracks. `useMidiTracks` makes MIDI tracks.
+- A track object you write by hand needs the field. A MIDI track without it is read as an audio track and rejected.
+
+:::danger A track that breaks the rule throws
+
+`PlaylistEngine.setTracks()`, `addTrack()` and `updateTrack(id, track)` throw an `Error` for a track whose clips do not match its kind, before changing anything. The message names the track and the clip.
+
+**In `WaveformPlaylistProvider` the error does not reach React, so an error boundary will not catch it.** The provider reports it instead:
+
+- the `onError` prop is called with the error;
+- `[waveform-playlist] Error loading audio: …` is logged as a console warning;
+- the playlist stays in its loading state (`isReady` false, `data-playlist-state="loading"`) and plays nothing, until `tracks` is valid again.
+
+**Pass `onError` to the provider.** Without it, the only sign of a rejected track is the console warning and a playlist that never becomes ready.
+
+```tsx
+<WaveformPlaylistProvider tracks={tracks} onError={(error) => showProblem(error.message)}>
+```
+
+If you call a `PlaylistEngine` yourself, the throw is synchronous: wrap the call in `try`/`catch`, or call `assertTrackKind(track)` from `@waveform-playlist/core` first.
+
+:::
+
+**Find:**
+
+- Track objects written by hand: object literals typed `ClipTrack`, and anything pushed into the provider's `tracks` that did not come from `createTrack` or one of the loading hooks. TypeScript reports each one (`Property 'kind' is missing`).
+- Tracks holding `midiNotes` clips that are built with `createTrack({ … })` and no `kind`.
+- Saved projects: track data stored before this release has no `kind`.
+- Tracks that hold audio clips and MIDI clips together.
+
+**Replace with:**
+
+```tsx
+// Before
+const drums: ClipTrack = { id: 'drums', name: 'Drums', clips, muted: false, soloed: false, volume: 1, pan: 0 };
+const keys = createTrack({ name: 'Keys', clips: [midiClip] });
+
+// After
+const drums: ClipTrack = { id: 'drums', kind: 'audio', name: 'Drums', clips, muted: false, soloed: false, volume: 1, pan: 0 };
+const keys = createTrack({ name: 'Keys', kind: 'midi', clips: [midiClip] });
+```
+
+For saved data and for tracks that mixed the two, `splitTrackByKind(track)` from `@waveform-playlist/core` gives back valid tracks:
+
+```tsx
+import { splitTrackByKind } from '@waveform-playlist/core';
+
+const tracks = savedTracks.flatMap((track) => splitTrackByKind(track));
+```
+
+- A track whose clips are all of one kind comes back as one track with that kind set. An empty track keeps the kind it has, or becomes an audio track.
+- A track holding both comes back as two. The audio track keeps the id; the MIDI track gets the id plus `-midi` (or the id you pass as the second argument) and the same name, volume, pan, mute and solo.
+
+After a split the two tracks are separate: each has its own fader, mute and solo, and its own effects chain. If you key `trackEffects` or other per-track state by id, give the new MIDI track its own entry.
+
+**What else changes:**
+
+- **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty. An audio track is never drawn as one: `renderMode: 'piano-roll'` on an audio track is ignored (waveform).
+- **Recording.** `useIntegratedRecording`'s `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped.
+- **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id.
 
 ## `addEffect` and `addEffectToTrack` return a promise
 
@@ -1043,3 +1113,46 @@ registerEffect('my-effect', definition);
 The definition shape is unchanged apart from one addition: `EffectParamDef` has an optional `label`. New in core: `unregisterEffect(type)`. One rule of `NativeEffectInstance` is now stated and relied on by both hosts: the host owns every connection out of `output` and disconnects all of them when it rewires the chain, so do not connect `output` to anything inside the effect (take a feedback tap from a node before it).
 
 Do not confuse core's `createEffectInstance(type, audioContext, params)` with the `createEffectInstance(definition, initialParams)` exported from `@waveform-playlist/browser/tone`; the second one builds a built-in Tone.js effect.
+
+## Web components: `<daw-track kind="midi">` declares a MIDI track
+
+**Packages:** `@dawcore/components`.
+
+This entry is for code that uses `<daw-editor>`. A `<daw-track>` now has a `kind` attribute, `audio` (the default) or `midi`, and holds clips of that kind only. `render-mode="piano-roll"` no longer makes a track a MIDI track: it is ignored on an audio track, and a MIDI track is always drawn as a piano roll.
+
+`editor.loadMidi()` and `editor.addTrack({ midi: { notes } })` set the kind for you and need no change.
+
+**Find:**
+
+- `<daw-track render-mode="piano-roll">` in markup, and `setAttribute('render-mode', 'piano-roll')` / `track.renderMode = 'piano-roll'` in scripts.
+- `editor.addTrack({ renderMode: 'piano-roll', clips: [{ midiNotes }] })`.
+- A `<daw-track>` that has both `<daw-clip src>` children and clips with `midiNotes`.
+
+**Replace with:**
+
+```html
+<!-- Before -->
+<daw-track name="Piano" render-mode="piano-roll"></daw-track>
+
+<!-- After -->
+<daw-track name="Piano" kind="midi"></daw-track>
+```
+
+```typescript
+// Before
+await editor.addTrack({ name: 'Piano', renderMode: 'piano-roll', clips: [{ midiNotes }] });
+
+// After
+await editor.addTrack({ name: 'Piano', kind: 'midi', clips: [{ midiNotes }] });
+```
+
+Put audio clips and MIDI clips on separate `<daw-track>` elements.
+
+**What happens to a clip of the wrong kind:** it is not added, and the editor dispatches `daw-clip-error` with `{ trackId, clipId, error }`. This covers a MIDI clip (no `src`) on an audio track, a `<daw-clip src>` on a MIDI track, `editor.addClip()` with a `src` onto a MIDI track (the promise rejects), and `midiNotes` assigned to a clip of an audio track. If every clip of a track is refused, `daw-track-error` follows and `addTrack()` rejects. Listen for `daw-clip-error`: an un-migrated `render-mode="piano-roll"` track shows up as that event and an empty track.
+
+Also:
+
+- Set `kind` before the track is added to the editor. A change after the track has loaded is ignored with a console warning.
+- `editor.startRecording()` onto a MIDI track records nothing and dispatches `daw-recording-error`.
+- `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one.
+

@@ -6,7 +6,7 @@
  */
 
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { sortClipsByTime } from '@waveform-playlist/core';
+import { assertTrackKind, sortClipsByTime } from '@waveform-playlist/core';
 import {
   constrainClipDrag,
   constrainBoundaryTrim,
@@ -205,7 +205,11 @@ export class PlaylistEngine {
   // Track Management
   // ---------------------------------------------------------------------------
 
+  // A track holds audio clips or MIDI clips, never both (#756). The three
+  // methods that take a track check it before they change anything, so a
+  // throw leaves the engine, the undo history and the adapter untouched.
   setTracks(tracks: ClipTrack[]): void {
+    tracks.forEach(assertTrackKind);
     this.clearHistory();
     this._tracks = tracks.map((track) => ({
       ...track,
@@ -220,6 +224,7 @@ export class PlaylistEngine {
   }
 
   addTrack(track: ClipTrack): void {
+    assertTrackKind(track);
     this._pushUndoSnapshot();
     const enriched = {
       ...track,
@@ -278,6 +283,7 @@ export class PlaylistEngine {
     const resolved = track ?? this._tracks.find((t) => t.id === trackId);
     if (!resolved) return;
     if (track) {
+      assertTrackKind(track);
       this._pushUndoSnapshot();
       const enriched = {
         ...track,

@@ -76,6 +76,7 @@ describe('useMidiTracks', () => {
       expect(mockFetch).not.toHaveBeenCalled();
       expect(result.current.tracks).toHaveLength(1);
       expect(result.current.tracks[0].name).toBe('Test');
+      expect(result.current.tracks[0].kind).toBe('midi');
       expect(result.current.tracks[0].clips).toHaveLength(1);
       expect(result.current.tracks[0].clips[0].midiNotes).toEqual(notes);
       expect(result.current.error).toBeNull();
@@ -206,6 +207,7 @@ describe('useMidiTracks', () => {
       expect(result.current.tracks).toHaveLength(2);
       expect(result.current.tracks[0].name).toBe('Lead');
       expect(result.current.tracks[1].name).toBe('Bass');
+      expect(result.current.tracks.map((t) => t.kind)).toEqual(['midi', 'midi']);
     });
 
     it('flattens multi-track MIDI into one ClipTrack', async () => {

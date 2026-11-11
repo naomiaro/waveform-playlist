@@ -56,7 +56,7 @@ vi.mock('tone', () => ({
 import { createToneAdapter, isToneAdapter } from '../TonePlayoutAdapter';
 import { TonePlayout } from '../TonePlayout';
 import { isNativeGlobalContext } from '../audioContext';
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip, TrackKind } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { SoundFontCache } from '../SoundFontCache';
 
@@ -77,8 +77,12 @@ function makeClip(
   };
 }
 
-function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
-  return { id, name: `Track ${id}`, clips, muted: false, soloed: false, volume: 1, pan: 0 };
+function makeTrack(
+  id: string,
+  clips: AudioClip[],
+  kind: TrackKind = clips[0]?.midiNotes ? 'midi' : 'audio'
+): ClipTrack {
+  return { id, kind, name: `Track ${id}`, clips, muted: false, soloed: false, volume: 1, pan: 0 };
 }
 
 function makeMidiClip(
@@ -538,105 +542,97 @@ describe('createToneAdapter', () => {
       expect(mockTrack.setPan).toHaveBeenCalledWith(-0.5);
     });
 
-    // A mixed audio+MIDI track becomes TWO playout tracks (t1 + t1:midi).
-    // Every runtime control must reach both halves — otherwise muting a mixed
-    // track leaves its MIDI playing, and soloing it silences its own MIDI half
-    // (the companion isn't in soloedTracks, so updateSoloMuting mutes it).
-    describe('mixed-track :midi companion', () => {
-      function mixedTrack(): ClipTrack {
-        return makeTrack('t1', [
-          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-        ]);
+    // A track is one playout track under its own id (#756). There is no
+    // companion id for any control to forward to.
+    describe('one playout track per track', () => {
+      function everyIdTouched(instance: Record<string, ReturnType<typeof vi.fn>>): string[] {
+        return ['getTrack', 'setMute', 'setSolo', 'removeTrack', 'resumeTrackMidPlayback'].flatMap(
+          (method) => instance[method].mock.calls.map((call) => String(call[0]))
+        );
       }
 
-      // #660: one effects chain per track. Both halves running the closure
-      // would return the chain into two faders — the track would play twice.
-      it('only the audio half runs the track effects closure; the MIDI half feeds its input', () => {
-        const effects = vi.fn();
-        const adapter = createToneAdapter({ trackEffects: () => effects });
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        const audioHalfInput = { name: 'audio-half-input' };
-        instance.getTrack = vi.fn((id: string) =>
-          id === 't1' ? { trackInput: audioHalfInput } : undefined
-        );
-
-        adapter.setTracks([mixedTrack()]);
-
-        expect(instance.addTrack.mock.lastCall![0].effects).toBe(effects);
-        const midiEffects = instance.addMidiTrack.mock.lastCall![0].effects;
-        expect(midiEffects).toBeTypeOf('function');
-        expect(midiEffects).not.toBe(effects);
-
-        const midiInput = { connect: vi.fn() };
-        const midiFader = { connect: vi.fn() };
-        midiEffects(midiInput, midiFader, false);
-        // mixedTrack() has mono audio: no trim, straight into the audio input.
-        expect(midiInput.connect).toHaveBeenCalledWith(audioHalfInput);
-        expect(midiInput.connect).not.toHaveBeenCalledWith(midiFader);
-        expect(effects).not.toHaveBeenCalled(); // TonePlayout is mocked; the audio ToneTrack calls it
-      });
-
-      it('a MIDI-only track runs the track effects closure itself', () => {
-        const effects = vi.fn();
-        const adapter = createToneAdapter({ trackEffects: () => effects });
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        const midiOnly = mixedTrack();
-        midiOnly.clips = midiOnly.clips.filter((c) => c.midiNotes);
-
-        adapter.setTracks([midiOnly]);
-
-        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBe(effects);
-      });
-
-      it('a mixed track without effects passes none to either half', () => {
+      it.each(['audio', 'midi'] as const)('controls of a %s track address only its id', (kind) => {
         const adapter = createToneAdapter();
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const clip =
+          kind === 'midi'
+            ? makeMidiClip({ id: 'c1', startSample: 0, durationSamples: 44100 })
+            : makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+        const track = makeTrack('t1', [clip]);
+        adapter.setTracks([track]);
+        adapter.play(0);
 
-        adapter.setTracks([mixedTrack()]);
-
-        expect(instance.addTrack.mock.lastCall![0].effects).toBeUndefined();
-        expect(instance.addMidiTrack.mock.lastCall![0].effects).toBeUndefined();
-      });
-
-      it('setTrackMute also mutes the :midi companion', () => {
-        const adapter = createToneAdapter();
-        adapter.setTracks([mixedTrack()]);
         adapter.setTrackMute('t1', true);
-
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        expect(instance.setMute).toHaveBeenCalledWith('t1', true);
-        expect(instance.setMute).toHaveBeenCalledWith('t1:midi', true);
-      });
-
-      it('setTrackSolo also soloes the :midi companion', () => {
-        const adapter = createToneAdapter();
-        adapter.setTracks([mixedTrack()]);
         adapter.setTrackSolo('t1', true);
-
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        expect(instance.setSolo).toHaveBeenCalledWith('t1', true);
-        expect(instance.setSolo).toHaveBeenCalledWith('t1:midi', true);
-      });
-
-      it('setTrackVolume also reaches the :midi companion', () => {
-        const adapter = createToneAdapter();
-        adapter.setTracks([mixedTrack()]);
         adapter.setTrackVolume('t1', 0.5);
+        adapter.setTrackPan('t1', 0.25);
+        adapter.updateTrack!('t1', track);
+        adapter.setTracks([track]);
+        adapter.removeTrack!('t1');
 
         const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        expect(instance.getTrack).toHaveBeenCalledWith('t1');
-        expect(instance.getTrack).toHaveBeenCalledWith('t1:midi');
+        const ids = everyIdTouched(instance);
+        expect(ids.length).toBeGreaterThan(0);
+        expect(ids.filter((id) => id !== 't1')).toEqual([]);
       });
 
-      it('setTrackPan also reaches the :midi companion', () => {
-        const adapter = createToneAdapter();
-        adapter.setTracks([mixedTrack()]);
-        adapter.setTrackPan('t1', 0.25);
+      it('a MIDI track runs the track effects closure itself', () => {
+        const effects = vi.fn();
+        const adapter = createToneAdapter({ trackEffects: () => effects });
+        adapter.setTracks([
+          makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+        ]);
 
         const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-        expect(instance.getTrack).toHaveBeenCalledWith('t1');
-        expect(instance.getTrack).toHaveBeenCalledWith('t1:midi');
+        expect(instance.addMidiTrack.mock.calls[0][0].effects).toBe(effects);
+        expect(instance.addTrack).not.toHaveBeenCalled();
+      });
+
+      it('builds from the kind, not from the clips: an audio track never builds a MIDI track', () => {
+        const adapter = createToneAdapter();
+        // A track the engine would have rejected: the adapter follows `kind`.
+        adapter.setTracks([
+          makeTrack(
+            't1',
+            [
+              makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
+              makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+            ],
+            'audio'
+          ),
+        ]);
+
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        expect(instance.addTrack).toHaveBeenCalledTimes(1);
+        expect(instance.addTrack.mock.calls[0][0].clips).toHaveLength(1);
+        expect(instance.addMidiTrack).not.toHaveBeenCalled();
+      });
+
+      it('updateTrack on a MIDI track rebuilds it without trying a clip-level audio update', () => {
+        const adapter = createToneAdapter();
+        const track = makeTrack('t1', [
+          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+        ]);
+        adapter.setTracks([track]);
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+        adapter.updateTrack!('t1', track);
+
+        expect(instance.replaceTrackClips).not.toHaveBeenCalled();
+        expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+        expect(instance.addMidiTrack).toHaveBeenCalledTimes(2);
+      });
+
+      it('updateTrack removes a MIDI track whose last clip was deleted', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([
+          makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+        ]);
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+        adapter.updateTrack!('t1', makeTrack('t1', [], 'midi'));
+
+        expect(instance.removeTrack).toHaveBeenCalledWith('t1');
+        expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -787,23 +783,6 @@ describe('createToneAdapter', () => {
     });
   });
 
-  describe('removeTrack', () => {
-    it('removeTrack also removes the companion :midi playout track', () => {
-      const adapter = createToneAdapter();
-      adapter.setTracks([
-        makeTrack('t1', [
-          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-        ]),
-      ]);
-      adapter.removeTrack!('t1');
-
-      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-      expect(instance.removeTrack).toHaveBeenCalledWith('t1');
-      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
-    });
-  });
-
   describe('updateTrack (pan law, #669)', () => {
     it('passes the track source channel count with the clip update', () => {
       const adapter = createToneAdapter();
@@ -827,56 +806,6 @@ describe('createToneAdapter', () => {
         expect.any(Number),
         2
       );
-    });
-  });
-
-  describe('updateTrack (companion MIDI)', () => {
-    it('re-adds only the MIDI half after replaceTrackClips updates audio in place', () => {
-      const adapter = createToneAdapter();
-      const mixedTrack = makeTrack('t1', [
-        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-        makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-      ]);
-      adapter.setTracks([mixedTrack]);
-
-      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-      expect(instance.addTrack).toHaveBeenCalledTimes(1);
-      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
-      instance.replaceTrackClips.mockReturnValue(true);
-
-      adapter.updateTrack!('t1', mixedTrack);
-
-      // Audio updated in place — NOT re-added (a second addTrack would leak
-      // the old ToneTrack; TonePlayout.addTrack has no idempotency guard)
-      expect(instance.addTrack).toHaveBeenCalledTimes(1);
-      // MIDI half removed and re-added
-      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
-      expect(instance.addMidiTrack).toHaveBeenCalledTimes(2);
-    });
-
-    it('removes the stale :midi companion when the last MIDI clip is deleted', () => {
-      const adapter = createToneAdapter();
-      const mixedTrack = makeTrack('t1', [
-        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-        makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-      ]);
-      adapter.setTracks([mixedTrack]);
-
-      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
-      instance.replaceTrackClips.mockReturnValue(true);
-
-      // User deletes the MIDI clip — audio-only update. Without companion
-      // cleanup, the t1:midi MidiToneTrack keeps its Part scheduled and the
-      // deleted MIDI keeps playing (ghost playback).
-      const audioOnly = makeTrack('t1', [
-        makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-      ]);
-      adapter.updateTrack!('t1', audioOnly);
-
-      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
-      // No MIDI clips remain — nothing re-added
-      expect(instance.addMidiTrack).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1088,22 +1017,6 @@ describe('createToneAdapter', () => {
       const arg = instance.addSoundFontTrack.mock.calls[0][0];
       expect(arg.track.gain).toBe(0.5);
       expect(arg.track.muted).toBe(true);
-    });
-
-    it('uses :midi suffixed id for mixed audio+MIDI tracks', () => {
-      const adapter = createToneAdapter();
-      adapter.setTracks([
-        makeTrack('t1', [
-          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-        ]),
-      ]);
-
-      adapter.setSoundFontCache(loadedCache);
-
-      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-      expect(instance.removeTrack).toHaveBeenCalledWith('t1:midi');
-      expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('t1:midi');
     });
 
     it('does not rebuild tracks removed via removeTrack', () => {
@@ -1336,20 +1249,6 @@ describe('createToneAdapter', () => {
       expect(instance.addSoundFontTrack).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('SoundFont not loaded'));
       warnSpy.mockRestore();
-    });
-
-    it('uses :midi suffixed id for tracks with both audio and MIDI clips', () => {
-      const adapter = createToneAdapter({ soundFontCache: loadedCache });
-      adapter.setTracks([
-        makeTrack('t1', [
-          makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 }),
-          makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
-        ]),
-      ]);
-
-      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
-      expect(instance.addTrack.mock.calls[0][0].track.id).toBe('t1');
-      expect(instance.addSoundFontTrack.mock.calls[0][0].track.id).toBe('t1:midi');
     });
   });
 

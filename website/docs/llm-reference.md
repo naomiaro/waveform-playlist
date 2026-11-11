@@ -385,6 +385,36 @@ interface PlaylistDataContextValue {
 ## Data Types
 
 ```typescript
+// From @waveform-playlist/core
+type TrackKind = 'audio' | 'midi';
+
+interface ClipTrack {
+  id: string;
+  kind: TrackKind;        // Required. A track holds audio clips or MIDI clips (clips with midiNotes), never both
+  name: string;
+  clips: AudioClip[];
+  muted: boolean;
+  soloed: boolean;
+  volume: number;         // 0.0 to 1.0+
+  pan: number;            // -1.0 to 1.0
+  color?: string;
+  height?: number;
+  renderMode?: RenderMode;  // Audio tracks only. A MIDI track is always drawn as a piano roll
+  spectrogramConfig?: SpectrogramConfig;
+  spectrogramColorMap?: ColorMapValue;
+}
+
+createTrack(options: { name: string; kind?: TrackKind /* default 'audio' */; clips?: AudioClip[]; /* … */ }): ClipTrack;
+clipKind(clip): TrackKind;              // 'midi' when clip.midiNotes != null
+trackKind(track): TrackKind;            // track.kind, or 'audio' when it is missing (plain JS)
+assertTrackKind(track): void;           // Throws when a clip is not of the track's kind
+splitTrackByKind(track, midiTrackId?): ClipTrack[];  // One track with its kind set, or two for a track holding both
+                                                     // (audio keeps the id; MIDI gets id + '-midi' or midiTrackId)
+```
+
+A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console warning, and the playlist stays in its loading state until `tracks` is valid. Always pass `onError`.
+
+```typescript
 interface TrackState {
   name: string;
   muted: boolean;
@@ -1128,13 +1158,15 @@ interface MidiLoadResult {
 }
 ```
 
-Created tracks get `render-mode="piano-roll"` automatically. **Cleanup-on-failure:** any per-track rejection removes every `<daw-track>` appended during the call — both succeeded ones AND elements `addTrack` left in the DOM before rejecting. Editor returns to its pre-call state via `Promise.allSettled` + diff cleanup. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
+Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. **Cleanup-on-failure:** any per-track rejection removes every `<daw-track>` appended during the call — both succeeded ones AND elements `addTrack` left in the DOM before rejecting. Editor returns to its pre-call state via `Promise.allSettled` + diff cleanup. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
 
 ---
 
 ## Engine (`@waveform-playlist/engine`)
 
 Framework-agnostic timeline engine. Used internally by the browser package provider.
+
+`setTracks(tracks)`, `addTrack(track)` and `updateTrack(id, track)` throw an `Error` when a track's clips are not all of its `kind` (see `ClipTrack` under Data Types). The check runs before any state changes: no undo step, no adapter call.
 
 ```typescript
 import { PlaylistEngine } from '@waveform-playlist/engine';

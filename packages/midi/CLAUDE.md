@@ -39,6 +39,10 @@ Provides MIDI file loading, parsing, and React hook integration for waveform-pla
 
 2. **`useMidiTracks()`** — React hook mirroring `useAudioTracks` from `@waveform-playlist/browser`. Handles fetch, parse, and `ClipTrack` construction with loading states.
 
+### Tracks Are MIDI Tracks
+
+`useMidiTracks` builds every track with `createTrack({ kind: 'midi', … })` (#756). A track without it is read as an audio track and the engine rejects its MIDI clip.
+
 ### Multi-Track Expansion
 
 One MIDI config can produce multiple `ClipTrack` objects. A `.mid` file with N MIDI tracks generates N `ClipTrack`s by default. The `flatten: true` option merges all tracks into one.

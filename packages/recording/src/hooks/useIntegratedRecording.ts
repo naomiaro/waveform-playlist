@@ -15,6 +15,7 @@ import {
   type RecordingProgressSource,
   carveClipRange,
   resolveRecordingOffsetSamples,
+  trackKind,
 } from '@waveform-playlist/core';
 import {
   resumeGlobalAudioContext,
@@ -158,6 +159,20 @@ export function useIntegratedRecording(
     if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')
+      );
+      return false;
+    }
+    // A track holds one kind of clip (#756): a take is audio, so it cannot
+    // land on a MIDI track. Refuse before anything is captured. A track that
+    // was created in this same render is not in the list yet and is let through.
+    const target = tracksRef.current.find((t) => t.id === selectedTrackIdRef.current);
+    if (target && trackKind(target) === 'midi') {
+      setHookError(
+        new Error(
+          'Cannot start recording: "' +
+            (target.name || target.id) +
+            '" is a MIDI track. Select or create an audio track first.'
+        )
       );
       return false;
     }

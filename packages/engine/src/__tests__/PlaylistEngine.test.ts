@@ -22,6 +22,7 @@ function makeClip(
 function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
   return {
     id,
+    kind: 'audio',
     name: `Track ${id}`,
     clips,
     muted: false,

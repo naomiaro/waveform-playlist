@@ -74,6 +74,20 @@ interface UseMidiTracksOptions {
 }
 ```
 
+### MIDI Tracks
+
+Every track `useMidiTracks` returns is a MIDI track (`kind: 'midi'`). A track holds one kind of clip: MIDI clips go on MIDI tracks and audio clips on audio tracks, so put a `.mid` part and an audio stem on separate tracks. A MIDI track is always drawn as a piano roll.
+
+If you build a MIDI track yourself, set the kind:
+
+```tsx
+import { createTrack } from '@waveform-playlist/core';
+
+const keys = createTrack({ name: 'Keys', kind: 'midi', clips: [midiClip] });
+```
+
+A track whose clips do not match its kind is rejected. The provider reports it through its `onError` prop (an error boundary does not see it) and the playlist stays in its loading state, so pass `onError`.
+
 ### Pre-Parsed Notes
 
 If you already have note data (e.g., from a custom parser or algorithm), skip the fetch step:
@@ -190,7 +204,7 @@ function MixedPlayer() {
 
 ## Web Components
 
-For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This creates one `<daw-track>` element per note-bearing MIDI track, each with `render-mode="piano-roll"` set automatically.
+For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This creates one `<daw-track>` element per note-bearing MIDI track, each a MIDI track (`kind="midi"`), drawn as a piano roll.
 
 ### Installation
 

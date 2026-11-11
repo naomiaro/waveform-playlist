@@ -176,6 +176,26 @@ describe('useIntegratedRecording', () => {
     }
   });
 
+  it('refuses to record onto a MIDI track (#756)', async () => {
+    getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+    const setTracks = vi.fn();
+    const midiTrack: ClipTrack = { ...makeTrack('track-1'), kind: 'midi', name: 'Keys' };
+    const { result } = renderHook(() => useIntegratedRecording([midiTrack], setTracks, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    let started: boolean | undefined;
+    await act(async () => {
+      started = await result.current.startRecording();
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.error?.message).toMatch(/"Keys" is a MIDI track/);
+    expect(setTracks).not.toHaveBeenCalled();
+  });
+
   it('rejects changeDevice while recording (stream untouched, error surfaced)', async () => {
     const setTracks = vi.fn();
     const { result } = await setupRecording([makeTrack('track-1')], setTracks);
