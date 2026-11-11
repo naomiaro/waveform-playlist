@@ -13,4 +13,18 @@ These plugin bundles were generated ahead of time with [faust2wam](https://githu
 
 **Not included: `faust-ui`.** faust2wam normally also vendors [`faust-ui`](https://github.com/grame-cncm/faust-ui) for the plugin's own GUI. faust-ui is **GPL-3.0-or-later**, so the compile script removes it (`stripFaustUi`). These plugins therefore have no GUI of their own; hosts show their generic parameter panel instead.
 
-The LGPL files are kept as separate files rather than merged into an application bundle, so they can be replaced with another build of the same library. Only `index.js` is modified from what faust2wam generates (the GUI hookup is removed, as noted in the table); `faustwasm/index.js` is unmodified. The licence texts are not copied into these folders: see the linked repositories for the LGPL and the libraries' source. If you copy these bundles into your own project, the LGPL terms for those files come with them. This is a description of what is in the folder, not legal advice.
+The LGPL files are kept as separate files rather than merged into an application bundle, so they can be replaced with another build of the same library. Only `index.js` is modified from what faust2wam generates (the GUI hookup is removed, as noted in the table); `faustwasm/index.js` is unmodified.
+
+## Licence texts and source
+
+The licence texts for the LGPL files are in [`licenses/`](./licenses/):
+
+- `licenses/faustwasm-COPYING.txt` — the `COPYING.txt` shipped in `@grame/faustwasm` (its copyright notice and the LGPL 2.1 text), copied unchanged. Applies to each `faustwasm/index.js`.
+- `licenses/LGPL-3.0.txt` — the GNU Lesser General Public License, version 3. Applies to each plugin's `index.js` and `descriptor.json` (faust2wam's templates).
+- `licenses/GPL-3.0.txt` — the GNU General Public License, version 3. Included because the LGPL-3.0 is written as additional permissions on top of it and refers to it. **No GPL-licensed code is in these folders.**
+
+Source for the LGPL files:
+
+- faustwasm: https://github.com/grame-cncm/faustwasm (the vendored file is the `dist` build of `@grame/faustwasm` 0.15.7).
+- faust2wam: https://github.com/Fr0stbyteR/faust2wam (`@shren/faust2wam` 0.0.16; the plugin `index.js` is its `assets/wam2` template with the GUI import and `createGui()` removed by `examples/faust-precompiled/compile.mjs`).
+ If you copy these bundles into your own project, the LGPL terms for those files come with them. This is a description of what is in the folder, not legal advice.
