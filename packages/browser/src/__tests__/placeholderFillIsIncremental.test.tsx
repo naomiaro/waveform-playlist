@@ -8,7 +8,11 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
+import {
+  WaveformPlaylistProvider,
+  usePlaylistData,
+  usePlaylistState,
+} from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -67,11 +71,13 @@ function createFakeAdapter() {
 let probe: {
   trackStates: { name: string; volume: number }[];
   isReady: boolean;
+  canUndo: boolean;
 };
 
 const ProbeChild: React.FC = () => {
   const { trackStates, isReady } = usePlaylistData();
-  probe = { trackStates, isReady };
+  const { canUndo } = usePlaylistState();
+  probe = { trackStates, isReady, canUndo };
   return null;
 };
 
@@ -142,6 +148,41 @@ describe('a placeholder track that gets its clips', () => {
     });
 
     expect(adapter.updateTrack.mock.calls[0][1]).toMatchObject({ volume: 1, muted: false, pan: 0 });
+  });
+
+  // "The audio arrived" is not a step to undo back to an empty placeholder.
+  it('leaves nothing to undo', async () => {
+    const placeholder = makeTrack('t1', 'Guitar (loading...)', []);
+    const { setTracks } = mount([placeholder]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    await act(async () => {
+      setTracks([{ ...placeholder, name: 'Guitar', clips: [makeClip('c1')] } as ClipTrack]);
+    });
+
+    expect(probe.canUndo).toBe(false);
+  });
+
+  // An added track is mirrored to the parent. What is mirrored must already
+  // hold the filled track, or a parent that stores it loses the fill.
+  it('a fill and an add in one change mirror the filled track, not the placeholder', async () => {
+    const loaded = makeTrack('t1', 'Drums', [makeClip('c1')]);
+    const placeholder = makeTrack('t2', 'Guitar (loading...)', []);
+    const { adapter, onTracksChange, setTracks } = mount([loaded, placeholder]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    adapter.setTracks.mockClear();
+    onTracksChange.mockClear();
+
+    const filled = { ...placeholder, name: 'Guitar', clips: [makeClip('c2')] } as ClipTrack;
+    await act(async () => {
+      setTracks([loaded, filled, makeTrack('t3', 'Bass', [])]);
+    });
+
+    expect(adapter.setTracks).not.toHaveBeenCalled();
+    const mirrored = onTracksChange.mock.lastCall?.[0] as ClipTrack[];
+    expect(mirrored.map((t) => t.id)).toEqual(['t1', 't2', 't3']);
+    expect(mirrored[1].name).toBe('Guitar');
+    expect(mirrored[1].clips).toHaveLength(1);
   });
 
   it('still rebuilds when a track that has clips is replaced', async () => {

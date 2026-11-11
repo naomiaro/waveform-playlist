@@ -844,10 +844,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             pan: trackState?.pan ?? track.pan,
           };
         };
-        for (const track of addedTracks) {
-          engine.addTrack(withUiState(track));
-        }
-
+        // Fills before adds: an add is mirrored to the parent, and what it
+        // mirrors must already hold the filled tracks.
         if (filledTracks.length > 0) {
           // The parent already has these tracks, as on the initial setTracks:
           // do not echo them back through onTracksChange.
@@ -862,6 +860,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           // As a rebuild did: "the audio arrived" is not a step to undo back
           // to an empty placeholder.
           engine.clearHistory();
+          // clearHistory emits nothing; without this `canUndo` stays true.
+          onUndoEngineState(engine.getState());
+        }
+
+        for (const track of addedTracks) {
+          engine.addTrack(withUiState(track));
         }
 
         // Initialize track states for the new tracks (preserve existing), and

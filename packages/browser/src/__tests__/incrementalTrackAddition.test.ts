@@ -96,12 +96,24 @@ describe('incrementalTrackChange', () => {
     ).toBeNull();
   });
 
-  it('accepts reordered existing tracks (still the same objects)', () => {
+  // The engine keeps its own track order and mixer state is stored by
+  // position, so a change that also reorders is a rebuild.
+  it('returns null when the existing tracks changed order', () => {
+    const track1 = makeTrack('1');
+    const track2 = makeTrack('2');
+    const placeholder = makeTrack('3');
+    const filledTrack = { ...placeholder, clips: [clip('a')] } as ClipTrack;
+
+    expect(incrementalTrackChange([track1, track2], [track2, track1, makeTrack('4')])).toBeNull();
+    expect(incrementalTrackChange([track1, placeholder], [filledTrack, track1])).toBeNull();
+  });
+
+  it('accepts a new track inserted between existing ones', () => {
     const track1 = makeTrack('1');
     const track2 = makeTrack('2');
     const track3 = makeTrack('3');
 
-    expect(incrementalTrackChange([track1, track2], [track2, track1, track3])?.added).toEqual([
+    expect(incrementalTrackChange([track1, track2], [track1, track3, track2])?.added).toEqual([
       track3,
     ]);
   });
