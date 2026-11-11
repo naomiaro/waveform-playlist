@@ -90,4 +90,15 @@ describe('DevicePixelRatioProvider', () => {
     );
     expect(seen).toBe(2);
   });
+
+  it('without a provider, the hook returns the live ratio, not one captured at import', () => {
+    setDevicePixelRatio(3);
+    const { rerender } = render(<Probe />);
+    expect(seen).toBe(3);
+
+    setDevicePixelRatio(1.25);
+    rerender(<Probe />);
+    expect(seen).toBe(1.25);
+    expect(liveListenerCount()).toBe(0);
+  });
 });
