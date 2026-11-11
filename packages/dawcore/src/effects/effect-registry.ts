@@ -136,7 +136,9 @@ function biquadDefinition(spec: BiquadFilterSpec): NativeEffectDefinition {
  */
 function registerBuiltIn(type: string, definition: NativeEffectDefinition): void {
   if (!getEffectDefinitions().has(type)) {
-    registerEffect(type, definition);
+    // Marked as this library's catalogue, so other hosts of the shared
+    // registry (the React effects hooks) do not list them as app effects.
+    registerEffect(type, { ...definition, builtIn: true });
   }
 }
 

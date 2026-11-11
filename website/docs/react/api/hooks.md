@@ -1308,7 +1308,7 @@ function TrackRack({
 function getAvailableEffects(): EffectDefinition[];
 ```
 
-Both hooks return this list as `availableEffects`, read when the calling component renders. Register custom effects before the component that shows the picker renders. Adding by id (`addEffect('my-id')`) does not depend on the list.
+Both hooks return this list as `availableEffects`, read when the calling component renders. Register custom effects before the component that shows the picker renders. Adding by id (`addEffect('my-id')`) does not depend on the list. Effects that belong to another library's own catalogue in the shared registry are not listed: when `@dawcore/components` is loaded on the same page, its `native-*` effects stay out of the React list (they are marked `builtIn`), and can still be added by id.
 
 ### Effect types
 
@@ -1399,6 +1399,13 @@ interface NativeEffectDefinition {
    *  to run more than once on the same context. */
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
+  /**
+   * Set by a host library on the effects of its own catalogue (dawcore's
+   * `native-*`), never by an app. A host lists its own catalogue plus what
+   * the app registered: the React effect picker leaves these out. The effect
+   * can still be added by id anywhere.
+   */
+  builtIn?: boolean;
 }
 
 interface EffectParamDef {

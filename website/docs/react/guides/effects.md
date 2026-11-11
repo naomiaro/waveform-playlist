@@ -295,7 +295,7 @@ function EffectsRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
 
 `addEffect(id)` returns a `Promise<string>` that resolves with the new entry's `instanceId`. A built-in effect is in the chain before the call returns; the promise is there for [custom effects](#custom-effects), which may load a worklet first. An id that is neither a built-in nor a registered type rejects.
 
-`availableEffects` lists the effects that can be added: the built-in effects and, when the app is in native AudioContext mode, the [custom effects](#custom-effects) registered so far. It is read when the component that called the hook renders and is not a subscription, so a type registered after that render appears only on that component's next render. Adding by id does not depend on the list: `addEffect('my-id')` works for any registered type.
+`availableEffects` lists the effects that can be added: the built-in effects and, when the app is in native AudioContext mode, the [custom effects](#custom-effects) registered so far. It is read when the component that called the hook renders and is not a subscription, so a type registered after that render appears only on that component's next render. Adding by id does not depend on the list: `addEffect('my-id')` works for any registered type. Effects that belong to another library's own catalogue in the shared registry are not listed: when `@dawcore/components` is loaded on the same page, its `native-*` effects stay out of the React list (they are marked `builtIn`), and can still be added by id.
 
 ### Lifetime of a chain
 

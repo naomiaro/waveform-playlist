@@ -834,6 +834,13 @@ interface NativeEffectDefinition {
    *  safe to run more than once on the same context. */
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
+  /**
+   * Set by a host library on the effects of its own catalogue (dawcore's
+   * `native-*`), never by an app. A host lists its own catalogue plus what
+   * the app registered: the React effect picker leaves these out. The effect
+   * can still be added by id anywhere.
+   */
+  builtIn?: boolean;
 }
 
 /** Result of creating an effect via the registry. */
@@ -1831,7 +1838,7 @@ createEffectChain(effects: EffectInstance[]): {
   output: ToneAudioNode | AudioNode;
   dispose: () => void;
 };
-getAvailableEffects(): EffectDefinition[]; // built-ins, then (native-context mode only) registered custom types
+getAvailableEffects(): EffectDefinition[]; // built-ins, then (native-context mode only) the custom types the app registered; another host's `builtIn` catalogue (dawcore's native-*) is left out
 // The registry functions (registerEffect, a different createEffectInstance, …)
 // are from `@waveform-playlist/core` — see "Effect registry" above.
 

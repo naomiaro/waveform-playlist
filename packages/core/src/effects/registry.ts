@@ -67,6 +67,14 @@ export interface NativeEffectDefinition {
    */
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
+  /**
+   * Set by a host library on the effects of its own catalogue (dawcore's
+   * `native-*`), never by an app. The registry is shared between hosts, and a
+   * host lists its own catalogue plus what the app registered, not another
+   * host's catalogue: the React effect picker leaves these out. The effect
+   * can still be added by id anywhere.
+   */
+  builtIn?: boolean;
 }
 
 /** Result of creating an effect via the registry. */

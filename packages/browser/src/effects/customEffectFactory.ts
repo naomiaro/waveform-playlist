@@ -65,9 +65,12 @@ export function toEffectDefinition(
 let availableCache: { custom: EffectDefinition[]; list: EffectDefinition[] } | null = null;
 
 /**
- * The effects that can be added right now: the built-in effects, followed by
- * every registered custom effect when the app is in native-context mode (a
- * registered effect cannot be added without it). Returns the same array until
+ * The effects to offer in a picker: the built-in Tone.js effects, followed by
+ * the custom effects the app registered when it is in native-context mode (a
+ * registered effect cannot be added without it). Another host library's own
+ * catalogue in the shared registry (`builtIn` definitions: dawcore's
+ * `native-*`, present when `@dawcore/components` is loaded too) is left out;
+ * those can still be added by id. Returns the same array until
  * that set changes, so it is safe to read during render. It is a read, not a
  * subscription: a type registered later appears the next time this is called.
  */
@@ -75,7 +78,8 @@ export function getAvailableEffects(): EffectDefinition[] {
   if (!isNativeGlobalContext()) return effectDefinitions;
   const custom: EffectDefinition[] = [];
   getEffectDefinitions().forEach((definition, type) => {
-    if (!getEffectDefinition(type)) custom.push(toEffectDefinition(type, definition));
+    if (definition.builtIn || getEffectDefinition(type)) return;
+    custom.push(toEffectDefinition(type, definition));
   });
   if (custom.length === 0) return effectDefinitions;
   const cached = availableCache;

@@ -224,6 +224,24 @@ describe('effect registry', () => {
 // The registry is shared (core): an app can register under a built-in's name
 // before this package loads, and the module can be evaluated more than once.
 describe('built-in registration', () => {
+  it('marks its built-ins, and only those, as a host catalogue', () => {
+    registerEffect('custom-boost', {
+      label: 'Boost',
+      category: 'dynamics',
+      defaults: {},
+      params: {},
+      create: (ctx) => {
+        const node = ctx.createGain();
+        return { input: node, output: node, applyParams: () => {} };
+      },
+    });
+    const defs = getEffectDefinitions();
+    for (const [type, definition] of defs) {
+      expect(definition.builtIn === true, type).toBe(type.startsWith('native-'));
+    }
+    expect(defs.size).toBe(12);
+  });
+
   it('does not overwrite a type the app registered first, and does not warn', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const mine = { ...getEffectDefinitions().get('native-gain')!, label: 'My Gain' };

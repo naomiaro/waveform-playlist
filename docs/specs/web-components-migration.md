@@ -1061,6 +1061,13 @@ interface NativeEffectDefinition {
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   // Must work on any BaseAudioContext so the same definitions serve offline rendering:
   create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
+  /**
+   * Set by a host library on the effects of its own catalogue (dawcore's
+   * `native-*`), never by an app. A host lists its own catalogue plus what
+   * the app registered: the React effect picker leaves these out. The effect
+   * can still be added by id anywhere.
+   */
+  builtIn?: boolean;
 }
 
 interface NativeEffectInstance {

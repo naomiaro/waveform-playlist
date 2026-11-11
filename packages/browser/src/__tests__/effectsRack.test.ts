@@ -829,6 +829,23 @@ describe('getAvailableEffects', () => {
     expect(ids).toHaveLength(effectDefinitions.length + 1);
   });
 
+  it("leaves out another host library's own catalogue, which can still be added by id", async () => {
+    // What @dawcore/components does for its native-* effects on import.
+    registerEffect('native-compressor', tremolo({ label: 'Compressor', builtIn: true }));
+    registerEffect('my-tremolo', tremolo());
+
+    const ids = getAvailableEffects().map((definition) => definition.id);
+    expect(ids).not.toContain('native-compressor');
+    expect(ids).toContain('my-tremolo');
+
+    const rack = new EffectsRack();
+    await rack.add('native-compressor');
+    expect(rack.effects.getSnapshot()[0]).toMatchObject({
+      effectId: 'native-compressor',
+      kind: 'custom',
+    });
+  });
+
   it('lists only the built-ins outside native-context mode, where a registered effect cannot be added', () => {
     registerEffect('my-tremolo', tremolo());
     isNativeGlobalContext.mockReturnValue(false);
