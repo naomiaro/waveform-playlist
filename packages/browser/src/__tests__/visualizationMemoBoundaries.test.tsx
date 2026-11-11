@@ -372,23 +372,28 @@ describe('visualization memo boundaries (#693)', () => {
     expect(transforms().sort()).toEqual(['scaleX(0.25)', 'scaleX(1)', 'scaleX(1)', 'scaleX(1)']);
   });
 
-  it('pressing a clip selects its track by its current index after the tracks change', async () => {
+  it('a control panel selects its track by its current index after the tracks change', async () => {
+    // `selectTrack` keeps its identity across `tracks` changes (it is a prop of
+    // every memoized clip and panel), so it must read the current tracks.
     const { a, b, c, d } = threeTracks();
     const { setTracks } = await mount([
       makeTrack('t1', [a, b]),
       makeTrack('t2', [c]),
       makeTrack('t3', [d]),
     ]);
-    // t1 is removed: clip d's track moves from index 2 to index 1.
+    // t1 is removed: t3 moves from index 2 to index 1.
     await act(async () => {
       setTracks([makeTrack('t2', [c]), makeTrack('t3', [d])]);
     });
     await waitFor(() => expect(probe.data.isReady).toBe(true));
 
-    const clipD = document.querySelector('[data-track-id="t3"] [data-clip-container]');
-    expect(clipD).not.toBeNull();
+    const muteButtons = Array.from(document.querySelectorAll('button')).filter(
+      (button) => button.textContent === 'Mute'
+    );
+    expect(muteButtons).toHaveLength(2);
+    // The click bubbles to the panel, which selects its track.
     await act(async () => {
-      fireEvent.mouseDown(clipD!);
+      fireEvent.click(muteButtons[1]);
     });
 
     expect(probe.state.selectedTrackId).toBe('t3');
