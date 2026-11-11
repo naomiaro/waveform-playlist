@@ -1080,9 +1080,8 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 ```typescript
 interface WaveformProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
+  // label: "m:ss" in the temporal scale, bar.beat (e.g. "2.3") in beats mode. There is no renderTimestamp.
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
-  /** @deprecated Use renderTick */
-  renderTimestamp?: (timeMs: number, pixelPosition: number) => ReactNode;
   renderPlayhead?: RenderPlayheadFunction;
   renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
