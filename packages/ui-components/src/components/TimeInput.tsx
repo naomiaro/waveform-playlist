@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { formatTime, parseTime, type TimeFormat } from '../utils/timeFormat';
 import { BaseInput, ScreenReaderOnly } from '../styled/index';
 
@@ -16,7 +16,8 @@ export interface TimeInputProps {
  * TimeInput - A styled input for time values with format support
  *
  * Uses BaseInput for consistent theming. Displays time in the specified
- * format and parses user input on blur.
+ * format and parses user input on blur. `onChange` fires only when the text
+ * was edited, so moving focus through the input never rounds the value.
  */
 export const TimeInput: React.FC<TimeInputProps> = ({
   id,
@@ -27,27 +28,20 @@ export const TimeInput: React.FC<TimeInputProps> = ({
   onChange,
   readOnly = false,
 }) => {
-  const [displayValue, setDisplayValue] = useState('');
-
-  // Update display value when value or format changes
-  useEffect(() => {
-    const formatted = formatTime(value, format);
-    setDisplayValue(formatted);
-  }, [value, format, id]);
+  // Only an in-progress edit is state; otherwise the display is derived from the props.
+  const [draft, setDraft] = useState<string | null>(null);
+  const displayValue = draft ?? formatTime(value, format);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDisplayValue = e.target.value;
-    setDisplayValue(newDisplayValue);
+    setDraft(e.target.value);
   };
 
   const handleBlur = () => {
-    // Parse the display value and notify parent
-    if (onChange) {
-      const parsedValue = parseTime(displayValue, format);
-      onChange(parsedValue);
-    }
-    // Re-format to ensure consistent display
-    setDisplayValue(formatTime(value, format));
+    if (draft === null) return; // nothing was typed, so there is nothing to report
+    // Dropping the draft returns the display to the formatted prop; the parent
+    // decides whether the parsed value becomes the new prop.
+    setDraft(null);
+    onChange?.(parseTime(draft, format));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

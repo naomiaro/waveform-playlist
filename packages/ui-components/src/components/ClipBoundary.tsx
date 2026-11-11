@@ -9,7 +9,6 @@ type BoundaryEdge = 'left' | 'right';
 interface BoundaryContainerProps {
   readonly $edge: BoundaryEdge;
   readonly $isDragging?: boolean;
-  readonly $isHovered?: boolean;
   readonly $touchOptimized?: boolean;
 }
 
@@ -25,30 +24,13 @@ const BoundaryContainer = styled.div<BoundaryContainerProps>`
   pointer-events: auto; /* Re-enable pointer events (parent ClipContainer has pointer-events: none) */
   touch-action: none; /* Prevent browser scroll during drag on touch devices */
 
-  /* Invisible by default, visible on hover */
-  background: ${(props) =>
-    props.$isDragging
-      ? 'rgba(255, 255, 255, 0.4)'
-      : props.$isHovered
-        ? 'rgba(255, 255, 255, 0.2)'
-        : 'transparent'};
+  /* Invisible by default; the :hover and :active rules below make it visible */
+  background: ${(props) => (props.$isDragging ? 'rgba(255, 255, 255, 0.4)' : 'transparent')};
 
   ${(props) =>
     props.$edge === 'left'
-      ? `border-left: 2px solid ${
-          props.$isDragging
-            ? 'rgba(255, 255, 255, 0.8)'
-            : props.$isHovered
-              ? 'rgba(255, 255, 255, 0.5)'
-              : 'transparent'
-        };`
-      : `border-right: 2px solid ${
-          props.$isDragging
-            ? 'rgba(255, 255, 255, 0.8)'
-            : props.$isHovered
-              ? 'rgba(255, 255, 255, 0.5)'
-              : 'transparent'
-        };`}
+      ? `border-left: 2px solid ${props.$isDragging ? 'rgba(255, 255, 255, 0.8)' : 'transparent'};`
+      : `border-right: 2px solid ${props.$isDragging ? 'rgba(255, 255, 255, 0.8)' : 'transparent'};`}
 
   transition: background 0.15s ease, border-color 0.15s ease;
 
@@ -104,8 +86,6 @@ export const ClipBoundary: FunctionComponent<ClipBoundaryProps> = ({
   dragHandleProps,
   touchOptimized = false,
 }) => {
-  const [isHovered, setIsHovered] = React.useState(false);
-
   if (!dragHandleProps) {
     // No drag handle props provided, render non-interactive boundary
     return null;
@@ -120,10 +100,7 @@ export const ClipBoundary: FunctionComponent<ClipBoundaryProps> = ({
       data-boundary-edge={edge}
       $edge={edge}
       $isDragging={isDragging}
-      $isHovered={isHovered}
       $touchOptimized={touchOptimized}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     />
   );
 };

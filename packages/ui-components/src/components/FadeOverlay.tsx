@@ -1,4 +1,4 @@
-import React, { FunctionComponent } from 'react';
+import React, { FunctionComponent, useMemo } from 'react';
 import styled, { useTheme } from 'styled-components';
 import type { FadeType } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '../wfpl-theme';
@@ -48,6 +48,13 @@ export interface FadeOverlayProps {
   color?: string;
 }
 
+const FADE_PATH_HEIGHT = 100;
+
+/** Two decimals is well below a device pixel at any zoom the overlay is drawn at. */
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 /**
  * Generates an SVG path for a fade in curve
  * Always generates fadeIn shape - fadeOut is achieved by CSS transform scaleX(-1)
@@ -90,7 +97,7 @@ function generateFadePath(
     // Y=0 is top of SVG, Y=height is bottom
     // We draw the curve edge, then fill above it
     const y = (1 - curvedProgress) * height;
-    points.push(`${x},${y}`);
+    points.push(`${round2(x)},${round2(y)}`);
   }
 
   // Path: start at bottom-left, draw curve, go to top-right, top-left, close
@@ -112,6 +119,13 @@ export const FadeOverlay: FunctionComponent<FadeOverlayProps> = ({
 }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
 
+  // The path depends only on width and curve; left and colour change far more often
+  // (a clip being dragged re-renders its overlays on every pointermove).
+  const path = useMemo(
+    () => (width < 1 ? '' : generateFadePath(width, FADE_PATH_HEIGHT, curveType)),
+    [width, curveType]
+  );
+
   // Don't render if width is too small
   if (width < 1) return null;
 
@@ -120,8 +134,8 @@ export const FadeOverlay: FunctionComponent<FadeOverlayProps> = ({
 
   return (
     <FadeContainer $left={left} $width={width} $type={type}>
-      <FadeSvg $type={type} viewBox={`0 0 ${width} 100`} preserveAspectRatio="none">
-        <path d={generateFadePath(width, 100, curveType)} fill={fillColor} />
+      <FadeSvg $type={type} viewBox={`0 0 ${width} ${FADE_PATH_HEIGHT}`} preserveAspectRatio="none">
+        <path d={path} fill={fillColor} />
       </FadeSvg>
     </FadeContainer>
   );

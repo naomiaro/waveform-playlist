@@ -188,6 +188,8 @@ const rebuildChain = useCallback(() => {
 
 **Consumers:** `AnimatedPlayhead` (id: `'playhead'`), `ChannelWithProgress` (id: `useId()` — unique per instance), `AudioPosition` (id: `'audio-position'`). Auto-scroll uses `visualTime` directly in the loop body. MediaElement provider is excluded — has its own separate animation pattern.
 
+**Per-frame annotation lookups** in both providers' loops go through `createAnnotationLookup()` (`src/utils/annotationLookup.ts`): `atTime` / `byId` return exactly what the `find` calls they replaced returned, cached against the annotations array's identity (so annotations must be replaced, not mutated). `atTime` only uses the cached hit and binary search when the list is sorted and non-overlapping; otherwise it falls back to the linear scan, because with overlaps "first match" depends on index order.
+
 **Do NOT add new rAF loops for visual playback updates.** Register a frame callback instead. Use `visualTime` for DOM positioning, `time` for state/logic.
 
 **Loop handling:** Looping is handled natively by Tone.js Transport (`Transport.loop`/`loopStart`/`loopEnd`). The animation loop does NOT detect loop boundaries — `Transport.seconds` auto-wraps, so `getPlaybackTime()` returns the correct position. Selection/annotation playback disables Transport loop; `stop()` disables it before stopping.
@@ -462,7 +464,7 @@ if (derived !== prevRef.current) {
 
 - **Default:** the animation loop auto-stops playback when raw engine time reaches `duration` and returns the cursor to the play-start position (player style).
 - **`indefinitePlayback` prop:** opt out — the transport rolls until an explicit stop/pause (DAW style; implies the fillViewport layout). Stored in a ref for the loop; exposed via `usePlaylistState()`.
-- **`fillViewport` prop (layout only):** `PlaylistVisualization` floors `displayDuration` to fill the scroll container. `indefinitePlayback || fillViewport` gates the floor. Recording UIs want `fillViewport`, not `indefinitePlayback`.
+- **`fillViewport` prop (layout only):** `PlaylistVisualization` floors `displayDuration` to fill the scroll container. `indefinitePlayback || fillViewport` gates the floor. Recording UIs want `fillViewport`, not `indefinitePlayback`. The container width is state: measured in a layout effect (first paint already fills) and kept current by a `ResizeObserver` on the scroll container, only while the floor is active. Never read `clientWidth` in the render body (`fillViewportContainerWidth.test.tsx`).
 - **Recording session suppression:** while `setRecordingActive(true, …)` is active, the auto-stop is skipped so punch-in takes run past existing material. Overdub flows MUST call it eagerly (before `play()`) — the recordingState render round-trip loses the race against the first animation frame (empty timeline: `time 0 >= duration 0` stops instantly).
 
 **`setRecordingActive(active, armedTrackId?)` (usePlaylistControls):** besides the suppression, an `armedTrackId` transiently mutes that track for the session — punch-in replaces whatever the take overlaps, so the doomed material must not play under the overdub. Previous mute captured/restored via engine-level `setTrackMute` (survives adapter rebuilds); UI `trackStates` mute untouched. Auto-wired from `PlaylistVisualization`'s `recordingState` prop by an effect with cleanup (releases on recording end AND unmount; re-arms on remount-while-recording). Explicit ends (selection playback via `playbackEndTimeRef`, annotation boundaries) stop regardless of all of the above.
@@ -501,6 +503,10 @@ const setState = useCallback((v) => {
   setStateRaw(v);
 }, []);
 ```
+
+## MediaElement Progress Overlay
+
+`ChannelWithMediaElementProgress` matches `ChannelWithProgress`: the overlay is as wide as the channel and animated with `transform: scaleX(ratio)` (never `width`, which lays out every frame); geometry and colour go through `.attrs()` inline styles. It still runs its own rAF loop (the MediaElement provider has no frame-callback registry).
 
 ## MediaElement currentTime vs currentTimeRef
 

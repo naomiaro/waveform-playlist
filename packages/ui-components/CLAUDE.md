@@ -246,3 +246,10 @@ Adding a new field to `PlayheadProps` is a soft-breaking change for custom playh
 ## Clip-Gain Waveform Scaling (#662)
 
 `Channel`'s optional `gain` prop (default 1) scales the aggregated peak at draw time via `scalePeakByGain` (`utils/peakRendering.ts`: gain magnitude, clamped to ±1, the same object back at unity so the hot path allocates nothing). It is part of `drawVersion`, so a gain change redraws without new peak data. `SmartChannel` forwards it through `...props`; spectrogram and piano-roll ignore it. The browser package opts in with `<Waveform gainScaledWaveforms />` (off by default) and reads each clip's value from `ClipPeaks.gain`. dawcore carries the same helper in its own `utils/peak-rendering.ts` (no cross-package re-exports) — keep the two in step.
+
+## Small Component Rules (#701)
+
+- **Hover/active styling is CSS only.** `ClipBoundary` once mirrored `:hover` in an `isHovered` state (two renders per hover, and a new styled-components class each time). Use `&:hover` / `&:active`; keep props for states CSS cannot see (`$isDragging`).
+- **`TimeInput` keeps only the in-progress edit in state** (`draft: string | null`); the displayed text is `draft ?? formatTime(value, format)`. `onChange` fires on blur only when there is a draft, so tabbing through never rounds the value to the display format.
+- **`FadeOverlay` memoises its path on `(width, curveType)`** and rounds coordinates to two decimals; `left` and colour change far more often than the shape.
+- `PlayoutProvider` / `usePlayoutStatus` / `usePlayoutStatusUpdate` were removed (unused; see the upgrade guide).

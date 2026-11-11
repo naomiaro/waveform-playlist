@@ -45,6 +45,7 @@ import {
   useWaveformDataCache,
 } from './hooks';
 import { useShallowStable } from './hooks/useShallowStable';
+import { createAnnotationLookup } from './utils/annotationLookup';
 
 // Types
 export interface ClipPeaks {
@@ -440,6 +441,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Ref for animation loop (avoids restarting loop on annotation change)
   const annotationsRef = useRef<AnnotationData[]>(annotations);
   annotationsRef.current = annotations;
+  // Per-frame lookups for the animation loop (cached; see annotationLookup.ts)
+  const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
 
   // State
   const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
@@ -1433,9 +1436,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Handle annotation playback based on continuous play mode
       const currentAnnotations = annotationsRef.current;
       if (currentAnnotations.length > 0) {
-        const currentAnnotation = currentAnnotations.find(
-          (ann) => time >= ann.start && time < ann.end
-        );
+        const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
         if (continuousPlayRef.current) {
           // Continuous play ON: update active annotation, let audio play to the end
@@ -1449,8 +1450,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         } else {
           // Continuous play OFF: stop at end of current annotation
           if (activeAnnotationIdRef.current) {
-            const activeAnnotation = currentAnnotations.find(
-              (ann) => ann.id === activeAnnotationIdRef.current
+            const activeAnnotation = annotationLookup.byId(
+              currentAnnotations,
+              activeAnnotationIdRef.current
             );
             if (activeAnnotation && time >= activeAnnotation.end) {
               // Stop playback at end of current annotation
@@ -1527,6 +1529,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     startAnimationFrameLoop,
     getPlaybackTime,
     setCurrentTimeRefs,
+    annotationLookup,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
