@@ -27,6 +27,7 @@
     "example:dawcore-native": "vite --config examples/dawcore-native/vite.config.ts",
     "example:dawcore-tone": "vite --config examples/dawcore-tone/vite.config.ts",
     "example:dawcore-wam": "vite --config examples/dawcore-wam/vite.config.ts",
+    "example:faust:compile": "node examples/faust-precompiled/compile.mjs",
     "example:media-element": "vite --config examples/media-element-player/vite.config.ts",
     "example:react-starter": "vite --config examples/react-starter/vite.config.ts"
   },

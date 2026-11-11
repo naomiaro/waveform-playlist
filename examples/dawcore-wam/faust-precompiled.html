@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>dawcore — precompiled Faust effect (native transport)</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f1a;
+      color: #e0d4c8;
+      padding: 24px;
+      max-width: 1100px;
+    }
+    h1 { font-size: 1.2rem; margin-bottom: 8px; }
+    p { font-size: 0.85rem; line-height: 1.5; color: #b8ab9c; max-width: 70ch; }
+    code { color: #c49a6c; }
+    daw-editor {
+      --daw-wave-color: #c49a6c;
+      --daw-playhead-color: #d08070;
+      --daw-background: #1a1a2e;
+      --daw-track-background: #16213e;
+      --daw-ruler-color: #c49a6c;
+      --daw-ruler-background: #0f0f1a;
+      margin-bottom: 12px;
+    }
+    daw-transport { display: flex; gap: 8px; margin-bottom: 16px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+    button, select {
+      background: #16213e;
+      color: #e0d4c8;
+      border: 1px solid #c49a6c;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .effect {
+      border: 1px solid #2c3a5e;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 8px;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .effect > div { grid-column: 1 / -1; }
+    #log {
+      margin-top: 12px;
+      font-family: monospace;
+      font-size: 0.75rem;
+      color: #888;
+      max-height: 140px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Precompiled Faust effect — native transport</h1>
+  <p>
+    <code>tremolo.dsp</code> was compiled ahead of time; the browser never runs the Faust compiler and
+    <code>@dawcore/faust</code> is not loaded. The same effect is available two ways: as an AudioWorklet
+    registered with <code>registerEffect()</code> (compiled with <code>faust2wasm</code>), and as a static
+    WAM plugin (compiled with <code>faust2wam</code>). This page runs on <code>NativePlayoutAdapter</code> from <code>@dawcore/transport</code>.
+  </p>
+
+  <daw-editor id="editor" samples-per-pixel="1024" wave-height="80" timescale>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/03_Kick.opus" name="Kick"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/07_Bass1.opus" name="Bass"></daw-track>
+    <daw-track src="/media/audio/AlbertKader_Whiptails/09_Synth1.opus" name="Synth"></daw-track>
+  </daw-editor>
+
+  <daw-transport for="editor">
+    <daw-play-button></daw-play-button>
+    <daw-pause-button></daw-pause-button>
+    <daw-stop-button></daw-stop-button>
+  </daw-transport>
+
+  <div class="controls">
+    <label for="target">Add to</label>
+    <select id="target"><option value="master">Master</option></select>
+    <button id="add-worklet">Add tremolo — AudioWorklet</button>
+    <button id="add-wam">Add tremolo — WAM plugin</button>
+    <button id="export">Export (offline render)</button>
+  </div>
+
+  <div id="rack"></div>
+  <div id="log"></div>
+
+  <script type="module">
+    import '@dawcore/components';
+    import { NativePlayoutAdapter } from '@dawcore/transport';
+
+    const editor = document.getElementById('editor');
+    editor.adapter = new NativePlayoutAdapter(new AudioContext({ latencyHint: 0 }));
+
+    import { setupFaustDemo } from '../faust-precompiled/demo.js';
+
+    setupFaustDemo(editor);
+  </script>
+</body>
+</html>

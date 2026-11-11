@@ -406,8 +406,13 @@ export class EffectsManager {
     const { instance } = entry;
     if (typeof instance.createGui === 'function') {
       try {
-        const element = await instance.createGui();
-        return makeGuiRecord(element, () => instance.destroyGui?.(element));
+        const element: unknown = await instance.createGui();
+        // The WAM SDK's base createGui() exists on every plugin and resolves
+        // undefined when the plugin ships no GUI module — "no GUI", not a
+        // failure. Anything that is not an element takes the fallback below.
+        if (element instanceof HTMLElement) {
+          return makeGuiRecord(element, () => instance.destroyGui?.(element));
+        }
       } catch (err) {
         console.warn(
           PREFIX +

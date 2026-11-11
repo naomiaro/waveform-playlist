@@ -237,6 +237,25 @@ describe('openEffectGui — generic parameter panel fallback', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('gui exploded'));
   });
 
+  it('falls back when createGui resolves with no element (the WAM SDK base class has no GUI)', async () => {
+    // WebAudioModule.createGui() exists on EVERY plugin and resolves undefined
+    // when the plugin ships no GUI module — e.g. a Faust WAM built without
+    // faust-ui. That is "no GUI", not an error.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    plugin.createGui!.mockResolvedValueOnce(undefined);
+    const track = await appendTrack();
+    const id = await track.addWamPlugin(PLUGIN_URL);
+
+    const element = await track.openEffectGui(id, container);
+
+    expect(element.className).toBe('mock-wam-panel');
+    expect(container.contains(element)).toBe(true);
+    expect(plugin.destroyGui).not.toHaveBeenCalled();
+    // Not reported as a createGui failure.
+    expect(warn).not.toHaveBeenCalledWith(expect.stringContaining('createGui failed'));
+    warn.mockRestore();
+  });
+
   it('panel edits route through setParameterValues and dispatch daw-effect-change', async () => {
     plugin = makeMockPlugin({ withGui: false });
     createWamInstance.mockReset().mockResolvedValue(plugin);

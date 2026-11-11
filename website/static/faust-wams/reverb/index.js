@@ -11,7 +11,6 @@
 import { WebAudioModule } from './sdk/index.js';
 import { CompositeAudioNode, ParamMgrFactory } from './sdk-parammgr/index.js';
 import { FaustMonoDspGenerator, FaustPolyDspGenerator } from "./faustwasm/index.js";
-import createElement from './gui.js';
 
 class FaustCompositeAudioNode extends CompositeAudioNode {
 	/**
@@ -185,7 +184,6 @@ export default class FaustPlugin extends WebAudioModule {
 		return node;
 	}
 
-	createGui() {
-		return createElement(this);
-	}
+	// createGui() removed by examples/faust-precompiled/compile.mjs: the
+	// generated GUI depends on faust-ui (GPL-3.0-or-later), which is not shipped.
 }
