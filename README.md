@@ -278,6 +278,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 - [`record.html`](examples/dawcore-tone/record.html) — Mic recording with overdub
 - [`analyser.html`](examples/dawcore-tone/analyser.html) — Spectrum analyser connected to master output
 - [`spectrogram.html`](examples/dawcore-tone/spectrogram.html) — Per-track FFT spectrograms with the Tone.js adapter
+- [`faust-precompiled.html`](examples/dawcore-tone/faust-precompiled.html) — The same precompiled Faust effect on the Tone.js adapter (native AudioContext mode)
 - [`midi.html`](examples/dawcore-tone/midi.html) — Programmatic MIDI clips with piano-roll render mode and Tone.js PolySynth
 - [`midi-load.html`](examples/dawcore-tone/midi-load.html) — Load `.mid` files (URL or file picker) via `editor.loadMidi()` and play them through Tone.js PolySynth
 - [`soundfont.html`](examples/dawcore-tone/soundfont.html) — MIDI through SoundFont samples: `SoundFontCache.fromUrl()` + `createToneAdapter({ soundFontCache })`, with PolySynth fallback when the `.sf2` fails to load
@@ -286,6 +287,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 **dawcore-wam** example pages:
 
 - [`index.html`](examples/dawcore-wam/index.html) — WAM 2.0 plugin hosting end to end: insert plugins on **any track or the master bus** (one rack per track + master), with the target chosen from a dropdown that tracks every track — including stems **dragged-and-dropped** onto the editor (`file-drop`). Load community plugins by URL or from the [webaudiomodules.com](https://www.webaudiomodules.com/) library, open plugin GUIs, reorder/bypass chains, save and restore chains (including state) via localStorage, export the mix to WAV through `exportAudio()`, and compile Faust DSP to a live effect in the browser (`@dawcore/faust`) — plus pre-compiled Faust effects served from this repo
+- [`faust-precompiled.html`](examples/dawcore-wam/faust-precompiled.html) — A Faust effect compiled ahead of time (no compiler in the browser, no `@dawcore/faust`), on the native transport: loaded as an AudioWorklet effect via `registerEffect()` and as a static WAM plugin via `addWamPlugin(url)`, with parameter panels and offline export. Sources in [`examples/faust-precompiled/`](examples/faust-precompiled/); `pnpm example:faust:compile` recompiles the `.dsp`
 
 **Spec & roadmap:** [`docs/specs/web-components-migration.md`](docs/specs/web-components-migration.md) — full element catalogue, attribute/property/event tables, programmatic API contracts, theming tokens, and migration phases.
 

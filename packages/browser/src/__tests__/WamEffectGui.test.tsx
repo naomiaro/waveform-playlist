@@ -72,6 +72,24 @@ describe('WamEffectGui', () => {
     expect(createWamParameterPanel).toHaveBeenCalled();
   });
 
+  it('falls back to the generic panel when createGui resolves with no element', async () => {
+    // WebAudioModule's base createGui() exists on every plugin and resolves
+    // undefined when the plugin ships no GUI (e.g. a Faust WAM built without
+    // faust-ui). The panel is ours, so the plugin's destroyGui is not called.
+    const destroyGui = vi.fn();
+    const plugin = {
+      audioNode: {},
+      createGui: vi.fn(async () => undefined),
+      destroyGui,
+      destroy: vi.fn(),
+    } as unknown as WamPluginInstance;
+
+    const { container, unmount } = render(<WamEffectGui plugin={plugin} />);
+    await waitFor(() => expect(container.querySelector('.generic-panel')).not.toBeNull());
+    unmount();
+    expect(destroyGui).not.toHaveBeenCalled();
+  });
+
   it('renders nothing without a plugin', () => {
     const { container } = render(<WamEffectGui plugin={undefined} />);
     expect(container.querySelector('.wam-effect-gui')?.children.length ?? 0).toBe(0);

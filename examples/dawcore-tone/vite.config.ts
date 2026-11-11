@@ -1,10 +1,13 @@
 import { defineConfig } from 'vite';
 import path from 'node:path';
+import { serveCompiledFaust } from '../faust-precompiled/vite-plugin.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 
 export default defineConfig({
   root: import.meta.dirname,
+  // Serves the precompiled Faust demo's output as static files (never bundled).
+  plugins: [serveCompiledFaust()],
   publicDir: path.resolve(repoRoot, 'website/static'),
   resolve: {
     alias: {

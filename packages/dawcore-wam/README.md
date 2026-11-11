@@ -60,6 +60,8 @@ See [`examples/dawcore-wam/`](https://github.com/naomiaro/waveform-playlist/tree
 
 You don't have to wait for someone to publish the effect you need — [Faust](https://faust.grame.fr/) is a DSP language that compiles to a standard WAM 2.0 bundle via [`@shren/faust2wam`](https://www.npmjs.com/package/@shren/faust2wam). The generated plugins load through `addWamPlugin(url)` with **zero special handling**: descriptor validation, chain insertion, bypass, the auto-generated GUI, `getState()`/`setState()` persistence, and offline export all work out of the box.
 
+This section is the short version. The [Precompiled Faust Effects guide](https://naomiaro.github.io/waveform-playlist/docs/faust-effects) covers it step by step, including a second route that needs no WAM host, loading in React, and the licences of what the compiler writes.
+
 The complete workflow, starting from a one-line lowpass filter:
 
 **1. Write the DSP** (`lowpass.dsp`) — every `hslider`/`vslider`/`checkbox` declaration becomes a WAM parameter _and_ a control in the auto-generated GUI:
@@ -81,19 +83,21 @@ npx faust2wam lowpass.dsp out/lowpass
 
 **3. Host the bundle** — `out/lowpass/` is a self-contained static directory (`index.js`, `descriptor.json`, `dsp-module.wasm`, dsp metadata, and vendored `sdk/`, `sdk-parammgr/`, `faustwasm/`, `faust-ui/` runtimes). Serve it from any static host; cross-origin hosting needs `Access-Control-Allow-Origin` headers (see the CORS note above). The `fftw/` and `host/` directories and the `.map`/`.d.ts` files are only needed for `-fft` plugins and standalone testing — safe to omit when hosting plain effects.
 
+**Licences in that folder:** `faustwasm/` is LGPL, the generated `index.js` is LGPL-3.0, the WAM SDK is MIT, and `faust-ui/` (with `gui.js`) is **GPL-3.0-or-later**. If you cannot ship GPL code, delete `faust-ui/` and `gui.js` and remove the `gui.js` import and the `createGui()` method from `index.js`; the plugin then has no GUI of its own and hosts fall back to the generic parameter panel. The guide has the details.
+
 **4. Load it**:
 
 ```javascript
 await track.addWamPlugin('https://your-host/out/lowpass/index.js');
 ```
 
-Three pre-compiled Faust effects (the stereo lowpass, a `dm.zita_light` reverb, a `dm.flanger_demo` flanger) are bundled with the repo's example under [`website/static/faust-wams/`](https://github.com/naomiaro/waveform-playlist/tree/main/website/static/faust-wams) — each directory includes its `.dsp` source. Run `pnpm example:dawcore-wam` and click the buttons in the "Faust effects" section.
+Three pre-compiled Faust effects (the stereo lowpass, a `dm.zita_light` reverb, a `dm.flanger_demo` flanger), built **without faust-ui**, are bundled with the repo's example under [`website/static/faust-wams/`](https://github.com/naomiaro/waveform-playlist/tree/main/website/static/faust-wams) — each directory includes its `.dsp` source. Run `pnpm example:dawcore-wam` and click the buttons in the "Faust effects" section.
 
 Faust-generated plugins are well-behaved WAM citizens; quirks observed (none need host-side handling):
 
 - `getState()` returns a **flat parameter map** keyed by Faust paths (`{ "/Lowpass/cutoff": 250 }`) rather than the `{ params: ... }` envelope some plugins use. State is treated as an opaque snapshot, so persistence and offline cloning work unchanged.
 - The descriptor always reports `hasMidiInput: true`, even for pure audio effects — harmless (effect validation only requires audio input + output).
-- The GUI element sizes itself from faust-ui's computed `minWidth`/`minHeight` (inline styles, scrollable container) — it lays out fine in a normal document flow without a fixed-size plugin window.
+- With faust-ui kept, the GUI element sizes itself from faust-ui's computed `minWidth`/`minHeight` (inline styles, scrollable container) and lays out fine in a normal document flow without a fixed-size plugin window. With faust-ui removed, the plugin's `createGui()` resolves with no element — the WAM SDK's way of saying "no GUI" — and `openEffectGui` / `<WamEffectGui>` show the generic parameter panel.
 - Parameter names/addresses derive from the DSP source (`declare name` + control labels), and the descriptor identifier becomes `fr.grame.faust.<name>` with vendor `Faust User`.
 
 **No build step at all?** [`@dawcore/faust`](https://www.npmjs.com/package/@dawcore/faust) compiles Faust DSP source **in the browser** — paste code, get a live plugin. It wraps `@shren/faust2wam`'s browser API (the same `generate()` the CLI uses). `<daw-track>.addFaustEffect(dspCode)` uses it (optional peer dep, ~2.5 MB gzipped compiler loaded on first use only) and instantiates the result through this package's `createWamInstanceFromFactory`.
