@@ -263,11 +263,13 @@ editor.addEventListener('daw-effect-add', (e) => console.log(e.detail));
 // also: daw-effect-remove, daw-effect-change, daw-effect-bypass, daw-effect-reorder
 ```
 
-Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()` (exports from `@dawcore/components`).
+Register custom effects with `registerEffect(type, definition)`; inspect built-ins with `getEffectDefinitions()`. Both are exports of `@waveform-playlist/core` (add it as a direct dependency), not of `@dawcore/components`. The registry is shared with the React effects hooks in `@waveform-playlist/browser/tone`, so one registration serves both. The definition types are `NativeEffectDefinition`, `NativeEffectInstance` and `EffectParamDef`, also from core.
 
 An effect backed by an `AudioWorkletNode` needs its module added to every context it is created on — including the `OfflineAudioContext` that `exportAudio()` builds internally. Give the definition an async `prepare` hook; it runs once per context:
 
 ```javascript
+import { registerEffect } from '@waveform-playlist/core';
+
 registerEffect('my-limiter', {
   label: 'Limiter',
   category: 'dynamics',

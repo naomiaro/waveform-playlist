@@ -139,10 +139,11 @@ Host third-party [Web Audio Modules (WAM 2.0)](https://www.webaudiomodules.com/)
 [View WAM! Kick It Up a Notch](/examples/wam-effects)
 
 ```tsx
-import { useDynamicEffects, WamEffectGui } from '@waveform-playlist/browser/tone';
+import { useDynamicEffects, useActiveEffects, WamEffectGui } from '@waveform-playlist/browser/tone';
 
 function MasterRack() {
-  const { activeEffects, addWamEffect, getWamPlugin } = useDynamicEffects();
+  const { effects, addWamEffect, getWamPlugin } = useDynamicEffects();
+  const activeEffects = useActiveEffects(effects);
 
   return (
     <div>

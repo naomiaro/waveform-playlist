@@ -1020,7 +1020,7 @@ editor.addEventListener('daw-track-ready', async (e) => {
 Custom native effects register alongside the built-ins:
 
 ```typescript
-import { registerEffect, getEffectDefinitions } from '@dawcore/components';
+import { registerEffect, getEffectDefinitions } from '@waveform-playlist/core';
 
 registerEffect('my-highpass', {
   label: 'Highpass Filter',
@@ -1048,10 +1048,10 @@ registerEffect('my-highpass', {
 const allEffects = getEffectDefinitions();
 ```
 
-**Registration shapes** (see `packages/dawcore/src/effects/types.ts`):
+**Registration shapes** (see `packages/core/src/effects/registry.ts`):
 
 ```typescript
-interface EffectDefinition {
+interface NativeEffectDefinition {
   label: string;
   category: string;
   defaults: Record<string, number>;
@@ -1060,10 +1060,10 @@ interface EffectDefinition {
   // Optional async per-context setup (e.g. audioWorklet.addModule) — see below:
   prepare?: (audioContext: BaseAudioContext) => Promise<void>;
   // Must work on any BaseAudioContext so the same definitions serve offline rendering:
-  create: (audioContext: BaseAudioContext, params: Record<string, number>) => EffectInstance;
+  create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
 }
 
-interface EffectInstance {
+interface NativeEffectInstance {
   input: AudioNode; // Chain attachment points (same node for single-node effects)
   output: AudioNode;
   applyParams: (params: Record<string, number>) => void; // In-place — chain never rebuilds for param changes
@@ -1075,6 +1075,7 @@ interface EffectParamDef {
   max: number;
   step?: number;
   unit?: string; // 's', 'ms', 'Hz', 'dB', '%'
+  label?: string; // Display name for a parameter panel; defaults to the parameter's key
 }
 ```
 
@@ -1084,7 +1085,7 @@ The built-ins use this same shape internally — `registerEffect` adds to the sa
 
 - `exportAudio()` awaits it on the offline context before the first `create` of that type.
 - `setEffectsState()` awaits it on the live context (a failure becomes a placeholder, like any failed native restore).
-- `addEffect()` / `addTrackEffect()` are synchronous and cannot — call `await editor.prepareEffect(type)` first (or the exported `prepareEffect(type, audioContext)`). Without it, the error thrown by `create` is rewrapped with that hint.
+- `addEffect()` / `addTrackEffect()` are synchronous and cannot — call `await editor.prepareEffect(type)` first (or `prepareEffect(type, audioContext)` from `@waveform-playlist/core`). Without it, the error thrown by `create` is rewrapped with that hint.
 
 ### Usage
 

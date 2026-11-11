@@ -50,12 +50,12 @@ There are two ways to compile and load it. Both produce the same sound.
 | Compiler | `faust2wasm` from `@grame/faustwasm` | `faust2wam` from `@shren/faust2wam` |
 | Loads with | `registerEffect()` + about 30 lines of glue | `addWamPlugin(url)` — no glue |
 | Web components | Yes | Yes |
-| React | Not yet — there is no hook for a custom worklet effect | Yes (`addWamEffect(url)`) |
+| React | Yes (`addEffect(id)`) | Yes (`addWamEffect(url)`) |
 | Output size | about 200 kB | about 310 kB (after removing what you don't need) |
 | Needs `@dawcore/wam` | No | Yes |
 | GPL code in the output | No | Yes unless you remove `faust-ui` (shown below) |
 
-## Route A — an AudioWorklet effect (web components)
+## Route A — an AudioWorklet effect (web components and React)
 
 ### Compile
 
@@ -77,8 +77,14 @@ No Faust toolchain is needed; the compiler runs as WebAssembly inside Node. The 
 
 ### Register it
 
+`registerEffect` comes from `@waveform-playlist/core`. One registration serves both `<daw-editor>` and the React effects hooks. Web-component users and React users both need `@waveform-playlist/core` as a direct dependency for this import:
+
+```bash
+npm install @waveform-playlist/core
+```
+
 ```javascript
-import { registerEffect } from '@dawcore/components';
+import { registerEffect } from '@waveform-playlist/core';
 
 export async function registerFaustTremolo(baseUrl) {
   // A runtime URL import — the two comments stop Vite and webpack from
@@ -132,7 +138,7 @@ export async function registerFaustTremolo(baseUrl) {
 }
 ```
 
-### Use it
+### Load it — web components
 
 ```javascript
 await registerFaustTremolo('/faust/tremolo/');
@@ -152,6 +158,42 @@ const buffer = await editor.exportAudio(); // the effect renders offline too
 From here it is an ordinary effect: reorder, bypass and remove work, `getEffectsState()` / `setEffectsState()` save and restore it, and `openEffectGui(id, container)` shows a parameter panel built from `params`.
 
 `FaustMonoAudioWorkletNode` extends the browser's own `AudioWorkletNode`, so the editor must run on a native `AudioContext`. `NativePlayoutAdapter` always does. On the Tone.js adapter, call `configureGlobalContext({ nativeAudioContext: true })` from `@waveform-playlist/playout` before creating the adapter (not available in Firefox — see [WAM Plugins](./wam-plugins.md#browser-support-tone-backends)).
+
+### Load it — React
+
+```tsx
+import { configureGlobalContext } from '@waveform-playlist/playout';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useDynamicEffects } from '@waveform-playlist/browser/tone';
+import { registerFaustTremolo } from './faust-tremolo-effect';
+
+// Module scope, before anything creates the audio context: a worklet effect
+// needs native AudioContext mode.
+configureGlobalContext({ nativeAudioContext: true });
+
+// Register once for the whole app. Adding the effect waits for this.
+const registered = registerFaustTremolo('/faust/tremolo/');
+
+function App({ tracks }) {
+  const { addEffect, updateParameter, masterEffects } = useDynamicEffects();
+
+  const addTremolo = async () => {
+    await registered;
+    // Runs the definition's prepare step on the audio context, then adds it.
+    const id = await addEffect('faust-tremolo');
+    updateParameter(id, 'depth', 0.8);
+  };
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterEffects}>
+      <button onClick={addTremolo}>Add tremolo</button>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+The registration is the same one the web components use. There is no separate prepare step: `addEffect` awaits the definition's `prepare` on the live context before it creates the effect, and rejects if the app is not in native AudioContext mode. For one track, use `addEffectToTrack(trackId, 'faust-tremolo')` from `useTrackDynamicEffects()`. A WAV export made with `useExportWav()` renders the effect: the offline effects function runs `prepare` on the export's offline context. See [Custom effects](./react/guides/effects.md#custom-effects) for the rack UI, bypass and export wiring.
 
 ## Route B — a WAM plugin (web components and React)
 

@@ -246,15 +246,15 @@ Both paths must respect `mono` flag consistently. Live preview slices to first c
 **Solution:** Store current state in a ref, read from ref inside callback:
 
 ```typescript
-const activeEffectsRef = useRef(activeEffects);
-activeEffectsRef.current = activeEffects; // Update on every render
+const tracksRef = useRef(tracks);
+tracksRef.current = tracks; // Update on every render
 
-const rebuildChain = useCallback(() => {
-  const currentEffects = activeEffectsRef.current; // Fresh state
+const selectTrack = useCallback((index: number) => {
+  const current = tracksRef.current; // Fresh state
 }, []); // Stable function - no dependencies
 ```
 
-**Applied in:** `useDynamicEffects`, `useTrackDynamicEffects`, `WaveformPlaylistContext` track controls (`tracksRef`)
+**Applied in:** `WaveformPlaylistContext` track controls (`tracksRef`), `PlaylistVisualization`. The effects hooks used this until #679; their state now lives in an `EffectsRack` store read at call time (see "Audio Effects Architecture").
 
 ## Smooth Playback Animation Pattern
 

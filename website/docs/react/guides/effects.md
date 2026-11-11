@@ -221,23 +221,41 @@ Expands or narrows the stereo image.
 
 ### Dynamic Master Effects (Add/Remove at Runtime)
 
-```tsx
-import { useDynamicEffects, effectDefinitions } from '@waveform-playlist/browser/tone';
+`useDynamicEffects()` owns the master chain. It returns the chain as a source (`effects`), not as React state, and everything it returns keeps its identity between renders. Read the list with `useActiveEffects(effects)` in the component that draws the rack: that component re-renders when the chain changes (an effect added, removed, moved, bypassed, or a parameter set), and the component that called `useDynamicEffects()` does not.
 
-function EffectsPanel() {
-  const {
-    activeEffects,
-    availableEffects,
-    addEffect,
-    removeEffect,
-    updateParameter,
-    masterEffects,
-  } = useDynamicEffects();
+```tsx
+import {
+  useDynamicEffects,
+  useActiveEffects,
+  type UseDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
+
+function App() {
+  const masterFx = useDynamicEffects();
 
   return (
-    <WaveformPlaylistProvider effects={masterEffects} tracks={tracks}>
+    <WaveformPlaylistProvider effects={masterFx.masterEffects} tracks={tracks}>
+      <EffectsRack masterFx={masterFx} />
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+// Only this component re-renders on a slider step.
+function EffectsRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
+  const { effects, availableEffects, addEffect, removeEffect, updateParameter, toggleBypass } =
+    masterFx;
+  const activeEffects = useActiveEffects(effects);
+
+  return (
+    <div>
       {/* Effect selector */}
-      <select onChange={(e) => addEffect(e.target.value)}>
+      <select
+        value=""
+        onChange={(e) => {
+          if (e.target.value) addEffect(e.target.value).catch(console.error);
+        }}
+      >
         <option value="">Add Effect...</option>
         {availableEffects.map((def) => (
           <option key={def.id} value={def.id}>{def.name}</option>
@@ -248,26 +266,275 @@ function EffectsPanel() {
       {activeEffects.map((effect) => (
         <div key={effect.instanceId}>
           <h4>{effect.definition.name}</h4>
-          {effect.definition.parameters.map((param) => (
-            <input
-              key={param.name}
-              type="range"
-              min={param.min}
-              max={param.max}
-              step={param.step}
-              value={effect.params[param.name] as number}
-              onChange={(e) =>
-                updateParameter(effect.instanceId, param.name, parseFloat(e.target.value))
-              }
-            />
-          ))}
+          {effect.definition.parameters
+            .filter((param) => param.type === 'number')
+            .map((param) => (
+              <input
+                key={param.name}
+                type="range"
+                aria-label={param.label}
+                min={param.min}
+                max={param.max}
+                step={param.step}
+                value={effect.params[param.name] as number}
+                onChange={(e) =>
+                  updateParameter(effect.instanceId, param.name, parseFloat(e.target.value))
+                }
+              />
+            ))}
+          <button onClick={() => toggleBypass(effect.instanceId)}>
+            {effect.bypassed ? 'Enable' : 'Bypass'}
+          </button>
           <button onClick={() => removeEffect(effect.instanceId)}>Remove</button>
         </div>
       ))}
-    </WaveformPlaylistProvider>
+    </div>
   );
 }
 ```
+
+`addEffect(id)` returns a `Promise<string>` that resolves with the new entry's `instanceId`. A built-in effect is in the chain before the call returns; the promise is there for [custom effects](#custom-effects), which may load a worklet first. An id that is neither a built-in nor a registered type rejects.
+
+`availableEffects` lists the built-in effects followed by every registered custom effect.
+
+### Per-Track Effects
+
+`useTrackDynamicEffects()` keeps one chain per track id. Give each track its effects function, and read one track's chain with `useActiveEffects(getTrackEffects(trackId))`.
+
+```tsx
+import { useMemo } from 'react';
+import {
+  useTrackDynamicEffects,
+  useActiveEffects,
+  type UseTrackDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
+
+function App() {
+  const trackFx = useTrackDynamicEffects();
+  const { getTrackEffectsFunction } = trackFx;
+
+  // getTrackEffectsFunction returns the same function for the same track id.
+  const tracksWithEffects = useMemo(
+    () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
+    [tracks, getTrackEffectsFunction]
+  );
+
+  return (
+    <WaveformPlaylistProvider tracks={tracksWithEffects}>
+      {tracks.map((track) => (
+        <TrackRack key={track.id} trackId={track.id} trackFx={trackFx} />
+      ))}
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+function TrackRack({ trackId, trackFx }: { trackId: string; trackFx: UseTrackDynamicEffectsReturn }) {
+  const entries = useActiveEffects(trackFx.getTrackEffects(trackId));
+
+  return (
+    <div>
+      <button onClick={() => trackFx.addEffectToTrack(trackId, 'reverb').catch(console.error)}>
+        Add reverb
+      </button>
+      {entries.map((effect, index) => (
+        <div key={effect.instanceId}>
+          {effect.definition.name}
+          <button
+            disabled={index === 0}
+            onClick={() => trackFx.reorderTrackEffects(trackId, index, index - 1)}
+          >
+            Move up
+          </button>
+          <button onClick={() => trackFx.toggleBypass(trackId, effect.instanceId)}>
+            {effect.bypassed ? 'Enable' : 'Bypass'}
+          </button>
+          <button onClick={() => trackFx.removeEffectFromTrack(trackId, effect.instanceId)}>
+            Remove
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Bypass
+
+`toggleBypass` takes an effect out of the signal without removing it from the list.
+
+- An effect with a wet/dry control (`ActiveEffect.wetParam` is set) stays connected and its wet level is set to 0. Its stored wet value is restored when the bypass is turned off.
+- An effect without one (the built-in compressor, limiter, gate and 3-band EQ, WAM plugins, and custom effects whose definition names no `wetParam`) is disconnected from the chain while bypassed.
+
+Bypassed effects are left out of a WAV export.
+
+### Exporting with Effects
+
+Pass the offline effects functions to `useExportWav()` or `ExportWavButton`. Both hooks always return a function, the same one on every call, and it reads the chain when the export runs. With no active effect it passes the audio straight through.
+
+```tsx
+import { useExportWav } from '@waveform-playlist/browser/tone';
+
+const { exportWav } = useExportWav();
+const { createOfflineEffectsFunction } = masterFx;
+const { createOfflineTrackEffectsFunction } = trackFx;
+
+await exportWav(tracks, trackStates, {
+  effectsFunction: createOfflineEffectsFunction(),
+  createOfflineTrackEffects: createOfflineTrackEffectsFunction,
+});
+```
+
+The export rejects if an effect in the live chain cannot be rebuilt on the offline context. It does not render without it.
+
+## Custom Effects
+
+You can add your own effect, an `AudioWorkletNode` or any chain of native Web Audio nodes, to the same racks. Register it once with `registerEffect()` from `@waveform-playlist/core`, then add it by id like a built-in. The registry is shared with the web components: one registration serves the React hooks and `<daw-editor>`.
+
+```bash
+npm install @waveform-playlist/core
+```
+
+### Requirements
+
+Custom effects are native nodes, so the app must run in native AudioContext mode, the same requirement as [WAM plugins](/docs/wam-plugins). Call this before any audio initialization:
+
+```tsx
+import { configureGlobalContext } from '@waveform-playlist/playout';
+
+configureGlobalContext({ nativeAudioContext: true });
+```
+
+Without it, `addEffect` rejects for a custom effect. Native mode is not available in Firefox; see [browser support](/docs/wam-plugins#browser-support-tone-backends).
+
+### Register the effect
+
+This example is a tremolo written as an AudioWorklet processor. The processor file is served as a static file:
+
+```javascript
+// public/worklets/demo-tremolo-processor.js
+class DemoTremoloProcessor extends AudioWorkletProcessor {
+  static get parameterDescriptors() {
+    return [
+      { name: 'rate', defaultValue: 6, minValue: 0.1, maxValue: 20, automationRate: 'k-rate' },
+      { name: 'depth', defaultValue: 0.8, minValue: 0, maxValue: 1, automationRate: 'k-rate' },
+    ];
+  }
+
+  constructor() {
+    super();
+    this.phase = 0;
+  }
+
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    const output = outputs[0];
+    const rate = parameters.rate[0];
+    const depth = parameters.depth[0];
+    const step = (2 * Math.PI * rate) / sampleRate;
+    const frames = output[0] ? output[0].length : 0;
+
+    for (let i = 0; i < frames; i++) {
+      // 1 at the top of the cycle, 1 - depth at the bottom.
+      const gain = 1 - depth * (0.5 - 0.5 * Math.cos(this.phase + i * step));
+      for (let channel = 0; channel < output.length; channel++) {
+        const source = input[channel];
+        output[channel][i] = source ? source[i] * gain : 0;
+      }
+    }
+    this.phase = (this.phase + frames * step) % (2 * Math.PI);
+    return true;
+  }
+}
+
+registerProcessor('demo-tremolo', DemoTremoloProcessor);
+```
+
+The definition tells the hooks how to load and build it:
+
+```typescript
+import { getEffectDefinitions, registerEffect } from '@waveform-playlist/core';
+
+/** The id the effect is added by: `addEffect(DEMO_TREMOLO)`. */
+export const DEMO_TREMOLO = 'demo-tremolo';
+
+const MODULE_URL = '/worklets/demo-tremolo-processor.js';
+
+export function registerDemoTremolo(): void {
+  if (getEffectDefinitions().has(DEMO_TREMOLO)) return;
+
+  registerEffect(DEMO_TREMOLO, {
+    label: 'Tremolo (custom AudioWorklet)',
+    category: 'custom',
+    defaults: { rate: 6, depth: 0.8 },
+    params: {
+      rate: { min: 0.1, max: 20, step: 0.1, unit: 'Hz', label: 'Rate' },
+      depth: { min: 0, max: 1, step: 0.01, label: 'Depth' },
+    },
+
+    // Runs once per AudioContext: the live one, and the offline one of every
+    // WAV export. A worklet module has to be added to each.
+    prepare: (audioContext) => audioContext.audioWorklet.addModule(MODULE_URL),
+
+    // Synchronous: the processor is registered on this context by now.
+    create: (audioContext) => {
+      const node = new AudioWorkletNode(audioContext, DEMO_TREMOLO);
+      return {
+        input: node,
+        output: node,
+        applyParams: (params) => {
+          for (const name of ['rate', 'depth']) {
+            const param = node.parameters.get(name);
+            if (param && params[name] !== undefined) param.value = params[name];
+          }
+        },
+        dispose: () => node.disconnect(),
+      };
+    },
+  });
+}
+```
+
+The fields of a definition (`NativeEffectDefinition` from `@waveform-playlist/core`):
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `label` | Yes | Display name. Becomes `definition.name` in the rack. |
+| `category` | Yes | Any string. Becomes `definition.category`. |
+| `defaults` | Yes | Initial value of each parameter. Parameters are numbers. |
+| `params` | Yes | Per parameter: `min`, `max`, and optional `step`, `unit`, `label`. The rack's `definition.parameters` is built from this. |
+| `create(audioContext, params)` | Yes | Builds the nodes on the given context and returns `{ input, output, applyParams, dispose? }`. Synchronous. It is called with the live context and with the offline context of an export, so use the `audioContext` argument for every node. |
+| `prepare(audioContext)` | No | Async setup that must finish before `create` can run on a context, typically `audioWorklet.addModule(url)`. It must be safe to run more than once on the same context. |
+| `wetParam` | No | Name of the effect's wet/dry parameter. When set, bypass sets that parameter to 0 and leaves the effect connected. When omitted, bypass disconnects the effect. |
+
+### Add it
+
+```tsx
+import { useDynamicEffects, useTrackDynamicEffects } from '@waveform-playlist/browser/tone';
+import { registerDemoTremolo, DEMO_TREMOLO } from './demoTremoloEffect';
+
+registerDemoTremolo(); // module scope, or before the first render
+
+const { addEffect, updateParameter } = useDynamicEffects();
+const { addEffectToTrack } = useTrackDynamicEffects();
+
+const id = await addEffect(DEMO_TREMOLO); // master chain
+updateParameter(id, 'rate', 8);
+
+await addEffectToTrack(trackId, DEMO_TREMOLO); // one track
+```
+
+`addEffect` awaits the definition's `prepare` hook on the live context and then creates the effect, so there is no separate prepare call in React. The entry has `kind: 'custom'`. Its sliders, bypass, reorder and remove work like any other entry, and the type appears at the end of `availableEffects`.
+
+A built-in id wins over a registered type of the same name, so pick an id that does not collide with the [built-in ids](#available-effects).
+
+### Export
+
+Nothing extra is needed. The offline effects functions from [Exporting with Effects](#exporting-with-effects) run `prepare` on the export's offline context and create the effect there.
+
+### Faust effects
+
+A [Faust](https://faust.grame.fr/) effect compiled at build time registers the same way. See [Precompiled Faust Effects](/docs/faust-effects) for the compile step and the registration code.
 
 ## Effect Categories
 

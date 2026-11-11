@@ -108,3 +108,39 @@ Why not the built-in nodes:
 - **Tone.js `Panner`** wraps a `StereoPannerNode` with a fixed channel count. On Tone's default context (standardized-audio-context) that setting cannot be changed, so a mono track's panner is locked to one channel and a stereo effect on the track is summed to mono before it is panned.
 
 The stage implements the same two laws as `StereoPannerNode` (`panMatrix(pan, sourceChannelCount)` is the pure math) but takes the law from the caller — the channel count of the track's source material — and always passes stereo through. It works on any `AudioContext` or `OfflineAudioContext`, and on the raw context behind Tone.js.
+
+## Effect registry
+
+`registerEffect(type, definition)` makes a custom effect (an `AudioWorkletNode`, or any chain of native nodes) available by id to both hosts in this project: `<daw-editor>` (`editor.addEffect(type)`) and the React effects hooks (`addEffect(type)` from `useDynamicEffects()`). Both render it in their offline exports.
+
+```typescript
+import { registerEffect } from '@waveform-playlist/core';
+
+registerEffect('my-tremolo', {
+  label: 'Tremolo',
+  category: 'modulation',
+  defaults: { rate: 6, depth: 0.8 },
+  params: {
+    rate: { min: 0.1, max: 20, step: 0.1, unit: 'Hz' },
+    depth: { min: 0, max: 1, step: 0.01 },
+  },
+  // Optional. Runs once per audio context, the offline one of an export included.
+  prepare: (audioContext) => audioContext.audioWorklet.addModule('/worklets/tremolo.js'),
+  create: (audioContext) => {
+    const node = new AudioWorkletNode(audioContext, 'my-tremolo');
+    return {
+      input: node,
+      output: node,
+      applyParams: (params) => {
+        if (params.rate !== undefined) node.parameters.get('rate').value = params.rate;
+        if (params.depth !== undefined) node.parameters.get('depth').value = params.depth;
+      },
+      dispose: () => node.disconnect(),
+    };
+  },
+});
+```
+
+A definition with a `wetParam` is bypassed by setting that parameter to 0; one without is disconnected while bypassed. Also exported: `unregisterEffect`, `getEffectDefinitions`, `prepareEffect`, `ensureEffectPrepared`, `needsPrepare`, `createEffectInstance`, and the types `NativeEffectDefinition`, `NativeEffectInstance` and `EffectParamDef`.
+
+The registry is stored on `globalThis`, so an effect registered through one installed copy of this package is visible to a host that uses another copy.

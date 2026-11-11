@@ -66,15 +66,17 @@ Side benefit of native mode: `sampleRate` is honored by the underlying `AudioCon
 
 ## React hooks
 
-WAM support is layered onto the existing effects hooks — `useDynamicEffects()` (master chain) and `useTrackDynamicEffects()` (per-track chains), both from `@waveform-playlist/browser/tone`. Each active effect entry (`ActiveEffect` / `TrackActiveEffect`) carries a `kind: 'native' | 'wam'` discriminator and, for WAM entries, the plugin's module `url`.
+WAM support is layered onto the existing effects hooks — `useDynamicEffects()` (master chain) and `useTrackDynamicEffects()` (per-track chains), both from `@waveform-playlist/browser/tone`. Each active effect entry (`ActiveEffect` / `TrackActiveEffect`) carries a `kind: 'native' | 'wam' | 'custom'` discriminator and, for WAM entries, the plugin's module `url`.
 
 ### Adding a WAM plugin
 
 ```tsx
-import { useDynamicEffects } from '@waveform-playlist/browser/tone';
+import { useDynamicEffects, useActiveEffects } from '@waveform-playlist/browser/tone';
 
 function MasterRack() {
-  const { activeEffects, addWamEffect, toggleBypass, removeEffect } = useDynamicEffects();
+  const { effects, addWamEffect, toggleBypass, removeEffect } = useDynamicEffects();
+  // The chain is a source; this component re-renders when it changes.
+  const activeEffects = useActiveEffects(effects);
 
   const handleAddDelay = () =>
     addWamEffect('https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js');
@@ -100,7 +102,7 @@ function MasterRack() {
 
 ### Bypass semantics
 
-Built-in Tone effects bypass by zeroing their `wet` parameter — the node stays connected in the graph. WAM plugins have no `wet` parameter, so `toggleBypass` uses **disconnection bypass** instead: a bypassed WAM entry is dropped from the rebuilt chain entirely rather than silenced in place. Toggling it back on reinserts it at the same position.
+Built-in Tone effects that have a `wet` parameter bypass by zeroing it — the node stays connected in the graph. WAM plugins have no `wet` parameter, so `toggleBypass` uses **disconnection bypass** instead: a bypassed WAM entry is dropped from the rebuilt chain entirely rather than silenced in place. Toggling it back on reinserts it at the same position. Built-in effects without a wet control (compressor, limiter, gate, 3-band EQ) and custom effects whose definition names no `wetParam` are bypassed the same way.
 
 ### Mounting a plugin's GUI
 
@@ -147,7 +149,7 @@ Without it installed, `addWamEffect`/`addWamEffectToTrack` throw a friendly inst
 
 ### Exporting with WAM plugins
 
-`useExportWav()` renders WAM entries into the exported WAV. The offline render happens on a native `OfflineAudioContext` (wrapped in a Tone `OfflineContext`), and `createOfflineEffectsFunction()` / `createOfflineTrackEffectsFunction()` re-instantiate each WAM plugin on that context from its URL-cached factory, transferring the live instance's state (`getState()`) at export time — the same pattern as dawcore's `exportAudio()`. Bypassed WAM entries stay excluded (disconnection bypass, parity with live playback), and a WAM plugin that fails to re-instantiate fails the export rather than silently rendering without it.
+`useExportWav()` renders WAM entries into the exported WAV. The offline render happens on a native `OfflineAudioContext` (wrapped in a Tone `OfflineContext`), and the functions returned by `createOfflineEffectsFunction()` / `createOfflineTrackEffectsFunction(trackId)` re-instantiate each WAM plugin on that context from its URL-cached factory, transferring the live instance's state (`getState()`) at export time — the same pattern as dawcore's `exportAudio()`. Bypassed WAM entries stay excluded (disconnection bypass, parity with live playback), and a WAM plugin that fails to re-instantiate fails the export rather than silently rendering without it.
 
 The offline render temporarily swaps Tone's global context while the export graph is built — don't add tracks or mutate effect chains while an export is in flight, or nodes created during that window would land on the offline context. Exports themselves are serialized internally, so overlapping calls to `useExportWav()` can't corrupt the global context.
 
@@ -189,7 +191,7 @@ Runnable demo: `pnpm example:dawcore-wam` — community-library picker, GUIs, pe
 
 ## Your own effects with Faust
 
-You can write an effect in [Faust](https://faust.grame.fr/), compile it ahead of time to a WAM plugin, and load it by URL like any other. See [Precompiled Faust Effects](./faust-effects.md) — including which generated files are LGPL or GPL, and how to leave the GPL part out.
+You can write an effect in [Faust](https://faust.grame.fr/), compile it ahead of time to a WAM plugin, and load it by URL like any other, or compile it to an AudioWorklet effect and register it with `registerEffect()` from `@waveform-playlist/core`. See [Precompiled Faust Effects](./faust-effects.md) — including which generated files are LGPL or GPL, and how to leave the GPL part out.
 
 ## Limitations
 
@@ -200,7 +202,7 @@ You can write an effect in [Faust](https://faust.grame.fr/), compile it ahead of
 
 ## See also
 
-- [Audio Effects](/docs/react/guides/effects) — built-in Tone.js effects and the core `useDynamicEffects`/`useTrackDynamicEffects` API
+- [Audio Effects](/docs/react/guides/effects) — built-in Tone.js effects, custom effects registered with `registerEffect()`, and the core `useDynamicEffects`/`useTrackDynamicEffects` API
 - [Hooks API Reference](/docs/react/api/hooks#effects-hooks) — full `UseDynamicEffectsReturn`/`UseTrackDynamicEffectsReturn` signatures
 - [Web Components Getting Started](/docs/web-components/getting-started)
 - Try it: [WAM! Kick It Up a Notch](pathname:///waveform-playlist/examples/wam-effects)
