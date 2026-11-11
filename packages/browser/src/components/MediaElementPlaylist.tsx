@@ -23,6 +23,7 @@ import {
   useMediaElementData,
 } from '../MediaElementPlaylistContext';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
+import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
 import { ChannelWithMediaElementProgress } from './ChannelWithMediaElementProgress';
 import type {
@@ -181,6 +182,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   // Mouse handlers for click-to-seek
   const mouseDownTimeRef = useRef<number>(0);
+  // The element the drag began on (the click overlay), for pointer positions
+  // while the pointer is somewhere else.
+  const dragElementRef = useRef<HTMLDivElement | null>(null);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -189,6 +193,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
       const clickTime = (x * samplesPerPixel) / sampleRate;
 
       mouseDownTimeRef.current = clickTime;
+      dragElementRef.current = e.currentTarget;
       setIsSelecting(true);
       setSelectionStart(clickTime);
       setSelectionEnd(clickTime);
@@ -196,58 +201,61 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     [samplesPerPixel, sampleRate]
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isSelecting) return;
+  // The drag is followed on the window, not on the overlay: the pointer may
+  // leave the waveform (a fast drag past either end, or drifting above or
+  // below it, which is easy on a single short track) and the button may be
+  // released anywhere. Positions outside the overlay clamp to its ends.
+  const dragTimeAt = (clientX: number): number | null => {
+    const element = dragElementRef.current;
+    if (!element) return null;
+    return (clampedOffsetX(element, clientX) * samplesPerPixel) / sampleRate;
+  };
 
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const moveTime = (x * samplesPerPixel) / sampleRate;
+  const handleDragMove = (e: MouseEvent) => {
+    const moveTime = dragTimeAt(e.clientX);
+    if (moveTime === null) return;
+    setSelectionEnd(moveTime);
+  };
 
-      setSelectionEnd(moveTime);
-    },
-    [isSelecting, samplesPerPixel, sampleRate]
-  );
+  const handleDragEnd = (e: MouseEvent | null) => {
+    setIsSelecting(false);
 
-  const handleMouseUp = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isSelecting) return;
+    // The window lost focus mid-drag: there is no release position. Keep the
+    // selection as the last move left it.
+    if (e === null) return;
 
-      setIsSelecting(false);
+    // During playback, use the time captured at mouseDown — auto-scroll shifts the
+    // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
+    // would produce a wrong (shifted) position.
+    if (isPlaying && playoutRef.current) {
+      const clickTime = Math.max(0, mouseDownTimeRef.current);
+      seekTo(clickTime);
+      setSelectionStart(clickTime);
+      setSelectionEnd(clickTime);
+      playoutRef.current.stop();
+      play(clickTime);
+      return;
+    }
 
-      // During playback, use the time captured at mouseDown — auto-scroll shifts the
-      // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
-      // would produce a wrong (shifted) position.
-      if (isPlaying && playoutRef.current) {
-        const clickTime = Math.max(0, mouseDownTimeRef.current);
-        seekTo(clickTime);
-        setSelectionStart(clickTime);
-        setSelectionEnd(clickTime);
-        playoutRef.current.stop();
-        play(clickTime);
-        return;
-      }
+    const endTime = dragTimeAt(e.clientX);
+    if (endTime === null) return;
 
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const endTime = (x * samplesPerPixel) / sampleRate;
+    const start = Math.min(selectionStart, endTime);
+    const end = Math.max(selectionStart, endTime);
 
-      const start = Math.min(selectionStart, endTime);
-      const end = Math.max(selectionStart, endTime);
+    // If it's just a click (not a drag), seek to that position
+    if (Math.abs(end - start) < 0.1) {
+      seekTo(start);
+      setSelectionStart(start);
+      setSelectionEnd(start);
+    } else {
+      // It was a drag - finalize the selection
+      setSelectionStart(start);
+      setSelectionEnd(end);
+    }
+  };
 
-      // If it's just a click (not a drag), seek to that position
-      if (Math.abs(end - start) < 0.1) {
-        seekTo(start);
-        setSelectionStart(start);
-        setSelectionEnd(start);
-      } else {
-        // It was a drag - finalize the selection
-        setSelectionStart(start);
-        setSelectionEnd(end);
-      }
-    },
-    [isSelecting, selectionStart, samplesPerPixel, sampleRate, seekTo, isPlaying, playoutRef, play]
-  );
+  useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
 
   // Show loading if peaks not ready
   if (peaksDataArray.length === 0) {
@@ -278,8 +286,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
           tracksWidth={tracksFullWidth}
           controlsWidth={controls.show ? controls.width : 0}
           onTracksMouseDown={handleMouseDown}
-          onTracksMouseMove={handleMouseMove}
-          onTracksMouseUp={handleMouseUp}
           scrollContainerRef={handleScrollContainerRef}
           isSelecting={isSelecting}
           timescale={timeScaleHeight > 0 ? <SmartScale /> : undefined}

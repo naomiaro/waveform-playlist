@@ -417,9 +417,21 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 - jsdom doesn't implement `isContentEditable` (returns `undefined` as of jsdom 28). Polyfill with `Object.defineProperty(el, 'isContentEditable', { value: true })` in tests
 - `handleKeyboardEvent` is a pure function in `@waveform-playlist/core` (re-exported from `useKeyboardShortcuts.ts` for backwards compatibility). Unit tests import from core directly.
 
+## Selection Drag Is Followed on the Window
+
+`PlaylistVisualization` and `MediaElementPlaylist` handle only `mousedown` on the click overlay. Moves and the release come from `useWindowDrag(isSelecting, onMove, onEnd)` (`src/hooks/useWindowDrag.ts`), which listens on `window` while the drag is active, so the selection follows a pointer that has left the waveform and the drag ends wherever the button is released.
+
+- Positions come from `clampedOffsetX(dragElementRef.current, clientX)`: the overlay the press landed on, clamped to its ends. A fast drag past the left edge therefore selects from 0.
+- `onEnd(null)` is a window `blur` (the `mouseup` went to another application): end the drag, keep the selection, no seek.
+- Before this, a release outside the overlay left `isSelecting` true: the next move over the tracks extended the selection with no button held, and `ClickOverlay`'s `$isSelecting` z-index (110) stayed above the clips (105), so headers and trim handles could not be grabbed until the next click.
+- The hook sets `user-select: none` on the root element for the drag. Do NOT replace that with `preventDefault()` on the mousedown: the press must still take focus off a focused control (Space after clicking the waveform is play/pause, see "Shortcuts Yield to the Focused Control").
+- e2e gotcha: a diagonal `page.mouse.move(..., { steps })` out of the tracks changes the selection on the way; leave vertically when the test is about the range.
+
+Covered by `hooks/__tests__/useWindowDrag.test.tsx` and the "outside the tracks" / "past the left edge" tests in `e2e/multi-clip.spec.ts` and `e2e/media-element.spec.ts`.
+
 ## Click-to-Seek During Auto-Scroll
 
-`handleMouseUp` must NOT recompute click time from `getBoundingClientRect()` during playback — auto-scroll shifts the overlay between mouseDown and mouseUp, producing wrong positions. Instead, `mouseDownTimeRef` captures the time at mouseDown, and mouseUp reuses it when `isPlaying`. Applied in both `PlaylistVisualization` and `MediaElementPlaylist`.
+The release handler (`handleDragEnd`) must NOT recompute click time from `getBoundingClientRect()` during playback — auto-scroll shifts the overlay between mouseDown and mouseUp, producing wrong positions. Instead, `mouseDownTimeRef` captures the time at mouseDown, and mouseUp reuses it when `isPlaying`. Applied in both `PlaylistVisualization` and `MediaElementPlaylist`.
 
 ## Progress Overlay Width Invariant
 

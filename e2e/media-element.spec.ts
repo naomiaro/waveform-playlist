@@ -18,6 +18,90 @@ test.describe('Media Element Example', () => {
     await page.waitForSelector('h1:has-text("Media Element")', { timeout: 30000 });
   });
 
+  test.describe('Selection', () => {
+    // The drag is followed on the window: the pointer may leave the waveform and
+    // the button may be released anywhere.
+    test('a drag keeps following the pointer outside the waveform', async ({ page }) => {
+      const container = page.locator('[data-scroll-container]').first();
+      await expect(container).toBeVisible();
+      await expect(container.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await container.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+
+      const y = box!.y + box!.height / 2;
+      const anchorX = box!.x + 100;
+      const selection = page.locator('[data-selection]').first();
+      const expectSelection = async (left: number, width: number) => {
+        await expect(async () => {
+          const selectionBox = await selection.boundingBox();
+          expect(selectionBox).toBeTruthy();
+          expect(Math.abs(selectionBox!.x - left)).toBeLessThanOrEqual(2);
+          expect(Math.abs(selectionBox!.width - width)).toBeLessThanOrEqual(2);
+        }).toPass({ timeout: 5000 });
+      };
+      const heading = await page.locator('h1').first().boundingBox();
+      expect(heading).toBeTruthy();
+      const outsideY = heading!.y + heading!.height / 2;
+
+      await page.mouse.move(anchorX, y);
+      await page.mouse.down();
+      await page.mouse.move(anchorX + 40, y, { steps: 4 });
+      // Leave upwards, then keep dragging right while outside.
+      await page.mouse.move(anchorX + 40, outsideY, { steps: 5 });
+      await page.mouse.move(anchorX + 200, outsideY, { steps: 8 });
+      await expectSelection(anchorX, 200);
+
+      // Released outside: the range is kept and the drag is over.
+      await page.mouse.up();
+      await expectSelection(anchorX, 200);
+      for (let i = 0; i <= 5; i++) {
+        await page.mouse.move(anchorX + 300 + i * 20, y);
+      }
+      await page.waitForTimeout(200);
+      await expectSelection(anchorX, 200);
+
+      // Dragging over the page did not select its text.
+      expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+    });
+
+    test('a drag past the left edge of the waveform selects from the start', async ({ page }) => {
+      const container = page.locator('[data-scroll-container]').first();
+      await expect(container).toBeVisible();
+      await expect(container.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await container.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+
+      const y = box!.y + box!.height / 2;
+      const anchorX = box!.x + 100;
+      const selection = page.locator('[data-selection]').first();
+      const expectSelection = async (left: number, width: number) => {
+        await expect(async () => {
+          const selectionBox = await selection.boundingBox();
+          expect(selectionBox).toBeTruthy();
+          expect(Math.abs(selectionBox!.x - left)).toBeLessThanOrEqual(2);
+          expect(Math.abs(selectionBox!.width - width)).toBeLessThanOrEqual(2);
+        }).toPass({ timeout: 5000 });
+      };
+      const heading = await page.locator('h1').first().boundingBox();
+      expect(heading).toBeTruthy();
+      const outsideY = heading!.y + heading!.height / 2;
+
+      await page.mouse.move(anchorX, y);
+      await page.mouse.down();
+      // One jump from inside to well left of the waveform, as a fast drag does.
+      await page.mouse.move(Math.max(box!.x - 150, 1), outsideY);
+      await expectSelection(box!.x, 100);
+      await page.mouse.up();
+      await expectSelection(box!.x, 100);
+    });
+  });
+
   test.describe('Custom Playhead (PlayheadWithMarker)', () => {
     test('playback with custom playhead produces no console errors', async ({ page }) => {
       const consoleErrors: string[] = [];

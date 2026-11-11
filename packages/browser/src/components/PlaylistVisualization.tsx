@@ -27,6 +27,7 @@ import {
 } from '../WaveformPlaylistContext';
 import { applyTrackOrderPreview, computeTrackLayout } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
+import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { useRecordingLayout } from '../hooks/useRecordingLayout';
 import type { AnnotationAction, RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
@@ -227,6 +228,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   const [isSelecting, setIsSelecting] = useState(false);
   const mouseDownTimeRef = useRef<number>(0);
+  // The element the drag began on (the click overlay), for pointer positions
+  // while the pointer is somewhere else.
+  const dragElementRef = useRef<HTMLDivElement | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -328,17 +332,26 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     }
 
     mouseDownTimeRef.current = clickTime;
+    dragElementRef.current = e.currentTarget;
     setIsSelecting(true);
     setCurrentTime(clickTime);
     setSelection(clickTime, clickTime);
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isSelecting || isPlaying) return;
+  // The drag is followed on the window, not on the overlay: the pointer may
+  // leave the tracks (a fast drag past either end, or drifting above or below
+  // them) and the button may be released anywhere. Positions outside the
+  // overlay clamp to its ends.
+  const dragTimeAt = (clientX: number): number | null => {
+    const element = dragElementRef.current;
+    if (!element) return null;
+    return (clampedOffsetX(element, clientX) * samplesPerPixel) / sampleRate;
+  };
 
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const moveTime = (x * samplesPerPixel) / sampleRate;
+  const handleDragMove = (e: MouseEvent) => {
+    if (isPlaying) return;
+    const moveTime = dragTimeAt(e.clientX);
+    if (moveTime === null) return;
 
     // The anchor is where the drag began. It comes from a ref, not from the
     // selection state: this component does not subscribe to the selection
@@ -348,10 +361,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     setSelection(Math.min(anchor, moveTime), Math.max(anchor, moveTime));
   };
 
-  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isSelecting) return;
-
+  const handleDragEnd = (e: MouseEvent | null) => {
     setIsSelecting(false);
+
+    // The window lost focus mid-drag: there is no release position. Keep the
+    // selection as the last move left it.
+    if (e === null) return;
 
     // During playback, use the time captured at mouseDown — auto-scroll shifts the
     // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
@@ -364,9 +379,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
       return;
     }
 
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const endTime = (x * samplesPerPixel) / sampleRate;
+    const endTime = dragTimeAt(e.clientX);
+    if (endTime === null) return;
 
     const anchor = mouseDownTimeRef.current;
     const start = Math.min(anchor, endTime);
@@ -378,6 +392,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
       setSelection(start, end);
     }
   };
+
+  useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
 
   // Shared vertical layout for BOTH columns (waveform rows + control slots).
   // Heights use the existing slot formula; order applies the live drag
@@ -512,8 +528,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
           tracksWidth={tracksFullWidth}
           controlsWidth={controls.show ? controls.width : 0}
           onTracksMouseDown={handleMouseDown}
-          onTracksMouseMove={handleMouseMove}
-          onTracksMouseUp={handleMouseUp}
           scrollContainerRef={handleScrollContainerRef}
           isSelecting={isSelecting}
           data-playlist-state={isReady ? 'ready' : 'loading'}
