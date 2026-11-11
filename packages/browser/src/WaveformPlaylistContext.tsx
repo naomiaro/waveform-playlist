@@ -46,6 +46,7 @@ import { useShallowStable } from './hooks/useShallowStable';
 import { createAnnotationLookup } from './utils/annotationLookup';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
+import { incrementalTrackChange } from './utils/incrementalTrackChange';
 
 // Types
 export interface ClipPeaks {
@@ -579,6 +580,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Monotonic counter from engine.getState().tracksVersion — used to detect
   // track mutations (move/trim/split/add/remove) vs other statechange events.
   const lastTracksVersionRef = useRef(0);
+  // Set while this provider applies a `tracks` prop change to the engine track
+  // by track; the statechange it causes must not be mirrored back to the parent.
+  const suppressTracksMirrorRef = useRef(false);
   // Flag set during render to prevent the previous effect cleanup from disposing the
   // engine when we're skipping the rebuild. React runs previous cleanup before the
   // current effect body, so the flag must be set during render (which precedes cleanup).
@@ -715,17 +719,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // tracks per-frame, triggering effect re-runs whose cleanup would dispose the engine.
   const isEngineTracks = tracks === engineTracksRef.current;
 
-  // Detect additive-only track changes: new tracks appended, existing tracks unchanged.
-  // Uses reference equality on individual tracks — if any existing track object changed
-  // (e.g., clip added to it), this is false and triggers a full rebuild.
+  // Detect track changes that can be applied to the running engine: new tracks
+  // appended, or an empty track that got its clips (a placeholder whose audio
+  // arrived). Existing tracks are compared by reference; a changed track that
+  // already had clips makes this null and triggers a full rebuild.
   const prevTracks = prevTracksRef.current;
-  const isIncrementalAdd =
-    engineRef.current !== null &&
-    tracks.length > prevTracks.length &&
-    prevTracks.every((pt) => {
-      const current = tracks.find((t) => t.id === pt.id);
-      return current === pt; // reference equality — existing tracks must be untouched
-    });
+  const incrementalChange =
+    engineRef.current !== null ? incrementalTrackChange(prevTracks, tracks) : null;
+  const isIncrementalAdd = incrementalChange !== null;
   // Note: prevTracks may be empty here (e.g. recording's first track on a
   // persistent empty-timeline engine) — that's a valid 0→1 incremental add, so
   // it must NOT require prevTracks.length > 0. The engineRef !== null guard keeps
@@ -816,32 +817,54 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // tracks unchanged. Add each new track to the existing engine without
     // tearing down the playout. This avoids disposing and recreating all
     // audio nodes when dropping a file or finishing a recording.
-    if (isIncrementalAdd && engineRef.current) {
+    if (incrementalChange && engineRef.current) {
       try {
-        // Use prevTracks captured during render (not prevTracksRef.current) to ensure
-        // the guard condition and inner logic operate on the same snapshot.
-        const prevIds = new Set(prevTracks.map((t) => t.id));
-        const addedTracks = tracks.filter((t) => !prevIds.has(t.id));
+        // incrementalChange was computed during render from the same prevTracks
+        // snapshot as the guard, not from prevTracksRef.current.
+        const engine = engineRef.current;
+        const { added: addedTracks, filled: filledTracks } = incrementalChange;
 
-        // Merge current UI state into new tracks before adding to engine
+        // Merge current UI state into a track before handing it to the engine
         const currentTrackStates = trackStatesRef.current;
-        for (const track of addedTracks) {
-          const trackIndex = tracks.indexOf(track);
-          const trackState = currentTrackStates[trackIndex];
-          const trackWithState = {
+        const withUiState = (track: ClipTrack): ClipTrack => {
+          const trackState = currentTrackStates[tracks.indexOf(track)];
+          return {
             ...track,
             volume: trackState?.volume ?? track.volume,
             muted: trackState?.muted ?? track.muted,
             soloed: trackState?.soloed ?? track.soloed,
             pan: trackState?.pan ?? track.pan,
           };
-          engineRef.current!.addTrack(trackWithState);
+        };
+        for (const track of addedTracks) {
+          engine.addTrack(withUiState(track));
         }
 
-        // Initialize track states for the new tracks (preserve existing)
+        if (filledTracks.length > 0) {
+          // The parent already has these tracks, as on the initial setTracks:
+          // do not echo them back through onTracksChange.
+          suppressTracksMirrorRef.current = true;
+          try {
+            for (const track of filledTracks) {
+              engine.updateTrack(track.id, withUiState(track));
+            }
+          } finally {
+            suppressTracksMirrorRef.current = false;
+          }
+          // As a rebuild did: "the audio arrived" is not a step to undo back
+          // to an empty placeholder.
+          engine.clearHistory();
+        }
+
+        // Initialize track states for the new tracks (preserve existing), and
+        // take the names of the filled ones ("x (loading...)" becomes "x").
+        const filledNames = new Map(filledTracks.map((t) => [tracks.indexOf(t), t.name]));
         setTrackStates((prev) => {
-          if (prev.length === tracks.length) return prev;
-          const newStates = [...prev];
+          const renamed = prev.some((state, i) => (filledNames.get(i) ?? state.name) !== state.name)
+            ? prev.map((state, i) => ({ ...state, name: filledNames.get(i) ?? state.name }))
+            : prev;
+          if (renamed.length === tracks.length) return renamed;
+          const newStates = [...renamed];
           for (const track of addedTracks) {
             newStates.push({
               name: track.name,
@@ -1030,7 +1053,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           // selection/zoom/volume changes. Per-track mixer edits bump the
           // engine's separate mixerVersion (#501) and are persisted here via
           // trackStates, so they intentionally do not flow through onTracksChange.
-          if (!suppressTracksMirroring && state.tracksVersion !== lastTracksVersionRef.current) {
+          if (suppressTracksMirrorRef.current) {
+            // A change this provider is applying from its own `tracks` prop.
+            lastTracksVersionRef.current = state.tracksVersion;
+          } else if (
+            !suppressTracksMirroring &&
+            state.tracksVersion !== lastTracksVersionRef.current
+          ) {
             lastTracksVersionRef.current = state.tracksVersion;
             engineTracksRef.current = state.tracks;
 

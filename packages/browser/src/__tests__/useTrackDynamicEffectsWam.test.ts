@@ -371,8 +371,16 @@ describe('useTrackDynamicEffects — WAM entries', () => {
       };
       const fader = { connect: vi.fn() } as unknown as ToneAudioNode;
       act(() => {
-        view.result.current.getTrackEffectsFunction('t1')?.(inputs.t1 as unknown as Gain, fader, false);
-        view.result.current.getTrackEffectsFunction('t2')?.(inputs.t2 as unknown as Gain, fader, false);
+        view.result.current.getTrackEffectsFunction('t1')?.(
+          inputs.t1 as unknown as Gain,
+          fader,
+          false
+        );
+        view.result.current.getTrackEffectsFunction('t2')?.(
+          inputs.t2 as unknown as Gain,
+          fader,
+          false
+        );
       });
       inputs.t1.disconnect.mockClear();
       inputs.t2.disconnect.mockClear();

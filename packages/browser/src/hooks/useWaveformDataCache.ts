@@ -15,6 +15,8 @@
  * - Creates the worker lazily on first clip needing generation
  * - Generates waveform data once per unique AudioBuffer; a job keeps running
  *   across `tracks` changes
+ * - A failed job is tried again on the next `tracks` change, three attempts
+ *   per buffer in all
  * - Terminates the worker on unmount
  */
 
@@ -30,10 +32,19 @@ export interface UseWaveformDataCacheReturn {
   version: number;
 }
 
+/**
+ * Attempts per buffer before giving up. A failed job is tried again on the
+ * next `tracks` change (a crashed worker is replaced), but a buffer that can
+ * never succeed (a CSP that blocks blob workers) must not be copied and sent
+ * again on every pointer move of a trim.
+ */
+const MAX_GENERATION_ATTEMPTS = 3;
+
 function buffersNeedingGeneration(
   tracks: ClipTrack[],
   generated: WeakMap<AudioBuffer, WaveformData>,
-  inflight: WeakMap<AudioBuffer, Promise<void>>
+  inflight: WeakMap<AudioBuffer, Promise<void>>,
+  failures: WeakMap<AudioBuffer, number>
 ): Set<AudioBuffer> {
   const buffers = new Set<AudioBuffer>();
   for (const track of tracks) {
@@ -41,6 +52,7 @@ function buffersNeedingGeneration(
       // Clips with their own waveformData never need the worker.
       if (!clip.audioBuffer || clip.waveformData) continue;
       if (generated.has(clip.audioBuffer) || inflight.has(clip.audioBuffer)) continue;
+      if ((failures.get(clip.audioBuffer) ?? 0) >= MAX_GENERATION_ATTEMPTS) continue;
       buffers.add(clip.audioBuffer);
     }
   }
@@ -56,6 +68,7 @@ export function useWaveformDataCache(
   const workerRef = useRef<PeaksWorkerApi | null>(null);
   const generatedByBufferRef = useRef<WeakMap<AudioBuffer, WaveformData>>(new WeakMap());
   const inflightByBufferRef = useRef<WeakMap<AudioBuffer, Promise<void>>>(new WeakMap());
+  const failuresByBufferRef = useRef<WeakMap<AudioBuffer, number>>(new WeakMap());
   // Changes on unmount. A job started in an earlier mount (StrictMode
   // remounts, or a real unmount) must not set state or warn.
   const mountSessionRef = useRef(0);
@@ -79,7 +92,13 @@ export function useWaveformDataCache(
     const generatedByBuffer = generatedByBufferRef.current;
     const inflightByBuffer = inflightByBufferRef.current;
     const session = mountSessionRef.current;
-    const buffers = buffersNeedingGeneration(tracks, generatedByBuffer, inflightByBuffer);
+    const failuresByBuffer = failuresByBufferRef.current;
+    const buffers = buffersNeedingGeneration(
+      tracks,
+      generatedByBuffer,
+      inflightByBuffer,
+      failuresByBuffer
+    );
     if (buffers.size === 0) return;
 
     const worker = getWorker();
@@ -118,8 +137,18 @@ export function useWaveformDataCache(
         })
         .catch((err) => {
           settle();
+          // A job rejected by the unmount's terminate() is not a failure of
+          // the buffer.
           if (mountSessionRef.current !== session) return;
-          console.warn('[waveform-playlist] Worker peak generation failed: ' + String(err));
+          const attempts = (failuresByBuffer.get(audioBuffer) ?? 0) + 1;
+          failuresByBuffer.set(audioBuffer, attempts);
+          console.warn(
+            '[waveform-playlist] Worker peak generation failed' +
+              (attempts >= MAX_GENERATION_ATTEMPTS
+                ? ' ' + attempts + ' times, giving up on this audio buffer: '
+                : ': ') +
+              String(err)
+          );
         });
 
       inflightByBuffer.set(audioBuffer, job);
