@@ -13,6 +13,7 @@ import { createEffectInstance, type EffectInstance } from '../effects/effectFact
 import { loadWamModule } from '../effects/loadWam';
 import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
 import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
+import { chainTopologyKey } from '../effects/chainTopology';
 import type { OfflineEffectsFunction } from './useExportWav';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { Analyser, Volume, ToneAudioNode, connect } from 'tone';
@@ -318,10 +319,14 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     setActiveEffects([]);
   }, []);
 
-  // Rebuild chain when effects change
+  // Rewire the chain when its wiring changes (an effect added, removed, moved,
+  // or a WAM entry bypassed), and not when a parameter does: the list is
+  // replaced on every slider step, and rewiring per step disconnected and
+  // reconnected the live graph each time.
+  const topologyKey = chainTopologyKey(activeEffects);
   useEffect(() => {
-    rebuildChain(activeEffects);
-  }, [activeEffects, rebuildChain]);
+    rebuildChain(activeEffectsRef.current);
+  }, [topologyKey, rebuildChain]);
 
   // The effects function that gets passed to WaveformPlaylistProvider
   // This function is stable - it reads from refs at call time to avoid stale closures

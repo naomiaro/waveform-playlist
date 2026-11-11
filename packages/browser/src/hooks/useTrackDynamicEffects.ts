@@ -10,6 +10,7 @@ import { createEffectInstance, type EffectInstance } from '../effects/effectFact
 import { loadWamModule } from '../effects/loadWam';
 import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
 import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
+import { chainTopologyKey } from '../effects/chainTopology';
 import type { OfflineTrackEffectsFunction } from './useExportWav';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { Gain, ToneAudioNode, connect, disconnect } from 'tone';
@@ -442,11 +443,22 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     [] // No dependencies - stable function that reads from refs
   );
 
-  // Rebuild chains when effects change
+  // Rewire a track's chain when ITS wiring changes (an effect added, removed,
+  // or a WAM entry bypassed). The state map is replaced on every parameter
+  // change of any track; rewiring from that disconnected and reconnected the
+  // live chain of every track per slider step.
+  const wiredTopologyRef = useRef(new Map<string, string>());
   useEffect(() => {
+    const wired = wiredTopologyRef.current;
     trackEffectsState.forEach((effects, trackId) => {
+      const key = chainTopologyKey(effects);
+      if (wired.get(trackId) === key) return;
+      wired.set(trackId, key);
       rebuildTrackChain(trackId, effects);
     });
+    for (const trackId of wired.keys()) {
+      if (!trackEffectsState.has(trackId)) wired.delete(trackId);
+    }
   }, [trackEffectsState, rebuildTrackChain]);
 
   // Cleanup on unmount
