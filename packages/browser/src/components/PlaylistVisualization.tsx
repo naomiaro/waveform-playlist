@@ -9,56 +9,36 @@ import React, {
   useCallback,
 } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
 import {
   Playlist,
-  Track as TrackComponent,
-  Clip,
-  Selection,
-  TimescaleLoopRegion,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
   SmartScale,
-  CloseButton,
-  Controls,
-  Header,
-  Button,
-  ButtonGroup,
-  Slider,
-  SliderWrapper,
-  VolumeDownIcon,
-  VolumeUpIcon,
-  TrackMenu,
   useTheme,
   waveformColorToCss,
   type RenderPlayheadFunction,
-  SpectrogramLabels,
   CLIP_HEADER_HEIGHT,
-  ReorderRail,
 } from '@waveform-playlist/ui-components';
-import { SortableTrackControls } from './SortableTrackControls';
-import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
   usePlaybackAnimation,
   usePlaylistState,
   usePlaylistControls,
   usePlaylistData,
-  type ClipPeaks,
-  type TrackState,
 } from '../WaveformPlaylistContext';
 import { applyTrackOrderPreview, computeTrackLayout } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
-import { resolveRecordingOffsetSamples, type Peaks } from '@waveform-playlist/core';
-import { AnimatedPlayhead } from './AnimatedPlayhead';
-import { ChannelWithProgress } from './ChannelWithProgress';
-import type { SpectrogramConfig } from '@waveform-playlist/core';
-import type { AnnotationAction } from '@waveform-playlist/core';
-import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
-import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
+import type { AnnotationAction, RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
+import type { GetAnnotationBoxLabelFn } from '../types/annotations';
+import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
+import { TrackRows, type SpectrogramTrackHelpers } from './TrackRows';
+import { TrackControlsColumn } from './TrackControlsColumn';
 import {
-  SpectrogramIntegrationContext,
-  type SpectrogramIntegration,
-} from '../SpectrogramIntegrationContext';
+  AnnotationBoxesOverlay,
+  LoopRegionOverlay,
+  PlayheadOverlay,
+  SelectionOverlay,
+} from './VisualizationOverlays';
+import { getTrackChannelCount, type VisualizationRecordingState } from './visualizationLayout';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -66,77 +46,6 @@ const DEFAULT_EMPTY_TRACK_DURATION = 60;
 // Passed to the spectrogram settings modal when no config exists at any level.
 // A module constant, so the prop keeps its identity across renders.
 const EMPTY_SPECTROGRAM_CONFIG: SpectrogramConfig = {};
-
-/** Drop-shadow for the floating (fully opaque) drag-source controls row. */
-const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
-
-interface PositionedRowProps {
-  readonly $top: number;
-  readonly $animate: boolean;
-}
-
-/**
- * Shared relative container for absolutely-positioned track rows. Explicit
- * height because absolute children don't size their parent.
- */
-const TracksLayout = styled.div.attrs<{ $height: number }>((props) => ({
-  style: { height: `${props.$height}px` },
-}))<{ $height: number }>`
-  position: relative;
-`;
-
-/**
- * Positions one waveform track row from the shared layout map. Positioned
- * via `top`, NOT `translateY` — a transform (even translateY(0)) creates a
- * stacking context on every row, which flattens the clips' z-index: 105
- * beneath the ClickOverlay (z-index: 1) and blocks all clip interactions
- * (header drag, boundary trim, split). `top` moves the row without a
- * stacking context, so clip z-indexes keep competing globally as before.
- * Transition only while a track drag is active (+trailing window) so
- * unrelated layout changes stay instant.
- */
-const TrackRowPositioner = styled.div.attrs<PositionedRowProps>((props) => ({
-  style: { top: `${props.$top}px` },
-}))<PositionedRowProps>`
-  position: absolute;
-  left: 0;
-  right: 0;
-  ${(props) => props.$animate && 'transition: top 150ms ease;'}
-  @media (prefers-reduced-motion: reduce) {
-    transition: none;
-  }
-`;
-
-interface ControlSlotProps {
-  readonly $height: number;
-  readonly $top: number;
-  readonly $animate: boolean;
-  readonly $isSelected?: boolean;
-}
-
-/**
- * Height-synced container for each track's controls in the ControlsColumn.
- * Uses the same height formula as Track: waveHeight * numChannels + clipHeaderHeight.
- */
-const ControlSlot = styled.div.attrs<ControlSlotProps>((props) => ({
-  style: {
-    height: `${props.$height}px`,
-    top: `${props.$top}px`,
-  },
-}))<ControlSlotProps>`
-  position: absolute;
-  left: 0;
-  right: 0;
-  overflow: hidden;
-  pointer-events: auto;
-  background: ${(props) => props.theme.surfaceColor};
-  transition: background 0.15s ease-in-out;
-  ${(props) => props.$animate && 'transition: top 150ms ease, background 0.15s ease-in-out;'}
-  @media (prefers-reduced-motion: reduce) {
-    transition: background 0.15s ease-in-out;
-  }
-  ${(props) => props.$isSelected && `background: ${props.theme.selectedTrackControlsBackground};`}
-`;
 
 export interface PlaylistVisualizationProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
@@ -165,241 +74,11 @@ export interface PlaylistVisualizationProps {
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
   onRemoveTrack?: (trackIndex: number) => void;
   // Live recording state for real-time waveform preview
-  recordingState?: {
-    isRecording: boolean;
-    trackId: string;
-    startSample: number;
-    durationSamples: number;
-    peaks: (Int8Array | Int16Array)[];
-    bits: 8 | 16;
-    /**
-     * Latency offset (seconds) to skip in the live preview. Absolute replacement
-     * for the auto-computed outputLatency + lookAhead value. Pass the same value
-     * given to useIntegratedRecording so preview and finalized clip match.
-     */
-    latencyOffset?: number;
-  };
+  recordingState?: VisualizationRecordingState;
   /** Enable vertical track reordering: a drag grip + move up/down buttons on
    *  each default track control panel. Drag requires ClipInteractionProvider
    *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
   trackReordering?: boolean;
-}
-
-/**
- * Wrapper that isolates the custom playhead's hooks from PlaylistVisualization.
- * Calling renderPlayhead() directly would merge its hooks into the parent,
- * causing "Rendered more hooks" errors if renderPlayhead is conditionally provided.
- */
-const CustomPlayhead: React.FC<{
-  renderPlayhead: RenderPlayheadFunction;
-  color: string;
-  samplesPerPixel: number;
-  sampleRate: number;
-}> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
-  const {
-    isPlaying,
-    currentTimeRef,
-    visualTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    getPlaybackTime,
-    getAudioContextTime,
-  } = usePlaybackAnimation();
-
-  // Use visualTimeRef so the initial position matches the audible output
-  // (the playhead's rAF loop also reads visualTimeRef for in-sync animation).
-  const visualTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
-
-  return renderPlayhead({
-    position: (visualTime * sampleRate) / samplesPerPixel,
-    color,
-    isPlaying,
-    currentTimeRef,
-    visualTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    samplesPerPixel,
-    sampleRate,
-    controlsOffset: 0,
-    getAudioContextTime,
-    getPlaybackTime,
-  }) as React.ReactElement;
-};
-
-/** Compute the maximum channel count for a track, considering both clip peaks and live recording. */
-function getTrackChannelCount(
-  trackClipPeaks: ClipPeaks[],
-  recordingState: PlaylistVisualizationProps['recordingState'],
-  trackId: string | undefined,
-  mono: boolean
-): number {
-  const clipChannels =
-    trackClipPeaks.length > 0
-      ? Math.max(1, ...trackClipPeaks.map((clip) => clip.peaks.data.length))
-      : 1;
-  const recordingChannels =
-    recordingState?.isRecording && recordingState.trackId === trackId
-      ? mono
-        ? 1
-        : recordingState.peaks.length
-      : 0;
-  return Math.max(clipChannels, recordingChannels);
-}
-
-interface DefaultTrackControlsProps {
-  trackIndex: number;
-  track: ClipTrack;
-  trackState: TrackState;
-  effectiveRenderMode: RenderMode;
-  selectTrack: (trackIndex: number) => void;
-  onRemoveTrack?: (trackIndex: number) => void;
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
-  spectrogram: SpectrogramIntegration | null;
-  setSettingsModalTrackId: (id: string | null) => void;
-  trackReordering: boolean;
-  reorderTrack: (trackId: string, toIndex: number) => void;
-  trackCount: number;
-  /** Attach to the drag grip element (the `handleRef` from SortableTrackControls). */
-  gripRef?: (element: Element | null) => void;
-  /** True while the track has no mixer state yet (still loading): the mixer
-   *  and reorder controls cannot take effect, so they render disabled. */
-  disabled: boolean;
-}
-
-/**
- * Default track control panel: name/close header, mute/solo, volume/pan sliders,
- * plus an optional drag grip and move up/down buttons when `trackReordering` is
- * enabled. Extracted into its own component (used both directly and wrapped in
- * SortableTrackControls) so the trackReordering branch doesn't change the hook
- * count of the shared JSX.
- */
-function DefaultTrackControls({
-  trackIndex,
-  track,
-  trackState,
-  effectiveRenderMode,
-  selectTrack,
-  onRemoveTrack,
-  setTrackMute,
-  setTrackSolo,
-  setTrackVolume,
-  setTrackPan,
-  spectrogram,
-  setSettingsModalTrackId,
-  trackReordering,
-  reorderTrack,
-  trackCount,
-  gripRef,
-  disabled,
-}: DefaultTrackControlsProps) {
-  return (
-    <Controls
-      onClick={() => selectTrack(trackIndex)}
-      style={
-        trackReordering ? { position: 'relative', paddingLeft: 18, paddingRight: 18 } : undefined
-      }
-    >
-      <Header style={{ justifyContent: 'center', position: 'relative' }}>
-        {onRemoveTrack && (
-          <CloseButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemoveTrack(trackIndex);
-            }}
-          />
-        )}
-        <span
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            padding: '0 24px',
-            display: 'block',
-          }}
-        >
-          {trackState.name || `Track ${trackIndex + 1}`}
-        </span>
-        {spectrogram?.renderMenuItems && (
-          <span style={{ position: 'absolute', right: 0, top: 0 }}>
-            <TrackMenu
-              items={(onClose) =>
-                spectrogram.renderMenuItems!({
-                  renderMode: effectiveRenderMode,
-                  onRenderModeChange: (mode) => spectrogram.setTrackRenderMode(track.id, mode),
-                  onOpenSettings: () => setSettingsModalTrackId(track.id),
-                  onClose,
-                })
-              }
-            />
-          </span>
-        )}
-      </Header>
-      <ButtonGroup>
-        <Button
-          $variant={trackState.muted ? 'danger' : 'outline'}
-          aria-pressed={trackState.muted}
-          disabled={disabled}
-          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-        >
-          Mute
-        </Button>
-        <Button
-          $variant={trackState.soloed ? 'info' : 'outline'}
-          aria-pressed={trackState.soloed}
-          disabled={disabled}
-          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-        >
-          Solo
-        </Button>
-      </ButtonGroup>
-      <SliderWrapper>
-        <VolumeDownIcon />
-        <Slider
-          min="0"
-          max="1"
-          step="0.01"
-          value={trackState.volume}
-          aria-label="Volume"
-          disabled={disabled}
-          onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
-        />
-        <VolumeUpIcon />
-      </SliderWrapper>
-      <SliderWrapper>
-        <span>L</span>
-        <Slider
-          min="-1"
-          max="1"
-          step="0.01"
-          value={trackState.pan}
-          aria-label="Pan"
-          disabled={disabled}
-          onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
-        />
-        <span>R</span>
-      </SliderWrapper>
-      {trackReordering && (
-        <ReorderRail
-          style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)' }}
-          gripRef={gripRef as React.Ref<HTMLButtonElement>}
-          onGripClick={(e) => e.stopPropagation()}
-          upDisabled={disabled || trackIndex === 0}
-          downDisabled={disabled || trackIndex === trackCount - 1}
-          onMoveUp={(e) => {
-            e.stopPropagation();
-            reorderTrack(track.id, trackIndex - 1);
-          }}
-          onMoveDown={(e) => {
-            e.stopPropagation();
-            reorderTrack(track.id, trackIndex + 1);
-          }}
-        />
-      )}
-    </Controls>
-  );
 }
 
 /**
@@ -411,6 +90,16 @@ function DefaultTrackControls({
  *
  * Does NOT render AnnotationText (the annotation list below the waveform).
  * Pair with PlaylistAnnotationList for a full annotation editing UI.
+ *
+ * This component is the shell: sizes, the shared vertical layout, the pointer
+ * handlers of the selection drag, and the context for the primitives. It reads
+ * selection state (for those handlers), so it re-renders on every pointer move
+ * of a selection drag. What it renders is therefore split (#693):
+ *  - `TrackRows` and `TrackControlsColumn` are memoized and get no selection,
+ *    cursor or annotation state, so they skip those renders;
+ *  - the overlays in VisualizationOverlays.tsx read that state themselves.
+ * Everything handed to the two memoized parts must keep its identity across a
+ * render that did not change it — memoize it here, or the boundary is void.
  */
 export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   renderTrackControls,
@@ -430,38 +119,15 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying, getLookAhead, getOutputLatency } = usePlaybackAnimation();
+  const { isPlaying } = usePlaybackAnimation();
+  const { selectionStart, selectedTrackId, indefinitePlayback, fillViewport } = usePlaylistState();
   const {
-    selectionStart,
-    selectionEnd,
-    annotations,
-    activeAnnotationId,
-    annotationsEditable,
-    linkEndpoints: _linkEndpoints,
-    continuousPlay,
-    selectedTrackId,
-    loopStart,
-    loopEnd,
-    isLoopEnabled,
-    indefinitePlayback,
-    fillViewport,
-  } = usePlaylistState();
-  const annotationIntegration = useContext(AnnotationIntegrationContext);
-  const {
-    setAnnotations: _setAnnotations,
-    setActiveAnnotationId,
-    setTrackMute,
-    setTrackSolo,
-    setTrackVolume,
-    setTrackPan,
     setSelection,
     play,
     setScrollContainer,
     setSelectedTrackId,
     setCurrentTime,
-    setLoopRegion,
     setRecordingActive,
-    reorderTrack,
   } = usePlaylistControls();
   const {
     peaksDataArray,
@@ -502,23 +168,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   // Per-track spectrogram rendering helpers (memoized) — only computed when spectrogram is available
   const perTrackSpectrogramHelpers = useMemo(() => {
-    if (!spectrogram)
-      return new Map<
-        string,
-        {
-          colorLUT: Uint8Array;
-          frequencyScaleFn: (f: number, minF: number, maxF: number) => number;
-          config: SpectrogramConfig | undefined;
-        }
-      >();
-    const helpers = new Map<
-      string,
-      {
-        colorLUT: Uint8Array;
-        frequencyScaleFn: (f: number, minF: number, maxF: number) => number;
-        config: SpectrogramConfig | undefined;
-      }
-    >();
+    const helpers = new Map<string, SpectrogramTrackHelpers>();
+    if (!spectrogram) return helpers;
     tracks.forEach((track) => {
       const mode =
         spectrogram.trackSpectrogramOverrides.get(track.id)?.renderMode ??
@@ -540,6 +191,31 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     });
     return helpers;
   }, [tracks, spectrogram]);
+
+  // Render mode per track: a spectrogram override, else the track's own mode,
+  // else piano roll for a track with MIDI notes.
+  const renderModeById = useMemo(() => {
+    const modes = new Map<string, RenderMode>();
+    tracks.forEach((track) => {
+      const hasMidiNotes = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
+      modes.set(
+        track.id,
+        spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode ??
+          track.renderMode ??
+          (hasMidiNotes ? 'piano-roll' : 'waveform')
+      );
+    });
+    return modes;
+  }, [tracks, spectrogram]);
+
+  // The recording, reduced to what track heights depend on. `recordingState`
+  // itself is a new object on every recording frame.
+  const recordingTrackId = recordingState?.isRecording ? recordingState.trackId : null;
+  const recordingChannelCount = recordingState?.isRecording
+    ? mono
+      ? 1
+      : recordingState.peaks.length
+    : 0;
 
   // State for spectrogram settings modal
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
@@ -598,28 +274,18 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   const tracksFullWidth = Math.floor((displayDuration * sampleRate) / samplesPerPixel);
 
-  const handleAnnotationClick = async (annotation: AnnotationData) => {
-    setActiveAnnotationId(annotation.id);
-    const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
-    try {
-      await play(annotation.start, playDuration);
-    } catch (err) {
-      console.error(
-        'waveform-playlist: Failed to start playback for annotation',
-        annotation.id,
-        err
-      );
-    }
-  };
-
+  // Reads `tracks` through a ref so its identity survives `tracks` changes: it
+  // is a prop of every memoized clip and control panel.
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
   const selectTrack = useCallback(
     (trackIndex: number) => {
-      if (trackIndex >= 0 && trackIndex < tracks.length) {
-        const track = tracks[trackIndex];
+      const track = tracksRef.current[trackIndex];
+      if (track) {
         setSelectedTrackId(track.id);
       }
     },
-    [tracks, setSelectedTrackId]
+    [setSelectedTrackId]
   );
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -635,9 +301,13 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
     for (let i = 0; i < peaksDataArray.length; i++) {
       const trackClipPeaks = peaksDataArray[i];
-      const rawCh = getTrackChannelCount(trackClipPeaks, recordingState, tracks[i]?.id, mono);
+      const trackId = tracks[i]?.id;
+      const rawCh = getTrackChannelCount(
+        trackClipPeaks,
+        trackId === recordingTrackId ? recordingChannelCount : 0
+      );
       const trackMode =
-        spectrogram?.trackSpectrogramOverrides.get(tracks[i]?.id)?.renderMode ??
+        spectrogram?.trackSpectrogramOverrides.get(trackId)?.renderMode ??
         tracks[i]?.renderMode ??
         'waveform';
       const effectiveCh = trackMode === 'both' ? rawCh * 2 : rawCh;
@@ -711,11 +381,21 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     peaksDataArray.forEach((trackClipPeaks, trackIndex) => {
       const track = tracks[trackIndex];
       if (!track) return;
-      const maxChannels = getTrackChannelCount(trackClipPeaks, recordingState, track.id, mono);
+      const maxChannels = getTrackChannelCount(
+        trackClipPeaks,
+        track.id === recordingTrackId ? recordingChannelCount : 0
+      );
       m.set(track.id, waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0));
     });
     return m;
-  }, [peaksDataArray, tracks, recordingState, mono, waveHeight, showClipHeaders]);
+  }, [
+    peaksDataArray,
+    tracks,
+    recordingTrackId,
+    recordingChannelCount,
+    waveHeight,
+    showClipHeaders,
+  ]);
 
   const displayOrderIds = useMemo(
     () => applyTrackOrderPreview(tracks, trackDragPreview).map((t) => t.id),
@@ -729,114 +409,91 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
 
-  // Build track controls slots for the ControlsColumn (outside scroll area)
-  const trackControlsSlots = controls.show
-    ? [
-        <TracksLayout key="control-slots-layout" $height={trackLayout.totalHeight}>
-          {peaksDataArray.map((trackClipPeaks, trackIndex) => {
-            const track = tracks[trackIndex];
-            if (!track) return null;
+  // Controls for the ControlsColumn (outside the scroll area). The array is
+  // memoized because `Playlist` receives it as a prop.
+  const trackControlsSlots = useMemo(
+    () =>
+      controls.show
+        ? [
+            <TrackControlsColumn
+              key="control-slots-layout"
+              tracks={tracks}
+              trackStates={trackStates}
+              renderModeById={renderModeById}
+              trackLayout={trackLayout}
+              trackHeightById={trackHeightById}
+              animateTrackLayout={animateTrackLayout}
+              selectedTrackId={selectedTrackId}
+              trackReorderEpoch={trackReorderEpoch}
+              trackReordering={trackReordering}
+              renderTrackControls={renderTrackControls}
+              onRemoveTrack={onRemoveTrack}
+              selectTrack={selectTrack}
+              spectrogram={spectrogram}
+              setSettingsModalTrackId={setSettingsModalTrackId}
+            />,
+          ]
+        : undefined,
+    [
+      controls.show,
+      tracks,
+      trackStates,
+      renderModeById,
+      trackLayout,
+      trackHeightById,
+      animateTrackLayout,
+      selectedTrackId,
+      trackReorderEpoch,
+      trackReordering,
+      renderTrackControls,
+      onRemoveTrack,
+      selectTrack,
+      spectrogram,
+    ]
+  );
 
-            const trackState = trackStates[trackIndex] || {
-              name: `Track ${trackIndex + 1}`,
-              muted: false,
-              soloed: false,
-              volume: 1.0,
-              pan: 0,
-            };
+  // Memoized so that consumers of the context (every channel, the timescale)
+  // are not re-rendered by a render of this component that changed none of it.
+  const playlistInfo = useMemo(
+    () => ({
+      samplesPerPixel,
+      sampleRate,
+      zoomLevels: [samplesPerPixel],
+      waveHeight,
+      timeScaleHeight,
+      duration: displayDuration * 1000,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+    }),
+    [
+      samplesPerPixel,
+      sampleRate,
+      waveHeight,
+      timeScaleHeight,
+      displayDuration,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+    ]
+  );
 
-            const hasMidiNotes = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
-            const effectiveRenderMode =
-              spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode ??
-              track.renderMode ??
-              (hasMidiNotes ? 'piano-roll' : 'waveform');
-
-            const slotHeight = trackHeightById.get(track.id) ?? 0;
-
-            const defaultControlProps: Omit<DefaultTrackControlsProps, 'gripRef'> = {
-              trackIndex,
-              track,
-              trackState,
-              effectiveRenderMode,
-              selectTrack,
-              onRemoveTrack,
-              setTrackMute,
-              setTrackSolo,
-              setTrackVolume,
-              setTrackPan,
-              spectrogram,
-              setSettingsModalTrackId,
-              trackReordering,
-              reorderTrack,
-              trackCount: peaksDataArray.length,
-              // No mixer state yet means the provider is still loading this
-              // track (deferEngineRebuild): the engine does not know it, so a
-              // mute/solo/volume/pan change could not take effect.
-              disabled: trackStates[trackIndex] === undefined,
-            };
-
-            const trackControlContent = renderTrackControls ? (
-              renderTrackControls(trackIndex)
-            ) : trackReordering ? (
-              <SortableTrackControls trackId={track.id} index={trackIndex}>
-                {({ ref, handleRef, isDragSource }) => (
-                  <div
-                    ref={ref as React.Ref<HTMLDivElement>}
-                    style={{
-                      height: '100%',
-                      boxShadow: isDragSource ? DRAG_SOURCE_SHADOW : undefined,
-                      // Opaque background for the floating (top-layer, popover-based)
-                      // drag-source row — without it the row underneath shows through.
-                      // onDragStart selects the dragged track, so its slot always shows
-                      // the selected-track background while lifted.
-                      background: isDragSource ? theme.selectedTrackControlsBackground : undefined,
-                    }}
-                  >
-                    <DefaultTrackControls {...defaultControlProps} gripRef={handleRef} />
-                  </div>
-                )}
-              </SortableTrackControls>
-            ) : (
-              <DefaultTrackControls {...defaultControlProps} />
-            );
-
-            return (
-              // key includes trackReorderEpoch: forces a remount after every
-              // track-reorder drag, discarding @dnd-kit sortable-plugin DOM
-              // corruption (see bumpTrackReorderEpoch's doc comment in
-              // WaveformPlaylistContext). Stays at `-0` — a no-op suffix — for
-              // consumers that never enable trackReordering.
-              <ControlSlot
-                key={`${track.id}-${trackReorderEpoch}`}
-                $height={slotHeight}
-                $top={trackLayout.topById.get(track.id) ?? 0}
-                $animate={animateTrackLayout}
-                $isSelected={track.id === selectedTrackId}
-              >
-                {trackControlContent}
-              </ControlSlot>
-            );
-          })}
-        </TracksLayout>,
-      ]
-    : undefined;
+  const timescale = useMemo(
+    () =>
+      timeScaleHeight > 0 ? (
+        <>
+          <SmartScale renderTick={renderTick} />
+          <LoopRegionOverlay maxPosition={tracksFullWidth} />
+        </>
+      ) : undefined,
+    [timeScaleHeight, renderTick, tracksFullWidth]
+  );
 
   return (
     <DevicePixelRatioProvider>
-      <PlaylistInfoContext.Provider
-        value={{
-          samplesPerPixel,
-          sampleRate,
-          zoomLevels: [samplesPerPixel],
-          waveHeight,
-          timeScaleHeight,
-          duration: displayDuration * 1000,
-          controls,
-          barWidth,
-          barGap,
-          roundedBars,
-        }}
-      >
+      <PlaylistInfoContext.Provider value={playlistInfo}>
         <Playlist
           className={className}
           theme={theme}
@@ -855,276 +512,39 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
           data-playlist-state={isReady ? 'ready' : 'loading'}
           trackControlsSlots={trackControlsSlots}
           timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
-          timescale={
-            timeScaleHeight > 0 ? (
-              <>
-                <SmartScale renderTick={renderTick} />
-                {isLoopEnabled && (
-                  <TimescaleLoopRegion
-                    startPosition={(Math.min(loopStart, loopEnd) * sampleRate) / samplesPerPixel}
-                    endPosition={(Math.max(loopStart, loopEnd) * sampleRate) / samplesPerPixel}
-                    markerColor={theme.loopMarkerColor}
-                    regionColor={theme.loopRegionColor}
-                    minPosition={0}
-                    maxPosition={tracksFullWidth}
-                    onLoopRegionChange={(startPixels, endPixels) => {
-                      const startSeconds = (startPixels * samplesPerPixel) / sampleRate;
-                      const endSeconds = (endPixels * samplesPerPixel) / sampleRate;
-                      setLoopRegion(startSeconds, endSeconds);
-                    }}
-                  />
-                )}
-              </>
-            ) : undefined
-          }
+          timescale={timescale}
         >
           <>
-            <TracksLayout $height={trackLayout.totalHeight}>
-              {peaksDataArray.map((trackClipPeaks, trackIndex) => {
-                const track = tracks[trackIndex];
-                if (!track) return null;
-
-                const hasMidiNotes = track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0);
-                const effectiveRenderMode =
-                  spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode ??
-                  track.renderMode ??
-                  (hasMidiNotes ? 'piano-roll' : 'waveform');
-
-                const maxChannels = getTrackChannelCount(
-                  trackClipPeaks,
-                  recordingState,
-                  track.id,
-                  mono
-                );
-
-                return (
-                  <TrackRowPositioner
-                    key={track.id}
-                    $top={trackLayout.topById.get(track.id) ?? 0}
-                    $animate={animateTrackLayout}
-                    data-track-row=""
-                    data-track-id={track.id}
-                    data-track-drag-source={
-                      trackDragPreview?.trackId === track.id ? 'true' : undefined
-                    }
-                  >
-                    <TrackComponent
-                      numChannels={maxChannels}
-                      backgroundColor={
-                        effectiveRenderMode === 'piano-roll'
-                          ? theme.pianoRollBackgroundColor || '#1a1a2e'
-                          : waveformColorToCss(theme.waveOutlineColor)
-                      }
-                      offset={0}
-                      width={tracksFullWidth}
-                      hasClipHeaders={showClipHeaders}
-                      trackId={track.id}
-                      isSelected={track.id === selectedTrackId}
-                    >
-                      {effectiveRenderMode !== 'waveform' &&
-                        (() => {
-                          const helpers = perTrackSpectrogramHelpers.get(track.id);
-                          const trackCfg = helpers?.config;
-                          if (!trackCfg?.labels || !helpers) return null;
-                          return (
-                            <SpectrogramLabels
-                              waveHeight={waveHeight}
-                              numChannels={maxChannels}
-                              frequencyScaleFn={helpers.frequencyScaleFn}
-                              minFrequency={trackCfg.minFrequency ?? 0}
-                              maxFrequency={trackCfg.maxFrequency ?? sampleRate / 2}
-                              labelsColor={trackCfg.labelsColor}
-                              labelsBackground={trackCfg.labelsBackground}
-                              renderMode={effectiveRenderMode as 'spectrogram' | 'both'}
-                              hasClipHeaders={showClipHeaders}
-                            />
-                          );
-                        })()}
-                      {trackClipPeaks.map((clip, clipIndex) => {
-                        const peaksData = clip.peaks;
-                        const width = peaksData.length;
-
-                        return (
-                          <Clip
-                            key={clip.clipId}
-                            clipId={clip.clipId}
-                            trackIndex={trackIndex}
-                            clipIndex={clipIndex}
-                            trackName={clip.trackName}
-                            startSample={clip.startSample}
-                            durationSamples={clip.durationSamples}
-                            samplesPerPixel={samplesPerPixel}
-                            showHeader={showClipHeaders}
-                            disableHeaderDrag={!interactiveClips}
-                            isSelected={track.id === selectedTrackId}
-                            trackId={track.id}
-                            fadeIn={clip.fadeIn}
-                            fadeOut={clip.fadeOut}
-                            sampleRate={sampleRate}
-                            showFades={showFades}
-                            touchOptimized={touchOptimized}
-                            onMouseDown={(e) => {
-                              const target = e.target as HTMLElement;
-                              const isDraggable = target.closest(
-                                '[role="button"][aria-roledescription="draggable"]'
-                              );
-                              if (isDraggable) {
-                                return;
-                              }
-                              selectTrack(trackIndex);
-                            }}
-                          >
-                            {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => {
-                              return (
-                                <ChannelWithProgress
-                                  key={`${clip.clipId}-${channelIndex}`}
-                                  index={channelIndex}
-                                  data={channelPeaks}
-                                  bits={peaksData.bits}
-                                  length={width}
-                                  isSelected={track.id === selectedTrackId}
-                                  gain={gainScaledWaveforms ? (clip.gain ?? 1) : 1}
-                                  clipStartSample={clip.startSample}
-                                  clipDurationSamples={clip.durationSamples}
-                                  renderMode={clip.midiNotes ? 'piano-roll' : effectiveRenderMode}
-                                  midiNotes={clip.midiNotes}
-                                  clipSampleRate={clip.sampleRate}
-                                  clipOffsetSeconds={
-                                    clip.offsetSamples != null
-                                      ? clip.offsetSamples / (clip.sampleRate || sampleRate)
-                                      : 0
-                                  }
-                                  samplesPerPixel={samplesPerPixel}
-                                  spectrogramClipId={clip.clipId}
-                                  spectrogramOnCanvasRegister={
-                                    spectrogram ? spectrogram.registerSpectrogramCanvas : undefined
-                                  }
-                                  spectrogramOnCanvasUnregister={
-                                    spectrogram
-                                      ? spectrogram.unregisterSpectrogramCanvas
-                                      : undefined
-                                  }
-                                />
-                              );
-                            })}
-                          </Clip>
-                        );
-                      })}
-                      {recordingState?.isRecording &&
-                        recordingState.trackId === track.id &&
-                        recordingState.peaks[0]?.length > 0 &&
-                        (() => {
-                          // Strip leading-silence peaks so the visible preview matches
-                          // audible content. Recorder runs at real time, but the user's
-                          // first reaction lands ~outputLatency+lookAhead seconds into
-                          // the buffer (they hadn't heard the backing track yet). Without
-                          // this, the playhead — which now uses audible time — would
-                          // appear behind the right edge of the recorded waveform.
-                          // Mirrors useIntegratedRecording's finalization compensation
-                          // (shared `resolveRecordingOffsetSamples`) and dawcore's preview-skip
-                          // pattern. `getLookAhead()` reads from the same engine the
-                          // playhead's animation loop uses — keeps the two in lockstep.
-                          const latencyOffsetSamples = resolveRecordingOffsetSamples({
-                            overrideSeconds: recordingState.latencyOffset,
-                            outputLatency: getOutputLatency(),
-                            lookAhead: getLookAhead(),
-                            sampleRate,
-                          });
-                          const latencyPixels = Math.floor(latencyOffsetSamples / samplesPerPixel);
-                          const skipPeakElements = latencyPixels * 2; // each pixel is a min/max pair
-                          const previewDuration = Math.max(
-                            0,
-                            recordingState.durationSamples - latencyOffsetSamples
-                          );
-                          const previewChannels = (
-                            mono ? recordingState.peaks.slice(0, 1) : recordingState.peaks
-                          ).map((channelPeaks) =>
-                            skipPeakElements > 0 && skipPeakElements < channelPeaks.length
-                              ? channelPeaks.subarray(skipPeakElements)
-                              : channelPeaks
-                          );
-                          return (
-                            <Clip
-                              key={`${track.id}-recording`}
-                              clipId="recording-preview"
-                              trackIndex={trackIndex}
-                              clipIndex={trackClipPeaks.length}
-                              trackName="Recording..."
-                              startSample={recordingState.startSample}
-                              durationSamples={previewDuration}
-                              samplesPerPixel={samplesPerPixel}
-                              showHeader={showClipHeaders}
-                              disableHeaderDrag={true}
-                              isSelected={track.id === selectedTrackId}
-                              trackId={track.id}
-                            >
-                              {previewChannels.map((channelPeaks, chIdx) => (
-                                <ChannelWithProgress
-                                  key={`${track.id}-recording-${chIdx}`}
-                                  index={chIdx}
-                                  data={channelPeaks}
-                                  bits={recordingState.bits}
-                                  length={Math.floor(channelPeaks.length / 2)}
-                                  isSelected={track.id === selectedTrackId}
-                                  clipStartSample={recordingState.startSample}
-                                  clipDurationSamples={previewDuration}
-                                />
-                              ))}
-                            </Clip>
-                          );
-                        })()}
-                    </TrackComponent>
-                  </TrackRowPositioner>
-                );
-              })}
-            </TracksLayout>
-            {annotations.length > 0 && annotationIntegration && (
-              <annotationIntegration.AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
-                {annotations.map((annotation, index) => {
-                  const startPosition = (annotation.start * sampleRate) / samplesPerPixel;
-                  const endPosition = (annotation.end * sampleRate) / samplesPerPixel;
-                  const label = getAnnotationBoxLabel
-                    ? getAnnotationBoxLabel(annotation, index)
-                    : annotation.id;
-                  return (
-                    <annotationIntegration.AnnotationBox
-                      key={annotation.id}
-                      annotationId={annotation.id}
-                      annotationIndex={index}
-                      startPosition={startPosition}
-                      endPosition={endPosition}
-                      label={label}
-                      color="#ff9800"
-                      isActive={annotation.id === activeAnnotationId}
-                      onClick={() => handleAnnotationClick(annotation)}
-                      editable={annotationsEditable}
-                    />
-                  );
-                })}
-              </annotationIntegration.AnnotationBoxesWrapper>
-            )}
-            {selectionStart !== selectionEnd && (
-              <Selection
-                startPosition={
-                  (Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel
-                }
-                endPosition={
-                  (Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel
-                }
-                color={theme.selectionColor}
-              />
-            )}
-            {(isPlaying || selectionStart === selectionEnd) &&
-              (renderPlayhead ? (
-                <CustomPlayhead
-                  renderPlayhead={renderPlayhead}
-                  color={theme.playheadColor}
-                  samplesPerPixel={samplesPerPixel}
-                  sampleRate={sampleRate}
-                />
-              ) : (
-                <AnimatedPlayhead color={theme.playheadColor} />
-              ))}
+            <TrackRows
+              tracks={tracks}
+              peaksDataArray={peaksDataArray}
+              renderModeById={renderModeById}
+              spectrogramHelpersById={perTrackSpectrogramHelpers}
+              trackLayout={trackLayout}
+              animateTrackLayout={animateTrackLayout}
+              width={tracksFullWidth}
+              selectedTrackId={selectedTrackId}
+              dragSourceTrackId={trackDragPreview?.trackId ?? null}
+              waveHeight={waveHeight}
+              mono={mono}
+              recordingState={recordingState}
+              samplesPerPixel={samplesPerPixel}
+              sampleRate={sampleRate}
+              showClipHeaders={showClipHeaders}
+              gainScaledWaveforms={gainScaledWaveforms}
+              interactiveClips={interactiveClips}
+              showFades={showFades}
+              touchOptimized={touchOptimized}
+              selectTrack={selectTrack}
+              registerSpectrogramCanvas={spectrogram?.registerSpectrogramCanvas}
+              unregisterSpectrogramCanvas={spectrogram?.unregisterSpectrogramCanvas}
+            />
+            <AnnotationBoxesOverlay
+              width={tracksFullWidth}
+              getAnnotationBoxLabel={getAnnotationBoxLabel}
+            />
+            <SelectionOverlay />
+            <PlayheadOverlay renderPlayhead={renderPlayhead} />
           </>
         </Playlist>
       </PlaylistInfoContext.Provider>
