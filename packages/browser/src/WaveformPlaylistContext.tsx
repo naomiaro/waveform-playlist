@@ -589,6 +589,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
+  /** A selection is highlighted (non-empty). Reads refs, so it is safe in the loop. */
+  const hasSelection = useCallback(
+    () => (selectionEndRef.current ?? 0) > (selectionStartRef.current ?? 0),
+    [selectionStartRef, selectionEndRef]
+  );
   const {
     isLoopEnabled,
     loopStart,
@@ -1433,12 +1438,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         cb(frameData);
       }
 
-      // Handle annotation playback based on continuous play mode
+      // Handle annotation playback based on continuous play mode.
+      // Skipped on the frame that reaches a bounded play's end: the end check
+      // below stops there, and the active annotation must not move on first.
       const currentAnnotations = annotationsRef.current;
-      if (currentAnnotations.length > 0) {
+      const reachedBoundedEnd =
+        playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current;
+      if (currentAnnotations.length > 0 && !reachedBoundedEnd) {
         const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
-        if (continuousPlayRef.current) {
+        // A highlighted selection takes continuous play out of the picture:
+        // playback is not cut at annotation boundaries, whichever way the
+        // toggle is set. The active annotation still follows the playhead.
+        if (continuousPlayRef.current || hasSelection()) {
           // Continuous play ON: update active annotation, let audio play to the end
           if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
             setActiveAnnotationId(currentAnnotation.id);
@@ -1530,6 +1542,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     getPlaybackTime,
     setCurrentTimeRefs,
     annotationLookup,
+    hasSelection,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -1543,9 +1556,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // value: this effect also runs when playback starts and when the loop is
   // rebuilt, and with continuous play already on those used to stop and restart
   // the audio as well (every Play started twice; a duration change restarted it).
+  //
+  // While a selection is highlighted, continuous play has no effect at all:
+  // the loop does not cut playback at annotation boundaries (see the loop) and
+  // switching the toggle reschedules nothing.
   const prevContinuousPlayRef = useRef(continuousPlay);
   useEffect(() => {
-    const continuousPlayTurnedOn = continuousPlay && !prevContinuousPlayRef.current;
+    const continuousPlayTurnedOn =
+      continuousPlay && !prevContinuousPlayRef.current && !hasSelection();
     prevContinuousPlayRef.current = continuousPlay;
 
     const reschedulePlayback = async () => {
@@ -1568,8 +1586,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           // What continuous play removes is the end of the annotation being
           // played. Only an end that IS the active annotation's end is dropped
           // (the loop's own end check with it, or it would stop playback there
-          // anyway). Any other bounded play, such as a selection, keeps its end
-          // even when an annotation happens to be active under it.
+          // anyway). Any other bounded play, such as a programmatic
+          // play(start, duration), keeps its end.
           const boundedEnd = playbackEndTimeRef.current;
           const activeId = activeAnnotationIdRef.current;
           const activeAnnotation = activeId
@@ -1604,6 +1622,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     animationFrameRef,
     getAudioContextTime,
     annotationLookup,
+    hasSelection,
   ]);
 
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
