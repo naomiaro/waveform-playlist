@@ -4,7 +4,7 @@
  * re-render on every pointer move of a selection drag and on every
  * active-annotation change during playback, and the rows do not.
  */
-import React, { useCallback, useContext } from 'react';
+import React, { useCallback } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
@@ -12,10 +12,6 @@ import {
   type RenderPlayheadFunction,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
-import {
-  AnnotationIntegrationContext,
-  type AnnotationBoxIntegrationProps,
-} from '../AnnotationIntegrationContext';
 import {
   useActiveAnnotation,
   useCurrentTime,
@@ -27,6 +23,7 @@ import {
 } from '../WaveformPlaylistContext';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
+import { AnnotationBoxes } from './AnnotationBoxes';
 
 /** The highlighted selection range. Renders nothing for a collapsed selection. */
 export const SelectionOverlay: React.FC = () => {
@@ -125,56 +122,11 @@ export interface AnnotationBoxesOverlayProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
 }
 
-interface AnnotationBoxItemProps {
-  AnnotationBox: React.ComponentType<AnnotationBoxIntegrationProps>;
-  annotation: AnnotationData;
-  index: number;
-  startPosition: number;
-  endPosition: number;
-  label: string;
-  isActive: boolean;
-  editable: boolean;
-  onSelect: (annotation: AnnotationData) => void;
-}
-
-/**
- * One annotation box. Memoized: the active annotation changes at every
- * annotation boundary during playback, and only the box that stops being
- * active and the box that becomes active have a changed prop (#740).
- * `onSelect` must keep its identity across renders of the overlay.
- */
-const AnnotationBoxItem = React.memo(function AnnotationBoxItem({
-  AnnotationBox,
-  annotation,
-  index,
-  startPosition,
-  endPosition,
-  label,
-  isActive,
-  editable,
-  onSelect,
-}: AnnotationBoxItemProps) {
-  return (
-    <AnnotationBox
-      annotationId={annotation.id}
-      annotationIndex={index}
-      startPosition={startPosition}
-      endPosition={endPosition}
-      label={label}
-      color="#ff9800"
-      isActive={isActive}
-      onClick={() => onSelect(annotation)}
-      editable={editable}
-    />
-  );
-});
-
 /** The row of annotation boxes under the tracks. Needs the annotation integration. */
 export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
   width,
   getAnnotationBoxLabel,
 }) => {
-  const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations, annotationsEditable, continuousPlay } = usePlaylistState();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setActiveAnnotationId, play } = usePlaylistControls();
@@ -199,25 +151,17 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
     [continuousPlay, play, setActiveAnnotationId]
   );
 
-  if (annotations.length === 0 || !annotationIntegration) return null;
-
   return (
-    <annotationIntegration.AnnotationBoxesWrapper height={30} width={width}>
-      {annotations.map((annotation, index) => (
-        <AnnotationBoxItem
-          key={annotation.id}
-          AnnotationBox={annotationIntegration.AnnotationBox}
-          annotation={annotation}
-          index={index}
-          startPosition={(annotation.start * sampleRate) / samplesPerPixel}
-          endPosition={(annotation.end * sampleRate) / samplesPerPixel}
-          label={getAnnotationBoxLabel ? getAnnotationBoxLabel(annotation, index) : annotation.id}
-          isActive={annotation.id === activeAnnotationId}
-          editable={annotationsEditable}
-          onSelect={handleAnnotationClick}
-        />
-      ))}
-    </annotationIntegration.AnnotationBoxesWrapper>
+    <AnnotationBoxes
+      annotations={annotations}
+      activeAnnotationId={activeAnnotationId}
+      editable={annotationsEditable}
+      width={width}
+      sampleRate={sampleRate}
+      samplesPerPixel={samplesPerPixel}
+      getAnnotationBoxLabel={getAnnotationBoxLabel}
+      onSelect={handleAnnotationClick}
+    />
   );
 };
 

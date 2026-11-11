@@ -1,0 +1,289 @@
+// @vitest-environment jsdom
+//
+// #744: the MediaElement player's annotation boxes and text list, through the
+// real MediaElementPlaylistProvider. An active-annotation change (every
+// annotation boundary during playback) may render the two boxes involved and
+// may change only `activeAnnotationId` among the props the list is given.
+import './jsdom-polyfills'; // must be first — sets globals the import graph needs
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
+import React from 'react';
+import WaveformData from 'waveform-data';
+import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+
+// Counts renders of the waveform channel: the proxy for "the waveform part of
+// the visualization rendered".
+const counts = vi.hoisted(() => ({ channel: 0 }));
+
+vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    SmartChannel: (props: React.ComponentProps<typeof actual.SmartChannel>) => {
+      counts.channel++;
+      return createElement(actual.SmartChannel, props);
+    },
+  };
+});
+
+import {
+  MediaElementPlaylistProvider,
+  useMediaElementControls,
+  useMediaElementData,
+  useMediaElementState,
+} from '../MediaElementPlaylistContext';
+import {
+  AnnotationIntegrationContext,
+  type AnnotationIntegration,
+  type AnnotationBoxIntegrationProps,
+  type AnnotationTextIntegrationProps,
+} from '../AnnotationIntegrationContext';
+import { MediaElementWaveform } from '../components/MediaElementWaveform';
+import { MediaElementAnnotationList } from '../components/MediaElementAnnotationList';
+
+const SAMPLE_RATE = 48000;
+const SOURCE_SCALE = 256;
+const SAMPLES_PER_PIXEL = 512;
+const SECONDS = 4;
+const LENGTH = (SECONDS * SAMPLE_RATE) / SOURCE_SCALE;
+
+const WAVEFORM_DATA = WaveformData.create({
+  version: 2,
+  channels: 1,
+  sample_rate: SAMPLE_RATE,
+  samples_per_pixel: SOURCE_SCALE,
+  bits: 8,
+  length: LENGTH,
+  data: Array.from({ length: LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -10 : 10)),
+});
+
+const TRACK = { source: 'test.mp3', waveformData: WAVEFORM_DATA, name: 'Test' };
+
+const ANNOTATIONS = [
+  { id: 'n1', start: 0, end: 1, lines: ['one'] },
+  { id: 'n2', start: 1, end: 2, lines: ['two'] },
+  { id: 'n3', start: 2, end: 3, lines: ['three'] },
+  { id: 'n4', start: 3, end: 4, lines: ['four'] },
+];
+const ANNOTATION_LIST = { annotations: ANNOTATIONS };
+
+function createFakePlayout() {
+  return {
+    addTrack: vi.fn(),
+    getTrack: () => undefined,
+    setOnPlaybackComplete() {},
+    play: vi.fn(),
+    pause() {},
+    stop() {},
+    seekTo() {},
+    setPlaybackRate() {},
+    getCurrentTime: () => 0,
+    dispose() {},
+  };
+}
+
+let boxRenders: Record<string, number> = {};
+let boxProps: Record<string, AnnotationBoxIntegrationProps> = {};
+let listProps: AnnotationTextIntegrationProps[] = [];
+
+const FakeBox: React.FC<AnnotationBoxIntegrationProps> = (props) => {
+  boxRenders[props.annotationId] = (boxRenders[props.annotationId] ?? 0) + 1;
+  boxProps[props.annotationId] = props;
+  return (
+    <button data-box={props.annotationId} onClick={props.onClick}>
+      {props.label}
+    </button>
+  );
+};
+
+const FakeAnnotationText: React.FC<AnnotationTextIntegrationProps> = (props) => {
+  listProps.push(props);
+  return null;
+};
+
+const INTEGRATION = {
+  AnnotationBox: FakeBox,
+  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AnnotationText: FakeAnnotationText,
+} as unknown as AnnotationIntegration;
+
+let probe: {
+  controls: ReturnType<typeof useMediaElementControls>;
+  data: ReturnType<typeof useMediaElementData>;
+  state: ReturnType<typeof useMediaElementState>;
+};
+
+const ProbeChild: React.FC = () => {
+  probe = {
+    controls: useMediaElementControls(),
+    data: useMediaElementData(),
+    state: useMediaElementState(),
+  };
+  return null;
+};
+
+async function mount(children: React.ReactNode) {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  boxRenders = {};
+  boxProps = {};
+  listProps = [];
+  const playout = createFakePlayout();
+  const createPlayout = () => playout as unknown as MediaElementPlayout;
+  render(
+    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={createPlayout}
+        annotationList={ANNOTATION_LIST}
+        onAnnotationsChange={() => {}}
+      >
+        <ProbeChild />
+        {children}
+      </MediaElementPlaylistProvider>
+    </AnnotationIntegrationContext.Provider>
+  );
+  await waitFor(() => expect(probe.data.duration).toBe(SECONDS));
+  await waitFor(() => expect(probe.data.peaksDataArray.length).toBe(1));
+  await act(async () => {});
+  return { playout };
+}
+
+const lastList = () => listProps[listProps.length - 1];
+
+function changedListProps(
+  before: AnnotationTextIntegrationProps,
+  after: AnnotationTextIntegrationProps
+) {
+  const keys = Array.from(
+    new Set([...Object.keys(before), ...Object.keys(after)])
+  ) as (keyof AnnotationTextIntegrationProps)[];
+  return keys.filter((key) => after[key] !== before[key]);
+}
+
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
+  vi.restoreAllMocks();
+});
+
+describe('MediaElement annotation boxes (#744)', () => {
+  it('renders a box per annotation at its pixel position', async () => {
+    await mount(<MediaElementWaveform />);
+
+    expect(Object.keys(boxProps).sort()).toEqual(['n1', 'n2', 'n3', 'n4']);
+    const pxPerSecond = SAMPLE_RATE / SAMPLES_PER_PIXEL;
+    expect(boxProps.n3.startPosition).toBe(2 * pxPerSecond);
+    expect(boxProps.n3.endPosition).toBe(3 * pxPerSecond);
+    expect(boxProps.n3.annotationIndex).toBe(2);
+    expect(boxProps.n3.label).toBe('n3');
+    expect(boxProps.n3.editable).toBe(false);
+  });
+
+  it('an active-annotation change renders the two boxes involved and no other', async () => {
+    await mount(<MediaElementWaveform />);
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+    });
+    boxRenders = {};
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+    });
+
+    expect(Object.keys(boxRenders).sort()).toEqual(['n1', 'n2']);
+    expect(boxProps.n1.isActive).toBe(false);
+    expect(boxProps.n2.isActive).toBe(true);
+  });
+
+  it('an active-annotation change does not render the waveform', async () => {
+    await mount(<MediaElementWaveform />);
+    expect(counts.channel).toBeGreaterThan(0);
+    counts.channel = 0;
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+    });
+
+    expect(boxProps.n2.isActive).toBe(true);
+    expect(counts.channel).toBe(0);
+  });
+
+  it('a click on a box makes it active and plays from its start', async () => {
+    const { playout } = await mount(<MediaElementWaveform />);
+
+    await act(async () => {
+      fireEvent.click(document.querySelector('[data-box="n3"]')!);
+    });
+
+    expect(probe.state.activeAnnotationId).toBe('n3');
+    expect(playout.play.mock.lastCall).toEqual([undefined, 2]);
+  });
+
+  it('the boxes follow the editable prop and the label function', async () => {
+    await mount(
+      <MediaElementWaveform editable getAnnotationBoxLabel={(a, index) => index + ':' + a.id} />
+    );
+
+    expect(boxProps.n1.editable).toBe(true);
+    expect(boxProps.n4.label).toBe('3:n4');
+  });
+});
+
+describe('MediaElement annotation list (#744)', () => {
+  it('through MediaElementWaveform, an active-annotation change changes nothing else the list is given', async () => {
+    await mount(<MediaElementWaveform linkEndpoints />);
+    const before = lastList();
+    expect(before.annotationListConfig).toEqual({ linkEndpoints: true, continuousPlay: false });
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+    });
+
+    const after = lastList();
+    expect(after).not.toBe(before);
+    expect(after.activeAnnotationId).toBe('n2');
+    expect(changedListProps(before, after)).toEqual(['activeAnnotationId']);
+  });
+
+  it('standalone, an active-annotation change changes nothing else the list is given', async () => {
+    await mount(<MediaElementAnnotationList />);
+    const before = lastList();
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+    });
+
+    const after = lastList();
+    expect(after.activeAnnotationId).toBe('n2');
+    expect(changedListProps(before, after)).toEqual(['activeAnnotationId']);
+  });
+
+  it('the default options never link endpoints and follow continuous play', async () => {
+    await mount(<MediaElementAnnotationList />);
+    expect(lastList().annotationListConfig).toEqual({
+      linkEndpoints: false,
+      continuousPlay: false,
+    });
+
+    await act(async () => {
+      probe.controls.setContinuousPlay(true);
+    });
+
+    expect(lastList().annotationListConfig).toEqual({ linkEndpoints: false, continuousPlay: true });
+  });
+
+  it('controls are handed to the list only when editable', async () => {
+    const controls = [{ text: 'x', title: 'Delete', action: () => {} }];
+    await mount(<MediaElementAnnotationList controls={controls} />);
+    expect(lastList().editable).toBe(false);
+    expect(lastList().controls).toBeUndefined();
+
+    cleanup();
+    await mount(<MediaElementAnnotationList controls={controls} editable />);
+    expect(lastList().editable).toBe(true);
+    expect(lastList().controls).toBe(controls);
+  });
+});

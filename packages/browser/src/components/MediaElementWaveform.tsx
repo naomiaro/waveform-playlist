@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { RenderAnnotationItemProps } from '@waveform-playlist/core';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import { useMediaElementState } from '../MediaElementPlaylistContext';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 import { MediaElementPlaylist } from './MediaElementPlaylist';
-import { MediaElementAnnotationList } from './MediaElementAnnotationList';
+import {
+  MediaElementAnnotationList,
+  type MediaElementAnnotationListProps,
+} from './MediaElementAnnotationList';
 
 // Re-export annotation types for convenience
 export type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
@@ -52,6 +55,17 @@ export interface MediaElementWaveformProps {
  *
  * For multi-track editing, use the full Waveform with WaveformPlaylistProvider.
  */
+/**
+ * The text list, only when there are annotations. It reads the provider state
+ * so that MediaElementWaveform does not: that state changes at every
+ * annotation boundary during playback (#744).
+ */
+const AnnotationListWhenPresent: React.FC<MediaElementAnnotationListProps> = (props) => {
+  const { annotations } = useMediaElementState();
+  if (annotations.length === 0) return null;
+  return <MediaElementAnnotationList {...props} />;
+};
+
 export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   annotationTextHeight,
   getAnnotationBoxLabel,
@@ -65,7 +79,11 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   showFades = false,
   className,
 }) => {
-  const { annotations } = useMediaElementState();
+  // Kept across renders: a new object re-renders every item of the list.
+  const annotationListConfig = useMemo(
+    () => ({ linkEndpoints, continuousPlay: false }),
+    [linkEndpoints]
+  );
 
   return (
     <>
@@ -78,17 +96,15 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
         showFades={showFades}
         className={className}
       />
-      {annotations.length > 0 && (
-        <MediaElementAnnotationList
-          height={annotationTextHeight}
-          renderAnnotationItem={renderAnnotationItem}
-          onAnnotationUpdate={onAnnotationUpdate}
-          editable={editable}
-          annotationListConfig={{ linkEndpoints, continuousPlay: false }}
-          scrollActivePosition={scrollActivePosition}
-          scrollActiveContainer={scrollActiveContainer}
-        />
-      )}
+      <AnnotationListWhenPresent
+        height={annotationTextHeight}
+        renderAnnotationItem={renderAnnotationItem}
+        onAnnotationUpdate={onAnnotationUpdate}
+        editable={editable}
+        annotationListConfig={annotationListConfig}
+        scrollActivePosition={scrollActivePosition}
+        scrollActiveContainer={scrollActiveContainer}
+      />
     </>
   );
 };
