@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useLayoutEffect, useRef } from 'react';
+import React, { FunctionComponent, useLayoutEffect } from 'react';
 import styled from 'styled-components';
 import type { Peaks, Bits } from '@waveform-playlist/core';
 import {
@@ -10,6 +10,7 @@ import {
 import { useVisibleChunkIndices } from '../contexts/ScrollViewport';
 import { useClipViewportOrigin } from '../contexts/ClipViewportOrigin';
 import { useChunkedCanvasRefs } from '../hooks/useChunkedCanvasRefs';
+import { useIdentityVersion } from '../hooks/useIdentityVersion';
 import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
 import {
   addBarToPath,
@@ -161,18 +162,13 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
   // Track data reference changes with a monotonic counter — typed arrays
   // with the same length/values but different references must trigger a
   // redraw (e.g., trim produces new array with same length + first sample).
-  const dataVersionRef = useRef(0);
-  const prevDataRef = useRef(data);
-  if (prevDataRef.current !== data) {
-    dataVersionRef.current += 1;
-    prevDataRef.current = data;
-  }
+  const dataVersion = useIdentityVersion(data);
 
   // Compute a fingerprint of the drawing parameters — when this changes,
   // all chunks need redrawing. When only visibleChunkIndices changes,
   // existing chunks can be skipped (only new mounts need drawing).
   const drawVersion =
-    `${dataVersionRef.current}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${roundedBars}-${gain}` +
+    `${dataVersion}-${bits}-${waveHeight}-${devicePixelRatio}-${length}-${barWidth}-${barGap}-${drawMode}-${roundedBars}-${gain}` +
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {

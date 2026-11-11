@@ -20,6 +20,8 @@ import { SmartChannel } from '../components/SmartChannel';
 import { StyledTimeScale, type PrecomputedTickData } from '../components/TimeScale';
 import { SmartScale } from '../components/SmartScale';
 import { defaultTheme } from '../wfpl-theme';
+import { PlaylistInfoContext, usePlaylistInfo } from '../contexts/PlaylistInfo';
+import { BeatsAndBarsProvider } from '../contexts/BeatsAndBars';
 
 // TimeScale reads its tick colour from the theme.
 const Themed: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -119,6 +121,13 @@ describe('PianoRollChannel', () => {
     expect(clears()).toEqual({ 0: 3, 1: 3 });
   });
 
+  it('redraws when the height changes (resizing a canvas clears it)', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<PianoRollChannel {...pianoProps} />);
+    rerender(<PianoRollChannel {...pianoProps} waveHeight={120} />);
+    expect(clears()).toEqual({ 0: 2, 1: 2 });
+  });
+
   it('redraws when the notes are replaced, even by an equal list', () => {
     visibleChunks = [0];
     const { rerender } = render(<PianoRollChannel {...pianoProps} />);
@@ -159,7 +168,19 @@ function tickData(canvasInfo: Map<number, number>, label = 'a'): PrecomputedTick
   };
 }
 
+// The context's default value, read once through the hook.
+let playlistInfoDefaults: ReturnType<typeof usePlaylistInfo>;
+const CaptureDefaults: React.FC = () => {
+  playlistInfoDefaults = usePlaylistInfo();
+  return null;
+};
+
 describe('TimeScale', () => {
+  beforeEach(() => {
+    rtlRender(<CaptureDefaults />);
+    cleanup();
+  });
+
   const TICKS = new Map<number, number>([
     [0, 15],
     [500, 7],
@@ -223,6 +244,27 @@ describe('TimeScale', () => {
     expect(clears()).toEqual({ 0: 2 });
   });
 
+  it('redraws when the scale height or the tick colour changes', () => {
+    visibleChunks = [0];
+    const data = tickData(TICKS);
+    const scale = (timeScaleHeight: number, timeColor: string) => (
+      <ThemeProvider theme={{ ...defaultTheme, timeColor }}>
+        <PlaylistInfoContext.Provider value={{ ...playlistInfoDefaults, timeScaleHeight }}>
+          <StyledTimeScale tickData={data} />
+        </PlaylistInfoContext.Provider>
+      </ThemeProvider>
+    );
+    const { rerender } = render(scale(15, '#000'));
+    rerender(scale(15, '#000'));
+    expect(clears()).toEqual({ 0: 1 });
+
+    rerender(scale(30, '#000'));
+    expect(clears()).toEqual({ 0: 2 });
+
+    rerender(scale(30, '#fff'));
+    expect(clears()).toEqual({ 0: 3 });
+  });
+
   it('redraws when the ticks change', () => {
     visibleChunks = [0];
     const { rerender } = render(<StyledTimeScale tickData={tickData(TICKS)} />);
@@ -250,5 +292,25 @@ describe('SmartScale', () => {
     expect(screen.getByText('0:00')).toBeDefined();
     expect(log.get(0)!.fillRects.length).toBeGreaterThan(0);
     expect(log.get(1)!.fillRects.length).toBeGreaterThan(0);
+  });
+
+  it('in beats mode, labels bars and keeps the ticks across a new renderTick', () => {
+    visibleChunks = [0, 1];
+    const scale = (renderTick?: (label: string) => React.ReactNode) => (
+      <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="off">
+        <SmartScale renderTick={renderTick} />
+      </BeatsAndBarsProvider>
+    );
+    const { rerender } = render(scale());
+    // 120 bpm at 48 px per second: a bar is 96 px, so bars are labelled.
+    expect(screen.getByText('1')).toBeDefined();
+    expect(screen.getByText('2')).toBeDefined();
+    // Bar lines are full height.
+    expect(log.get(0)!.fillRects).toContainEqual([96, 0, 1, 15]);
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+
+    rerender(scale((label) => <i>{'bar ' + label}</i>));
+    expect(screen.getByText('bar 2')).toBeDefined();
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
   });
 });
