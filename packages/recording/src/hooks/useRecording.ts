@@ -471,6 +471,9 @@ export function useRecording(
       }
       if (workletNodeRef.current) {
         workletNodeRef.current.port.postMessage({ command: 'stop' });
+        // Nothing the worklet still sends may reach `progress`: a subscriber
+        // can outlive this hook, and while paused a message publishes directly.
+        workletNodeRef.current.port.onmessage = null;
 
         // Disconnect worklet from source
         if (mediaStreamSourceRef.current) {

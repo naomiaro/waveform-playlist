@@ -171,8 +171,8 @@ export function useIntegratedRecording(
       }
 
       // Capture timeline position NOW — before recording starts.
-      // Using currentTime at stop time would be wrong during overdub
-      // (playback advances currentTime while recording).
+      // The position at stop time would be wrong: the caller may pass a new
+      // `currentTime` (a seek, a pause) while the take is running.
       recordingStartTimeRef.current = currentTimeRef.current;
 
       return await startRec();
@@ -208,7 +208,7 @@ export function useIntegratedRecording(
         return;
       }
 
-      // Use the captured start time (not live currentTime which advances during overdub).
+      // Use the start time captured when the take began, not the current `currentTime`.
       // Punch-in replace (#579): the take lands exactly here; overlapped
       // content is carved out below when the clip list is assembled.
       const startSample = Math.floor(recordingStartTimeRef.current * buffer.sampleRate);

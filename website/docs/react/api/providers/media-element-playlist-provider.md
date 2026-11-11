@@ -239,6 +239,7 @@ interface MediaElementControlsContextValue {
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
   setAutomaticScroll: (enabled: boolean) => void;
   setScrollContainer: (element: HTMLDivElement | null) => void;

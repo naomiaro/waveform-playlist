@@ -147,15 +147,22 @@ Provides @dnd-kit drag handlers for annotation boundary editing.
 ```typescript
 import { useAnnotationDragHandlers } from '@waveform-playlist/browser';
 
+const { annotations, linkEndpoints } = usePlaylistState();
+const { setAnnotations, annotationPreview } = usePlaylistControls();
+const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
+
 const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
-  annotations,           // AnnotationData[]
-  onAnnotationsChange,   // (annotations) => void
-  samplesPerPixel,       // number
-  duration,              // number (total duration in seconds)
-  linkEndpoints,         // boolean
-  sampleRate,            // number (optional — defaults to getGlobalAudioContext().sampleRate)
+  annotations,                          // AnnotationData[]
+  onAnnotationsChange: setAnnotations,  // called once, on release, when `preview` is passed
+  preview: annotationPreview,           // optional: shows the drag without changing your state per move
+  samplesPerPixel,                      // number
+  sampleRate,                           // number (default 48000; pass the provider's)
+  duration,                             // number (total duration in seconds)
+  linkEndpoints,                        // boolean
 });
 ```
+
+Without `preview`, `onAnnotationsChange` is called on every pointer move. Escape cancels the drag and restores every annotation it moved. If you draw annotations yourself, read them through `useAnnotationsWithPreview(annotations, annotationPreview)` so your boxes follow the drag.
 
 Use with `@dnd-kit/react`'s `DragDropProvider`:
 

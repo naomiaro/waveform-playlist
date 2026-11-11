@@ -105,18 +105,19 @@ Both providers use React Context with split contexts for performance (7 in Wavef
 3. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
 4. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
 5. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
-6. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters
+6. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters, annotationPreview (a source: the annotations as an edge drag in progress would leave them)
 7. **usePlaylistData()** — Stable: duration, tracks, trackStates, playoutRef (PlaylistEngine), isDraggingRef, display config, isReady
 
 **MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
 1. **useMediaElementAnimation()** — isPlaying, currentTime
 2. **useMediaElementState()** — continuousPlay, annotations, playbackRate
-3. **useMediaElementControls()** — play/pause/stop/seekTo, setPlaybackRate
+3. **useMediaElementControls()** — play/pause/stop/seekTo, setPlaybackRate, annotationPreview
 4. **useMediaElementData()** — duration, peaksDataArray, sampleRate, display config
 
 ## Key Hooks
 
 *From `@waveform-playlist/browser` (core, engine-free):*
+- `useAnnotationDragHandlers(opts)` — Drag handlers for annotation box edges. Pass `preview: annotationPreview` (from `usePlaylistControls()` / `useMediaElementControls()`) and each move is published to the preview while `onAnnotationsChange` is called once, on release; without it, once per move. Escape restores every annotation the drag moved. `useAnnotationsWithPreview(annotations, annotationPreview)` returns what to draw in a custom annotation renderer.
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips

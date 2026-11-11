@@ -61,7 +61,7 @@ function setup(options: { preview?: boolean } = {}) {
     act(() => fn(view.result.current));
     view.rerender();
   };
-  return { run, onAnnotationsChange, preview, current: () => annotations };
+  return { run, onAnnotationsChange, preview, current: () => annotations, unmount: view.unmount };
 }
 
 const times = (list: AnnotationData[]) => list.map((a) => [a.start, a.end]);
@@ -170,6 +170,17 @@ describe('useAnnotationDragHandlers', () => {
       run((h) => h.onDragEnd(endEvent(false)));
 
       expect(onAnnotationsChange).not.toHaveBeenCalled();
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
+    it('a drag whose component unmounts does not leave its preview behind', () => {
+      const { run, preview, unmount } = setup({ preview: true });
+
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      expect(preview.source.getSnapshot()).not.toBeNull();
+      unmount();
+
       expect(preview.source.getSnapshot()).toBeNull();
     });
 

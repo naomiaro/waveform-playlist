@@ -342,6 +342,7 @@ interface PlaylistControlsContextValue {
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;

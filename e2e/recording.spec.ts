@@ -76,6 +76,32 @@ async function commitsDuring(page: Page, ms: number): Promise<number> {
   return page.evaluate(() => (window as unknown as { __commits: number }).__commits);
 }
 
+/** React commits and animation frames during the next `ms` milliseconds. */
+async function commitsAndFramesDuring(
+  page: Page,
+  ms: number
+): Promise<{ commits: number; frames: number }> {
+  return page.evaluate(
+    (duration) =>
+      new Promise<{ commits: number; frames: number }>((resolve) => {
+        const win = window as unknown as { __commits: number };
+        win.__commits = 0;
+        let frames = 0;
+        const started = performance.now();
+        const tick = () => {
+          if (performance.now() - started >= duration) {
+            resolve({ commits: win.__commits, frames });
+            return;
+          }
+          frames++;
+          requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }),
+    ms
+  );
+}
+
 const INPUT_METER = 0;
 const OUTPUT_METER = 1;
 
@@ -149,12 +175,14 @@ test.describe('Recording example', () => {
       expect(box!.width).toBeGreaterThan(firstWidth + 20);
     }).toPass({ timeout: 10000 });
 
-    // While recording, React renders about once per frame (the preview clip):
-    // about 120 commits in two seconds. It was about 360 before #695.
+    // While recording, React renders about once per frame (the preview clip).
+    // It was about three commits per frame before #695. Counted against the
+    // page's own frames, so the bound holds on a 120 Hz display too.
     await expect(async () => {
-      const commits = await commitsDuring(page, 2000);
+      const { commits, frames } = await commitsAndFramesDuring(page, 2000);
+      expect(frames).toBeGreaterThan(20);
       expect(commits).toBeGreaterThan(20);
-      expect(commits).toBeLessThan(150);
+      expect(commits).toBeLessThan(frames * 1.25);
     }).toPass({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'Stop' }).click();

@@ -552,6 +552,7 @@ interface PlaylistControlsContextValue {
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
 
   // Loop controls
@@ -963,7 +964,34 @@ function useDragSensors(options?: DragSensorOptions): PluginDescriptor[];
 
 ### useAnnotationDragHandlers
 
-Similar to `useClipDragHandlers` but for annotation boxes.
+Drag handlers for the edges of annotation boxes, for `@dnd-kit/react`'s `DragDropProvider`.
+
+```typescript
+function useAnnotationDragHandlers(options: {
+  annotations: AnnotationData[];
+  onAnnotationsChange: (annotations: AnnotationData[]) => void;
+  samplesPerPixel: number;
+  sampleRate?: number; // default 48000; pass the provider's
+  duration: number;
+  linkEndpoints: boolean;
+  preview?: AnnotationPreviewHandle;
+}): { onDragStart; onDragMove; onDragEnd };
+```
+
+Pass `preview: annotationPreview` (from `usePlaylistControls()`) to keep the drag out of your own state: each move is published to the preview, which the built-in annotation boxes and list follow, and `onAnnotationsChange` is called once, on release. Without `preview`, `onAnnotationsChange` is called on every move, which re-renders whatever component holds the annotations for each one.
+
+Every move is computed from the annotations as they were when the drag began. Pressing Escape cancels the drag and puts back every annotation it moved, linked and pushed neighbours included.
+
+### useAnnotationsWithPreview
+
+```typescript
+function useAnnotationsWithPreview(
+  annotations: AnnotationData[],
+  preview: AnnotationPreviewHandle
+): AnnotationData[];
+```
+
+For a custom annotation list or row of boxes: returns the previewed annotations while an edge is being dragged with a preview, and `annotations` otherwise. Call it in the component that draws the annotations, so that only it re-renders per pointer move.
 
 ---
 

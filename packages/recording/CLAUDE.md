@@ -145,6 +145,10 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 
 `stopRecording()` awaits the worklet's `done: true` message before building the AudioBuffer (`stopAckResolveRef` + `Promise.race` against a 1000ms safety timeout). Without the await, the partial buffer at stop time arrives after the synchronous chunk read and is silently dropped — last ~16ms of every recording lost.
 
+## Unmount Detaches the Worklet Handler
+
+`useRecording`'s unmount cleanup sets `port.onmessage = null` after posting `stop`. `progress` is a source that a subscriber can hold after the hook is gone, and while paused a queued message publishes to it directly.
+
 ## Hook Test Setup
 
 - `vitest.config.ts` sets `environment: 'jsdom'`. Tests use `@testing-library/react` `renderHook` + `act`.
