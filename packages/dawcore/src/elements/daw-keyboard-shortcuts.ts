@@ -1,6 +1,6 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { handleKeyboardEvent, observeFocusSource } from '@waveform-playlist/core';
+import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 import type { DawEditorElement } from './daw-editor';
 
@@ -112,8 +112,6 @@ export class DawKeyboardShortcutsElement extends LitElement {
 
   // --- Lifecycle ---
 
-  private _stopObservingFocus: (() => void) | null = null;
-
   override connectedCallback(): void {
     super.connectedCallback();
     // Upgrade-property dance: a remap assigned BEFORE this element was
@@ -140,16 +138,11 @@ export class DawKeyboardShortcutsElement extends LitElement {
       );
     }
     document.addEventListener('keydown', this._onKeyDown);
-    // Lets the handler tell a clicked button (Space stays a shortcut) from one
-    // reached with Tab (Space activates the button).
-    this._stopObservingFocus = observeFocusSource(document);
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     document.removeEventListener('keydown', this._onKeyDown);
-    this._stopObservingFocus?.();
-    this._stopObservingFocus = null;
     this._editor = null;
   }
 
