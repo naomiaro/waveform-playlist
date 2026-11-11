@@ -1009,11 +1009,17 @@ describe('Transport', () => {
     });
 
     it('addTrack uses the track source channel count', () => {
-      const ctx = mockAudioContext();
-      const transport = new Transport(ctx);
-      transport.setTracks([]);
-      transport.addTrack(makeTrack([makeClip()]));
-      expect(monoLawGains(ctx)).toBe(0);
+      const stereoCtx = mockAudioContext();
+      const stereoTransport = new Transport(stereoCtx);
+      stereoTransport.setTracks([]);
+      stereoTransport.addTrack(makeTrack([makeClip()]));
+      expect(monoLawGains(stereoCtx)).toBe(0);
+
+      const monoCtx = mockAudioContext();
+      const monoTransport = new Transport(monoCtx);
+      monoTransport.setTracks([]);
+      monoTransport.addTrack(makeTrack([makeClip({ audioBuffer: monoBuffer })]));
+      expect(monoLawGains(monoCtx)).toBe(2);
     });
 
     it('updateTrack switches the law when a stereo clip joins a mono track', () => {
