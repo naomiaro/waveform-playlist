@@ -97,7 +97,7 @@ describe('incrementalTrackChange', () => {
   });
 
   // The engine keeps its own track order and mixer state is stored by
-  // position, so a change that also reorders is a rebuild.
+  // position, so a change that also moves an existing track is a rebuild.
   it('returns null when the existing tracks changed order', () => {
     const track1 = makeTrack('1');
     const track2 = makeTrack('2');
@@ -108,14 +108,13 @@ describe('incrementalTrackChange', () => {
     expect(incrementalTrackChange([track1, placeholder], [filledTrack, track1])).toBeNull();
   });
 
-  it('accepts a new track inserted between existing ones', () => {
+  // The engine appends an added track and its mixer state is appended too.
+  it('returns null when a new track is inserted before an existing one', () => {
     const track1 = makeTrack('1');
     const track2 = makeTrack('2');
-    const track3 = makeTrack('3');
 
-    expect(incrementalTrackChange([track1, track2], [track1, track3, track2])?.added).toEqual([
-      track3,
-    ]);
+    expect(incrementalTrackChange([track1, track2], [track1, makeTrack('3'), track2])).toBeNull();
+    expect(incrementalTrackChange([track1], [makeTrack('3'), track1])).toBeNull();
   });
 
   // useDynamicTracks: a placeholder with no clips is replaced by the same

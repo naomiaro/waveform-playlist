@@ -11,8 +11,8 @@ export interface IncrementalTrackChange {
  * Decides whether a new `tracks` array can be applied to the running engine
  * track by track, without disposing and rebuilding it.
  *
- * It can when every track of the previous array is still present, in the
- * same order, and is
+ * It can when every track of the previous array is still at its index
+ * (new tracks come after them) and is
  * either the same object or was empty and now has clips, and at least one
  * track was added or filled. Anything else (a track removed, a track with
  * clips replaced) returns `null`: a full rebuild.
@@ -38,11 +38,11 @@ export function incrementalTrackChange(
     filled.push(current);
   }
 
-  // The engine keeps its own order and the mixer state is stored by position,
-  // so the tracks that were there must keep their order.
+  // The engine appends an added track, and the mixer state is stored by
+  // position with new states appended too: the tracks that were there must
+  // keep their places, with the new ones after them.
+  if (prevTracks.some((track, index) => tracks[index].id !== track.id)) return null;
   const prevIds = new Set(prevTracks.map((track) => track.id));
-  const kept = tracks.filter((track) => prevIds.has(track.id));
-  if (kept.some((track, index) => track.id !== prevTracks[index].id)) return null;
   const added = tracks.filter((track) => !prevIds.has(track.id));
   if (added.length === 0 && filled.length === 0) return null;
   return { added, filled };
