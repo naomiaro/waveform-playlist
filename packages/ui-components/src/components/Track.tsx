@@ -16,10 +16,10 @@ interface ContainerWithHeaderProps extends ContainerProps {
 const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
   style: {
     height: `${props.$waveHeight * props.$numChannels + (props.$hasClipHeaders ? CLIP_HEADER_HEIGHT : 0)}px`,
+    width: props.$width !== undefined ? `${props.$width}px` : undefined,
   },
 }))<ContainerWithHeaderProps>`
   position: relative;
-  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
 `;
 
 interface ChannelContainerProps {

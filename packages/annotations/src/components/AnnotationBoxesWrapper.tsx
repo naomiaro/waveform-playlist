@@ -9,10 +9,10 @@ interface ContainerProps {
 const Container = styled.div.attrs<ContainerProps>((props) => ({
   style: {
     height: `${props.$height}px`,
+    width: props.$width !== undefined ? `${props.$width}px` : undefined,
   },
 }))<ContainerProps>`
   position: relative;
-  ${(props) => props.$width !== undefined && `width: ${props.$width}px;`}
   background: transparent;
   z-index: 110;
 `;

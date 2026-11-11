@@ -36,10 +36,17 @@ const MenuButton = styled.button`
 
 const DROPDOWN_MIN_WIDTH = 180;
 
-const Dropdown = styled.div<{ $top: number; $left: number }>`
+interface DropdownProps {
+  readonly $top: number;
+  readonly $left: number;
+}
+
+// Position is an inline style: it changes on every scroll frame while the menu is
+// open, and a template interpolation would generate a CSS class per position.
+const Dropdown = styled.div.attrs<DropdownProps>((p) => ({
+  style: { top: `${p.$top}px`, left: `${p.$left}px` },
+}))<DropdownProps>`
   position: fixed;
-  top: ${(p) => p.$top}px;
-  left: ${(p) => p.$left}px;
   z-index: 10000;
   background: ${(p) => p.theme.timescaleBackgroundColor ?? '#222'};
   color: ${(p) => p.theme.textColor ?? 'inherit'};
@@ -84,7 +91,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ items: itemsProp }) => {
       top = Math.max(4, rect.bottom - dropHeight);
     }
 
-    setDropdownPos({ top, left });
+    setDropdownPos((prev) => (prev.top === top && prev.left === left ? prev : { top, left }));
   }, []);
 
   // Position on open, refine after mount, reposition on scroll/resize
@@ -92,17 +99,29 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ items: itemsProp }) => {
     if (!open) return;
     updatePosition();
 
-    // Refine once the dropdown has mounted and has actual dimensions
-    const rafId = requestAnimationFrame(() => updatePosition());
+    // At most one measurement per animation frame, however many scroll or resize
+    // events arrive in between.
+    let frameId: number | null = null;
+    const scheduleUpdate = () => {
+      if (frameId !== null) return;
+      frameId = requestAnimationFrame(() => {
+        frameId = null;
+        updatePosition();
+      });
+    };
 
-    const onScroll = () => updatePosition();
-    const onResize = () => updatePosition();
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onResize);
+    // Measure again on the next frame, once the dropdown has been laid out
+    scheduleUpdate();
+
+    // Capture phase: scroll events don't bubble, and the scrolling ancestor may be
+    // any element. Passive: the handler never calls preventDefault.
+    const scrollOptions = { capture: true, passive: true };
+    window.addEventListener('scroll', scheduleUpdate, scrollOptions);
+    window.addEventListener('resize', scheduleUpdate);
     return () => {
-      cancelAnimationFrame(rafId);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onResize);
+      if (frameId !== null) cancelAnimationFrame(frameId);
+      window.removeEventListener('scroll', scheduleUpdate, scrollOptions);
+      window.removeEventListener('resize', scheduleUpdate);
     };
   }, [open, updatePosition]);
 
