@@ -47,6 +47,23 @@ function TrackMeter({ levels }: { levels: number[] }) {
 }
 ```
 
+For a live meter, pass the `meter` source returned by `useOutputMeter` (`@waveform-playlist/browser/tone`) or `useMicrophoneLevel` (`@waveform-playlist/recording`). The component draws each reading straight to the DOM and does not re-render for it:
+
+```tsx
+import { SegmentedVUMeter, useMeterLevels } from '@waveform-playlist/ui-components';
+import type { MeterSource } from '@waveform-playlist/core';
+
+function LiveMeter({ meter }: { meter: MeterSource }) {
+  return <SegmentedVUMeter meter={meter} channelLabels={['L', 'R']} />;
+}
+
+// The numbers as React state, at most 10 times a second by default.
+function PeakReadout({ meter }: { meter: MeterSource }) {
+  const { peakLevels } = useMeterLevels(meter);
+  return <span>{Math.round(Math.max(...peakLevels) * 100)}%</span>;
+}
+```
+
 ## Theming
 
 Wrap your tree in styled-components' `ThemeProvider` with a `WaveformPlaylistTheme` object — `defaultTheme` and `darkTheme` are exported as starting points and can be partially overridden:

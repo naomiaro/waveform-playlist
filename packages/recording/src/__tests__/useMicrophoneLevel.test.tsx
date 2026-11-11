@@ -96,4 +96,101 @@ describe('useMicrophoneLevel', () => {
     expect(result.current.error).toBeNull();
     warnSpy.mockRestore();
   });
+
+  function post(data: number[]) {
+    meterNode.port.onmessage!({ data: new Float32Array(data) } as MessageEvent);
+  }
+
+  it('publishes levels through a stable meter source without re-rendering', async () => {
+    const stream = createMockStream('s1');
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return useMicrophoneLevel(stream);
+    });
+    await act(async () => {});
+    const meter = result.current.meter;
+    const listener = vi.fn();
+    meter.subscribe(listener);
+    const rendersBefore = renders;
+
+    act(() => {
+      post([0.5, 0.1]);
+      post([0.25, 0.1]);
+    });
+
+    expect(listener).toHaveBeenCalledTimes(2);
+    expect(meter.getSnapshot().levels).toHaveLength(1);
+    expect(meter.getSnapshot().levels[0]).toBeGreaterThan(0);
+    expect(meter.getSnapshot().rmsLevels[0]).toBeGreaterThan(0);
+    expect(listener.mock.lastCall![0]).toBe(meter.getSnapshot());
+    expect(renders).toBe(rendersBefore);
+    expect(result.current.meter).toBe(meter);
+  });
+
+  it('returns no per-frame values of its own', async () => {
+    const stream = createMockStream('s1');
+    const { result } = renderHook(() => useMicrophoneLevel(stream));
+    await act(async () => {});
+    expect(Object.keys(result.current).sort()).toEqual(['error', 'meter', 'resetPeak']);
+  });
+
+  it('starts silent with one entry per requested channel', () => {
+    const { result } = renderHook(() => useMicrophoneLevel(null, { channelCount: 2 }));
+    expect(result.current.meter.getSnapshot()).toEqual({
+      levels: [0, 0],
+      peakLevels: [0, 0],
+      rmsLevels: [0, 0],
+    });
+  });
+
+  it('repeats a mono microphone across the requested channels', async () => {
+    const stream = createMockStream('s1', 1);
+    const { result } = renderHook(() => useMicrophoneLevel(stream, { channelCount: 2 }));
+    await act(async () => {});
+
+    act(() => post([0.5, 0.1]));
+
+    const { levels, rmsLevels, peakLevels } = result.current.meter.getSnapshot();
+    expect(levels).toHaveLength(2);
+    expect(levels[0]).toBe(levels[1]);
+    expect(rmsLevels[0]).toBe(rmsLevels[1]);
+    expect(peakLevels).toHaveLength(2);
+  });
+
+  it('holds the peak until resetPeak', async () => {
+    const stream = createMockStream('s1');
+    const { result } = renderHook(() => useMicrophoneLevel(stream));
+    await act(async () => {});
+    const meter = result.current.meter;
+
+    act(() => post([1, 0.5]));
+    const loud = meter.getSnapshot().peakLevels[0];
+    act(() => post([0, 0]));
+    expect(meter.getSnapshot().peakLevels[0]).toBe(loud);
+
+    const listener = vi.fn();
+    meter.subscribe(listener);
+    act(() => result.current.resetPeak());
+
+    expect(meter.getSnapshot().peakLevels).toEqual([0]);
+    expect(meter.getSnapshot().levels[0]).toBeGreaterThan(0);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('goes silent when the stream is removed', async () => {
+    const { result, rerender } = renderHook(
+      ({ stream }: { stream: MediaStream | null }) => useMicrophoneLevel(stream),
+      { initialProps: { stream: createMockStream('s1') as MediaStream | null } }
+    );
+    await act(async () => {});
+    const meter = result.current.meter;
+    act(() => post([1, 0.5]));
+    expect(meter.getSnapshot().levels[0]).toBeGreaterThan(0);
+
+    rerender({ stream: null });
+
+    expect(result.current.meter).toBe(meter);
+    expect(meter.getSnapshot()).toEqual({ levels: [0], peakLevels: [0], rmsLevels: [0] });
+  });
 });

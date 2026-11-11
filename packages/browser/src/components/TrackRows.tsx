@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useSyncExternalStore } from 'react';
 import {
   Track as TrackComponent,
   Clip,
@@ -180,6 +180,13 @@ const RecordingPreviewClip: React.FC<RecordingPreviewClipProps> = ({
   mono,
 }) => {
   const { getLookAhead, getOutputLatency } = usePlaybackAnimation();
+  // The one place that follows the take frame by frame (#695).
+  // Called as methods (not destructured), so a source written as a class works.
+  const source = recordingState.progress;
+  const subscribe = useCallback((onChange: () => void) => source.subscribe(onChange), [source]);
+  const getSnapshot = useCallback(() => source.getSnapshot(), [source]);
+  const progress = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const durationSamples = Math.floor(progress.duration * sampleRate);
 
   const latencyOffsetSamples = resolveRecordingOffsetSamples({
     overrideSeconds: recordingState.latencyOffset,
@@ -189,13 +196,16 @@ const RecordingPreviewClip: React.FC<RecordingPreviewClipProps> = ({
   });
   const latencyPixels = Math.floor(latencyOffsetSamples / samplesPerPixel);
   const skipPeakElements = latencyPixels * 2; // each pixel is a min/max pair
-  const previewDuration = Math.max(0, recordingState.durationSamples - latencyOffsetSamples);
-  const previewChannels = (mono ? recordingState.peaks.slice(0, 1) : recordingState.peaks).map(
+  const previewDuration = Math.max(0, durationSamples - latencyOffsetSamples);
+  const previewChannels = (mono ? progress.peaks.slice(0, 1) : progress.peaks).map(
     (channelPeaks) =>
       skipPeakElements > 0 && skipPeakElements < channelPeaks.length
         ? channelPeaks.subarray(skipPeakElements)
         : channelPeaks
   );
+
+  // Nothing to draw until the first peaks arrive.
+  if (!(progress.peaks[0]?.length > 0)) return null;
 
   return (
     <Clip
@@ -321,7 +331,7 @@ const TrackRow = React.memo(function TrackRow({
             {...clipOptions}
           />
         ))}
-        {recordingState?.isRecording && recordingState.peaks[0]?.length > 0 && (
+        {recordingState?.isRecording && (
           <RecordingPreviewClip
             key={`${trackId}-recording`}
             recordingState={recordingState}
@@ -360,6 +370,8 @@ export interface TrackRowsProps extends ClipDisplayOptions {
   waveHeight: number;
   mono: boolean;
   recordingState: VisualizationRecordingState | undefined;
+  /** Channels of the take being recorded (already 1 when `mono`). */
+  recordingChannelCount: number;
 }
 
 /**
@@ -383,6 +395,7 @@ export const TrackRows = React.memo(function TrackRows({
   waveHeight,
   mono,
   recordingState,
+  recordingChannelCount,
   ...clipOptions
 }: TrackRowsProps) {
   return (
@@ -392,7 +405,7 @@ export const TrackRows = React.memo(function TrackRows({
         if (!track) return null;
 
         const isArmed = recordingState?.isRecording === true && recordingState.trackId === track.id;
-        const recordingChannels = isArmed ? (mono ? 1 : recordingState.peaks.length) : 0;
+        const recordingChannels = isArmed ? recordingChannelCount : 0;
         const helpers = spectrogramHelpersById.get(track.id);
 
         return (

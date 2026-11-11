@@ -1,13 +1,22 @@
 import styled from 'styled-components';
+import type { RecordingProgressSource } from '@waveform-playlist/core';
 import type { ClipPeaks } from '../WaveformPlaylistContext';
 
 /** Live recording state for the real-time waveform preview. */
 export interface VisualizationRecordingState {
   isRecording: boolean;
+  /** Which track is being recorded into. */
   trackId: string;
+  /** Where on the timeline the take started. */
   startSample: number;
-  durationSamples: number;
-  peaks: (Int8Array | Int16Array)[];
+  /**
+   * The take's elapsed time and per-channel preview peaks, from
+   * `useRecording` / `useIntegratedRecording`. A source, not values: only the
+   * preview clip follows it frame by frame, so the component that renders
+   * `<Waveform>` does not re-render while recording.
+   */
+  progress: RecordingProgressSource;
+  /** Bit depth of the peak values. */
   bits: 8 | 16;
   /**
    * Latency offset (seconds) to skip in the live preview. Absolute replacement

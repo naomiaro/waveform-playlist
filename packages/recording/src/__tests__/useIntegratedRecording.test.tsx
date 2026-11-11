@@ -155,6 +155,27 @@ describe('useIntegratedRecording', () => {
     return rendered;
   }
 
+  it('exposes the meter and the recording progress as sources, not as state', async () => {
+    const setTracks = vi.fn();
+    const { result } = await setupRecording([makeTrack('track-1')], setTracks);
+
+    expect(typeof result.current.meter.subscribe).toBe('function');
+    expect(result.current.meter.getSnapshot().levels.length).toBeGreaterThan(0);
+    expect(typeof result.current.progress.subscribe).toBe('function');
+    expect(result.current.progress.getSnapshot().peaks.length).toBeGreaterThan(0);
+    for (const removed of [
+      'duration',
+      'level',
+      'peakLevel',
+      'levels',
+      'peakLevels',
+      'rmsLevels',
+      'recordingPeaks',
+    ]) {
+      expect(result.current).not.toHaveProperty(removed);
+    }
+  });
+
   it('rejects changeDevice while recording (stream untouched, error surfaced)', async () => {
     const setTracks = vi.fn();
     const { result } = await setupRecording([makeTrack('track-1')], setTracks);

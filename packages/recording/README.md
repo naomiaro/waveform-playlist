@@ -34,11 +34,18 @@ Pairs with `@waveform-playlist/browser` — see the [Recording guide](https://na
 ### Basic Recording
 
 ```tsx
-import { useMicrophoneAccess, useRecording } from '@waveform-playlist/recording';
+import {
+  useMicrophoneAccess,
+  useRecording,
+  useRecordingProgress,
+} from '@waveform-playlist/recording';
 
 function RecordButton() {
   const { stream, hasPermission, requestAccess } = useMicrophoneAccess();
-  const { isRecording, duration, peaks, startRecording, stopRecording } = useRecording(stream);
+  const { isRecording, progress, startRecording, stopRecording } = useRecording(stream);
+  // `progress` is a source ({ duration, peaks }), not state: useRecording does
+  // not re-render as the take grows. This reads it 10 times a second.
+  const { duration } = useRecordingProgress(progress);
 
   const handleRecord = async () => {
     if (!hasPermission) {
@@ -72,24 +79,32 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function MicMonitor() {
   const { stream, requestAccess } = useMicrophoneAccess();
-  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
 
   return (
     <>
       <button onClick={() => requestAccess()}>Enable Microphone</button>
-      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+      <SegmentedVUMeter meter={meter} />
     </>
   );
 }
 ```
+
+`meter` is a source, not state: levels change about 60 times a second, and the hook does not re-render for them. `SegmentedVUMeter` draws each reading straight to the DOM. For the numbers in render, use `useMeterLevels(meter)` from `@waveform-playlist/ui-components` (10 updates a second by default), or `meter.subscribe(callback)` to draw them yourself.
 
 ### Integrated Recording (with a track list)
 
 `useIntegratedRecording` combines microphone access, metering, and recording into one hook that appends the finalized clip directly to a `ClipTrack[]` — the same array shape used by `@waveform-playlist/browser`'s `WaveformPlaylistProvider`.
 
 ```tsx
-import { useIntegratedRecording } from '@waveform-playlist/recording';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
+import type { ClipTrack, RecordingProgressSource } from '@waveform-playlist/core';
+
+// Only this label re-renders as the take grows.
+function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
+  const { duration } = useRecordingProgress(progress);
+  return <>{duration.toFixed(1)}s</>;
+}
 
 function Recorder({
   tracks,
@@ -104,16 +119,14 @@ function Recorder({
 }) {
   const {
     isRecording,
-    duration,
-    levels,
-    peakLevels,
+    meter, // live microphone levels — <SegmentedVUMeter meter={meter} />
+    progress, // the take's elapsed time and live peaks — <Waveform recordingState={{ …, progress }} />
     devices,
     selectedDevice,
     requestMicAccess,
     changeDevice,
     startRecording,
     stopRecording,
-    recordingPeaks, // live per-channel peaks — feed straight into your waveform preview
     error,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
     currentTime,
@@ -124,7 +137,13 @@ function Recorder({
     <div>
       <button onClick={() => requestMicAccess()}>Enable Microphone</button>
       <button onClick={isRecording ? stopRecording : startRecording} disabled={!selectedTrackId}>
-        {isRecording ? `Stop (${duration.toFixed(1)}s)` : 'Record'}
+        {isRecording ? (
+          <>
+            Stop (<ElapsedTime progress={progress} />)
+          </>
+        ) : (
+          'Record'
+        )}
       </button>
       {error && <p>{error.message}</p>}
     </div>
@@ -165,14 +184,17 @@ The core AudioWorklet-based recording hook.
   - `bits?: 8 | 16` — peak value bit depth (default: `16`)
 
 **Returns (`UseRecordingReturn`):**
-- `isRecording: boolean`, `isPaused: boolean`, `duration: number` (seconds)
-- `peaks: (Int8Array | Int16Array)[]` — one entry per channel, growing live during recording
+- `isRecording: boolean`, `isPaused: boolean`
+- `progress: RecordingProgressSource` — a source of `{ duration: number; peaks: (Int8Array | Int16Array)[] }` (seconds elapsed; one peaks entry per channel, growing live). Published once per animation frame while recording; the hook does not re-render for it. After a stop, `duration` is the recorded buffer's length
 - `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
-- `level: number`, `peakLevel: number` — **deprecated** (always `0`); use `useMicrophoneLevel` for metering. Removed in the next major
 - `startRecording: () => Promise<boolean>` — resolves `true` when the capture pipeline actually started (`false`: no stream, already recording, worklet failure); check it before starting synchronized playback
 - `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
 - `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI
 - `error: Error | null`
+
+#### `useRecordingProgress(progress, options?)`
+
+A recording's `{ duration, peaks }` as React state, at most `options.updateRate` times a second (default: `10`). Use it for slow displays such as an elapsed-time label. Pass the `progress` source itself to `<Waveform recordingState>` for the live preview.
 
 #### `useMicrophoneLevel(stream, options?)`
 
@@ -185,8 +207,7 @@ Sample-accurate VU metering via a separate meter AudioWorklet — independent of
   - `channelCount?: number` (default: `1`)
 
 **Returns (`UseMicrophoneLevelReturn`):**
-- `levels: number[]`, `peakLevels: number[]`, `rmsLevels: number[]` — per channel, normalized 0–1
-- `level: number`, `peakLevel: number` — scalar convenience values (max across channels when `channelCount > 1`)
+- `meter: MeterSource` — a source of `{ levels: number[]; peakLevels: number[]; rmsLevels: number[] }`, per channel, normalized 0–1. Stable identity; the hook does not re-render as levels change. Read it with `<SegmentedVUMeter meter={meter} />`, `useMeterLevels(meter)`, or `meter.subscribe(callback)` / `meter.getSnapshot()`
 - `resetPeak: () => void` — clears held peak indicators, e.g. on device switch
 - `error: Error | null`
 
@@ -203,7 +224,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
   - `samplesPerPixel?: number` (default: `1024`)
   - `latencyOffset?: number` — seconds; overrides the auto-computed `outputLatency + lookAhead` compensation applied to the clip's start. `0` disables compensation; omit to auto-compute
 
-**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `duration`, `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels`), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), `recordingPeaks` (live per-channel peaks for preview), and a combined `error`.
+**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
 
 **Overdub with `@waveform-playlist/browser`:** call `usePlaylistControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
 

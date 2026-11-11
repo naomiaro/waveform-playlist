@@ -153,7 +153,7 @@ When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after
 Rules when changing these files:
 
 1. Anything handed to `TrackRows`/`TrackControlsColumn` must keep its identity across a shell render that did not change it. `selectTrack` reads `tracks` through a ref for this reason; `trackControlsSlots`, the `PlaylistInfoContext` value and the `timescale` element are `useMemo`'d; track heights depend on the recording's track id and channel count, not on `recordingState` (a new object every recording frame).
-2. `recordingState` is passed down to the armed track's row only (`undefined` for the others), so a recording frame re-renders one row until the take's end plus 10 s passes the displayed duration. From then on `displayDuration` grows every frame: every row gets a new `width` (their clips still skip) and the `PlaylistInfoContext` value changes, so every channel re-renders, as before #693.
+2. `recordingState` is passed down to the armed track's row only (`undefined` for the others). Since #695 it holds a `progress` source instead of per-frame values, so a recording frame re-renders the preview clip only, and `displayDuration` grows in 10-second steps (see "60 Hz Values Are Sources"): every row gets a new `width` once per step, not once per frame.
 3. Pass track fields (`trackId`, render mode) rather than the `track` object: track objects are replaced by engine statechanges and by consumers.
 4. `renderTrackControls(trackIndex)` is called inside the memoized column, so it runs when the column's props change (tracks, mixer state, layout, the selected track, `onRemoveTrack`, the spectrogram integration, the function itself) and not on time-selection or cursor changes. An `onRemoveTrack` or `renderTrackControls` with a new identity per consumer render re-renders every panel, as before; consumers get the benefit only with stable functions.
 
@@ -173,7 +173,7 @@ Three approaches for detecting when tracks finish loading:
 
 **Two paths for recording data:**
 
-1. **Live preview** — `RecordingPreviewClip` (`components/TrackRows.tsx`) renders `recordingState.peaks` directly, one `ChannelWithProgress` per channel. Bypasses the `WaveformPlaylistContext` peak generation pipeline entirely.
+1. **Live preview** — `RecordingPreviewClip` (`components/TrackRows.tsx`) subscribes to `recordingState.progress` and renders its peaks directly, one `ChannelWithProgress` per channel. Bypasses the `WaveformPlaylistContext` peak generation pipeline entirely.
 2. **Post-recording** — clips go through `derivePeaks` (Path A/B/C), which applies `mono` merge via `extractPeaksFromWaveformDataFull`.
 
 Both paths must respect `mono` flag consistently. Live preview slices to first channel when `mono` is true. `recordingState.bits` flows through to the renderer (not hardcoded).
@@ -482,6 +482,16 @@ if (derived !== prevRef.current) {
 
 **Stable stub refs:** When MediaElement components pass `PlayheadProps` to render functions, Tone.js-specific refs (`playbackStartTimeRef`, `audioStartPositionRef`) are stubbed as `ZERO_REF` (module-level constant). Never create `{ current: 0 }` inline — it causes useEffect dep churn on every render.
 
+## 60 Hz Values Are Sources, Not State (#695)
+
+Meter levels and recording progress change about 60 times a second. They are published through core's `ValueSource` (`subscribe` + `getSnapshot`) and never put in React state by the library:
+
+- `useOutputMeter()` returns `{ meter, resetPeak, error }`. `meter` keeps its identity for the life of the hook, and the hook does not re-render when levels change. `<SegmentedVUMeter meter={meter} />` draws from it; `useMeterLevels(meter)` (ui-components) is the opt-in, throttled state.
+- `<Waveform recordingState>` takes `progress` (from `useRecording` / `useIntegratedRecording`), not `durationSamples` and `peaks`. `RecordingPreviewClip` is the ONLY component that follows it frame by frame (`useSyncExternalStore`). The shell reads two numbers through `useRecordingLayout` (`hooks/useRecordingLayout.ts`): the take's channel count and `recordingDisplayEnd()`, the timeline end the take needs, which moves in 10-second steps (10 to 20 s ahead of the take). Selectors that return numbers are what keep the shell from rendering per frame; do not read `progress.getSnapshot()` in the shell's render for anything else.
+- Rule for new per-frame data: add a source (or a frame callback while playing), let the one component that draws it subscribe, and give everything else a coarse selector. Never thread the value through the host component as a prop.
+
+Measured on the recording example (4 tracks, dev build, fiber-walk probe): idle with a mic stream 63 commits/s and about 17,000 component renders/s before, 0 after; recording 182 commits/s and about 43,000 renders/s before, 60 and about 1,140 after (the preview clip). `recordingPreviewSubscription.test.tsx` counts renders with wrappers around the real components; `e2e/recording.spec.ts` drives the page with a synthetic microphone.
+
 ## Output Metering (useOutputMeter)
 
 **Critical: Context mismatch gotcha.** Always use `getGlobalContext()` from `@waveform-playlist/playout` — never `getContext()`/`getDestination()` from Tone.js. `getGlobalContext()` creates a new Context via `setContext()`, replacing the default. Nodes created with `getContext()` before that happens end up on a dead audio graph.
@@ -505,7 +515,7 @@ if (derived !== prevRef.current) {
 
 **Problem:** When playback stops, browsers stop calling the worklet's `process()` (tail-time optimization — no active upstream sources). The last non-zero levels freeze in React state.
 
-**Fix:** `useOutputMeter({ isPlaying })` — a separate `useEffect` resets all levels (current, peak, RMS) and smoothed state when `isPlaying` transitions to `false`. Prefer state-driven cleanup over staleness timers.
+**Fix:** `useOutputMeter({ isPlaying })` — a separate `useEffect` publishes silent levels (current, peak, RMS) and clears the smoothed state when `isPlaying` transitions to `false`. Prefer state-driven cleanup over staleness timers. A worklet message that is still in flight when the reset runs starts the smoothed peak decaying again, so on the recording example the output meter falls over about three seconds after Stop rather than at once (seen while checking #695 and not compared against a build from before it; the reset and the message handler are the same logic as before).
 
 ## Incremental Track Addition (loadAudio optimization)
 

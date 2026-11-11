@@ -120,6 +120,13 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
+/** Let one animation frame (and the publish it carries) run. */
+async function nextFrame() {
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+}
+
 describe('useRecording', () => {
   it('startRecording resolves true on success and false without a stream', async () => {
     const noStream = renderHook(() => useRecording(null));
@@ -471,15 +478,17 @@ describe('useRecording', () => {
       await result.current.startRecording();
     });
 
-    // Pre-stop: a flush should advance peaks
-    const peaksBefore = result.current.peaks;
+    // Pre-stop: a flush advances the published peaks on the next frame
+    const progress = result.current.progress;
+    const peaksBefore = progress.getSnapshot().peaks;
     act(() => {
       mockWorkletNode.port.onmessage!({
         data: { channels: [new Float32Array(512).fill(0.3)], channelCount: 1 },
       } as MessageEvent);
     });
-    expect(result.current.peaks).not.toBe(peaksBefore);
-    const peaksAfterPreStop = result.current.peaks;
+    await nextFrame();
+    expect(progress.getSnapshot().peaks).not.toBe(peaksBefore);
+    const peaksAfterPreStop = progress.getSnapshot().peaks;
 
     // Defer the done message and inject a flush BEFORE done arrives
     mockWorkletNode.port.postMessage = vi.fn((msg: { command?: string }) => {
@@ -506,11 +515,112 @@ describe('useRecording', () => {
     // The mid-stop flush's chunk made it into the AudioBuffer (512 + 256 = 768)
     expect(buffer).not.toBeNull();
     expect(buffer!.length).toBe(768);
-    // But peaks state was NOT updated for that intermediate flush — the
-    // last setPeaks happened at the pre-stop flush. After stopRecording
-    // resolves, finally-block sets isRecording=false but peaks stay.
-    // (We can't trivially compare references because the React re-render
-    // recreates the wrapper, but length-equivalence is the contract.)
-    expect(result.current.peaks).toBe(peaksAfterPreStop);
+    // But the published peaks were NOT updated for that intermediate flush:
+    // the preview must not grow past where the user stopped.
+    expect(progress.getSnapshot().peaks).toBe(peaksAfterPreStop);
+  });
+
+  it('publishes duration and peaks once per frame without re-rendering', async () => {
+    const stream = createMockStream();
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders++;
+      return useRecording(stream);
+    });
+    const progress = result.current.progress;
+    expect(progress.getSnapshot()).toEqual({ duration: 0, peaks: [new Int16Array(0)] });
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    const listener = vi.fn();
+    progress.subscribe(listener);
+    const rendersBefore = renders;
+
+    // Several worklet flushes inside one frame are one publish.
+    act(() => {
+      for (let i = 0; i < 3; i++) {
+        mockWorkletNode.port.onmessage!({
+          data: { channels: [new Float32Array(128).fill(0.3)], channelCount: 1 },
+        } as MessageEvent);
+      }
+    });
+    expect(listener).not.toHaveBeenCalled();
+    await nextFrame();
+    expect(listener).toHaveBeenCalledTimes(1);
+    const first = progress.getSnapshot();
+    expect(first.duration).toBeGreaterThan(0);
+
+    await nextFrame();
+    await nextFrame();
+    expect(progress.getSnapshot().duration).toBeGreaterThan(first.duration);
+    // Peaks did not change after the first frame: same arrays, new duration.
+    expect(progress.getSnapshot().peaks).toBe(first.peaks);
+    expect(renders).toBe(rendersBefore);
+    expect(result.current.progress).toBe(progress);
+  });
+
+  it('has one empty peaks array per channel as soon as recording starts', async () => {
+    const stream = createMockStream(2);
+    const { result } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.progress.getSnapshot().peaks).toHaveLength(2);
+  });
+
+  it('ends on the recorded buffer length after stop', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(4800).fill(0.3)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    expect(result.current.progress.getSnapshot().duration).toBeCloseTo(0.1, 5);
+    expect(result.current.audioBuffer).not.toBeNull();
+  });
+
+  it('starts the next take from zero', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(4800).fill(0.3)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    const restarted = result.current.progress.getSnapshot();
+    expect(restarted.duration).toBeLessThan(0.05);
+    expect(restarted.peaks[0]).toHaveLength(0);
+  });
+
+  it('returns no per-frame values of its own', () => {
+    const { result } = renderHook(() => useRecording(createMockStream()));
+    expect(Object.keys(result.current).sort()).toEqual([
+      'audioBuffer',
+      'error',
+      'isPaused',
+      'isRecording',
+      'pauseRecording',
+      'progress',
+      'resumeRecording',
+      'startRecording',
+      'stopRecording',
+    ]);
   });
 });

@@ -11,6 +11,8 @@ import type { MicrophoneDevice } from '../types';
 import {
   type ClipTrack,
   type AudioClip,
+  type MeterSource,
+  type RecordingProgressSource,
   carveClipRange,
   resolveRecordingOffsetSamples,
 } from '@waveform-playlist/core';
@@ -62,19 +64,19 @@ export interface UseIntegratedRecordingReturn {
   // Recording state
   isRecording: boolean;
   isPaused: boolean;
-  duration: number;
-  level: number;
-  peakLevel: number;
   /**
-   * Per-channel peak levels (0-1). Array length matches the metered channel
-   * count (auto-detected mic channels; mono mirrored up to channelCount —
-   * see UseMicrophoneLevelReturn.levels).
+   * Live microphone levels (`useMicrophoneLevel`'s `meter`). The hook does not
+   * re-render as they change: pass it to `<SegmentedVUMeter meter={meter} />`
+   * or read it with `meter.subscribe()` / `useMeterLevels(meter)`.
    */
-  levels: number[];
-  /** Per-channel held peak levels (0-1). Same length contract as `levels`. */
-  peakLevels: number[];
-  /** Per-channel RMS levels (0-1). Same length contract as `levels`. */
-  rmsLevels: number[];
+  meter: MeterSource;
+  /**
+   * Elapsed time and live-preview peaks of the take (`useRecording`'s
+   * `progress`). The hook does not re-render as they change: pass it to
+   * `<Waveform recordingState={{ …, progress }} />` or read it with
+   * `progress.subscribe()` / `useRecordingProgress(progress)`.
+   */
+  progress: RecordingProgressSource;
   error: Error | null;
 
   // Microphone state
@@ -93,9 +95,6 @@ export interface UseIntegratedRecordingReturn {
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;
   changeDevice: (deviceId: string) => Promise<void>;
-
-  // Track state (for live waveform during recording)
-  recordingPeaks: (Int8Array | Int16Array)[];
 }
 
 export function useIntegratedRecording(
@@ -132,11 +131,7 @@ export function useIntegratedRecording(
 
   // Microphone level (for VU meter)
   const {
-    level,
-    peakLevel,
-    levels,
-    peakLevels,
-    rmsLevels,
+    meter,
     resetPeak,
     error: meterError,
   } = useMicrophoneLevel(stream, {
@@ -147,9 +142,7 @@ export function useIntegratedRecording(
   const {
     isRecording,
     isPaused,
-    duration,
-    peaks,
-    audioBuffer: _recordedAudioBuffer,
+    progress,
     startRecording: startRec,
     stopRecording: stopRec,
     pauseRecording,
@@ -342,12 +335,8 @@ export function useIntegratedRecording(
     // Recording state
     isRecording,
     isPaused,
-    duration,
-    level,
-    peakLevel,
-    levels,
-    peakLevels,
-    rmsLevels,
+    meter,
+    progress,
     error: hookError || micError || meterError || recError,
 
     // Microphone state
@@ -363,8 +352,5 @@ export function useIntegratedRecording(
     resumeRecording,
     requestMicAccess,
     changeDevice,
-
-    // Track state
-    recordingPeaks: peaks,
   };
 }

@@ -231,6 +231,15 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 
 **Above-0 dB support:** `dBRange` defaults to `[-50, 5]`. Output meters can exceed 0 dB when mixed tracks sum hot. Input meters (microphone) are clamped to 0 dB by the audio driver. Default color stops include `{ dB: 2, color: '#ff0000' }` as an "over" indicator for output signals. Red zone starts at -1 dB.
 
+## SegmentedVUMeter Live Source (#695)
+
+`<SegmentedVUMeter meter={source} />` takes a core `MeterSource` and draws each published value straight to the DOM in a layout-effect subscription; React does not render for a level change. The `levels` / `peakLevels` props remain for a meter driven by props.
+
+- The subscription keeps, per segment, what it last drew (lit, peak marker) and writes `backgroundColor`, `opacity`, `boxShadow` and `data-peak` only where that changed. Both paths get these values from one function, `segmentVisual()`, so a React render and a direct write can never disagree; change the look there only.
+- The component still renders from `meter.getSnapshot()`, so the first paint and any later render (a prop change) show what the subscription last drew. The only state it reads from the meter is the channel count, through a `useSyncExternalStore` selector that returns a number (a microphone's count is known only after its stream is set up).
+- Segment colours are memoized per threshold set (`segmentColors`); do not call `getColorForDb` per segment in the render or draw loops.
+- `useThrottledValue(source, { updateRate })` (`src/hooks/useThrottledValue.ts`) is the generic "source as React state, at most N times a second" hook; `useMeterLevels` is its meter-typed alias and recording's `useRecordingProgress` wraps it too. It shows a lone change at once and always ends on the latest value.
+
 ## SegmentedVUMeter Theming
 
 **Decision:** Transparent background, no padding/border-radius — consumers control container styling. `labelColor` prop (not theme) controls scale/channel label color for light/dark mode. Inactive segments use `rgba(128, 128, 128, 0.2)` to work on any background. Use transient `$props` for color, not CSS variables.

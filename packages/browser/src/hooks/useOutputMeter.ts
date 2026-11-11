@@ -13,11 +13,14 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getGlobalContext } from '@waveform-playlist/playout';
-import { gainToNormalized } from '@waveform-playlist/core';
+import {
+  createValueSource,
+  readMeterMessage,
+  silentMeterLevels,
+  type MeterLevels,
+  type MeterSource,
+} from '@waveform-playlist/core';
 import { meterProcessorUrl, type MeterMessage } from '@waveform-playlist/worklets';
-
-/** Peak decay constant — exponential decay for smooth peak hold (~800ms to 1/e at 60fps) */
-const PEAK_DECAY = 0.98;
 
 export interface UseOutputMeterOptions {
   /**
@@ -37,19 +40,20 @@ export interface UseOutputMeterOptions {
    * all levels (current, peak, RMS) and smoothed state are reset to zero.
    * Without this, the browser's tail-time optimization stops calling the
    * worklet's process() when no audio flows, leaving the last non-zero
-   * levels frozen in state.
+   * levels frozen.
    * Default: false
    */
   isPlaying?: boolean;
 }
 
 export interface UseOutputMeterReturn {
-  /** Per-channel peak output levels (0-1) */
-  levels: number[];
-  /** Per-channel held peak levels (0-1) */
-  peakLevels: number[];
-  /** Per-channel RMS output levels (0-1) */
-  rmsLevels: number[];
+  /**
+   * The live output levels, one entry per channel. Its identity is stable for
+   * the life of the hook, and the hook does NOT re-render when levels change:
+   * pass it to `<SegmentedVUMeter meter={meter} />`, call `meter.subscribe()`,
+   * or use `useMeterLevels(meter)` for throttled React state.
+   */
+  meter: MeterSource;
   /** Reset all held peak levels to 0 */
   resetPeak: () => void;
   /** Error from meter setup (worklet load failure, context issues, etc.) */
@@ -59,29 +63,27 @@ export interface UseOutputMeterReturn {
 export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMeterReturn {
   const { channelCount = 2, updateRate = 60, isPlaying = false } = options;
 
-  const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
-  const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
-  const [rmsLevels, setRmsLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
+  // Levels change ~60 times a second, so they live in a source, not in state.
+  const [{ source: meter, publish }] = useState(() =>
+    createValueSource<MeterLevels>(silentMeterLevels(channelCount))
+  );
 
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
-  const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
+  const smoothedPeakRef = useRef<number[]>([]);
   const [meterError, setMeterError] = useState<Error | null>(null);
 
-  const resetPeak = useCallback(
-    () => setPeakLevels(new Array(channelCount).fill(0)),
-    [channelCount]
-  );
+  const resetPeak = useCallback(() => {
+    const current = meter.getSnapshot();
+    publish({ ...current, peakLevels: current.peakLevels.map(() => 0) });
+  }, [meter, publish]);
 
   // Reset all levels when playback stops
   useEffect(() => {
     if (!isPlaying) {
-      const zeros = new Array(channelCount).fill(0);
-      smoothedPeakRef.current = new Array(channelCount).fill(0);
-      setLevels(zeros);
-      setRmsLevels(zeros);
-      setPeakLevels(zeros);
+      smoothedPeakRef.current = [];
+      publish(silentMeterLevels(channelCount));
     }
-  }, [isPlaying, channelCount]);
+  }, [isPlaying, channelCount, publish]);
 
   useEffect(() => {
     let isMounted = true;
@@ -118,30 +120,19 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
       const destination = context.destination;
       destination.chain(workletNode);
 
-      smoothedPeakRef.current = new Array(channelCount).fill(0);
+      smoothedPeakRef.current = [];
 
       // Listen for meter data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
         if (!isMounted) return;
 
-        // MeterMessage layout: [0..N-1] peak, [N..2N-1] rms
-        const data = event.data as MeterMessage;
-        const workletChannels = data.length / 2;
-        const smoothed = smoothedPeakRef.current;
-
-        const peakValues: number[] = [];
-        const rmsValues: number[] = [];
-
-        for (let ch = 0; ch < workletChannels; ch++) {
-          // Smoothed peak: jump up instantly, decay slowly
-          smoothed[ch] = Math.max(data[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
-          peakValues.push(gainToNormalized(smoothed[ch]));
-          rmsValues.push(gainToNormalized(data[workletChannels + ch]));
-        }
-
-        setLevels(peakValues);
-        setRmsLevels(rmsValues);
-        setPeakLevels((prev) => peakValues.map((val, i) => Math.max(prev[i] ?? 0, val)));
+        const reading = readMeterMessage({
+          data: event.data as MeterMessage,
+          previousSmoothedPeaks: smoothedPeakRef.current,
+          heldPeakLevels: meter.getSnapshot().peakLevels,
+        });
+        smoothedPeakRef.current = reading.smoothedPeaks;
+        publish(reading.levels);
       };
     };
 
@@ -172,7 +163,7 @@ export function useOutputMeter(options: UseOutputMeterOptions = {}): UseOutputMe
         workletNodeRef.current = null;
       }
     };
-  }, [channelCount, updateRate]);
+  }, [channelCount, updateRate, meter, publish]);
 
-  return { levels, peakLevels, rmsLevels, resetPeak, error: meterError };
+  return { meter, resetPeak, error: meterError };
 }

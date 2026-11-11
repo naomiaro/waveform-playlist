@@ -205,9 +205,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const {
     isRecording,
     isPaused,
-    duration,
-    levels: inputLevels,
-    peakLevels: inputPeaks,
+    meter: inputMeter,
+    progress: recordingProgress,
     devices,
     hasPermission,
     selectedDevice,
@@ -219,7 +218,6 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     requestMicAccess,
     changeDevice,
     error,
-    recordingPeaks,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
     currentTime,
     channelCount: 2,
@@ -232,7 +230,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const isResampling = micSampleRate != null && ctxSampleRate > 0 && micSampleRate !== ctxSampleRate;
 
   // Output meter for master bus
-  const { levels: outputLevels, peakLevels: outputPeaks } = useOutputMeter({ channelCount: 2, isPlaying });
+  const { meter: outputMeter } = useOutputMeter({ channelCount: 2, isPlaying });
 
   // Auto-request mic access on mount
   useEffect(() => {
@@ -475,25 +473,34 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     ? Math.floor(recordStartTimeRef.current * sampleRate)
     : 0;
 
-  // Auto-scroll to keep recording in view
+  // Auto-scroll to keep recording in view. The take's progress is a source
+  // (it changes every animation frame), so this follows it with a
+  // subscription and writes scrollLeft directly instead of re-rendering.
   useEffect(() => {
-    if (!isRecording || !isAutomaticScroll || !scrollContainerRef.current) return;
+    if (!isRecording || !isAutomaticScroll) return;
 
-    const scrollContainer = scrollContainerRef.current;
     const controlWidth = controls.show ? controls.width : 0;
-
-    const recordingEndSample = recordingStartSample + Math.floor(duration * sampleRate);
-    const recordingEndPixel = Math.floor(recordingEndSample / samplesPerPixel);
-
-    const visibleStart = scrollContainer.scrollLeft;
-    const visibleEnd = visibleStart + scrollContainer.clientWidth - controlWidth;
     const bufferZone = 100;
 
-    if (recordingEndPixel > visibleEnd - bufferZone) {
-      const targetScroll = recordingEndPixel - scrollContainer.clientWidth + controlWidth + bufferZone;
-      scrollContainer.scrollLeft = Math.max(0, targetScroll);
-    }
-  }, [isRecording, isAutomaticScroll, duration, recordingStartSample, sampleRate, samplesPerPixel, controls, scrollContainerRef]);
+    const follow = ({ duration }: { duration: number }) => {
+      const scrollContainer = scrollContainerRef.current;
+      if (!scrollContainer) return;
+
+      const recordingEndSample = recordingStartSample + Math.floor(duration * sampleRate);
+      const recordingEndPixel = Math.floor(recordingEndSample / samplesPerPixel);
+
+      const visibleStart = scrollContainer.scrollLeft;
+      const visibleEnd = visibleStart + scrollContainer.clientWidth - controlWidth;
+
+      if (recordingEndPixel > visibleEnd - bufferZone) {
+        const targetScroll = recordingEndPixel - scrollContainer.clientWidth + controlWidth + bufferZone;
+        scrollContainer.scrollLeft = Math.max(0, targetScroll);
+      }
+    };
+
+    follow(recordingProgress.getSnapshot());
+    return recordingProgress.subscribe(follow);
+  }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, controls, scrollContainerRef]);
 
   // Handle dropped/selected audio files
   const handleFiles = useCallback(
@@ -618,8 +625,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               <MicrophoneIcon size={12} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
               <MeterLabel>In</MeterLabel>
               <SegmentedVUMeter
-                levels={inputLevels}
-                peakLevels={inputPeaks}
+                meter={inputMeter}
                 orientation="horizontal"
                 segmentCount={40}
                 segmentWidth={14}
@@ -634,8 +640,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
               <SpeakerHighIcon size={12} weight="bold" style={{ color: 'var(--gray-9)', flexShrink: 0 }} />
               <MeterLabel>Out</MeterLabel>
               <SegmentedVUMeter
-                levels={outputLevels}
-                peakLevels={outputPeaks}
+                meter={outputMeter}
                 orientation="horizontal"
                 segmentCount={40}
                 segmentWidth={14}
@@ -669,8 +674,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   isRecording: true,
                   trackId: selectedTrackId,
                   startSample: recordingStartSample,
-                  durationSamples: Math.floor(duration * sampleRate),
-                  peaks: recordingPeaks,
+                  // A source, not values: only the preview clip follows the
+                  // take frame by frame; this component does not re-render.
+                  progress: recordingProgress,
                   bits: 16,
                   // Same override the hook uses, so the live preview matches the
                   // finalized clip (otherwise preview uses the auto value).

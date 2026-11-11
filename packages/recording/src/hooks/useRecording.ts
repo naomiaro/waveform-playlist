@@ -4,7 +4,13 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { UseRecordingReturn, RecordingOptions } from '../types';
-import { concatenateAudioData, createAudioBuffer, appendPeaks } from '@waveform-playlist/core';
+import {
+  concatenateAudioData,
+  createAudioBuffer,
+  appendPeaks,
+  createValueSource,
+  type RecordingProgress,
+} from '@waveform-playlist/core';
 import { getGlobalContext } from '@waveform-playlist/playout';
 import { addRecordingWorkletModule } from '@waveform-playlist/worklets';
 
@@ -21,13 +27,14 @@ export function useRecording(
   // State
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [duration, setDuration] = useState(0);
-  // Per-channel peaks for multi-channel live preview
-  const [peaks, setPeaks] = useState<(Int8Array | Int16Array)[]>([emptyPeaks(bits)]);
   const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [level, setLevel] = useState(0); // Current RMS level (0-1)
-  const [peakLevel, setPeakLevel] = useState(0); // Peak level since recording started (0-1)
+  // Elapsed time changes every animation frame and the per-channel preview
+  // peaks on every worklet message, so both live in a source instead of
+  // state: the component using this hook does not re-render while recording.
+  const [{ source: progress, publish: publishProgressValue }] = useState(() =>
+    createValueSource<RecordingProgress>({ duration: 0, peaks: [emptyPeaks(bits)] })
+  );
 
   // Per-instance flag to prevent loading worklet multiple times within the same hook instance.
   // Note: Multiple hook instances each have their own ref — see "Multi-Instance Worklet
@@ -67,22 +74,31 @@ export function useRecording(
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
-  // Mirrors the duration state for callbacks that must not close over it.
+  // Elapsed seconds, and the preview peaks accumulated so far. Written by the
+  // duration loop and the worklet handler; published together, at most once
+  // per animation frame, by publishProgress.
   const durationRef = useRef<number>(0);
+  const peaksRef = useRef<(Int8Array | Int16Array)[]>(progress.getSnapshot().peaks);
+
+  const publishProgress = useCallback(() => {
+    const current = progress.getSnapshot();
+    if (current.duration === durationRef.current && current.peaks === peaksRef.current) return;
+    publishProgressValue({ duration: durationRef.current, peaks: peaksRef.current });
+  }, [progress, publishProgressValue]);
 
   // Shared duration update loop — starts a rAF loop that updates duration
-  // from performance.now(). Used by both startRecording and resumeRecording.
+  // from performance.now() and publishes the progress once per frame. Used by
+  // both startRecording and resumeRecording.
   const startDurationLoop = useCallback(() => {
     const tick = () => {
       if (isRecordingRef.current && !isPausedRef.current && !isStoppingRef.current) {
-        const elapsed = (performance.now() - startTimeRef.current) / 1000;
-        durationRef.current = elapsed;
-        setDuration(elapsed);
+        durationRef.current = (performance.now() - startTimeRef.current) / 1000;
+        publishProgress();
         animationFrameRef.current = requestAnimationFrame(tick);
       }
     };
     tick();
-  }, []);
+  }, [publishProgress]);
 
   // Load AudioWorklet module
   const loadWorklet = useCallback(async () => {
@@ -166,10 +182,10 @@ export function useRecording(
       // arrives before refs are cleared, corrupting samplesProcessedBefore calculations
       recordedChunksRef.current = Array.from({ length: streamChannelCount }, () => []);
       totalSamplesRef.current = 0;
-      setPeaks(Array.from({ length: streamChannelCount }, () => emptyPeaks(bits)));
+      durationRef.current = 0;
+      peaksRef.current = Array.from({ length: streamChannelCount }, () => emptyPeaks(bits));
+      publishProgress();
       setAudioBuffer(null);
-      setLevel(0);
-      setPeakLevel(0);
 
       // Listen for audio data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
@@ -201,17 +217,21 @@ export function useRecording(
           // final clip (which is shorter due to latency compensation).
           // Chunks are already pushed above so no audio is lost.
           if (stopAckResolveRef.current === null) {
-            setPeaks((prevPeaks) => {
-              // Ensure we have an entry per channel
-              const updated: (Int8Array | Int16Array)[] = [];
-              for (let ch = 0; ch < channels.length; ch++) {
-                const prev = prevPeaks[ch] ?? emptyPeaks(bits);
-                updated.push(
-                  appendPeaks(prev, channels[ch], samplesPerPixel, samplesProcessedBefore, bits)
-                );
-              }
-              return updated;
-            });
+            // A new outer array per message (one entry per channel); the
+            // duration loop publishes it on the next frame.
+            const previous = peaksRef.current;
+            peaksRef.current = channels.map((channel, ch) =>
+              appendPeaks(
+                previous[ch] ?? emptyPeaks(bits),
+                channel,
+                samplesPerPixel,
+                samplesProcessedBefore,
+                bits
+              )
+            );
+            // While paused the loop is not running; messages already queued
+            // when the pause was sent still belong in the preview.
+            if (isPausedRef.current) publishProgress();
           }
         }
 
@@ -257,7 +277,15 @@ export function useRecording(
     } finally {
       isStartingRef.current = false;
     }
-  }, [stream, channelCount, samplesPerPixel, bits, loadWorklet, startDurationLoop]);
+  }, [
+    stream,
+    channelCount,
+    samplesPerPixel,
+    bits,
+    loadWorklet,
+    startDurationLoop,
+    publishProgress,
+  ]);
 
   // Stop recording
   const stopRecording = useCallback(async (): Promise<AudioBuffer | null> => {
@@ -376,8 +404,7 @@ export function useRecording(
 
       setAudioBuffer(buffer);
       durationRef.current = buffer.duration;
-      setDuration(buffer.duration);
-      // Keep peakLevel to show the peak reached during recording
+      publishProgress();
 
       return buffer;
     } catch (err) {
@@ -392,9 +419,8 @@ export function useRecording(
       isStoppingRef.current = false;
       setIsRecording(false);
       setIsPaused(false);
-      setLevel(0);
     }
-  }, [channelCount]);
+  }, [channelCount, publishProgress]);
   stopRecordingRef.current = stopRecording;
   finishStopRecordingRef.current = finishStopRecording;
 
@@ -467,11 +493,8 @@ export function useRecording(
   return {
     isRecording,
     isPaused,
-    duration,
-    peaks,
+    progress,
     audioBuffer,
-    level,
-    peakLevel,
     startRecording,
     stopRecording,
     pauseRecording,

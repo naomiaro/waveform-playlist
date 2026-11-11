@@ -27,6 +27,7 @@ import {
 } from '../WaveformPlaylistContext';
 import { applyTrackOrderPreview, computeTrackLayout } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
+import { useRecordingLayout } from '../hooks/useRecordingLayout';
 import type { AnnotationAction, RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
@@ -210,12 +211,14 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   // The recording, reduced to what track heights depend on. `recordingState`
   // itself is a new object on every recording frame.
+  const recordingProgress = recordingState?.isRecording ? recordingState.progress : undefined;
+  const recordingLayout = useRecordingLayout(
+    recordingProgress,
+    recordingState?.startSample ?? 0,
+    sampleRate
+  );
   const recordingTrackId = recordingState?.isRecording ? recordingState.trackId : null;
-  const recordingChannelCount = recordingState?.isRecording
-    ? mono
-      ? 1
-      : recordingState.peaks.length
-    : 0;
+  const recordingChannelCount = recordingProgress ? (mono ? 1 : recordingLayout.channelCount) : 0;
 
   // State for spectrogram settings modal
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
@@ -266,10 +269,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     displayDuration = Math.max(displayDuration, minContainerDuration);
   }
 
-  if (recordingState?.isRecording) {
-    const recordingEndSample = recordingState.startSample + recordingState.durationSamples;
-    const recordingEndTime = recordingEndSample / sampleRate;
-    displayDuration = Math.max(displayDuration, recordingEndTime + 10);
+  if (recordingProgress) {
+    // Grows in steps, not with every frame of the take (#695).
+    displayDuration = Math.max(displayDuration, recordingLayout.displayEndSeconds);
   }
 
   const tracksFullWidth = Math.floor((displayDuration * sampleRate) / samplesPerPixel);
@@ -528,6 +530,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
               waveHeight={waveHeight}
               mono={mono}
               recordingState={recordingState}
+              recordingChannelCount={recordingChannelCount}
               samplesPerPixel={samplesPerPixel}
               sampleRate={sampleRate}
               showClipHeaders={showClipHeaders}

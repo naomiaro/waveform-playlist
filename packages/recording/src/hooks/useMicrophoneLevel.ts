@@ -7,11 +7,14 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getGlobalContext } from '@waveform-playlist/playout';
-import { gainToNormalized } from '@waveform-playlist/core';
+import {
+  createValueSource,
+  readMeterMessage,
+  silentMeterLevels,
+  type MeterLevels,
+  type MeterSource,
+} from '@waveform-playlist/core';
 import { addMeterWorkletModule, type MeterMessage } from '@waveform-playlist/worklets';
-
-/** Peak decay constant — exponential decay for smooth peak hold (~800ms to 1/e at 60fps) */
-const PEAK_DECAY = 0.98;
 
 export interface UseMicrophoneLevelOptions {
   /**
@@ -29,43 +32,21 @@ export interface UseMicrophoneLevelOptions {
 
 export interface UseMicrophoneLevelReturn {
   /**
-   * Current peak audio level (0-1)
-   * For single channel: channel 0 level
-   * For multi-channel: max across all channels
+   * The live levels. Its identity is stable for the life of the hook, and the
+   * hook does NOT re-render when levels change: pass it to
+   * `<SegmentedVUMeter meter={meter} />`, call `meter.subscribe()`, or use
+   * `useMeterLevels(meter)` for throttled React state.
+   *
+   * Each array has one entry per metered channel: the mic's auto-detected
+   * channels, with mono repeated up to the requested `channelCount`. A mic
+   * with MORE channels than `channelCount` yields one entry per actual channel.
    */
-  level: number;
+  meter: MeterSource;
 
   /**
-   * Held peak level since last reset (0-1)
-   * For single channel: channel 0 peak
-   * For multi-channel: max across all channels
-   */
-  peakLevel: number;
-
-  /**
-   * Reset the held peak level
+   * Reset the held peak levels
    */
   resetPeak: () => void;
-
-  /**
-   * Per-channel peak levels (0-1). Array length matches the metered channel
-   * count: the mic's auto-detected channels, with mono mirrored up to the
-   * requested `channelCount`. A mic with MORE channels than `channelCount`
-   * yields one entry per actual channel.
-   * True peak: max absolute sample value per analysis frame.
-   */
-  levels: number[];
-
-  /**
-   * Per-channel held peak levels (0-1). Same length contract as `levels`.
-   */
-  peakLevels: number[];
-
-  /**
-   * Per-channel RMS levels (0-1). Same length contract as `levels`.
-   * RMS: root mean square of samples per analysis frame.
-   */
-  rmsLevels: number[];
 
   /**
    * Error from meter setup (worklet load failure, context issues, etc.)
@@ -79,14 +60,14 @@ export interface UseMicrophoneLevelReturn {
  *
  * @param stream - MediaStream from getUserMedia
  * @param options - Configuration options
- * @returns Object with current peak level, RMS level, and held peak level
+ * @returns A meter source, a peak reset, and any setup error
  *
  * @example
  * ```typescript
  * const { stream } = useMicrophoneAccess();
- * const { levels, rmsLevels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+ * const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
  *
- * return <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+ * return <SegmentedVUMeter meter={meter} />;
  * ```
  */
 export function useMicrophoneLevel(
@@ -95,26 +76,25 @@ export function useMicrophoneLevel(
 ): UseMicrophoneLevelReturn {
   const { updateRate = 60, channelCount = 1 } = options;
 
-  const [levels, setLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
-  const [peakLevels, setPeakLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
-  const [rmsLevels, setRmsLevels] = useState<number[]>(() => new Array(channelCount).fill(0));
+  // Levels change ~60 times a second, so they live in a source, not in state.
+  const [{ source: meter, publish }] = useState(() =>
+    createValueSource<MeterLevels>(silentMeterLevels(channelCount))
+  );
   const [meterError, setMeterError] = useState<Error | null>(null);
 
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const smoothedPeakRef = useRef<number[]>(new Array(channelCount).fill(0));
+  const smoothedPeakRef = useRef<number[]>([]);
 
-  const resetPeak = useCallback(
-    () => setPeakLevels(new Array(channelCount).fill(0)),
-    [channelCount]
-  );
+  const resetPeak = useCallback(() => {
+    const current = meter.getSnapshot();
+    publish({ ...current, peakLevels: current.peakLevels.map(() => 0) });
+  }, [meter, publish]);
 
   useEffect(() => {
     if (!stream) {
-      setLevels(new Array(channelCount).fill(0));
-      setPeakLevels(new Array(channelCount).fill(0));
-      setRmsLevels(new Array(channelCount).fill(0));
-      smoothedPeakRef.current = new Array(channelCount).fill(0);
+      smoothedPeakRef.current = [];
+      publish(silentMeterLevels(channelCount));
       return;
     }
 
@@ -162,35 +142,21 @@ export function useMicrophoneLevel(
       sourceRef.current = source;
       source.connect(workletNode);
 
-      smoothedPeakRef.current = new Array(actualChannels).fill(0);
+      smoothedPeakRef.current = [];
 
       // Listen for meter data from worklet
       workletNode.port.onmessage = (event: MessageEvent) => {
         if (!isMounted) return;
 
-        // MeterMessage layout: [0..N-1] peak, [N..2N-1] rms
-        const data = event.data as MeterMessage;
-        const workletChannels = data.length / 2;
-        const smoothed = smoothedPeakRef.current;
-
-        const peakValues: number[] = [];
-        const rmsValues: number[] = [];
-
-        for (let ch = 0; ch < workletChannels; ch++) {
-          smoothed[ch] = Math.max(data[ch], (smoothed[ch] ?? 0) * PEAK_DECAY);
-          peakValues.push(gainToNormalized(smoothed[ch]));
-          rmsValues.push(gainToNormalized(data[workletChannels + ch]));
-        }
-
-        // Mirror mono to fill requested channelCount
-        const mirroredPeaks =
-          workletChannels < channelCount ? new Array(channelCount).fill(peakValues[0]) : peakValues;
-        const mirroredRms =
-          workletChannels < channelCount ? new Array(channelCount).fill(rmsValues[0]) : rmsValues;
-
-        setLevels(mirroredPeaks);
-        setRmsLevels(mirroredRms);
-        setPeakLevels((prev) => mirroredPeaks.map((val, i) => Math.max(prev[i] ?? 0, val)));
+        const reading = readMeterMessage({
+          data: event.data as MeterMessage,
+          previousSmoothedPeaks: smoothedPeakRef.current,
+          heldPeakLevels: meter.getSnapshot().peakLevels,
+          // Mirror mono to fill the requested channelCount
+          minChannels: channelCount,
+        });
+        smoothedPeakRef.current = reading.smoothedPeaks;
+        publish(reading.levels);
       };
 
       // Setup succeeded — clear any error from a previous failed attempt so
@@ -227,19 +193,11 @@ export function useMicrophoneLevel(
         workletNodeRef.current = null;
       }
     };
-  }, [stream, updateRate, channelCount]);
-
-  // Backwards-compatible scalar values
-  const level = channelCount === 1 ? (levels[0] ?? 0) : Math.max(...levels);
-  const peakLevel = channelCount === 1 ? (peakLevels[0] ?? 0) : Math.max(...peakLevels);
+  }, [stream, updateRate, channelCount, meter, publish]);
 
   return {
-    level,
-    peakLevel,
+    meter,
     resetPeak,
-    levels,
-    peakLevels,
-    rmsLevels,
     error: meterError,
   };
 }

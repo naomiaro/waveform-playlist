@@ -12,3 +12,5 @@ export type {
   UseIntegratedRecordingReturn,
   IntegratedRecordingOptions,
 } from './useIntegratedRecording';
+
+export { useRecordingProgress } from './useRecordingProgress';
