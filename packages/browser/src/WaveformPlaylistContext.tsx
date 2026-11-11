@@ -290,7 +290,7 @@ export interface PlaylistDataContextValue {
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
-// Create the 4 separate contexts
+// Create the 5 separate contexts
 // Shared default so an omitted `controls` prop keeps one identity across
 // renders — a fresh object here would invalidate the data context every render.
 const DEFAULT_CONTROLS = { show: false, width: 0 };

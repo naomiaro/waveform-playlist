@@ -82,12 +82,13 @@ Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvi
 
 ## Context Hooks
 
-`WaveformPlaylistProvider` splits its context into four hooks so components only re-render for the data they actually read:
+`WaveformPlaylistProvider` splits its context into five hooks so components only re-render for the data they actually read:
 
 | Hook | Exposes |
 |------|---------|
 | `usePlaybackAnimation` | `isPlaying`, `currentTime`, animation refs, `getPlaybackTime()`, `registerFrameCallback()` for 60fps-driven UI (playhead, progress bars) |
-| `usePlaylistState` | Low-frequency state — selection, loop region, annotations, `selectedTrackId`, `canUndo`/`canRedo` |
+| `usePlaylistState` | Low-frequency state — loop region, annotations, `selectedTrackId`, `canUndo`/`canRedo` |
+| `useSelection` | `selectionStart`, `selectionEnd` — changes on every pointer move of a selection drag, so only components that show the selection should call it |
 | `usePlaylistControls` | Actions — `play`, `pause`, `stop`, `seekTo`, track mute/solo/volume/pan, zoom, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) |
 | `usePlaylistData` | Derived/config data — `tracks`, `duration`, `sampleRate`, `peaksDataArray`, `trackStates`, `isReady` |
 

@@ -21,6 +21,7 @@ const counts = vi.hoisted(() => ({
   track: {} as Record<string, number>,
   controls: 0,
   scale: 0,
+  shell: 0,
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
@@ -44,6 +45,12 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     Controls: (props: React.ComponentProps<typeof actual.Controls>) => {
       counts.controls++;
       return createElement(actual.Controls, props);
+    },
+    // Rendered unconditionally by `PlaylistVisualization`, so this counts the
+    // shell's own renders (#733).
+    Playlist: (props: React.ComponentProps<typeof actual.Playlist>) => {
+      counts.shell++;
+      return createElement(actual.Playlist, props);
     },
     SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
       counts.scale++;
@@ -165,6 +172,7 @@ function resetCounts() {
   counts.track = {};
   counts.controls = 0;
   counts.scale = 0;
+  counts.shell = 0;
 }
 
 function totalOf(record: Record<string, number>): number {
@@ -260,6 +268,9 @@ describe('visualization memo boundaries (#693)', () => {
     });
 
     expect(probe.selection.selectionEnd).toBe(0.5);
+    // The shell does not subscribe to the selection (#733). A leftward drag
+    // still renders it: the cursor moves, and it reads the animation context.
+    expect(counts.shell).toBe(0);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);
