@@ -120,7 +120,7 @@ Both providers use React Context with 4 split contexts for performance.
 - `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'timescale'` (sample-based grid). Snaps absolute position, not delta.
 - `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
-- `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0). Shortcuts never take a key the focused control uses: text fields and `<select>` keep all keys, Escape closes an open modal dialog, Space/Enter activate a focused `<button>` or link (and a focused slider or checkbox keeps its keys) unless it was focused by a pointer click or drag
+- `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0). Shortcuts never take a key the focused control uses: text fields keep all keys, Escape closes an open modal dialog, Space/Enter activate a focused `<button>` or link (and a focused `<select>`, slider or checkbox keeps its keys) except that Space stays a shortcut on a control that was focused by a pointer click or drag
 - `useUndoState(opts)` — Undo/redo state (canUndo, canRedo, undo, redo) with engine delegation
 - `KeyboardShortcuts` — Self-closing component for declarative keyboard shortcut setup. Props: `playback` (Space/Escape/0), `clipSplitting` ('s' key), `annotations` (arrow nav, boundary editing), `undo` (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z), `additionalShortcuts`. All booleans default to false. Reads all required data from context.
 

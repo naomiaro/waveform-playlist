@@ -401,10 +401,10 @@ Waveform Playlist supports common keyboard shortcuts:
 
 A shortcut does not fire for a key that the focused control uses itself:
 
-- Text fields, `<select>` and `contenteditable` elements keep every key.
+- Text fields and `contenteditable` elements keep every key.
 - `Escape` closes an open modal dialog (`<dialog>` opened with `showModal()`, or an `aria-modal="true"` container) and does not also stop playback, wherever focus is.
-- `Space` and `Enter` activate a focused `<button>`, link or `<summary>`, and a focused slider, checkbox or other non-text `<input>` keeps every key, so every control can be operated with Tab and the keyboard.
-- The exception to the previous point is a control that got focus from a pointer click or drag: it keeps focus without having been navigated to, so `Space` and `Enter` are still shortcuts there. Clicking Mute, or dragging a volume slider, and then pressing `Space` plays.
+- `Space` and `Enter` activate a focused `<button>`, link or `<summary>`, and a focused `<select>`, slider, checkbox or other non-text `<input>` keeps every key, so every control can be operated with Tab and the keyboard.
+- The exception to the previous point is a control that got focus from a pointer click or drag: it keeps focus without having been navigated to, and `Space` is the transport key, so `Space` is still a shortcut there. `Enter` always goes to the focused control. Clicking Mute, dragging a volume slider or picking a value from a dropdown, and then pressing `Space`, plays.
 
 Elements that are only given a role (`<div role="button">`) are not covered: a shortcut still fires while one has focus.
 

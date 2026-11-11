@@ -253,6 +253,16 @@ describe('handleKeyboardEvent', () => {
           expect(action).toHaveBeenCalledTimes(2);
         });
 
+        it('keeps Enter even when it was focused with the pointer', () => {
+          const el = make(kind);
+          focusWithPointer(el);
+          const enter = vi.fn();
+          const event = keydownOn(el, 'Enter');
+          handleKeyboardEvent(event, [...all, { key: 'Enter', action: enter }], true);
+          expect(enter).not.toHaveBeenCalled();
+          expect(event.defaultPrevented).toBe(false);
+        });
+
         it('does not keep other keys', () => {
           const el = make(kind);
           focusWithKeyboard(el);
@@ -308,7 +318,56 @@ describe('handleKeyboardEvent', () => {
           expect(action).toHaveBeenCalledTimes(1);
           handleKeyboardEvent(keydownOn(input, '0'), all, true);
           expect(zero).not.toHaveBeenCalled();
+          const enter = vi.fn();
+          handleKeyboardEvent(keydownOn(input, 'Enter'), [{ key: 'Enter', action: enter }], true);
+          expect(enter).not.toHaveBeenCalled();
         });
+      });
+
+      it('a <select> used with the pointer gives Space back, and keeps its other keys', () => {
+        // Pick a time format with the mouse, then press Space to play.
+        const select = document.createElement('select');
+        host.appendChild(select);
+        focusWithPointer(select);
+        const event = keydownOn(select, ' ');
+        handleKeyboardEvent(event, all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(event.defaultPrevented).toBe(true);
+        // Enter reopens it, Escape closes its list, a character selects an option.
+        const enter = vi.fn();
+        const withEnter = [...all, { key: 'Enter', action: enter }];
+        const enterEvent = keydownOn(select, 'Enter');
+        handleKeyboardEvent(enterEvent, withEnter, true);
+        handleKeyboardEvent(keydownOn(select, 'Escape'), withEnter, true);
+        handleKeyboardEvent(keydownOn(select, '0'), withEnter, true);
+        expect(enter).not.toHaveBeenCalled();
+        expect(enterEvent.defaultPrevented).toBe(false);
+        expect(escape).not.toHaveBeenCalled();
+        expect(zero).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        ['multiple', ''],
+        ['size', '4'],
+      ])('a list box (<select %s>) keeps Space even after a click', (attribute, value) => {
+        const select = document.createElement('select');
+        select.setAttribute(attribute, value);
+        host.appendChild(select);
+        focusWithPointer(select);
+        handleKeyboardEvent(keydownOn(select, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
+      });
+
+      it('a <select> reached with the keyboard keeps every key', () => {
+        const select = document.createElement('select');
+        host.appendChild(select);
+        focusWithKeyboard(select);
+        for (const key of [' ', 'Enter', 'Escape', '0']) {
+          handleKeyboardEvent(keydownOn(select, key), all, true);
+        }
+        expect(action).not.toHaveBeenCalled();
+        expect(escape).not.toHaveBeenCalled();
+        expect(zero).not.toHaveBeenCalled();
       });
 
       it('a clicked text input still keeps every key', () => {
