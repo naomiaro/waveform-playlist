@@ -365,6 +365,8 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Provider-level animation-loop tests:** mount the REAL `WaveformPlaylistProvider` in jsdom (`// @vitest-environment jsdom` + `./jsdom-polyfills` first) with an injected fake adapter (`createAdapter` prop — no tone/playout import) whose `getCurrentTime()` the test controls, a probe child capturing context hooks, and a setTimeout-based `requestAnimationFrame` polyfill (jsdom lacks rAF without pretendToBeVisual). Reference: `animationLoopEndOfAudio.test.tsx` (end-of-audio semantics, recording suppression, armed-track mute).
 
+**The `reschedulePlayback` effect restarts the AUDIO only when `continuousPlay` turns on (#701).** It compares against `prevContinuousPlayRef`; every other run (playback starting, the loop closure changing) only restarts the animation loop. Keyed on the current value instead, every Play with continuous play on stopped and restarted the engine, and so did any duration change. The transition branch also clears `playbackEndTimeRef`, otherwise the loop stops at the old annotation end even though the engine was rescheduled without one. `continuousPlayReschedule.test.tsx` logs the fake adapter's `play`/`stop` calls.
+
 **Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when `duration` state updates, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
 
 ## Shortcuts Yield to the Focused Control (#710)

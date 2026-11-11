@@ -1534,15 +1534,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
-  // Restart animation loop and reschedule playout when continuousPlay changes during playback
-  // This ensures the loop always has the current continuousPlay value
-  // and removes duration limits when switching to continuous play
+  // Two jobs, during playback only:
+  //  - restart the animation loop whenever its closure changes (e.g. `duration`),
+  //    so the running loop always has current values;
+  //  - when continuous play is switched ON, reschedule the audio without an end,
+  //    so it runs past the annotation it was bounded to.
+  // The reschedule is tied to that false -> true transition, not to the current
+  // value: this effect also runs when playback starts and when the loop is
+  // rebuilt, and with continuous play already on those used to stop and restart
+  // the audio as well (every Play started twice; a duration change restarted it).
+  const prevContinuousPlayRef = useRef(continuousPlay);
   useEffect(() => {
+    const continuousPlayTurnedOn = continuousPlay && !prevContinuousPlayRef.current;
+    prevContinuousPlayRef.current = continuousPlay;
+
     const reschedulePlayback = async () => {
       if (isPlaying && animationFrameRef.current && engineRef.current) {
-        // When toggling continuous play ON, reschedule playout without duration limit
-        // so audio continues past the current annotation boundary
-        if (continuousPlay) {
+        if (continuousPlayTurnedOn) {
           const currentPos = currentTimeRef.current;
 
           // Stop current playout (which may have duration limit + pause callback).
@@ -1557,11 +1565,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           playbackStartTimeRef.current = timeNow;
           audioStartPositionRef.current = currentPos;
 
-          // Play without duration - will play to end of track
+          // Play without duration - will play to end of track. The loop's own
+          // end check must go too, or it stops playback at the old end anyway.
+          playbackEndTimeRef.current = null;
           engineRef.current.play(currentPos);
           startAnimationLoop();
         } else {
-          // Just restart animation loop for continuous play OFF
+          // Nothing about the audio changed: only refresh the loop.
           stopAnimationLoop();
           startAnimationLoop();
         }
