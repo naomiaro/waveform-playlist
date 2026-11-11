@@ -126,4 +126,75 @@ test.describe('Media Element Annotations Example', () => {
       expect(Math.abs(start.x - end.x - 60)).toBeLessThanOrEqual(2);
     }).toPass({ timeout: 5000 });
   });
+
+  // Reported by hand: separate two annotations, switch Link endpoints on, drag
+  // one into the other. The boxes looked joined but the two times differed by a
+  // few milliseconds for the rest of the drag.
+  test('with Link endpoints on, annotations dragged into each other share one time', async ({
+    page,
+  }) => {
+    await page.getByRole('checkbox', { name: 'Editable' }).check();
+    const container = page.locator('[data-scroll-container]');
+    const handles = container.locator('[aria-roledescription="draggable"]');
+    await expect(handles).toHaveCount(31);
+    const label = container.getByText('4', { exact: true });
+    await expect(label).toBeVisible();
+
+    // The right edge of box 4: the first handle to the right of its label.
+    const rightEdgeOfBox4 = async () => {
+      const labelBox = await label.boundingBox();
+      expect(labelBox).toBeTruthy();
+      const centre = labelBox!.x + labelBox!.width / 2;
+      const boxes = await handles.evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, height: rect.height };
+        })
+      );
+      const edges = boxes.filter((b) => b.height < 60 && b.x > centre).sort((a, b) => a.x - b.x);
+      expect(edges.length).toBeGreaterThan(0);
+      return edges[0];
+    };
+    const drag = async (from: { x: number; y: number }, distance: number, stepSize: number) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      const steps = Math.ceil(Math.abs(distance) / stepSize);
+      for (let i = 1; i <= steps; i++) {
+        const travelled = Math.min(i * stepSize, Math.abs(distance)) * Math.sign(distance);
+        await page.mouse.move(from.x + travelled, from.y);
+        await page.waitForTimeout(30);
+      }
+      await page.mouse.up();
+    };
+    // "0:09.240 - 0:11.920" from the list row of an annotation.
+    const timesOf = async (id: string) => {
+      const row = page.getByText(id, { exact: true }).locator('xpath=..');
+      // The id runs straight into the first time in the row's text.
+      const text = ((await row.textContent()) ?? '').replace(id, '');
+      const match = text.match(/(\d+:\d{2}\.\d{3})\s*-\s*(\d+:\d{2}\.\d{3})/);
+      expect(match, 'times in "' + text + '"').toBeTruthy();
+      return { start: match![1], end: match![2] };
+    };
+
+    // Unlinked: pull the end of 4 away from 5. A fraction of a pixel, so that
+    // the way back passes within 10 ms of the neighbour without reaching it.
+    const start = await rightEdgeOfBox4();
+    await drag(start, -40.3, 5);
+    await expect(async () => {
+      expect((await timesOf('f000004')).end).not.toBe((await timesOf('f000005')).start);
+    }).toPass({ timeout: 5000 });
+
+    // Linked: drag it back into 5 and beyond, one pixel at a time.
+    await page.getByRole('checkbox', { name: 'Link endpoints' }).check();
+    const separated = await rightEdgeOfBox4();
+    await drag(separated, 55, 1);
+
+    await expect(async () => {
+      const four = await timesOf('f000004');
+      const five = await timesOf('f000005');
+      expect(four.end).toBe(five.start);
+      // 5's start moved from where it was: the drag went past the join.
+      expect(five.start).not.toBe('0:11.920');
+    }).toPass({ timeout: 5000 });
+  });
 });

@@ -49,16 +49,18 @@ export function updateAnnotationBoundaries(
 
   if (isDraggingStart) {
     const constrainedStart = Math.min(annotation.end - minDuration, Math.max(0, newTime));
-    const delta = constrainedStart - annotation.start;
 
     updatedAnnotations[annotationIndex] = { ...annotation, start: constrainedStart };
 
     if (linkEndpoints && annotationIndex > 0) {
       const prevAnnotation = updatedAnnotations[annotationIndex - 1];
       if (Math.abs(prevAnnotation.end - annotation.start) < linkThreshold) {
+        // Linked edges share one position. Setting the neighbour's edge to the
+        // dragged edge (not moving it by the same amount) closes a gap smaller
+        // than the threshold instead of carrying it along for the whole drag.
         updatedAnnotations[annotationIndex - 1] = {
           ...prevAnnotation,
-          end: Math.max(prevAnnotation.start + minDuration, prevAnnotation.end + delta),
+          end: Math.max(prevAnnotation.start + minDuration, constrainedStart),
         };
       } else if (constrainedStart <= prevAnnotation.end) {
         updatedAnnotations[annotationIndex] = {
@@ -78,17 +80,16 @@ export function updateAnnotationBoundaries(
     }
   } else {
     const constrainedEnd = Math.max(annotation.start + minDuration, Math.min(newTime, duration));
-    const delta = constrainedEnd - annotation.end;
 
     updatedAnnotations[annotationIndex] = { ...annotation, end: constrainedEnd };
 
     if (linkEndpoints && annotationIndex < updatedAnnotations.length - 1) {
       const nextAnnotation = updatedAnnotations[annotationIndex + 1];
       if (Math.abs(nextAnnotation.start - annotation.end) < linkThreshold) {
-        const newStart = nextAnnotation.start + delta;
+        // As above: the linked edge takes the dragged edge's position.
         updatedAnnotations[annotationIndex + 1] = {
           ...nextAnnotation,
-          start: Math.min(nextAnnotation.end - minDuration, newStart),
+          start: Math.min(nextAnnotation.end - minDuration, constrainedEnd),
         };
 
         let currentIndex = annotationIndex + 1;
