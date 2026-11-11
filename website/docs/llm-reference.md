@@ -645,7 +645,7 @@ function useAnnotationsWithPreview(
 ): AnnotationData[];
 ```
 
-With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way every move is computed from the annotations as they were when the drag began, and a cancelled drag (Escape) restores all of them. `MediaElementWaveform`'s built-in boxes always drag with the preview.
+With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way a cancelled drag (Escape) restores every annotation the drag moved. `MediaElementWaveform`'s built-in boxes always drag with the preview.
 
 ### useClipDragHandlers
 

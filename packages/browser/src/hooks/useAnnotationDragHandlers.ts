@@ -74,10 +74,10 @@ export function useAnnotationDragHandlers({
   linkEndpoints,
   preview,
 }: UseAnnotationDragHandlersOptions) {
-  // The annotations as they were when the drag began. Every move is computed
-  // from them (applying a move to the result of the previous one would
-  // compound the link and collision adjustments), and a cancelled drag
-  // restores them.
+  // `snapshot`: the annotations as they were when the drag began; a cancelled
+  // drag restores them. Each move is applied to the result of the previous
+  // move, not to the snapshot: that is how, with linked endpoints, an edge
+  // dragged into a separated neighbour picks it up and carries it along (#747).
   const dragRef = React.useRef<{
     snapshot: AnnotationData[];
     start: number;
@@ -161,7 +161,9 @@ export function useAnnotationDragHandlers({
         annotationIndex,
         newTime,
         isDraggingStart: edge === 'start',
-        annotations: drag.snapshot,
+        annotations: preview
+          ? (preview.source.getSnapshot() ?? drag.snapshot)
+          : annotationsRef.current,
         duration,
         linkEndpoints,
       });

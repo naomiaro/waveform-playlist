@@ -314,11 +314,10 @@ A component that calls `useActiveAnnotation()` re-renders at every annotation bo
 
 **Package:** `@waveform-playlist/browser`.
 
-Three behaviour changes, none of them a type error:
+Two behaviour changes, neither of them a type error:
 
 1. **`MediaElementWaveform` / `MediaElementPlaylist`:** while an annotation edge is dragged, `onAnnotationsChange` (and `onAnnotationUpdate`) used to be called on every pointer move. They are now called once, when the edge is released, with the final annotations. During the drag the boxes and the annotation list follow a preview that does not go through your state.
-2. **`useAnnotationDragHandlers`:** every move is computed from the annotations as they were when the drag began. Before, each move was applied to the result of the previous one, so a neighbour pushed or linked along the way stayed where it had been pushed when you dragged back.
-3. **Escape during the drag** restores every annotation the drag moved. Before, only the dragged annotation was restored.
+2. **Escape during the drag** (both players, `useAnnotationDragHandlers`) restores every annotation the drag moved. Before, only the dragged annotation was restored.
 
 **Find:** code that relies on `onAnnotationsChange` firing during a drag in the MediaElement player (for example to show the dragged time somewhere of your own).
 

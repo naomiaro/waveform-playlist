@@ -980,7 +980,7 @@ function useAnnotationDragHandlers(options: {
 
 Pass `preview: annotationPreview` (from `usePlaylistControls()`) to keep the drag out of your own state: each move is published to the preview, which the built-in annotation boxes and list follow, and `onAnnotationsChange` is called once, on release. Without `preview`, `onAnnotationsChange` is called on every move, which re-renders whatever component holds the annotations for each one.
 
-Every move is computed from the annotations as they were when the drag began. Pressing Escape cancels the drag and puts back every annotation it moved, linked and pushed neighbours included.
+Pressing Escape cancels the drag and puts back every annotation it moved, linked and pushed neighbours included.
 
 ### useAnnotationsWithPreview
 

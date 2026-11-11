@@ -99,15 +99,20 @@ describe('useAnnotationDragHandlers', () => {
       expect(current()).toBe(before);
     });
 
-    it('each move starts from the annotations as they were when the drag began', () => {
+    // #747: with linked endpoints, an edge dragged into a separated
+    // neighbour picks it up and carries it along. That needs each move to be
+    // applied to the result of the previous one.
+    it('an edge dragged into a separated neighbour carries it along', () => {
       const { run, current } = setup();
 
-      run((h) => h.onDragStart(startEvent(0, 'end')));
-      // Far enough right to squeeze the neighbour, then back to where it began.
-      run((h) => h.onDragMove(moveEvent(0, 'end', 95)));
-      run((h) => h.onDragMove(moveEvent(0, 'end', 0)));
+      // c starts at 3; b ends at 2.
+      run((h) => h.onDragStart(startEvent(1, 'end')));
+      for (let px = 10; px <= 130; px += 10) {
+        run((h) => h.onDragMove(moveEvent(1, 'end', px)));
+      }
 
-      expect(times(current())).toEqual(times(initial()));
+      expect(current()[1].end).toBeCloseTo(3.3, 5);
+      expect(current()[2].start).toBe(current()[1].end);
     });
 
     it('a release keeps what the moves reported and reports nothing more', () => {
@@ -148,6 +153,19 @@ describe('useAnnotationDragHandlers', () => {
         [3, 4],
       ]);
       expect(preview.source.getSnapshot()).toBeNull();
+    });
+
+    it('an edge dragged into a separated neighbour carries it along', () => {
+      const { run, preview } = setup({ preview: true });
+
+      run((h) => h.onDragStart(startEvent(1, 'end')));
+      for (let px = 10; px <= 130; px += 10) {
+        run((h) => h.onDragMove(moveEvent(1, 'end', px)));
+      }
+
+      const previewed = preview.source.getSnapshot()!;
+      expect(previewed[1].end).toBeCloseTo(3.3, 5);
+      expect(previewed[2].start).toBe(previewed[1].end);
     });
 
     it('Escape drops the preview and reports nothing', () => {
