@@ -1674,13 +1674,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       const actualStartTime = startTime ?? currentTimeRef.current;
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
 
-      // Is this the highlighted selection being played, start to end?
+      // Is this the highlighted selection being played?
       const selectionStartNow = selectionStartRef.current ?? 0;
       const selectionEndNow = selectionEndRef.current ?? 0;
+      // It may start inside the selection (resuming after a pause) but always
+      // runs to the selection's end.
       isSelectionPlayRef.current =
         endTime !== undefined &&
         selectionEndNow > selectionStartNow &&
-        Math.abs(actualStartTime - selectionStartNow) < 1e-6 &&
+        actualStartTime >= selectionStartNow - 1e-6 &&
+        actualStartTime < selectionEndNow &&
         Math.abs(endTime - selectionEndNow) < 1e-6;
       const requestId = ++playRequestIdRef.current;
 
@@ -1930,6 +1933,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setCurrentTimeRefs(start);
       setCurrentTime(start);
 
+      // A play queued behind an engine rebuild follows the cursor too, and
+      // loses the end of whatever bounded play it was going to resume.
+      if (pendingResumeRef.current) {
+        pendingResumeRef.current = { position: start };
+        playbackEndTimeRef.current = null;
+        isSelectionPlayRef.current = false;
+      }
+
       if (isPlayingRef.current && engineRef.current) {
         // Stop + seek before restarting playback from selection start.
         // engine.stop() resets _currentTime and _isPlaying, creating a window
@@ -1946,14 +1957,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.seek(start);
         // The restart below is open-ended from the new position: whatever
         // bounded play was running (a selection, an annotation) is over, so
-        // its end and its "this is the selection" mark must not outlive it.
-        // A stale end stopped playback at once when the new position was past it.
+        // nothing of it may outlive it. Its end stopped playback at once when
+        // the new position was past it; its active annotation did the same
+        // through the loop's stop-at-annotation-end; and its play-start
+        // position is where a later stop would have returned the cursor.
         playbackEndTimeRef.current = null;
         isSelectionPlayRef.current = false;
+        playStartPositionRef.current = start;
+        if (activeAnnotationIdRef.current !== null) setActiveAnnotationId(null);
         engineRef.current.play(start);
       }
     },
-    [setSelectionEngine, setCurrentTimeRefs]
+    [setSelectionEngine, setCurrentTimeRefs, setActiveAnnotationId]
   );
 
   // Memoize setScrollContainer callback

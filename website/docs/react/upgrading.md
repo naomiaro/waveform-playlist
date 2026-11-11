@@ -187,7 +187,7 @@ A shortcut no longer fires for a key that the focused control uses itself. This 
 | a `<select>` dropdown | `Space`, `Escape`, `0` and other shortcuts fired | every key goes to the dropdown |
 | a slider, checkbox or text input | no shortcut fired | unchanged |
 | a link | `Space` toggled playback | unchanged for `Space`; `Enter` follows the link and no longer runs an Enter shortcut |
-| anything, while a modal dialog is open | `Escape` stopped playback and the dialog stayed open | `Escape` closes the dialog |
+| anything except a text field, while a modal dialog is open | `Escape` stopped playback and the dialog stayed open | `Escape` closes the dialog |
 
 `Space` is play/pause whenever focus is not on a control.
 

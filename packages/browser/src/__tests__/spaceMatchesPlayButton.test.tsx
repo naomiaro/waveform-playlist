@@ -106,15 +106,16 @@ interface Probe {
   setCurrentTime: (time: number) => void;
   setLoopEnabled: (enabled: boolean) => void;
   stop: () => void;
+  pause: () => void;
 }
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
   const { isPlaying } = usePlaybackAnimation();
-  const { setSelection, setCurrentTime, setLoopEnabled, stop } = usePlaylistControls();
+  const { setSelection, setCurrentTime, setLoopEnabled, stop, pause } = usePlaylistControls();
   const { isReady } = usePlaylistData();
   usePlaylistState();
-  probe = { isReady, isPlaying, setSelection, setCurrentTime, setLoopEnabled, stop };
+  probe = { isReady, isPlaying, setSelection, setCurrentTime, setLoopEnabled, stop, pause };
   return null;
 };
 
@@ -181,6 +182,59 @@ describe.each([
 
     await start();
     expect(probe.isPlaying).toBe(true);
+    expect(lastPlay(log)).toBe('play(2,4)');
+  });
+
+  it('after a pause inside the selection, resumes from the cursor to the selection end', async () => {
+    const { log, setNow } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await start();
+    expect(lastPlay(log)).toBe('play(2,4)');
+    setNow(3);
+    await wait(40);
+    await act(async () => {
+      probe.pause();
+    });
+    await wait(30);
+    expect(probe.isPlaying).toBe(false);
+    log.length = 0;
+
+    await start();
+    expect(probe.isPlaying).toBe(true);
+    expect(lastPlay(log)).toBe('play(3,4)');
+  });
+
+  it('once the selection has played to its end, plays it again from its start', async () => {
+    const { log, setNow } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await start();
+    setNow(4.05);
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
+    log.length = 0;
+
+    await start();
+    expect(lastPlay(log)).toBe('play(2,4)');
+  });
+
+  it('with the cursor outside the selection, plays the selection from its start', async () => {
+    const { log } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await act(async () => {
+      probe.setCurrentTime(7);
+    });
+    await wait(30);
+    log.length = 0;
+
+    await start();
     expect(lastPlay(log)).toBe('play(2,4)');
   });
 

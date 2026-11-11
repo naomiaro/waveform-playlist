@@ -186,12 +186,27 @@ describe('handleKeyboardEvent', () => {
 
       const invisible = document.createElement('div');
       invisible.setAttribute('aria-modal', 'true');
-      (invisible as Element & { checkVisibility: () => boolean }).checkVisibility = () => false;
+      // visibility: hidden / opacity: 0 (an animated modal while closed) need
+      // the options; without them checkVisibility only sees display: none.
+      const checkVisibility = vi.fn((options?: Record<string, boolean>) =>
+        options?.visibilityProperty && options?.opacityProperty ? false : true
+      );
+      (invisible as unknown as { checkVisibility: typeof checkVisibility }).checkVisibility =
+        checkVisibility;
       document.body.appendChild(invisible);
       handleKeyboardEvent(keydownOn(document.body, 'Escape'), all, true);
       expect(escape).toHaveBeenCalledTimes(2);
+      expect(checkVisibility).toHaveBeenCalled();
+
+      const ariaHidden = document.createElement('div');
+      ariaHidden.setAttribute('aria-modal', 'true');
+      ariaHidden.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(ariaHidden);
+      handleKeyboardEvent(keydownOn(document.body, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(3);
       modal.remove();
       invisible.remove();
+      ariaHidden.remove();
     });
 
     it('leaves Escape to an open modal even when the event has no element target', () => {

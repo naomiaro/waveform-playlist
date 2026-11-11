@@ -1071,7 +1071,8 @@ interface KeyboardShortcut {
 
 function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybackShortcutsReturn;
 // Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind)
-// Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor
+// Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor.
+// With the cursor inside the selection (paused there) both resume from the cursor to the selection's end.
 // A shortcut is skipped when the focused control uses the key itself, however it got focus:
 //   - input (every type, incl. range and checkbox), textarea, select, contenteditable: every key
 //   - Escape while a modal <dialog> or [aria-modal="true"] is open

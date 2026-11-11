@@ -100,13 +100,26 @@ function activates(element: Element, key: string): boolean {
   return key === 'Enter' && (tag === 'A' || tag === 'AREA') && element.hasAttribute('href');
 }
 
-/** Rendered at all? Unknown (no `checkVisibility`) counts as rendered. */
+/**
+ * Is this container actually showing? A closed custom dialog is often left in
+ * the page: `hidden`, `aria-hidden`, `display: none`, or (animated ones)
+ * `visibility: hidden` / `opacity: 0`. Unknown (no `checkVisibility`, as in
+ * test DOMs) counts as showing.
+ */
 function isRendered(element: Element): boolean {
   if (element.hasAttribute('hidden')) return false;
-  const check = (element as Element & { checkVisibility?: () => boolean }).checkVisibility;
+  if (element.getAttribute('aria-hidden') === 'true') return false;
+  const check = (
+    element as Element & {
+      checkVisibility?: (options?: {
+        visibilityProperty?: boolean;
+        opacityProperty?: boolean;
+      }) => boolean;
+    }
+  ).checkVisibility;
   if (typeof check !== 'function') return true;
   try {
-    return check.call(element);
+    return check.call(element, { visibilityProperty: true, opacityProperty: true });
   } catch {
     return true;
   }
