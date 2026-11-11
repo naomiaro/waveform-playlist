@@ -10,6 +10,7 @@ export { useMasterAnalyser } from './hooks/useAudioEffects';
 
 export { useDynamicEffects } from './hooks/useDynamicEffects';
 export type { UseDynamicEffectsReturn, ActiveEffect } from './hooks/useDynamicEffects';
+export type { EffectParameterValue } from './effects/effectsRack';
 
 export { useTrackDynamicEffects } from './hooks/useTrackDynamicEffects';
 export type {
