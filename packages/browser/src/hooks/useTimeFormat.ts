@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   formatTime as formatTimeUtil,
   parseTime as parseTimeUtil,
@@ -30,13 +30,15 @@ export interface TimeFormatControls {
 export function useTimeFormat(): TimeFormatControls {
   const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
 
-  const formatTime = (seconds: number) => {
-    return formatTimeUtil(seconds, timeFormat);
-  };
+  const formatTime = useCallback(
+    (seconds: number) => formatTimeUtil(seconds, timeFormat),
+    [timeFormat]
+  );
 
-  const parseTime = (timeString: string) => {
-    return parseTimeUtil(timeString, timeFormat);
-  };
+  const parseTime = useCallback(
+    (timeString: string) => parseTimeUtil(timeString, timeFormat),
+    [timeFormat]
+  );
 
   return {
     timeFormat,

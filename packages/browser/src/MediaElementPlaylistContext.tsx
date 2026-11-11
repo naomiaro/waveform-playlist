@@ -85,6 +85,10 @@ export interface MediaElementDataContextValue {
 }
 
 // Create contexts
+// Shared default so an omitted `controls` prop keeps one identity across
+// renders — a fresh object here would invalidate the data context every render.
+const DEFAULT_CONTROLS = { show: false, width: 0 };
+
 const MediaElementAnimationContext = createContext<MediaElementAnimationContextValue | null>(null);
 const MediaElementStateContext = createContext<MediaElementStateContextValue | null>(null);
 const MediaElementControlsContext = createContext<MediaElementControlsContextValue | null>(null);
@@ -172,7 +176,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   preservesPitch = true,
   automaticScroll = false,
   theme: userTheme,
-  controls = { show: false, width: 0 },
+  controls = DEFAULT_CONTROLS,
   annotationList,
   barWidth = 1,
   barGap = 0,
@@ -584,7 +588,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ]
   );
 
-  const mergedTheme = { ...defaultTheme, ...userTheme };
+  const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
 
   return (
     <ThemeProvider theme={mergedTheme}>
