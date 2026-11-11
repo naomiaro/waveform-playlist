@@ -230,7 +230,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 ### E2E Testing with Playwright
 
-- **Run tests**: `pnpm test`, `pnpm test:ui` (interactive), `pnpm test:headed` (visible browser). The `test` script is root-only — use `pnpm -w run test` from package directories.
+- **Run tests**: `pnpm test`, `pnpm test:ui` (interactive), `pnpm test:headed` (visible browser). The suite's only project is Chromium. **Playwright's Firefox needs `@playwright/test` >= 1.65 on this machine** (macOS 27): the Firefox builds shipped with 1.60 fail to launch with `sandbox_extension_issue_file_to_process … Operation not permitted` and a timeout — that is Firefox's own content sandbox, NOT Claude Code's Bash sandbox (do not add `sandbox` settings for it; enabling the Bash sandbox blocks local ports, browser launches and `gh`). One-off cross-browser run: a temporary config that spreads `playwright.config.ts` and replaces `projects` with `devices['Desktop Firefox']`, `npx playwright test --config <tmp>`. On Firefox 159 the suite was 183/184 (2026-11-10): `multi-clip.spec.ts` "pressing 0 rewinds to start" fails ~10/10 under the runner — Play is clicked and `isPlaying` stays false — equally with the provider from before #676, and 24/24 fresh sequential loads outside the runner play fine; cause not found. Playwright's WebKit (26.4 and 27.2) cannot create dawcore's blob-URL peak worker (`WebKitBlobResource error 1`), so `<daw-editor>` pages load no tracks there; whether real Safari is affected is unknown. The `test` script is root-only — use `pnpm -w run test` from package directories.
 - **Config**: `playwright.config.ts` - uses `BASE_PATH` and `PORT` env vars
 - **Location**: `e2e/` directory
 
