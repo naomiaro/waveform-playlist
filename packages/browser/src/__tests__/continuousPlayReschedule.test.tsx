@@ -103,6 +103,7 @@ interface Probe {
   isReady: boolean;
   isPlaying: boolean;
   continuousPlay: boolean;
+  activeAnnotationId: string | null;
   duration: number;
   play: (startTime?: number, playDuration?: number) => Promise<void>;
   setContinuousPlay: (enabled: boolean) => void;
@@ -113,8 +114,16 @@ const ProbeChild: React.FC = () => {
   const { isPlaying } = usePlaybackAnimation();
   const { play, setContinuousPlay } = usePlaylistControls();
   const { isReady, duration } = usePlaylistData();
-  const { continuousPlay } = usePlaylistState();
-  probe = { isReady, isPlaying, continuousPlay, duration, play, setContinuousPlay };
+  const { continuousPlay, activeAnnotationId } = usePlaylistState();
+  probe = {
+    isReady,
+    isPlaying,
+    continuousPlay,
+    activeAnnotationId,
+    duration,
+    play,
+    setContinuousPlay,
+  };
   return null;
 };
 
@@ -198,7 +207,9 @@ describe('continuous play and audio rescheduling', () => {
     await wait(60);
     expect(log).toEqual(['stop', 'play(1,2)']);
     setNow(1.5);
-    await wait(40);
+    await wait(40); // let a frame read the new time
+    // The loop has seen a frame inside the annotation.
+    await waitFor(() => expect(probe.activeAnnotationId).toBe('a'));
     log.length = 0;
 
     await act(async () => {
@@ -209,12 +220,58 @@ describe('continuous play and audio rescheduling', () => {
     expect(probe.isPlaying).toBe(true);
     expect(log).toEqual(['stop', 'play(1.5,)']);
 
-    // ...and playback really does run past the annotation's end (2 s).
+    // ...and playback really does run past the annotation's end (2 s): a frame
+    // at 2.5 s clears the active annotation and does not stop.
     log.length = 0;
     setNow(2.5);
-    await wait(80);
+    await waitFor(() => expect(probe.activeAnnotationId).toBeNull());
     expect(probe.isPlaying).toBe(true);
     expect(log).toEqual([]);
+  });
+
+  it('a selection played over an annotation keeps its own end', async () => {
+    // Selection 1.2 s -> 1.7 s, inside annotation "a" (1 s -> 2 s), which is
+    // therefore the active annotation while the selection plays.
+    const { log, setNow } = await mount(false);
+    await act(async () => {
+      await probe.play(1.2, 0.5);
+    });
+    await wait(60);
+    setNow(1.4);
+    await wait(40);
+    await waitFor(() => expect(probe.activeAnnotationId).toBe('a'));
+    log.length = 0;
+
+    await act(async () => {
+      probe.setContinuousPlay(true);
+    });
+    await wait(60);
+    expect(log).toEqual(['stop', 'play(1.4,1.7)']);
+
+    setNow(1.8);
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
+  });
+
+  it('a bounded play that is not on an annotation keeps its end', async () => {
+    // e.g. playing a selection, 4 s -> 6 s, away from the annotation.
+    const { log, setNow } = await mount(false);
+    await act(async () => {
+      await probe.play(4, 2);
+    });
+    await wait(60);
+    setNow(5);
+    await wait(40);
+    expect(probe.activeAnnotationId).toBeNull();
+    log.length = 0;
+
+    await act(async () => {
+      probe.setContinuousPlay(true);
+    });
+    await wait(60);
+    expect(log).toEqual(['stop', 'play(5,6)']);
+
+    setNow(6.5);
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 
   it('turning continuous play off during playback leaves the audio alone', async () => {
