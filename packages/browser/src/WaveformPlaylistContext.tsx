@@ -701,6 +701,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // assigned to engineRef (or the build fails / is superseded). While it is
   // true and engineRef is null, play() queues instead of no-opping.
   const engineBuildInFlightRef = useRef(false);
+  // Incremented by every play(), stop() and pause(). A play() that has been
+  // waiting on engine.init() compares it afterwards: if it moved, the user has
+  // since asked for something else and the older play must not start.
+  const playRequestIdRef = useRef(0);
   // Bumped each time a freshly built engine is assigned. The resume effect
   // depends on it: the `tracks` change that starts a rebuild fires BEFORE the
   // async build finishes, so `tracks` alone cannot trigger the resume.
@@ -1570,27 +1574,27 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // engineRef is null while a rebuild is in flight — the pending play
       // stays queued until the run triggered by engineEpoch.
       const engine = engineRef.current;
-      if (pendingResumeRef.current && engine) {
-        const { position, endTime } = pendingResumeRef.current;
-        pendingResumeRef.current = null;
+      const request = pendingResumeRef.current;
+      if (request && engine) {
+        const { position, endTime } = request;
 
         const timeNow = getAudioContextTime();
         playbackStartTimeRef.current = timeNow;
         audioStartPositionRef.current = position;
 
         if (!audioInitializedRef.current) {
+          // The request STAYS in the slot across this await, so whatever
+          // happens meanwhile is unambiguous: stop()/pause()/a newer play()
+          // replace or clear it, and if the engine is replaced, the new
+          // engine's own run of this effect finds it still waiting.
           await engine.init();
-          if (engineRef.current !== engine) {
-            // Replaced again during init: hand the play to the next engine
-            // (unless a newer request already took the slot).
-            if (!pendingResumeRef.current) {
-              pendingResumeRef.current = { position, endTime };
-            }
+          if (engineRef.current !== engine || pendingResumeRef.current !== request) {
             return;
           }
           audioInitializedRef.current = true;
         }
 
+        pendingResumeRef.current = null;
         engine.play(position, endTime);
         setIsPlaying(true);
         startAnimationLoop();
@@ -1609,6 +1613,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     async (startTime?: number, playDuration?: number) => {
       const actualStartTime = startTime ?? currentTimeRef.current;
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
+      const requestId = ++playRequestIdRef.current;
 
       const engine = engineRef.current;
       if (!engine) {
@@ -1662,14 +1667,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Guarded by ref so subsequent plays skip the await entirely.
       if (!audioInitializedRef.current) {
         await engine.init();
+        if (playRequestIdRef.current !== requestId) {
+          // stop(), pause() or a newer play() happened while init() was
+          // pending. This request is obsolete — starting it now would play
+          // after the user's Stop, or over their newer request.
+          return;
+        }
         if (engineRef.current !== engine) {
           // A rebuild disposed this engine while init() was pending. Hand the
-          // play to its replacement instead of starting a dead engine.
-          pendingResumeRef.current = { position: actualStartTime, endTime };
+          // play to its replacement instead of starting a dead engine — if
+          // there is one: after a failed build nothing is coming, and a
+          // stranded request would fire on some later, unrelated rebuild.
           if (engineRef.current) {
-            // The replacement is already assigned, so its epoch run has
-            // passed — ask for another.
+            pendingResumeRef.current = { position: actualStartTime, endTime };
+            // Already assigned, so its epoch run has passed — ask for another.
             setEngineEpoch((epoch) => epoch + 1);
+          } else if (engineBuildInFlightRef.current) {
+            pendingResumeRef.current = { position: actualStartTime, endTime };
           }
           return;
         }
@@ -1690,14 +1704,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   const pause = useCallback(() => {
-    // Cancels a play still queued behind an engine rebuild.
+    // Cancels a play queued behind an engine rebuild or parked in init().
     pendingResumeRef.current = null;
-    if (!engineRef.current) return;
+    playRequestIdRef.current += 1;
 
+    // With no engine (a rebuild is in flight) there is nothing to pause, but
+    // the UI state must still change: playback that was running when the
+    // rebuild began leaves isPlaying true until its resume, which was just
+    // cancelled. Hold the cursor where it is.
+    const engine = engineRef.current;
     // Get current position from engine (auto-wraps at loop boundaries)
-    const pauseTime = getPlaybackTime();
+    const pauseTime = engine ? getPlaybackTime() : currentTimeRef.current;
 
-    engineRef.current.pause();
+    engine?.pause();
     setIsPlaying(false);
     stopAnimationLoop();
 
@@ -1707,11 +1726,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [stopAnimationLoop, getPlaybackTime, setCurrentTimeRefs]);
 
   const stop = useCallback(() => {
-    // Cancels a play still queued behind an engine rebuild.
+    // Cancels a play queued behind an engine rebuild or parked in init().
     pendingResumeRef.current = null;
-    if (!engineRef.current) return;
+    playRequestIdRef.current += 1;
 
-    engineRef.current.stop();
+    // No engine while a rebuild is in flight — the UI state still resets
+    // (see pause()).
+    engineRef.current?.stop();
     setIsPlaying(false);
     stopAnimationLoop();
 

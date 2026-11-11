@@ -123,6 +123,8 @@ let adapters: FakeAdapter[];
  * which is what keeps the rebuild window open in a real page.
  */
 let buildGate: Promise<void> | null;
+/** When set, the NEXT adapter's init() waits for this promise. */
+let nextInitGate: Promise<void> | null;
 
 function Harness({ tracks }: { tracks: ClipTrack[] }) {
   return (
@@ -133,6 +135,8 @@ function Harness({ tracks }: { tracks: ClipTrack[] }) {
       indefinitePlayback
       createAdapter={() => {
         const adapter = createFakeAdapter();
+        adapter.initGate = nextInitGate;
+        nextInitGate = null;
         adapters.push(adapter);
         const gate = buildGate;
         buildGate = null;
@@ -152,6 +156,15 @@ const settle = (ms = 60) => new Promise<void>((resolve) => setTimeout(resolve, m
 // (an appended track would take the incremental path and keep the engine).
 const firstTracks = () => [makeTrack('track-a', [makeClip(0, 4, 'clip-a')])];
 const changedTracks = () => [makeTrack('track-a', [makeClip(0, 6, 'clip-a2')])];
+const changedAgainTracks = () => [makeTrack('track-a', [makeClip(0, 8, 'clip-a3')])];
+
+function gate(): { promise: Promise<void>; open: () => void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
+}
 
 /** Re-render with changed tracks and hold the new engine's build open. */
 function startGatedRebuild(view: { rerender: (ui: React.ReactElement) => void }): () => void {
@@ -179,6 +192,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
   beforeEach(() => {
     adapters = [];
     buildGate = null;
+    nextInitGate = null;
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -242,6 +256,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
       await settle();
     });
 
+    expect(adapters[0].playCalls.filter((c) => c.afterDispose)).toEqual([]);
     expect(adapters).toHaveLength(2);
     expect(adapters[1].playCalls).toEqual([]);
     expect(probe.isPlaying).toBe(false);
@@ -258,6 +273,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
       await settle();
     });
 
+    expect(adapters[0].playCalls.filter((c) => c.afterDispose)).toEqual([]);
     expect(adapters[1].playCalls).toEqual([]);
     expect(probe.isPlaying).toBe(false);
   });
@@ -372,6 +388,164 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     expect(adapters[1].playCalls).toHaveLength(1);
     expect(adapters[1].playCalls[0]).toMatchObject({ startTime: 1.5, afterDispose: false });
     expect(probe.isPlaying).toBe(true);
+  });
+
+  describe('stop / pause while a rebuild that began DURING playback is in flight', () => {
+    it.each(['stop', 'pause'] as const)(
+      '%s() ends playback: isPlaying resets and the new engine stays silent',
+      async (control) => {
+        const view = await mountReady();
+        await act(async () => {
+          await probe.play(0);
+        });
+        expect(probe.isPlaying).toBe(true);
+
+        const finishBuild = startGatedRebuild(view);
+        // No engine exists right now — the control must still take effect.
+        act(() => {
+          probe[control]();
+        });
+        expect(probe.isPlaying).toBe(false);
+
+        await act(async () => {
+          finishBuild();
+          await settle();
+        });
+        expect(adapters[1].playCalls).toEqual([]);
+        expect(probe.isPlaying).toBe(false);
+      }
+    );
+  });
+
+  it('a resume handed over while ITS init() was pending starts on the engine that replaced it', async () => {
+    const view = await mountReady();
+    await act(async () => {
+      await probe.play(0);
+    });
+
+    // Rebuild 1 → engine B, whose init() (the resume's) is held open.
+    const initB = gate();
+    nextInitGate = initB.promise;
+    await act(async () => {
+      view.rerender(<Harness tracks={changedTracks()} />);
+      await settle();
+    });
+    expect(adapters).toHaveLength(2);
+    expect(adapters[1].playCalls).toEqual([]); // parked in B.init()
+
+    // Rebuild 2 → engine C is built and assigned while B.init() is pending.
+    await act(async () => {
+      view.rerender(<Harness tracks={changedAgainTracks()} />);
+      await settle();
+    });
+    expect(adapters).toHaveLength(3);
+
+    await act(async () => {
+      initB.open();
+      await settle();
+    });
+
+    expect(adapters[1].playCalls).toEqual([]);
+    expect(adapters[2].playCalls).toHaveLength(1);
+    expect(probe.isPlaying).toBe(true);
+  });
+
+  it('stop() while play() is awaiting init() across a rebuild is final', async () => {
+    const view = await mountReady();
+    const init = gate();
+    adapters[0].initGate = init.promise;
+    let playPromise!: Promise<void>;
+    act(() => {
+      playPromise = probe.play(0); // parked in init()
+    });
+    const finishBuild = startGatedRebuild(view);
+    act(() => {
+      probe.stop(); // the user changed their mind
+    });
+
+    await act(async () => {
+      init.open();
+      await playPromise;
+      finishBuild();
+      await settle();
+    });
+
+    expect(adapters[1].playCalls).toEqual([]);
+    expect(probe.isPlaying).toBe(false);
+  });
+
+  it('stop() while play() is awaiting init() is final without any rebuild too', async () => {
+    await mountReady();
+    const init = gate();
+    adapters[0].initGate = init.promise;
+    let playPromise!: Promise<void>;
+    act(() => {
+      playPromise = probe.play(0);
+      probe.stop();
+    });
+    await act(async () => {
+      init.open();
+      await playPromise;
+      await settle();
+    });
+
+    expect(adapters[0].playCalls).toEqual([]);
+    expect(probe.isPlaying).toBe(false);
+  });
+
+  it('a newer play queued during the rebuild is not replaced by an older one finishing init()', async () => {
+    const view = await mountReady();
+    const init = gate();
+    adapters[0].initGate = init.promise;
+    let olderPlay!: Promise<void>;
+    act(() => {
+      olderPlay = probe.play(0); // parked in init()
+    });
+    const finishBuild = startGatedRebuild(view);
+    await act(async () => {
+      await probe.play(5); // queued for the new engine
+      init.open();
+      await olderPlay;
+      finishBuild();
+      await settle();
+    });
+
+    expect(adapters[1].playCalls).toEqual([
+      { startTime: 5, endTime: undefined, afterDispose: false },
+    ]);
+  });
+
+  it('a play that outlives a FAILED build is dropped, not replayed on a later rebuild', async () => {
+    const view = await mountReady();
+    const init = gate();
+    adapters[0].initGate = init.promise;
+    let playPromise!: Promise<void>;
+    act(() => {
+      playPromise = probe.play(0); // parked in init()
+    });
+
+    // The rebuild fails: no engine is coming.
+    buildGate = Promise.reject(new Error('adapter failed to load'));
+    buildGate.catch(() => {});
+    await act(async () => {
+      view.rerender(<Harness tracks={changedTracks()} />);
+      await settle();
+    });
+    await act(async () => {
+      init.open();
+      await playPromise;
+      await settle();
+    });
+
+    // A later, successful rebuild must not start playback by itself.
+    await act(async () => {
+      view.rerender(<Harness tracks={changedAgainTracks()} />);
+      await settle();
+    });
+    const last = adapters[adapters.length - 1];
+    expect(last.disposed).toBe(false);
+    expect(last.playCalls).toEqual([]);
+    expect(probe.isPlaying).toBe(false);
   });
 
   it('play() with no rebuild in flight still starts immediately', async () => {
