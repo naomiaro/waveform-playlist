@@ -18,6 +18,8 @@ import {
   usePlaylistControls,
   usePlaylistData,
   usePlaybackAnimation,
+  usePlaylistState,
+  useSelection,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -82,7 +84,26 @@ function createFakeAdapter(): PlayoutAdapter {
 type Controls = ReturnType<typeof usePlaylistControls>;
 type Data = ReturnType<typeof usePlaylistData>;
 
+type State = ReturnType<typeof usePlaylistState>;
+type Selection = ReturnType<typeof useSelection>;
+
 let probe: { controls: Controls; data: Data; theme: unknown; isPlaying: boolean };
+let stateProbe: { state: State; renders: number };
+let selectionProbe: { selection: Selection; renders: number };
+
+// Reads only the state context, as most consumers do (#733).
+const StateProbeChild: React.FC = () => {
+  stateProbe = { state: usePlaylistState(), renders: (stateProbe?.renders ?? 0) + 1 };
+  return null;
+};
+
+const SelectionProbeChild: React.FC = () => {
+  selectionProbe = {
+    selection: useSelection(),
+    renders: (selectionProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
 
 const ProbeChild: React.FC = () => {
   probe = {
@@ -113,6 +134,8 @@ async function mount({ inlineProps = false } = {}) {
         : {})}
     >
       <ProbeChild />
+      <StateProbeChild />
+      <SelectionProbeChild />
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
@@ -233,5 +256,49 @@ describe('provider context values keep their identity (#691)', () => {
 
     expect(probe.data.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
     expect(probe.data.trackStates[1]).toMatchObject({ pan: -0.5, soloed: true });
+  });
+});
+
+describe('selection lives in its own context (#733)', () => {
+  it('a selection change leaves the state value and its consumers alone', async () => {
+    await mount();
+    const stateBefore = stateProbe.state;
+    const stateRendersBefore = stateProbe.renders;
+    const selectionRendersBefore = selectionProbe.renders;
+
+    await act(async () => {
+      probe.controls.setSelection(0.1, 0.5);
+    });
+
+    expect(selectionProbe.selection).toEqual({ selectionStart: 0.1, selectionEnd: 0.5 });
+    expect(selectionProbe.renders).toBeGreaterThan(selectionRendersBefore);
+    expect(stateProbe.state).toBe(stateBefore);
+    expect(stateProbe.renders).toBe(stateRendersBefore);
+    expect(stateProbe.state).not.toHaveProperty('selectionStart');
+    expect(stateProbe.state).not.toHaveProperty('selectionEnd');
+  });
+
+  it('selection value survives a state change that is not a selection change', async () => {
+    await mount();
+    await act(async () => {
+      probe.controls.setSelection(0.1, 0.5);
+    });
+    const selectionBefore = selectionProbe.selection;
+    const selectionRendersBefore = selectionProbe.renders;
+
+    await act(async () => {
+      probe.controls.setLoopRegion(0.2, 0.4);
+    });
+
+    expect(stateProbe.state.loopStart).toBe(0.2);
+    expect(selectionProbe.selection).toBe(selectionBefore);
+    expect(selectionProbe.renders).toBe(selectionRendersBefore);
+  });
+
+  it('useSelection throws outside the provider', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => render(<SelectionProbeChild />)).toThrow(
+      'useSelection must be used within WaveformPlaylistProvider'
+    );
   });
 });

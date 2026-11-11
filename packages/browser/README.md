@@ -7,7 +7,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
-- **Four focused context hooks** — `usePlaybackAnimation`, `usePlaylistState`, `usePlaylistControls`, `usePlaylistData` isolate 60fps playhead updates from low-frequency state so unrelated components don't re-render on every animation frame
+- **Five focused context hooks** — `usePlaybackAnimation`, `usePlaylistState`, `useSelection`, `usePlaylistControls`, `usePlaylistData` isolate 60fps playhead updates and selection drags from low-frequency state so unrelated components don't re-render on every animation frame or pointer move
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
 - **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`

@@ -3,6 +3,7 @@ import { BaseControlButton } from '@waveform-playlist/ui-components';
 import {
   usePlaybackAnimation,
   usePlaylistState,
+  useSelection,
   usePlaylistControls,
   usePlaylistData,
 } from '../WaveformPlaylistContext';
@@ -157,7 +158,8 @@ export const LoopButton: React.FC<{ className?: string }> = ({ className }) => {
 };
 
 export const SetLoopRegionButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { selectionStart, selectionEnd, loopStart, loopEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
+  const { loopStart, loopEnd } = usePlaylistState();
   const { setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
 
   const hasValidSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;

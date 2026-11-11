@@ -57,6 +57,7 @@ import {
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
+  useSelection,
 } from '../WaveformPlaylistContext';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -138,6 +139,7 @@ let probe: {
   controls: ReturnType<typeof usePlaylistControls>;
   data: ReturnType<typeof usePlaylistData>;
   state: ReturnType<typeof usePlaylistState>;
+  selection: ReturnType<typeof useSelection>;
 };
 
 const ProbeChild: React.FC = () => {
@@ -145,6 +147,7 @@ const ProbeChild: React.FC = () => {
     controls: usePlaylistControls(),
     data: usePlaylistData(),
     state: usePlaylistState(),
+    selection: useSelection(),
   };
   return null;
 };
@@ -256,7 +259,7 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setSelection(0.1, 0.5);
     });
 
-    expect(probe.state.selectionEnd).toBe(0.5);
+    expect(probe.selection.selectionEnd).toBe(0.5);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);
@@ -278,7 +281,7 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setSelection(0.2, 0.6);
     });
 
-    expect(probe.state.selectionStart).toBe(0.2);
+    expect(probe.selection.selectionStart).toBe(0.2);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);

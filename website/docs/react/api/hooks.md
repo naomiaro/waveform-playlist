@@ -13,6 +13,7 @@ React hooks for accessing playlist state and controls.
 import {
   // Core context hooks
   usePlaylistState,
+  useSelection,
   usePlaylistControls,
   usePlaylistData,
   usePlaybackAnimation,
@@ -329,6 +330,48 @@ function DragDropPlaylist() {
 
 ---
 
+## useSelection
+
+The selected time range, in seconds. It has its own context because it changes on every pointer move of a selection drag; a component that calls this hook re-renders that often, and components that only call `usePlaylistState()` do not.
+
+### Signature
+
+```typescript
+function useSelection(): SelectionContextValue;
+```
+
+### Returns
+
+```typescript
+interface SelectionContextValue {
+  /** Equal to `selectionEnd` when nothing is selected */
+  selectionStart: number;
+  selectionEnd: number;
+}
+```
+
+### Example
+
+```tsx
+function SelectionReadout() {
+  const { selectionStart, selectionEnd } = useSelection();
+  const { setSelection } = usePlaylistControls();
+
+  if (selectionStart === selectionEnd) return <span>No selection</span>;
+
+  return (
+    <span>
+      {selectionStart.toFixed(2)}s to {selectionEnd.toFixed(2)}s{' '}
+      <button onClick={() => setSelection(0, 0)}>Clear</button>
+    </span>
+  );
+}
+```
+
+Available inside `WaveformPlaylistProvider` only.
+
+---
+
 ## usePlaylistState
 
 Access the current playlist state.
@@ -350,8 +393,6 @@ interface PlaylistStateContextValue {
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
@@ -574,7 +615,7 @@ function useSelectionState(props: {
 };
 ```
 
-Note: For consumer components, use `setSelection()` from `usePlaylistControls()` and `selectionStart` / `selectionEnd` from `usePlaylistState()`.
+Note: For consumer components, use `setSelection()` from `usePlaylistControls()` and `selectionStart` / `selectionEnd` from `useSelection()`.
 
 ### useLoopState
 

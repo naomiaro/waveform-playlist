@@ -266,6 +266,15 @@ interface PlaybackAnimationContextValue {
 
 See [hooks.md](/docs/react/api/hooks) for the full interface with JSDoc comments.
 
+### Selection (useSelection)
+
+```typescript
+interface SelectionContextValue {
+  selectionStart: number;
+  selectionEnd: number;
+}
+```
+
 ### State (usePlaylistState)
 
 ```typescript
@@ -277,8 +286,6 @@ interface PlaylistStateContextValue {
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;

@@ -3,6 +3,7 @@ import {
   usePlaybackAnimation,
   usePlaylistControls,
   usePlaylistState,
+  useSelection,
 } from '../WaveformPlaylistContext';
 
 /**
@@ -20,7 +21,8 @@ import {
  */
 export function usePlayFromSelectionOrCursor(): () => Promise<void> {
   const { currentTimeRef } = usePlaybackAnimation();
-  const { selectionStart, selectionEnd, isLoopEnabled } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
+  const { isLoopEnabled } = usePlaylistState();
   const { play } = usePlaylistControls();
 
   const latest = useRef({ selectionStart, selectionEnd, isLoopEnabled });

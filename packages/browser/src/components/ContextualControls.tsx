@@ -10,6 +10,7 @@ import styled from 'styled-components';
 import {
   usePlaybackAnimation,
   usePlaylistState,
+  useSelection,
   usePlaylistControls,
   usePlaylistData,
 } from '../WaveformPlaylistContext';
@@ -90,7 +91,7 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
  * Selection time inputs that use the playlist context
  */
 export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ className }) => {
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { setSelection } = usePlaylistControls();
 
   return (

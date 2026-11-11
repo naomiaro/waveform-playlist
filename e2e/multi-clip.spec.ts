@@ -360,6 +360,49 @@ test.describe('Multi-Clip Example', () => {
   });
 
   test.describe('Selection', () => {
+    // #733: the drag anchor is where the pointer went down. A leftward drag
+    // used to keep only the last pointer movement.
+    for (const direction of [1, -1]) {
+      test(`dragging ${direction > 0 ? 'right' : 'left'} selects the dragged range`, async ({
+        page,
+      }) => {
+        const row = page.locator('[data-track-row]').first();
+        await expect(row).toBeVisible();
+        let box: { x: number; y: number; width: number; height: number } | null = null;
+        await expect(async () => {
+          box = await row.boundingBox();
+          expect(box).toBeTruthy();
+        }).toPass({ timeout: 5000 });
+
+        // Below the clip header, away from clip boundaries.
+        const y = box!.y + box!.height - 10;
+        const anchorX = box!.x + 500;
+        const dragPx = 200;
+
+        await page.mouse.move(anchorX, y);
+        await page.mouse.down();
+        for (let i = 1; i <= 10; i++) {
+          await page.mouse.move(anchorX + direction * i * (dragPx / 10), y);
+        }
+
+        const selection = page.locator('[data-selection]');
+        const expectedLeft = direction > 0 ? anchorX : anchorX - dragPx;
+        const expectDraggedRange = async () => {
+          await expect(async () => {
+            const selectionBox = await selection.boundingBox();
+            expect(selectionBox).toBeTruthy();
+            expect(Math.abs(selectionBox!.width - dragPx)).toBeLessThanOrEqual(2);
+            expect(Math.abs(selectionBox!.x - expectedLeft)).toBeLessThanOrEqual(2);
+          }).toPass({ timeout: 5000 });
+        };
+
+        // While the button is still down, and again after release.
+        await expectDraggedRange();
+        await page.mouse.up();
+        await expectDraggedRange();
+      });
+    }
+
     test('clip z-index is lower than playhead z-index', async ({ page }) => {
       // Selection should render above clips but below playhead
       // We verify clips have lower z-index than playhead as a proxy for correct layering

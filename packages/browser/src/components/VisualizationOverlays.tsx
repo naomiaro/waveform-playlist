@@ -18,6 +18,7 @@ import {
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
+  useSelection,
 } from '../WaveformPlaylistContext';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
@@ -25,7 +26,7 @@ import { AnimatedPlayhead } from './AnimatedPlayhead';
 /** The highlighted selection range. Renders nothing for a collapsed selection. */
 export const SelectionOverlay: React.FC = () => {
   const theme = useTheme() as WaveformPlaylistTheme;
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { sampleRate, samplesPerPixel } = usePlaylistData();
 
   if (selectionStart === selectionEnd) return null;
@@ -89,7 +90,7 @@ export interface PlayheadOverlayProps {
 export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isPlaying } = usePlaybackAnimation();
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { sampleRate, samplesPerPixel } = usePlaylistData();
 
   if (!isPlaying && selectionStart !== selectionEnd) return null;
