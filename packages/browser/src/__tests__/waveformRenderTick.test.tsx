@@ -122,6 +122,8 @@ describe('<Waveform> timescale label callbacks', () => {
     expect(calls.has('2:20')).toBe(true);
 
     // The label parses to the real time, and the pixel position agrees with it.
+    // Exact only because 48000 / 4096 makes SmartScale's accumulated step a
+    // dyadic fraction; other sample rates or zoom levels can be a pixel off.
     const pixelsPerSecond = SAMPLE_RATE / SAMPLES_PER_PIXEL;
     for (const [label, pixelPosition] of calls) {
       const ms = labelToMs(label);
@@ -132,8 +134,11 @@ describe('<Waveform> timescale label callbacks', () => {
   });
 
   it('renderTimestamp is no longer a prop', () => {
+    // The guard is the directive: `pnpm typecheck` covers this file, and an
+    // unused @ts-expect-error (the prop coming back) fails it. vitest does not
+    // typecheck, so the assertion below only keeps the element in use.
     // @ts-expect-error -- removed in #714; use renderTick
     const element = <Waveform renderTimestamp={() => null} />;
-    expect(element.props).toHaveProperty('renderTimestamp');
+    expect(element.type).toBe(Waveform);
   });
 });

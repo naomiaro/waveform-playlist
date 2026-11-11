@@ -148,7 +148,7 @@ If you used the context on its own, without a playlist provider, to hold your ow
 
 **Package:** `@waveform-playlist/browser`.
 
-The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => ReactNode`, but it never received a time in milliseconds: it was given `parseFloat` of the formatted tick label, which is the minutes part (`"0:30"` → `0`, `"1:00"` → `1`), or a bar number in beats mode. It is removed; `renderTick` is the only label callback.
+The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => ReactNode`, but it never received a time in milliseconds: it was given `parseFloat` of the formatted tick label, which is the minutes part (`"0:30"` → `0`, `"1:00"` → `1`), or the bar and beat read as a decimal number in beats mode (`"2.3"` gave `2.3`). It is removed; `renderTick` is the only label callback.
 
 **Find:** `renderTimestamp=` on `<Waveform>`.
 
