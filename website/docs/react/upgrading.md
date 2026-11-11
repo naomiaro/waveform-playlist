@@ -868,7 +868,7 @@ const { getTrackEffectsFunction } = useTrackDynamicEffects();
 >
 ```
 
-Delete the memo. If `tracks` in your state came back through `onTracksChange` while the old code ran, the objects may still have an `effects` property. It is ignored, and it stays on the objects (the engine copies every property of a track) until the tracks are created again.
+Delete the memo.
 
 A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. `AudioTrackConfig` has a new optional `id` for this: the track built from the config gets that id (without it an id is generated, as before, and is on `tracks[i].id` once the track exists). Ids must be unique: `useAudioTracks` warns about duplicates but still builds the tracks with the ids as given. An empty string counts as no id. Tracks added with `useDynamicTracks` always get generated ids; read them from `tracks`.
 
@@ -895,7 +895,7 @@ const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
 <WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
 ```
 
-**When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built, and a track with both audio and MIDI clips can have only its MIDI half rebuilt (a clip edit, a SoundFont arriving), which would leave its two halves on different answers. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
+**When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built, and a track with both audio and MIDI clips can have only its MIDI half rebuilt (a clip edit, a SoundFont arriving): if the answer has become `undefined` by then, the MIDI half plays without the chain the audio half still has. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
 
 **With your own adapter:** the provider's `trackEffects` prop, like `effects`, reaches the default Tone.js adapter only. If you pass `createAdapter`, give the function to the adapter yourself:
 

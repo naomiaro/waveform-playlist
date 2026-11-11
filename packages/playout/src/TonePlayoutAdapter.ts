@@ -28,8 +28,9 @@ export interface ToneAdapterOptions {
    * existing audio track keeps its graph and does not ask.
    *
    * Return the same function for the same id for as long as the track exists.
-   * A track with audio and MIDI clips can have its MIDI half rebuilt alone, so
-   * an answer that changes in between leaves the two halves disagreeing.
+   * A track with audio and MIDI clips can have its MIDI half rebuilt alone: if
+   * the answer has become `undefined` by then, that half plays without the
+   * chain the audio half still has.
    */
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** When provided, MIDI clips use SoundFont sample playback instead of PolySynth */

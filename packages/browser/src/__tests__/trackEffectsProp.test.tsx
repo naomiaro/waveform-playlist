@@ -232,7 +232,7 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(adapter.setTracks).toHaveBeenCalledTimes(1);
   });
 
-  it('control: copied track objects rebuild the engine after every clip edit', async () => {
+  it('control: copied track objects rebuild the engine on a clip edit and on an added track', async () => {
     render(<App copyTracks />);
     await waitFor(() => expect(isReady).toBe(true));
     expect(h.createToneAdapter).toHaveBeenCalledTimes(1);
