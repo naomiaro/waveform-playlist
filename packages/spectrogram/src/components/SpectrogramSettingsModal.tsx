@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useId, useState } from 'react';
+import React, { useRef, useEffect, useId, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
 import type {
   SpectrogramConfig,
@@ -352,7 +352,7 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
   // Latest props for the native `close` listener, so the listener is attached
   // once and not re-added whenever the parent passes a new `onClose`.
   const latestRef = useRef({ open, onClose });
-  useEffect(() => {
+  useLayoutEffect(() => {
     latestRef.current = { open, onClose };
   });
 
@@ -370,7 +370,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
     return () => dialog.removeEventListener('close', handleClose);
   }, []);
 
-  useEffect(() => {
+  // Layout effect: the dialog opens and closes in the same frame as the form
+  // mounts and unmounts, whatever triggered the change.
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (open && !dialog.open) {

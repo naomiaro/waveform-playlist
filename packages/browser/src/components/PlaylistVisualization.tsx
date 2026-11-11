@@ -62,11 +62,11 @@ import {
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
 
-/** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 // Passed to the spectrogram settings modal when no config exists at any level.
 // A module constant, so the prop keeps its identity across renders.
 const EMPTY_SPECTROGRAM_CONFIG: SpectrogramConfig = {};
 
+/** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
 interface PositionedRowProps {

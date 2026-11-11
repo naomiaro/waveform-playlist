@@ -149,7 +149,7 @@ describe('spectrogram settings modal on a track with no config', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Track menu' }));
     fireEvent.click(screen.getByRole('button', { name: 'Open spectrogram settings' }));
 
-    const fftSize = () => screen.getAllByRole('combobox', { hidden: true })[0] as HTMLSelectElement;
+    const fftSize = () => screen.getByLabelText('FFT Size') as HTMLSelectElement;
     expect(fftSize().value).toBe('2048');
     fireEvent.change(fftSize(), { target: { value: '8192' } });
     expect(fftSize().value).toBe('8192');
