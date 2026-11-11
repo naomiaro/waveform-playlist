@@ -5,6 +5,7 @@ import { MAX_CANVAS_WIDTH } from '@waveform-playlist/core';
 import { useVisibleChunkIndices } from '../contexts/ScrollViewport';
 import { useClipViewportOrigin } from '../contexts/ClipViewportOrigin';
 import { useChunkedCanvasRefs } from '../hooks/useChunkedCanvasRefs';
+import { useIdentityVersion } from '../hooks/useIdentityVersion';
 
 interface CanvasProps {
   readonly $cssWidth: number;
@@ -95,6 +96,13 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
 
   const color = isSelected ? selectedNoteColor : noteColor;
 
+  // Fingerprint of everything the drawing depends on. Each canvas is stamped
+  // with it after drawing, so when only the set of visible chunks changes
+  // (scrolling) the chunks already on screen are skipped and only newly mounted
+  // ones are drawn. Same scheme as Channel.
+  const notesVersion = useIdentityVersion(midiNotes);
+  const drawVersion = `${notesVersion}-${waveHeight}-${devicePixelRatio}-${samplesPerPixel}-${sampleRate}-${clipOffsetSeconds}-${color}-${minMidi}-${maxMidi}-${length}`;
+
   // useLayoutEffect so canvas drawing completes before the browser paints —
   // prevents flicker from clearRect being visible for one frame.
   useLayoutEffect(() => {
@@ -103,6 +111,7 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
     const pixelsPerSecond = sampleRate / samplesPerPixel;
 
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
+      if (canvas.dataset.drawVersion === drawVersion) continue;
       const chunkPixelStart = canvasIdx * MAX_CANVAS_WIDTH;
       const canvasWidth = canvas.width / devicePixelRatio;
 
@@ -144,6 +153,7 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
       }
 
       ctx.globalAlpha = 1;
+      canvas.dataset.drawVersion = drawVersion;
     }
   }, [
     canvasMapRef,
@@ -159,6 +169,7 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
     length,
     visibleChunkIndices,
     index,
+    drawVersion,
   ]);
 
   const canvases = visibleChunkIndices.map((i) => {
