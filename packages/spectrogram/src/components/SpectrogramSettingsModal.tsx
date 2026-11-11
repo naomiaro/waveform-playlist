@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useId, useState } from 'react';
 import styled from 'styled-components';
 import type {
   SpectrogramConfig,
@@ -23,6 +23,7 @@ const StyledDialog = styled.dialog`
   color: ${(p) => p.theme.textColor ?? 'inherit'};
   min-width: 380px;
   max-width: 500px;
+  overscroll-behavior: contain;
 
   &::backdrop {
     background: rgba(0, 0, 0, 0.5);
@@ -116,16 +117,15 @@ const WINDOW_FUNCTIONS = [
 const FREQ_SCALES = ['linear', 'logarithmic', 'mel', 'bark', 'erb'] as const;
 const COLOR_MAPS: ColorMapName[] = ['viridis', 'magma', 'inferno', 'grayscale', 'igray', 'roseus'];
 
-export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> = ({
-  open,
-  onClose,
-  config,
-  colorMap,
-  onApply,
-}) => {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+type SettingsFormProps = Omit<SpectrogramSettingsModalProps, 'open'>;
 
-  // Local form state
+/**
+ * The form is a draft of the settings. It is mounted only while the dialog is
+ * open, so its state starts from the props each time the dialog opens and is
+ * never overwritten by a parent re-render while the user is editing.
+ */
+const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, onApply }) => {
+  const id = useId();
   const [fftSize, setFftSize] = useState(config.fftSize ?? 2048);
   const [windowFn, setWindowFn] = useState(config.windowFunction ?? 'hann');
   const [freqScale, setFreqScale] = useState(config.frequencyScale ?? 'mel');
@@ -141,42 +141,6 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
     config.hopSize ?? Math.floor((config.fftSize ?? 2048) / 4)
   );
   const [showLabels, setShowLabels] = useState(config.labels ?? false);
-
-  // Sync local state when props change
-  useEffect(() => {
-    setFftSize(config.fftSize ?? 2048);
-    setWindowFn(config.windowFunction ?? 'hann');
-    setFreqScale(config.frequencyScale ?? 'mel');
-    setLocalColorMap(typeof colorMap === 'string' ? colorMap : 'viridis');
-    setMinFreq(config.minFrequency ?? 0);
-    setMaxFreq(config.maxFrequency ?? 20000);
-    setGainDb(config.gainDb ?? 20);
-    setRangeDb(config.rangeDb ?? 80);
-    setZeroPadding(config.zeroPaddingFactor ?? 2);
-    setHopSize(config.hopSize ?? Math.floor((config.fftSize ?? 2048) / 4));
-    setShowLabels(config.labels ?? false);
-  }, [config, colorMap]);
-
-  // Open/close dialog + handle native close (Escape key)
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
-
-    if (open && !dialog.open) {
-      dialog.showModal();
-    } else if (!open && dialog.open) {
-      dialog.close();
-    }
-
-    const handleClose = () => {
-      // Only call onClose if dialog was open (avoids double-fire)
-      if (open) {
-        onClose();
-      }
-    };
-    dialog.addEventListener('close', handleClose);
-    return () => dialog.removeEventListener('close', handleClose);
-  }, [open, onClose]);
 
   const handleApply = () => {
     onApply(
@@ -198,12 +162,12 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
   };
 
   return (
-    <StyledDialog ref={dialogRef}>
-      <Title>Spectrogram Settings</Title>
+    <>
       <FormGrid>
         <Field>
-          <Label>FFT Size</Label>
+          <Label htmlFor={`${id}-fft-size`}>FFT Size</Label>
           <Select
+            id={`${id}-fft-size`}
             value={fftSize}
             onChange={(e) => {
               const v = Number(e.target.value) as FFTSize;
@@ -220,8 +184,12 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Hop Size</Label>
-          <Select value={hopSize} onChange={(e) => setHopSize(Number(e.target.value))}>
+          <Label htmlFor={`${id}-hop-size`}>Hop Size</Label>
+          <Select
+            id={`${id}-hop-size`}
+            value={hopSize}
+            onChange={(e) => setHopSize(Number(e.target.value))}
+          >
             {[
               { label: `${fftSize} (no overlap)`, value: fftSize },
               { label: `${Math.floor(fftSize / 2)} (50%)`, value: Math.floor(fftSize / 2) },
@@ -236,8 +204,12 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Zero Padding</Label>
-          <Select value={zeroPadding} onChange={(e) => setZeroPadding(Number(e.target.value))}>
+          <Label htmlFor={`${id}-zero-padding`}>Zero Padding</Label>
+          <Select
+            id={`${id}-zero-padding`}
+            value={zeroPadding}
+            onChange={(e) => setZeroPadding(Number(e.target.value))}
+          >
             {[1, 2, 4, 8, 16].map((v) => (
               <option key={v} value={v}>
                 {v}
@@ -247,8 +219,12 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Window Function</Label>
-          <Select value={windowFn} onChange={(e) => setWindowFn(e.target.value as typeof windowFn)}>
+          <Label htmlFor={`${id}-window-function`}>Window Function</Label>
+          <Select
+            id={`${id}-window-function`}
+            value={windowFn}
+            onChange={(e) => setWindowFn(e.target.value as typeof windowFn)}
+          >
             {WINDOW_FUNCTIONS.map((w) => (
               <option key={w} value={w}>
                 {w}
@@ -258,8 +234,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Frequency Scale</Label>
+          <Label htmlFor={`${id}-frequency-scale`}>Frequency Scale</Label>
           <Select
+            id={`${id}-frequency-scale`}
             value={freqScale}
             onChange={(e) => setFreqScale(e.target.value as typeof freqScale)}
           >
@@ -272,8 +249,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Color Map</Label>
+          <Label htmlFor={`${id}-color-map`}>Color Map</Label>
           <Select
+            id={`${id}-color-map`}
             value={localColorMap}
             onChange={(e) => setLocalColorMap(e.target.value as ColorMapName)}
           >
@@ -286,8 +264,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Min Frequency (Hz)</Label>
+          <Label htmlFor={`${id}-min-frequency`}>Min Frequency (Hz)</Label>
           <NumberInput
+            id={`${id}-min-frequency`}
             type="number"
             min={0}
             max={5000}
@@ -298,8 +277,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Max Frequency (Hz)</Label>
+          <Label htmlFor={`${id}-max-frequency`}>Max Frequency (Hz)</Label>
           <NumberInput
+            id={`${id}-max-frequency`}
             type="number"
             min={1000}
             max={22050}
@@ -310,8 +290,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Range (dB)</Label>
+          <Label htmlFor={`${id}-range-db`}>Range (dB)</Label>
           <NumberInput
+            id={`${id}-range-db`}
             type="number"
             min={1}
             max={120}
@@ -322,8 +303,9 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
         </Field>
 
         <Field>
-          <Label>Gain (dB)</Label>
+          <Label htmlFor={`${id}-gain-db`}>Gain (dB)</Label>
           <NumberInput
+            id={`${id}-gain-db`}
             type="number"
             min={-20}
             max={60}
@@ -346,11 +328,64 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
       </FormGrid>
 
       <ButtonRow>
-        <ModalButton onClick={onClose}>Cancel</ModalButton>
-        <ModalButton $primary onClick={handleApply}>
+        <ModalButton type="button" onClick={onClose}>
+          Cancel
+        </ModalButton>
+        <ModalButton type="button" $primary onClick={handleApply}>
           Apply
         </ModalButton>
       </ButtonRow>
+    </>
+  );
+};
+
+export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> = ({
+  open,
+  onClose,
+  config,
+  colorMap,
+  onApply,
+}) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  // Latest props for the native `close` listener, so the listener is attached
+  // once and not re-added whenever the parent passes a new `onClose`.
+  const latestRef = useRef({ open, onClose });
+  useEffect(() => {
+    latestRef.current = { open, onClose };
+  });
+
+  // Native close (Escape key)
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const handleClose = () => {
+      // Only report a close the parent did not ask for (avoids double-fire)
+      if (latestRef.current.open) {
+        latestRef.current.onClose();
+      }
+    };
+    dialog.addEventListener('close', handleClose);
+    return () => dialog.removeEventListener('close', handleClose);
+  }, []);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) {
+      dialog.showModal();
+    } else if (!open && dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
+
+  return (
+    <StyledDialog ref={dialogRef} aria-labelledby={titleId}>
+      <Title id={titleId}>Spectrogram Settings</Title>
+      {open && (
+        <SettingsForm onClose={onClose} config={config} colorMap={colorMap} onApply={onApply} />
+      )}
     </StyledDialog>
   );
 };

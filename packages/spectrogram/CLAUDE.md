@@ -68,3 +68,7 @@ For details on `createSpectrogramWorkerPool`, generation-based abort, lazy per-b
 ## Controls Outside Scroll Container
 
 **Gotcha:** `scrollContainerRef` coordinates do NOT include `controlWidth`. Controls render in a fixed `ControlsColumn` outside the scroll area. Never add `controlWidth` to chunk pixel positions in `getVisibleChunkRange` or viewport calculations.
+
+## Settings Modal Form Is a Draft (#698)
+
+`SpectrogramSettingsModal` is a dialog shell plus an inner `SettingsForm` that is mounted only while `open`. The form's `useState` initialisers read the props once per open; there is no props-to-state sync effect. Do not add one: the call site (`PlaylistVisualization`) re-renders on playback and zoom, and an effect keyed on `config` identity reset the open form to defaults whenever the fallback `{}` was a new object. The native `close` listener (Escape) is attached once and reads `open`/`onClose` from a ref. `settingsModalKeepsEdits.test.tsx` mounts the real `<Waveform />` call site with a fake integration (no worker pool) to cover the two packages together; it resolves `@waveform-playlist/browser` via `dist/`, so rebuild browser after changing the call site.

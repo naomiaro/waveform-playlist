@@ -127,22 +127,100 @@ describe('SpectrogramSettingsModal', () => {
     expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('re-syncs local form state when the config prop changes', () => {
-    const { selects, rerender } = renderModal();
-    expect(selects()[0].value).toBe('4096');
+  it('keeps unapplied edits when re-rendered with an equal but new config object', () => {
+    const { selects, rerender } = renderModal({ config: {} });
+    fireEvent.change(selects()[0], { target: { value: '8192' } });
 
     rerender(
       <SpectrogramSettingsModal
         open
         onClose={vi.fn()}
-        config={{ ...baseConfig, fftSize: 512, windowFunction: 'hann' }}
-        colorMap="viridis"
+        config={{}}
+        colorMap="magma"
         onApply={vi.fn()}
       />
     );
 
+    expect(selects()[0].value).toBe('8192');
+  });
+
+  it('starts from the current props each time it opens', () => {
+    const { selects, rerender } = renderModal();
+    const modal = (open: boolean, config: SpectrogramConfig, colorMap: ColorMapValue) => (
+      <SpectrogramSettingsModal
+        open={open}
+        onClose={vi.fn()}
+        config={config}
+        colorMap={colorMap}
+        onApply={vi.fn()}
+      />
+    );
+
+    // An abandoned edit does not survive a close and reopen.
+    fireEvent.change(selects()[0], { target: { value: '8192' } });
+    rerender(modal(false, baseConfig, 'magma'));
+    rerender(modal(true, baseConfig, 'magma'));
+    expect(selects()[0].value).toBe('4096');
+
+    // Reopened for another track: the form shows that track's settings.
+    rerender(modal(false, baseConfig, 'magma'));
+    rerender(modal(true, { ...baseConfig, fftSize: 512, windowFunction: 'hann' }, 'viridis'));
     expect(selects()[0].value).toBe('512');
     expect(selects()[3].value).toBe('hann');
-    expect((selects()[5] as HTMLSelectElement).value).toBe('viridis');
+    expect(selects()[5].value).toBe('viridis');
+  });
+
+  it('renders no form controls while closed', () => {
+    renderModal({ open: false });
+    expect(screen.queryAllByRole('combobox', { hidden: true })).toHaveLength(0);
+  });
+
+  it('keeps one close listener across onClose identity changes and calls the latest', () => {
+    const add = vi.spyOn(HTMLDialogElement.prototype, 'addEventListener');
+    const first = vi.fn();
+    const latest = vi.fn();
+    const { rerender, container } = renderModal({ onClose: first });
+    // React attaches its own `close` listener to a <dialog>, so compare counts
+    // before and after the re-render instead of expecting exactly one.
+    const closeListeners = () => add.mock.calls.filter(([type]) => type === 'close').length;
+    const afterMount = closeListeners();
+    expect(afterMount).toBeGreaterThan(0);
+    rerender(
+      <SpectrogramSettingsModal
+        open
+        onClose={latest}
+        config={baseConfig}
+        colorMap="magma"
+        onApply={vi.fn()}
+      />
+    );
+
+    expect(closeListeners()).toBe(afterMount);
+
+    // Native close (Escape)
+    container.querySelector('dialog')!.dispatchEvent(new Event('close'));
+    expect(first).not.toHaveBeenCalled();
+    expect(latest).toHaveBeenCalledTimes(1);
+    add.mockRestore();
+  });
+
+  it('labels every control and names the dialog', () => {
+    renderModal();
+    for (const name of [
+      'FFT Size',
+      'Hop Size',
+      'Zero Padding',
+      'Window Function',
+      'Frequency Scale',
+      'Color Map',
+      'Min Frequency (Hz)',
+      'Max Frequency (Hz)',
+      'Range (dB)',
+      'Gain (dB)',
+      'Show Frequency Labels',
+    ]) {
+      expect(screen.getByLabelText(name)).toBeDefined();
+    }
+    expect(screen.getByRole('dialog', { name: 'Spectrogram Settings' })).toBeDefined();
   });
 });
