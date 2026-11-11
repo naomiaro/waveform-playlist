@@ -235,6 +235,51 @@ describe('ClipCollisionModifier', () => {
   });
 
   describe('edge cases', () => {
+    it('accepts tracks as a getter and reads it on every call', () => {
+      const first = makeTrack([makeClip({ id: 'c1' })]);
+      const second = makeTrack([makeClip({ id: 'c1', startSample: 500 })]);
+      let current = [first];
+      const modifier = new ClipCollisionModifier(
+        {} as ConstructorParameters<typeof ClipCollisionModifier>[0],
+        { tracks: () => current, samplesPerPixel: 100 }
+      );
+      mockedConstrainClipDrag.mockReturnValue(0);
+      const operation = makeOperation({
+        transform: { x: 1, y: 0 },
+        sourceData: { trackIndex: 0, clipIndex: 0 },
+      });
+
+      modifier.apply(operation);
+      current = [second];
+      modifier.apply(operation);
+
+      expect(mockedConstrainClipDrag.mock.calls[0][0]).toBe(first.clips[0]);
+      expect(mockedConstrainClipDrag.mock.calls[1][0]).toBe(second.clips[0]);
+    });
+
+    it('sorts a track once while its clips array is unchanged', () => {
+      const track = makeTrack([
+        makeClip({ id: 'late', startSample: 1000 }),
+        makeClip({ id: 'early', startSample: 0 }),
+      ]);
+      const modifier = createModifier({ tracks: [track], samplesPerPixel: 100 });
+      mockedConstrainClipDrag.mockReturnValue(0);
+      const operation = makeOperation({
+        transform: { x: 1, y: 0 },
+        sourceData: { trackIndex: 0, clipIndex: 0 },
+      });
+
+      modifier.apply(operation);
+      modifier.apply(operation);
+      modifier.apply(operation);
+
+      const sortedArgs = mockedConstrainClipDrag.mock.calls.map((call) => call[2]);
+      expect(sortedArgs[0].map((c) => c.id)).toEqual(['early', 'late']);
+      expect(sortedArgs[1]).toBe(sortedArgs[0]);
+      expect(sortedArgs[2]).toBe(sortedArgs[0]);
+      expect(mockedConstrainClipDrag.mock.calls[2][3]).toBe(1);
+    });
+
     it('returns original transform when source is null', () => {
       const modifier = createModifier({
         tracks: [],

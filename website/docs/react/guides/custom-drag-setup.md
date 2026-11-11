@@ -90,7 +90,7 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
 
 - **`useDragSensors()`** — Configures pointer activation. Pass `{ touchOptimized: true }` for mobile (250ms touch delay).
 - **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming.
-- **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track.
+- **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track. `tracks` can also be a function returning the current tracks, e.g. `ClipCollisionModifier.configure({ tracks: () => tracksRef.current, samplesPerPixel })`, which lets you memoise the `modifiers` array without rebuilding it each time tracks change (a boundary trim changes them on every pointer move).
 - **Feedback plugin config is per-entity** — the clip components declare their own `@dnd-kit` Feedback settings (no drop animation on clip moves, no Feedback on trim handles) via `useDraggable({ plugins })`, so a plain `DragDropProvider` needs no `plugins` prop for them.
 - **`RestrictToHorizontalAxis`** — Constrains drag to horizontal movement only.
 

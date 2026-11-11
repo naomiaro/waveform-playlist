@@ -6,9 +6,16 @@ import {
 } from '@dnd-kit/abstract';
 import { constrainClipDrag } from '@waveform-playlist/engine';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { sortedClipsOf } from '../utils/sortedClips';
 
 interface ClipCollisionOptions {
-  tracks: ClipTrack[];
+  /**
+   * The tracks to check against, or a function returning them. Pass a function
+   * (reading a ref, say) to keep the configured modifier's identity stable while
+   * tracks change, so the modifiers array handed to DragDropProvider is not
+   * rebuilt on every edit.
+   */
+  tracks: ClipTrack[] | (() => ClipTrack[]);
   samplesPerPixel: number;
 }
 
@@ -40,7 +47,9 @@ export class ClipCollisionModifier extends Modifier<
     // Boundary trims: zero transform (visual feedback from React state updates)
     if (boundary) return { x: 0, y: 0 };
 
-    const { tracks, samplesPerPixel } = this.options;
+    const { samplesPerPixel } = this.options;
+    const tracks =
+      typeof this.options.tracks === 'function' ? this.options.tracks() : this.options.tracks;
     const track = tracks[trackIndex];
     if (!track) return transform;
 
@@ -49,7 +58,7 @@ export class ClipCollisionModifier extends Modifier<
 
     // Convert pixel delta to samples, constrain, convert back
     const deltaSamples = transform.x * samplesPerPixel;
-    const sortedClips = [...track.clips].sort((a, b) => a.startSample - b.startSample);
+    const sortedClips = sortedClipsOf(track.clips);
     const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clip.id);
     const constrainedDelta = constrainClipDrag(clip, deltaSamples, sortedClips, sortedIndex);
 

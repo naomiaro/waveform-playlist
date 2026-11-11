@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 
@@ -39,18 +39,23 @@ export interface UseKeyboardShortcutsOptions {
 export const useKeyboardShortcuts = (options: UseKeyboardShortcutsOptions): void => {
   const { shortcuts, enabled = true } = options;
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => handleKeyboardEvent(event, shortcuts, enabled),
-    [shortcuts, enabled]
-  );
+  // The listener reads the latest shortcuts from a ref. Callers build the array
+  // inline, so its identity changes on every render; keyed on it, the window
+  // listener was removed and re-added each time.
+  const shortcutsRef = useRef(shortcuts);
+  useEffect(() => {
+    shortcutsRef.current = shortcuts;
+  });
 
   useEffect(() => {
     if (!enabled) return;
 
+    const handleKeyDown = (event: KeyboardEvent) =>
+      handleKeyboardEvent(event, shortcutsRef.current, true);
     window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleKeyDown, enabled]);
+  }, [enabled]);
 };
