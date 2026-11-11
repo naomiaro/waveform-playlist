@@ -39,6 +39,12 @@ describe('resolvePlayoutAdapter', () => {
     expect(h.createToneAdapter).toHaveBeenCalledWith({ effects: fn, soundFontCache: cache });
   });
 
+  it('forwards trackEffects to the default adapter (#752)', async () => {
+    const trackEffects = (() => undefined) as never;
+    await resolvePlayoutAdapter({ trackEffects });
+    expect(h.createToneAdapter).toHaveBeenCalledWith(expect.objectContaining({ trackEffects }));
+  });
+
   it('configures the global context only when a sampleRate is provided', async () => {
     await resolvePlayoutAdapter({ sampleRate: 44100 });
     expect(h.configureGlobalContext).toHaveBeenCalledWith({ sampleRate: 44100 });

@@ -604,17 +604,6 @@ export function WamEffectsExample() {
     }
   }, [loadedTracks]);
 
-  // Destructure the stable callback to satisfy exhaustive-deps.
-  const { getTrackEffectsFunction } = trackFx;
-
-  // Attach per-track effects functions so WAM/native inserts can be added live.
-  // New track objects mean an engine rebuild, so this must only recompute
-  // when `tracks` does.
-  const tracksWithEffects = useMemo(
-    () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
-    [tracks, getTrackEffectsFunction]
-  );
-
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
   const selectedTrackName = selectedTrack?.name ?? 'Track';
 
@@ -740,7 +729,8 @@ export function WamEffectsExample() {
       </RacksRow>
 
       <WaveformPlaylistProvider
-        tracks={tracksWithEffects}
+        tracks={tracks}
+        trackEffects={trackFx.getTrackEffectsFunction}
         sampleRate={48000}
         onTracksChange={setTracks}
         deferEngineRebuild={loading}

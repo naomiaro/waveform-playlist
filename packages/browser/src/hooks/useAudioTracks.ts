@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ClipTrack,
   type Fade,
-  type TrackEffectsFunction,
   type WaveformDataObject,
   type RenderMode,
   type SpectrogramConfig,
@@ -33,7 +32,6 @@ export interface AudioTrackConfig {
   volume?: number;
   pan?: number;
   color?: string;
-  effects?: TrackEffectsFunction;
   // Multi-clip support
   startTime?: number; // When the clip starts on the timeline (default: 0)
   duration?: number; // Duration of the clip (default: full audio duration)

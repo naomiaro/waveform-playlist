@@ -71,14 +71,6 @@ export type TrackClipPeaks = ClipPeaks[];
 
 export type { TrackDragPreview };
 
-// Legacy WaveformTrack type - kept for reference but deprecated
-// @deprecated Use ClipTrack from @waveform-playlist/core instead
-export interface WaveformTrack {
-  src: string | AudioBuffer;
-  name?: string;
-  effects?: TrackEffectsFunction;
-}
-
 export interface TrackState {
   name: string;
   muted: boolean;
@@ -351,7 +343,20 @@ export interface WaveformPlaylistProviderProps {
     linkEndpoints?: boolean;
     controls?: AnnotationAction[];
   };
+  /** Master effects chain (default Tone.js adapter only). */
   effects?: EffectsFunction;
+  /**
+   * Returns the effects function of a track by id, or `undefined` for none:
+   * pass `getTrackEffectsFunction` from `useTrackDynamicEffects()`. Default
+   * Tone.js adapter only; with `createAdapter`, give the same function to your
+   * own `createToneAdapter({ trackEffects })`.
+   *
+   * It is called when a track's audio graph is built, with the function passed
+   * on the latest render. A new function identity does not rebuild anything,
+   * so an inline arrow is fine; a different result for a track that is already
+   * built applies the next time that track is built.
+   */
+  trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   onReady?: () => void;
   /** Called when audio/engine initialization fails (e.g. a missing optional peer,
    *  a throwing `createAdapter`, or an invalid `zoomLevels`/`samplesPerPixel`). The
@@ -422,6 +427,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   controls: controlsProp = DEFAULT_CONTROLS,
   annotationList,
   effects,
+  trackEffects,
   onReady,
   onError,
   onAnnotationUpdate: _onAnnotationUpdate,
@@ -561,6 +567,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const tracksRef = useRef<ClipTrack[]>(tracks);
   const soundFontCacheRef = useRef(soundFontCache);
   soundFontCacheRef.current = soundFontCache;
+  // The adapter keeps ONE lookup for its whole life and calls it whenever it
+  // builds a track. It reads the prop through a ref so that a new function
+  // identity (an inline arrow) is not a reason to rebuild the engine (#752).
+  const trackEffectsRef = useRef(trackEffects);
+  trackEffectsRef.current = trackEffects;
+  const resolveTrackEffects = useCallback(
+    (trackId: string) => trackEffectsRef.current?.(trackId),
+    []
+  );
   const trackStatesRef = useRef<TrackState[]>(trackStates);
   const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
@@ -1002,6 +1017,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         const adapter = await resolvePlayoutAdapter({
           createAdapter,
           effects,
+          trackEffects: resolveTrackEffects,
           soundFontCache: soundFontCacheRef.current,
           sampleRate: sampleRateProp,
         });
@@ -1232,6 +1248,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     onReady,
     onError,
     effects,
+    resolveTrackEffects,
     stopAnimationFrameLoop,
     onSelectionEngineState,
     onLoopEngineState,

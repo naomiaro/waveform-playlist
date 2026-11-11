@@ -197,9 +197,6 @@ export interface ClipTrack {
   /** Track height in pixels (for UI) */
   height?: number;
 
-  /** Optional effects function for this track */
-  effects?: TrackEffectsFunction;
-
   /** Visualization render mode. Default: 'waveform' */
   renderMode?: RenderMode;
 

@@ -65,7 +65,7 @@ export interface ExportOptions extends WavEncoderOptions {
   /**
    * Optional function to create offline track effects.
    * Takes a trackId and returns an offline effects function for that track.
-   * This is used instead of track.effects to avoid AudioContext mismatch issues.
+   * The live chain cannot be used: its nodes belong to the live AudioContext.
    */
   createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   /** Progress callback (0-1) */

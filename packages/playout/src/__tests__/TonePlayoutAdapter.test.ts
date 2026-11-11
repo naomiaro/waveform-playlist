@@ -210,18 +210,45 @@ describe('createToneAdapter', () => {
       expect(firstInstance.removeTrack).toHaveBeenCalledWith('t1');
     });
 
-    it('passes track effects to playout.addTrack', () => {
-      const adapter = createToneAdapter();
+    // #752: a track's effects come from the adapter's `trackEffects` lookup,
+    // by track id. Tracks are plain data and carry no function.
+    it('asks trackEffects for the function of each track it builds', () => {
       const effectsFn = vi.fn();
+      const trackEffects = vi.fn((trackId: string) => (trackId === 't1' ? effectsFn : undefined));
+      const adapter = createToneAdapter({ trackEffects });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip]), makeTrack('t2', [clip])]);
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(mockInstance.addTrack.mock.calls[0][0].effects).toBe(effectsFn);
+      expect(mockInstance.addTrack.mock.calls[1][0].effects).toBeUndefined();
+      expect(trackEffects).toHaveBeenCalledWith('t1');
+      expect(trackEffects).toHaveBeenCalledWith('t2');
+    });
+
+    it('asks trackEffects again for a track added later', () => {
+      const effectsFn = vi.fn();
+      const adapter = createToneAdapter({ trackEffects: () => effectsFn });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([]);
+      adapter.addTrack!(makeTrack('t9', [clip]));
+
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(mockInstance.addTrack.mock.lastCall![0].effects).toBe(effectsFn);
+    });
+
+    it('ignores an `effects` field left on a track object', () => {
+      const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
       const track = makeTrack('t1', [clip]);
-      (track as unknown as Record<string, unknown>).effects = effectsFn;
+      (track as unknown as Record<string, unknown>).effects = vi.fn();
       adapter.setTracks([track]);
 
       const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
         .value;
-      const addTrackArg = mockInstance.addTrack.mock.calls[0][0];
-      expect(addTrackArg.effects).toBe(effectsFn);
+      expect(mockInstance.addTrack.mock.calls[0][0].effects).toBeUndefined();
     });
   });
 
@@ -450,15 +477,15 @@ describe('createToneAdapter', () => {
       // #660: one effects chain per track. Both halves running the closure
       // would return the chain into two faders — the track would play twice.
       it('only the audio half runs the track effects closure; the MIDI half feeds its input', () => {
-        const adapter = createToneAdapter();
+        const effects = vi.fn();
+        const adapter = createToneAdapter({ trackEffects: () => effects });
         const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
         const audioHalfInput = { name: 'audio-half-input' };
         instance.getTrack = vi.fn((id: string) =>
           id === 't1' ? { trackInput: audioHalfInput } : undefined
         );
-        const effects = vi.fn();
 
-        adapter.setTracks([{ ...mixedTrack(), effects }]);
+        adapter.setTracks([mixedTrack()]);
 
         expect(instance.addTrack.mock.lastCall![0].effects).toBe(effects);
         const midiEffects = instance.addMidiTrack.mock.lastCall![0].effects;
@@ -475,10 +502,10 @@ describe('createToneAdapter', () => {
       });
 
       it('a MIDI-only track runs the track effects closure itself', () => {
-        const adapter = createToneAdapter();
-        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
         const effects = vi.fn();
-        const midiOnly = { ...mixedTrack(), effects };
+        const adapter = createToneAdapter({ trackEffects: () => effects });
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const midiOnly = mixedTrack();
         midiOnly.clips = midiOnly.clips.filter((c) => c.midiNotes);
 
         adapter.setTracks([midiOnly]);

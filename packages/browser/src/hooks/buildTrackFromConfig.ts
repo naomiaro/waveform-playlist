@@ -75,7 +75,6 @@ export function buildTrackFromConfig(
       pan: config.pan ?? 0,
       color: config.color,
     }),
-    effects: config.effects,
     renderMode: config.renderMode,
     spectrogramConfig: config.spectrogramConfig,
     spectrogramColorMap: config.spectrogramColorMap,

@@ -17,4 +17,4 @@ export type {
 } from './SortableTrackControls';
 
 // Re-export WaveformPlaylistProvider and types from context
-export { WaveformPlaylistProvider, type WaveformTrack } from '../WaveformPlaylistContext';
+export { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
