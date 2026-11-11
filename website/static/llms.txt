@@ -137,7 +137,7 @@ Both providers use React Context with 4 split contexts for performance.
 
 ### MIDI Hooks (from `@waveform-playlist/midi`)
 
-- `useMidiTracks(configs, options)` — Load .mid files into ClipTrack[] with midiNotes for piano roll rendering. `options: { sampleRate: number }`. One config can produce multiple tracks (one per MIDI channel). Supports pre-parsed notes via `midiNotes` prop.
+- `useMidiTracks(configs, options)` — Load .mid files into ClipTrack[] with midiNotes for piano roll rendering. `options: { sampleRate: number }`. One config can produce multiple tracks (one per MIDI channel). Supports pre-parsed notes via `midiNotes` prop. `configs` is compared by value, so an inline array literal is fine; files load in parallel and tracks keep config order.
 - `parseMidiFile(data, options?)` — Pure function: ArrayBuffer → ParsedMidi with tracks, notes, tempo, time signature. No React dependency. Re-exported from `@dawcore/midi`.
 - `parseMidiUrl(url, options?, signal?)` — Fetch + parse convenience wrapper with AbortSignal support. Re-exported from `@dawcore/midi`.
 

@@ -48,6 +48,8 @@ function MidiPlayer() {
 }
 ```
 
+`configs` is compared by value, so the array can be written inline as above: tracks reload only when a config actually changes. Several files are fetched in parallel and the tracks keep the order of the configs.
+
 A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI channel (e.g., Piano, Bass, Drums). All tracks are returned at once after loading completes.
 
 ### MidiTrackConfig Options

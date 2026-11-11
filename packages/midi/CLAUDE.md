@@ -88,22 +88,15 @@ MIDI velocity is a 0-127 integer. `@tonejs/midi` normalizes to 0-1 float, but ro
 
 **Run:** `cd packages/midi && npx vitest run`
 
-**Test count:** 20 tests (8 parser + 12 hook)
-
 **Environment:** jsdom (required for `@testing-library/react` in hook tests)
 
 **Test MIDI data:** Created programmatically with `@tonejs/midi`'s `Midi` constructor — no fixture files needed. Use `midi.header.setTempo()` (never direct assignment).
 
-**Hook test stability:** Config arrays must be declared outside `renderHook()` callbacks to maintain stable references. Inline arrays create new references on each render, causing `useEffect` to re-run infinitely.
+**`configs` is compared by value (#700):** the load effect is keyed on a copy of `configs` held in state and replaced during render only when `midiConfigsEqual` says a config changed. Inline array literals are fine, in tests and in consumer code. Before #700 the effect was keyed on array identity and an inline literal looped until the process ran out of memory. Rules that keep it that way:
 
-```typescript
-// ✅ Stable reference
-const configs: MidiTrackConfig[] = [{ midiNotes: notes, name: 'Test' }];
-const { result } = renderHook(() => useMidiTracks(configs, { sampleRate: 48000 }));
-
-// ❌ New reference each render — infinite effect loop
-const { result } = renderHook(() => useMidiTracks([{ midiNotes: notes }], { sampleRate: 48000 }));
-```
+- `midiConfigsEqual` compares a fixed list of `MidiTrackConfig` keys with `Object.is` (NaN equals NaN), and notes by identity first, then field by field. A new field on `MidiTrackConfig` must be added to `SCALAR_CONFIG_KEYS` (the `satisfies` clause rejects a key that is not on the type, but does not flag a missing one).
+- Configs and notes are treated as immutable: mutating one in place and passing a shallow copy does not reload.
+- Tests that pass inline configs count renders with `renderGuard()` (`useMidiTracksInlineConfigs.test.ts`), which throws past 50 renders. Without it a regression exhausts the worker's memory instead of failing.
 
 ### Flatten Is Visual-Only (Planned)
 
@@ -129,6 +122,7 @@ When a MIDI config has a `name` and the file contains multiple tracks, `useMidiT
 ## Track Naming Logic
 
 `@tonejs/midi` defaults `track.instrument.name` to `"acoustic grand piano"` (program 0) even when no program change event exists. Use `track.instrument.number > 0` to detect explicitly-set instruments. Naming priority:
+
 - Channel 9 → "Drums"
 - Program > 0 → title-cased GM name (e.g., "Electric Bass (Finger)")
 - Program 0 → track name from MIDI file → "Acoustic Grand Piano" → "Channel N"
