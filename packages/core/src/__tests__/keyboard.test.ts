@@ -5,6 +5,7 @@ import {
   getShortcutLabel,
   matchesKeyBinding,
   observeFocusSource,
+  keyBelongsToFocusedControl,
 } from '../keyboard';
 import type { KeyboardShortcut } from '../keyboard';
 
@@ -143,6 +144,26 @@ describe('handleKeyboardEvent', () => {
       dialog.remove();
     });
 
+    it('leaves Escape to an open modal dialog when focus is outside it', () => {
+      // Clicking the dialog's padding can leave focus on <body>.
+      const dialog = withPseudo(document.createElement('dialog'), { ':modal': true });
+      dialog.setAttribute('open', '');
+      document.body.appendChild(dialog);
+
+      const event = keydownOn(document.body, 'Escape');
+      handleKeyboardEvent(event, all, true);
+      expect(escape).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+      expect(keyBelongsToFocusedControl(event)).toBe(true);
+
+      // Only Escape: other shortcuts are unaffected, and so is Escape once it closes.
+      handleKeyboardEvent(keydownOn(document.body, '0'), all, true);
+      expect(zero).toHaveBeenCalledTimes(1);
+      dialog.remove();
+      handleKeyboardEvent(keydownOn(document.body, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(1);
+    });
+
     it('leaves Escape to an aria-modal container', () => {
       const modal = document.createElement('div');
       modal.setAttribute('role', 'dialog');
@@ -205,7 +226,7 @@ describe('handleKeyboardEvent', () => {
         return el;
       }
 
-      describe.each(['button', 'summary', 'a', 'role'])('%s', (kind) => {
+      describe.each(['button', 'summary', 'a'])('%s', (kind) => {
         it('keeps Space and Enter when it was focused from the keyboard', () => {
           const el = make(kind);
           focusWithKeyboard(el);
@@ -240,6 +261,62 @@ describe('handleKeyboardEvent', () => {
           expect(zero).toHaveBeenCalledTimes(1);
           expect(escape).toHaveBeenCalledTimes(1);
         });
+      });
+
+      it('does not yield to an ARIA-role widget: only its own script knows its keys', () => {
+        // e.g. a dnd-kit drag handle: role="button", focusable, pointer-only.
+        const handle = make('role');
+        focusWithKeyboard(handle);
+        handleKeyboardEvent(keydownOn(handle, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it('gives Space back to the shortcut once the pointer is used elsewhere', () => {
+        // Tab to Mute, then drag a clip: that pointerdown is cancelled, so focus
+        // never leaves the button.
+        const button = make('button');
+        const elsewhere = make('div');
+        focusWithKeyboard(button);
+        elsewhere.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      describe.each(['range', 'checkbox'])('<input type="%s">', (type) => {
+        function makeInput() {
+          const input = document.createElement('input');
+          input.setAttribute('type', type);
+          host.appendChild(input);
+          return input;
+        }
+
+        it('keeps every key while operated from the keyboard', () => {
+          const input = makeInput();
+          focusWithKeyboard(input);
+          for (const key of [' ', '0', 'Escape']) {
+            handleKeyboardEvent(keydownOn(input, key), all, true);
+          }
+          expect(action).not.toHaveBeenCalled();
+          expect(zero).not.toHaveBeenCalled();
+          expect(escape).not.toHaveBeenCalled();
+        });
+
+        it('after a click or drag, Space is a shortcut again but other keys are not', () => {
+          const input = makeInput();
+          focusWithPointer(input);
+          handleKeyboardEvent(keydownOn(input, ' '), all, true);
+          expect(action).toHaveBeenCalledTimes(1);
+          handleKeyboardEvent(keydownOn(input, '0'), all, true);
+          expect(zero).not.toHaveBeenCalled();
+        });
+      });
+
+      it('a clicked text input still keeps every key', () => {
+        const input = document.createElement('input');
+        host.appendChild(input);
+        focusWithPointer(input);
+        handleKeyboardEvent(keydownOn(input, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
       });
 
       it('counts a press on a child of the button as pointer focus', () => {

@@ -9,9 +9,12 @@ import { test, expect, type Page } from '@playwright/test';
 const timeDisplay = (page: Page) => page.getByText(/\d{2}:\d{2}:\d{2}\.\d{3}/).first();
 
 async function expectNotPlaying(page: Page) {
+  // Playback start is asynchronous (AudioContext resume), so give a wrongly
+  // started playback time to show before reading.
   const before = await timeDisplay(page).textContent();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(1000);
   expect(await timeDisplay(page).textContent()).toBe(before);
+  await expect(page.getByRole('button', { name: 'Play', exact: true }).first()).toBeEnabled();
 }
 
 async function expectPlaying(page: Page) {
@@ -37,6 +40,21 @@ test.describe('Shortcuts and focused controls', () => {
     await expect(dialog).toHaveCount(0);
   });
 
+  test('Escape closes the modal after clicking its heading', async ({ page, baseURL }) => {
+    await page.goto(`${baseURL}/examples/mir-spectrogram`);
+    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+
+    await page.getByRole('button', { name: /menu/i }).first().click();
+    await page.getByText('Spectrogram Settings...').first().click();
+    const dialog = page.locator('dialog[open]');
+    await expect(dialog).toBeVisible();
+    // A click on non-focusable content takes focus off the <select>.
+    await dialog.getByRole('heading').first().click();
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
+
   test.describe('multi-clip', () => {
     test.beforeEach(async ({ page, baseURL }) => {
       await page.goto(`${baseURL}/examples/multi-clip`);
@@ -46,7 +64,7 @@ test.describe('Shortcuts and focused controls', () => {
     test('Space activates a button that was focused with the keyboard', async ({ page }) => {
       const mute = page.getByRole('button', { name: 'Mute' }).first();
       await mute.focus();
-      // Arrive by keyboard so the button is :focus-visible.
+      // Arrive by keyboard: focus that follows a key press is keyboard focus.
       await page.keyboard.press('Shift+Tab');
       await page.keyboard.press('Tab');
       await expect(mute).toBeFocused();

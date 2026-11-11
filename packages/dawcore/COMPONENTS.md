@@ -331,7 +331,7 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 | `undoShortcuts`      | `UndoShortcutMap`      | Custom undo/redo key bindings |
 | `customShortcuts`    | `KeyBinding[]`         | Additional custom shortcuts   |
 
-**Focused controls keep their keys.** A shortcut does not fire when the focused control uses the key itself: text fields, `<select>` and `contenteditable` keep every key; `Escape` closes an open modal dialog; `Space` and `Enter` activate a focused button or link, unless it got focus from a pointer click: after clicking a button, `Space` is still play/pause. The check looks through shadow DOM, so it covers the controls inside `<daw-track-controls>` and the transport buttons.
+**Focused controls keep their keys.** A shortcut does not fire when the focused control uses the key itself: text fields, `<select>` and `contenteditable` keep every key; `Escape` closes an open modal dialog; `Space` and `Enter` activate a focused `<button>` or link, and a focused slider keeps its keys. The exception is a control that got focus from a pointer click or drag: after clicking M or S, or dragging a volume slider, `Space` is still play/pause. The check looks through shadow DOM, so it covers the controls inside `<daw-track-controls>` and the transport buttons, and `<daw-annotation-track keyboard-controls>` applies the same rule to its own shortcuts.
 
 ---
 

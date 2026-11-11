@@ -67,6 +67,26 @@ function matchesOr(element: Element, selector: string, fallback: boolean): boole
   }
 }
 
+/** `<input>` types that are not text entry: they use a few keys, not all of them. */
+const NON_TEXT_INPUT_TYPES = new Set([
+  'range',
+  'checkbox',
+  'radio',
+  'button',
+  'submit',
+  'reset',
+  'color',
+  'file',
+  'image',
+]);
+
+function isNonTextInput(element: Element): boolean {
+  return (
+    element.tagName === 'INPUT' &&
+    NON_TEXT_INPUT_TYPES.has((element.getAttribute('type') ?? 'text').toLowerCase())
+  );
+}
+
 /** Controls that take text or use most keys themselves: no shortcut fires on them. */
 function ownsAllKeys(element: Element): boolean {
   const tag = element.tagName;
@@ -78,26 +98,16 @@ function ownsAllKeys(element: Element): boolean {
   );
 }
 
-const ACTIVATION_ROLES = new Set([
-  'button',
-  'link',
-  'checkbox',
-  'radio',
-  'switch',
-  'tab',
-  'option',
-  'menuitem',
-  'menuitemcheckbox',
-  'menuitemradio',
-]);
-
-/** Controls that Space or Enter activates. */
+/**
+ * Native controls that Space or Enter activates. ARIA-role widgets
+ * (`role="button"` on a div) are left out on purpose: whether they respond to
+ * a key is up to their own script, and yielding to one that does not (a drag
+ * handle that is only draggable with a pointer) would just make the key dead.
+ */
 function isActivatable(element: Element): boolean {
   const tag = element.tagName;
   if (tag === 'BUTTON' || tag === 'SUMMARY') return true;
-  if ((tag === 'A' || tag === 'AREA') && element.hasAttribute('href')) return true;
-  const role = element.getAttribute('role');
-  return role !== null && ACTIVATION_ROLES.has(role);
+  return (tag === 'A' || tag === 'AREA') && element.hasAttribute('href');
 }
 
 /** An open modal `<dialog>` or an `aria-modal` container: Escape closes it. */
@@ -111,17 +121,38 @@ function isOpenModal(element: Element): boolean {
 }
 
 /**
+ * A modal dialog is open in the document of `element`. Focus is not always
+ * inside it: clicking the dialog's own padding can leave focus on `<body>`,
+ * and Escape still closes the dialog from there.
+ */
+function documentHasOpenModal(element: Element): boolean {
+  const doc = element.ownerDocument;
+  if (!doc) return false;
+  try {
+    return Array.from(doc.querySelectorAll('dialog[open], [aria-modal="true"]')).some(isOpenModal);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * How the focused element got focus. `:focus-visible` cannot answer this at
  * keydown time: Chromium makes the focused element match it as soon as any key
  * is pressed, so a button focused by a click matches during the very keydown
  * we are deciding about.
+ *
+ * `keyboardFocusedElement` is the element the user navigated to with the
+ * keyboard (or that a script focused) and has not used a pointer since.
  */
 let pointerDownPath: EventTarget[] = [];
-let pointerFocusedElement: EventTarget | null = null;
+let keyboardFocusedElement: EventTarget | null = null;
 const observedDocuments = new Map<Document, number>();
 
 function onPointerDown(event: Event): void {
   pointerDownPath = event.composedPath();
+  // Any pointer use ends keyboard operation of the focused control, even when
+  // the press does not move focus (a drag whose pointerdown is cancelled).
+  keyboardFocusedElement = null;
 }
 
 function onFocusSourceKeyDown(): void {
@@ -133,8 +164,10 @@ function onFocusIn(event: Event): void {
   const focused = event.composedPath()[0] ?? event.target;
   // Pointer focus only when the pointer went down on the element itself (or
   // inside it). Focus moved by script after a click elsewhere, such as the
-  // first item of a menu that was just opened, is not.
-  pointerFocusedElement = focused && pointerDownPath.includes(focused) ? focused : null;
+  // first item of a menu that was just opened, counts as keyboard focus.
+  const byPointer = focused !== null && pointerDownPath.includes(focused);
+  keyboardFocusedElement = byPointer ? null : focused;
+  pointerDownPath = [];
 }
 
 /**
@@ -169,9 +202,15 @@ export function observeFocusSource(doc: Document = document): () => void {
     doc.removeEventListener('focusin', onFocusIn, true);
     if (observedDocuments.size === 0) {
       pointerDownPath = [];
-      pointerFocusedElement = null;
+      keyboardFocusedElement = null;
     }
   };
+}
+
+/** The user is operating `element` from the keyboard (see `observeFocusSource`). */
+function isKeyboardOperated(element: Element): boolean {
+  // Not observing: assume keyboard, the accessible default.
+  return observedDocuments.size === 0 || element === keyboardFocusedElement;
 }
 
 /**
@@ -179,22 +218,32 @@ export function observeFocusSource(doc: Document = document): () => void {
  * a global shortcut must leave it alone:
  *
  * - text fields, `<select>` and contenteditable keep every key;
- * - Escape belongs to an open modal dialog anywhere around the focused element;
- * - Space and Enter belong to a button, link or similar control, unless it got
- *   focus from a pointer click (see `observeFocusSource`). A clicked control
- *   keeps focus without the user having navigated to it, so the shortcut wins
- *   there: clicking Mute and then pressing Space still plays.
+ * - Escape belongs to an open modal dialog, wherever focus is;
+ * - Space and Enter belong to a focused `<button>`, link or `<summary>`, and
+ *   every key belongs to a focused slider, checkbox or other non-text input,
+ *   while the user is operating it from the keyboard. A control that was
+ *   clicked keeps focus without having been navigated to, so Space and Enter
+ *   stay shortcuts there: clicking Mute, or dragging a volume slider, and then
+ *   pressing Space still plays.
+ *
+ * `handleKeyboardEvent` applies this itself. It is exported for listeners that
+ * match keys on their own.
  */
-function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
+export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   const path = elementPath(event);
   const focused = path[0];
   if (!focused) return false;
 
-  if (ownsAllKeys(focused)) return true;
-  if (event.key === 'Escape' && path.some(isOpenModal)) return true;
-  if ((event.key === ' ' || event.key === 'Enter') && isActivatable(focused)) {
-    return focused !== pointerFocusedElement;
+  if (event.key === 'Escape' && (path.some(isOpenModal) || documentHasOpenModal(focused))) {
+    return true;
   }
+
+  const isActivationKey = event.key === ' ' || event.key === 'Enter';
+  if (isNonTextInput(focused)) {
+    return !isActivationKey || isKeyboardOperated(focused);
+  }
+  if (ownsAllKeys(focused)) return true;
+  if (isActivationKey && isActivatable(focused)) return isKeyboardOperated(focused);
   return false;
 }
 
