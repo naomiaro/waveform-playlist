@@ -40,8 +40,13 @@ function run(cli, args) {
   const result = spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
   if (result.status !== 0) {
     throw new Error(
-      'Faust compile failed (' + path.basename(cli) + ' ' + args.join(' ') + '):\n' +
-        (result.stdout || '') + (result.stderr || '')
+      'Faust compile failed (' +
+        path.basename(cli) +
+        ' ' +
+        args.join(' ') +
+        '):\n' +
+        (result.stdout || '') +
+        (result.stderr || '')
     );
   }
 }
@@ -75,7 +80,9 @@ export function stripFaustUi(wamDir) {
   const guiMethod = /\n\tcreateGui\(\) \{\n\t\treturn createElement\(this\);\n\t\}\n/;
   if (!source.includes(importLine) || !guiMethod.test(source)) {
     throw new Error(
-      'stripFaustUi: ' + indexPath + ' does not look like faust2wam output — ' +
+      'stripFaustUi: ' +
+        indexPath +
+        ' does not look like faust2wam output — ' +
         'the template changed; update this script before shipping the result.'
     );
   }

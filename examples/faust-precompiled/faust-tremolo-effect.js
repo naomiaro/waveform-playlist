@@ -17,7 +17,9 @@ import { registerEffect } from '@dawcore/components';
 export async function registerFaustTremolo(baseUrl) {
   // Runtime URL import: both ignore-comments keep Vite and webpack from
   // trying to bundle it.
-  const faustwasm = await import(/* webpackIgnore: true */ /* @vite-ignore */ baseUrl + 'faustwasm/index.js');
+  const faustwasm = await import(
+    /* webpackIgnore: true */ /* @vite-ignore */ baseUrl + 'faustwasm/index.js'
+  );
   const meta = await (await fetch(baseUrl + 'dsp-meta.json')).json();
   const module = await WebAssembly.compileStreaming(fetch(baseUrl + 'dsp-module.wasm'));
 
@@ -41,7 +43,14 @@ export async function registerFaustTremolo(baseUrl) {
     // that exportAudio() creates. createNode() registers the processor on that
     // context; the node it returns is not needed.
     prepare: async (ctx) => {
-      const node = await generator.createNode(ctx, processorName, factory, false, 512, processorName);
+      const node = await generator.createNode(
+        ctx,
+        processorName,
+        factory,
+        false,
+        512,
+        processorName
+      );
       node.destroy();
     },
 

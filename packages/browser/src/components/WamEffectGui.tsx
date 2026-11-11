@@ -22,11 +22,19 @@ export const WamEffectGui: React.FC<WamEffectGuiProps> = ({ plugin, className })
     if (!plugin || !host) return;
     let cancelled = false;
     let gui: HTMLElement | null = null;
+    // True when `gui` came from the plugin's createGui — only those are the
+    // plugin's to destroy. The generic panel is plain DOM owned here.
+    let pluginOwnsGui = false;
 
     (async () => {
       try {
-        if (plugin.createGui) {
-          gui = await plugin.createGui();
+        // createGui exists on every WebAudioModule: the SDK base class
+        // resolves undefined when the plugin ships no GUI. Treat anything
+        // that is not an element as "no GUI".
+        const own: unknown = plugin.createGui ? await plugin.createGui() : undefined;
+        if (own instanceof HTMLElement) {
+          gui = own;
+          pluginOwnsGui = true;
         } else {
           const wam = await loadWamModule();
           gui = await wam.createWamParameterPanel(
@@ -34,7 +42,7 @@ export const WamEffectGui: React.FC<WamEffectGuiProps> = ({ plugin, className })
           );
         }
         if (cancelled) {
-          if (gui) {
+          if (gui && pluginOwnsGui) {
             try {
               plugin.destroyGui?.(gui);
             } catch (destroyErr) {
@@ -61,6 +69,7 @@ export const WamEffectGui: React.FC<WamEffectGuiProps> = ({ plugin, className })
       cancelled = true;
       if (gui) {
         gui.remove();
+        if (!pluginOwnsGui) return;
         try {
           plugin.destroyGui?.(gui);
         } catch (destroyErr) {

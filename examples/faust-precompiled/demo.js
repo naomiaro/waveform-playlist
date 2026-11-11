@@ -74,7 +74,8 @@ export async function setupFaustDemo(editor) {
     row.className = 'effect';
     const title = document.createElement('strong');
     const where = host === editor ? 'Master' : host.getAttribute('name');
-    title.textContent = where + ' — ' + (info?.label || info?.type || 'effect') + ' [' + info?.kind + ']';
+    title.textContent =
+      where + ' — ' + (info?.label || info?.type || 'effect') + ' [' + info?.kind + ']';
     const bypass = document.createElement('button');
     bypass.textContent = 'Bypass';
     bypass.addEventListener('click', () => {
@@ -115,8 +116,12 @@ export async function setupFaustDemo(editor) {
         }
       }
       log(
-        'exported ' + buffer.duration.toFixed(2) + ' s, ' + buffer.numberOfChannels +
-          ' ch, RMS ' + Math.sqrt(sum / count).toFixed(4)
+        'exported ' +
+          buffer.duration.toFixed(2) +
+          ' s, ' +
+          buffer.numberOfChannels +
+          ' ch, RMS ' +
+          Math.sqrt(sum / count).toFixed(4)
       );
     } catch (err) {
       log('export failed: ' + describe(err));
