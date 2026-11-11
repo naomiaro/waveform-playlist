@@ -196,19 +196,19 @@ test.describe('Effects Example', () => {
 
     // #752: track effects reach the adapter through the provider's
     // `trackEffects` prop, so `tracks` is passed as it is and an added file is
-    // applied to the running engine. A full rebuild shows as the playlist
-    // leaving the "ready" state.
+    // applied to the running engine. Only a full engine build dispatches
+    // `waveform-playlist:ready`. (The "loading" state is no signal: a rebuild
+    // that finishes within one React batch never shows it.)
     test('adding a file does not rebuild the engine', async ({ page }) => {
       const fxButtons = page.getByRole('button', { name: /FX/ });
       await expect(fxButtons).toHaveCount(4);
 
       await page.evaluate(() => {
-        const playlist = document.querySelector('[data-playlist-state]')!;
-        const seen: string[] = [];
-        (window as unknown as { __playlistStates: string[] }).__playlistStates = seen;
-        new MutationObserver(() => {
-          seen.push(playlist.getAttribute('data-playlist-state') ?? 'missing');
-        }).observe(playlist, { attributes: true, attributeFilter: ['data-playlist-state'] });
+        const counter = window as unknown as { __engineBuilds: number };
+        counter.__engineBuilds = 0;
+        window.addEventListener('waveform-playlist:ready', () => {
+          counter.__engineBuilds += 1;
+        });
       });
 
       await page.locator('input[type="file"]').setInputFiles({
@@ -218,13 +218,12 @@ test.describe('Effects Example', () => {
       });
 
       await expect(fxButtons).toHaveCount(5, { timeout: 10000 });
-      await expect(page.locator('[data-playlist-state="ready"]')).toBeVisible();
-      // Give a rebuild, if one were started, time to show.
-      await page.waitForTimeout(500);
-      const states = await page.evaluate(
-        () => (window as unknown as { __playlistStates: string[] }).__playlistStates
+      // Give a rebuild, if one were started, time to finish.
+      await page.waitForTimeout(1000);
+      const builds = await page.evaluate(
+        () => (window as unknown as { __engineBuilds: number }).__engineBuilds
       );
-      expect(states).toEqual([]);
+      expect(builds).toBe(0);
     });
   });
 
