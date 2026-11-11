@@ -300,6 +300,8 @@ See `examples/dawcore-native/effects.html` for a native-effects demo and `exampl
 
 ### Faust Effects (compiled in the browser)
 
+> `addFaustEffect` is for **live compilation** only — DSP source written or supplied at runtime. If your effects are fixed when you build your app, compile them in advance and load them as ordinary effects: see the [Precompiled Faust Effects guide](https://naomiaro.github.io/waveform-playlist/docs/faust-effects). Live compilation downloads the Faust compiler and ships LGPL and GPL-3.0-or-later code to the browser.
+
 Write custom DSP in [Faust](https://faust.grame.fr/) and hear it instantly — `addFaustEffect(dspCode, options?)` compiles the source **in the browser** via the optional `@dawcore/faust` peer (`npm install @dawcore/faust @dawcore/wam`) and adds the result to the chain as an ordinary WAM entry:
 
 ```javascript

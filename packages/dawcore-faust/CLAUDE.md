@@ -34,3 +34,13 @@
 
 - `addFaustEffect(dspCode, { name? })` on `<daw-editor>`/`<daw-track>` → `EffectsManager._addFaustToChain`: validate → compile (BEFORE any chain work, so errors leave the chain untouched) → `ensureWamHost` → `createWamInstanceFromFactory` → shared `_insertWamPlugin` (same helper as `addWamPlugin`).
 - Chain entries are `kind: 'wam'` with `source: { faust: dspCode }` and **no url**. Serialized form: `{ kind: 'wam', faustDsp, faustName?, bypassed, state? }` — restore and offline export **recompile** via this package. Failed recompiles become bypassed placeholders that round-trip the saved DSP + state.
+
+## Scope and licences (#677)
+
+**This package is for LIVE compilation only** (DSP source supplied at runtime). For effects known at build time the documented answer is to precompile — `website/docs/faust-effects.md`, demos in `examples/faust-precompiled/` — and not install this package at all. Say so wherever `addFaustEffect` is documented.
+
+**Licences, from the packages' own metadata (checked 2026-11-10):** `@shren/faust2wam` LGPL-3.0; `@grame/faustwasm` LGPL (COPYING.txt: 2.1-or-later; package.json LGPL-3.0 at 0.15.7); **`@shren/faust-ui` / `@grame/faust-ui` GPL-3.0-or-later** (the GRAME repo has an explicit GPL-3.0 LICENSE file — deliberate, not an oversight; GRAME's `faust-web-component` depends on it too). faust2wam's browser bundle, which this package loads, INLINES faust-ui. So live compilation ships LGPL + GPL-3 code to the browser; this package's own tarball contains none of it and stays MIT. Do not describe any of these as MIT (the old `website/static/faust-wams/LICENSES.md` did).
+
+**Precompiled output:** `faust2wasm` (faustwasm CLI) writes the effect + the faustwasm runtime only; `faust2wam` also vendors `faust-ui/` + `gui.js`. `examples/faust-precompiled/compile.mjs` `stripFaustUi()` removes them and the `createGui()` override from the generated `index.js`, and throws if the template no longer matches. The repo's fixtures in `website/static/faust-wams/` are built that way — never commit a `faust-ui/` folder. Regenerate with `node examples/faust-precompiled/compile.mjs --fixtures` (compile from a temp copy that keeps the `.dsp` FILE NAME: the compiler records it in `dsp-meta.json`).
+
+**The precompiled runtime has the same minification hazard as live compilation** — it builds the processor from class source text at load time. The rule is "serve the compiled folder as static files and import it by URL with `/* webpackIgnore: true */ /* @vite-ignore */`"; `examples/faust-precompiled/vite-plugin.mjs` does this for the demos (dev middleware + copy on build). Verified: both demo pages built with `minify: 'esbuild'` load both routes and render the expected levels.

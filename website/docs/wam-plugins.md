@@ -187,6 +187,10 @@ The trade-off: no built-in Tone.js effects — chains here mix WAM plugins with 
 
 Runnable demo: `pnpm example:dawcore-wam` — community-library picker, GUIs, persistence, WAV export, and in-browser Faust compilation, all on the native adapter.
 
+## Your own effects with Faust
+
+You can write an effect in [Faust](https://faust.grame.fr/), compile it ahead of time to a WAM plugin, and load it by URL like any other. See [Precompiled Faust Effects](./faust-effects.md) — including which generated files are LGPL or GPL, and how to leave the GPL part out.
+
 ## Limitations
 
 - **Don't mutate effect chains or add tracks while a WAV export is in flight** — the offline render swaps Tone's global context during the graph build, so nodes created in that window land on the offline context. See [Exporting with WAM plugins](#exporting-with-wam-plugins).
