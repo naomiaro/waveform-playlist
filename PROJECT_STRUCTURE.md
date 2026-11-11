@@ -339,8 +339,11 @@ const clip = createClipFromSeconds({
   │   ├── ChannelWithMediaElementProgress.tsx  # MediaElement progress overlay
   │   ├── AnimatedPlayhead.tsx          # Smooth 60fps playhead (Tone.js)
   │   ├── AnimatedMediaElementPlayhead.tsx # Smooth 60fps playhead (MediaElement)
+  │   ├── AnnotationListView.tsx        # The annotation list both providers render (shared)
+  │   ├── AnnotationBoxes.tsx           # The row of annotation boxes both providers render (shared)
   │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider
   │   ├── MediaElementAnnotationList.tsx # Annotation list for MediaElement provider
+  │   ├── MediaElementAnnotationBoxes.tsx # MediaElement boxes: provider state + boundary drag wiring
   │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement)
   │   ├── MediaElementWaveform.tsx      # Public MediaElement waveform component
   │   ├── ContextualControls.tsx        # Context-aware wrappers

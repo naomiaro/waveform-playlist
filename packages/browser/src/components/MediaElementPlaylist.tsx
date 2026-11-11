@@ -1,6 +1,4 @@
-import React, { useContext, useRef, useState, useCallback } from 'react';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
+import React, { useRef, useState, useCallback } from 'react';
 import {
   Playlist,
   Track as TrackComponent,
@@ -14,23 +12,17 @@ import {
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
-import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import type { Peaks } from '@waveform-playlist/core';
 import {
   useMediaElementAnimation,
-  useMediaElementState,
   useMediaElementControls,
   useMediaElementData,
 } from '../MediaElementPlaylistContext';
-import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
+import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
 import { ChannelWithMediaElementProgress } from './ChannelWithMediaElementProgress';
-import type {
-  AnnotationData,
-  GetAnnotationBoxLabelFn,
-  OnAnnotationUpdateFn,
-} from '../types/annotations';
+import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 
 /**
  * Wrapper that isolates the custom playhead's hooks from MediaElementPlaylist.
@@ -106,10 +98,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   // MediaElement context hooks
   const { isPlaying } = useMediaElementAnimation();
-  const { annotations, activeAnnotationId } = useMediaElementState();
-  const annotationIntegration = useContext(AnnotationIntegrationContext);
-  const { play, seekTo, setActiveAnnotationId, setAnnotations, setScrollContainer } =
-    useMediaElementControls();
+  // No annotation state here: it changes at every annotation boundary during
+  // playback, and only MediaElementAnnotationBoxes needs it (#744).
+  const { play, seekTo, setScrollContainer } = useMediaElementControls();
   const {
     duration,
     peaksDataArray,
@@ -144,41 +135,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   // Calculate dimensions
   const tracksFullWidth = Math.floor((duration * sampleRate) / samplesPerPixel);
-
-  // Annotation click handler
-  const handleAnnotationClick = useCallback(
-    async (annotation: AnnotationData) => {
-      setActiveAnnotationId(annotation.id);
-      try {
-        await play(annotation.start);
-      } catch (err) {
-        console.error(
-          'waveform-playlist: Failed to start playback for annotation',
-          annotation.id,
-          err
-        );
-      }
-    },
-    [setActiveAnnotationId, play]
-  );
-
-  // Handle annotation boundary updates
-  const handleAnnotationUpdate = useCallback(
-    (updatedAnnotations: AnnotationData[]) => {
-      setAnnotations(updatedAnnotations);
-      onAnnotationUpdate?.(updatedAnnotations);
-    },
-    [setAnnotations, onAnnotationUpdate]
-  );
-
-  // Drag handlers for annotation boundary editing
-  const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
-    annotations,
-    onAnnotationsChange: handleAnnotationUpdate,
-    samplesPerPixel,
-    duration,
-    linkEndpoints: linkEndpointsProp,
-  });
 
   // Mouse handlers for click-to-seek
   const mouseDownTimeRef = useRef<number>(0);
@@ -367,38 +323,13 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
                 </TrackComponent>
               );
             })}
-            {annotations.length > 0 && annotationIntegration && (
-              <DragDropProvider
-                onDragStart={onDragStart}
-                onDragMove={onDragMove}
-                onDragEnd={onDragEnd}
-                modifiers={editable ? [RestrictToHorizontalAxis] : []}
-              >
-                <annotationIntegration.AnnotationBoxesWrapper height={30} width={tracksFullWidth}>
-                  {annotations.map((annotation, index) => {
-                    const startPosition = (annotation.start * sampleRate) / samplesPerPixel;
-                    const endPosition = (annotation.end * sampleRate) / samplesPerPixel;
-                    const label = getAnnotationBoxLabel
-                      ? getAnnotationBoxLabel(annotation, index)
-                      : annotation.id;
-                    return (
-                      <annotationIntegration.AnnotationBox
-                        key={annotation.id}
-                        annotationId={annotation.id}
-                        annotationIndex={index}
-                        startPosition={startPosition}
-                        endPosition={endPosition}
-                        label={label}
-                        color="#ff9800"
-                        isActive={annotation.id === activeAnnotationId}
-                        onClick={() => handleAnnotationClick(annotation)}
-                        editable={editable}
-                      />
-                    );
-                  })}
-                </annotationIntegration.AnnotationBoxesWrapper>
-              </DragDropProvider>
-            )}
+            <MediaElementAnnotationBoxes
+              width={tracksFullWidth}
+              getAnnotationBoxLabel={getAnnotationBoxLabel}
+              editable={editable}
+              linkEndpoints={linkEndpointsProp}
+              onAnnotationUpdate={onAnnotationUpdate}
+            />
             {selectionStart !== selectionEnd && (
               <Selection
                 startPosition={

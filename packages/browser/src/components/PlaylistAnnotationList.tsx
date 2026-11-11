@@ -1,33 +1,15 @@
-import React, { useCallback, useMemo } from 'react';
-import type {
-  AnnotationData,
-  AnnotationAction,
-  AnnotationActionOptions,
-  RenderAnnotationItemProps,
-} from '@waveform-playlist/core';
-import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
+import React from 'react';
+import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
 import {
   useActiveAnnotation,
   usePlaylistState,
   usePlaylistControls,
 } from '../WaveformPlaylistContext';
-import type { OnAnnotationUpdateFn } from '../types/annotations';
+import { AnnotationListView, type AnnotationListCommonProps } from './AnnotationListView';
 
 export type { OnAnnotationUpdateFn } from '../types/annotations';
 
-export interface PlaylistAnnotationListProps {
-  /** Height in pixels for the annotation text list */
-  height?: number;
-  /**
-   * Custom render function for annotation items in the text list.
-   * When provided, completely replaces the default annotation item rendering.
-   */
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
-  /**
-   * Callback when annotations are updated (e.g., text edited).
-   * Called with the full updated annotations array.
-   */
-  onAnnotationUpdate?: OnAnnotationUpdateFn;
+export interface PlaylistAnnotationListProps extends AnnotationListCommonProps {
   /**
    * Action controls to show on each annotation item (e.g., delete, split).
    * Only rendered when `annotationsEditable` is true in context.
@@ -38,10 +20,6 @@ export interface PlaylistAnnotationListProps {
    * `{ linkEndpoints, continuousPlay }` if not provided.
    */
   annotationListConfig?: AnnotationActionOptions;
-  /** Where to position the active annotation when auto-scrolling. Defaults to 'center'. */
-  scrollActivePosition?: ScrollLogicalPosition;
-  /** Which scrollable containers to scroll: 'nearest' or 'all'. Defaults to 'nearest'. */
-  scrollActiveContainer?: 'nearest' | 'all';
 }
 
 /**
@@ -50,50 +28,20 @@ export interface PlaylistAnnotationListProps {
  * Requires @waveform-playlist/annotations with AnnotationProvider.
  * Throws if used without `<AnnotationProvider>` wrapping the component tree.
  */
-export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
-  height,
-  renderAnnotationItem,
-  onAnnotationUpdate,
-  controls,
-  annotationListConfig,
-  scrollActivePosition = 'center',
-  scrollActiveContainer = 'nearest',
-}) => {
+export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = (props) => {
   const { annotations, annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
   const { activeAnnotationId } = useActiveAnnotation();
-  const integration = useAnnotationIntegration();
   const { setAnnotations } = usePlaylistControls();
 
-  // Memoized: it is a dependency of a handler given to every memoized row of
-  // the list, and this component renders at every annotation boundary.
-  const resolvedConfig = useMemo(
-    () => annotationListConfig ?? { linkEndpoints, continuousPlay },
-    [annotationListConfig, linkEndpoints, continuousPlay]
-  );
-
-  const handleAnnotationUpdate = useCallback(
-    (updatedAnnotations: AnnotationData[]) => {
-      setAnnotations(updatedAnnotations);
-      onAnnotationUpdate?.(updatedAnnotations);
-    },
-    [setAnnotations, onAnnotationUpdate]
-  );
-
-  const { AnnotationText } = integration;
-
   return (
-    <AnnotationText
+    <AnnotationListView
+      {...props}
       annotations={annotations}
-      activeAnnotationId={activeAnnotationId ?? undefined}
-      shouldScrollToActive={true}
-      scrollActivePosition={scrollActivePosition}
-      scrollActiveContainer={scrollActiveContainer}
+      activeAnnotationId={activeAnnotationId}
       editable={annotationsEditable}
-      controls={annotationsEditable ? controls : undefined}
-      annotationListConfig={resolvedConfig}
-      height={height}
-      onAnnotationUpdate={handleAnnotationUpdate}
-      renderAnnotationItem={renderAnnotationItem}
+      linkEndpoints={linkEndpoints}
+      continuousPlay={continuousPlay}
+      setAnnotations={setAnnotations}
     />
   );
 };

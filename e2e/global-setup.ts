@@ -18,6 +18,7 @@ const ROUTES = [
   '/examples/effects',
   '/examples/flexible-api',
   '/examples/media-element',
+  '/examples/media-element-annotations',
   '/examples/midi',
   '/examples/mir-spectrogram',
   '/examples/mobile-annotations',

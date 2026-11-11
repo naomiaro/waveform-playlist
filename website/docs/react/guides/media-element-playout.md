@@ -194,4 +194,4 @@ The key insight: `Tone.Gain.input` is a native `GainNode`, so `outputNode.connec
 
 ## Live Example
 
-See the [Media Element Playout example](/examples/media-element) for a working demo with playback rate controls and custom playhead.
+See the [Media Element Playout example](/examples/media-element) for a working demo with playback rate controls and custom playhead. The [Media Element Annotations example](/examples/media-element-annotations) adds annotation boxes and the annotation list to a streamed track.
