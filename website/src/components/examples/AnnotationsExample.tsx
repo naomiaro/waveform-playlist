@@ -4,7 +4,12 @@ import { FileDropZone } from '../FileDropZone';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import * as Tone from 'tone';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import {
+  createTrack,
+  createClipFromSeconds,
+  keyBelongsToFocusedControl,
+  type ClipTrack,
+} from '@waveform-playlist/core';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
@@ -445,14 +450,8 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input field
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target instanceof HTMLElement && e.target.isContentEditable)
-      ) {
-        return;
-      }
+      // Leave the key to a focused text field, dropdown or other control
+      if (keyBelongsToFocusedControl(e)) return;
 
       if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();

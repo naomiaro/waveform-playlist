@@ -1071,11 +1071,14 @@ interface KeyboardShortcut {
 
 function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybackShortcutsReturn;
 // Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind)
-// Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor
+// Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor.
+// With the cursor inside the selection (e.g. paused there) both resume from the cursor to the selection's end.
+// setSelection(start, end) during playback: a range restarts and plays start -> end; a collapsed selection continues open-ended.
 // A shortcut is skipped when the focused control uses the key itself, however it got focus:
 //   - input (every type, incl. range and checkbox), textarea, select, contenteditable: every key
 //   - Escape while a modal <dialog> or [aria-modal="true"] is open
-//   - Space / Enter on a focused <button>, <a href> or <summary>
+//   - Space / Enter on a focused <button> or <summary>; Enter (not Space) on a focused <a href>
+//   - while an input/select/textarea has focus NO shortcut fires (incl. undo, split)
 //   - so after clicking Mute, Space toggles Mute again; Space is play/pause when focus is not on a control
 //   - elements with only an ARIA role (<div role="button">) are NOT covered
 ```
