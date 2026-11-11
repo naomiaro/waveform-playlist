@@ -47,9 +47,9 @@
   "peerDependencies": {
     "@dnd-kit/dom": "^0.5.0",
     "@dnd-kit/react": "^0.5.0",
-    "react": ">=17.0.0",
-    "react-dom": ">=17.0.0",
-    "styled-components": ">=5.0.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "styled-components": "^6.0.0"
   },
   "peerDependenciesMeta": {
     "@dnd-kit/dom": {
@@ -69,12 +69,12 @@
     "@storybook/addon-webpack5-compiler-swc": "^4.0.3",
     "@storybook/react-webpack5": "^10.4.3",
     "@testing-library/react": "^16.3.2",
-    "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.7",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "@types/styled-components": "^5.1.36",
     "jsdom": "^28.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "storybook": "^10.4.3",
     "styled-components": "^6.4.2",
     "tsup": "^8.5.1",

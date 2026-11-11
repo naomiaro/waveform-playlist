@@ -475,7 +475,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Visual: AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack
   - Text: Annotation, AnnotationText
   - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox
-- **Peer Dependencies:** React ^18.0.0, styled-components ^6.0.0
+- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
 - **Documentation:** See `website/docs/getting-started/installation.md`
@@ -540,7 +540,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
      - Docusaurus webpack aliases handle module resolution
   3. **Try-Catch for Cleanup** - Wrap disconnect calls in try-catch for microphone switching
 
-- **Peer Dependencies:** React ^18.0.0
+- **Peer Dependencies:** React ^19.0.0
 - **Use Cases:** Voice recording, podcast editing, audio capture, overdub recording
 - **Example:** `website/src/components/examples/RecordingExample.tsx` + `RecordingControls.tsx`
 - **Debugging:** See `packages/recording/CLAUDE.md`
@@ -610,7 +610,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Multi-track expansion:** One MIDI config can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
 - **No native sample rate:** MIDI is event-based — `sampleRate` is required on `useMidiTracks()`'s options (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
 - **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core`
-- **Peer Dependencies:** React ^18.0.0
+- **Peer Dependencies:** React ^19.0.0
 - **Location:** `packages/midi/`
 
 ### 🧱 Web Components

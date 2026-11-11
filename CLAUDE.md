@@ -109,7 +109,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 - `website/static/llms.txt` — Library discovery page, served at `/llms.txt`. Update when packages, architecture, or key APIs change.
 - `website/docs/llm-reference.md` — All TypeScript interfaces from source, no prose. Update when any context type, hook signature, or component prop changes.
-- **Keep all doc surfaces in sync** — When adding new context fields, hook returns, or component props, update: (1) `llm-reference.md` (interfaces), (2) `llms.txt` (descriptions), (3) `docs/api/hooks.md` (context value interfaces), (4) `docs/examples.md` (code snippets), (5) example page files in `src/pages/examples/` (keyboard shortcuts sections, feature lists), (6) provider API docs (`docs/react/api/providers/*.md`) AND guide hook tables (e.g. `media-element-playout.md`), (7) the root README demo table. For dawcore element attributes also: `packages/dawcore/COMPONENTS.md`, the element's entry in `packages/dawcore/CLAUDE.md`, and the attribute tables in `docs/specs/web-components-migration.md`.
+- **Keep all doc surfaces in sync** — When adding new context fields, hook returns, or component props, update: (1) `llm-reference.md` (interfaces), (2) `llms.txt` (descriptions), (3) `docs/api/hooks.md` (context value interfaces), (4) `docs/examples.md` (code snippets), (5) example page files in `src/pages/examples/` (keyboard shortcuts sections, feature lists), (6) provider API docs (`docs/react/api/providers/*.md`) AND guide hook tables (e.g. `media-element-playout.md`), (7) the root README demo table. **Breaking changes** additionally get an entry in `website/docs/react/upgrading.md` (one section per change: what changed, a **Find** pattern, a **Replace with** before/after) — that page is linked from `llms.txt` and `llm-reference.md` so a coding agent can migrate a consumer from it alone. For dawcore element attributes also: `packages/dawcore/COMPONENTS.md`, the element's entry in `packages/dawcore/CLAUDE.md`, and the attribute tables in `docs/specs/web-components-migration.md`.
 
 ---
 
@@ -127,6 +127,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 ### React/TypeScript
 
+- **React 19 only** (since #702): every React package peers on `react`/`react-dom` `^19.0.0` and `styled-components` `^6.0.0`, and all workspace devDependencies pin the same React, so there is ONE React copy in the workspace. Keep it that way — a package without an explicit `react` devDependency gets whatever pnpm auto-installs for the peer, and a second copy breaks any jsdom test that mounts components across packages ("Cannot read properties of null (reading 'useContext')" / "A React Element from an older version of React was rendered"). `trackControlsDisabledWhileLoading.test.tsx` in browser is the template for mounting the full `<Waveform />` under jsdom.
 - Use functional components with hooks
 - Props interfaces: `{ComponentName}Props`
 - Use `React.FC<Props>` for component types
