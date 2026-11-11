@@ -89,19 +89,43 @@ export interface ChannelWithProgressProps extends SmartChannelProps {
  * The progress overlay shows the "played" portion of the waveform.
  * Updates via the shared animation frame registry — no own rAF loop.
  */
-export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
+interface ClipProgressProps {
+  clipStartSample: number;
+  clipDurationSamples: number;
+  color: string;
+  height: number;
+  top: number;
+}
+
+/** Fraction of the clip that lies before `time`, 0 to 1. */
+function playedRatio(
+  time: number,
+  sampleRate: number,
+  clipStartSample: number,
+  clipDurationSamples: number
+): number {
+  const currentSample = time * sampleRate;
+  if (currentSample <= clipStartSample) return 0;
+  if (currentSample >= clipStartSample + clipDurationSamples) return 1;
+  return (currentSample - clipStartSample) / clipDurationSamples;
+}
+
+/**
+ * The played-portion overlay of one channel. It is the only part of a channel
+ * that follows the cursor, so it alone subscribes to the animation and data
+ * contexts (#693): a seek, or a selection whose start moves, re-renders these
+ * small overlays and not the channels (and their canvases' React trees) around
+ * them.
+ */
+const ClipProgress: React.FC<ClipProgressProps> = ({
   clipStartSample,
   clipDurationSamples,
-  midiNotes,
-  clipSampleRate,
-  clipOffsetSeconds,
-  ...smartChannelProps
+  color,
+  height,
+  top,
 }) => {
   const progressRef = useRef<HTMLDivElement>(null);
   const callbackId = useId();
-  const theme = useTheme() as WaveformPlaylistTheme;
-  const { waveHeight } = usePlaylistInfo();
-
   const {
     isPlaying,
     currentTimeRef,
@@ -110,8 +134,6 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     unregisterFrameCallback,
   } = usePlaybackAnimation();
   const { samplesPerPixel, sampleRate } = usePlaylistData();
-
-  const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
 
   // Use shared helper to compute clip pixel width (must match Clip.tsx sizing)
   // peaksData.length may be shorter than the clip when audio is shorter than configured duration
@@ -126,19 +148,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     if (isPlaying) {
       registerFrameCallback(callbackId, ({ visualTime, sampleRate: sr }) => {
         if (progressRef.current) {
-          const currentSample = visualTime * sr;
-          const clipEndSample = clipStartSample + clipDurationSamples;
-
-          let ratio = 0;
-          if (currentSample <= clipStartSample) {
-            ratio = 0;
-          } else if (currentSample >= clipEndSample) {
-            ratio = 1;
-          } else {
-            const playedSamples = currentSample - clipStartSample;
-            ratio = playedSamples / clipDurationSamples;
-          }
-
+          const ratio = playedRatio(visualTime, sr, clipStartSample, clipDurationSamples);
           // scaleX is composite-only — no layout reflow, GPU-accelerated
           progressRef.current.style.transform = `scaleX(${ratio})`;
         }
@@ -155,26 +165,40 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   ]);
 
   // Also update when not playing (for seeks, stops, etc.). Reads visualTimeRef
-  // so the static progress fill matches the playhead's audible position.
+  // so the static progress fill matches the playhead's audible position. No
+  // dependency array on purpose: the animation context re-renders this
+  // component whenever the resting position changes.
   useEffect(() => {
     if (!isPlaying && progressRef.current) {
       const currentTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
-      const currentSample = currentTime * sampleRate;
-      const clipEndSample = clipStartSample + clipDurationSamples;
-
-      let ratio = 0;
-      if (currentSample <= clipStartSample) {
-        ratio = 0;
-      } else if (currentSample >= clipEndSample) {
-        ratio = 1;
-      } else {
-        const playedSamples = currentSample - clipStartSample;
-        ratio = playedSamples / clipDurationSamples;
-      }
-
+      const ratio = playedRatio(currentTime, sampleRate, clipStartSample, clipDurationSamples);
       progressRef.current.style.transform = `scaleX(${ratio})`;
     }
   });
+
+  return (
+    <ProgressOverlay
+      ref={progressRef}
+      $color={color}
+      $height={height}
+      $top={top}
+      $width={clipPixelWidth}
+    />
+  );
+};
+
+export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
+  clipStartSample,
+  clipDurationSamples,
+  midiNotes,
+  clipSampleRate,
+  clipOffsetSeconds,
+  ...smartChannelProps
+}) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+  const { waveHeight } = usePlaylistInfo();
+
+  const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
 
   // Get the draw mode from theme (defaults to 'inverted')
   const drawMode = theme?.waveformDrawMode || 'inverted';
@@ -244,12 +268,12 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
       )}
       {/* Progress overlay - shows played portion with progress color (skip for piano-roll) */}
       {!isPianoRollMode && (
-        <ProgressOverlay
-          ref={progressRef}
-          $color={progressColor}
-          $height={effectiveHeight}
-          $top={effectiveTop}
-          $width={clipPixelWidth}
+        <ClipProgress
+          clipStartSample={clipStartSample}
+          clipDurationSamples={clipDurationSamples}
+          color={progressColor}
+          height={effectiveHeight}
+          top={effectiveTop}
         />
       )}
       {/* Waveform canvas with transparent background */}
