@@ -6,6 +6,7 @@ import {
   createTrack,
 } from '@waveform-playlist/core';
 import { parseMidiFile } from '@dawcore/midi';
+import { midiConfigsEqual } from './midiConfigsEqual';
 
 /**
  * Configuration for a single MIDI track to load.
@@ -64,6 +65,10 @@ export interface UseMidiTracksOptions {
  * all track controls and layout containers appear simultaneously in React,
  * while canvas rendering is deferred to the UI layer for progressive drawing.
  *
+ * `configs` is compared by value, so it can be written inline: tracks reload
+ * only when a config actually changes, not when the array is a new object.
+ * Several `src` files are fetched in parallel; tracks keep the config order.
+ *
  * @example
  * ```typescript
  * const { tracks, loading, error } = useMidiTracks(
@@ -78,10 +83,30 @@ export interface UseMidiTracksOptions {
  * );
  * ```
  */
+/** End of the last note, in seconds. A loop, not `Math.max(...)`: a spread of a
+ * very large note list exceeds the engine's argument limit. */
+function lastNoteEnd(notes: MidiNoteData[]): number {
+  let end = 0;
+  for (const note of notes) {
+    const noteEnd = note.time + note.duration;
+    if (noteEnd > end) end = noteEnd;
+  }
+  return end;
+}
+
 export function useMidiTracks(
-  configs: MidiTrackConfig[],
+  configsProp: MidiTrackConfig[],
   options: UseMidiTracksOptions
 ): UseMidiTracksReturn {
+  // The effect below is keyed on `configs`. Keep the previous array while the new
+  // one describes the same tracks, so an inline array literal (a new identity on
+  // every render) does not re-run the effect, which sets state, which renders,
+  // which re-runs the effect.
+  const [configs, setConfigs] = useState(configsProp);
+  if (configs !== configsProp && !midiConfigsEqual(configs, configsProp)) {
+    setConfigs(configsProp);
+  }
+
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,53 +173,65 @@ export function useMidiTracks(
         }
         setError(null);
 
-        const allTracks: ClipTrack[] = [];
-
         for (const config of configs) {
-          if (cancelled) break;
+          if (!config.midiNotes && !config.src) {
+            throw new Error('MIDI track config must provide src or midiNotes');
+          }
+        }
 
+        // Fetch every file at once. A URL used by several configs is fetched once.
+        const inflight = new Map<string, Promise<ArrayBuffer>>();
+        const loadBuffer = (src: string): Promise<ArrayBuffer> => {
+          const cached = bufferCacheRef.current.get(src);
+          if (cached) return Promise.resolve(cached);
+          const pending = inflight.get(src);
+          if (pending) return pending;
+          const request = (async () => {
+            const response = await fetch(src, { signal: abortController.signal });
+            if (!response.ok) {
+              throw new Error(`Failed to fetch ${src}: ${response.statusText}`);
+            }
+            const buffer = await response.arrayBuffer();
+            bufferCacheRef.current.set(src, buffer);
+            return buffer;
+          })();
+          inflight.set(src, request);
+          return request;
+        };
+        const buffers = await Promise.all(
+          configs.map((config) =>
+            !config.midiNotes && config.src ? loadBuffer(config.src) : undefined
+          )
+        );
+        if (cancelled) return;
+
+        // Build in config order, whatever order the fetches finished in.
+        const allTracks: ClipTrack[] = [];
+        configs.forEach((config, index) => {
+          const buffer = buffers[index];
           if (config.midiNotes) {
             // Pre-parsed notes — no fetch needed
             const notes = config.midiNotes;
-            const duration =
-              notes.length > 0 ? Math.max(...notes.map((n) => n.time + n.duration)) : 0;
             const trackName = config.name || 'MIDI Track';
-            allTracks.push(createTrackFromNotes(config, notes, trackName, duration));
-          } else if (config.src) {
-            // Use cached buffer if available, otherwise fetch
-            let buffer = bufferCacheRef.current.get(config.src);
-            if (!buffer) {
-              const response = await fetch(config.src, {
-                signal: abortController.signal,
-              });
-              if (!response.ok) {
-                throw new Error(`Failed to fetch ${config.src}: ${response.statusText}`);
-              }
-              buffer = await response.arrayBuffer();
-              bufferCacheRef.current.set(config.src, buffer);
-            }
-
+            allTracks.push(createTrackFromNotes(config, notes, trackName, lastNoteEnd(notes)));
+          } else if (buffer) {
             const parsed = parseMidiFile(buffer, {
               flatten: config.flatten,
             });
             for (const parsedTrack of parsed.tracks) {
-              if (cancelled) break;
-              const trackName = parsedTrack.name;
               allTracks.push(
                 createTrackFromNotes(
                   config,
                   parsedTrack.notes,
-                  trackName,
+                  parsedTrack.name,
                   parsedTrack.duration,
                   parsedTrack.channel,
                   parsedTrack.programNumber
                 )
               );
             }
-          } else {
-            throw new Error('MIDI track config must provide src or midiNotes');
           }
-        }
+        });
 
         if (!cancelled) {
           setTracks(allTracks);
@@ -208,6 +245,8 @@ export function useMidiTracks(
           setError(errorMessage);
           setLoading(false);
           console.error('Error loading MIDI tracks:', err);
+          // One file failed: stop the others still in flight.
+          abortController.abort();
         }
       }
     };
