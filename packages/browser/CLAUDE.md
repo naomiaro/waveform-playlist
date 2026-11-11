@@ -142,6 +142,23 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in `derivePeaks` converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Path A wins whenever it succeeds, and the worker skips clips that have `waveformData`, so these peaks stay until the clip loses its `waveformData`. `createClip` (called by both direct callers and `createClipFromSeconds`) logs a per-clip warning with the clip name.
 
+## Memo Boundaries in the Visualization (#693)
+
+`PlaylistVisualization` is a shell: sizes, the shared vertical layout, the selection-drag pointer handlers and `PlaylistInfoContext`. It reads selection state for those handlers, so it re-renders on every pointer move of a selection drag (and on every active-annotation change, since both live in `PlaylistStateContext`). What it renders is split so that this is cheap:
+
+- `TrackRows` → `TrackRow` → `ClipView` (`components/TrackRows.tsx`) and `TrackControlsColumn` → `DefaultTrackControls` are `React.memo`. They take NO selection, cursor or annotation state. Their props are primitives, stable callbacks, and the identity-stable pieces of `peaksDataArray` from `derivePeaks` (#692).
+- `SelectionOverlay`, `PlayheadOverlay`, `AnnotationBoxesOverlay`, `LoopRegionOverlay` (`components/VisualizationOverlays.tsx`) read that state from context themselves.
+- In `ChannelWithProgress`, only the inner `ClipProgress` overlay subscribes to the animation and data contexts. The channel itself must not: `setSelection` also sets `currentTime` (so a leftward selection drag changes the animation context per move), and `trackStates` lives in the data context (so a volume change would re-render every channel).
+
+Rules when changing these files:
+
+1. Anything handed to `TrackRows`/`TrackControlsColumn` must keep its identity across a shell render that did not change it. `selectTrack` reads `tracks` through a ref for this reason; `trackControlsSlots`, the `PlaylistInfoContext` value and the `timescale` element are `useMemo`'d; track heights depend on the recording's track id and channel count, not on `recordingState` (a new object every recording frame).
+2. `recordingState` is passed down to the armed track's row only (`undefined` for the others), so a recording frame re-renders one row.
+3. Pass track fields (`trackId`, render mode) rather than the `track` object: track objects are replaced by engine statechanges and by consumers.
+4. `renderTrackControls(trackIndex)` is called inside the memoized column, so it runs when tracks, mixer state, layout or the function itself change, not on selection or cursor changes.
+
+`visualizationMemoBoundaries.test.tsx` counts renders with wrappers around the real `Clip`, `SmartChannel`, `Track`, `Controls` and `SmartScale`. `SmartChannel` is the proxy for `ChannelWithProgress` renders including context-triggered ones. Measured on `/examples/multi-clip` (7 tracks, 13 clips): about 440 component renders per pointer move of a selection drag before, 31 (dragging right) and 63 (dragging left) after.
+
 ## Playlist Loading Detection
 
 Three approaches for detecting when tracks finish loading:

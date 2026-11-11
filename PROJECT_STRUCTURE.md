@@ -318,7 +318,12 @@ const clip = createClipFromSeconds({
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
-  │   ├── PlaylistVisualization.tsx      # Main waveform + track rendering
+  │   ├── PlaylistVisualization.tsx      # Visualization shell: sizes, layout, selection-drag handlers
+  │   ├── TrackRows.tsx                 # Memoized track rows, clips and recording preview
+  │   ├── TrackControlsColumn.tsx       # Memoized controls column (one slot per track)
+  │   ├── DefaultTrackControls.tsx      # Default track control panel (memoized)
+  │   ├── VisualizationOverlays.tsx     # Selection, playhead, annotation boxes, loop region
+  │   ├── visualizationLayout.tsx       # Shared row/slot styled components and channel-count helper
   │   ├── Waveform.tsx                  # Public waveform component
   │   ├── ClipInteractionProvider.tsx   # Declarative clip drag/trim/snap/collision
   │   ├── KeyboardShortcuts.tsx         # Declarative keyboard shortcut component (playback, splitting, undo props)
