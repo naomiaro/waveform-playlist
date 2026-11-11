@@ -19,6 +19,7 @@ import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
+import { useShallowStable } from './hooks/useShallowStable';
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -175,8 +176,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
-  theme: userTheme,
-  controls = DEFAULT_CONTROLS,
+  theme: userThemeProp,
+  controls: controlsProp = DEFAULT_CONTROLS,
   annotationList,
   barWidth = 1,
   barGap = 0,
@@ -189,6 +190,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   createPlayout,
   children,
 }) => {
+  // Inline object literals from the parent get a new identity per render;
+  // keep the previous one while the contents are unchanged so the memoized
+  // context values and the merged theme below are not invalidated.
+  const controls = useShallowStable(controlsProp);
+  const userTheme = useShallowStable(userThemeProp);
+
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
 
   // State

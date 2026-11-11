@@ -17,6 +17,7 @@ import {
   WaveformPlaylistProvider,
   usePlaylistControls,
   usePlaylistData,
+  usePlaybackAnimation,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -62,7 +63,7 @@ function createFakeAdapter(): PlayoutAdapter {
     addTrack() {},
     removeTrack() {},
     updateTrack() {},
-    play() {},
+    play: vi.fn(),
     pause() {},
     stop() {},
     seek() {},
@@ -81,36 +82,48 @@ function createFakeAdapter(): PlayoutAdapter {
 type Controls = ReturnType<typeof usePlaylistControls>;
 type Data = ReturnType<typeof usePlaylistData>;
 
-let probe: { controls: Controls; data: Data; theme: unknown };
+let probe: { controls: Controls; data: Data; theme: unknown; isPlaying: boolean };
 
 const ProbeChild: React.FC = () => {
-  probe = { controls: usePlaylistControls(), data: usePlaylistData(), theme: useTheme() };
+  probe = {
+    controls: usePlaylistControls(),
+    data: usePlaylistData(),
+    theme: useTheme(),
+    isPlaying: usePlaybackAnimation().isPlaying,
+  };
   return null;
 };
 
 const TRACKS = [makeTrack('track-1'), makeTrack('track-2')];
 
-async function mount() {
+// `inlineProps` passes fresh `controls` and `theme` object literals on every
+// render of the wrapper, which is how most consumers write them.
+async function mount({ inlineProps = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  // No `controls` and no `theme` prop: the defaults are what must stay stable.
   const Wrapper: React.FC = () => (
     <WaveformPlaylistProvider
       tracks={TRACKS}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
+      {...(inlineProps
+        ? { controls: { show: true, width: 200 }, theme: { playheadColor: 'red' } }
+        : {})}
     >
       <ProbeChild />
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(probe.data.isReady).toBe(true));
-  return { rerender: () => utils.rerender(<Wrapper />) };
+  return { adapter, rerender: () => utils.rerender(<Wrapper />) };
 }
 
-afterEach(() => {
-  cleanup();
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
   vi.restoreAllMocks();
 });
 
@@ -149,6 +162,63 @@ describe('provider context values keep their identity (#691)', () => {
 
     expect(probe.data).toBe(dataBefore);
     expect(probe.theme).toBe(themeBefore);
+  });
+
+  it('data value and theme survive a parent re-render that passes equal inline objects', async () => {
+    const { rerender } = await mount({ inlineProps: true });
+    const dataBefore = probe.data;
+    const themeBefore = probe.theme;
+    expect(probe.data.controls).toEqual({ show: true, width: 200 });
+
+    await act(async () => {
+      rerender();
+    });
+
+    expect(probe.data).toBe(dataBefore);
+    expect(probe.theme).toBe(themeBefore);
+  });
+
+  it('controls value survives play and pause', async () => {
+    await mount();
+    const before = probe.controls;
+
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+    expect(probe.controls).toBe(before);
+
+    await act(async () => {
+      probe.controls.pause();
+    });
+    expect(probe.isPlaying).toBe(false);
+    expect(probe.controls).toBe(before);
+  });
+
+  it('seekTo and setSelection captured before play still restart playback while playing', async () => {
+    const { adapter } = await mount();
+    const play = adapter.play as ReturnType<typeof vi.fn>;
+    // Captured while stopped: these must read the live playing state, not the
+    // value from the render they were created in.
+    const { seekTo, setSelection } = probe.controls;
+
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+    const callsAfterPlay = play.mock.calls.length;
+
+    await act(async () => {
+      seekTo(0.5);
+    });
+    expect(play.mock.calls.length).toBeGreaterThan(callsAfterPlay);
+    const callsAfterSeek = play.mock.calls.length;
+
+    await act(async () => {
+      setSelection(0.25, 0.75);
+    });
+    expect(play.mock.calls.length).toBeGreaterThan(callsAfterSeek);
+    expect(probe.isPlaying).toBe(true);
   });
 
   it('two track setters called in one batch both apply', async () => {

@@ -44,6 +44,7 @@ import {
   useAnimationFrameLoop,
   useWaveformDataCache,
 } from './hooks';
+import { useShallowStable } from './hooks/useShallowStable';
 
 // Types
 export interface ClipPeaks {
@@ -378,8 +379,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
   automaticScroll = false,
-  theme: userTheme,
-  controls = DEFAULT_CONTROLS,
+  theme: userThemeProp,
+  controls: controlsProp = DEFAULT_CONTROLS,
   annotationList,
   effects,
   onReady,
@@ -399,6 +400,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   createAdapter,
   children,
 }) => {
+  // Inline object literals from the parent get a new identity per render;
+  // keep the previous one while the contents are unchanged so the memoized
+  // context values and the merged theme below are not invalidated.
+  const controls = useShallowStable(controlsProp);
+  const userTheme = useShallowStable(userThemeProp);
+
   // Default progressBarWidth to barWidth + barGap (fills gaps)
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
 
