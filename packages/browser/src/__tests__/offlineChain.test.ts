@@ -119,10 +119,10 @@ describe('buildOfflineChain / connectOfflineChain', () => {
     const calls = (connect as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls).toHaveLength(3);
     expect(calls[0][0]).toBe(from);
-    expect(calls[0][1]).toBe(instances[0].effect);
-    expect(calls[1][0]).toBe(instances[0].effect);
-    expect(calls[1][1]).toBe(instances[1].effect);
-    expect(calls[2][0]).toBe(instances[1].effect);
+    expect(calls[0][1]).toBe(instances[0].input);
+    expect(calls[1][0]).toBe(instances[0].input);
+    expect(calls[1][1]).toBe(instances[1].input);
+    expect(calls[2][0]).toBe(instances[1].input);
     expect(calls[2][1]).toBe(to);
   });
 
@@ -148,7 +148,7 @@ describe('buildOfflineChain / connectOfflineChain', () => {
     expect(ensureWamHost).toHaveBeenCalledWith(rawContext);
     expect(cloneInstanceInto).toHaveBeenCalledWith(livePlugin, rawContext, 'group-1');
     expect(instances).toHaveLength(1);
-    expect(instances[0].effect).toBe(cloneNode);
+    expect(instances[0].input).toBe(cloneNode);
 
     dispose();
     expect(cloneDestroy).toHaveBeenCalled();
@@ -172,17 +172,17 @@ describe('buildOfflineChain / connectOfflineChain', () => {
       rawContext
     );
     expect(instances).toHaveLength(3);
-    expect(instances[1].effect).toBe(cloneNode);
+    expect(instances[1].input).toBe(cloneNode);
 
     const from = { name: 'from' };
     const to = { name: 'to' };
     connectOfflineChain(from as never, instances, to as never);
     const calls = (connect as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls.map((c) => [c[0], c[1]])).toEqual([
-      [from, instances[0].effect],
-      [instances[0].effect, cloneNode],
-      [cloneNode, instances[2].effect],
-      [instances[2].effect, to],
+      [from, instances[0].input],
+      [instances[0].input, cloneNode],
+      [cloneNode, instances[2].input],
+      [instances[2].input, to],
     ]);
   });
 

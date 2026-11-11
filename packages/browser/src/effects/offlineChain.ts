@@ -3,22 +3,26 @@
  * Natives are re-created fresh on the current (offline) context; WAM entries
  * are re-instantiated on the offline context from their URL-cached factories
  * with the live instance's state transferred (cloneInstanceInto — worklets
- * are context-bound). Any failure disposes the partially-built chain and
+ * are context-bound); registered custom effects run their `prepare` hook on
+ * the offline context (an AudioWorklet module has to be added to every
+ * context) and are created there with the live parameters. Any failure disposes the partially-built chain and
  * rethrows: a WAV export must never silently render without an effect the
  * live chain has (#536).
  */
 import { connect } from 'tone';
 import type { ToneAudioNode } from 'tone';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
+import { ensureEffectPrepared } from '@waveform-playlist/core';
 import type { EffectDefinition } from './effectDefinitions';
 import { createEffectInstance, type EffectInstance } from './effectFactory';
 import { createWamEffectInstance } from './wamEffectFactory';
+import { createCustomEffectInstance } from './customEffectFactory';
 import { loadWamModule } from './loadWam';
 
 /** Structural subset of ActiveEffect / TrackActiveEffect used offline. */
 export interface OfflineChainEntry {
   instanceId: string;
-  kind: 'native' | 'wam';
+  kind: 'native' | 'wam' | 'custom';
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
 }
@@ -44,6 +48,11 @@ export async function buildOfflineChain(
     for (const entry of entries) {
       if (entry.kind === 'native') {
         instances.push(createEffectInstance(entry.definition, entry.params));
+        continue;
+      }
+      if (entry.kind === 'custom') {
+        await ensureEffectPrepared(entry.definition.id, rawContext);
+        instances.push(createCustomEffectInstance(entry.definition.id, rawContext, entry.params));
         continue;
       }
       const livePlugin = getLivePlugin(entry.instanceId);
@@ -77,8 +86,8 @@ export function connectOfflineChain(
 ): void {
   let current: ToneAudioNode | AudioNode = from;
   for (const inst of instances) {
-    connect(current, inst.effect);
-    current = inst.effect;
+    connect(current, inst.input);
+    current = inst.output;
   }
   connect(current, to);
 }

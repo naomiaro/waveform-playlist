@@ -15,8 +15,9 @@ export { useTrackDynamicEffects } from './hooks/useTrackDynamicEffects';
 export type {
   UseTrackDynamicEffectsReturn,
   TrackActiveEffect,
-  TrackEffectsState,
 } from './hooks/useTrackDynamicEffects';
+
+export { useActiveEffects } from './hooks/useActiveEffects';
 
 export { useExportWav } from './hooks/useExportWav';
 export type {
@@ -42,7 +43,16 @@ export {
   createEffectInstance,
   createEffectChain,
 } from './effects';
-export type { EffectDefinition, EffectParameter, ParameterType, EffectInstance } from './effects';
+export type {
+  EffectDefinition,
+  EffectCategory,
+  BuiltInEffectCategory,
+  EffectParameter,
+  ParameterType,
+  EffectInstance,
+} from './effects';
+export { getAvailableEffects, createCustomEffectInstance } from './effects/customEffectFactory';
+export type { CustomEffectInstance } from './effects/customEffectFactory';
 
 export { ExportWavButton } from './components/ExportControls';
 export type { ExportWavButtonProps } from './components/ExportControls';

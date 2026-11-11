@@ -17,18 +17,30 @@ export interface EffectParameter {
   options?: { value: string | number; label: string }[];
 }
 
+/** The categories the built-in effects use. */
+export type BuiltInEffectCategory =
+  | 'delay'
+  | 'reverb'
+  | 'modulation'
+  | 'distortion'
+  | 'filter'
+  | 'dynamics'
+  | 'spatial'
+  | 'wam';
+
+// `string & {}` keeps editor completion for the known names while accepting
+// any other string.
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export type EffectCategory = BuiltInEffectCategory | (string & {});
+
 export interface EffectDefinition {
   id: string;
   name: string;
-  category:
-    | 'delay'
-    | 'reverb'
-    | 'modulation'
-    | 'distortion'
-    | 'filter'
-    | 'dynamics'
-    | 'spatial'
-    | 'wam';
+  /**
+   * The built-in effects use the listed categories and WAM plugins use
+   * `'wam'`; a registered custom effect may name any category of its own.
+   */
+  category: EffectCategory;
   description: string;
   parameters: EffectParameter[];
 }

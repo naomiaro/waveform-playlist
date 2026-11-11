@@ -1,42 +1,33 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  isNativeGlobalContext,
-  getGlobalAudioContext,
-  type EffectsFunction,
-} from '@waveform-playlist/playout';
-import {
-  effectDefinitions,
-  getEffectDefinition,
-  type EffectDefinition,
-} from '../effects/effectDefinitions';
-import { createEffectInstance, type EffectInstance } from '../effects/effectFactory';
-import { loadWamModule } from '../effects/loadWam';
-import { createWamEffectInstance, type WamEffectInstance } from '../effects/wamEffectFactory';
-import { buildOfflineChain, connectOfflineChain } from '../effects/offlineChain';
-import { chainTopologyKey } from '../effects/chainTopology';
-import type { OfflineEffectsFunction } from './useExportWav';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { EffectsFunction } from '@waveform-playlist/playout';
+import type { ValueSource } from '@waveform-playlist/core';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
-import { Analyser, Volume, ToneAudioNode, connect } from 'tone';
+import { Analyser } from 'tone';
+import type { EffectDefinition } from '../effects/effectDefinitions';
+import { getAvailableEffects } from '../effects/customEffectFactory';
+import { EffectsRack, type ActiveEffect, type EffectParameterValue } from '../effects/effectsRack';
+import type { OfflineEffectsFunction } from './useExportWav';
 
-export interface ActiveEffect {
-  instanceId: string;
-  effectId: string;
-  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
-  kind: 'native' | 'wam';
-  /** Module URL for wam entries. */
-  url?: string;
-  definition: EffectDefinition;
-  params: Record<string, number | string | boolean>;
-  bypassed: boolean;
-}
+export type { ActiveEffect } from '../effects/effectsRack';
 
 export interface UseDynamicEffectsReturn {
-  // State
-  activeEffects: ActiveEffect[];
+  /**
+   * The master chain, in order. Read it with `useActiveEffects(effects)` in
+   * the component that draws the rack: this hook does not re-render when the
+   * list changes, so a slider step re-renders that component only.
+   */
+  effects: ValueSource<ActiveEffect[]>;
+  /** The built-in effects, then every type registered with `registerEffect()`. */
   availableEffects: EffectDefinition[];
 
-  // Actions
-  addEffect: (effectId: string) => void;
+  /**
+   * Adds a built-in effect or a registered custom effect by id. A built-in is
+   * in the chain before this returns. A registered type is added once its
+   * `prepare` hook has run on the audio context, and requires native-context
+   * mode (`configureGlobalContext({ nativeAudioContext: true })`).
+   * Resolves with the new entry's instanceId; rejects for an unknown id.
+   */
+  addEffect: (effectId: string) => Promise<string>;
   /**
    * Hosts a WAM plugin from a module URL and appends it to the master chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
@@ -48,11 +39,7 @@ export interface UseDynamicEffectsReturn {
   /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
   getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
-  updateParameter: (
-    instanceId: string,
-    paramName: string,
-    value: number | string | boolean
-  ) => void;
+  updateParameter: (instanceId: string, paramName: string, value: EffectParameterValue) => void;
   toggleBypass: (instanceId: string) => void;
   reorderEffects: (fromIndex: number, toIndex: number) => void;
   clearAllEffects: () => void;
@@ -61,11 +48,12 @@ export interface UseDynamicEffectsReturn {
   masterEffects: EffectsFunction;
 
   /**
-   * Creates a fresh effects function for offline rendering. Native effects are
-   * re-created on the offline context; WAM entries are re-instantiated from
-   * their URL-cached factories with the live instance's state transferred.
-   * The returned function may be async and may reject — a WAV export never
-   * silently renders without an effect the live chain has.
+   * Creates a fresh effects function for offline rendering, from the chain as
+   * it is when called (`undefined` when no effect is active). Built-in
+   * effects are re-created on the offline context, WAM entries re-instantiated
+   * with the live instance's state, registered custom effects prepared and
+   * created there. The returned function is async and may reject — a WAV
+   * export never silently renders without an effect the live chain has.
    */
   createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
 
@@ -74,372 +62,62 @@ export interface UseDynamicEffectsReturn {
 }
 
 /**
- * Hook for managing a dynamic chain of audio effects with real-time parameter updates
+ * Hook for managing a dynamic chain of audio effects with real-time parameter
+ * updates. Everything it returns keeps its identity for the life of the
+ * component (`masterEffects` follows `fftSize`; `availableEffects` follows
+ * the registry).
  */
 export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsReturn {
-  // Track active effects in state (for UI)
-  const [activeEffects, setActiveEffects] = useState<ActiveEffect[]>([]);
-
-  // Ref to store current activeEffects for reading in callbacks (avoids stale closures)
-  const activeEffectsRef = useRef<ActiveEffect[]>(activeEffects);
-  activeEffectsRef.current = activeEffects;
-
-  // Track effect instances (for audio processing)
-  const effectInstancesRef = useRef<Map<string, EffectInstance>>(new Map());
-
-  // Guards addWamEffect's async window — set false by the unmount cleanup.
-  const isMountedRef = useRef(true);
-
-  // Analyser for visualization
+  const [rack] = useState(() => new EffectsRack());
   const analyserRef = useRef<Analyser | null>(null);
 
-  // Reference to the current audio graph nodes
-  const graphNodesRef = useRef<{
-    masterGainNode: Volume;
-    destination: ToneAudioNode;
-    analyserNode: Analyser;
-  } | null>(null);
+  useEffect(() => rack.dispose, [rack]);
 
-  // Rebuild the effect chain when effects change
-  // Note: effects is passed as parameter to avoid stale closure issues
-  const rebuildChain = useCallback((effects: ActiveEffect[]) => {
-    const nodes = graphNodesRef.current;
-    if (!nodes) return;
-
-    const { masterGainNode, destination, analyserNode } = nodes;
-
-    // Disconnect everything first
-    try {
-      masterGainNode.disconnect();
-    } catch (e) {
-      console.warn('[waveform-playlist] Error disconnecting master effects chain:', e);
-    }
-
-    // Get effect instances in order. Bypassed WAM entries are dropped from the
-    // chain entirely (disconnection bypass — WAM has no wet param).
-    const audible = effects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
-    const instances = audible
-      .map((ae) => effectInstancesRef.current.get(ae.instanceId))
-      .filter((inst): inst is EffectInstance => inst !== undefined);
-
-    if (instances.length === 0) {
-      // No effects - connect directly to analyser -> destination
-      masterGainNode.connect(analyserNode);
-      analyserNode.connect(destination);
-    } else {
-      // Connect: masterGain -> effect1 -> effect2 -> ... -> analyser -> destination
-      let currentNode: ToneAudioNode | AudioNode = masterGainNode;
-
-      instances.forEach((inst) => {
-        try {
-          inst.disconnect();
-        } catch (e) {
-          console.warn(`[waveform-playlist] Error disconnecting effect "${inst.id}":`, e);
-        }
-        connect(currentNode, inst.effect);
-        currentNode = inst.effect;
-      });
-
-      // Connect last effect to analyser
-      connect(currentNode, analyserNode);
-      analyserNode.connect(destination);
-    }
-  }, []);
-
-  // Add a new effect
-  const addEffect = useCallback((effectId: string) => {
-    const definition = getEffectDefinition(effectId);
-    if (!definition) {
-      console.error(`Unknown effect: ${effectId}`);
-      return;
-    }
-
-    // Build default params
-    const params: Record<string, number | string | boolean> = {};
-    definition.parameters.forEach((p) => {
-      params[p.name] = p.default;
-    });
-
-    // Create the effect instance
-    const instance = createEffectInstance(definition, params);
-    effectInstancesRef.current.set(instance.instanceId, instance);
-
-    // Add to state
-    const newActiveEffect: ActiveEffect = {
-      instanceId: instance.instanceId,
-      effectId: definition.id,
-      kind: 'native',
-      definition,
-      params,
-      bypassed: false,
-    };
-
-    setActiveEffects((prev) => [...prev, newActiveEffect]);
-  }, []);
-
-  // Host a WAM plugin and append it to the chain. Requires native-context mode.
-  const addWamEffect = useCallback(async (url: string, initialState?: unknown): Promise<string> => {
-    if (!isNativeGlobalContext()) {
-      throw new Error(
-        '[waveform-playlist] WAM plugins require a native AudioContext. Call ' +
-          'configureGlobalContext({ nativeAudioContext: true }) from ' +
-          '@waveform-playlist/playout before any audio initialization.'
-      );
-    }
-    const wam = await loadWamModule();
-    const ctx = getGlobalAudioContext();
-    const { hostGroupId } = await wam.ensureWamHost(ctx);
-    const plugin = await wam.createWamInstance(
-      url,
-      ctx,
-      hostGroupId,
-      initialState !== undefined ? { initialState } : undefined
-    );
-    if (!isMountedRef.current) {
-      try {
-        plugin.destroy();
-      } catch (err) {
-        console.warn(
-          '[waveform-playlist] Error destroying WAM plugin after unmount: ' +
-            (err instanceof Error ? err.message : String(err))
-        );
-      }
-      throw new Error(
-        '[waveform-playlist] addWamEffect aborted: hook unmounted before the plugin finished loading.'
-      );
-    }
-    const instance = createWamEffectInstance(plugin);
-    effectInstancesRef.current.set(instance.instanceId, instance);
-
-    const definition: EffectDefinition = {
-      id: instance.id,
-      name: plugin.descriptor?.name ?? url,
-      category: 'wam',
-      description: 'WAM plugin',
-      parameters: [],
-    };
-    setActiveEffects((prev) => [
-      ...prev,
-      {
-        instanceId: instance.instanceId,
-        effectId: instance.id,
-        kind: 'wam',
-        url,
-        definition,
-        params: {},
-        bypassed: false,
-      },
-    ]);
-    return instance.instanceId;
-  }, []);
-
-  // Live plugin handle for GUI mounting (WamEffectGui).
-  const getWamPlugin = useCallback((instanceId: string): WamPluginInstance | undefined => {
-    const inst = effectInstancesRef.current.get(instanceId) as WamEffectInstance | undefined;
-    return inst?.kind === 'wam' ? inst.plugin : undefined;
-  }, []);
-
-  // Remove an effect
-  const removeEffect = useCallback((instanceId: string) => {
-    const instance = effectInstancesRef.current.get(instanceId);
-    if (instance) {
-      instance.dispose();
-      effectInstancesRef.current.delete(instanceId);
-    }
-
-    setActiveEffects((prev) => prev.filter((e) => e.instanceId !== instanceId));
-  }, []);
-
-  // Update a parameter in real-time
-  const updateParameter = useCallback(
-    (instanceId: string, paramName: string, value: number | string | boolean) => {
-      // Update the actual effect instance
-      const instance = effectInstancesRef.current.get(instanceId);
-      if (instance) {
-        instance.setParameter(paramName, value);
-      }
-
-      // Update state for UI
-      setActiveEffects((prev) =>
-        prev.map((e) =>
-          e.instanceId === instanceId ? { ...e, params: { ...e.params, [paramName]: value } } : e
-        )
-      );
-    },
-    []
-  );
-
-  // Toggle bypass for an effect (uses wet parameter - 0 = bypass, restore original for active)
-  const toggleBypass = useCallback((instanceId: string) => {
-    // Get current state from ref to determine new bypassed value (avoids stale closure)
-    const effect = activeEffectsRef.current.find((e) => e.instanceId === instanceId);
-    if (!effect) return;
-
-    const newBypassed = !effect.bypassed;
-
-    if (effect.kind === 'wam') {
-      // Disconnection bypass: the rebuild effect drops bypassed wam entries.
-      setActiveEffects((prev) =>
-        prev.map((e) => (e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e))
-      );
-      return;
-    }
-
-    // Update the actual effect instance
-    // When bypassing: set wet to 0
-    // When un-bypassing: restore the original wet value from params
-    const instance = effectInstancesRef.current.get(instanceId);
-    if (instance) {
-      const originalWet = (effect.params.wet as number) ?? 1;
-      instance.setParameter('wet', newBypassed ? 0 : originalWet);
-    }
-
-    // Update state for UI
-    setActiveEffects((prev) =>
-      prev.map((e) => (e.instanceId === instanceId ? { ...e, bypassed: newBypassed } : e))
-    );
-  }, []);
-
-  // Reorder effects in the chain
-  const reorderEffects = useCallback((fromIndex: number, toIndex: number) => {
-    setActiveEffects((prev) => {
-      const newEffects = [...prev];
-      const [removed] = newEffects.splice(fromIndex, 1);
-      newEffects.splice(toIndex, 0, removed);
-      return newEffects;
-    });
-  }, []);
-
-  // Clear all effects
-  const clearAllEffects = useCallback(() => {
-    // Dispose all instances
-    effectInstancesRef.current.forEach((inst) => inst.dispose());
-    effectInstancesRef.current.clear();
-
-    setActiveEffects([]);
-  }, []);
-
-  // Rewire the chain when its wiring changes (an effect added, removed, moved,
-  // or a WAM entry bypassed), and not when a parameter does: the list is
-  // replaced on every slider step, and rewiring per step disconnected and
-  // reconnected the live graph each time.
-  const topologyKey = chainTopologyKey(activeEffects);
-  useEffect(() => {
-    rebuildChain(activeEffectsRef.current);
-  }, [topologyKey, rebuildChain]);
-
-  // The effects function that gets passed to WaveformPlaylistProvider
-  // This function is stable - it reads from refs at call time to avoid stale closures
+  // The effects function that gets passed to WaveformPlaylistProvider.
   const masterEffects: EffectsFunction = useCallback(
     (masterGainNode, destination, _isOffline) => {
-      // Create analyser for visualization
       const analyserNode = new Analyser('fft', fftSize);
       analyserRef.current = analyserNode;
 
-      // Store references for rebuilding chain
-      graphNodesRef.current = {
-        masterGainNode,
-        destination,
-        analyserNode,
-      };
-
-      // Build initial chain - read from ref to get current state.
-      // Bypassed WAM entries are dropped (disconnection bypass — no wet param).
-      const effects = activeEffectsRef.current;
-      const audible = effects.filter((ae) => !(ae.kind === 'wam' && ae.bypassed));
-      const instances = audible
-        .map((ae) => effectInstancesRef.current.get(ae.instanceId))
-        .filter((inst): inst is EffectInstance => inst !== undefined);
-
-      if (instances.length === 0) {
-        // No effects - connect directly to analyser -> destination
-        masterGainNode.connect(analyserNode);
-        analyserNode.connect(destination);
-      } else {
-        // Connect: masterGain -> effect1 -> effect2 -> ... -> analyser -> destination
-        let currentNode: ToneAudioNode | AudioNode = masterGainNode;
-
-        instances.forEach((inst) => {
-          connect(currentNode, inst.effect);
-          currentNode = inst.effect;
-        });
-
-        // Connect last effect to analyser
-        connect(currentNode, analyserNode);
-        analyserNode.connect(destination);
-      }
+      // masterGain -> effect 1 -> … -> analyser -> destination
+      const detach = rack.attach(masterGainNode, analyserNode);
+      analyserNode.connect(destination);
 
       return function cleanup() {
+        detach();
         analyserNode.dispose();
-        analyserRef.current = null;
-        graphNodesRef.current = null;
+        if (analyserRef.current === analyserNode) {
+          analyserRef.current = null;
+        }
       };
     },
-    [fftSize] // Only fftSize - reads effects from ref
+    [rack, fftSize]
   );
 
-  // Cleanup on unmount
-  useEffect(() => {
-    isMountedRef.current = true;
-    const effectInstances = effectInstancesRef.current;
-    return () => {
-      isMountedRef.current = false;
-      effectInstances.forEach((inst) => inst.dispose());
-      effectInstances.clear();
-    };
-  }, []);
-
-  /**
-   * Creates a fresh effects function for offline rendering. Native effects
-   * are re-created on the offline context; WAM entries are re-instantiated
-   * from the live instance's state (cloneInstanceInto), asynchronously.
-   */
   const createOfflineEffectsFunction = useCallback((): OfflineEffectsFunction | undefined => {
-    // Bypassed entries are excluded offline: natives keep the existing
-    // exclusion; WAM entries use disconnection bypass (parity with live).
-    const nonBypassed = activeEffects.filter((e) => !e.bypassed);
-    if (nonBypassed.length === 0) {
-      return undefined;
-    }
-    const hasWam = nonBypassed.some((e) => e.kind === 'wam');
+    const offline = rack.createOfflineFunction();
+    if (!offline) return undefined;
+    return (masterGainNode, destination) => offline(masterGainNode, destination);
+  }, [rack]);
 
-    return async (masterGainNode: Volume, destination: ToneAudioNode, _isOffline: boolean) => {
-      if (hasWam && !isNativeGlobalContext()) {
-        throw new Error(
-          '[waveform-playlist] WAV export with WAM effects requires a native AudioContext. ' +
-            'Call configureGlobalContext({ nativeAudioContext: true }) from ' +
-            '@waveform-playlist/playout before any audio initialization.'
-        );
-      }
-      // Tone nodes inside the offline build are created on the current
-      // (offline) global context — its rawContext must host the WAM clones.
-      const rawContext = masterGainNode.context.rawContext as unknown as BaseAudioContext;
-      const { instances, dispose } = await buildOfflineChain(
-        nonBypassed,
-        (instanceId) => {
-          const inst = effectInstancesRef.current.get(instanceId) as WamEffectInstance | undefined;
-          return inst?.kind === 'wam' ? inst.plugin : undefined;
-        },
-        rawContext
-      );
-      connectOfflineChain(masterGainNode, instances, destination);
-      return dispose;
-    };
-  }, [activeEffects]);
+  const availableEffects = getAvailableEffects();
 
-  return {
-    activeEffects,
-    availableEffects: effectDefinitions,
-    addEffect,
-    addWamEffect,
-    getWamPlugin,
-    removeEffect,
-    updateParameter,
-    toggleBypass,
-    reorderEffects,
-    clearAllEffects,
-    masterEffects,
-    createOfflineEffectsFunction,
-    analyserRef,
-  };
+  return useMemo(
+    () => ({
+      effects: rack.effects,
+      availableEffects,
+      addEffect: rack.add,
+      addWamEffect: rack.addWam,
+      getWamPlugin: rack.getWamPlugin,
+      removeEffect: rack.remove,
+      updateParameter: rack.updateParameter,
+      toggleBypass: rack.toggleBypass,
+      reorderEffects: rack.reorder,
+      clearAllEffects: rack.clear,
+      masterEffects,
+      createOfflineEffectsFunction,
+      analyserRef,
+    }),
+    [rack, availableEffects, masterEffects, createOfflineEffectsFunction]
+  );
 }

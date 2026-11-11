@@ -114,7 +114,7 @@ describe('useDynamicEffects — WAM entries', () => {
       'group-1',
       undefined
     );
-    const entry = result.current.activeEffects.find((e) => e.instanceId === id);
+    const entry = result.current.effects.getSnapshot().find((e) => e.instanceId === id);
     expect(entry?.kind).toBe('wam');
     expect(entry?.definition.name).toBe('BigMuff');
     expect(result.current.getWamPlugin(id)?.audioNode).toBe(fakeAudioNode);
@@ -130,8 +130,10 @@ describe('useDynamicEffects — WAM entries', () => {
 
   it('native addEffect entries carry kind "native"', () => {
     const { result } = renderHook(() => useDynamicEffects());
-    act(() => result.current.addEffect('reverb'));
-    expect(result.current.activeEffects[0].kind).toBe('native');
+    act(() => {
+      void result.current.addEffect('reverb');
+    });
+    expect(result.current.effects.getSnapshot()[0].kind).toBe('native');
   });
 
   it('removeEffect on a wam entry destroys the plugin', async () => {
@@ -142,7 +144,7 @@ describe('useDynamicEffects — WAM entries', () => {
     });
     act(() => result.current.removeEffect(id));
     expect(destroy).toHaveBeenCalled();
-    expect(result.current.activeEffects).toHaveLength(0);
+    expect(result.current.effects.getSnapshot()).toHaveLength(0);
   });
 
   it('addWamEffect works under StrictMode double-invoked effects', async () => {
@@ -155,7 +157,7 @@ describe('useDynamicEffects — WAM entries', () => {
       id = await result.current.addWamEffect('https://example.com/p/index.js');
     });
     expect(id).toMatch(/^wam_/);
-    expect(result.current.activeEffects.some((e) => e.instanceId === id)).toBe(true);
+    expect(result.current.effects.getSnapshot().some((e) => e.instanceId === id)).toBe(true);
   });
 
   it('addWamEffect aborts and destroys the plugin if the hook unmounts before it resolves', async () => {
@@ -190,7 +192,7 @@ describe('useDynamicEffects — WAM entries', () => {
     expect(destroy).toHaveBeenCalled();
     // Hook already unmounted — result.current is frozen at the last render before
     // unmount, which never saw the plugin land (the guard fired before setActiveEffects).
-    expect(result.current.activeEffects.some((e) => e.kind === 'wam')).toBe(false);
+    expect(result.current.effects.getSnapshot().some((e) => e.kind === 'wam')).toBe(false);
   });
 
   it('toggleBypass excludes the wam node from the rebuilt chain, and re-includes it on un-bypass', async () => {
@@ -322,12 +324,12 @@ describe('useDynamicEffects — WAM entries', () => {
 
     it('a parameter change updates the list and leaves the graph alone', () => {
       const { result, mockVolume } = setup();
-      const id = result.current.activeEffects[0].instanceId;
+      const id = result.current.effects.getSnapshot()[0].instanceId;
 
       act(() => result.current.updateParameter(id, 'wet', 0.3));
       act(() => result.current.updateParameter(id, 'decay', 2));
 
-      expect(result.current.activeEffects[0].params.wet).toBe(0.3);
+      expect(result.current.effects.getSnapshot()[0].params.wet).toBe(0.3);
       expect(mockVolume.disconnect).not.toHaveBeenCalled();
       expect(connect).not.toHaveBeenCalled();
     });
@@ -335,9 +337,9 @@ describe('useDynamicEffects — WAM entries', () => {
     it('bypassing a native effect (wet to 0) leaves the graph alone', () => {
       const { result, mockVolume } = setup();
 
-      act(() => result.current.toggleBypass(result.current.activeEffects[0].instanceId));
+      act(() => result.current.toggleBypass(result.current.effects.getSnapshot()[0].instanceId));
 
-      expect(result.current.activeEffects[0].bypassed).toBe(true);
+      expect(result.current.effects.getSnapshot()[0].bypassed).toBe(true);
       expect(mockVolume.disconnect).not.toHaveBeenCalled();
       expect(connect).not.toHaveBeenCalled();
     });
@@ -345,13 +347,15 @@ describe('useDynamicEffects — WAM entries', () => {
     it('adding, removing and reordering each rewire the chain', () => {
       const { result, mockVolume } = setup();
 
-      act(() => result.current.addEffect('phaser'));
+      act(() => {
+        void result.current.addEffect('phaser');
+      });
       expect(mockVolume.disconnect).toHaveBeenCalledTimes(1);
 
       act(() => result.current.reorderEffects(0, 2));
       expect(mockVolume.disconnect).toHaveBeenCalledTimes(2);
 
-      act(() => result.current.removeEffect(result.current.activeEffects[0].instanceId));
+      act(() => result.current.removeEffect(result.current.effects.getSnapshot()[0].instanceId));
       expect(mockVolume.disconnect).toHaveBeenCalledTimes(3);
     });
   });

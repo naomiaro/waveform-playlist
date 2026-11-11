@@ -108,7 +108,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     await act(async () => {
       id = await result.current.addWamEffectToTrack('track-1', 'https://example.com/p/index.js');
     });
-    const entries = result.current.trackEffectsState.get('track-1') ?? [];
+    const entries = result.current.getTrackEffects('track-1').getSnapshot();
     expect(entries[0]?.kind).toBe('wam');
     expect(entries[0]?.instanceId).toBe(id);
     expect(result.current.getTrackWamPlugin('track-1', id)?.audioNode).toBe(fakeAudioNode);
@@ -124,8 +124,10 @@ describe('useTrackDynamicEffects — WAM entries', () => {
 
   it('native addEffectToTrack entries carry kind "native"', () => {
     const { result } = renderHook(() => useTrackDynamicEffects());
-    act(() => result.current.addEffectToTrack('t1', 'reverb'));
-    const entries = result.current.trackEffectsState.get('t1') ?? [];
+    act(() => {
+      void result.current.addEffectToTrack('t1', 'reverb');
+    });
+    const entries = result.current.getTrackEffects('t1').getSnapshot();
     expect(entries[0]?.kind).toBe('native');
   });
 
@@ -149,7 +151,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
       id = await result.current.addWamEffectToTrack('t1', 'https://example.com/p/index.js');
     });
     expect(id).toMatch(/^wam_/);
-    const entries = result.current.trackEffectsState.get('t1') ?? [];
+    const entries = result.current.getTrackEffects('t1').getSnapshot();
     expect(entries.some((e) => e.instanceId === id)).toBe(true);
   });
 
@@ -183,7 +185,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
 
     await expect(addPromise).rejects.toThrow(/unmounted/);
     expect(destroy).toHaveBeenCalled();
-    const entries = result.current.trackEffectsState.get('t1') ?? [];
+    const entries = result.current.getTrackEffects('t1').getSnapshot();
     expect(entries.some((e) => e.kind === 'wam')).toBe(false);
   });
 
@@ -268,7 +270,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     vi.mocked(tone.connect).mockClear();
 
     // The rebuilt track is still registered: a bypass toggle rewires INTO it.
-    const instanceId = result.current.trackEffectsState.get('t1')![0].instanceId;
+    const instanceId = result.current.getTrackEffects('t1').getSnapshot()[0].instanceId;
     act(() => {
       result.current.toggleBypass('t1', instanceId);
     });
@@ -388,7 +390,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
       return { ...view, inputs };
     }
     const firstId = (result: { current: ReturnType<typeof useTrackDynamicEffects> }, t: string) =>
-      result.current.trackEffectsState.get(t)![0].instanceId;
+      result.current.getTrackEffects(t).getSnapshot()[0].instanceId;
 
     it('a parameter change updates the list and leaves every graph alone', () => {
       const { result, inputs } = setup();
@@ -396,7 +398,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
 
       act(() => result.current.updateTrackEffectParameter('t1', id, 'wet', 0.3));
 
-      expect(result.current.trackEffectsState.get('t1')![0].params.wet).toBe(0.3);
+      expect(result.current.getTrackEffects('t1').getSnapshot()[0].params.wet).toBe(0.3);
       expect(inputs.t1.disconnect).not.toHaveBeenCalled();
       expect(inputs.t2.disconnect).not.toHaveBeenCalled();
       expect(connect).not.toHaveBeenCalled();
@@ -407,7 +409,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
 
       act(() => result.current.toggleBypass('t1', firstId(result, 't1')));
 
-      expect(result.current.trackEffectsState.get('t1')![0].bypassed).toBe(true);
+      expect(result.current.getTrackEffects('t1').getSnapshot()[0].bypassed).toBe(true);
       expect(inputs.t1.disconnect).not.toHaveBeenCalled();
       expect(connect).not.toHaveBeenCalled();
     });
@@ -415,7 +417,9 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     it("adding or removing an effect rewires that track's chain only", () => {
       const { result, inputs } = setup();
 
-      act(() => result.current.addEffectToTrack('t1', 'phaser'));
+      act(() => {
+        void result.current.addEffectToTrack('t1', 'phaser');
+      });
       expect(inputs.t1.disconnect).toHaveBeenCalledTimes(1);
       expect(inputs.t2.disconnect).not.toHaveBeenCalled();
 
