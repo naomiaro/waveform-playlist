@@ -62,6 +62,10 @@ import {
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
 
+// Passed to the spectrogram settings modal when no config exists at any level.
+// A module constant, so the prop keeps its identity across renders.
+const EMPTY_SPECTROGRAM_CONFIG: SpectrogramConfig = {};
+
 /** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
@@ -538,6 +542,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   // State for spectrogram settings modal
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
+  const closeSettingsModal = useCallback(() => setSettingsModalTrackId(null), []);
 
   const [isSelecting, setIsSelecting] = useState(false);
   const mouseDownTimeRef = useRef<number>(0);
@@ -1128,14 +1133,14 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         createPortal(
           <spectrogram.SettingsModal
             open={settingsModalTrackId !== null}
-            onClose={() => setSettingsModalTrackId(null)}
+            onClose={closeSettingsModal}
             config={
               settingsModalTrackId !== null
                 ? (spectrogram.trackSpectrogramOverrides.get(settingsModalTrackId)?.config ??
                   tracks.find((t) => t.id === settingsModalTrackId)?.spectrogramConfig ??
                   spectrogram.spectrogramConfig ??
-                  {})
-                : {}
+                  EMPTY_SPECTROGRAM_CONFIG)
+                : EMPTY_SPECTROGRAM_CONFIG
             }
             colorMap={
               settingsModalTrackId !== null
