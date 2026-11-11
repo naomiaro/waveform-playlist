@@ -1,4 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// The pan stage has its own unit tests in core (panStage.test.ts) and is
+// verified against real audio in a browser. Here it is one opaque node, so
+// the graph assertions below stay about the TRACK's wiring.
+const panStages: Array<{
+  input: unknown;
+  output: unknown;
+  args: [number, number];
+  setPan: ReturnType<typeof vi.fn>;
+  setSourceChannelCount: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+}> = [];
+
+vi.mock('@waveform-playlist/core', () => ({
+  createPanStage: vi.fn((_ctx: unknown, pan: number, sourceChannelCount: number) => {
+    const node = createNode('pan');
+    const stage = {
+      input: node,
+      output: node,
+      args: [pan, sourceChannelCount] as [number, number],
+      setPan: vi.fn(),
+      setSourceChannelCount: vi.fn(),
+      dispose: vi.fn(() => node.outputs.clear()),
+    };
+    panStages.push(stage);
+    return stage;
+  }),
+}));
+
 import { TrackNode } from '../audio/track-node';
 
 /**
@@ -12,8 +41,6 @@ interface MockNode {
   connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
   gain?: { value: number };
-  pan?: { value: number };
-  channelCount?: number;
 }
 
 function createNode(name: string, extra: Partial<MockNode> = {}): MockNode {
@@ -52,7 +79,9 @@ function mockAudioContext() {
     createGain: vi.fn(() =>
       createNode(gainNames[gains++] ?? 'gain' + gains, { gain: { value: 1 } })
     ),
-    createStereoPanner: vi.fn(() => createNode('pan', { pan: { value: 0 }, channelCount: 1 })),
+    createStereoPanner: vi.fn(() => {
+      throw new Error('TrackNode must not create a StereoPannerNode (#669)');
+    }),
   } as unknown as AudioContext;
 }
 
@@ -63,10 +92,10 @@ function asNode(node: unknown): MockNode {
 function nodes(ctx: AudioContext) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gainResults = (ctx.createGain as any).mock.results.map((r: any) => r.value as MockNode);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pan = (ctx.createStereoPanner as any).mock.results[0].value as MockNode;
+  const stage = panStages[panStages.length - 1];
+  const pan = stage.input as MockNode;
   const [input, volume, mute] = gainResults;
-  return { input, volume, pan, mute };
+  return { input, volume, pan, mute, stage };
 }
 
 describe('TrackNode', () => {
@@ -76,6 +105,7 @@ describe('TrackNode', () => {
   beforeEach(() => {
     ctx = mockAudioContext();
     master.outputs.clear();
+    panStages.length = 0;
   });
 
   function build() {
@@ -107,10 +137,26 @@ describe('TrackNode', () => {
     expect(input.gain!.value).toBe(1);
   });
 
-  it('setPan updates the panner', () => {
-    const { track, pan } = build();
+  it('setPan updates the pan stage', () => {
+    const { track, stage } = build();
     track.setPan(-0.5);
-    expect(pan.pan!.value).toBe(-0.5);
+    expect(stage.setPan).toHaveBeenCalledWith(-0.5);
+  });
+
+  it('builds a mono-law pan stage by default, centred', () => {
+    const { stage } = build();
+    expect(stage.args).toEqual([0, 1]);
+  });
+
+  it('builds the pan stage for the given source channel count', () => {
+    new TrackNode('track-2', ctx, 2);
+    expect(panStages[panStages.length - 1].args).toEqual([0, 2]);
+  });
+
+  it('setSourceChannelCount switches the pan law', () => {
+    const { track, stage } = build();
+    track.setSourceChannelCount(2);
+    expect(stage.setSourceChannelCount).toHaveBeenCalledWith(2);
   });
 
   it('setMute toggles the mute gain', () => {
@@ -221,9 +267,10 @@ describe('TrackNode', () => {
   });
 
   it('dispose disconnects all nodes', () => {
-    const { track, input, volume, pan, mute } = build();
+    const { track, input, volume, pan, mute, stage } = build();
     track.dispose();
 
+    expect(stage.dispose).toHaveBeenCalledTimes(1);
     for (const node of [input, volume, pan, mute]) {
       expect(node.outputs.size).toBe(0);
     }

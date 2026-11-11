@@ -281,6 +281,29 @@ Effects are organized into categories for easier discovery:
 - **Dynamics** - Compression, limiting, gating
 - **Spatial** - Stereo width and positioning
 
+## Track Signal Chain and Panning
+
+Track effects are **pre-fader inserts**: a track's clips run through its effects first, then its volume, pan and mute.
+
+```
+clips → effects → volume → pan → mute → master
+```
+
+So the volume fader sets the track's level in the mix without changing how hard a compressor or distortion works, and mute and solo silence a track including its effect tails.
+
+### Why tracks are not panned with a `Panner` or `StereoPannerNode`
+
+Waveform Playlist pans every track with its own small pan stage (`createPanStage` from `@waveform-playlist/core`) rather than Tone.js's `Panner` or the browser's built-in `StereoPannerNode`:
+
+- A **`StereoPannerNode`** chooses its pan law from the signal it receives: equal-power for mono input (−3 dB per side at centre), a different law for stereo input (unity at centre). Because effects come before the pan, the panner would see the effects' output instead of the track's audio. A mono track would get about 3 dB louder at centre, and pan differently, as soon as you added a stereo reverb.
+- Tone.js's **`Panner`** wraps a `StereoPannerNode` with a fixed channel count that cannot be changed on Tone's default audio context. A mono track's panner is locked to one channel, so a stereo effect on that track would be summed to mono.
+
+The pan stage uses the same two pan laws as `StereoPannerNode`, so levels and pan positions are the ones you would expect, but it picks the law from the track's audio (mono or stereo clips) instead of from the effects' output, and it always keeps a stereo signal stereo. The same stage is used for playback and WAV export, with the Tone.js engine and with the native `@dawcore/transport`.
+
+A track that mixes mono and stereo clips is panned with the stereo law, so its mono clips play 3 dB louder at centre than on a mono-only track. Keep mono and stereo material on separate tracks if you want a track's level to stay put when clips are added or removed.
+
+You can still use `Panner`, `AutoPanner` or a `StereoPannerNode` as an **effect** inside a track's chain.
+
 ## Learn More
 
 For deeper understanding of audio effects and Tone.js:

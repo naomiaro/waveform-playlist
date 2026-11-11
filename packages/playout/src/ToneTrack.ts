@@ -1,7 +1,22 @@
-import { Volume, Gain, ToneAudioNode, getDestination, getTransport, getContext } from 'tone';
-import { Track, gainToDb, applyFadeIn, applyFadeOut, type Fade } from '@waveform-playlist/core';
+import {
+  Volume,
+  Gain,
+  ToneAudioNode,
+  connect,
+  getDestination,
+  getTransport,
+  getContext,
+} from 'tone';
+import {
+  Track,
+  gainToDb,
+  applyFadeIn,
+  applyFadeOut,
+  createPanStage,
+  type Fade,
+  type PanStage,
+} from '@waveform-playlist/core';
 import { getUnderlyingAudioParam } from './fades';
-import { createTrackPanStage, type TrackPanStage } from './trackPan';
 
 /**
  * Wires a track's effects, PRE-FADER (#660): connect `trackInput` through
@@ -40,7 +55,7 @@ export interface ToneTrackOptions {
   track: Track;
   effects?: TrackEffectsFunction;
   destination?: ToneAudioNode;
-  /** Max channel count across clips — selects the pan stage (see trackPan.ts). Default: 1 */
+  /** Max channel count across clips — selects the pan law (core's createPanStage). Default: 1 */
   channelCount?: number;
 }
 
@@ -57,7 +72,7 @@ export class ToneTrack {
   /** Pre-fader summing point: clip sources → inputGain → [effects] → volume. */
   private inputGain: Gain;
   private volumeNode: Volume;
-  private panStage: TrackPanStage;
+  private panStage: PanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -77,14 +92,20 @@ export class ToneTrack {
     // Create shared track-level Tone.js nodes
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
-    // The pan LAW is chosen by the source's channel count (see trackPan.ts).
-    this.panStage = createTrackPanStage(options.track.stereoPan, options.channelCount ?? 1);
+    // Core's gain-matrix pan stage, built from native nodes on Tone's raw
+    // context. The pan LAW is chosen by the source's channel count.
+    this.panStage = createPanStage(
+      getContext().rawContext as BaseAudioContext,
+      options.track.stereoPan,
+      options.channelCount ?? 1
+    );
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
     // Every source goes through the gain-matrix pan stage (never a Tone
-    // Panner — see trackPan.ts): Volume → Pan → MuteGain → destination
+    // Panner — see the playout CLAUDE.md): Volume → Pan → MuteGain → destination.
+    // Tone's connect() helper makes the native → Tone edge.
     this.volumeNode.connect(this.panStage.input);
-    this.panStage.output.connect(this.muteGain);
+    connect(this.panStage.output, this.muteGain);
     this.muteGain.connect(options.destination || getDestination());
 
     // Pre-fader insert (#660): inputGain → [effects] → Volume. The fader,
@@ -278,6 +299,16 @@ export class ToneTrack {
     }
 
     this.scheduledClips.splice(index, 1);
+  }
+
+  /**
+   * Select the pan law from the track's source material: 1 = mono law,
+   * 2+ = stereo law. Call when the track's clips change — a stereo clip
+   * joining a mono track moves it to the stereo law (same rule as the
+   * native transport and the offline export).
+   */
+  setSourceChannelCount(sourceChannelCount: number): void {
+    this.panStage.setSourceChannelCount(sourceChannelCount);
   }
 
   /**

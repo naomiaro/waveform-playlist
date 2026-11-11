@@ -12,11 +12,8 @@ function createMockAudioContext() {
       connect: vi.fn(),
       disconnect: vi.fn(),
     })),
-    createStereoPanner: vi.fn(() => ({
-      pan: { value: 0 },
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    })),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createChannelMerger: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
     createBufferSource: vi.fn(() => ({
       buffer: null,
       connect: vi.fn(),

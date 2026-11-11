@@ -40,8 +40,10 @@
     "dist",
     "README.md"
   ],
+  "dependencies": {
+    "@waveform-playlist/core": "workspace:*"
+  },
   "devDependencies": {
-    "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",

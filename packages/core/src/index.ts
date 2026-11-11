@@ -9,3 +9,4 @@ export * from './probeRangeSupport';
 export * from './enumerateMicrophones';
 export * from './annotations/boundaries';
 export * from './annotations/shortcuts';
+export * from './panStage';

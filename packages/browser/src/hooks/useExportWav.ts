@@ -2,16 +2,13 @@ import { useState, useCallback } from 'react';
 import {
   gainToDb,
   trackChannelCount,
+  createPanStage,
   applyFadeIn,
   applyFadeOut,
   type ClipTrack,
   type FadeType,
 } from '@waveform-playlist/core';
-import {
-  getUnderlyingAudioParam,
-  getGlobalAudioContext,
-  createTrackPanStage,
-} from '@waveform-playlist/playout';
+import { getUnderlyingAudioParam, getGlobalAudioContext } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
@@ -255,7 +252,7 @@ async function renderOffline(
     | undefined,
   onProgress: (progress: number) => void
 ): Promise<AudioBuffer> {
-  const { Volume, Gain, Player, ToneAudioBuffer } = await import('tone');
+  const { Volume, Gain, Player, ToneAudioBuffer, connect } = await import('tone');
 
   onProgress(0.1);
 
@@ -289,10 +286,14 @@ async function renderOffline(
           // Track-level nodes mirror ToneTrack: input → [effects] → volume → pan → mute
           const trackInput = new Gain({ gain: 1 });
           const trackVolume = new Volume(gainToDb(state.volume));
-          // Same pan stage as live playback (playout's trackPan): the law is
-          // chosen by the source's channel count, and a stereo effect on a mono
-          // track stays stereo.
-          const trackPan = createTrackPanStage(state.pan, trackChannelCount(track));
+          // Same pan stage as live playback (core's createPanStage, native
+          // nodes on the raw offline context): the law is chosen by the source's
+          // channel count, and a stereo effect on a mono track stays stereo.
+          const trackPan = createPanStage(
+            context.rawContext as BaseAudioContext,
+            state.pan,
+            trackChannelCount(track)
+          );
           const trackMute = new Gain(state.muted ? 0 : 1);
 
           // Conditionally insert per-track effects chain (may be async — WAM cloning)
@@ -308,7 +309,7 @@ async function renderOffline(
 
           // Connect track chain: trackVolume → trackPan → trackMute → master
           trackMute.connect(masterVolume);
-          trackPan.output.connect(trackMute);
+          connect(trackPan.output, trackMute); // native → Tone edge
           trackVolume.connect(trackPan.input);
 
           // Schedule each clip

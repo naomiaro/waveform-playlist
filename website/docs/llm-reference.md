@@ -1373,6 +1373,25 @@ getEffectsByCategory(category: string): EffectDefinition[];
 createEffectInstance(definition: EffectDefinition): EffectInstance;
 createEffectChain(effects: EffectInstance[]): void;
 
+// Pan stage (from `@waveform-playlist/core`) — every renderer pans tracks with
+// this, never a StereoPannerNode or Tone Panner: the law comes from the track's
+// SOURCE channel count, not from the layout its pre-fader effects output.
+interface PanMatrix { ll: number; lr: number; rl: number; rr: number }
+type PanStageContext = Pick<
+  BaseAudioContext,
+  'createGain' | 'createChannelSplitter' | 'createChannelMerger'
+>;
+interface PanStage {
+  readonly input: AudioNode;
+  readonly output: AudioNode;
+  setPan(pan: number): void; // -1 … 1
+  setSourceChannelCount(sourceChannelCount: number): void; // 1 = mono law, 2+ = stereo law
+  dispose(): void;
+}
+panMatrix(pan: number, sourceChannelCount: number): PanMatrix;
+createPanStage(context: PanStageContext, pan: number, sourceChannelCount: number): PanStage;
+trackChannelCount(track: { clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }> }): number;
+
 // Keyboard
 getShortcutLabel(shortcut: KeyboardShortcut): string;
 // Returns e.g. "Cmd+Shift+S" on Mac, "Ctrl+Shift+S" on Windows

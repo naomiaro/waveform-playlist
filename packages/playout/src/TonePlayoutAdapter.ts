@@ -372,7 +372,14 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
           gain: clip.gain,
         }));
 
-        const audioUpdated = playout.replaceTrackClips(trackId, clipInfos, startTime);
+        // The pan law follows the track's clips (a stereo take on a mono
+        // track), exactly as on the native transport and in the export.
+        const audioUpdated = playout.replaceTrackClips(
+          trackId,
+          clipInfos,
+          startTime,
+          trackChannelCount(track)
+        );
 
         // Also update companion MIDI track if present. Re-add only the MIDI
         // half — the audio track was updated in-place by replaceTrackClips
