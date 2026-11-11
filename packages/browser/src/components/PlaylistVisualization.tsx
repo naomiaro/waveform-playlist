@@ -581,20 +581,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     return () => observer.disconnect();
   }, [fillsContainer, scrollContainerElement]);
 
-  // Calculate dimensions — derive duration directly from tracks prop to prevent width
-  // shift. The `duration` state is set in an effect and lags tracks by at least one render.
-  const tracksMaxDuration = tracks.reduce((max, track) => {
-    return track.clips.reduce((clipMax, clip) => {
-      const end = (clip.startSample + clip.durationSamples) / clip.sampleRate;
-      return Math.max(clipMax, end);
-    }, max);
-  }, 0);
-  let displayDuration =
-    tracksMaxDuration > 0
-      ? tracksMaxDuration
-      : duration > 0
-        ? duration
-        : DEFAULT_EMPTY_TRACK_DURATION;
+  // Calculate dimensions. `duration` is derived from `tracks` in the provider,
+  // so it is already current in this render.
+  let displayDuration = duration > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION;
 
   if (fillsContainer) {
     const minContainerDuration = (scrollContainerWidth * samplesPerPixel) / sampleRate;
@@ -716,8 +705,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   // Shared vertical layout for BOTH columns (waveform rows + control slots).
   // Heights use the existing slot formula; order applies the live drag
   // preview so both columns slide together. Hoisted from the per-slot
-  // computation so the two columns can never disagree. Must run before the
-  // loading-state early return below (rules-of-hooks: no conditional hooks).
+  // computation so the two columns can never disagree.
   const trackHeightById = useMemo(() => {
     const m = new Map<string, number>();
     peaksDataArray.forEach((trackClipPeaks, trackIndex) => {
@@ -740,15 +728,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   );
 
   const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
-
-  // Only show loading if we have tracks WITH clips but peaks haven't been computed yet.
-  // Don't check audioBuffers — it's set in an effect and can be stale for one or more
-  // renders after tracks change, causing the playlist to unmount and remount (layout shift).
-  // Placeholder tracks (clips: []) bypass this check intentionally.
-  const hasClips = tracks.some((track) => track.clips.length > 0);
-  if (hasClips && peaksDataArray.length === 0) {
-    return <div className={className}>Loading waveform...</div>;
-  }
 
   // Build track controls slots for the ControlsColumn (outside scroll area)
   const trackControlsSlots = controls.show

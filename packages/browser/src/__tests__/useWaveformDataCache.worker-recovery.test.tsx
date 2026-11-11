@@ -53,7 +53,7 @@ describe('useWaveformDataCache worker recovery', () => {
     const buf2 = makeBuffer();
     rerender({ tracks: [makeTrack('t1', 'c1', buf1), makeTrack('t2', 'c2', buf2)] });
 
-    await waitFor(() => expect(result.current.cache.has('c2')).toBe(true));
+    await waitFor(() => expect(result.current.getWaveformData(buf2)).toBe(fakeWaveformData));
     expect(healthyWorker.generate).toHaveBeenCalled();
   });
 });
