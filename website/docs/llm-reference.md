@@ -10,6 +10,10 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 **Source of truth:** `packages/browser/src/WaveformPlaylistContext.tsx`, `packages/browser/src/MediaElementPlaylistContext.tsx`
 
+**Requirements:** the React packages need `react` / `react-dom` `^19.0.0` and `styled-components` `^6.0.0`.
+
+**Upgrading from an earlier major:** see the [upgrade guide](./react/upgrading.md) — one Find / Replace-with entry per breaking change.
+
 ---
 
 ## Provider Props (WaveformPlaylistProvider)

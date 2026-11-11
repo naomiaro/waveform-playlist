@@ -31,10 +31,7 @@ jobs:
 
   unit-tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        react-version: [18, 19]
-    name: Unit Tests (React ${{ matrix.react-version }})
+    name: Unit Tests
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,23 +47,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Override React version
-        if: matrix.react-version == 19
-        run: |
-          node -e "
-            const pkg = require('./package.json');
-            pkg.pnpm = pkg.pnpm || {};
-            pkg.pnpm.overrides = {
-              ...pkg.pnpm.overrides,
-              'react': '^19.0.0',
-              'react-dom': '^19.0.0',
-              '@types/react': '^19.0.0',
-              '@types/react-dom': '^19.0.0'
-            };
-            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-          pnpm install --no-frozen-lockfile
 
       - name: Build packages
         run: pnpm build

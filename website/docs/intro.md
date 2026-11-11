@@ -21,7 +21,7 @@ A multitrack Web Audio editor and player with canvas waveform visualization. One
 
 ### React
 
-For React 18+ / 19+ projects. Hooks + components.
+For React 19 projects. Hooks + components.
 
 ```tsx
 const { tracks, loading } = useAudioTracks([{ src: '/drums.mp3' }]);

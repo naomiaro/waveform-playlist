@@ -24,7 +24,7 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 
 | Package | Purpose |
 |---------|---------|
-| `react` / `react-dom` | ^18.0.0 or ^19.0.0 |
+| `react` / `react-dom` | ^19.0.0 |
 | `styled-components` | ^6.0.0 — CSS-in-JS styling |
 | `tone` | ^15.0.0 — Web Audio engine (optional if you supply your own `PlayoutAdapter`) |
 | `@dnd-kit/react` | ^0.5.0 — drag-and-drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |

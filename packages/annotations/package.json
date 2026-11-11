@@ -43,11 +43,13 @@
   ],
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
-    "@types/react": "^18.3.31",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "@types/styled-components": "^5.1.36",
     "@waveform-playlist/browser": "workspace:*",
     "jsdom": "^28.1.0",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
@@ -60,7 +62,7 @@
     "@dnd-kit/dom": "^0.5.0",
     "@dnd-kit/react": "^0.5.0",
     "@waveform-playlist/browser": "workspace:^",
-    "react": "^18.0.0",
+    "react": "^19.0.0",
     "styled-components": "^6.0.0"
   }
 }
