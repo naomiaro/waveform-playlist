@@ -145,4 +145,77 @@ describe('AnnotationText items (#740)', () => {
     expect(options).toEqual({ linkEndpoints: true });
     expect(onUpdate).toHaveBeenCalledTimes(1);
   });
+
+  it('a control sees new options when only the options change', () => {
+    const onUpdate = vi.fn();
+    const action = vi.fn();
+    const controls = [{ text: 'X', title: 'act', action }];
+    const ui = (linkEndpoints: boolean) => (
+      <AnnotationText
+        annotations={ANNOTATIONS}
+        editable
+        controls={controls}
+        annotationListConfig={{ linkEndpoints }}
+        onAnnotationUpdate={onUpdate}
+      />
+    );
+    const { rerender, getAllByTitle } = render(ui(false));
+    rerender(ui(true));
+
+    fireEvent.click(getAllByTitle('act')[0]);
+
+    expect(action.mock.calls[0][3]).toEqual({ linkEndpoints: true });
+  });
+
+  it('an edit is ignored once the list stops being editable, and applied once it is again', () => {
+    const onUpdate = vi.fn();
+    const ui = (editable: boolean) => (
+      <AnnotationText annotations={ANNOTATIONS} editable={editable} onAnnotationUpdate={onUpdate} />
+    );
+    const { rerender, getByText } = render(ui(true));
+
+    rerender(ui(false));
+    fireEvent.blur(getByText('second'));
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    rerender(ui(true));
+    fireEvent.blur(getByText('second'));
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('an edit goes to the update callback of the latest render', () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const ui = (onUpdate: (annotations: AnnotationData[]) => void) => (
+      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationUpdate={onUpdate} />
+    );
+    const { rerender, getByText } = render(ui(first));
+    rerender(ui(second));
+
+    fireEvent.blur(getByText('third'));
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('an id edit renames that annotation in the current list, and an empty id is refused', () => {
+    const onUpdate = vi.fn();
+    const { getByText } = render(
+      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationUpdate={onUpdate} />
+    );
+
+    const label = getByText('b');
+    label.textContent = '   ';
+    fireEvent.blur(label);
+    expect(onUpdate).not.toHaveBeenCalled();
+
+    label.textContent = ' b2 ';
+    fireEvent.blur(label);
+    expect((onUpdate.mock.calls[0][0] as AnnotationData[]).map((a) => a.id)).toEqual([
+      'a',
+      'b2',
+      'c',
+      'd',
+    ]);
+  });
 });
