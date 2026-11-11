@@ -80,14 +80,26 @@ export function buildTrackFromConfig(
     spectrogramColorMap: config.spectrogramColorMap,
   };
 
-  // Preserve stable IDs across rebuilds so React doesn't unmount/remount tracks
+  // Preserve stable IDs across rebuilds so React doesn't unmount/remount tracks.
+  // An id given in the config always wins over the one generated for its index.
   const existingIds = stableIds.get(index);
-  if (existingIds) {
-    track.id = existingIds.trackId;
-    track.clips[0] = { ...track.clips[0], id: existingIds.clipId };
-  } else {
-    stableIds.set(index, { trackId: track.id, clipId: track.clips[0].id });
+  const trackId = config.id ?? existingIds?.trackId ?? track.id;
+  const clipId = existingIds?.clipId ?? clip.id;
+  if (!existingIds) {
+    stableIds.set(index, { trackId: track.id, clipId });
   }
 
-  return track;
+  return { ...track, id: trackId, clips: [{ ...clip, id: clipId }] };
+}
+
+/** The config ids that are used by more than one config, each listed once. */
+export function duplicateTrackIds(configs: Pick<AudioTrackConfig, 'id'>[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const { id } of configs) {
+    if (id === undefined) continue;
+    if (seen.has(id)) duplicates.add(id);
+    seen.add(id);
+  }
+  return [...duplicates];
 }

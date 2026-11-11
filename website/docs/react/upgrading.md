@@ -870,7 +870,7 @@ const { getTrackEffectsFunction } = useTrackDynamicEffects();
 
 Delete the memo. If `tracks` in your state came back through `onTracksChange` while the old code ran, the objects may still have an `effects` property; it is ignored and disappears with the next edit.
 
-A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well:
+A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. `AudioTrackConfig` has a new optional `id` for this: the track built from the config gets that id (without it an id is generated, as before, and is on `tracks[i].id` once the track exists). Ids must be unique; `useAudioTracks` warns about duplicates.
 
 ```tsx
 // Before
@@ -883,17 +883,16 @@ const { tracks } = useAudioTracks([
 
 // After
 const { tracks } = useAudioTracks([
-  { src: 'vocals.mp3', name: 'Vocals' },
-  { src: 'drums.mp3', name: 'Drums' },
+  { id: 'vocals', src: 'vocals.mp3', name: 'Vocals' },
+  { id: 'drums', src: 'drums.mp3', name: 'Drums' },
 ]);
 
-const trackEffects = useCallback(
-  (trackId: string) =>
-    tracks.find((track) => track.id === trackId)?.name === 'Vocals' ? vocalReverb : undefined,
-  [tracks]
-);
+// Module level, or memoized: any stable object.
+const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
+  vocals: vocalReverb,
+};
 
-<WaveformPlaylistProvider tracks={tracks} trackEffects={trackEffects}>
+<WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
 ```
 
 **When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.

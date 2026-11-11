@@ -438,6 +438,9 @@ function useAudioTracks(
 };
 
 interface AudioTrackConfig {
+  /** Track id. Optional (generated if absent); must be unique. Give one to key
+   *  the provider's `trackEffects` lookup on an id the app knows up front. */
+  id?: string;
   src?: string;
   audioBuffer?: AudioBuffer;
   name?: string;

@@ -42,6 +42,7 @@ Each track configuration supports these options:
 
 ```tsx
 interface AudioTrackConfig {
+  id?: string;               // Track id (default: generated). Must be unique
   src?: string;              // URL to audio file
   audioBuffer?: AudioBuffer; // Pre-loaded AudioBuffer (skips fetch/decode)
   name?: string;             // Display name
