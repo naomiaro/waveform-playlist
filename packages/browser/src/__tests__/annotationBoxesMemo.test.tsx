@@ -254,4 +254,45 @@ describe('annotation boxes (#740)', () => {
     // changed label.
     expect(lastProps.n3.label).toBe('B2:n3');
   });
+
+  // #704 close-out: an edge drag publishes its moves to the provider's
+  // preview source instead of changing the annotations on every move.
+  describe('edge-drag preview', () => {
+    it('a previewed move renders the box it moves and no other, and the provider not at all', async () => {
+      await mount();
+      const controlsBefore = probe.controls;
+      const dataBefore = probe.data;
+      const pxPerSecond = SAMPLE_RATE / probe.data.samplesPerPixel;
+      boxRenders = {};
+
+      await act(async () => {
+        probe.controls.annotationPreview.publish(
+          ANNOTATIONS.map((a) => (a.id === 'n2' ? { ...a, end: a.end - 0.25 } : a))
+        );
+      });
+
+      expect(Object.keys(boxRenders)).toEqual(['n2']);
+      expect(lastProps.n2.endPosition).toBe((ANNOTATIONS[1].end - 0.25) * pxPerSecond);
+      expect(probe.controls).toBe(controlsBefore);
+      expect(probe.data).toBe(dataBefore);
+    });
+
+    it('dropping the preview puts the boxes back on the annotations', async () => {
+      await mount();
+      const pxPerSecond = SAMPLE_RATE / probe.data.samplesPerPixel;
+      await act(async () => {
+        probe.controls.annotationPreview.publish(
+          ANNOTATIONS.map((a) => (a.id === 'n2' ? { ...a, end: a.end - 0.25 } : a))
+        );
+      });
+      boxRenders = {};
+
+      await act(async () => {
+        probe.controls.annotationPreview.publish(null);
+      });
+
+      expect(Object.keys(boxRenders)).toEqual(['n2']);
+      expect(lastProps.n2.endPosition).toBe(ANNOTATIONS[1].end * pxPerSecond);
+    });
+  });
 });

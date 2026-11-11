@@ -31,6 +31,8 @@ import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
+import { createValueSource } from '@waveform-playlist/core';
+import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import {
   useTimeFormat,
   useZoomControls,
@@ -243,6 +245,12 @@ export interface PlaylistControlsContextValue {
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
+  /**
+   * Where an annotation edge drag shows its moves while it is in progress.
+   * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom
+   * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
+   */
+  annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
 
   // Loop controls
@@ -1939,6 +1947,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     scrollContainerRef.current = element;
   }, []);
 
+  // Created once: the annotations as an edge drag in progress would leave them.
+  const [annotationPreview] = useState<AnnotationPreviewHandle>(() =>
+    createValueSource<AnnotationData[] | null>(null)
+  );
+
   // Stable callback ref for onAnnotationsChange to avoid re-creating controls context
   const onAnnotationsChangeRef = useRef(onAnnotationsChange);
   onAnnotationsChangeRef.current = onAnnotationsChange;
@@ -2102,6 +2115,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLinkEndpoints,
       setAnnotationsEditable,
       setAnnotations,
+      annotationPreview,
       setActiveAnnotationId,
 
       // Loop controls
@@ -2144,6 +2158,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLinkEndpoints,
       setAnnotationsEditable,
       setAnnotations,
+      annotationPreview,
       setActiveAnnotationId,
       setLoopEnabled,
       setLoopRegion,

@@ -30,9 +30,11 @@ export type {
   MediaElementControlsContextValue,
   MediaElementDataContextValue,
 } from './MediaElementPlaylistContext';
+export type { AnnotationPreviewHandle } from './hooks';
 export {
   useClipDragHandlers,
   useAnnotationDragHandlers,
+  useAnnotationsWithPreview,
   useAnnotationKeyboardControls,
   useDragSensors,
   useClipSplitting,

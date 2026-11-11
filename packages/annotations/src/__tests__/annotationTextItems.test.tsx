@@ -62,6 +62,35 @@ describe('AnnotationText items (#740)', () => {
     expect(last('b')?.isActive).toBe(true);
   });
 
+  // Each move of an edge drag replaces one or two annotation objects in a new
+  // array. The edit and control handlers every row receives used to be
+  // rebuilt from that array, which re-rendered all rows.
+  it('a change to one annotation renders that item and no other', () => {
+    const calls: Record<string, number> = {};
+    const renderItem = vi.fn(({ annotation }) => {
+      calls[annotation.id] = (calls[annotation.id] ?? 0) + 1;
+      return <span>{annotation.id}</span>;
+    });
+    const onUpdate = vi.fn();
+    const controls = [{ title: 'x', action: vi.fn() }];
+    const ui = (annotations: AnnotationData[]) => (
+      <AnnotationText
+        annotations={annotations}
+        activeAnnotationId="a"
+        editable
+        controls={controls}
+        onAnnotationUpdate={onUpdate}
+        renderAnnotationItem={renderItem}
+      />
+    );
+    const { rerender } = render(ui(ANNOTATIONS));
+    for (const id of Object.keys(calls)) delete calls[id];
+
+    rerender(ui(ANNOTATIONS.map((a) => (a.id === 'c' ? { ...a, end: 2.5 } : a))));
+
+    expect(Object.keys(calls)).toEqual(['c']);
+  });
+
   it('the default items mark the active one and scroll to it', () => {
     const ui = (activeId: string) => (
       <AnnotationText

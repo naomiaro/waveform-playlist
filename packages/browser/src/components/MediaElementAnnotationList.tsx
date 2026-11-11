@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
 import { useMediaElementState, useMediaElementControls } from '../MediaElementPlaylistContext';
+import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationListView, type AnnotationListCommonProps } from './AnnotationListView';
 
 export type { OnAnnotationUpdateFn } from '../types/annotations';
@@ -33,12 +34,14 @@ export const MediaElementAnnotationList: React.FC<MediaElementAnnotationListProp
   ...props
 }) => {
   const { annotations, activeAnnotationId, continuousPlay } = useMediaElementState();
-  const { setAnnotations } = useMediaElementControls();
+  const { setAnnotations, annotationPreview } = useMediaElementControls();
+  // While an edge is dragged, the times in the list follow it.
+  const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
   return (
     <AnnotationListView
       {...props}
-      annotations={annotations}
+      annotations={shownAnnotations}
       activeAnnotationId={activeAnnotationId}
       editable={editable}
       linkEndpoints={false}

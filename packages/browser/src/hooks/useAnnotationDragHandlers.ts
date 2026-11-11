@@ -1,6 +1,18 @@
 import React from 'react';
+import { flushSync } from 'react-dom';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
-import { updateAnnotationBoundaries, type AnnotationData } from '@waveform-playlist/core';
+import {
+  updateAnnotationBoundaries,
+  type AnnotationData,
+  type ValueSourceHandle,
+} from '@waveform-playlist/core';
+
+/**
+ * Where an annotation edge drag shows its moves while it is in progress:
+ * the annotations as the drag would leave them, or `null` when no drag is
+ * running. Both providers have one (`annotationPreview` in their controls).
+ */
+export type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>;
 
 interface UseAnnotationDragHandlersOptions {
   annotations: AnnotationData[];
@@ -11,6 +23,14 @@ interface UseAnnotationDragHandlersOptions {
   sampleRate?: number;
   duration: number;
   linkEndpoints: boolean;
+  /**
+   * Pass the provider's `annotationPreview` to keep the drag out of your own
+   * state: each move is published there (the built-in annotation boxes and
+   * list follow it), and `onAnnotationsChange` is called once, on release.
+   * Without it `onAnnotationsChange` is called on every move, which
+   * re-renders whatever holds the annotations for each one.
+   */
+  preview?: AnnotationPreviewHandle;
 }
 
 /**
@@ -18,13 +38,16 @@ interface UseAnnotationDragHandlersOptions {
  *
  * Provides drag handlers for use with @dnd-kit/react DragDropProvider.
  * Handles annotation boundary resizing with linked endpoints support.
+ * A cancelled drag (Escape) puts back every annotation it moved.
  *
  * @example
  * ```tsx
  * const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
  *   annotations,
  *   onAnnotationsChange: setAnnotations,
+ *   preview: annotationPreview, // from usePlaylistControls()
  *   samplesPerPixel,
+ *   sampleRate,
  *   duration,
  *   linkEndpoints,
  * });
@@ -49,44 +72,65 @@ export function useAnnotationDragHandlers({
   sampleRate = 48000,
   duration,
   linkEndpoints,
+  preview,
 }: UseAnnotationDragHandlersOptions) {
-  // Store original annotation state when drag starts (for cumulative delta application)
-  const originalAnnotationStateRef = React.useRef<{
+  // The annotations as they were when the drag began. Every move is computed
+  // from them (applying a move to the result of the previous one would
+  // compound the link and collision adjustments), and a cancelled drag
+  // restores them.
+  const dragRef = React.useRef<{
+    snapshot: AnnotationData[];
     start: number;
     end: number;
     annotationIndex: number;
   } | null>(null);
 
-  const onDragStart = React.useCallback(
-    (event: DragStartEvent) => {
-      const data = event.operation.source?.data as
-        | {
-            annotationId: string;
-            annotationIndex: number;
-            edge: 'start' | 'end';
+  // Read through refs so the handlers keep their identity while a drag
+  // without a preview replaces `annotations` on every move.
+  const annotationsRef = React.useRef(annotations);
+  annotationsRef.current = annotations;
+  const onAnnotationsChangeRef = React.useRef(onAnnotationsChange);
+  onAnnotationsChangeRef.current = onAnnotationsChange;
+
+  // A drag that never ends (its component unmounts mid-drag) must not leave
+  // its preview on screen.
+  React.useEffect(() => {
+    if (!preview) return;
+    return () => {
+      if (dragRef.current) {
+        dragRef.current = null;
+        preview.publish(null);
+      }
+    };
+  }, [preview]);
+
+  const onDragStart = React.useCallback((event: DragStartEvent) => {
+    const data = event.operation.source?.data as
+      | {
+          annotationId: string;
+          annotationIndex: number;
+          edge: 'start' | 'end';
+        }
+      | undefined;
+
+    const snapshot = annotationsRef.current;
+    const annotation =
+      data?.annotationIndex === undefined ? undefined : snapshot[data.annotationIndex];
+    dragRef.current =
+      data && annotation
+        ? {
+            snapshot,
+            start: annotation.start,
+            end: annotation.end,
+            annotationIndex: data.annotationIndex,
           }
-        | undefined;
-
-      if (!data || data.annotationIndex === undefined) {
-        originalAnnotationStateRef.current = null;
-        return;
-      }
-
-      const annotation = annotations[data.annotationIndex];
-      if (annotation) {
-        originalAnnotationStateRef.current = {
-          start: annotation.start,
-          end: annotation.end,
-          annotationIndex: data.annotationIndex,
-        };
-      }
-    },
-    [annotations]
-  );
+        : null;
+  }, []);
 
   const onDragMove = React.useCallback(
     (event: DragMoveEvent) => {
-      if (!originalAnnotationStateRef.current) {
+      const drag = dragRef.current;
+      if (!drag) {
         return;
       }
 
@@ -101,7 +145,6 @@ export function useAnnotationDragHandlers({
       if (!data) return;
 
       const { edge, annotationIndex } = data;
-      const originalState = originalAnnotationStateRef.current;
 
       // The dragmove event is dispatched BEFORE position.current is updated (happens
       // in a microtask), so the snapshot's position.current is stale. Use event.to
@@ -110,9 +153,7 @@ export function useAnnotationDragHandlers({
       const rawDeltaX = currentX - event.operation.position.initial.x;
       const timeDelta = (rawDeltaX * samplesPerPixel) / sampleRate;
 
-      // Apply delta to original state
-      const newTime =
-        edge === 'start' ? originalState.start + timeDelta : originalState.end + timeDelta;
+      const newTime = edge === 'start' ? drag.start + timeDelta : drag.end + timeDelta;
 
       // The boundary logic (linked endpoints, collisions) is core's, shared with
       // dawcore's annotation track.
@@ -120,30 +161,49 @@ export function useAnnotationDragHandlers({
         annotationIndex,
         newTime,
         isDraggingStart: edge === 'start',
-        annotations,
+        annotations: drag.snapshot,
         duration,
         linkEndpoints,
       });
 
-      onAnnotationsChange(updatedAnnotations);
+      if (preview) {
+        preview.publish(updatedAnnotations);
+      } else {
+        onAnnotationsChangeRef.current(updatedAnnotations);
+      }
     },
-    [annotations, onAnnotationsChange, samplesPerPixel, sampleRate, duration, linkEndpoints]
+    [samplesPerPixel, sampleRate, duration, linkEndpoints, preview]
   );
 
   const onDragEnd = React.useCallback(
     (event: DragEndEvent) => {
-      // Handle canceled drags — revert annotations to pre-drag state
-      if (event.canceled && originalAnnotationStateRef.current) {
-        const { annotationIndex, start, end } = originalAnnotationStateRef.current;
-        const revertedAnnotations = annotations.map((annotation, idx) => {
-          if (idx !== annotationIndex) return annotation;
-          return { ...annotation, start, end };
-        });
-        onAnnotationsChange(revertedAnnotations);
+      const drag = dragRef.current;
+      dragRef.current = null;
+      if (!drag) return;
+
+      if (!preview) {
+        // The moves were reported as they happened; a cancelled drag takes
+        // them all back, the neighbours it moved included.
+        if (event.canceled && annotationsRef.current !== drag.snapshot) {
+          onAnnotationsChangeRef.current(drag.snapshot);
+        }
+        return;
       }
-      originalAnnotationStateRef.current = null;
+
+      const result = preview.source.getSnapshot();
+      if (result === null) return;
+      if (event.canceled) {
+        preview.publish(null);
+        return;
+      }
+      // Committed and cleared in one synchronous render, so the boxes never
+      // show the old positions between the two.
+      flushSync(() => {
+        onAnnotationsChangeRef.current(result);
+        preview.publish(null);
+      });
     },
-    [annotations, onAnnotationsChange]
+    [preview]
   );
 
   return {
