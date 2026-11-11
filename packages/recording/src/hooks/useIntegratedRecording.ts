@@ -114,8 +114,9 @@ export function useIntegratedRecording(
   const recordingStartTimeRef = useRef(0);
 
   // Keep selectedTrackId and currentTime in refs for use in callbacks.
-  // Avoids stale closures and prevents 60fps useCallback recreation
-  // (currentTime updates at animation-frame rate during playback).
+  // Avoids stale closures and keeps the callbacks from being recreated when
+  // either changes (currentTime is the resting position: it changes on seek,
+  // pause and stop, not while playing).
   const selectedTrackIdRef = useRef(selectedTrackId);
   selectedTrackIdRef.current = selectedTrackId;
   const currentTimeRef = useRef(currentTime);

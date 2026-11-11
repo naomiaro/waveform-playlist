@@ -150,9 +150,11 @@ describe('PlaylistAnnotationList (#740)', () => {
     const after = last();
     expect(after).not.toBe(before);
     expect(after.activeAnnotationId).toBe('n2');
-    const changed = (Object.keys(after) as (keyof AnnotationTextIntegrationProps)[]).filter(
-      (key) => after[key] !== before[key]
-    );
+    // The union of keys: a prop that was dropped counts as changed too.
+    const keys = Array.from(
+      new Set([...Object.keys(before), ...Object.keys(after)])
+    ) as (keyof AnnotationTextIntegrationProps)[];
+    const changed = keys.filter((key) => after[key] !== before[key]);
     expect(changed).toEqual(['activeAnnotationId']);
   });
 

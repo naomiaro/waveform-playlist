@@ -271,6 +271,8 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 ### Save/Load State
 
 ```tsx
+// Zoom is not saved: there is no setter for samplesPerPixel (only zoomIn /
+// zoomOut), so a saved zoom level could not be restored.
 function SaveLoadState() {
   // trackStates: { name, muted, soloed, volume, pan } per track
   const { trackStates } = usePlaylistData();
@@ -313,6 +315,20 @@ function SaveLoadState() {
 ### External Transport Control
 
 ```tsx
+// TypeScript needs to know about the global this component sets
+declare global {
+  interface Window {
+    waveformPlaylist?: {
+      play: () => void;
+      pause: () => void;
+      stop: () => void;
+      seekTo: (time: number) => void;
+      getPosition: () => number;
+      isPlaying: () => boolean;
+    };
+  }
+}
+
 function ExternalTransport() {
   const { play, pause, stop, seekTo } = usePlaylistControls();
   // currentTimeRef follows playback; reading it needs no re-render

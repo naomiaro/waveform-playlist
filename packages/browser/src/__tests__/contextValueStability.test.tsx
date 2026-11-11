@@ -420,6 +420,8 @@ describe('the resting cursor position lives in its own context (#740)', () => {
     });
     expect(animationProbe.animation.isPlaying).toBe(true);
     expect(currentTimeProbe.currentTime).toBe(0.25);
+    // Relies on the fake adapter ignoring seek: the engine keeps reporting 1.5,
+    // so only stop() itself can produce the 0.6 asserted below.
     (adapter as unknown as { getCurrentTime: () => number }).getCurrentTime = () => 1.5;
 
     await act(async () => {

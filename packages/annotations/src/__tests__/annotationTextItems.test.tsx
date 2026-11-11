@@ -18,15 +18,20 @@ const ANNOTATIONS: AnnotationData[] = [
 ];
 
 let scrolled: string[];
+let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
 beforeEach(() => {
   scrolled = [];
+  originalScrollIntoView = Element.prototype.scrollIntoView;
   Element.prototype.scrollIntoView = function (this: Element) {
     scrolled.push(this.textContent ?? '');
   };
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  Element.prototype.scrollIntoView = originalScrollIntoView;
+});
 
 describe('AnnotationText items (#740)', () => {
   it('an active-annotation change renders the two items involved and no other', () => {
