@@ -1516,8 +1516,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           engineRef.current.stop();
         }
         setIsPlaying(false);
-        setCurrentTimeRefs(playbackEndTimeRef.current);
-        setCurrentTime(playbackEndTimeRef.current);
+        // The selection finishing returns the cursor to the selection's start,
+        // the same as when the engine ends the play itself (see the stop
+        // mirror): which of the two notices the end first is a race on the
+        // Tone path, and they must not disagree. Other bounded plays leave the
+        // cursor at their end.
+        const endCursor = isSelectionPlayRef.current
+          ? playStartPositionRef.current
+          : playbackEndTimeRef.current;
+        setCurrentTimeRefs(endCursor);
+        setCurrentTime(endCursor);
         playbackEndTimeRef.current = null; // Clear the end time
         return;
       }
@@ -1973,12 +1981,24 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // request by identity, and a new object would strand it (#675, rule 4).
       const queued = pendingResumeRef.current;
       if (queued) {
+        // The queued play will start it; restarting the engine here as well
+        // would start it twice.
         queued.position = start;
         queued.endTime = endTime;
         replaceBoundedPlay();
+        return;
       }
 
-      if (isPlayingRef.current && engineRef.current) {
+      if (!isPlayingRef.current) {
+        // Nothing is playing: whatever play ended earlier no longer says
+        // anything about this position. Without this, Stop (Escape) pressed
+        // while stopped sent the cursor back to an old play's start.
+        isSelectionPlayRef.current = false;
+        playStartPositionRef.current = start;
+        return;
+      }
+
+      if (engineRef.current) {
         // Stop + seek before restarting playback from selection start.
         // engine.stop() resets _currentTime and _isPlaying, creating a window
         // where getCurrentTime() returns wrong value. seek() immediately

@@ -109,12 +109,13 @@ interface Probe {
   play: (startTime?: number, playDuration?: number) => Promise<void>;
   setContinuousPlay: (enabled: boolean) => void;
   setSelection: (start: number, end: number) => void;
+  stop: () => void;
 }
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
   const { isPlaying, currentTime } = usePlaybackAnimation();
-  const { play, setContinuousPlay, setSelection } = usePlaylistControls();
+  const { play, setContinuousPlay, setSelection, stop } = usePlaylistControls();
   const { isReady, duration } = usePlaylistData();
   const { continuousPlay, activeAnnotationId } = usePlaylistState();
   probe = {
@@ -127,6 +128,7 @@ const ProbeChild: React.FC = () => {
     play,
     setContinuousPlay,
     setSelection,
+    stop,
   };
   return null;
 };
@@ -469,6 +471,46 @@ describe('continuous play and audio rescheduling', () => {
       await waitFor(() => expect(probe.isPlaying).toBe(false));
       // Ready to play the same annotation again.
       expect(probe.currentTime).toBe(1);
+    });
+
+    it('the selection finishing returns the cursor to the selection start', async () => {
+      const { setNow } = await mount(false);
+      await act(async () => {
+        probe.setSelection(1.5, 3);
+      });
+      await wait(30);
+      await act(async () => {
+        await probe.play(1.5, 1.5);
+      });
+      await wait(60);
+      setNow(3.05);
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+      expect(probe.currentTime).toBe(1.5);
+    });
+
+    it('Stop pressed while stopped leaves a cursor placed since the last play where it is', async () => {
+      const { setNow } = await mount(false);
+      await act(async () => {
+        probe.setSelection(1.5, 3);
+      });
+      await wait(30);
+      await act(async () => {
+        await probe.play(1.5, 1.5);
+      });
+      await wait(60);
+      setNow(3.05);
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+
+      await act(async () => {
+        probe.setSelection(7, 7); // click elsewhere while stopped
+      });
+      await wait(30);
+      expect(probe.currentTime).toBe(7);
+      await act(async () => {
+        probe.stop(); // e.g. Escape
+      });
+      await wait(30);
+      expect(probe.currentTime).toBe(7);
     });
 
     it('selection playback ending where an annotation starts does not highlight it', async () => {
