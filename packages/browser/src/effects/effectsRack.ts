@@ -70,6 +70,41 @@ function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+interface FinalizationRegistryLike<T> {
+  register(target: object, heldValue: T): void;
+}
+type FinalizationRegistryConstructor = new <T>(
+  cleanup: (heldValue: T) => void
+) => FinalizationRegistryLike<T>;
+
+let collectedRacks: FinalizationRegistryLike<Map<string, EffectInstance>> | null | undefined;
+
+/**
+ * Dispose a rack's instances once the rack itself has been garbage-collected.
+ *
+ * The hooks cannot do this when their component unmounts: React runs the same
+ * cleanup for a real unmount, a StrictMode remount, Fast Refresh and a hidden
+ * `<Activity>`, and in the last three the chain must still be there
+ * afterwards. A rack that is really gone becomes unreachable, and its
+ * instances (worklets that keep processing, WAM plugins) are released here.
+ * Best effort: collection is not prompt and not guaranteed. An app that wants
+ * them released at a known moment calls clear() (`clearAllEffects`).
+ */
+function disposeWhenCollected(rack: object, instances: Map<string, EffectInstance>): void {
+  if (collectedRacks === undefined) {
+    const Registry = (globalThis as { FinalizationRegistry?: FinalizationRegistryConstructor })
+      .FinalizationRegistry;
+    collectedRacks = Registry
+      ? new Registry<Map<string, EffectInstance>>((orphaned) => {
+          orphaned.forEach((instance) => instance.dispose());
+          orphaned.clear();
+        })
+      : null;
+  }
+  // `instances` must not lead back to the rack, or it would never be collected.
+  collectedRacks?.register(rack, instances);
+}
+
 export class EffectsRack {
   private readonly handle: ValueSourceHandle<ActiveEffect[]> = createValueSource(NO_EFFECTS);
   private readonly instances = new Map<string, EffectInstance>();
@@ -77,6 +112,10 @@ export class EffectsRack {
   private wiredKey = '';
   /** Bumped by clear(): an add that was awaiting across it is dropped. */
   private generation = 0;
+
+  constructor() {
+    disposeWhenCollected(this, this.instances);
+  }
 
   /** The effects in chain order. A new array on every change. */
   get effects(): ValueSource<ActiveEffect[]> {
@@ -248,7 +287,7 @@ export class EffectsRack {
       throw new Error(
         '[waveform-playlist] addEffect("' +
           effectId +
-          '") aborted: the effects chain was cleared or disposed before the effect was ready.'
+          '") aborted: the effects chain was cleared before the effect was ready.'
       );
     }
     // The type may have been registered again during the await. The instance
@@ -294,11 +333,11 @@ export class EffectsRack {
         plugin.destroy();
       } catch (err) {
         console.warn(
-          '[waveform-playlist] Error destroying WAM plugin after unmount: ' + message(err)
+          '[waveform-playlist] Error destroying a WAM plugin dropped by clear(): ' + message(err)
         );
       }
       throw new Error(
-        '[waveform-playlist] addWamEffect aborted: the effects chain was cleared or disposed (hook unmounted) before the plugin finished loading.'
+        '[waveform-playlist] addWamEffect aborted: the effects chain was cleared before the plugin finished loading.'
       );
     }
     const instance = createWamEffectInstance(plugin);
@@ -399,16 +438,6 @@ export class EffectsRack {
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     if (this.list().length > 0) this.commit(NO_EFFECTS);
-  };
-
-  /**
-   * For the owner going away: the same as clear(). The list and the
-   * instances go together, so a remount (StrictMode, an `<Activity>` shown
-   * again) never finds entries whose instances are gone. The rack stays
-   * usable.
-   */
-  dispose = (): void => {
-    this.clear();
   };
 
   /**

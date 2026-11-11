@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import type { ValueSource } from '@waveform-playlist/core';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
@@ -76,7 +76,10 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
   const [rack] = useState(() => new EffectsRack());
   const analyserRef = useRef<Analyser | null>(null);
 
-  useEffect(() => rack.dispose, [rack]);
+  // No cleanup effect: the chain is state. It survives a StrictMode remount,
+  // Fast Refresh and a hidden <Activity> like any other state, and its
+  // instances are released when the rack is collected (see EffectsRack) or by
+  // clearAllEffects().
 
   // The effects function that gets passed to WaveformPlaylistProvider.
   const masterEffects: EffectsFunction = useCallback(

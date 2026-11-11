@@ -37,7 +37,12 @@ export function registerDemoTremolo(): void {
             if (param && params[name] !== undefined) param.value = params[name];
           }
         },
-        dispose: () => node.disconnect(),
+        // Lets the processor stop; a worklet that returns true from process()
+        // runs until the page closes otherwise.
+        dispose: () => {
+          node.port.postMessage('dispose');
+          node.disconnect();
+        },
       };
     },
   });

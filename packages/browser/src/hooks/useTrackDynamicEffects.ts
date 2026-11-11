@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { TrackEffectsFunction } from '@waveform-playlist/playout';
 import type { ValueSource } from '@waveform-playlist/core';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
@@ -100,12 +100,8 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
     [store]
   );
 
-  useEffect(
-    () => () => {
-      store.racks.forEach((rack) => rack.dispose());
-    },
-    [store]
-  );
+  // No cleanup effect: the chains are state and survive a remount (see
+  // useDynamicEffects). clearTrackEffects(trackId) releases a track's effects.
 
   const actions = useMemo(
     () => ({

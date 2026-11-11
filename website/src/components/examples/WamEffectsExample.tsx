@@ -695,7 +695,11 @@ export function WamEffectsExample() {
         </Banner>
       )}
 
-      {status && <StatusLine $tone={status.tone}>{status.text}</StatusLine>}
+      {status && (
+        <StatusLine role={status.tone === 'error' ? 'alert' : 'status'} $tone={status.tone}>
+          {status.text}
+        </StatusLine>
+      )}
 
       <LibraryBrowser
         wamEnabled={wamActive}
@@ -712,7 +716,11 @@ export function WamEffectsExample() {
             <span style={{ fontSize: 13, color: 'var(--ifm-color-content-secondary, #666)' }}>
               Track rack:
             </span>
-            <Select value={selectedTrackId} onChange={(e) => setSelectedTrackId(e.target.value)}>
+            <Select
+              aria-label="Track rack"
+              value={selectedTrackId}
+              onChange={(e) => setSelectedTrackId(e.target.value)}
+            >
               {tracks.map((track) => (
                 <option key={track.id} value={track.id}>
                   {track.name}
@@ -720,12 +728,14 @@ export function WamEffectsExample() {
               ))}
             </Select>
           </Row>
-          <TrackRack
-            trackFx={trackFx}
-            trackId={selectedTrackId}
-            trackName={selectedTrackName}
-            onError={handleAddError}
-          />
+          {selectedTrackId && (
+            <TrackRack
+              trackFx={trackFx}
+              trackId={selectedTrackId}
+              trackName={selectedTrackName}
+              onError={handleAddError}
+            />
+          )}
         </div>
       </RacksRow>
 

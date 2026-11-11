@@ -329,7 +329,9 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
 
   const handleAdd = () => {
     if (selectedEffect) {
-      addEffectToTrack(trackId, selectedEffect);
+      addEffectToTrack(trackId, selectedEffect).catch((err: unknown) =>
+        console.error('Could not add effect: ' + String(err))
+      );
       setSelectedEffect('');
     }
   };

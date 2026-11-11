@@ -689,20 +689,22 @@ export function EffectsExample() {
       defaultsAddedRef.current = true;
 
       // Add a reverb to the master effects chain
-      addMasterEffect('reverb');
+      // The add functions return promises and reject if an effect cannot be built.
+      const report = (err: unknown) => console.error('Could not add effect: ' + String(err));
+      addMasterEffect('reverb').catch(report);
 
       // Add effects to individual tracks for demonstration
       // Kick: Compressor for punch
-      if (tracks[0]) addEffectToTrack(tracks[0].id, 'compressor');
+      if (tracks[0]) addEffectToTrack(tracks[0].id, 'compressor').catch(report);
 
       // Bass: Distortion for grit
-      if (tracks[1]) addEffectToTrack(tracks[1].id, 'distortion');
+      if (tracks[1]) addEffectToTrack(tracks[1].id, 'distortion').catch(report);
 
       // HiHat: Reverb for space
-      if (tracks[2]) addEffectToTrack(tracks[2].id, 'reverb');
+      if (tracks[2]) addEffectToTrack(tracks[2].id, 'reverb').catch(report);
 
       // Synth: Ping Pong Delay
-      if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay');
+      if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay').catch(report);
     }
   }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
 

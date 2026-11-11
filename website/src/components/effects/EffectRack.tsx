@@ -106,7 +106,11 @@ export const EffectRack: React.FC<EffectRackProps> = ({
         </RackTitle>
         <EffectSelector
           availableEffects={availableEffects}
-          onAddEffect={addEffect}
+          onAddEffect={(effectId) => {
+            addEffect(effectId).catch((err: unknown) =>
+              console.error('Could not add effect: ' + String(err))
+            );
+          }}
           onClearAll={clearAllEffects}
           hasActiveEffects={activeEffects.length > 0}
         />

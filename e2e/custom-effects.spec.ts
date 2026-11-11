@@ -24,6 +24,55 @@ function differenceRms(a: Buffer, b: Buffer): number {
   return Math.sqrt(sum / count);
 }
 
+/** The rack of the track chosen in the "Track rack" selector. */
+async function trackRack(page: Page) {
+  const selector = page.getByLabel('Track rack');
+  await expect(selector).not.toHaveValue('');
+  const name = await selector.locator('option:checked').textContent();
+  return page.getByRole('group', { name: `${name} chain`, exact: true });
+}
+
+/**
+ * Tap the output of the demo tremolo node with an analyser, so a test can
+ * read the signal that actually passes through the effect during playback.
+ * Must run before the page loads.
+ */
+async function tapTremoloOutput(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const state = window as unknown as { __tremoloTap?: AnalyserNode };
+    const originalConnect = AudioNode.prototype.connect;
+    const isTremolo = (node: AudioNode): boolean =>
+      typeof AudioWorkletNode !== 'undefined' &&
+      node instanceof AudioWorkletNode &&
+      node.parameters.has('depth') &&
+      node.context instanceof AudioContext;
+    AudioNode.prototype.connect = function (this: AudioNode, ...args: unknown[]) {
+      if (isTremolo(this) && !(args[0] instanceof AnalyserNode)) {
+        // The chain disconnects every output of the node when it rewires, so
+        // the tap is made again on each connection the chain makes.
+        const tap = state.__tremoloTap ?? this.context.createAnalyser();
+        state.__tremoloTap = tap;
+        originalConnect.call(this, tap);
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (originalConnect as any).apply(this, args);
+    } as typeof AudioNode.prototype.connect;
+  });
+}
+
+/** RMS of the signal currently at the tremolo's output (0 when nothing reaches the tap). */
+async function tremoloOutputRms(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const tap = (window as unknown as { __tremoloTap?: AnalyserNode }).__tremoloTap;
+    if (!tap) return 0;
+    const samples = new Float32Array(tap.fftSize);
+    tap.getFloatTimeDomainData(samples);
+    let sum = 0;
+    for (const sample of samples) sum += sample * sample;
+    return Math.sqrt(sum / samples.length);
+  });
+}
+
 async function exportMix(page: Page): Promise<Buffer> {
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 120_000 }),
@@ -71,7 +120,7 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
   });
 
   test('track chain: add and remove on the selected track', async ({ page }) => {
-    const rack = page.getByRole('group', { name: /^(?!Master).* chain$/ });
+    const rack = await trackRack(page);
     await rack.getByLabel('Effect to add').selectOption({ label: TREMOLO });
     await rack.getByRole('button', { name: 'Add', exact: true }).click();
 
@@ -86,11 +135,13 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
     await expect(entry).toHaveCount(0);
   });
 
-  test('plays with the effect in the chain', async ({ page }) => {
-    const rack = page.getByRole('group', { name: 'Master chain' });
-    await rack.getByLabel('Effect to add').selectOption({ label: TREMOLO });
-    await rack.getByRole('button', { name: 'Add', exact: true }).click();
-    await expect(rack.getByRole('group', { name: TREMOLO })).toBeVisible();
+  test('during playback the signal passes through the effect, and not while it is bypassed', async ({
+    page,
+    baseURL,
+  }) => {
+    await tapTremoloOutput(page);
+    await page.goto(`${baseURL}/examples/wam-effects`);
+    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 60_000 });
 
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(String(err)));
@@ -98,11 +149,31 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
       if (message.type() === 'error') errors.push(message.text());
     });
 
-    await page.getByRole('button', { name: 'Play' }).click();
-    await expect(page.getByRole('button', { name: 'Pause' })).toBeEnabled({ timeout: 10_000 });
-    await page.waitForTimeout(500);
-    await page.getByRole('button', { name: 'Stop' }).click();
+    const rack = page.getByRole('group', { name: 'Master chain' });
+    await rack.getByLabel('Effect to add').selectOption({ label: TREMOLO });
+    await rack.getByRole('button', { name: 'Add', exact: true }).click();
+    const entry = rack.getByRole('group', { name: TREMOLO });
+    await expect(entry).toBeVisible();
 
+    await page.getByRole('button', { name: 'Play' }).click();
+    // The mix reaches the worklet node's output while it is in the chain.
+    await expect(async () => {
+      expect(await tremoloOutputRms(page)).toBeGreaterThan(0.01);
+    }).toPass({ timeout: 15_000 });
+
+    // Bypassed: the node is out of the chain, so nothing leaves it.
+    await entry.getByRole('button', { name: 'On', exact: true }).click();
+    await expect(async () => {
+      expect(await tremoloOutputRms(page)).toBe(0);
+    }).toPass({ timeout: 10_000 });
+
+    // Back in the chain, the signal returns: the processor resumes.
+    await entry.getByRole('button', { name: 'Bypassed', exact: true }).click();
+    await expect(async () => {
+      expect(await tremoloOutputRms(page)).toBeGreaterThan(0.01);
+    }).toPass({ timeout: 15_000 });
+
+    await page.getByRole('button', { name: 'Stop' }).click();
     expect(errors).toEqual([]);
   });
 
@@ -129,7 +200,7 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
 
     // One track's chain: a smaller change to the mix than the master's, but
     // well above the noise floor measured between two dry exports.
-    const track = page.getByRole('group', { name: /^(?!Master).* chain$/ });
+    const track = await trackRack(page);
     await track.getByLabel('Effect to add').selectOption({ label: TREMOLO });
     await track.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(track.getByRole('group', { name: TREMOLO })).toBeVisible();

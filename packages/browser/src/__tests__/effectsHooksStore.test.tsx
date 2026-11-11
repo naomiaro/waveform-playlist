@@ -66,7 +66,7 @@ vi.mock('tone', () => {
   };
 });
 
-import React, { StrictMode, useEffect } from 'react';
+import React, { StrictMode, useEffect, useRef } from 'react';
 import { connect, disconnect } from 'tone';
 import type { Gain, ToneAudioNode, Volume } from 'tone';
 import { registerEffect, unregisterEffect, getEffectDefinitions } from '@waveform-playlist/core';
@@ -207,20 +207,23 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
     await expect(result.current.addEffect('nope')).rejects.toThrow(/Unknown effect "nope"/);
   });
 
-  it('under StrictMode an effect added on mount ends up in the list exactly once, with its instance', async () => {
+  it('under StrictMode, defaults added once on mount are still in the chain, with live instances', async () => {
     registerBoost();
-    const aborted: string[] = [];
     let api: ReturnType<typeof useDynamicEffects> | undefined;
+    let effectRuns = 0;
     function Root() {
       const fx = useDynamicEffects();
       api = fx;
       const { addEffect } = fx;
+      const added = useRef(false);
       useEffect(() => {
+        effectRuns++;
+        // The usual "only once" guard. The ref survives StrictMode's remount,
+        // so the chain has to survive it too.
+        if (added.current) return;
+        added.current = true;
         void addEffect('reverb');
-        addEffect('my-boost').catch((err: unknown) => {
-          // The first (discarded) mount's add is dropped by the cleanup.
-          aborted.push(String(err));
-        });
+        void addEffect('my-boost');
       }, [addEffect]);
       return null;
     }
@@ -232,11 +235,11 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
       );
     });
 
-    // Proof that the effects really ran twice: the first mount's add was dropped.
-    expect(aborted).toHaveLength(1);
-    expect(aborted[0]).toMatch(/cleared or disposed/);
+    // The effects really were double-invoked.
+    expect(effectRuns).toBe(2);
     const list = api!.effects.getSnapshot();
-    expect(list.map((e) => e.effectId).sort()).toEqual(['my-boost', 'reverb']);
+    expect(list.map((e) => e.effectId)).toEqual(['reverb', 'my-boost']);
+    expect(disposeNative).not.toHaveBeenCalled();
     // Every listed entry has a live instance: wiring them reaches each one.
     vi.mocked(connect).mockClear();
     act(() => {
@@ -293,16 +296,17 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
     expect(disposeNative).toHaveBeenCalledTimes(1);
   });
 
-  it('unmount disposes the instances and empties the list', async () => {
+  it('the hook cleanup leaves the chain alone: an effect added before a hide is there after it', async () => {
     registerBoost();
     const { result, unmount } = renderHook(() => useDynamicEffects());
     await act(async () => {
       await result.current.addEffect('my-boost');
     });
     const { effects } = result.current;
+    // React runs the same cleanup for a hidden <Activity> as for an unmount.
     unmount();
-    expect(disposeNative).toHaveBeenCalledTimes(1);
-    expect(effects.getSnapshot()).toEqual([]);
+    expect(disposeNative).not.toHaveBeenCalled();
+    expect(effects.getSnapshot()).toHaveLength(1);
   });
 });
 
@@ -327,6 +331,18 @@ describe('useTrackDynamicEffects: one source per track', () => {
     expect(t1.getSnapshot()).toHaveLength(1);
     expect(t2.getSnapshot()).toEqual([]);
     expect(t2Listener).not.toHaveBeenCalled();
+  });
+
+  it('track chains survive the hook cleanup too', async () => {
+    registerBoost();
+    const { result, unmount } = renderHook(() => useTrackDynamicEffects());
+    await act(async () => {
+      await result.current.addEffectToTrack('t1', 'my-boost');
+    });
+    const t1 = result.current.getTrackEffects('t1');
+    unmount();
+    expect(disposeNative).not.toHaveBeenCalled();
+    expect(t1.getSnapshot()).toHaveLength(1);
   });
 
   it('returns the same effects function for the same track', () => {

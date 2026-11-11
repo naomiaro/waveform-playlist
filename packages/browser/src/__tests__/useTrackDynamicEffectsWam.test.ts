@@ -155,14 +155,14 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     expect(entries.some((e) => e.instanceId === id)).toBe(true);
   });
 
-  it('addWamEffectToTrack aborts and destroys the plugin if the hook unmounts before it resolves', async () => {
+  it('addWamEffectToTrack dropped by a clear while loading destroys the plugin and appends nothing', async () => {
     let resolvePlugin!: (value: unknown) => void;
     const pluginPromise = new Promise((resolve) => {
       resolvePlugin = resolve;
     });
     createWamInstance.mockImplementationOnce(() => pluginPromise);
 
-    const { result, unmount } = renderHook(() => useTrackDynamicEffects());
+    const { result } = renderHook(() => useTrackDynamicEffects());
 
     let addPromise: Promise<string> = Promise.resolve('');
     act(() => {
@@ -170,7 +170,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     });
 
     act(() => {
-      unmount();
+      result.current.clearTrackEffects('t1');
     });
 
     resolvePlugin({
@@ -183,7 +183,7 @@ describe('useTrackDynamicEffects — WAM entries', () => {
       destroy,
     });
 
-    await expect(addPromise).rejects.toThrow(/unmounted/);
+    await expect(addPromise).rejects.toThrow(/cleared before the plugin finished loading/);
     expect(destroy).toHaveBeenCalled();
     const entries = result.current.getTrackEffects('t1').getSnapshot();
     expect(entries.some((e) => e.kind === 'wam')).toBe(false);

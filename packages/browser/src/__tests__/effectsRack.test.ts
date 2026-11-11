@@ -226,28 +226,6 @@ describe('EffectsRack: custom (registered) effects', () => {
     expect(built).toHaveLength(0);
   });
 
-  it('an add still preparing when the rack is disposed is dropped', async () => {
-    let release: () => void = () => {};
-    registerEffect(
-      'my-tremolo',
-      tremolo({
-        prepare: () =>
-          new Promise<void>((resolve) => {
-            release = resolve;
-          }),
-      })
-    );
-    const rack = new EffectsRack();
-    const pending = rack.add('my-tremolo');
-    const rejected = expect(pending).rejects.toThrow(/disposed/);
-    rack.dispose();
-    release();
-    await rejected;
-
-    expect(built).toHaveLength(0);
-    expect(rack.effects.getSnapshot()).toEqual([]);
-  });
-
   it('wires input and output separately, in order, between the attachment points', async () => {
     registerEffect('my-tremolo', tremolo());
     const rack = new EffectsRack();
@@ -356,21 +334,6 @@ describe('EffectsRack: custom (registered) effects', () => {
       ['from', 'in1'],
       ['out1', 'to'],
     ]);
-  });
-
-  it('dispose() empties the list and disposes every instance together', async () => {
-    registerEffect('my-tremolo', tremolo());
-    const rack = new EffectsRack();
-    await rack.add('my-tremolo');
-    await rack.add('reverb');
-
-    rack.dispose();
-
-    expect(rack.effects.getSnapshot()).toEqual([]);
-    expect(built[0].dispose).toHaveBeenCalledTimes(1);
-    // Usable again afterwards (a StrictMode remount).
-    await rack.add('my-tremolo');
-    expect(rack.effects.getSnapshot()).toHaveLength(1);
   });
 
   it('detaching disconnects the chain tail from that destination only', async () => {
@@ -527,7 +490,7 @@ describe('EffectsRack: failures and edge cases', () => {
     expect(built[0].applied[0]).toEqual({ rate: 2, depth: 1 });
   });
 
-  it('clear() disposes every instance, wires straight through and drops an add still preparing', async () => {
+  it('clear() disposes every instance, wires straight through, drops an add still preparing, and leaves the rack usable', async () => {
     let release: () => void = () => {};
     registerEffect('my-tremolo', tremolo());
     registerEffect(
@@ -546,7 +509,7 @@ describe('EffectsRack: failures and edge cases', () => {
     await rack.add('my-tremolo');
     await rack.add('reverb');
     const pending = rack.add('slow');
-    const rejected = expect(pending).rejects.toThrow(/cleared or disposed/);
+    const rejected = expect(pending).rejects.toThrow(/cleared before the effect was ready/);
     from.connect.mockClear();
 
     rack.clear();
@@ -557,6 +520,42 @@ describe('EffectsRack: failures and edge cases', () => {
     expect(built[0].dispose).toHaveBeenCalledTimes(1);
     expect(built).toHaveLength(1);
     expect(from.connect).toHaveBeenCalledWith(to);
+
+    await rack.add('my-tremolo');
+    expect(rack.effects.getSnapshot()).toHaveLength(1);
+  });
+
+  it('releases the instances of a rack that has been garbage-collected', async () => {
+    // A stand-in for FinalizationRegistry: collection cannot be forced here.
+    const registered: Array<{ target: object; held: unknown }> = [];
+    let onCollected: (held: unknown) => void = () => {};
+    vi.stubGlobal(
+      'FinalizationRegistry',
+      class {
+        constructor(callback: (held: unknown) => void) {
+          onCollected = callback;
+        }
+        register(target: object, held: unknown) {
+          registered.push({ target, held });
+        }
+      }
+    );
+    vi.resetModules();
+    const { EffectsRack: FreshRack } = await import('../effects/effectsRack');
+    registerEffect('my-tremolo', tremolo());
+
+    const rack = new FreshRack();
+    await rack.add('my-tremolo');
+    expect(registered).toHaveLength(1);
+    expect(registered[0].target).toBe(rack);
+    // What is held must not keep the rack itself alive.
+    expect(registered[0].held).not.toBe(rack);
+    expect(built[0].dispose).not.toHaveBeenCalled();
+
+    onCollected(registered[0].held);
+
+    expect(built[0].dispose).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 
   it('after the current attachment is detached, a later add connects to nothing', async () => {
