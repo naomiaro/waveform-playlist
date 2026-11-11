@@ -838,6 +838,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         }}
       >
         <Playlist
+          className={className}
           theme={theme}
           backgroundColor={
             theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)

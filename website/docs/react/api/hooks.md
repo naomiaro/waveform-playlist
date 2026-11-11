@@ -77,7 +77,6 @@ function usePlaylistData(): {
   // Audio data
   sampleRate: number;
   duration: number;
-  audioBuffers: AudioBuffer[];
   tracks: ClipTrack[];
   trackStates: TrackState[];
   peaksDataArray: TrackClipPeaks[];

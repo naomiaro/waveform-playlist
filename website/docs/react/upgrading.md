@@ -1,6 +1,6 @@
 ---
 sidebar_position: 3
-description: "Upgrade guide for the next major release of the Waveform Playlist React packages: every breaking change with its before/after"
+description: 'Upgrade guide for the next major release of the Waveform Playlist React packages: every breaking change with its before/after'
 ---
 
 # Upgrading to the next major
@@ -104,14 +104,14 @@ These three exports were a standalone playback-status context (`progress`, `isPl
 
 **Replace with:** the hooks of the provider you already render, from `@waveform-playlist/browser`. Delete the `<PlayoutProvider>` wrapper.
 
-| Removed | Inside `WaveformPlaylistProvider` | Inside `MediaElementPlaylistProvider` |
-| --- | --- | --- |
-| `usePlayoutStatus().isPlaying` | `usePlaybackAnimation().isPlaying` | `useMediaElementAnimation().isPlaying` |
-| `usePlayoutStatus().progress` | `usePlaybackAnimation().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
-| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `usePlaylistState().selectionStart` / `.selectionEnd` | no selection in this provider |
-| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()` | `useMediaElementControls().play()` / `.pause()` |
-| `usePlayoutStatusUpdate().setProgress(t)` | `usePlaylistControls().seekTo(t)` | `useMediaElementControls().seekTo(t)` |
-| `usePlayoutStatusUpdate().setSelection(start, end)` | `usePlaylistControls().setSelection(start, end)` | no selection in this provider |
+| Removed                                               | Inside `WaveformPlaylistProvider`                                                       | Inside `MediaElementPlaylistProvider`                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `usePlayoutStatus().isPlaying`                        | `usePlaybackAnimation().isPlaying`                                                      | `useMediaElementAnimation().isPlaying`                        |
+| `usePlayoutStatus().progress`                         | `usePlaybackAnimation().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
+| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `usePlaylistState().selectionStart` / `.selectionEnd`                                   | no selection in this provider                                 |
+| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()`                                             | `useMediaElementControls().play()` / `.pause()`               |
+| `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaylistControls().seekTo(t)`                                                       | `useMediaElementControls().seekTo(t)`                         |
+| `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaylistControls().setSelection(start, end)`                                        | no selection in this provider                                 |
 
 ```tsx
 // Before
@@ -175,19 +175,47 @@ function labelToMs(label: string): number {
 
 Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat (`"2"`, `"2.3"`), not a time, and `labelToMs` does not apply.
 
+## `audioBuffers` is removed from `usePlaylistData()`
+
+**Package:** `@waveform-playlist/browser`.
+
+`usePlaylistData().audioBuffers` was a flat list of every clip's `AudioBuffer`, filled in by an effect, so it lagged `tracks` by at least one render. Nothing in the library read it. The buffers are on the clips.
+
+**Find:** `audioBuffers` read from `usePlaylistData()`.
+
+**Replace with:** the clips of `tracks`, which is current in every render:
+
+```tsx
+// Before
+const { audioBuffers } = usePlaylistData();
+
+// After
+const { tracks } = usePlaylistData();
+const audioBuffers = tracks.flatMap((track) =>
+  track.clips.flatMap((clip) => (clip.audioBuffer ? [clip.audioBuffer] : []))
+);
+```
+
+Two related values on `usePlaylistData()` keep their names and types but are now derived from `tracks` during render instead of being set by an effect:
+
+- `duration` and `peaksDataArray` already match `tracks` in the render that receives new tracks. Code that waited a render for them (for example an effect that compared `peaksDataArray.length` with `tracks.length`) no longer needs to.
+- `peaksDataArray` keeps the identity of everything that did not change: a clip's `peaks`, its entry, and its track's array. It is safe to use them as memo or effect dependencies.
+- `<Waveform>` no longer renders the text "Loading waveform..." before the first peaks; clips render at once and their waveforms fill in.
+- `<Waveform className="…">` now sets the class on the playlist's outermost element (the one with `data-playlist-state`). Before, the class was only on the "Loading waveform..." placeholder and disappeared once the playlist rendered, so check that a class you pass there has the styles you want on the whole playlist.
+
 ## Keyboard shortcuts yield to the focused control
 
 **Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useKeyboardShortcuts`, `usePlaybackShortcuts`, `<KeyboardShortcuts>`).
 
 A shortcut no longer fires for a key that the focused control uses itself. This fixes controls that could not be operated from the keyboard, and it changes what `Space` does right after you click a control:
 
-| Focus is on | Before | Now |
-| --- | --- | --- |
-| a `<button>` you clicked or tabbed to (Mute, Zoom In, your own buttons) | `Space` toggled playback and did not press the button | `Space` and `Enter` press the button |
-| a `<select>` dropdown | `Space`, `Escape`, `0` and other shortcuts fired | every key goes to the dropdown |
-| a slider, checkbox or text input | no shortcut fired | unchanged |
-| a link | `Space` toggled playback | unchanged for `Space`; `Enter` follows the link and no longer runs an Enter shortcut |
-| anything except a text field, while a modal dialog is open | `Escape` stopped playback and the dialog stayed open | `Escape` closes the dialog |
+| Focus is on                                                             | Before                                                | Now                                                                                  |
+| ----------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| a `<button>` you clicked or tabbed to (Mute, Zoom In, your own buttons) | `Space` toggled playback and did not press the button | `Space` and `Enter` press the button                                                 |
+| a `<select>` dropdown                                                   | `Space`, `Escape`, `0` and other shortcuts fired      | every key goes to the dropdown                                                       |
+| a slider, checkbox or text input                                        | no shortcut fired                                     | unchanged                                                                            |
+| a link                                                                  | `Space` toggled playback                              | unchanged for `Space`; `Enter` follows the link and no longer runs an Enter shortcut |
+| anything except a text field, while a modal dialog is open              | `Escape` stopped playback and the dialog stayed open  | `Escape` closes the dialog                                                           |
 
 `Space` is play/pause whenever focus is not on a control.
 
