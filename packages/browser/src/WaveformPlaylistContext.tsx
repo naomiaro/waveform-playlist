@@ -100,7 +100,6 @@ export interface FrameData {
 
 export interface PlaybackAnimationContextValue {
   isPlaying: boolean;
-  currentTime: number;
   currentTimeRef: React.RefObject<number>;
   /**
    * Visually-aligned playback time (engine.getAudibleTime() while playing;
@@ -140,7 +139,6 @@ export interface PlaylistStateContextValue {
   isAutomaticScroll: boolean;
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
-  activeAnnotationId: string | null;
   selectedTrackId: string | null; // ID of currently selected track for editing operations
   // Loop region (separate from selection) - Audacity-style loop points
   loopStart: number;
@@ -165,6 +163,27 @@ export interface PlaylistStateContextValue {
 export interface SelectionContextValue {
   selectionStart: number;
   selectionEnd: number;
+}
+
+/**
+ * Where the cursor rests, in seconds: the position playback starts from. It
+ * changes on a seek, a pause, a stop and a selection whose start moves; it does
+ * NOT advance during playback (read `currentTimeRef`, or register a frame
+ * callback, for that). Apart from the animation context so that a component
+ * reading `isPlaying` or a ref is not re-rendered by every seek, nor by every
+ * pointer move of a leftward selection drag (#740).
+ */
+export interface CurrentTimeContextValue {
+  currentTime: number;
+}
+
+/**
+ * The annotation that is playing or was last chosen. Apart from the state
+ * context because it changes at every annotation boundary during playback, and
+ * nothing else in the state value does (#740).
+ */
+export interface ActiveAnnotationContextValue {
+  activeAnnotationId: string | null;
 }
 
 export interface PlaylistControlsContextValue {
@@ -298,6 +317,8 @@ const DEFAULT_CONTROLS = { show: false, width: 0 };
 const PlaybackAnimationContext = createContext<PlaybackAnimationContextValue | null>(null);
 const PlaylistStateContext = createContext<PlaylistStateContextValue | null>(null);
 const SelectionContext = createContext<SelectionContextValue | null>(null);
+const CurrentTimeContext = createContext<CurrentTimeContextValue | null>(null);
+const ActiveAnnotationContext = createContext<ActiveAnnotationContextValue | null>(null);
 const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
 const PlaylistDataContext = createContext<PlaylistDataContextValue | null>(null);
 
@@ -1915,13 +1936,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 
   // Split context values for performance optimization
-  // Animation context only re-renders consumers on discrete events
-  // (play/pause/stop/seek), never during the animation loop itself
+  // Animation context only re-renders consumers when playback starts or
+  // stops, never during the animation loop itself, and not on a seek: the
+  // resting cursor position has its own context (#740)
 
   const animationValue: PlaybackAnimationContextValue = useMemo(
     () => ({
       isPlaying,
-      currentTime,
       currentTimeRef,
       visualTimeRef,
       playbackStartTimeRef,
@@ -1935,7 +1956,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }),
     [
       isPlaying,
-      currentTime,
       currentTimeRef,
       visualTimeRef,
       playbackStartTimeRef,
@@ -1957,7 +1977,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isAutomaticScroll,
       isLoopEnabled,
       annotations,
-      activeAnnotationId,
       selectedTrackId,
       loopStart,
       loopEnd,
@@ -1973,7 +1992,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isAutomaticScroll,
       isLoopEnabled,
       annotations,
-      activeAnnotationId,
       selectedTrackId,
       loopStart,
       loopEnd,
@@ -1989,6 +2007,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const selectionValue: SelectionContextValue = useMemo(
     () => ({ selectionStart, selectionEnd }),
     [selectionStart, selectionEnd]
+  );
+
+  // Their own contexts too (#740): the resting cursor position changes on
+  // every seek and on every pointer move of a leftward selection drag; the
+  // active annotation changes at every annotation boundary during playback.
+  const currentTimeValue: CurrentTimeContextValue = useMemo(() => ({ currentTime }), [currentTime]);
+  const activeAnnotationValue: ActiveAnnotationContextValue = useMemo(
+    () => ({ activeAnnotationId }),
+    [activeAnnotationId]
   );
 
   const setCurrentTimeControl = useCallback(
@@ -2164,11 +2191,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       <PlaybackAnimationContext.Provider value={animationValue}>
         <PlaylistStateContext.Provider value={stateValue}>
           <SelectionContext.Provider value={selectionValue}>
-            <PlaylistControlsContext.Provider value={controlsValue}>
-              <PlaylistDataContext.Provider value={dataValue}>
-                {children}
-              </PlaylistDataContext.Provider>
-            </PlaylistControlsContext.Provider>
+            <CurrentTimeContext.Provider value={currentTimeValue}>
+              <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
+                <PlaylistControlsContext.Provider value={controlsValue}>
+                  <PlaylistDataContext.Provider value={dataValue}>
+                    {children}
+                  </PlaylistDataContext.Provider>
+                </PlaylistControlsContext.Provider>
+              </ActiveAnnotationContext.Provider>
+            </CurrentTimeContext.Provider>
           </SelectionContext.Provider>
         </PlaylistStateContext.Provider>
       </PlaybackAnimationContext.Provider>
@@ -2204,6 +2235,34 @@ export const useSelection = () => {
   const context = useContext(SelectionContext);
   if (!context) {
     throw new Error('useSelection must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+/**
+ * Where the cursor rests, in seconds. A component that calls this re-renders
+ * on every seek, pause and stop, and on every pointer move of a selection drag
+ * to the left. The value does not advance during playback: for a live position
+ * read `currentTimeRef` from `usePlaybackAnimation()` or register a frame
+ * callback there.
+ */
+export const useCurrentTime = () => {
+  const context = useContext(CurrentTimeContext);
+  if (!context) {
+    throw new Error('useCurrentTime must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+/**
+ * The id of the annotation that is playing or was last chosen, or `null`. A
+ * component that calls this re-renders at every annotation boundary during
+ * playback, so call it in the smallest component that shows the active one.
+ */
+export const useActiveAnnotation = () => {
+  const context = useContext(ActiveAnnotationContext);
+  if (!context) {
+    throw new Error('useActiveAnnotation must be used within WaveformPlaylistProvider');
   }
   return context;
 };

@@ -104,14 +104,14 @@ These three exports were a standalone playback-status context (`progress`, `isPl
 
 **Replace with:** the hooks of the provider you already render, from `@waveform-playlist/browser`. Delete the `<PlayoutProvider>` wrapper.
 
-| Removed                                               | Inside `WaveformPlaylistProvider`                                                       | Inside `MediaElementPlaylistProvider`                         |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `usePlayoutStatus().isPlaying`                        | `usePlaybackAnimation().isPlaying`                                                      | `useMediaElementAnimation().isPlaying`                        |
-| `usePlayoutStatus().progress`                         | `usePlaybackAnimation().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
-| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `useSelection().selectionStart` / `.selectionEnd`                                       | no selection in this provider                                 |
-| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()`                                             | `useMediaElementControls().play()` / `.pause()`               |
-| `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaylistControls().seekTo(t)`                                                       | `useMediaElementControls().seekTo(t)`                         |
-| `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaylistControls().setSelection(start, end)`                                        | no selection in this provider                                 |
+| Removed                                               | Inside `WaveformPlaylistProvider`                                                 | Inside `MediaElementPlaylistProvider`                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `usePlayoutStatus().isPlaying`                        | `usePlaybackAnimation().isPlaying`                                                | `useMediaElementAnimation().isPlaying`                        |
+| `usePlayoutStatus().progress`                         | `useCurrentTime().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
+| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `useSelection().selectionStart` / `.selectionEnd`                                 | no selection in this provider                                 |
+| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()`                                       | `useMediaElementControls().play()` / `.pause()`               |
+| `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaylistControls().seekTo(t)`                                                 | `useMediaElementControls().seekTo(t)`                         |
+| `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaylistControls().setSelection(start, end)`                                  | no selection in this provider                                 |
 
 ```tsx
 // Before
@@ -232,6 +232,84 @@ A component that calls `useSelection()` re-renders on every pointer move of a dr
 
 Fixed along the way: dragging a selection from right to left now selects the whole dragged range. Before, the range collapsed to the last pointer movement.
 
+## `currentTime` moves from `usePlaybackAnimation()` to `useCurrentTime()`
+
+**Package:** `@waveform-playlist/browser`.
+
+`currentTime` is where the cursor rests: it changes on a seek, a pause, a stop and a selection whose start moves, and it does not advance during playback. While it was part of `usePlaybackAnimation()`, every component that called that hook for `isPlaying` or for a ref (a transport button, the whole playlist visualization, an app component that only wanted `currentTimeRef`) re-rendered on every seek and on every pointer move of a selection drag to the left. It now has its own context and hook. `usePlaybackAnimation()` no longer has `currentTime`; reading it from there gives `undefined` (a type error in TypeScript).
+
+**Find:** `currentTime` destructured or read from `usePlaybackAnimation()`.
+
+**Replace with:** `useCurrentTime()`, and keep `usePlaybackAnimation()` for the other fields:
+
+```tsx
+// Before
+import { usePlaybackAnimation } from '@waveform-playlist/browser';
+
+const { currentTime, isPlaying } = usePlaybackAnimation();
+
+// After
+import { useCurrentTime, usePlaybackAnimation } from '@waveform-playlist/browser';
+
+const { currentTime } = useCurrentTime();
+const { isPlaying } = usePlaybackAnimation();
+```
+
+If the value is only needed inside an event handler or a callback, do not subscribe at all; read the ref when the handler runs:
+
+```tsx
+const { currentTimeRef } = usePlaybackAnimation();
+const addMarker = () => createMarkerAt(currentTimeRef.current ?? 0);
+```
+
+**Also find (no type error, and a search for `currentTime` misses it):** every component that calls `usePlaybackAnimation()` and reads `currentTimeRef.current` (or `visualTimeRef.current`) while rendering, or in an effect without a dependency array, to show the position while stopped. Such a component never mentions `currentTime`, so it still compiles. It used to be re-rendered by `usePlaybackAnimation()` on every seek; it no longer is, so its display stays at the old position after a seek, a pause-and-seek or a selection change, until playback starts or stops. Search for `currentTimeRef.current` and `visualTimeRef.current` and check each use that is not inside an event handler or a frame callback.
+
+**Replace with:** a `useCurrentTime()` call in that component, and use its value:
+
+```tsx
+// Before: re-rendered by usePlaybackAnimation() on a seek
+const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+useEffect(() => {
+  if (!isPlaying) label.current.textContent = format(currentTimeRef.current ?? 0);
+});
+
+// After
+const { isPlaying } = usePlaybackAnimation();
+const { currentTime } = useCurrentTime();
+useEffect(() => {
+  if (!isPlaying) label.current.textContent = format(currentTime);
+}, [isPlaying, currentTime]);
+```
+
+A custom `renderPlayhead` function needs no change: it is called again with the new `position` after a seek. `setCurrentTime(t)` and `seekTo(t)` stay on `usePlaylistControls()`. `useCurrentTime()` must be called inside `WaveformPlaylistProvider`; `useMediaElementAnimation()` is unchanged and still returns `currentTime`.
+
+## `activeAnnotationId` moves from `usePlaylistState()` to `useActiveAnnotation()`
+
+**Package:** `@waveform-playlist/browser`.
+
+The active annotation changes at every annotation boundary during playback; nothing else in `usePlaylistState()` does. While it was part of that hook's value, every component that called `usePlaylistState()` for any field re-rendered at each boundary. It now has its own context and hook. `usePlaylistState()` no longer has `activeAnnotationId`; reading it from there gives `undefined` (a type error in TypeScript).
+
+**Find:** `activeAnnotationId` destructured or read from `usePlaylistState()`.
+
+**Replace with:** `useActiveAnnotation()`, and keep `usePlaylistState()` for the other fields:
+
+```tsx
+// Before
+import { usePlaylistState } from '@waveform-playlist/browser';
+
+const { annotations, activeAnnotationId } = usePlaylistState();
+
+// After
+import { usePlaylistState, useActiveAnnotation } from '@waveform-playlist/browser';
+
+const { annotations } = usePlaylistState();
+const { activeAnnotationId } = useActiveAnnotation();
+```
+
+`setActiveAnnotationId(id)` stays on `usePlaylistControls()`. `useActiveAnnotation()` must be called inside `WaveformPlaylistProvider`; `useMediaElementState()` is unchanged and still returns `activeAnnotationId`.
+
+A component that calls `useActiveAnnotation()` re-renders at every annotation boundary during playback, so call it in a small component that shows the active annotation, not in the component that renders the whole page.
+
 ## Keyboard shortcuts yield to the focused control
 
 **Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useKeyboardShortcuts`, `usePlaybackShortcuts`, `<KeyboardShortcuts>`).
@@ -285,12 +363,12 @@ type RecordingProgressSource = ValueSource<{ duration: number; peaks: (Int8Array
 
 The five entries below each replace removed fields. They all use the same four ways to read a source:
 
-| You had                                              | Use                                                                                              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `<SegmentedVUMeter levels={…} peakLevels={…} />`     | `<SegmentedVUMeter meter={meter} />` (new prop; draws to the DOM, no re-render)                  |
-| values read in render (labels, custom bars)          | `useMeterLevels(meter)` / `useRecordingProgress(progress)`: state, 10 updates a second by default |
-| values that must be state at full rate               | `useSyncExternalStore(source.subscribe, source.getSnapshot)`                                     |
-| an effect that depended on the value                 | `source.subscribe(callback)` inside the effect                                                   |
+| You had                                          | Use                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `<SegmentedVUMeter levels={…} peakLevels={…} />` | `<SegmentedVUMeter meter={meter} />` (new prop; draws to the DOM, no re-render)                   |
+| values read in render (labels, custom bars)      | `useMeterLevels(meter)` / `useRecordingProgress(progress)`: state, 10 updates a second by default |
+| values that must be state at full rate           | `useSyncExternalStore(source.subscribe, source.getSnapshot)`                                      |
+| an effect that depended on the value             | `source.subscribe(callback)` inside the effect                                                    |
 
 `useMeterLevels` and the generic `useThrottledValue` are exported from `@waveform-playlist/ui-components`; `useRecordingProgress` from `@waveform-playlist/recording`. All three take `{ updateRate }` (updates per second).
 

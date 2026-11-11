@@ -186,10 +186,14 @@ interface FrameData {
   readonly samplesPerPixel: number;
 }
 
+// Does NOT carry currentTime: that is useCurrentTime(). A consumer of this hook
+// re-renders when playback starts or stops, NOT on a seek. A component that shows
+// the stopped position from currentTimeRef.current (in render, or in an effect
+// without deps) must ALSO call useCurrentTime(), or it keeps the old position
+// after a seek. TypeScript does not flag this.
 interface PlaybackAnimationContextValue {
   isPlaying: boolean;
-  currentTime: number;
-  currentTimeRef: RefObject<number>;
+  currentTimeRef: RefObject<number>;   // live position; read it in callbacks and frame callbacks
   /** Visually-aligned playback time: engine.getAudibleTime() (raw − outputLatency − engine.lookAhead) while playing, raw time when resting. */
   visualTimeRef: RefObject<number>;
   playbackStartTimeRef: RefObject<number>;
@@ -220,6 +224,30 @@ interface SelectionContextValue {
 }
 ```
 
+### useCurrentTime()
+
+```typescript
+// Where the cursor rests, in seconds. Its own context: it changes on every seek,
+// pause and stop, and on every pointer move of a leftward selection drag.
+// It does NOT advance during playback (use currentTimeRef or registerFrameCallback
+// from usePlaybackAnimation() for that). NOT on usePlaybackAnimation().
+// WaveformPlaylistProvider only. Set it with usePlaylistControls().seekTo(t) or .setCurrentTime(t).
+interface CurrentTimeContextValue {
+  currentTime: number;
+}
+```
+
+### useActiveAnnotation()
+
+```typescript
+// The annotation that is playing or was last chosen. Its own context: it changes
+// at every annotation boundary during playback. NOT on usePlaylistState().
+// WaveformPlaylistProvider only. Set it with usePlaylistControls().setActiveAnnotationId(id).
+interface ActiveAnnotationContextValue {
+  activeAnnotationId: string | null;
+}
+```
+
 ### usePlaylistState()
 
 ```typescript
@@ -230,7 +258,6 @@ interface PlaylistStateContextValue {
   isAutomaticScroll: boolean;
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
-  activeAnnotationId: string | null;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;

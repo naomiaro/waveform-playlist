@@ -148,8 +148,11 @@ const { tracks, loading, error } = useAudioTracks([
 // Playback controls
 const { play, pause, stop, seekTo } = usePlaylistControls();
 
-// Playback animation (60fps updates)
-const { currentTime, isPlaying } = usePlaybackAnimation();
+// Playback state, refs and per-frame callbacks for 60fps UI
+const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+
+// Where the cursor rests (changes on seek, pause and stop)
+const { currentTime } = useCurrentTime();
 
 // Zoom controls
 const { zoomIn, zoomOut, samplesPerPixel } = useZoomControls();

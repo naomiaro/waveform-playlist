@@ -144,11 +144,11 @@ When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after
 
 ## Memo Boundaries in the Visualization (#693)
 
-`PlaylistVisualization` is a shell: sizes, the shared vertical layout, the selection-drag pointer handlers and `PlaylistInfoContext`. It does not subscribe to the selection (#733, next section), but it still re-renders on every `currentTime` change (it reads `isPlaying` from the animation context, so a seek and every move of a leftward selection drag) and on every active-annotation change. What it renders is split so that this is cheap:
+`PlaylistVisualization` is a shell: sizes, the shared vertical layout, the selection-drag pointer handlers and `PlaylistInfoContext`. It does not subscribe to the selection (#733), the resting cursor position or the active annotation (#740, both in the sections below), so it renders when playback starts or stops, on a state change such as the selected track, and on layout changes. What it renders is split so that this is cheap:
 
 - `TrackRows` → `TrackRow` → `ClipView` (`components/TrackRows.tsx`) and `TrackControlsColumn` → `DefaultTrackControls` are `React.memo`. They take NO selection, cursor or annotation state. Their props are primitives, stable callbacks, and the identity-stable pieces of `peaksDataArray` from `derivePeaks` (#692).
 - `SelectionOverlay`, `PlayheadOverlay`, `AnnotationBoxesOverlay`, `LoopRegionOverlay` (`components/VisualizationOverlays.tsx`) read that state from context themselves.
-- In `ChannelWithProgress`, only the inner `ClipProgress` overlay subscribes to the animation and data contexts. The channel itself must not: `setSelection` also sets `currentTime` (so a leftward selection drag changes the animation context per move), and `trackStates` lives in the data context (so a volume change would re-render every channel).
+- In `ChannelWithProgress`, only the inner `ClipProgress` overlay subscribes to the animation and data contexts. The channel itself must not: `ClipProgress` also calls `useCurrentTime()` (so it renders per move of a leftward selection drag), and `trackStates` lives in the data context (so a volume change would re-render every channel).
 
 Rules when changing these files:
 
@@ -167,9 +167,24 @@ Rules when changing these files:
 - The provider itself still renders per move (selection is its React state); its `children` are stable, so only context consumers follow.
 - `PlaylistVisualization`'s drag handlers take the anchor from `mouseDownTimeRef` (set at mouse-down), never from `selectionStart`. `selectionStart` is `min(anchor, pointer)`, so it stops being the anchor once the pointer passes left of it: until #733 a leftward drag selected only the last pointer movement.
 - `MediaElementPlaylistProvider` has no selection in any context; `MediaElementPlaylist` keeps it in local state with a fixed start, so it needed neither change.
-- Not split yet: `currentTime` from `isPlaying` in the animation context. `setSelection` also sets `currentTime`, so a LEFTWARD drag still re-renders every `usePlaybackAnimation()` consumer per move.
+- `setSelection` also sets `currentTime`, so a LEFTWARD drag changes the resting cursor position per move; that has its own context since #740 (next section).
 
 Measured per move of a rightward drag (dev build, `probes/select733.cjs`, which adds render time to the fiber-walk count): multi-clip 31 components to 9; annotations example (15 annotations) 369 to 17, React render at 4x CPU throttle 19.8 ms to 1.5 ms. Leftward: multi-clip 63 to 54, annotations 371 to 370. Guarded by `contextValueStability.test.tsx` (identities and render counts) and the drag-direction tests in `e2e/multi-clip.spec.ts`.
+
+## Resting Cursor Position and Active Annotation Have Their Own Contexts (#740)
+
+`currentTime` lives in `CurrentTimeContext` (`useCurrentTime()`), not in `PlaybackAnimationContext`. `activeAnnotationId` lives in `ActiveAnnotationContext` (`useActiveAnnotation()`), not in `PlaylistStateContext`. Seven contexts in all.
+
+- `currentTime` is the RESTING position (seek, pause, stop, a selection whose start moves). It does not advance during playback; `currentTimeRef` and frame callbacks do that. The animation value now changes only when `isPlaying` does.
+- A context subscription is to the whole value. Before the split, a component that read only `currentTimeRef` or `isPlaying` still rendered on every seek; changing the annotations example to read the ref alone did not change its render count at all. That is why the fix had to be in the provider and not in consumers.
+- `ClipProgress`, `AnimatedPlayhead`, `CustomPlayhead` and `AudioPosition` call `useCurrentTime()` for the re-render only. They position from `visualTimeRef` / `currentTimeRef` in an effect without dependencies, so without the call they would not move on a seek while stopped. Any new component that shows the resting position needs the same call (tests: "still follows a seek while stopped" in `visualizationMemoBoundaries.test.tsx`).
+- `useActiveAnnotation()` is called by `AnnotationBoxesOverlay`, `PlaylistAnnotationList` and `KeyboardShortcuts` only.
+- `MediaElementPlaylistProvider` is unchanged: its `currentTime` and `activeAnnotationId` are still in its animation and state values. Not measured there.
+
+Measured (dev build, 4x CPU throttle, `probes/select740.cjs`, which charges each rendered component to the nearest rendered ancestor whose parent did not render):
+
+- Leftward selection drag, per move: annotations example 370 components / 21 to 24 ms React render before, 21 / 1.8 ms after; multi-clip 54 / 3.5 ms before, 37 / 2.3 ms after (26 of the 37 are the 13 `ClipProgress` and their styled child).
+- Active-annotation change during playback, per boundary: annotations example 369 components / 23 to 27 ms before, 265 / 16 to 22 ms after. What is left is the annotation list (168) and the annotation boxes (94): both re-render every item when the active one changes, because neither memoizes its items.
 
 ## Playlist Loading Detection
 

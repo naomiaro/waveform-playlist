@@ -572,7 +572,7 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  usePlaybackAnimation,
+  useCurrentTime,
 } from '@waveform-playlist/browser';
 import { ExportWavButton } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
@@ -600,7 +600,7 @@ function RecordingControls({
   selectedTrackId: string | null;
   setSelectedTrackId: (id: string | null) => void;
 }) {
-  const { currentTime } = usePlaybackAnimation();
+  const { currentTime } = useCurrentTime();
 
   const {
     isRecording,

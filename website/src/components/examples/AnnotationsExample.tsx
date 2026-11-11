@@ -339,9 +339,11 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   minAnnotationDuration = 0.5,
 }) => {
   const { samplesPerPixel, duration, controls } = usePlaylistData();
-  const { annotations, linkEndpoints, activeAnnotationId } = usePlaylistState();
+  const { annotations, linkEndpoints } = usePlaylistState();
   const { setAnnotations, play } = usePlaylistControls();
-  const { currentTime } = usePlaybackAnimation();
+  // The ref, not `useCurrentTime()`: the position is only needed when the
+  // button is pressed, and this component renders the whole page.
+  const { currentTimeRef } = usePlaybackAnimation();
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
@@ -409,7 +411,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   const addAnnotationAtPlayhead = useCallback(() => {
     if (duration <= 0) return;
 
-    const gap = findNextAvailableGap(currentTime);
+    const gap = findNextAvailableGap(currentTimeRef.current ?? 0);
 
     if (!gap) {
       console.warn('Cannot create annotation: no available space found');
@@ -445,7 +447,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           ];
 
     setAnnotations(newAnnotations);
-  }, [currentTime, annotations, duration, setAnnotations, defaultAnnotationDuration, findNextAvailableGap]);
+  }, [currentTimeRef, annotations, duration, setAnnotations, defaultAnnotationDuration, findNextAvailableGap]);
 
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {

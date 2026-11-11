@@ -243,7 +243,6 @@ The provider exposes state and controls through React Context. Access them using
 ```typescript
 interface PlaybackAnimationContextValue {
   isPlaying: boolean;
-  currentTime: number;
   currentTimeRef: RefObject<number>;
   /** Visually-aligned playback time (audible time while playing; raw position otherwise). */
   visualTimeRef: RefObject<number>;
@@ -275,6 +274,26 @@ interface SelectionContextValue {
 }
 ```
 
+### Resting cursor position (useCurrentTime)
+
+```typescript
+interface CurrentTimeContextValue {
+  /** Where the cursor rests, in seconds. Does not advance during playback. */
+  currentTime: number;
+}
+```
+
+Changes on a seek, a pause, a stop and a selection whose start moves. For a live position during playback use `currentTimeRef` or a frame callback from `usePlaybackAnimation()`.
+
+### Active annotation (useActiveAnnotation)
+
+```typescript
+interface ActiveAnnotationContextValue {
+  /** The annotation that is playing or was last chosen */
+  activeAnnotationId: string | null;
+}
+```
+
 ### State (usePlaylistState)
 
 ```typescript
@@ -285,7 +304,6 @@ interface PlaylistStateContextValue {
   isAutomaticScroll: boolean;
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
-  activeAnnotationId: string | null;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;

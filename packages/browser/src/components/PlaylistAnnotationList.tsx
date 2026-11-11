@@ -6,7 +6,11 @@ import type {
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
 import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
-import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
+import {
+  useActiveAnnotation,
+  usePlaylistState,
+  usePlaylistControls,
+} from '../WaveformPlaylistContext';
 import type { OnAnnotationUpdateFn } from '../types/annotations';
 
 export type { OnAnnotationUpdateFn } from '../types/annotations';
@@ -55,8 +59,8 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
 }) => {
-  const { annotations, activeAnnotationId, annotationsEditable, linkEndpoints, continuousPlay } =
-    usePlaylistState();
+  const { annotations, annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
   const integration = useAnnotationIntegration();
   const { setAnnotations } = usePlaylistControls();
 

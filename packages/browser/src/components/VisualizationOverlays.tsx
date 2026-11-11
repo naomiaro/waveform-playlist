@@ -14,6 +14,8 @@ import {
 } from '@waveform-playlist/ui-components';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
+  useActiveAnnotation,
+  useCurrentTime,
   usePlaybackAnimation,
   usePlaylistControls,
   usePlaylistData,
@@ -60,6 +62,9 @@ const CustomPlayhead: React.FC<{
     getPlaybackTime,
     getAudioContextTime,
   } = usePlaybackAnimation();
+  // Subscribed for the re-render only, so a seek while stopped moves a custom
+  // playhead: the position below comes from the refs.
+  useCurrentTime();
 
   // Use visualTimeRef so the initial position matches the audible output
   // (the playhead's rAF loop also reads visualTimeRef for in-sync animation).
@@ -123,8 +128,8 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
   getAnnotationBoxLabel,
 }) => {
   const annotationIntegration = useContext(AnnotationIntegrationContext);
-  const { annotations, activeAnnotationId, annotationsEditable, continuousPlay } =
-    usePlaylistState();
+  const { annotations, annotationsEditable, continuousPlay } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
   const { setActiveAnnotationId, play } = usePlaylistControls();
   const { sampleRate, samplesPerPixel } = usePlaylistData();
 

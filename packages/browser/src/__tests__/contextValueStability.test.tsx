@@ -20,6 +20,8 @@ import {
   usePlaybackAnimation,
   usePlaylistState,
   useSelection,
+  useCurrentTime,
+  useActiveAnnotation,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -105,6 +107,36 @@ const SelectionProbeChild: React.FC = () => {
   return null;
 };
 
+type Animation = ReturnType<typeof usePlaybackAnimation>;
+let animationProbe: { animation: Animation; renders: number };
+let currentTimeProbe: { currentTime: number; renders: number };
+let activeAnnotationProbe: { activeAnnotationId: string | null; renders: number };
+
+// Reads only the animation context, as a transport button does (#740).
+const AnimationProbeChild: React.FC = () => {
+  animationProbe = {
+    animation: usePlaybackAnimation(),
+    renders: (animationProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
+
+const CurrentTimeProbeChild: React.FC = () => {
+  currentTimeProbe = {
+    currentTime: useCurrentTime().currentTime,
+    renders: (currentTimeProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
+
+const ActiveAnnotationProbeChild: React.FC = () => {
+  activeAnnotationProbe = {
+    activeAnnotationId: useActiveAnnotation().activeAnnotationId,
+    renders: (activeAnnotationProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
+
 const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaylistControls(),
@@ -136,6 +168,9 @@ async function mount({ inlineProps = false } = {}) {
       <ProbeChild />
       <StateProbeChild />
       <SelectionProbeChild />
+      <AnimationProbeChild />
+      <CurrentTimeProbeChild />
+      <ActiveAnnotationProbeChild />
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
@@ -299,6 +334,126 @@ describe('selection lives in its own context (#733)', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<SelectionProbeChild />)).toThrow(
       'useSelection must be used within WaveformPlaylistProvider'
+    );
+  });
+});
+
+describe('the resting cursor position lives in its own context (#740)', () => {
+  it('a seek while stopped leaves the animation value and its consumers alone', async () => {
+    await mount();
+    const animationBefore = animationProbe.animation;
+    const animationRendersBefore = animationProbe.renders;
+    const currentTimeRendersBefore = currentTimeProbe.renders;
+
+    await act(async () => {
+      probe.controls.seekTo(0.5);
+    });
+
+    expect(currentTimeProbe.currentTime).toBe(0.5);
+    expect(currentTimeProbe.renders).toBeGreaterThan(currentTimeRendersBefore);
+    expect(animationProbe.animation.currentTimeRef.current).toBe(0.5);
+    expect(animationProbe.animation).toBe(animationBefore);
+    expect(animationProbe.renders).toBe(animationRendersBefore);
+    expect(animationProbe.animation).not.toHaveProperty('currentTime');
+  });
+
+  it('a selection whose start moves (a leftward drag) leaves the animation value alone', async () => {
+    await mount();
+    await act(async () => {
+      probe.controls.setSelection(0.4, 0.6);
+    });
+    const animationBefore = animationProbe.animation;
+    const animationRendersBefore = animationProbe.renders;
+
+    await act(async () => {
+      probe.controls.setSelection(0.3, 0.6);
+    });
+    await act(async () => {
+      probe.controls.setSelection(0.2, 0.6);
+    });
+
+    expect(currentTimeProbe.currentTime).toBe(0.2);
+    expect(animationProbe.animation).toBe(animationBefore);
+    expect(animationProbe.renders).toBe(animationRendersBefore);
+  });
+
+  it('setCurrentTime reaches useCurrentTime consumers', async () => {
+    await mount();
+
+    await act(async () => {
+      probe.controls.setCurrentTime(0.75);
+    });
+
+    expect(currentTimeProbe.currentTime).toBe(0.75);
+  });
+
+  it('play and pause still reach animation consumers, and pause sets the resting position', async () => {
+    await mount();
+    const animationRendersBefore = animationProbe.renders;
+
+    await act(async () => {
+      await probe.controls.play(0.25);
+    });
+    expect(animationProbe.animation.isPlaying).toBe(true);
+    expect(animationProbe.renders).toBeGreaterThan(animationRendersBefore);
+
+    await act(async () => {
+      probe.controls.pause();
+    });
+    expect(animationProbe.animation.isPlaying).toBe(false);
+    expect(currentTimeProbe.currentTime).toBe(animationProbe.animation.currentTimeRef.current);
+  });
+
+  it('useCurrentTime throws outside the provider', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => render(<CurrentTimeProbeChild />)).toThrow(
+      'useCurrentTime must be used within WaveformPlaylistProvider'
+    );
+  });
+});
+
+describe('the active annotation lives in its own context (#740)', () => {
+  it('an active-annotation change leaves the state value and its consumers alone', async () => {
+    await mount();
+    const stateBefore = stateProbe.state;
+    const stateRendersBefore = stateProbe.renders;
+    const activeRendersBefore = activeAnnotationProbe.renders;
+    expect(activeAnnotationProbe.activeAnnotationId).toBeNull();
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+    });
+
+    expect(activeAnnotationProbe.activeAnnotationId).toBe('n1');
+    expect(activeAnnotationProbe.renders).toBeGreaterThan(activeRendersBefore);
+    expect(stateProbe.state).toBe(stateBefore);
+    expect(stateProbe.renders).toBe(stateRendersBefore);
+    expect(stateProbe.state).not.toHaveProperty('activeAnnotationId');
+  });
+
+  it('a state change that is not the active annotation leaves its consumers alone', async () => {
+    await mount();
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+    });
+    const activeRendersBefore = activeAnnotationProbe.renders;
+
+    await act(async () => {
+      probe.controls.setLoopRegion(0.2, 0.4);
+    });
+    await act(async () => {
+      probe.controls.setSelection(0.1, 0.5);
+    });
+
+    expect(stateProbe.state.loopStart).toBe(0.2);
+    expect(activeAnnotationProbe.activeAnnotationId).toBe('n1');
+    expect(activeAnnotationProbe.renders).toBe(activeRendersBefore);
+  });
+
+  it('useActiveAnnotation throws outside the provider', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(() => render(<ActiveAnnotationProbeChild />)).toThrow(
+      'useActiveAnnotation must be used within WaveformPlaylistProvider'
     );
   });
 });

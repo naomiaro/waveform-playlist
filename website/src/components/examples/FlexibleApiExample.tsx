@@ -33,6 +33,7 @@ import {
   Waveform,
   usePlaylistControls,
   usePlaybackAnimation,
+  useCurrentTime,
   usePlaylistData,
   usePlaylistState,
   useSelection,
@@ -72,6 +73,9 @@ const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ dura
   const timeRef = useRef<HTMLSpanElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
+  // Where the cursor rests. It changes on a seek, a pause and a stop (not
+  // during playback), which is when the stopped display below must update.
+  const { currentTime } = useCurrentTime();
 
   const formattedDuration = formatTime(duration, format);
 
@@ -110,9 +114,9 @@ const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ dura
   // Update when stopped (for seeks)
   useEffect(() => {
     if (!isPlaying && timeRef.current) {
-      timeRef.current.textContent = formatTime(currentTimeRef.current ?? 0, format);
+      timeRef.current.textContent = formatTime(currentTime, format);
     }
-  });
+  }, [isPlaying, currentTime, format]);
 
   return (
     <TimeDisplay>
@@ -584,7 +588,7 @@ export function FlexibleApiExample() {
             </Text>
             <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
               <li><Text size="2" color="gray"><code>usePlaylistControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions</Text></li>
-              <li><Text size="2" color="gray"><code>usePlaybackAnimation()</code> - Get <code>currentTime</code> for live position</Text></li>
+              <li><Text size="2" color="gray"><code>usePlaybackAnimation()</code> - Get <code>isPlaying</code> and <code>currentTimeRef</code> for the live position</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistData()</code> - Get <code>duration</code>, <code>sampleRate</code>, etc.</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistState()</code> - Get/set <code>timeFormat</code>, <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.</Text></li>
               <li><Text size="2" color="gray"><code>useSelection()</code> - Get <code>selectionStart</code> and <code>selectionEnd</code></Text></li>
