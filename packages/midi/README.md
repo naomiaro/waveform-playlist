@@ -54,7 +54,7 @@ console.log(parsed.tracks.map((t) => t.name)); // ['Piano', 'Drums', ...]
 
 ### `useMidiTracks(configs, options)`
 
-`configs` is compared by value, so it can be written inline: tracks reload only when a config actually changes. Files are fetched in parallel (a URL shared by several configs once) and tracks keep the config order. If you pass large `midiNotes` arrays, keep each array's identity stable (a constant or `useMemo`); a notes array rebuilt on every render is compared note by note on every render.
+`configs` is compared by value, so it can be written inline: tracks reload only when a config actually changes. Files are fetched in parallel (a URL shared by several configs once) and tracks keep the config order. If you pass large `midiNotes` arrays, keep each array's identity stable (a constant or `useMemo`); a notes array rebuilt on every render is compared note by note on every render. Treat configs and notes as immutable: mutating one in place does not trigger a reload.
 
 ```typescript
 function useMidiTracks(

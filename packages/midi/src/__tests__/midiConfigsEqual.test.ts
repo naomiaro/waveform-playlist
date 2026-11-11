@@ -42,4 +42,18 @@ describe('midiConfigsEqual', () => {
     ).toBe(false);
     expect(midiConfigsEqual([{ midiNotes: [note(60)] }], [{ src: '/a.mid' }])).toBe(false);
   });
+
+  it('treats NaN as equal to NaN', () => {
+    expect(
+      midiConfigsEqual(
+        [{ volume: NaN, midiNotes: [{ ...note(60), time: NaN }] }],
+        [{ volume: NaN, midiNotes: [{ ...note(60), time: NaN }] }]
+      )
+    ).toBe(true);
+  });
+
+  it('ignores properties that are not part of a MIDI track config', () => {
+    const withExtra = (extra: object) => ({ src: '/a.mid', ...{ meta: extra } });
+    expect(midiConfigsEqual([withExtra({})], [withExtra({})])).toBe(true);
+  });
 });

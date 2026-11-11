@@ -58,6 +58,17 @@ export interface UseMidiTracksOptions {
   sampleRate: number;
 }
 
+/** End of the last note, in seconds. A loop, not `Math.max(...)`: a spread of a
+ * very large note list exceeds the engine's argument limit. */
+function lastNoteEnd(notes: MidiNoteData[]): number {
+  let end = 0;
+  for (const note of notes) {
+    const noteEnd = note.time + note.duration;
+    if (noteEnd > end) end = noteEnd;
+  }
+  return end;
+}
+
 /**
  * Hook to load MIDI files and convert to ClipTrack format with midiNotes.
  *
@@ -83,28 +94,17 @@ export interface UseMidiTracksOptions {
  * );
  * ```
  */
-/** End of the last note, in seconds. A loop, not `Math.max(...)`: a spread of a
- * very large note list exceeds the engine's argument limit. */
-function lastNoteEnd(notes: MidiNoteData[]): number {
-  let end = 0;
-  for (const note of notes) {
-    const noteEnd = note.time + note.duration;
-    if (noteEnd > end) end = noteEnd;
-  }
-  return end;
-}
-
 export function useMidiTracks(
-  configsProp: MidiTrackConfig[],
+  configs: MidiTrackConfig[],
   options: UseMidiTracksOptions
 ): UseMidiTracksReturn {
-  // The effect below is keyed on `configs`. Keep the previous array while the new
+  // The effect below is keyed on `stableConfigs`. Keep the previous array while the new
   // one describes the same tracks, so an inline array literal (a new identity on
   // every render) does not re-run the effect, which sets state, which renders,
   // which re-runs the effect.
-  const [configs, setConfigs] = useState(configsProp);
-  if (configs !== configsProp && !midiConfigsEqual(configs, configsProp)) {
-    setConfigs(configsProp);
+  const [stableConfigs, setStableConfigs] = useState(configs);
+  if (stableConfigs !== configs && !midiConfigsEqual(stableConfigs, configs)) {
+    setStableConfigs(configs);
   }
 
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
@@ -117,7 +117,7 @@ export function useMidiTracks(
   const bufferCacheRef = useRef(new Map<string, ArrayBuffer>());
 
   useEffect(() => {
-    if (configs.length === 0) {
+    if (stableConfigs.length === 0) {
       setTracks([]);
       setLoading(false);
       setLoadedCount(0);
@@ -163,7 +163,7 @@ export function useMidiTracks(
 
     // Check if all src URLs are already cached — if so, skip loading state
     // to avoid flashing the loading overlay on re-parse-only changes.
-    const allCached = configs.every((c) => !c.src || bufferCacheRef.current.has(c.src));
+    const allCached = stableConfigs.every((c) => !c.src || bufferCacheRef.current.has(c.src));
 
     const loadTracks = async () => {
       try {
@@ -173,13 +173,13 @@ export function useMidiTracks(
         }
         setError(null);
 
-        for (const config of configs) {
+        for (const config of stableConfigs) {
           if (!config.midiNotes && !config.src) {
             throw new Error('MIDI track config must provide src or midiNotes');
           }
         }
 
-        // Fetch every file at once. A URL used by several configs is fetched once.
+        // Fetch every file at once. A URL used by several stableConfigs is fetched once.
         const inflight = new Map<string, Promise<ArrayBuffer>>();
         const loadBuffer = (src: string): Promise<ArrayBuffer> => {
           const cached = bufferCacheRef.current.get(src);
@@ -199,7 +199,7 @@ export function useMidiTracks(
           return request;
         };
         const buffers = await Promise.all(
-          configs.map((config) =>
+          stableConfigs.map((config) =>
             !config.midiNotes && config.src ? loadBuffer(config.src) : undefined
           )
         );
@@ -207,7 +207,7 @@ export function useMidiTracks(
 
         // Build in config order, whatever order the fetches finished in.
         const allTracks: ClipTrack[] = [];
-        configs.forEach((config, index) => {
+        stableConfigs.forEach((config, index) => {
           const buffer = buffers[index];
           if (config.midiNotes) {
             // Pre-parsed notes — no fetch needed
@@ -257,7 +257,7 @@ export function useMidiTracks(
       cancelled = true;
       abortController.abort();
     };
-  }, [configs, options.sampleRate]);
+  }, [stableConfigs, options.sampleRate]);
 
   return { tracks, loading, error, loadedCount, totalCount };
 }

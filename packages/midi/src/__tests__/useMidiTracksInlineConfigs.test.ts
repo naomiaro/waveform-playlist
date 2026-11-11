@@ -39,6 +39,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * Counts renders and throws once there are far too many. A regression of the
+ * loop then fails the test; without this it runs the worker out of memory.
+ */
+function renderGuard() {
+  const guard = {
+    count: 0,
+    tick() {
+      guard.count++;
+      if (guard.count > 50) throw new Error('render loop: more than 50 renders');
+    },
+  };
+  return guard;
+}
+
 /** Let any render loop run for a while. */
 async function settle() {
   await act(async () => {
@@ -48,9 +63,9 @@ async function settle() {
 
 describe('useMidiTracks with configs written inline', () => {
   it('loads once when the array literal holds pre-parsed notes', async () => {
-    let renders = 0;
+    const renders = renderGuard();
     const { result } = renderHook(() => {
-      renders++;
+      renders.tick();
       return useMidiTracks([{ midiNotes: NOTES, name: 'Synth Lead', duration: 30 }], {
         sampleRate: 48000,
       });
@@ -58,18 +73,18 @@ describe('useMidiTracks with configs written inline', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     const tracks = result.current.tracks;
-    const rendersWhenLoaded = renders;
+    const rendersWhenLoaded = renders.count;
 
     await settle();
 
-    expect(renders).toBe(rendersWhenLoaded);
+    expect(renders.count).toBe(rendersWhenLoaded);
     expect(result.current.tracks).toBe(tracks);
   });
 
   it('loads once when the notes themselves are written inline', async () => {
-    let renders = 0;
+    const renders = renderGuard();
     const { result } = renderHook(() => {
-      renders++;
+      renders.tick();
       return useMidiTracks(
         [
           {
@@ -83,39 +98,41 @@ describe('useMidiTracks with configs written inline', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     const tracks = result.current.tracks;
-    const rendersWhenLoaded = renders;
+    const rendersWhenLoaded = renders.count;
 
     await settle();
 
-    expect(renders).toBe(rendersWhenLoaded);
+    expect(renders.count).toBe(rendersWhenLoaded);
     expect(result.current.tracks).toBe(tracks);
   });
 
   it('fetches and parses once when the array literal holds a src', async () => {
     mockFetch.mockResolvedValue(okResponse(midiBuffer('Piano')));
-    let renders = 0;
+    const renders = renderGuard();
     const { result } = renderHook(() => {
-      renders++;
+      renders.tick();
       return useMidiTracks([{ src: '/music/song.mid', name: 'Piano' }], { sampleRate: 48000 });
     });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     const tracks = result.current.tracks;
-    const rendersWhenLoaded = renders;
+    const rendersWhenLoaded = renders.count;
 
     await settle();
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(renders).toBe(rendersWhenLoaded);
+    expect(renders.count).toBe(rendersWhenLoaded);
     expect(result.current.tracks).toBe(tracks);
   });
 
   it('does not retry forever when an inline config fails to load', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockFetch.mockResolvedValue({ ok: false, statusText: 'Not Found' });
-    const { result } = renderHook(() =>
-      useMidiTracks([{ src: '/missing.mid' }], { sampleRate: 48000 })
-    );
+    const renders = renderGuard();
+    const { result } = renderHook(() => {
+      renders.tick();
+      return useMidiTracks([{ src: '/missing.mid' }], { sampleRate: 48000 });
+    });
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
     await settle();
@@ -172,6 +189,45 @@ describe('useMidiTracks loading several files', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.tracks.map((t) => t.name)).toEqual(['A', 'B']);
+  });
+
+  it('aborts the fetches still in flight when one file fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const signals = new Map<string, AbortSignal>();
+    mockFetch.mockImplementation((url: string, init: { signal: AbortSignal }) => {
+      signals.set(url, init.signal);
+      if (url === '/bad.mid') return Promise.resolve({ ok: false, statusText: 'Not Found' });
+      return new Promise(() => {}); // never finishes
+    });
+    const configs = [{ src: '/slow.mid' }, { src: '/bad.mid' }];
+    const { result } = renderHook(() => useMidiTracks(configs, { sampleRate: 48000 }));
+
+    await waitFor(() => expect(result.current.error).toBe('Failed to fetch /bad.mid: Not Found'));
+    expect(signals.get('/slow.mid')?.aborted).toBe(true);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('reports no error when unmounted while a fetch is in flight', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let signal: AbortSignal | undefined;
+    mockFetch.mockImplementation(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          signal = init.signal;
+          init.signal.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError'))
+          );
+        })
+    );
+    const configs = [{ src: '/slow.mid' }];
+    const { unmount } = renderHook(() => useMidiTracks(configs, { sampleRate: 48000 }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+
+    unmount();
+    await settle();
+
+    expect(signal?.aborted).toBe(true);
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it('fetches a URL once when two configs share it', async () => {

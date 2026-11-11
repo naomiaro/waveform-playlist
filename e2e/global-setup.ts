@@ -17,6 +17,7 @@ const ROUTES = [
   '/examples/annotations',
   '/examples/effects',
   '/examples/media-element',
+  '/examples/midi',
   '/examples/mobile-annotations',
   '/examples/mobile-multi-clip',
   '/examples/multi-clip',
