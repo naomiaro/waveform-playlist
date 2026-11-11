@@ -85,6 +85,26 @@ async function tremoloOutputRms(page: Page): Promise<number> {
   });
 }
 
+/**
+ * Wait until the audio clock has moved on by more than the analysers hold
+ * (2048 samples, about 43 ms), so the next reading contains nothing from
+ * before the change that was just made.
+ */
+async function waitForFreshAudio(page: Page): Promise<void> {
+  const start = await page.evaluate(
+    () =>
+      (window as unknown as { __tremoloTap?: AnalyserNode }).__tremoloTap?.context.currentTime ?? 0
+  );
+  await page.waitForFunction(
+    (since) => {
+      const tap = (window as unknown as { __tremoloTap?: AnalyserNode }).__tremoloTap;
+      return tap !== undefined && tap.context.currentTime - since > 0.2;
+    },
+    start,
+    { timeout: 10_000 }
+  );
+}
+
 /** RMS of the loudest signal reaching an audio destination. */
 async function outputRms(page: Page): Promise<number> {
   return page.evaluate(() => {
@@ -171,13 +191,16 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
     await page.goto(`${baseURL}/examples/wam-effects`);
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 60_000 });
 
-    // Uncaught errors, and anything the library itself reports. Not every
-    // console error: the page also fetches community plugin descriptors from
-    // another site, and a failed request there is not this test's business.
+    // Uncaught errors, and anything the library itself reports: it prefixes
+    // its messages, and reports wiring and dispose problems as warnings. Not
+    // every console error: the page also fetches community plugin descriptors
+    // from another site, and a failed request there is not this test's
+    // business.
     const errors: string[] = [];
     page.on('pageerror', (err) => errors.push(String(err)));
     page.on('console', (message) => {
-      if (message.type() === 'error' && message.text().includes('waveform-playlist')) {
+      const reported = message.type() === 'error' || message.type() === 'warning';
+      if (reported && message.text().includes('[waveform-playlist]')) {
         errors.push(message.text());
       }
     });
@@ -206,13 +229,17 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
 
     // Back in the chain, the signal returns: the processor resumes.
     await entry.getByRole('button', { name: 'Bypassed', exact: true }).click();
+    await expect(entry.getByRole('button', { name: 'On', exact: true })).toBeVisible();
+    await waitForFreshAudio(page);
     await expect(async () => {
       expect(await tremoloOutputRms(page)).toBeGreaterThan(0.01);
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 15_000 });
 
-    // Removed: the mix is still heard.
+    // Removed: the mix is still heard. Read only audio from after the removal.
     await entry.getByRole('button', { name: 'Remove' }).click();
+    await expect(entry).toHaveCount(0);
+    await waitForFreshAudio(page);
     await expect(async () => {
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 10_000 });
