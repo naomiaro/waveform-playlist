@@ -48,8 +48,12 @@ const mockInputGain = {
   dispose: vi.fn(),
 };
 
+// `input` is the native GainNode behind a Tone Gain (public API): setMute
+// writes its AudioParam directly, so mute lands on a suspended context too.
+const mockMuteNativeGain = { setValueAtTime: vi.fn() };
 const mockMuteGain = {
   gain: { value: 1 },
+  input: { gain: mockMuteNativeGain },
   connect: vi.fn(),
   disconnect: vi.fn(),
   dispose: vi.fn(),
@@ -88,12 +92,6 @@ vi.mock('@waveform-playlist/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
   applyFadeIn: vi.fn(),
   applyFadeOut: vi.fn(),
-}));
-
-vi.mock('../fades', () => ({
-  getUnderlyingAudioParam: vi.fn(() => ({
-    setValueAtTime: vi.fn(),
-  })),
 }));
 
 import { ToneTrack } from '../ToneTrack';
@@ -456,6 +454,18 @@ describe('ToneTrack', () => {
       expect(createTrackPanStage).toHaveBeenLastCalledWith(makeTrack().stereoPan, 2);
       expect(mockVolume.connect).toHaveBeenCalledWith(mockPanStage.input);
       expect(mockPanStage.output.connect).toHaveBeenCalledWith(mockMuteGain);
+    });
+
+    it('setMute writes the native gain param (no Tone private fields)', () => {
+      const track = new ToneTrack({ clips: [], track: makeTrack() });
+
+      track.setMute(true);
+      expect(mockMuteNativeGain.setValueAtTime).toHaveBeenLastCalledWith(0, 0);
+      expect(mockMuteGain.gain.value).toBe(0);
+
+      track.setMute(false);
+      expect(mockMuteNativeGain.setValueAtTime).toHaveBeenLastCalledWith(1, 0);
+      expect(mockMuteGain.gain.value).toBe(1);
     });
 
     it('setPan drives the pan stage', () => {

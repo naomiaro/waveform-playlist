@@ -8,7 +8,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Key Dependencies:**
 
-- **Tone.js 15.1.22** - Audio engine for playback, scheduling, and effects
+- **Tone.js 15.1.22** (stable; the lockfile, website and examples) - Audio engine for playback, scheduling, and effects. `tone@next` (15.5.x) is also supported and gets its own CI job — see "Two Tone.js lines" in `packages/playout/CLAUDE.md`.
 
 **Website aesthetic** — see `website/CLAUDE.md` for the Berlin-underground design system, dark-mode palette, and example styling guidelines.
 

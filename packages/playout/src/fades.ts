@@ -12,7 +12,10 @@
  * (e.g., when the AudioContext is suspended and Tone.js Signal doesn't propagate).
  *
  * This uses `_param` which is a private Tone.js 15.x internal.
- * Pin the Tone.js version carefully if upgrading.
+ *
+ * @deprecated Nothing in waveform-playlist uses this any more. For a Tone
+ * `Gain`, the native param is public API: `gain.input.gain` (`Gain.input` is
+ * the native GainNode). Kept so existing imports keep working.
  *
  * @param signal - A Tone.js Signal or Param wrapper (e.g., `gain.gain`)
  * @returns The underlying AudioParam, or undefined if not found

@@ -189,6 +189,20 @@ describe('audioContext singleton', () => {
       expect(Context).toHaveBeenCalledWith({ latencyHint: 'playback' });
     });
 
+    it('passes sampleRate to the Context in the default path (#671)', () => {
+      // Tone 15.1.22 drops it; the 15.5.x line honours it. Passing it is
+      // harmless on the former and what makes the option work on the latter.
+      configureGlobalContext({ sampleRate: 44100 });
+
+      expect(Context).toHaveBeenCalledWith({ sampleRate: 44100 });
+    });
+
+    it('passes latencyHint and sampleRate together', () => {
+      configureGlobalContext({ sampleRate: 44100, latencyHint: 'playback' });
+
+      expect(Context).toHaveBeenCalledWith({ latencyHint: 'playback', sampleRate: 44100 });
+    });
+
     it('creates the Context with no options when none are given', () => {
       configureGlobalContext({});
 

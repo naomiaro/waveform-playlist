@@ -33,6 +33,7 @@ const mockGainDispose = vi.fn();
 const mockPannerDispose = vi.fn();
 const mockMuteGainValue = { value: 1 };
 const mockMuteGainGain = { ...mockMuteGainValue, value: 1 };
+const mockMuteNativeGain = { setValueAtTime: vi.fn() };
 const mockConnect = vi.fn();
 
 // Track which PolySynth gets which voice class to differentiate melodic vs percussion
@@ -105,6 +106,8 @@ vi.mock('tone', () => ({
       connect: mockConnect,
       dispose: mockGainDispose,
       gain: mockMuteGainGain,
+      // The native GainNode behind a Tone Gain (public API).
+      input: { gain: mockMuteNativeGain },
     };
   }),
   Panner: vi.fn().mockImplementation(function () {
@@ -117,13 +120,6 @@ vi.mock('tone', () => ({
   getDestination: vi.fn().mockReturnValue({}),
   getContext: vi.fn().mockReturnValue({
     rawContext: { currentTime: 0 },
-  }),
-}));
-
-// Mock fades utility
-vi.mock('../fades', () => ({
-  getUnderlyingAudioParam: vi.fn().mockReturnValue({
-    setValueAtTime: vi.fn(),
   }),
 }));
 
@@ -336,6 +332,8 @@ describe('MidiToneTrack', () => {
       const track = createTrack();
       track.setMute(true);
       expect(mockMuteGainGain.value).toBe(0);
+      // Written to the native param too, so it lands on a suspended context.
+      expect(mockMuteNativeGain.setValueAtTime).toHaveBeenLastCalledWith(0, 0);
     });
 
     it('setMute sets gain to 1 when unmuted', () => {

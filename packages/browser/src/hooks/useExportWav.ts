@@ -7,11 +7,7 @@ import {
   type ClipTrack,
   type FadeType,
 } from '@waveform-playlist/core';
-import {
-  getUnderlyingAudioParam,
-  getGlobalAudioContext,
-  createTrackPanStage,
-} from '@waveform-playlist/playout';
+import { getGlobalAudioContext, createTrackPanStage } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
@@ -347,18 +343,17 @@ async function renderOffline(
             player.connect(fadeGain);
             fadeGain.connect(trackInput);
 
-            // Apply fade automation via native AudioParam
+            // Apply fade automation on the native AudioParam. `Gain.input` is
+            // the native GainNode (public Tone API) — no private field needed.
             if (applyEffects) {
-              const audioParam = getUnderlyingAudioParam(fadeGain.gain);
-              if (audioParam) {
-                applyClipFades(audioParam, clipGain, startTime, clipDuration, fadeIn, fadeOut);
-              } else if (fadeIn || fadeOut) {
-                console.warn(
-                  '[waveform-playlist] Cannot apply fades for clip "' +
-                    (clip.name || clip.id) +
-                    '" - AudioParam not accessible'
-                );
-              }
+              applyClipFades(
+                fadeGain.input.gain,
+                clipGain,
+                startTime,
+                clipDuration,
+                fadeIn,
+                fadeOut
+              );
             }
 
             player.start(startTime, offset, clipDuration);

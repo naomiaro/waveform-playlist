@@ -1,6 +1,5 @@
 import { Volume, Gain, Part, ToneAudioNode, getDestination, getContext } from 'tone';
 import { Track, gainToDb } from '@waveform-playlist/core';
-import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
 import { createTrackPanStage, type TrackPanStage } from './trackPan';
 import type { PlayableTrack, MidiClipInfo } from './MidiToneTrack';
@@ -358,8 +357,8 @@ export class SoundFontToneTrack implements PlayableTrack {
   setMute(muted: boolean): void {
     this.track.muted = muted;
     const value = muted ? 0 : 1;
-    const audioParam = getUnderlyingAudioParam(this.muteGain.gain);
-    audioParam?.setValueAtTime(value, 0);
+    // Native param behind the Tone Gain (see ToneTrack.setMute).
+    this.muteGain.input.gain.setValueAtTime(value, 0);
     this.muteGain.gain.value = value;
   }
 

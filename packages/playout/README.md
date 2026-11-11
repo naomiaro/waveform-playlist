@@ -10,6 +10,19 @@ npm install @waveform-playlist/playout
 
 Requires `tone` (`^15.0.0`) as a peer dependency — this package doesn't bundle Tone.js, so the version in your app is the one that runs. `@waveform-playlist/engine` is an optional peer; most consumers pull in both automatically via `@waveform-playlist/browser` rather than installing this package directly.
 
+### Tone.js versions
+
+Two Tone.js lines satisfy the `^15.0.0` peer range, and both are tested on every pull request (build, type-check and unit tests, including a contract test for the Tone.js internals this package depends on):
+
+| | Install | Notes |
+|---|---|---|
+| Stable (default) | `npm install tone` — 15.1.x | What the examples and documentation site run. |
+| Prerelease | `npm install tone@next` — 15.5.x | Where upstream fixes land; Tone's stable line rarely releases. |
+
+What you gain on `tone@next`: `configureGlobalContext({ sampleRate })` is honoured on the default audio context. On 15.1.x Tone.js ignores the option there, the context runs at the hardware rate, and a warning is logged (use `nativeAudioContext: true` to set the rate on 15.1.x). The function returns the rate actually in use on both.
+
+`next` is a moving prerelease tag. Pin an exact version in your app if you adopt it.
+
 ## Usage
 
 ```typescript
