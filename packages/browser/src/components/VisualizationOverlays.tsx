@@ -4,7 +4,7 @@
  * re-render on every pointer move of a selection drag and on every
  * active-annotation change during playback, and the rows do not.
  */
-import React, { useContext } from 'react';
+import React, { useCallback, useContext } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
@@ -12,8 +12,13 @@ import {
   type RenderPlayheadFunction,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
-import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
+  AnnotationIntegrationContext,
+  type AnnotationBoxIntegrationProps,
+} from '../AnnotationIntegrationContext';
+import {
+  useActiveAnnotation,
+  useCurrentTime,
   usePlaybackAnimation,
   usePlaylistControls,
   usePlaylistData,
@@ -60,6 +65,9 @@ const CustomPlayhead: React.FC<{
     getPlaybackTime,
     getAudioContextTime,
   } = usePlaybackAnimation();
+  // Subscribed for the re-render only, so a seek while stopped moves a custom
+  // playhead: the position below comes from the refs.
+  useCurrentTime();
 
   // Use visualTimeRef so the initial position matches the audible output
   // (the playhead's rAF loop also reads visualTimeRef for in-sync animation).
@@ -117,47 +125,96 @@ export interface AnnotationBoxesOverlayProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
 }
 
+interface AnnotationBoxItemProps {
+  AnnotationBox: React.ComponentType<AnnotationBoxIntegrationProps>;
+  annotation: AnnotationData;
+  index: number;
+  startPosition: number;
+  endPosition: number;
+  label: string;
+  isActive: boolean;
+  editable: boolean;
+  onSelect: (annotation: AnnotationData) => void;
+}
+
+/**
+ * One annotation box. Memoized: the active annotation changes at every
+ * annotation boundary during playback, and only the box that stops being
+ * active and the box that becomes active have a changed prop (#740).
+ * `onSelect` must keep its identity across renders of the overlay.
+ */
+const AnnotationBoxItem = React.memo(function AnnotationBoxItem({
+  AnnotationBox,
+  annotation,
+  index,
+  startPosition,
+  endPosition,
+  label,
+  isActive,
+  editable,
+  onSelect,
+}: AnnotationBoxItemProps) {
+  return (
+    <AnnotationBox
+      annotationId={annotation.id}
+      annotationIndex={index}
+      startPosition={startPosition}
+      endPosition={endPosition}
+      label={label}
+      color="#ff9800"
+      isActive={isActive}
+      onClick={() => onSelect(annotation)}
+      editable={editable}
+    />
+  );
+});
+
 /** The row of annotation boxes under the tracks. Needs the annotation integration. */
 export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
   width,
   getAnnotationBoxLabel,
 }) => {
   const annotationIntegration = useContext(AnnotationIntegrationContext);
-  const { annotations, activeAnnotationId, annotationsEditable, continuousPlay } =
-    usePlaylistState();
+  const { annotations, annotationsEditable, continuousPlay } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
   const { setActiveAnnotationId, play } = usePlaylistControls();
   const { sampleRate, samplesPerPixel } = usePlaylistData();
 
-  if (annotations.length === 0 || !annotationIntegration) return null;
+  // A prop of every memoized box: its dependencies do not change when only
+  // the active annotation does.
+  const handleAnnotationClick = useCallback(
+    async (annotation: AnnotationData) => {
+      setActiveAnnotationId(annotation.id);
+      const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
+      try {
+        await play(annotation.start, playDuration);
+      } catch (err) {
+        console.error(
+          'waveform-playlist: Failed to start playback for annotation',
+          annotation.id,
+          err
+        );
+      }
+    },
+    [continuousPlay, play, setActiveAnnotationId]
+  );
 
-  const handleAnnotationClick = async (annotation: AnnotationData) => {
-    setActiveAnnotationId(annotation.id);
-    const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
-    try {
-      await play(annotation.start, playDuration);
-    } catch (err) {
-      console.error(
-        'waveform-playlist: Failed to start playback for annotation',
-        annotation.id,
-        err
-      );
-    }
-  };
+  if (annotations.length === 0 || !annotationIntegration) return null;
 
   return (
     <annotationIntegration.AnnotationBoxesWrapper height={30} width={width}>
       {annotations.map((annotation, index) => (
-        <annotationIntegration.AnnotationBox
+        <AnnotationBoxItem
           key={annotation.id}
-          annotationId={annotation.id}
-          annotationIndex={index}
+          AnnotationBox={annotationIntegration.AnnotationBox}
+          annotation={annotation}
+          index={index}
           startPosition={(annotation.start * sampleRate) / samplesPerPixel}
           endPosition={(annotation.end * sampleRate) / samplesPerPixel}
           label={getAnnotationBoxLabel ? getAnnotationBoxLabel(annotation, index) : annotation.id}
-          color="#ff9800"
           isActive={annotation.id === activeAnnotationId}
-          onClick={() => handleAnnotationClick(annotation)}
           editable={annotationsEditable}
+          onSelect={handleAnnotationClick}
         />
       ))}
     </annotationIntegration.AnnotationBoxesWrapper>

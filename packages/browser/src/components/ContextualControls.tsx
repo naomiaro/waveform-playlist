@@ -8,6 +8,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import styled from 'styled-components';
 import {
+  useCurrentTime,
   usePlaybackAnimation,
   usePlaylistState,
   useSelection,
@@ -58,6 +59,8 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
   const timeRef = useRef<HTMLSpanElement>(null);
   const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
     usePlaybackAnimation();
+  // Subscribed for the re-render only: what is shown comes from the ref.
+  useCurrentTime();
   const { timeFormat: format } = usePlaylistData();
 
   // Register per-frame callback during playback — uses raw time for display

@@ -12,7 +12,7 @@ import {
   type WaveformPlaylistTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
+import { useCurrentTime, usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
 
 const ChannelWrapper = styled.div`
   position: relative;
@@ -133,6 +133,8 @@ const ClipProgress: React.FC<ClipProgressProps> = ({
     registerFrameCallback,
     unregisterFrameCallback,
   } = usePlaybackAnimation();
+  // Subscribed for the re-render only: the effect below reads the refs.
+  useCurrentTime();
   const { samplesPerPixel, sampleRate } = usePlaylistData();
 
   // Use shared helper to compute clip pixel width (must match Clip.tsx sizing)
@@ -166,8 +168,8 @@ const ClipProgress: React.FC<ClipProgressProps> = ({
 
   // Also update when not playing (for seeks, stops, etc.). Reads visualTimeRef
   // so the static progress fill matches the playhead's audible position. No
-  // dependency array on purpose: the animation context re-renders this
-  // component whenever the resting position changes.
+  // dependency array on purpose: `useCurrentTime()` re-renders this component
+  // whenever the resting position changes.
   useEffect(() => {
     if (!isPlaying && progressRef.current) {
       const currentTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;

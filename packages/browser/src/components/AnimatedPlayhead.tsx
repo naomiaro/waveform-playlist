@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import { usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
+import { useCurrentTime, usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
 
 const PlayheadLine = styled.div.attrs<{ $color: string; $width: number }>((props) => ({
   style: {
@@ -35,6 +35,9 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
     registerFrameCallback,
     unregisterFrameCallback,
   } = usePlaybackAnimation();
+  // Subscribed for the re-render only: the resting-position effect below
+  // reads the refs.
+  useCurrentTime();
   const { samplesPerPixel, sampleRate, progressBarWidth } = usePlaylistData();
 
   // Register per-frame callback during playback

@@ -7,6 +7,8 @@ export {
   usePlaybackAnimation,
   usePlaylistState,
   useSelection,
+  useCurrentTime,
+  useActiveAnnotation,
   usePlaylistControls,
   usePlaylistData,
   usePlaylistDataOptional,

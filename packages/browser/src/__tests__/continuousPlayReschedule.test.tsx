@@ -12,6 +12,8 @@ import React from 'react';
 import {
   WaveformPlaylistProvider,
   usePlaybackAnimation,
+  useCurrentTime,
+  useActiveAnnotation,
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
@@ -114,10 +116,12 @@ interface Probe {
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
-  const { isPlaying, currentTime } = usePlaybackAnimation();
+  const { isPlaying } = usePlaybackAnimation();
+  const { currentTime } = useCurrentTime();
   const { play, setContinuousPlay, setSelection, stop } = usePlaylistControls();
   const { isReady, duration } = usePlaylistData();
-  const { continuousPlay, activeAnnotationId } = usePlaylistState();
+  const { continuousPlay } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
   probe = {
     isReady,
     isPlaying,

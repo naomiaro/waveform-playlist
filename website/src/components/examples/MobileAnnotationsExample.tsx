@@ -30,7 +30,7 @@ import {
   usePlaylistData,
   usePlaylistState,
   usePlaylistControls,
-  usePlaybackAnimation,
+  useActiveAnnotation,
   useAnnotationDragHandlers,
   useDragSensors,
 } from '@waveform-playlist/browser';
@@ -254,15 +254,35 @@ const AnnotationInfo = styled.div`
   }
 `;
 
+// The active annotation changes at every annotation boundary during playback.
+// Reading it in this small component keeps the rest of the page from
+// re-rendering each time.
+const ActiveAnnotationInfo: React.FC = () => {
+  const { annotations } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
+  const activeAnnotation = annotations.find(a => a.id === activeAnnotationId);
+
+  if (!activeAnnotation) return null;
+
+  return (
+    <AnnotationInfo>
+      <p><strong>Selected:</strong> {activeAnnotation.lines?.join(' ') || 'No text'}</p>
+      <p>
+        Time: {activeAnnotation.start?.toFixed(2)}s - {activeAnnotation.end?.toFixed(2)}s
+        ({((activeAnnotation.end || 0) - (activeAnnotation.start || 0)).toFixed(2)}s)
+      </p>
+    </AnnotationInfo>
+  );
+};
+
 interface MobileAnnotationsContentProps {
   tracks: ClipTrack[];
 }
 
 const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
   const { samplesPerPixel, duration, controls } = usePlaylistData();
-  const { annotations, linkEndpoints, activeAnnotationId, continuousPlay } = usePlaylistState();
+  const { annotations, linkEndpoints, continuousPlay } = usePlaylistState();
   const { setAnnotations, setActiveAnnotationId, play } = usePlaylistControls();
-  const { currentTime } = usePlaybackAnimation();
 
   // Use touch-optimized sensors with 250ms delay
   const sensors = useDragSensors({ touchOptimized: true });
@@ -274,9 +294,6 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
     duration,
     linkEndpoints,
   });
-
-  // Find active annotation for display
-  const activeAnnotation = annotations.find(a => a.id === activeAnnotationId);
 
   return (
     <DragDropProvider
@@ -330,15 +347,7 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
           annotationTextHeight={200}
         />
 
-        {activeAnnotation && (
-          <AnnotationInfo>
-            <p><strong>Selected:</strong> {activeAnnotation.lines?.join(' ') || 'No text'}</p>
-            <p>
-              Time: {activeAnnotation.start?.toFixed(2)}s - {activeAnnotation.end?.toFixed(2)}s
-              ({((activeAnnotation.end || 0) - (activeAnnotation.start || 0)).toFixed(2)}s)
-            </p>
-          </AnnotationInfo>
-        )}
+        <ActiveAnnotationInfo />
       </Container>
     </DragDropProvider>
   );

@@ -1,0 +1,214 @@
+// @vitest-environment jsdom
+//
+// #740: the active annotation changes at every annotation boundary during
+// playback. Only the box that stops being active and the one that becomes
+// active may re-render.
+import './jsdom-polyfills'; // must be first — sets globals the import graph needs
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
+import React from 'react';
+import {
+  WaveformPlaylistProvider,
+  usePlaylistControls,
+  usePlaylistData,
+  useActiveAnnotation,
+} from '../WaveformPlaylistContext';
+import {
+  AnnotationIntegrationContext,
+  type AnnotationIntegration,
+  type AnnotationBoxIntegrationProps,
+} from '../AnnotationIntegrationContext';
+import { AnnotationBoxesOverlay } from '../components/VisualizationOverlays';
+import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { PlayoutAdapter } from '@waveform-playlist/engine';
+
+if (typeof globalThis.requestAnimationFrame === 'undefined') {
+  globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
+    setTimeout(() => cb(performance.now()), 16) as unknown as number;
+  globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
+}
+
+const SAMPLE_RATE = 48000;
+
+const TRACKS: ClipTrack[] = [
+  {
+    id: 't1',
+    name: 't1',
+    clips: [
+      {
+        id: 'c1',
+        startSample: 0,
+        durationSamples: SAMPLE_RATE * 4,
+        offsetSamples: 0,
+        sampleRate: SAMPLE_RATE,
+      } as AudioClip,
+    ],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  } as ClipTrack,
+];
+
+const ANNOTATIONS = [
+  { id: 'n1', start: 0, end: 1, lines: ['one'] },
+  { id: 'n2', start: 1, end: 2, lines: ['two'] },
+  { id: 'n3', start: 2, end: 3, lines: ['three'] },
+  { id: 'n4', start: 3, end: 4, lines: ['four'] },
+];
+
+function createFakeAdapter(): PlayoutAdapter {
+  return {
+    audioContext: {
+      currentTime: 0,
+      sampleRate: SAMPLE_RATE,
+      state: 'running',
+      outputLatency: 0,
+    } as unknown as AudioContext,
+    ppqn: 960,
+    async init() {},
+    setTracks() {},
+    addTrack() {},
+    removeTrack() {},
+    updateTrack() {},
+    play: vi.fn(),
+    pause() {},
+    stop() {},
+    seek() {},
+    getCurrentTime: () => 0,
+    isPlaying: () => false,
+    setMasterVolume() {},
+    setTrackVolume() {},
+    setTrackMute() {},
+    setTrackSolo() {},
+    setTrackPan() {},
+    setLoop() {},
+    dispose() {},
+  } as unknown as PlayoutAdapter;
+}
+
+let boxRenders: Record<string, number> = {};
+let lastProps: Record<string, AnnotationBoxIntegrationProps> = {};
+
+const FakeBox: React.FC<AnnotationBoxIntegrationProps> = (props) => {
+  boxRenders[props.annotationId] = (boxRenders[props.annotationId] ?? 0) + 1;
+  lastProps[props.annotationId] = props;
+  return (
+    <button data-box={props.annotationId} data-active={props.isActive} onClick={props.onClick}>
+      {props.label}
+    </button>
+  );
+};
+
+const INTEGRATION = {
+  AnnotationBox: FakeBox,
+  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+} as unknown as AnnotationIntegration;
+
+let probe: {
+  controls: ReturnType<typeof usePlaylistControls>;
+  data: ReturnType<typeof usePlaylistData>;
+  activeAnnotationId: string | null;
+};
+
+const ProbeChild: React.FC = () => {
+  probe = {
+    controls: usePlaylistControls(),
+    data: usePlaylistData(),
+    activeAnnotationId: useActiveAnnotation().activeAnnotationId,
+  };
+  return null;
+};
+
+const ANNOTATION_LIST = { annotations: ANNOTATIONS };
+
+async function mount() {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  boxRenders = {};
+  lastProps = {};
+  const adapter = createFakeAdapter();
+  const createAdapter = () => adapter;
+  render(
+    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+      <WaveformPlaylistProvider
+        tracks={TRACKS}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={createAdapter}
+        annotationList={ANNOTATION_LIST}
+      >
+        <ProbeChild />
+        <AnnotationBoxesOverlay width={2000} />
+      </WaveformPlaylistProvider>
+    </AnnotationIntegrationContext.Provider>
+  );
+  await waitFor(() => expect(probe.data.isReady).toBe(true));
+  await act(async () => {});
+  return { adapter };
+}
+
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
+  vi.restoreAllMocks();
+});
+
+describe('annotation boxes (#740)', () => {
+  it('renders a box per annotation at its pixel position', async () => {
+    await mount();
+
+    expect(Object.keys(boxRenders).sort()).toEqual(['n1', 'n2', 'n3', 'n4']);
+    const pxPerSecond = SAMPLE_RATE / probe.data.samplesPerPixel;
+    expect(lastProps.n3.startPosition).toBe(2 * pxPerSecond);
+    expect(lastProps.n3.endPosition).toBe(3 * pxPerSecond);
+    expect(lastProps.n3.annotationIndex).toBe(2);
+    expect(lastProps.n3.label).toBe('n3');
+  });
+
+  it('an active-annotation change renders the two boxes involved and no other', async () => {
+    await mount();
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+    });
+    boxRenders = {};
+
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+    });
+
+    expect(Object.keys(boxRenders).sort()).toEqual(['n1', 'n2']);
+    expect(lastProps.n1.isActive).toBe(false);
+    expect(lastProps.n2.isActive).toBe(true);
+  });
+
+  it('a click on a box makes it active and plays it to its end', async () => {
+    const { adapter } = await mount();
+    const play = adapter.play as ReturnType<typeof vi.fn>;
+
+    await act(async () => {
+      fireEvent.click(document.querySelector('[data-box="n3"]')!);
+    });
+
+    expect(probe.activeAnnotationId).toBe('n3');
+    expect(play.mock.lastCall).toEqual([2, 3]);
+  });
+
+  it('a click after continuous play is switched on plays on past the end', async () => {
+    const { adapter } = await mount();
+    const play = adapter.play as ReturnType<typeof vi.fn>;
+    // The click handler is a prop of every memoized box; it must be rebuilt
+    // when continuous play changes, not kept from the first render.
+    await act(async () => {
+      probe.controls.setContinuousPlay(true);
+    });
+
+    await act(async () => {
+      fireEvent.click(document.querySelector('[data-box="n3"]')!);
+    });
+
+    expect(probe.activeAnnotationId).toBe('n3');
+    expect(play.mock.lastCall?.[0]).toBe(2);
+    expect(play.mock.lastCall?.[1]).toBeUndefined();
+  });
+});

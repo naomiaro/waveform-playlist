@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import type {
   AnnotationData,
   AnnotationAction,
@@ -6,7 +6,11 @@ import type {
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
 import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
-import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
+import {
+  useActiveAnnotation,
+  usePlaylistState,
+  usePlaylistControls,
+} from '../WaveformPlaylistContext';
 import type { OnAnnotationUpdateFn } from '../types/annotations';
 
 export type { OnAnnotationUpdateFn } from '../types/annotations';
@@ -55,12 +59,17 @@ export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
 }) => {
-  const { annotations, activeAnnotationId, annotationsEditable, linkEndpoints, continuousPlay } =
-    usePlaylistState();
+  const { annotations, annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
   const integration = useAnnotationIntegration();
   const { setAnnotations } = usePlaylistControls();
 
-  const resolvedConfig = annotationListConfig ?? { linkEndpoints, continuousPlay };
+  // Memoized: it is a dependency of a handler given to every memoized row of
+  // the list, and this component renders at every annotation boundary.
+  const resolvedConfig = useMemo(
+    () => annotationListConfig ?? { linkEndpoints, continuousPlay },
+    [annotationListConfig, linkEndpoints, continuousPlay]
+  );
 
   const handleAnnotationUpdate = useCallback(
     (updatedAnnotations: AnnotationData[]) => {

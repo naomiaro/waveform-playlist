@@ -65,8 +65,10 @@ import {
   usePlaylistData,
   usePlaylistState,
   useSelection,
+  useActiveAnnotation,
 } from '../WaveformPlaylistContext';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -147,6 +149,7 @@ let probe: {
   data: ReturnType<typeof usePlaylistData>;
   state: ReturnType<typeof usePlaylistState>;
   selection: ReturnType<typeof useSelection>;
+  activeAnnotationId: string | null;
 };
 
 const ProbeChild: React.FC = () => {
@@ -155,6 +158,7 @@ const ProbeChild: React.FC = () => {
     data: usePlaylistData(),
     state: usePlaylistState(),
     selection: useSelection(),
+    activeAnnotationId: useActiveAnnotation().activeAnnotationId,
   };
   return null;
 };
@@ -268,8 +272,7 @@ describe('visualization memo boundaries (#693)', () => {
     });
 
     expect(probe.selection.selectionEnd).toBe(0.5);
-    // The shell does not subscribe to the selection (#733). A leftward drag
-    // still renders it: the cursor moves, and it reads the animation context.
+    // The shell does not subscribe to the selection (#733).
     expect(counts.shell).toBe(0);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
@@ -293,6 +296,9 @@ describe('visualization memo boundaries (#693)', () => {
     });
 
     expect(probe.selection.selectionStart).toBe(0.2);
+    // Nor to the resting cursor position, which a leftward drag moves (#740).
+    expect(counts.shell).toBe(0);
+    expect(counts.scale).toBe(0);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);
@@ -310,7 +316,9 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setActiveAnnotationId('n2');
     });
 
-    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(probe.activeAnnotationId).toBe('n2');
+    // The shell reads the state context, which no longer carries it (#740).
+    expect(counts.shell).toBe(0);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);
@@ -384,6 +392,78 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setCurrentTime(2.25);
     });
     expect(transforms().sort()).toEqual(['scaleX(0.25)', 'scaleX(1)', 'scaleX(1)', 'scaleX(1)']);
+  });
+
+  it('the playhead still follows a seek while stopped (#740)', async () => {
+    await mount(threeTracks().tracks);
+    const playhead = () => document.querySelector<HTMLElement>('[data-playhead]');
+    const px = (seconds: number) => (seconds * SAMPLE_RATE) / probe.data.samplesPerPixel;
+
+    await act(async () => {
+      probe.controls.setCurrentTime(0.5);
+    });
+    expect(playhead()?.style.transform).toBe(`translate3d(${px(0.5)}px, 0, 0)`);
+
+    await act(async () => {
+      probe.controls.seekTo(2.25);
+    });
+    expect(playhead()?.style.transform).toBe(`translate3d(${px(2.25)}px, 0, 0)`);
+  });
+
+  it('a custom playhead is given the new position after a seek while stopped (#740)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const adapter = createFakeAdapter();
+    const positions: number[] = [];
+    render(
+      <WaveformPlaylistProvider
+        tracks={threeTracks().tracks}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={() => adapter}
+      >
+        <ProbeChild />
+        <PlaylistVisualization
+          renderPlayhead={({ position }) => {
+            positions.push(position);
+            return <div data-custom-playhead />;
+          }}
+        />
+      </WaveformPlaylistProvider>
+    );
+    await waitFor(() => expect(probe.data.isReady).toBe(true));
+    await act(async () => {});
+
+    await act(async () => {
+      probe.controls.seekTo(0.5);
+    });
+
+    expect(positions[positions.length - 1]).toBe((0.5 * SAMPLE_RATE) / probe.data.samplesPerPixel);
+  });
+
+  it('the audio position readout still follows a seek while stopped (#740)', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const adapter = createFakeAdapter();
+    render(
+      <WaveformPlaylistProvider
+        tracks={threeTracks().tracks}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={() => adapter}
+      >
+        <ProbeChild />
+        <AudioPosition />
+      </WaveformPlaylistProvider>
+    );
+    await waitFor(() => expect(probe.data.isReady).toBe(true));
+    const readout = () => document.querySelector('[aria-label="Audio position"]')?.textContent;
+    const atStart = readout();
+
+    await act(async () => {
+      probe.controls.seekTo(2.5);
+    });
+
+    expect(readout()).not.toBe(atStart);
+    expect(readout()).toContain('2.5');
   });
 
   it('a control panel selects its track by its current index after the tracks change', async () => {

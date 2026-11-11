@@ -104,13 +104,13 @@ function PositionDisplay() {
 
 ### Programmatic Access
 
-Access current time from `usePlaybackAnimation()` and duration from `usePlaylistData()`:
+Access the resting cursor position from `useCurrentTime()` and duration from `usePlaylistData()`. `currentTime` changes on a seek, a pause and a stop; it does not advance during playback. For a display that runs during playback, use `<AudioPosition />` or register a frame callback with `usePlaybackAnimation()`.
 
 ```tsx
-import { usePlaybackAnimation, usePlaylistData } from '@waveform-playlist/browser';
+import { useCurrentTime, usePlaylistData } from '@waveform-playlist/browser';
 
 function CustomPosition() {
-  const { currentTime } = usePlaybackAnimation();
+  const { currentTime } = useCurrentTime();
   const { duration } = usePlaylistData();
 
   const formatTime = (seconds: number) => {

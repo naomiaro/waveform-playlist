@@ -7,7 +7,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
-- **Five focused context hooks** — `usePlaybackAnimation`, `usePlaylistState`, `useSelection`, `usePlaylistControls`, `usePlaylistData` isolate 60fps playhead updates and selection drags from low-frequency state so unrelated components don't re-render on every animation frame or pointer move
+- **Seven focused context hooks** — `usePlaybackAnimation`, `usePlaylistState`, `useSelection`, `useCurrentTime`, `useActiveAnnotation`, `usePlaylistControls`, `usePlaylistData` isolate 60fps playhead updates, selection drags, seeks and annotation changes from low-frequency state so unrelated components don't re-render on every animation frame, pointer move or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
 - **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
@@ -82,13 +82,15 @@ Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvi
 
 ## Context Hooks
 
-`WaveformPlaylistProvider` splits its context into five hooks so components only re-render for the data they actually read:
+`WaveformPlaylistProvider` splits its context into seven hooks so components only re-render for the data they actually read:
 
 | Hook | Exposes |
 |------|---------|
-| `usePlaybackAnimation` | `isPlaying`, `currentTime`, animation refs, `getPlaybackTime()`, `registerFrameCallback()` for 60fps-driven UI (playhead, progress bars) |
+| `usePlaybackAnimation` | `isPlaying`, animation refs (`currentTimeRef` for the live position), `getPlaybackTime()`, `registerFrameCallback()` for 60fps-driven UI (playhead, progress bars) |
 | `usePlaylistState` | Low-frequency state — loop region, annotations, `selectedTrackId`, `canUndo`/`canRedo` |
 | `useSelection` | `selectionStart`, `selectionEnd` — changes on every pointer move of a selection drag, so only components that show the selection should call it |
+| `useCurrentTime` | `currentTime` — where the cursor rests; changes on a seek, a pause, a stop and a leftward selection drag, and does not advance during playback |
+| `useActiveAnnotation` | `activeAnnotationId` — changes at every annotation boundary during playback, so only components that show the active annotation should call it |
 | `usePlaylistControls` | Actions — `play`, `pause`, `stop`, `seekTo`, track mute/solo/volume/pan, zoom, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) |
 | `usePlaylistData` | Derived/config data — `tracks`, `duration`, `sampleRate`, `peaksDataArray`, `trackStates`, `isReady` |
 

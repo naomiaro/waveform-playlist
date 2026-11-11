@@ -25,6 +25,7 @@ import {
   AudioPosition,
   ClipInteractionProvider,
   usePlaybackAnimation,
+  useCurrentTime,
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
@@ -164,7 +165,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   setSelectedTrackId,
   onAddTrack,
 }) => {
-  const { currentTime, isPlaying, currentTimeRef } = usePlaybackAnimation();
+  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+  const { currentTime } = useCurrentTime();
   const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo, setRecordingActive } = usePlaylistControls();
   const {

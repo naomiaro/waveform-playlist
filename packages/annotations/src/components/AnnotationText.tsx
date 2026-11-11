@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useRef, useEffect } from 'react';
+import React, { FunctionComponent, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import type {
   AnnotationData,
@@ -153,6 +153,125 @@ export interface AnnotationTextProps {
   renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
 }
 
+const NO_CONTROLS: AnnotationAction[] = [];
+
+const formatTime = (seconds: number): string => {
+  if (isNaN(seconds) || !isFinite(seconds)) {
+    return '0:00.000';
+  }
+  const mins = Math.floor(seconds / 60);
+  const secs = (seconds % 60).toFixed(3);
+  return `${mins}:${secs.padStart(6, '0')}`;
+};
+
+const getIconClass = (classString: string) => {
+  return classString.replace(/\./g, ' ');
+};
+
+const blurOnEnter = (e: React.KeyboardEvent<HTMLElement>) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.currentTarget.blur();
+  }
+};
+
+interface AnnotationListItemProps {
+  annotation: AnnotationData;
+  index: number;
+  isActive: boolean;
+  /** Set on the active item only, so the list can scroll to it. */
+  itemRef?: React.Ref<HTMLDivElement>;
+  editable: boolean;
+  controls: AnnotationAction[];
+  onAnnotationClick?: (annotation: AnnotationData) => void;
+  onTextEdit: (index: number, newText: string) => void;
+  onIdEdit: (index: number, newId: string) => void;
+  onControlClick: (control: AnnotationAction, index: number) => void;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
+}
+
+/**
+ * One row of the list. Memoized: the active annotation changes at every
+ * annotation boundary during playback, and only the row that stops being
+ * active and the row that becomes active have a changed prop (#740). Every
+ * function handed to it must therefore keep its identity across a render of
+ * the list that did not change it.
+ */
+const AnnotationListItem = React.memo(function AnnotationListItem({
+  annotation,
+  index,
+  isActive,
+  itemRef,
+  editable,
+  controls,
+  onAnnotationClick,
+  onTextEdit,
+  onIdEdit,
+  onControlClick,
+  renderAnnotationItem,
+}: AnnotationListItemProps) {
+  const handleClick = () => onAnnotationClick?.(annotation);
+
+  // Use custom render function if provided
+  if (renderAnnotationItem) {
+    return (
+      <div ref={itemRef}>
+        {renderAnnotationItem({
+          annotation,
+          index,
+          isActive,
+          onClick: handleClick,
+          formatTime,
+        })}
+      </div>
+    );
+  }
+
+  // Default rendering
+  return (
+    <AnnotationItem ref={itemRef} $isActive={isActive} onClick={handleClick}>
+      <AnnotationHeader>
+        <AnnotationInfo>
+          <AnnotationIdLabel
+            $isEditable={editable}
+            contentEditable={editable}
+            suppressContentEditableWarning
+            onBlur={(e) => onIdEdit(index, e.currentTarget.textContent || '')}
+            onKeyDown={blurOnEnter}
+          >
+            {annotation.id}
+          </AnnotationIdLabel>
+          <TimeRange>
+            {formatTime(annotation.start)} - {formatTime(annotation.end)}
+          </TimeRange>
+        </AnnotationInfo>
+        {controls.length > 0 && (
+          <AnnotationControls onClick={(e) => e.stopPropagation()}>
+            {controls.map((control, idx) => (
+              <ControlButton
+                key={idx}
+                title={control.title}
+                onClick={() => onControlClick(control, index)}
+              >
+                {control.text ? control.text : <i className={getIconClass(control.class || '')} />}
+              </ControlButton>
+            ))}
+          </AnnotationControls>
+        )}
+      </AnnotationHeader>
+      <AnnotationTextContent
+        $isEditable={editable}
+        contentEditable={editable}
+        suppressContentEditableWarning
+        onBlur={(e) => onTextEdit(index, e.currentTarget.textContent || '')}
+        onKeyDown={blurOnEnter}
+      >
+        {annotation.lines.join('\n')}
+      </AnnotationTextContent>
+    </AnnotationItem>
+  );
+});
+
 const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   annotations,
   activeAnnotationId,
@@ -160,7 +279,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
   editable = false,
-  controls = [],
+  controls = NO_CONTROLS,
   annotationListConfig,
   height,
   onAnnotationClick,
@@ -181,138 +300,69 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
     }
   }, [activeAnnotationId, shouldScrollToActive, scrollActivePosition, scrollActiveContainer]);
 
-  const formatTime = (seconds: number): string => {
-    if (isNaN(seconds) || !isFinite(seconds)) {
-      return '0:00.000';
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(3);
-    return `${mins}:${secs.padStart(6, '0')}`;
-  };
+  // The three handlers below are props of every memoized row. Their
+  // dependencies do not change when only the active annotation does.
+  const handleTextEdit = useCallback(
+    (index: number, newText: string) => {
+      if (!editable || !onAnnotationUpdate) return;
 
-  const handleTextEdit = (index: number, newText: string) => {
-    if (!editable || !onAnnotationUpdate) return;
+      const updatedAnnotations = [...annotations];
+      updatedAnnotations[index] = {
+        ...updatedAnnotations[index],
+        lines: newText.split('\n'),
+      };
+      onAnnotationUpdate(updatedAnnotations);
+    },
+    [annotations, editable, onAnnotationUpdate]
+  );
 
-    const updatedAnnotations = [...annotations];
-    updatedAnnotations[index] = {
-      ...updatedAnnotations[index],
-      lines: newText.split('\n'),
-    };
-    onAnnotationUpdate(updatedAnnotations);
-  };
+  const handleIdEdit = useCallback(
+    (index: number, newId: string) => {
+      if (!editable || !onAnnotationUpdate) return;
 
-  const handleIdEdit = (index: number, newId: string) => {
-    if (!editable || !onAnnotationUpdate) return;
+      const trimmedId = newId.trim();
+      if (!trimmedId) return; // Don't allow empty IDs
 
-    const trimmedId = newId.trim();
-    if (!trimmedId) return; // Don't allow empty IDs
+      const updatedAnnotations = [...annotations];
+      updatedAnnotations[index] = {
+        ...updatedAnnotations[index],
+        id: trimmedId,
+      };
+      onAnnotationUpdate(updatedAnnotations);
+    },
+    [annotations, editable, onAnnotationUpdate]
+  );
 
-    const updatedAnnotations = [...annotations];
-    updatedAnnotations[index] = {
-      ...updatedAnnotations[index],
-      id: trimmedId,
-    };
-    onAnnotationUpdate(updatedAnnotations);
-  };
+  const handleControlClick = useCallback(
+    (control: AnnotationAction, index: number) => {
+      if (!onAnnotationUpdate) return;
 
-  const handleControlClick = (
-    control: AnnotationAction,
-    annotation: AnnotationData,
-    index: number
-  ) => {
-    if (!onAnnotationUpdate) return;
-
-    const annotationsCopy = [...annotations];
-    control.action(annotationsCopy[index], index, annotationsCopy, annotationListConfig || {});
-    onAnnotationUpdate(annotationsCopy);
-  };
-
-  const getIconClass = (classString: string) => {
-    return classString.replace(/\./g, ' ');
-  };
+      const annotationsCopy = [...annotations];
+      control.action(annotationsCopy[index], index, annotationsCopy, annotationListConfig || {});
+      onAnnotationUpdate(annotationsCopy);
+    },
+    [annotations, annotationListConfig, onAnnotationUpdate]
+  );
 
   return (
     <Container $height={height}>
       {annotations.map((annotation, index) => {
         const isActive = annotation.id === activeAnnotationId;
-        const handleClick = () => onAnnotationClick?.(annotation);
-
-        // Use custom render function if provided
-        if (renderAnnotationItem) {
-          return (
-            <div key={annotation.id} ref={isActive ? activeAnnotationRef : null}>
-              {renderAnnotationItem({
-                annotation,
-                index,
-                isActive,
-                onClick: handleClick,
-                formatTime,
-              })}
-            </div>
-          );
-        }
-
-        // Default rendering
         return (
-          <AnnotationItem
+          <AnnotationListItem
             key={annotation.id}
-            ref={isActive ? activeAnnotationRef : null}
-            $isActive={isActive}
-            onClick={handleClick}
-          >
-            <AnnotationHeader>
-              <AnnotationInfo>
-                <AnnotationIdLabel
-                  $isEditable={editable}
-                  contentEditable={editable}
-                  suppressContentEditableWarning
-                  onBlur={(e) => handleIdEdit(index, e.currentTarget.textContent || '')}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      (e.currentTarget as HTMLElement).blur();
-                    }
-                  }}
-                >
-                  {annotation.id}
-                </AnnotationIdLabel>
-                <TimeRange>
-                  {formatTime(annotation.start)} - {formatTime(annotation.end)}
-                </TimeRange>
-              </AnnotationInfo>
-              {controls.length > 0 && (
-                <AnnotationControls onClick={(e) => e.stopPropagation()}>
-                  {controls.map((control, idx) => (
-                    <ControlButton
-                      key={idx}
-                      title={control.title}
-                      onClick={() => handleControlClick(control, annotation, index)}
-                    >
-                      {control.text ? (
-                        control.text
-                      ) : (
-                        <i className={getIconClass(control.class || '')} />
-                      )}
-                    </ControlButton>
-                  ))}
-                </AnnotationControls>
-              )}
-            </AnnotationHeader>
-            <AnnotationTextContent
-              $isEditable={editable}
-              contentEditable={editable}
-              suppressContentEditableWarning
-              onBlur={(e) => handleTextEdit(index, e.currentTarget.textContent || '')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  (e.currentTarget as HTMLElement).blur();
-                }
-              }}
-            >
-              {annotation.lines.join('\n')}
-            </AnnotationTextContent>
-          </AnnotationItem>
+            annotation={annotation}
+            index={index}
+            isActive={isActive}
+            itemRef={isActive ? activeAnnotationRef : undefined}
+            editable={editable}
+            controls={controls}
+            onAnnotationClick={onAnnotationClick}
+            onTextEdit={handleTextEdit}
+            onIdEdit={handleIdEdit}
+            onControlClick={handleControlClick}
+            renderAnnotationItem={renderAnnotationItem}
+          />
         );
       })}
     </Container>

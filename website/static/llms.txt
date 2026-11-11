@@ -97,14 +97,16 @@ No React and no build step — drop `<daw-editor>` into any HTML page and assign
 
 ## Architecture
 
-Both providers use React Context with split contexts for performance (5 in WaveformPlaylistProvider, 4 in MediaElementPlaylistProvider).
+Both providers use React Context with split contexts for performance (7 in WaveformPlaylistProvider, 4 in MediaElementPlaylistProvider).
 
 **WaveformPlaylistProvider** (multi-track, Web Audio API):
-1. **usePlaybackAnimation()** — High-frequency: isPlaying, currentTime, timing refs
-2. **usePlaylistState()** — Medium-frequency: loop, annotations, selectedTrackId, settings (NOT the selection)
+1. **usePlaybackAnimation()** — isPlaying, timing refs (currentTimeRef for the live position), per-frame callback registry (NOT currentTime)
+2. **usePlaylistState()** — Medium-frequency: loop, annotations, selectedTrackId, settings (NOT the selection, NOT activeAnnotationId)
 3. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
-4. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters
-5. **usePlaylistData()** — Stable: duration, tracks, trackStates, playoutRef (PlaylistEngine), isDraggingRef, display config, isReady
+4. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
+5. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
+6. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters
+7. **usePlaylistData()** — Stable: duration, tracks, trackStates, playoutRef (PlaylistEngine), isDraggingRef, display config, isReady
 
 **MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
 1. **useMediaElementAnimation()** — isPlaying, currentTime

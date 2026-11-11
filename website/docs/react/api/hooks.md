@@ -14,6 +14,8 @@ import {
   // Core context hooks
   usePlaylistState,
   useSelection,
+  useCurrentTime,
+  useActiveAnnotation,
   usePlaylistControls,
   usePlaylistData,
   usePlaybackAnimation,
@@ -136,7 +138,6 @@ interface FrameData {
 
 function usePlaybackAnimation(): {
   isPlaying: boolean;
-  currentTime: number;
 
   // Refs for 60fps animation loops (read inside frame callbacks or rAF)
   currentTimeRef: RefObject<number>;
@@ -372,6 +373,75 @@ Available inside `WaveformPlaylistProvider` only.
 
 ---
 
+## useCurrentTime
+
+Where the cursor rests, in seconds: the position playback starts from. It changes on a seek (`seekTo`, `setCurrentTime`), a pause, a stop (including playback reaching the end) and a selection whose start moves. It does **not** advance during playback; for a live position read `currentTimeRef` or register a frame callback, both from `usePlaybackAnimation()`.
+
+It has its own context so that a component reading `isPlaying` or a ref from `usePlaybackAnimation()` is not re-rendered by every seek, nor by every pointer move of a selection drag to the left.
+
+### Signature
+
+```typescript
+function useCurrentTime(): CurrentTimeContextValue;
+```
+
+### Returns
+
+```typescript
+interface CurrentTimeContextValue {
+  /** Where the cursor rests, in seconds. Does not advance during playback. */
+  currentTime: number;
+}
+```
+
+### Example
+
+```tsx
+function CursorReadout() {
+  const { currentTime } = useCurrentTime();
+  return <span>Cursor at {currentTime.toFixed(2)}s</span>;
+}
+```
+
+Available inside `WaveformPlaylistProvider` only.
+
+---
+
+## useActiveAnnotation
+
+The id of the annotation that is playing or was last chosen, or `null`. It has its own context because it changes at every annotation boundary during playback; a component that calls this hook re-renders that often, and components that only call `usePlaylistState()` do not.
+
+### Signature
+
+```typescript
+function useActiveAnnotation(): ActiveAnnotationContextValue;
+```
+
+### Returns
+
+```typescript
+interface ActiveAnnotationContextValue {
+  /** The annotation that is playing or was last chosen */
+  activeAnnotationId: string | null;
+}
+```
+
+### Example
+
+```tsx
+function NowPlaying() {
+  const { annotations } = usePlaylistState();
+  const { activeAnnotationId } = useActiveAnnotation();
+  const active = annotations.find((a) => a.id === activeAnnotationId);
+
+  return active ? <p>{active.lines.join(' ')}</p> : null;
+}
+```
+
+Set it with `setActiveAnnotationId(id)` from `usePlaylistControls()`. Available inside `WaveformPlaylistProvider` only.
+
+---
+
 ## usePlaylistState
 
 Access the current playlist state.
@@ -392,7 +462,6 @@ interface PlaylistStateContextValue {
   isAutomaticScroll: boolean;
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
-  activeAnnotationId: string | null;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
@@ -687,7 +756,8 @@ function useTimeFormat(): {
 
 ```tsx
 function TimeDisplay() {
-  const { currentTime } = usePlaybackAnimation();
+  // The resting cursor position; it does not advance during playback
+  const { currentTime } = useCurrentTime();
   const { formatTime, setTimeFormat } = useTimeFormat();
 
   return (
@@ -778,7 +848,7 @@ interface UseIntegratedRecordingReturn {
 function RecordingControls() {
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const { currentTime } = usePlaybackAnimation();
+  const { currentTime } = useCurrentTime();
 
   const {
     isRecording,
