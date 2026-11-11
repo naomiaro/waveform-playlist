@@ -4,18 +4,23 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 // that two components dragging at once cannot restore each other's 'none'.
 let activeDrags = 0;
 let userSelectBeforeDrags = '';
+// Safari only knows the prefixed property.
+let webkitUserSelectBeforeDrags = '';
 
 function suspendTextSelection(): () => void {
   const root = document.documentElement;
   if (activeDrags === 0) {
     userSelectBeforeDrags = root.style.userSelect;
+    webkitUserSelectBeforeDrags = root.style.webkitUserSelect;
     root.style.userSelect = 'none';
+    root.style.webkitUserSelect = 'none';
   }
   activeDrags++;
   return () => {
     activeDrags--;
     if (activeDrags === 0) {
       root.style.userSelect = userSelectBeforeDrags;
+      root.style.webkitUserSelect = webkitUserSelectBeforeDrags;
     }
   };
 }
@@ -31,7 +36,7 @@ function suspendTextSelection(): () => void {
  * `stopPropagation()` elsewhere on the page cannot hide the release):
  *
  * - `onMove` for every `mousemove` with the primary button held;
- * - `onEnd` for `mouseup`, with the event;
+ * - `onEnd` for the primary button's `mouseup`, with the event;
  * - `onEnd(null)` when the drag ended without a release position: the window
  *   lost focus (`blur`: the `mouseup` goes to another application), or a move
  *   arrives with the primary button no longer held (the `mouseup` was lost).
@@ -63,7 +68,11 @@ export function useWindowDrag(
       }
       callbacksRef.current.onMove(event);
     };
-    const up = (event: MouseEvent) => callbacksRef.current.onEnd(event);
+    const up = (event: MouseEvent) => {
+      // Another button released while the primary one is still held.
+      if (event.button !== 0) return;
+      callbacksRef.current.onEnd(event);
+    };
     const blur = () => callbacksRef.current.onEnd(null);
     // The press began on the element, so the browser would extend a text
     // selection across the page as the pointer travels over it. Switched off

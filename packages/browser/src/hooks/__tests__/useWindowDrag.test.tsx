@@ -60,6 +60,18 @@ describe('useWindowDrag', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores the release of another button while the primary one is held', () => {
+    const onEnd = vi.fn();
+    renderHook(() => useWindowDrag(true, vi.fn(), onEnd));
+
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 2 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 1 }));
+    expect(onEnd).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new MouseEvent('mouseup', { button: 0 }));
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
   it('does not listen while inactive', () => {
     const onMove = vi.fn();
     const onEnd = vi.fn();
@@ -103,6 +115,7 @@ describe('useWindowDrag', () => {
 
     rerender({ active: true });
     expect(root.style.userSelect).toBe('none');
+    expect(root.style.webkitUserSelect).toBe('none');
 
     rerender({ active: false });
     expect(root.style.userSelect).toBe('text');
