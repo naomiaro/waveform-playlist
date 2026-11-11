@@ -11,7 +11,7 @@
 // by a context it consumes.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, act, waitFor, cleanup } from '@testing-library/react';
+import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
 
@@ -351,6 +351,47 @@ describe('visualization memo boundaries (#693)', () => {
     expect(counts.controls).toBe(1);
     expect(totalOf(counts.clip)).toBe(0);
     expect(counts.channel).toBe(0);
+  });
+
+  it('the played-portion overlay of each clip still follows a seek while stopped', async () => {
+    // Clips a, c and d span 0-1 s; b spans 2-3 s.
+    await mount(threeTracks().tracks);
+    const transforms = () =>
+      Array.from(document.querySelectorAll<HTMLElement>('[data-clip-container] div'))
+        .map((el) => el.style.transform)
+        .filter((t) => t.startsWith('scaleX'));
+
+    await act(async () => {
+      probe.controls.setCurrentTime(0.5);
+    });
+    expect(transforms().sort()).toEqual(['scaleX(0)', 'scaleX(0.5)', 'scaleX(0.5)', 'scaleX(0.5)']);
+
+    await act(async () => {
+      probe.controls.setCurrentTime(2.25);
+    });
+    expect(transforms().sort()).toEqual(['scaleX(0.25)', 'scaleX(1)', 'scaleX(1)', 'scaleX(1)']);
+  });
+
+  it('pressing a clip selects its track by its current index after the tracks change', async () => {
+    const { a, b, c, d } = threeTracks();
+    const { setTracks } = await mount([
+      makeTrack('t1', [a, b]),
+      makeTrack('t2', [c]),
+      makeTrack('t3', [d]),
+    ]);
+    // t1 is removed: clip d's track moves from index 2 to index 1.
+    await act(async () => {
+      setTracks([makeTrack('t2', [c]), makeTrack('t3', [d])]);
+    });
+    await waitFor(() => expect(probe.data.isReady).toBe(true));
+
+    const clipD = document.querySelector('[data-track-id="t3"] [data-clip-container]');
+    expect(clipD).not.toBeNull();
+    await act(async () => {
+      fireEvent.mouseDown(clipD!);
+    });
+
+    expect(probe.state.selectedTrackId).toBe('t3');
   });
 
   it('still shows the selection and moves it', async () => {
