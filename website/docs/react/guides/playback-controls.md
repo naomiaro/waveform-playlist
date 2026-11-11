@@ -403,7 +403,9 @@ A shortcut does not fire for a key that the focused control uses itself:
 
 - Text fields, sliders, checkboxes and every other `<input>`, `<textarea>`, `<select>` dropdowns and `contenteditable` elements keep every key.
 - `Escape` closes an open modal dialog (`<dialog>` opened with `showModal()`, or an `aria-modal="true"` container) and does not also stop playback, wherever focus is.
-- `Space` and `Enter` go to a focused `<button>`, link or `<summary>`.
+- `Space` and `Enter` go to a focused `<button>` or `<summary>`, and `Enter` to a focused link.
+
+While a text field, slider, checkbox or dropdown has focus, no shortcut fires at all, including undo and split.
 
 How the control got focus makes no difference. A control you clicked still has focus, so it behaves as it would on any other page: after clicking Mute, `Space` toggles Mute again; after picking a value from a dropdown, `Space` opens the dropdown. `Space` is play/pause when focus is not on a control. Click an empty part of the page, or press `Tab`, to move focus off one.
 

@@ -1438,21 +1438,26 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         cb(frameData);
       }
 
-      // Handle annotation playback based on continuous play mode.
-      // Skipped on the frame that reaches a bounded play's end: the end check
-      // below stops there, and the active annotation must not move on first.
+      // Handle annotation playback based on continuous play mode
       const currentAnnotations = annotationsRef.current;
-      const reachedBoundedEnd =
-        playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current;
-      if (currentAnnotations.length > 0 && !reachedBoundedEnd) {
+      if (currentAnnotations.length > 0) {
         const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
         // Playing the selection takes continuous play out of the picture:
         // playback is not cut at annotation boundaries, whichever way the
         // toggle is set. The active annotation still follows the playhead.
         if (continuousPlayRef.current || isSelectionPlayRef.current) {
+          // On the frame that reaches a bounded play's end, leave the highlight
+          // alone: the end check below stops there, and it must not move on to
+          // the next annotation first. (Only this branch: with continuous play
+          // off, the branch below is what stops an annotation at its end and
+          // returns the cursor to where playback started.)
+          const reachedBoundedEnd =
+            playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current;
           // Continuous play ON: update active annotation, let audio play to the end
-          if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
+          if (reachedBoundedEnd) {
+            // nothing: playback stops below
+          } else if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
             setActiveAnnotationId(currentAnnotation.id);
           } else if (!currentAnnotation && activeAnnotationIdRef.current !== null) {
             // Clear the active annotation when we're past it, but don't stop playback
@@ -1939,6 +1944,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.stop();
         suppressEngineStopMirrorRef.current = false;
         engineRef.current.seek(start);
+        // The restart below is open-ended from the new position: whatever
+        // bounded play was running (a selection, an annotation) is over, so
+        // its end and its "this is the selection" mark must not outlive it.
+        // A stale end stopped playback at once when the new position was past it.
+        playbackEndTimeRef.current = null;
+        isSelectionPlayRef.current = false;
         engineRef.current.play(start);
       }
     },

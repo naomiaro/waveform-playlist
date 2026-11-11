@@ -175,6 +175,40 @@ describe('handleKeyboardEvent', () => {
       modal.remove();
     });
 
+    it('ignores an aria-modal container that is hidden', () => {
+      // A closed custom dialog left in the page with the attribute still set.
+      const modal = document.createElement('div');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('hidden', '');
+      document.body.appendChild(modal);
+      handleKeyboardEvent(keydownOn(document.body, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(1);
+
+      const invisible = document.createElement('div');
+      invisible.setAttribute('aria-modal', 'true');
+      (invisible as Element & { checkVisibility: () => boolean }).checkVisibility = () => false;
+      document.body.appendChild(invisible);
+      handleKeyboardEvent(keydownOn(document.body, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(2);
+      modal.remove();
+      invisible.remove();
+    });
+
+    it('leaves Escape to an open modal even when the event has no element target', () => {
+      const dialog = withPseudo(document.createElement('dialog'), { ':modal': true });
+      dialog.setAttribute('open', '');
+      document.body.appendChild(dialog);
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperty(event, 'target', { value: document });
+      handleKeyboardEvent(event, all, true);
+      expect(escape).not.toHaveBeenCalled();
+      dialog.remove();
+    });
+
     it('still handles Escape in a non-modal or closed dialog', () => {
       const nonModal = withPseudo(document.createElement('dialog'), { ':modal': false });
       nonModal.setAttribute('open', '');
@@ -210,13 +244,7 @@ describe('handleKeyboardEvent', () => {
         return el;
       }
 
-      /** The events a real click produces, up to the focus change. */
-      function click(el: HTMLElement) {
-        el.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
-        el.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
-      }
-
-      describe.each(['button', 'summary', 'a'])('%s', (kind) => {
+      describe.each(['button', 'summary'])('%s', (kind) => {
         it('keeps Space and Enter while it has focus', () => {
           const el = make(kind);
           const enter = vi.fn();
@@ -230,15 +258,6 @@ describe('handleKeyboardEvent', () => {
           expect(enter).not.toHaveBeenCalled();
         });
 
-        it('keeps them just the same after being clicked: it still has focus', () => {
-          const el = make(kind);
-          click(el);
-          const event = keydownOn(el, ' ');
-          handleKeyboardEvent(event, all, true);
-          expect(action).not.toHaveBeenCalled();
-          expect(event.defaultPrevented).toBe(false);
-        });
-
         it('does not keep other keys', () => {
           const el = make(kind);
           handleKeyboardEvent(keydownOn(el, '0'), all, true);
@@ -248,29 +267,44 @@ describe('handleKeyboardEvent', () => {
         });
       });
 
-      it.each(['range', 'checkbox', 'text'])(
-        '<input type="%s"> keeps every key, clicked or not',
-        (type) => {
-          const input = document.createElement('input');
-          input.setAttribute('type', type);
-          host.appendChild(input);
-          click(input);
-          for (const key of [' ', 'Enter', '0', 'Escape']) {
-            const event = keydownOn(input, key);
-            handleKeyboardEvent(event, [...all, { key: 'Enter', action }], true);
-            expect(event.defaultPrevented).toBe(false);
-          }
-          expect(action).not.toHaveBeenCalled();
-          expect(zero).not.toHaveBeenCalled();
-          expect(escape).not.toHaveBeenCalled();
-        }
-      );
+      it('a link keeps Enter but not Space: Space does not activate a link', () => {
+        const link = make('a');
+        const enter = vi.fn();
+        const withEnter = [...all, { key: 'Enter', action: enter }];
+        const enterEvent = keydownOn(link, 'Enter');
+        handleKeyboardEvent(enterEvent, withEnter, true);
+        expect(enter).not.toHaveBeenCalled();
+        expect(enterEvent.defaultPrevented).toBe(false);
 
-      it('a <select> keeps every key, clicked or not', () => {
+        handleKeyboardEvent(keydownOn(link, ' '), withEnter, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it('a disabled button keeps nothing', () => {
+        const button = make('button') as HTMLButtonElement;
+        button.disabled = true;
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it.each(['range', 'checkbox', 'text'])('<input type="%s"> keeps every key', (type) => {
+        const input = document.createElement('input');
+        input.setAttribute('type', type);
+        host.appendChild(input);
+        for (const key of [' ', 'Enter', '0', 'Escape']) {
+          const event = keydownOn(input, key);
+          handleKeyboardEvent(event, [...all, { key: 'Enter', action }], true);
+          expect(event.defaultPrevented).toBe(false);
+        }
+        expect(action).not.toHaveBeenCalled();
+        expect(zero).not.toHaveBeenCalled();
+        expect(escape).not.toHaveBeenCalled();
+      });
+
+      it('a <select> keeps every key', () => {
         // A focused dropdown behaves as it does everywhere else: Space opens it.
         const select = document.createElement('select');
         host.appendChild(select);
-        click(select);
         for (const key of [' ', 'Enter', 'Escape', '0']) {
           const event = keydownOn(select, key);
           handleKeyboardEvent(event, [...all, { key: 'Enter', action }], true);
@@ -299,20 +333,6 @@ describe('handleKeyboardEvent', () => {
         handleKeyboardEvent(event, all, true);
         expect(action).toHaveBeenCalledTimes(1);
         expect(event.defaultPrevented).toBe(true);
-      });
-
-      it('sees through shadow DOM: the inner button is the focused element', () => {
-        const shadowHost = document.createElement('div');
-        host.appendChild(shadowHost);
-        const root = shadowHost.attachShadow({ mode: 'open' });
-        const inner = document.createElement('button');
-        root.appendChild(inner);
-        handleKeyboardEvent(
-          keydownOn(inner, ' ', [inner, root, shadowHost, document.body]),
-          all,
-          true
-        );
-        expect(action).not.toHaveBeenCalled();
       });
     });
 

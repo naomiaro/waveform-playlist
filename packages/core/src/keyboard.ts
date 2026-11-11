@@ -82,20 +82,43 @@ function ownsAllKeys(element: Element): boolean {
 }
 
 /**
- * Native controls that Space or Enter activates. ARIA-role widgets
- * (`role="button"` on a div) are left out on purpose: whether they respond to
- * a key is up to their own script, and yielding to one that does not (a drag
- * handle that is only draggable with a pointer) would just make the key dead.
+ * Does `key` activate this native control? Buttons and `<summary>` take Space
+ * and Enter; a link takes Enter only (Space on a link scrolls the page, so
+ * yielding it would lose the shortcut for nothing). A disabled button takes
+ * neither.
+ *
+ * ARIA-role widgets (`role="button"` on a div) are left out on purpose: whether
+ * they respond to a key is up to their own script, and yielding to one that
+ * does not (a drag handle that is only draggable with a pointer) would just
+ * make the key dead.
  */
-function isActivatable(element: Element): boolean {
+function activates(element: Element, key: string): boolean {
+  if (key !== ' ' && key !== 'Enter') return false;
   const tag = element.tagName;
-  if (tag === 'BUTTON' || tag === 'SUMMARY') return true;
-  return (tag === 'A' || tag === 'AREA') && element.hasAttribute('href');
+  if (tag === 'BUTTON') return (element as HTMLButtonElement).disabled !== true;
+  if (tag === 'SUMMARY') return true;
+  return key === 'Enter' && (tag === 'A' || tag === 'AREA') && element.hasAttribute('href');
 }
 
-/** An open modal `<dialog>` or an `aria-modal` container: Escape closes it. */
+/** Rendered at all? Unknown (no `checkVisibility`) counts as rendered. */
+function isRendered(element: Element): boolean {
+  if (element.hasAttribute('hidden')) return false;
+  const check = (element as Element & { checkVisibility?: () => boolean }).checkVisibility;
+  if (typeof check !== 'function') return true;
+  try {
+    return check.call(element);
+  } catch {
+    return true;
+  }
+}
+
+/** An open modal `<dialog>` or a visible `aria-modal` container: Escape closes it. */
 function isOpenModal(element: Element): boolean {
-  if (element.getAttribute('aria-modal') === 'true') return true;
+  if (element.getAttribute('aria-modal') === 'true') {
+    // A closed custom dialog is often left in the page, hidden, with the
+    // attribute still on it. That must not swallow Escape for good.
+    return isRendered(element);
+  }
   return (
     element.tagName === 'DIALOG' &&
     element.hasAttribute('open') &&
@@ -104,12 +127,12 @@ function isOpenModal(element: Element): boolean {
 }
 
 /**
- * A modal dialog is open in the document of `element`. Focus is not always
- * inside it: clicking the dialog's own padding can leave focus on `<body>`,
- * and Escape still closes the dialog from there.
+ * A modal dialog is open in `doc`. Focus is not always inside it: clicking the
+ * dialog's own padding can leave focus on `<body>`, and Escape still closes
+ * the dialog from there. A modal inside a shadow root is only seen while focus
+ * is inside it (the composed path), since this query does not pierce shadow DOM.
  */
-function documentHasOpenModal(element: Element): boolean {
-  const doc = element.ownerDocument;
+function documentHasOpenModal(doc: Document | null | undefined): boolean {
   if (!doc) return false;
   try {
     return Array.from(doc.querySelectorAll('dialog[open], [aria-modal="true"]')).some(isOpenModal);
@@ -125,7 +148,8 @@ function documentHasOpenModal(element: Element): boolean {
  * - `<input>` (every type), `<textarea>`, `<select>` and contenteditable keep
  *   every key;
  * - Escape belongs to an open modal dialog, wherever focus is;
- * - Space and Enter belong to a focused `<button>`, link or `<summary>`.
+ * - Space and Enter belong to a focused `<button>` or `<summary>`, and Enter to
+ *   a focused link.
  *
  * It makes no difference how the control got focus. A button the user clicked
  * still has focus, so Space activates it again, exactly as it does on any
@@ -137,13 +161,15 @@ function documentHasOpenModal(element: Element): boolean {
 export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   const path = elementPath(event);
   const focused = path[0];
-  if (!focused) return false;
 
-  if (event.key === 'Escape' && (path.some(isOpenModal) || documentHasOpenModal(focused))) {
-    return true;
+  if (event.key === 'Escape') {
+    // Also when the event has no element target (dispatched on the document).
+    const doc = focused?.ownerDocument ?? (typeof document !== 'undefined' ? document : null);
+    if (path.some(isOpenModal) || documentHasOpenModal(doc)) return true;
   }
+  if (!focused) return false;
   if (ownsAllKeys(focused)) return true;
-  return (event.key === ' ' || event.key === 'Enter') && isActivatable(focused);
+  return activates(focused, event.key);
 }
 
 /**

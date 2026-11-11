@@ -174,3 +174,38 @@ function labelToMs(label: string): number {
 ```
 
 Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat (`"2"`, `"2.3"`), not a time, and `labelToMs` does not apply.
+
+## Keyboard shortcuts yield to the focused control
+
+**Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useKeyboardShortcuts`, `usePlaybackShortcuts`, `<KeyboardShortcuts>`).
+
+A shortcut no longer fires for a key that the focused control uses itself. This fixes controls that could not be operated from the keyboard, and it changes what `Space` does right after you click a control:
+
+| Focus is on | Before | Now |
+| --- | --- | --- |
+| a `<button>` you clicked or tabbed to (Mute, Zoom In, your own buttons) | `Space` toggled playback and did not press the button | `Space` and `Enter` press the button |
+| a `<select>` dropdown | `Space`, `Escape`, `0` and other shortcuts fired | every key goes to the dropdown |
+| a slider, checkbox or text input | no shortcut fired | unchanged |
+| a link | `Space` toggled playback | unchanged for `Space`; `Enter` follows the link and no longer runs an Enter shortcut |
+| anything, while a modal dialog is open | `Escape` stopped playback and the dialog stayed open | `Escape` closes the dialog |
+
+`Space` is play/pause whenever focus is not on a control.
+
+**Find:** nothing to search for in most apps; this is a behaviour change. Check any flow or test of yours that clicks a button and then presses `Space` expecting play/pause, and any element given `role="button"` without being a real `<button>` (those are not covered and still let shortcuts through).
+
+**Replace with:** if a button of yours should not keep focus after a click, release it in the click handler:
+
+```tsx
+<button
+  onClick={(event) => {
+    toggleSomething();
+    event.currentTarget.blur(); // Space is play/pause again
+  }}
+>
+  Toggle
+</button>
+```
+
+Do this only where it helps pointer users and the button is still reachable with `Tab`; a keyboard user who pressed the button loses their place when it blurs. The built-in Play, Pause and Stop buttons need nothing: they are disabled while they do not apply, so focus leaves them on click.
+
+If you call `handleKeyboardEvent` yourself, the rule is applied for you. For your own key listeners, `keyBelongsToFocusedControl(event)` from `@waveform-playlist/core` answers the same question.

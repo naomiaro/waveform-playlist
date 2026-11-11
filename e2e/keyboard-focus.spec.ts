@@ -73,6 +73,13 @@ test.describe('Shortcuts and focused controls', () => {
     // Space belongs to the focused dropdown (it opens the list), not to play/pause.
     await page.keyboard.press('Space');
     await expectNotPlaying(page);
+
+    // Positive control: on this page Space IS play/pause once focus is off the
+    // dropdown, so the assertion above is not passing for want of a shortcut.
+    await page.keyboard.press('Escape'); // close the list Space opened
+    await select.evaluate((el) => (el as HTMLSelectElement).blur());
+    await page.keyboard.press('Space');
+    await expectPlaying(page);
   });
 
   test.describe('multi-clip', () => {
@@ -81,10 +88,10 @@ test.describe('Shortcuts and focused controls', () => {
       await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
     });
 
-    test('Space activates a button that was focused with the keyboard', async ({ page }) => {
+    test('Space activates a button reached with Tab', async ({ page }) => {
       const mute = page.getByRole('button', { name: 'Mute' }).first();
       await mute.focus();
-      // Arrive by keyboard: focus that follows a key press is keyboard focus.
+      // Leave and come back with the keyboard, as a keyboard user would arrive.
       await page.keyboard.press('Shift+Tab');
       await page.keyboard.press('Tab');
       await expect(mute).toBeFocused();

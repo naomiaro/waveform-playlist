@@ -102,6 +102,7 @@ function createLoggingAdapter(): LoggingAdapter {
 interface Probe {
   isReady: boolean;
   isPlaying: boolean;
+  currentTime: number;
   continuousPlay: boolean;
   activeAnnotationId: string | null;
   duration: number;
@@ -112,13 +113,14 @@ interface Probe {
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying, currentTime } = usePlaybackAnimation();
   const { play, setContinuousPlay, setSelection } = usePlaylistControls();
   const { isReady, duration } = usePlaylistData();
   const { continuousPlay, activeAnnotationId } = usePlaylistState();
   probe = {
     isReady,
     isPlaying,
+    currentTime,
     continuousPlay,
     activeAnnotationId,
     duration,
@@ -424,6 +426,95 @@ describe('continuous play and audio rescheduling', () => {
       setNow(2.5);
       await waitFor(() => expect(probe.activeAnnotationId).toBeNull());
       expect(probe.isPlaying).toBe(true);
+    });
+  });
+
+  describe('where playback leaves the cursor and the highlight', () => {
+    it('an annotation played with continuous play off returns the cursor to its start', async () => {
+      const { setNow } = await mount(false);
+      await act(async () => {
+        await probe.play(1, 1); // annotation "a": 1 s -> 2 s
+      });
+      await wait(60);
+      setNow(1.5);
+      await waitFor(() => expect(probe.activeAnnotationId).toBe('a'));
+
+      setNow(2.05);
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+      // Ready to play the same annotation again.
+      expect(probe.currentTime).toBe(1);
+    });
+
+    it('selection playback ending where an annotation starts does not highlight it', async () => {
+      // Selection 1.5 s -> 3 s; annotation "b" starts at 3 s.
+      const { setNow } = await mount(false);
+      await act(async () => {
+        probe.setSelection(1.5, 3);
+      });
+      await wait(30);
+      await act(async () => {
+        await probe.play(1.5, 1.5);
+      });
+      await wait(60);
+      setNow(2.5); // gap between "a" and "b"
+      await waitFor(() => expect(probe.activeAnnotationId).toBeNull());
+
+      setNow(3.05); // the stopping frame, already inside "b"
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+      expect(probe.activeAnnotationId).toBeNull();
+    });
+  });
+
+  describe('changing the selection during playback', () => {
+    it('moving the cursor past the old end keeps playing from there', async () => {
+      const { log, setNow } = await mount(false);
+      await act(async () => {
+        probe.setSelection(5, 6);
+      });
+      await wait(30);
+      await act(async () => {
+        await probe.play(5, 1);
+      });
+      await wait(60);
+      setNow(5.5);
+      await wait(40);
+      log.length = 0;
+
+      await act(async () => {
+        probe.setSelection(8, 8); // a click further along the timeline
+      });
+      await wait(60);
+      expect(log).toEqual(['stop', 'play(8,)']);
+      setNow(8.3);
+      await wait(60);
+      expect(probe.isPlaying).toBe(true);
+    });
+
+    it('ends selection playback: continuous play applies again', async () => {
+      // Playing selection 1.5 s -> 4 s, then the cursor is moved to 1.2 s.
+      const { setNow } = await mount(false);
+      await act(async () => {
+        probe.setSelection(1.5, 4);
+      });
+      await wait(30);
+      await act(async () => {
+        await probe.play(1.5, 2.5);
+      });
+      await wait(60);
+      setNow(1.8);
+      await wait(40);
+
+      await act(async () => {
+        probe.setSelection(1.2, 1.2);
+      });
+      await wait(60);
+      setNow(1.6);
+      await waitFor(() => expect(probe.activeAnnotationId).toBe('a'));
+      expect(probe.isPlaying).toBe(true);
+      // No longer the selection playing, and continuous play is off:
+      // playback stops at the end of annotation "a" (2 s).
+      setNow(2.05);
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
     });
   });
 });
