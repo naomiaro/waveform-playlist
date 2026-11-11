@@ -44,41 +44,6 @@ export interface WaveformDataObject {
 }
 
 /**
- * Generic effects function type for track-level audio processing.
- *
- * The actual implementation receives Tone.js audio nodes. Using generic types
- * here to avoid circular dependencies with the playout package.
- *
- * Effects are PRE-FADER inserts: the chain runs before the track's volume,
- * pan and mute. It must end at `faderInput` — connecting anywhere else (the
- * master bus, `toDestination()`) bypasses the track's volume, pan, mute and
- * solo.
- *
- * @param trackInput - Where the track's clips/notes arrive, at unity gain (Tone.js Gain node)
- * @param faderInput - The track's volume stage; connect the effects output here (Tone.js ToneAudioNode)
- * @param isOffline - Whether rendering offline (for export)
- * @returns Optional cleanup function called when track is disposed
- *
- * @example
- * ```typescript
- * const trackEffects: TrackEffectsFunction = (trackInput, faderInput, isOffline) => {
- *   const reverb = new Tone.Reverb({ decay: 1.5 });
- *   trackInput.connect(reverb);
- *   reverb.connect(faderInput);
- *
- *   return () => {
- *     reverb.dispose();
- *   };
- * };
- * ```
- */
-export type TrackEffectsFunction = (
-  trackInput: unknown,
-  faderInput: unknown,
-  isOffline: boolean
-) => void | (() => void);
-
-/**
  * Represents a single audio clip on the timeline
  *
  * IMPORTANT: All positions/durations are stored as SAMPLE COUNTS (integers)

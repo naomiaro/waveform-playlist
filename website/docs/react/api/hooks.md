@@ -1197,8 +1197,9 @@ interface UseTrackDynamicEffectsReturn {
    *  is still waiting is dropped too: its promise rejects. */
   clearTrackEffects: (trackId: string) => void;
   /**
-   * The effects function to give a track (`track.effects`). The same function
-   * is returned for the same track id.
+   * The effects function of a track. The same function is returned for the
+   * same track id. Pass this function itself to the provider:
+   * `<WaveformPlaylistProvider trackEffects={getTrackEffectsFunction}>`.
    */
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
   /**
@@ -1253,10 +1254,12 @@ function App({ tracks }: { tracks: ClipTrack[] }) {
   const masterFx = useDynamicEffects();
   const trackFx = useTrackDynamicEffects();
 
-  // (Give each track `effects: trackFx.getTrackEffectsFunction(track.id)` to
-  // make its chain audible; see the effects guide.)
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+    <WaveformPlaylistProvider
+      tracks={tracks}
+      effects={masterFx.masterEffects}
+      trackEffects={trackFx.getTrackEffectsFunction}
+    >
       <MasterRack masterFx={masterFx} />
       {tracks.map((track) => (
         <TrackRack key={track.id} trackId={track.id} trackFx={trackFx} />

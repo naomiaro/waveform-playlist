@@ -9,7 +9,8 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React, { useState } from 'react';
-import type { ClipTrack, AudioClip, TrackEffectsFunction } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { TrackEffectsFunction } from '@waveform-playlist/playout';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 
 const SAMPLE_RATE = 48000;

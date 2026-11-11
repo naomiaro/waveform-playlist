@@ -1,6 +1,9 @@
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import type { TrackEffectsFunction } from '@waveform-playlist/core';
-import type { EffectsFunction, SoundFontCache } from '@waveform-playlist/playout';
+import type {
+  EffectsFunction,
+  SoundFontCache,
+  TrackEffectsFunction,
+} from '@waveform-playlist/playout';
 
 /** Options for {@link resolvePlayoutAdapter}. */
 export interface ResolvePlayoutAdapterOptions {
