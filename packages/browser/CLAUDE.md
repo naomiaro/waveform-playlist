@@ -100,7 +100,7 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Output channels from source:** `Offline()` output channel count is derived from `trackChannelCount` across all rendered tracks — not hardcoded to 2.
 
-**Fade types:** All 4 types (linear, exponential, logarithmic, sCurve) are applied via `getUnderlyingAudioParam()` → `applyFadeEnvelope()`. The native `AudioParam` is extracted from the Tone.js `Gain` node.
+**Fade types:** All 4 types (linear, exponential, logarithmic, sCurve) are applied with `applyClipFades()` on the native `AudioParam` of the clip's Tone `Gain`, reached through public API: `fadeGain.input.gain` (not the private `_param`; see playout's CLAUDE.md).
 
 ## Shared Animation Frame Loop Hook
 
@@ -195,6 +195,24 @@ const rebuildChain = useCallback(() => {
 **AudioContext Init Pattern:** `audioInitializedRef` guards `engine.init()` (AudioContext resume via `Tone.start()`). Only the first play call awaits init; subsequent plays skip it entirely — no microtask yield. Reset to `false` when engine is rebuilt in `loadAudio`. This keeps the stop→play path fully synchronous after first play, preventing audio layering race conditions.
 
 **Engine is always persistent (never torn down on empty).** `loadAudio` creates the `PlaylistEngine`+adapter eagerly on mount and reuses it via `setTracks([])` when the timeline empties — it is NOT disposed at `tracks.length === 0`. This keeps a ready Transport so the first play/record never races an async engine rebuild or pays build latency (the cause of the intermittent "frozen recording playhead" — recording into an empty timeline auto-creates a track, and the overdub `play()` used to win the race against the rebuild and no-op). Lazy _module_ loading (dynamic import, #510) is unchanged — only the lifecycle is eager; an empty-on-mount provider holds a suspended AudioContext (resume still deferred to first play). The 0→1 track add takes the synchronous incremental path (`isIncrementalAdd` no longer requires `prevTracks.length > 0`; still gated on an existing engine).
+
+## Engine Rebuilds vs Playback (#675)
+
+A `tracks` change that needs a full rebuild disposes the engine, then creates the new adapter ASYNCHRONOUSLY (`await resolvePlayoutAdapter` — a dynamic import on the Tone path). Three rules keep playback correct across that window; breaking any of them brings back "Play is disabled, nothing plays, time frozen at 0":
+
+1. **A disposed engine is never reachable.** Every dispose goes through `disposeEngineKeepingPlayback()`, which nulls `engineRef`. Before this, `play()` in the window ran against the dead engine (the Tone adapter only warns `adapter.play() called but no playout is available`), set `isPlaying=true`, and nothing started the new engine.
+2. **"Was it playing?" comes from the engine, not `isPlayingRef`.** `isPlayingRef` is as fresh as the last render. React commits the new `tracks` and runs the rebuild effect in a later task; a `play()` whose `await engine.init()` resolves in between starts the OLD engine and calls `setIsPlaying(true)`, and the effect then reads a stale `false`. `disposeEngineKeepingPlayback()` checks `engine.getState().isPlaying` at dispose time and queues the resume itself.
+3. **Queued plays start from the build completing, not from the `tracks` change.** `pendingResumeRef` (`{ position, endTime? }`) is consumed by the resume effect, which depends on `engineEpoch` — a counter bumped when a freshly built engine is assigned. The `tracks`-triggered run happens before the build finishes and finds `engineRef` null. `play()` queues into the same slot when `engineBuildInFlightRef` is set, and re-checks `engineRef.current === engine` after its own `init()` await; `stop()`/`pause()` clear the slot; a failed build clears it.
+
+4. **A request stays in the slot until it actually starts.** The resume effect does NOT clear `pendingResumeRef` before awaiting `engine.init()`; after the await it proceeds only if the engine and the slot are both unchanged. So `stop()`/`pause()`/a newer `play()` during init cancel it by replacing or clearing the slot, and if the engine is replaced meanwhile, the new engine's own epoch run finds the request still waiting (clearing it first left a window where it was re-queued after the new engine's run and fired minutes later on an unrelated `tracks` change — found in review).
+5. **`play()` checks `playRequestIdRef` after its `init()` await.** `play()`, `stop()` and `pause()` each bump it. A play that was parked in `init()` returns if the id moved (it would otherwise start after the user's Stop, or over a newer play), and when its engine was replaced it queues only if a replacement exists or a build is in flight — never after a failed build.
+6. **`stop()` and `pause()` always reset the UI state, engine or not.** With `engineRef` null during a rebuild they still call `setIsPlaying(false)` and stop the animation loop. Playback that was running when the rebuild began keeps `isPlaying` true until its resume; returning early on a null engine after cancelling that resume left it stuck true (a regression in the first version of this fix, caught in review).
+
+`isPlaying` stays false while a play is queued by `play()` — it only turns true when an engine has actually been started.
+
+**Testing this (`playDuringEngineRebuild.test.tsx`):** the fake `createAdapter` returns a PROMISE of the adapter (awaited by `resolvePlayoutAdapter`, like the real dynamic import) so the test holds the rebuild window open; with a synchronous adapter the new engine is ready one microtask later and the race never opens. The commit-to-effect ordering (rule 2) cannot be produced inside `act()` — it flushes effects before microtasks — so that one test changes `tracks` outside `act()` (`IS_REACT_ACT_ENVIRONMENT = false`) and releases `init()` from a layout effect.
+
+**How it was found:** the "flaky" playback-start e2e tests on `/examples/waveform-data` (tracks stream in, so the playlist rebuilds right after first `ready`). Two standalone stress scripts never reproduced it (0/240); only the Playwright runner's timing did (~1 in 10 play tests with `--repeat-each` on the whole spec). A temporary spec that logged the console and the `data-playlist-state` transitions around the click showed both paths. After the fix: 1,776/1,776.
 
 ## Playhead outputLatency Compensation
 
