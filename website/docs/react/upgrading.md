@@ -143,3 +143,34 @@ If you used the context on its own, without a playlist provider, to hold your ow
 **Find:** `onChange` handlers on `<TimeInput>` and `onSelectionChange` handlers on `<SelectionTimeInputs>` that rely on being called when the input merely loses focus.
 
 **Replace with:** an `onBlur` listener on a wrapping element if you need to know that focus left. No change is needed if the handler only stores the value.
+
+## `renderTimestamp` is removed from `<Waveform>`
+
+**Package:** `@waveform-playlist/browser`.
+
+The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => ReactNode`, but it never received a time in milliseconds: it was given `parseFloat` of the formatted tick label, which is the minutes part (`"0:30"` → `0`, `"1:00"` → `1`), or the bar and beat read as a decimal number in beats mode (`"2.3"` gave `2.3`). It is removed; `renderTick` is the only label callback.
+
+**Find:** `renderTimestamp=` on `<Waveform>`.
+
+**Replace with:** `renderTick`, which receives the formatted label and the same pixel position.
+
+```tsx
+// Before
+<Waveform renderTimestamp={(timeMs, pixelPosition) => <MyLabel time={timeMs} />} />
+
+// After: show the label as it is
+<Waveform renderTick={(label, pixelPosition) => <MyLabel text={label} />} />
+```
+
+If the old callback really needs milliseconds, parse the label. In the temporal scale it is always `m:ss` on a whole second:
+
+```tsx
+function labelToMs(label: string): number {
+  const [minutes, seconds] = label.split(':').map(Number);
+  return (minutes * 60 + seconds) * 1000;
+}
+
+<Waveform renderTick={(label, pixelPosition) => <MyLabel time={labelToMs(label)} />} />;
+```
+
+Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat (`"2"`, `"2.3"`), not a time, and `labelToMs` does not apply.
