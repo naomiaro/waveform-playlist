@@ -27,10 +27,8 @@ import {
   type WaveformPlaylistTheme,
   defaultTheme,
 } from '@waveform-playlist/ui-components';
-import { extractPeaksFromWaveformDataFull } from './waveformDataLoader';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
-import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
 import {
@@ -46,6 +44,8 @@ import {
 } from './hooks';
 import { useShallowStable } from './hooks/useShallowStable';
 import { createAnnotationLookup } from './utils/annotationLookup';
+import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
+import { timelineDuration } from './utils/timelineDuration';
 
 // Types
 export interface ClipPeaks {
@@ -242,7 +242,6 @@ export interface PlaylistControlsContextValue {
 
 export interface PlaylistDataContextValue {
   duration: number;
-  audioBuffers: AudioBuffer[];
   peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
   trackStates: TrackState[];
   tracks: ClipTrack[]; // Original tracks array with IDs
@@ -448,9 +447,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
-  const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]); // Updated for clip-based peaks
+  // Timeline length in seconds: the end of the last clip. Derived during
+  // render so it never lags `tracks` (#692).
+  const duration = useMemo(() => timelineDuration(tracks), [tracks]);
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlayState] = useState(
@@ -627,7 +626,25 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     () => Math.min(...(stableZoomLevels ?? [256, 512, 1024, 2048, 4096, 8192])),
     [stableZoomLevels]
   );
-  const { cache: waveformDataCache } = useWaveformDataCache(tracks, baseScale);
+  const { getWaveformData: getGeneratedWaveformData, version: generatedWaveformVersion } =
+    useWaveformDataCache(tracks, baseScale);
+
+  // Peaks per track and clip, derived during render (#692). The cache in the
+  // ref is what keeps a clip's typed arrays (and its ClipPeaks object, and its
+  // track's array) identical while nothing they depend on changed — see
+  // utils/derivePeaks.ts. `generatedWaveformVersion` is the only signal that a
+  // worker result arrived; the lookup itself goes through a ref.
+  const peaksCacheRef = useRef<PeaksCache>(EMPTY_PEAKS_CACHE);
+  const peaksDataArray = useMemo(() => {
+    const next = derivePeaks(
+      tracks,
+      { samplesPerPixel, mono, getGeneratedWaveformData },
+      peaksCacheRef.current
+    );
+    peaksCacheRef.current = next;
+    return next.result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- generatedWaveformVersion invalidates the ref-backed lookup
+  }, [tracks, samplesPerPixel, mono, getGeneratedWaveformData, generatedWaveformVersion]);
 
   // Custom setter for continuousPlay that updates BOTH state and ref synchronously
   // This ensures the ref is updated immediately, before the animation loop can read it
@@ -761,15 +778,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineTracksRef.current = null;
       }
 
-      // Recalculate duration from updated clip positions
-      let maxDuration = 0;
-      tracks.forEach((track) => {
-        track.clips.forEach((clip) => {
-          const clipEnd = (clip.startSample + clip.durationSamples) / clip.sampleRate;
-          maxDuration = Math.max(maxDuration, clipEnd);
-        });
-      });
-      setDuration(maxDuration);
       prevTracksRef.current = tracks;
       return;
     }
@@ -800,16 +808,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           engineRef.current!.addTrack(trackWithState);
         }
 
-        // Update duration from all tracks (including newly added)
-        let maxDuration = 0;
-        tracks.forEach((track) => {
-          track.clips.forEach((clip) => {
-            const clipEnd = (clip.startSample + clip.durationSamples) / clip.sampleRate;
-            maxDuration = Math.max(maxDuration, clipEnd);
-          });
-        });
-        setDuration(maxDuration);
-
         // Initialize track states for the new tracks (preserve existing)
         setTrackStates((prev) => {
           if (prev.length === tracks.length) return prev;
@@ -826,17 +824,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           return newStates;
         });
 
-        // Extract audio buffers from all clips across all tracks
-        const buffers: AudioBuffer[] = [];
-        tracks.forEach((track) => {
-          track.clips.forEach((clip) => {
-            if (clip.audioBuffer) {
-              buffers.push(clip.audioBuffer);
-            }
-          });
-        });
-        setAudioBuffers(buffers);
-
         prevTracksRef.current = tracks;
         return;
       } catch (err) {
@@ -852,15 +839,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
     // When deferEngineRebuild flips to false, this effect re-runs and builds once.
     if (deferEngineRebuild) {
-      // Still update duration so the timeline renders at the correct width
-      let maxDuration = 0;
-      tracks.forEach((track) => {
-        track.clips.forEach((clip) => {
-          const clipEnd = (clip.startSample + clip.durationSamples) / clip.sampleRate;
-          maxDuration = Math.max(maxDuration, clipEnd);
-        });
-      });
-      setDuration(maxDuration);
       return;
     }
 
@@ -869,10 +847,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     if (tracks.length === 0) {
       // Clear content state when all tracks are removed.
-      setAudioBuffers([]);
-      setDuration(0);
       setTrackStates([]);
-      setPeaksDataArray([]);
 
       // Always keep a persistent engine alive — even with no tracks — so the
       // Transport is ready before playback/recording starts. Without this the
@@ -924,31 +899,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     const loadAudio = async () => {
       try {
-        // Extract all audio buffers from all clips across all tracks
-        const buffers: AudioBuffer[] = [];
-
-        tracks.forEach((track) => {
-          track.clips.forEach((clip) => {
-            if (clip.audioBuffer) {
-              buffers.push(clip.audioBuffer);
-            }
-          });
-        });
-
-        // Calculate total timeline duration from all clips across all tracks
-        // Use clip.sampleRate which is always defined (works for peaks-only clips too)
-        let maxDuration = 0;
-        tracks.forEach((track) => {
-          track.clips.forEach((clip) => {
-            const sampleRate = clip.sampleRate;
-            const clipEndSample = clip.startSample + clip.durationSamples;
-            const clipEnd = clipEndSample / sampleRate;
-            maxDuration = Math.max(maxDuration, clipEnd);
-          });
-        });
-
-        setAudioBuffers(buffers);
-        setDuration(maxDuration);
+        const maxDuration = timelineDuration(tracks);
 
         // Initialize or update track states, preserving existing UI state (mute/solo/volume/pan)
         // Only initialize from ClipTrack props when trackStates is empty or track count changes
@@ -1238,113 +1189,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache);
   }, [soundFontCache]);
 
-  // Regenerate peaks when zoom, mono, or waveformDataCache changes (without reloading audio)
-  // Peak sources in priority order:
-  //   A) clip.waveformData — external pre-computed peaks (e.g. from BBC audiowaveform)
-  //   B) waveformDataCache — worker-generated WaveformData (fast resample on zoom)
-  //   C) empty peaks — clip is still loading or has no audio data
+  // A clip with nothing to draw from is almost always a wiring mistake. Not
+  // while tracks are still streaming in (deferEngineRebuild): then it is expected.
   useEffect(() => {
-    if (tracks.length === 0) return;
-
-    const allTrackPeaks: TrackClipPeaks[] = tracks.map((track) => {
-      const clipPeaks: ClipPeaks[] = track.clips.map((clip) => {
-        let peaks: PeakData | undefined;
-
-        // Path A: External pre-computed waveform data (e.g. from audiowaveform .dat file)
-        // When sample rates match, use clip offsets directly.
-        // When rates mismatch (e.g., waveformData at 48000 Hz, clip rebuilt at 44100 Hz
-        // after audio decode), convert offsets to the waveformData's sample space and
-        // adjust samplesPerPixel so peaks fill the correct container width.
-        // Path B (worker) replaces these on next render once cache is populated.
-        if (clip.waveformData) {
-          try {
-            const wdRate = clip.waveformData.sample_rate;
-            const clipRate = clip.sampleRate;
-            let peakOffset = clip.offsetSamples;
-            let peakDuration = clip.durationSamples;
-            let peakSpp = samplesPerPixel;
-            if (wdRate !== clipRate && clipRate > 0 && wdRate > 0) {
-              const ratio = wdRate / clipRate;
-              peakOffset = Math.round(clip.offsetSamples * ratio);
-              peakDuration = Math.round(clip.durationSamples * ratio);
-              peakSpp = Math.max(1, Math.round(samplesPerPixel * ratio));
-            }
-            peaks = extractPeaksFromWaveformDataFull(
-              clip.waveformData as WaveformData,
-              peakSpp,
-              mono,
-              peakOffset,
-              peakDuration
-            );
-          } catch (err) {
-            console.warn(
-              '[waveform-playlist] Failed to extract peaks from waveformData: ' + String(err)
-            );
-          }
+    if (deferEngineRebuild) return;
+    for (const track of tracks) {
+      for (const clip of track.clips) {
+        if (!clip.audioBuffer && !clip.waveformData && !clip.midiNotes) {
+          console.warn(`[waveform-playlist] Clip "${clip.id}" has no audio data or waveform data`);
         }
-
-        // Path B: Worker-generated WaveformData cache (fast resample on zoom)
-        if (!peaks) {
-          const cached = waveformDataCache.get(clip.id);
-          if (cached) {
-            try {
-              peaks = extractPeaksFromWaveformDataFull(
-                cached,
-                samplesPerPixel,
-                mono,
-                clip.offsetSamples,
-                clip.durationSamples
-              );
-            } catch (err) {
-              console.warn(
-                '[waveform-playlist] Failed to extract peaks from cache: ' + String(err)
-              );
-            }
-          }
-        }
-
-        // Path C: No peaks data available yet — render empty while worker processes.
-        // Use correct channel count from audioBuffer to prevent track height shift
-        // when peaks arrive (mono mode collapses to 1 channel).
-        if (!peaks) {
-          if (!deferEngineRebuild && !clip.audioBuffer && !clip.waveformData && !clip.midiNotes) {
-            console.warn(
-              `[waveform-playlist] Clip "${clip.id}" has no audio data or waveform data`
-            );
-          }
-          const numChannels = mono ? 1 : (clip.audioBuffer?.numberOfChannels ?? 1);
-          // MIDI clips: derive pixel width from sample duration so the clip renders
-          // at the correct width instead of zero-width blank tracks.
-          const pixelLength = clip.midiNotes
-            ? Math.ceil(clip.durationSamples / samplesPerPixel)
-            : 0;
-          peaks = {
-            length: pixelLength,
-            data: Array.from({ length: numChannels }, () => new Int16Array(pixelLength * 2)),
-            bits: 16,
-          };
-        }
-
-        return {
-          clipId: clip.id,
-          trackName: track.name,
-          peaks,
-          startSample: clip.startSample,
-          durationSamples: clip.durationSamples,
-          fadeIn: clip.fadeIn,
-          fadeOut: clip.fadeOut,
-          midiNotes: clip.midiNotes,
-          sampleRate: clip.sampleRate,
-          offsetSamples: clip.offsetSamples,
-          gain: clip.gain,
-        };
-      });
-
-      return clipPeaks;
-    });
-
-    setPeaksDataArray(allTrackPeaks);
-  }, [tracks, samplesPerPixel, mono, waveformDataCache, deferEngineRebuild]);
+      }
+    }
+  }, [tracks, deferEngineRebuild]);
 
   // Audio clock from the adapter's own AudioContext (#510 — replaces tone's
   // getContext()). Stable; reads a ref so identity never changes.
@@ -2234,7 +2090,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const dataValue: PlaylistDataContextValue = useMemo(
     () => ({
       duration,
-      audioBuffers,
       peaksDataArray,
       trackStates,
       tracks,
@@ -2262,7 +2117,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }),
     [
       duration,
-      audioBuffers,
       peaksDataArray,
       trackStates,
       tracks,

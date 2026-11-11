@@ -309,7 +309,6 @@ interface PlaylistControlsContextValue {
 ```typescript
 interface PlaylistDataContextValue {
   duration: number;
-  audioBuffers: AudioBuffer[];
   peaksDataArray: TrackClipPeaks[];
   trackStates: TrackState[];
   tracks: ClipTrack[];

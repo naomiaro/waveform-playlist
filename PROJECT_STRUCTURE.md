@@ -315,7 +315,7 @@ const clip = createClipFromSeconds({
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useUndoState.ts              # Undo/redo state (engine delegation + onEngineState)
-  │   ├── useWaveformDataCache.ts       # Web worker peak generation cache
+  │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
   │   ├── PlaylistVisualization.tsx      # Main waveform + track rendering
@@ -714,7 +714,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
     └─→ PlaylistDataContext (static/infrequent updates)
-        └─→ duration, audioBuffers, peaksDataArray, isDraggingRef, etc.
+        └─→ duration, peaksDataArray, tracks, isDraggingRef, etc.
     ↓
 ├─→ Primitive Components (subscribe to relevant contexts only)
 │   ├─→ PlayButton, PauseButton, StopButton
@@ -862,7 +862,6 @@ export interface PlaylistControlsContextValue {
 // 4. Static/infrequent data
 export interface PlaylistDataContextValue {
   duration: number;
-  audioBuffers: AudioBuffer[];
   peaksDataArray: TrackClipPeaks[];
   trackStates: TrackState[];
   tracks: ClipTrack[];
@@ -970,9 +969,9 @@ const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
 const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
 
-// PlaylistDataContext
-const [duration, setDuration] = useState(0);
-const [audioBuffers, setAudioBuffers] = useState<AudioBuffer[]>([]);
+// PlaylistDataContext — derived from `tracks` during render, not state
+const duration = useMemo(() => timelineDuration(tracks), [tracks]);
+const peaksDataArray = useMemo(/* derivePeaks(...) with a per-clip cache */);
 ```
 
 Access contexts using specialized hooks:
@@ -981,7 +980,7 @@ Access contexts using specialized hooks:
 const { isPlaying, currentTime } = usePlaybackAnimation();
 const { continuousPlay, annotations } = usePlaylistState();
 const { play, pause, setContinuousPlay } = usePlaylistControls();
-const { duration, audioBuffers } = usePlaylistData();
+const { duration, tracks } = usePlaylistData();
 ```
 
 ### Refs for Performance

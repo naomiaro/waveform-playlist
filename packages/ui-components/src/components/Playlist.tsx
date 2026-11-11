@@ -118,6 +118,8 @@ export interface PlaylistProps {
   readonly trackControlsSlots?: React.ReactNode[];
   /** Height of the timescale gap spacer in the controls column (matches timescale height) */
   readonly timescaleGapHeight?: number;
+  /** Class name for the outermost element. */
+  readonly className?: string;
 }
 export const Playlist: FunctionComponent<PlaylistProps> = ({
   children,
@@ -136,6 +138,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   'data-playlist-state': playlistState,
   trackControlsSlots,
   timescaleGapHeight = 0,
+  className,
 }) => {
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
@@ -150,7 +153,7 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
   const showControls = controlsWidth !== undefined && controlsWidth > 0;
 
   return (
-    <Wrapper data-playlist-state={playlistState}>
+    <Wrapper className={className} data-playlist-state={playlistState}>
       {showControls && (
         <ControlsColumn $width={controlsWidth}>
           {timescaleGapHeight > 0 && <TimescaleGap $height={timescaleGapHeight} />}

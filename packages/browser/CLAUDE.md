@@ -130,13 +130,17 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 - `src/hooks/useWaveformDataCache.ts` — Cache hook, watches tracks for clips with `audioBuffer` but no `waveformData`
 - `src/waveformDataLoader.ts` — `extractPeaksFromWaveformDataFull()` for resample + channel extraction
 
-**Peak resolution order in WaveformPlaylistContext:** (1) `clip.waveformData` (external pre-computed), (2) worker cache hit, (3) empty peaks while worker runs.
+**Peak resolution order (`src/utils/derivePeaks.ts`):** (1) `clip.waveformData` (external pre-computed), (2) worker result for `clip.audioBuffer`, (3) empty peaks while worker runs.
+
+**Peaks and duration are derived during render, never set by an effect (#692).** `duration = useMemo(timelineDuration(tracks))`; `peaksDataArray = useMemo(derivePeaks(...))` over `tracks`, `samplesPerPixel`, `mono` and the worker hook's `version`. `derivePeaks` is a pure function that takes the previous pass (`PeaksCache`, held in `peaksCacheRef`) and reuses three identities, each of which something downstream is keyed on: a clip's typed arrays (`Channel` redraws when they change), its `ClipPeaks` object, and its track's array. The typed arrays are reused while the clip's source waveform data, `offsetSamples`, `durationSamples`, `sampleRate`, `samplesPerPixel` and `mono` are unchanged. Entries are found by clip id and compared on the waveform data's identity (split clips share one buffer but differ in offset and duration); a clip that gets a new id always recomputes. So a trim gives new arrays to the trimmed clip only, and a move gives a new `ClipPeaks` with the same arrays. Do not add a field to `ClipPeaks` without adding it to `sameClipPeaks`, or a change to it will not reach the screen. Measured on `/examples/multi-clip` (14 canvases) during a trim: 26 canvas redraws and 3 React commits per pointer move before, 1 and 1 after.
+
+**`useWaveformDataCache` has one piece of state, `version`.** Results live in a `WeakMap<AudioBuffer, WaveformData>` read during render through the stable `getWaveformData(buffer)`; `version` is bumped when a job finishes and is the dependency that makes the peaks memo look again. A `tracks` change over already-generated buffers sets no state (the old `Map<clipId, WaveformData>` state was rebuilt on every `tracks` change, one extra render per trim move). A job keeps running across `tracks` changes; only unmount forgets in-flight jobs, because terminating the worker rejects them (a StrictMode remount then starts them again).
 
 **Automatic:** Any clip with `audioBuffer` (loaded or recorded) gets worker treatment — no opt-in needed.
 
 ## Pre-Computed Peaks Rate Mismatch
 
-When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in the peak effect converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Worker cache (Path B) replaces these on the next render cycle. `createClip` (called by both direct callers and `createClipFromSeconds`) logs a per-clip warning with the clip name.
+When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in `derivePeaks` converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Path A wins whenever it succeeds, and the worker skips clips that have `waveformData`, so these peaks stay until the clip loses its `waveformData`. `createClip` (called by both direct callers and `createClipFromSeconds`) logs a per-clip warning with the clip name.
 
 ## Playlist Loading Detection
 
@@ -153,7 +157,7 @@ Three approaches for detecting when tracks finish loading:
 **Two paths for recording data:**
 
 1. **Live preview** — `PlaylistVisualization` renders `recordingState.peaks` directly, one `ChannelWithProgress` per channel. Bypasses the `WaveformPlaylistContext` peak generation pipeline entirely.
-2. **Post-recording** — clips go through the peak effect (Path A/B/C), which applies `mono` merge via `extractPeaksFromWaveformDataFull`.
+2. **Post-recording** — clips go through `derivePeaks` (Path A/B/C), which applies `mono` merge via `extractPeaksFromWaveformDataFull`.
 
 Both paths must respect `mono` flag consistently. Live preview slices to first channel when `mono` is true. `recordingState.bits` flows through to the renderer (not hardcoded).
 
@@ -337,13 +341,12 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Why:** When a recording is split into many clips sharing the same `AudioBuffer`, per-clip generation causes duplicate `Float32Array.slice()` allocations and OOM on large timelines.
 
-**Implementation:** Three `WeakMap<AudioBuffer, ...>` refs:
+**Implementation:** Two `WeakMap<AudioBuffer, ...>` refs:
 
-- `generatedByBufferRef` — cached results (`WaveformData`)
+- `generatedByBufferRef` — results (`WaveformData`), read during render via `getWaveformData(buffer)`
 - `inflightByBufferRef` — in-flight worker promises
-- `subscribersByBufferRef` — clip IDs waiting for a buffer's result
 
-**Pattern:** Generate once per buffer, fan out the result to all subscriber clip IDs via `setCache()`. `WeakMap` allows GC when `AudioBuffer` is released.
+**Pattern:** Generate once per buffer; every clip sharing it finds the result by buffer when `version` bumps. `WeakMap` allows GC when `AudioBuffer` is released.
 
 ## MIDI Clip Rendering Pipeline
 
@@ -367,7 +370,7 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **The `reschedulePlayback` effect restarts the AUDIO only when `continuousPlay` turns on (#701).** It compares against `prevContinuousPlayRef`; every other run (playback starting, the loop closure changing) only restarts the animation loop. Keyed on the current value instead, every Play with continuous play on stopped and restarted the engine, and so did any duration change. The transition branch drops the end (engine side AND `playbackEndTimeRef`, otherwise the loop stops there anyway) only when that end is the active annotation's own end; any other bounded play (a selection, even one playing over an annotation) keeps its end and is rescheduled with it. "An annotation is active" alone is not a usable test: on a page whose annotations cover the timeline one is always active. **While the selection itself is what is playing, continuous play has no effect at all** (maintainer's rule, 2026-11-11): `play()` sets `isSelectionPlayRef` when its start and end are the highlighted selection's; the loop then takes the follow-only branch, so playback is not cut at annotation boundaries, and the toggle reschedules nothing. Before, a selection crossing an annotation boundary stopped at that boundary with continuous play off. The rule is keyed on WHAT IS PLAYING, not on "a selection is highlighted": a first version used the latter, and an annotation clicked with a selection highlighted elsewhere then behaved inconsistently (continuous play on from the start continued; ticked midway did nothing). An annotation play always follows the toggle, and a click never clears the selection. In that follow-only branch the loop leaves the highlight alone on the frame that reaches `playbackEndTimeRef`, so it does not jump to the next annotation as playback stops. The skip must stay INSIDE the follow-only branch: applied to the whole annotation block (as #727 first did) it also skipped the continuous-play-off branch, which is what stops an annotation at its end and returns the cursor to its start, and the cursor was left at the end instead. `setSelection` during playback replaces the bounded play that was running: a new RANGE restarts as selection playback, start to end (looping on: open-ended); a collapsed selection (a cursor move) continues open-ended. Either way everything of the old play is replaced through one helper (`replaceBoundedPlay`): `playbackEndTimeRef`, `isSelectionPlayRef`, `playStartPositionRef` and the active annotation (the loop's stop-at-annotation-end would otherwise fire on the next frame). A queued `pendingResumeRef` is changed IN PLACE, because a resume parked in `init()` recognises its request by identity (#675 rule 4), and the resume effect reads `position`/`endTime` only after that await. `usePlayFromSelectionOrCursor` resumes from the cursor when it is strictly inside the selection, and `play()` recognises that as selection playback too (start inside the selection, end at its end). For selection playback `playStartPositionRef` is always the SELECTION start, and `stop()`, the engine-stop mirror AND the loop's own end-of-bounded-play branch all put the cursor there (the first two also seek the engine). The mirror and the loop race on the Tone path, so they must agree. With a queued resume, `setSelection` only re-points the request and returns (restarting as well started the engine twice); while stopped it resets `isSelectionPlayRef` and `playStartPositionRef`, so a Stop pressed while stopped does not send the cursor to an old play's start. Background: the engine alone rewinds to where its own play began, i.e. the resume point, and every later Play would then repeat only the tail. Known edge: a clicked annotation that starts inside the highlighted selection and ends exactly at its end is treated as selection playback (the continuous-play toggle is ignored for that play). Space and the Play button start playback through ONE hook, `usePlayFromSelectionOrCursor` (`src/hooks/`): the highlighted selection when looping is off, else from the cursor. Before, only the button knew about the selection and Space always played unbounded from the cursor; any new way of starting playback from the built-in UI must go through that hook (`spaceMatchesPlayButton.test.tsx` runs the same cases against both). Known gap, unchanged from before: if the switch happens while the engine is null (rebuild in flight) or while the first `play()` is parked in `init()`, the transition is consumed without a reschedule and playback still stops at the old end. `continuousPlayReschedule.test.tsx` logs the fake adapter's `play`/`stop` calls.
 
-**Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when `duration` state updates, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
+**Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when the derived `duration` changes, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
 
 ## Shortcuts Yield to the Focused Control (#710)
 
@@ -491,7 +494,7 @@ if (derived !== prevRef.current) {
 
 **Detection:** `isIncrementalAdd` is computed during render by comparing `prevTracksRef` with current tracks. Uses reference equality on individual track objects — if all previous tracks are unchanged and only new ones were appended, the incremental path is used.
 
-**When incremental:** File drops, new empty tracks, any append where existing tracks are untouched. Calls `engine.addTrack()` per new track, updates duration/trackStates/audioBuffers. No engine dispose/rebuild.
+**When incremental:** File drops, new empty tracks, any append where existing tracks are untouched. Calls `engine.addTrack()` per new track, updates trackStates (duration and peaks are derived from `tracks`). No engine dispose/rebuild.
 
 **When full rebuild:** Recording adds clip to existing track (modifies track object), effects change, any existing track modified.
 
@@ -526,7 +529,7 @@ const setState = useCallback((v) => {
 
 ## React Hook Patterns (cross-cutting)
 
-- **Derive Render Guards from Props, Not Effect State** — Don't use effect-set state (e.g., `audioBuffers`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
+- **Derive Render Guards from Props, Not Effect State** — Don't use effect-set state (e.g., `isReady`, `trackStates`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
 - **Copy Refs in useEffect Body** — When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup. **Exception:** for `[]` deps effects (mount/unmount only), refs are null at mount — copying captures null forever; read refs directly inside the cleanup function instead.
 - **Refs from Custom Hooks in Dep Arrays** — When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than `eslint-disable-next-line` which would mask real missing dependencies.
 - **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders, causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the _previous_ effect's cleanup, store it in a ref during render.
