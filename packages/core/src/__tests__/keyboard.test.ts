@@ -311,6 +311,34 @@ describe('handleKeyboardEvent', () => {
         });
       });
 
+      it('a <select> used with the pointer gives Space back, and keeps its other keys', () => {
+        // Pick a time format with the mouse, then press Space to play.
+        const select = document.createElement('select');
+        host.appendChild(select);
+        focusWithPointer(select);
+        const event = keydownOn(select, ' ');
+        handleKeyboardEvent(event, all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(event.defaultPrevented).toBe(true);
+        // Escape closes its list and typing a character selects an option.
+        handleKeyboardEvent(keydownOn(select, 'Escape'), all, true);
+        handleKeyboardEvent(keydownOn(select, '0'), all, true);
+        expect(escape).not.toHaveBeenCalled();
+        expect(zero).not.toHaveBeenCalled();
+      });
+
+      it('a <select> reached with the keyboard keeps every key', () => {
+        const select = document.createElement('select');
+        host.appendChild(select);
+        focusWithKeyboard(select);
+        for (const key of [' ', 'Enter', 'Escape', '0']) {
+          handleKeyboardEvent(keydownOn(select, key), all, true);
+        }
+        expect(action).not.toHaveBeenCalled();
+        expect(escape).not.toHaveBeenCalled();
+        expect(zero).not.toHaveBeenCalled();
+      });
+
       it('a clicked text input still keeps every key', () => {
         const input = document.createElement('input');
         host.appendChild(input);

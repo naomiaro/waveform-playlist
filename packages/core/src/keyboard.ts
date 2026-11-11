@@ -217,14 +217,15 @@ function isKeyboardOperated(element: Element): boolean {
  * True when the key already means something to the control that has focus, so
  * a global shortcut must leave it alone:
  *
- * - text fields, `<select>` and contenteditable keep every key;
+ * - text fields and contenteditable keep every key;
  * - Escape belongs to an open modal dialog, wherever focus is;
  * - Space and Enter belong to a focused `<button>`, link or `<summary>`, and
- *   every key belongs to a focused slider, checkbox or other non-text input,
- *   while the user is operating it from the keyboard. A control that was
- *   clicked keeps focus without having been navigated to, so Space and Enter
- *   stay shortcuts there: clicking Mute, or dragging a volume slider, and then
- *   pressing Space still plays.
+ *   every key belongs to a focused `<select>`, slider, checkbox or other
+ *   non-text input, while the user is operating it from the keyboard. A
+ *   control that was clicked keeps focus without having been navigated to, so
+ *   Space and Enter stay shortcuts there: clicking Mute, dragging a volume
+ *   slider or picking a value from a dropdown, and then pressing Space, still
+ *   plays.
  *
  * `handleKeyboardEvent` applies this itself. It is exported for listeners that
  * match keys on their own.
@@ -239,7 +240,10 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   }
 
   const isActivationKey = event.key === ' ' || event.key === 'Enter';
-  if (isNonTextInput(focused)) {
+  // Sliders, checkboxes and dropdowns: theirs while keyboard-operated; after a
+  // click (a value picked from a dropdown, a slider dragged) Space and Enter
+  // are shortcuts again, the other keys stay with the control.
+  if (isNonTextInput(focused) || focused.tagName === 'SELECT') {
     return !isActivationKey || isKeyboardOperated(focused);
   }
   if (ownsAllKeys(focused)) return true;
