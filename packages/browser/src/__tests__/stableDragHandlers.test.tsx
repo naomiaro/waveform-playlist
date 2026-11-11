@@ -45,13 +45,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// Every clip has a second of unused audio before and after it, so a trim can
+// grow it in either direction and only its neighbours stop it.
 function clip(id: string, startSample: number, durationSamples: number): AudioClip {
   return {
     id,
     startSample,
     durationSamples,
-    offsetSamples: 0,
-    sourceDurationSamples: durationSamples * 4,
+    offsetSamples: SAMPLE_RATE,
+    sourceDurationSamples: durationSamples + 2 * SAMPLE_RATE,
     sampleRate: SAMPLE_RATE,
   } as AudioClip;
 }
@@ -82,12 +84,16 @@ function fakeEngine() {
 }
 
 /** A dnd-kit event for the left boundary of clip `b`, dragged by `dx` pixels. */
-function trimEvent(dx: number, extra: Record<string, unknown> = {}) {
+function trimEvent(
+  dx: number,
+  extra: Record<string, unknown> = {},
+  boundary: 'left' | 'right' = 'left'
+) {
   return {
     canceled: false,
     to: { x: 100 + dx, y: 0 },
     operation: {
-      source: { data: { clipId: 'b', trackIndex: 0, clipIndex: 0, boundary: 'left' } },
+      source: { data: { clipId: 'b', trackIndex: 0, clipIndex: 0, boundary } },
       position: { initial: { x: 100, y: 0 }, current: { x: 100, y: 0 } },
       transform: { x: dx, y: 0 },
     },
@@ -144,27 +150,70 @@ describe('useClipDragHandlers', () => {
 
     const b = getTracks()[0].clips[0];
     expect(b.startSample).toBe(SAMPLE_RATE + 20_000);
-    expect(b.offsetSamples).toBe(20_000);
+    expect(b.offsetSamples).toBe(SAMPLE_RATE + 20_000);
     expect(b.durationSamples).toBe(SAMPLE_RATE - 20_000);
     // Untouched clips keep their identity.
     expect(getTracks()[0].clips[1].id).toBe('a');
   });
 
-  it('still stops a trim at the neighbouring clip after tracks have updated', () => {
+  it('stops a left trim exactly at the end of the previous clip', () => {
     const { hook, getTracks } = setup();
     const handlers = hook.result.current;
 
     act(() => handlers.onDragStart(trimEvent(0)));
     act(() => handlers.onDragMove(trimEvent(-10)));
     hook.rerender();
-    // Far past clip `a`, which ends at 0.5 s.
+    // Far past clip `a`, which ends at 0.5 s. `a` is stored AFTER `b` in the
+    // clips array, so a wrong sorted index would pick the wrong neighbour.
     act(() => handlers.onDragMove(trimEvent(-5000)));
 
-    // The clip has no audio before its offset 0, so it cannot grow left at all;
-    // it must not jump over or into its neighbour either.
+    expect(getTracks()[0].clips[0].startSample).toBe(SAMPLE_RATE / 2);
+  });
+
+  it('stops a right trim exactly at the start of the next clip', () => {
+    const { hook, getTracks } = setup();
+    const handlers = hook.result.current;
+
+    act(() => handlers.onDragStart(trimEvent(0, {}, 'right')));
+    act(() => handlers.onDragMove(trimEvent(10, {}, 'right')));
+    hook.rerender();
+    act(() => handlers.onDragMove(trimEvent(5000, {}, 'right')));
+
     const b = getTracks()[0].clips[0];
-    expect(b.startSample).toBeGreaterThanOrEqual(SAMPLE_RATE / 2);
-    expect(b.offsetSamples).toBeGreaterThanOrEqual(0);
+    expect(b.startSample + b.durationSamples).toBe(3 * SAMPLE_RATE);
+  });
+
+  it('follows a neighbour that is replaced during the drag (undo mid-trim)', () => {
+    const engine = fakeEngine();
+    let tracks = makeTracks();
+    const onTracksChange = (next: ClipTrack[]) => {
+      tracks = next;
+    };
+    const hook = renderHook(() =>
+      useClipDragHandlers({
+        tracks,
+        onTracksChange,
+        samplesPerPixel: 1000,
+        engineRef: { current: engine as unknown as PlaylistEngine },
+        isDraggingRef: { current: false },
+      })
+    );
+    const handlers = hook.result.current;
+
+    act(() => handlers.onDragStart(trimEvent(0, {}, 'right')));
+    act(() => handlers.onDragMove(trimEvent(10, {}, 'right')));
+    hook.rerender();
+
+    // Something else moves clip `c` 0.5 s earlier while the trim is in progress.
+    tracks = tracks.map((track) => ({
+      ...track,
+      clips: track.clips.map((c) => (c.id === 'c' ? { ...c, startSample: 2.5 * SAMPLE_RATE } : c)),
+    }));
+    hook.rerender();
+    act(() => handlers.onDragMove(trimEvent(5000, {}, 'right')));
+
+    const b = tracks[0].clips[0];
+    expect(b.startSample + b.durationSamples).toBe(2.5 * SAMPLE_RATE);
   });
 
   it('sorts the track once per drag, not on every move', () => {

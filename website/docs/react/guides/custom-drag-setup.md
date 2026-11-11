@@ -320,7 +320,7 @@ This uses delay-based activation for touch events (distinguishes drag from scrol
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `tracks` | `ClipTrack[]` | Current tracks for collision detection |
+| `tracks` | `ClipTrack[] \| (() => ClipTrack[])` | Current tracks for collision detection, or a function returning them (keeps the configured modifier stable while tracks change) |
 | `samplesPerPixel` | `number` | Current zoom level |
 
 ### `SnapToGridModifier.configure(options)`

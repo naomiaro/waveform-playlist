@@ -20,6 +20,26 @@ interface UseClipDragHandlersOptions {
   snapSamplePosition?: (samplePosition: number) => number;
 }
 
+/** A track's clips in timeline order, and where the clip at `clipIndex` sits in it. */
+function trimOrderFor(clips: readonly AudioClip[], clipIndex: number) {
+  const sortedClips = sortedClipsOf(clips);
+  return { clips, sortedClips, sortedIndex: sortedClips.indexOf(clips[clipIndex]) };
+}
+
+/** Whether every clip except the one at `clipIndex` is the same object in both arrays. */
+function sameNeighbours(
+  a: readonly AudioClip[],
+  b: readonly AudioClip[],
+  clipIndex: number
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (i !== clipIndex && a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 /**
  * Custom hook for handling clip drag operations (movement and trimming)
  *
@@ -80,10 +100,17 @@ export function useClipDragHandlers({
   tracksRef.current = tracks;
   const onTracksChangeRef = React.useRef(onTracksChange);
   onTracksChangeRef.current = onTracksChange;
-  // The trimmed clip's neighbours in timeline order, found once when the drag
-  // starts. A trim replaces only the dragged clip, and collision constraints
-  // keep it between the same two neighbours, so the order holds for the drag.
-  const trimOrderRef = React.useRef<{ sortedClips: AudioClip[]; sortedIndex: number } | null>(null);
+  // The trimmed clip's neighbours in timeline order. A trim replaces only the
+  // dragged clip, and collision constraints keep it between the same two
+  // neighbours, so the order found at drag start normally holds for the drag
+  // and is not re-sorted on every pointer move. `clips` is the array it was
+  // computed from: if any OTHER clip of the track has been replaced since (an
+  // undo during the drag, a recording landing on the track), it is recomputed.
+  const trimOrderRef = React.useRef<{
+    clips: readonly AudioClip[];
+    sortedClips: AudioClip[];
+    sortedIndex: number;
+  } | null>(null);
   // Store original clip state when drag starts (for cumulative delta application)
   const originalClipStateRef = React.useRef<{
     offsetSamples: number;
@@ -132,8 +159,7 @@ export function useClipDragHandlers({
           durationSamples: clip.durationSamples,
           startSample: clip.startSample,
         };
-        const sortedClips = sortedClipsOf(track.clips);
-        trimOrderRef.current = { sortedClips, sortedIndex: sortedClips.indexOf(clip) };
+        trimOrderRef.current = trimOrderFor(track.clips, data.clipIndex);
         // Signal provider to skip loadAudio rebuilds during the drag
         isDraggingRef.current = true;
         // Group the drag into one undo step
@@ -179,6 +205,10 @@ export function useClipDragHandlers({
 
       // Get original clip state (stored on drag start)
       const originalClip = originalClipStateRef.current;
+      const currentClips = tracksRef.current[trackIndex]?.clips;
+      if (currentClips && !sameNeighbours(trimOrderRef.current.clips, currentClips, clipIndex)) {
+        trimOrderRef.current = trimOrderFor(currentClips, clipIndex);
+      }
       const { sortedClips, sortedIndex } = trimOrderRef.current;
       const snapFn = snapSamplePositionRef.current;
 
@@ -300,6 +330,8 @@ export function useClipDragHandlers({
       if (!data) {
         // Transaction was opened in onDragStart — abort to prevent leak
         isDraggingRef.current = false;
+        originalClipStateRef.current = null;
+        trimOrderRef.current = null;
         engineRef.current?.abortTransaction();
         return;
       }
