@@ -90,3 +90,5 @@ export default defineConfig({
     },
   ],
 });
+
+# Automated fix for issue #710: Playback shortcuts swallow Escape inside the spectrogram settings modal (dialog cannot be closed from the keyboard)
