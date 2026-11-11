@@ -3,6 +3,15 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    # Nothing below is read by the jobs here (package build, lint of
+    # packages/*/src, unit tests), so a pull request that changes only these
+    # paths starts no run and shows no checks.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'plans/**'
+      - 'website/docs/**'
+      - 'website/static/llms.txt'
 
 jobs:
   validate:
