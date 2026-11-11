@@ -4,6 +4,8 @@ import {
   updateAnnotationBoundaries,
   resolveAnnotationShortcuts,
   matchesKeyBinding,
+  keyBelongsToFocusedControl,
+  observeFocusSource,
   ANNOTATION_LINK_THRESHOLD_TICKS,
   annotationMinDurationTicks,
 } from '@waveform-playlist/core';
@@ -331,13 +333,16 @@ export class DawAnnotationTrackElement extends LitElement {
 
   // Capture phase: runs before <daw-keyboard-shortcuts>' bubble-phase listener,
   // giving annotation shortcuts deterministic priority (spec rule).
+  private _stopObservingFocus: (() => void) | null = null;
+
   private _onKeyDownCapture = (e: KeyboardEvent): void => {
     if (!this.keyboardControls) return;
     if (e.repeat) return;
-    const target = e.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
-    }
+    // Same rule as the editor shortcuts: a key the focused control uses itself
+    // (text entry, Escape in a modal dialog, Space/Enter on a button reached
+    // with the keyboard) is not a shortcut. Reads the composed path, so it
+    // sees controls inside shadow roots that `e.target` hides at `document`.
+    if (keyBelongsToFocusedControl(e)) return;
     const match = this._shortcutEntries().find((entry) => matchesKeyBinding(e, entry.binding));
     if (!match) return;
 
@@ -434,6 +439,7 @@ export class DawAnnotationTrackElement extends LitElement {
       this.annotationShortcuts = value as AnnotationShortcutMap | null;
     }
     document.addEventListener('keydown', this._onKeyDownCapture, true); // capture phase
+    this._stopObservingFocus = observeFocusSource(document);
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-annotation-track-connected', {
@@ -458,6 +464,8 @@ export class DawAnnotationTrackElement extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener('keydown', this._onKeyDownCapture, true);
+    this._stopObservingFocus?.();
+    this._stopObservingFocus = null;
     this._childObserver?.disconnect();
     this._childObserver = null;
   }
