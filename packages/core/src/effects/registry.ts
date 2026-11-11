@@ -20,6 +20,10 @@ export interface EffectParamDef {
  * A live, wired effect. `input`/`output` are the chain attachment points
  * (the same node for single-node effects). `applyParams` updates AudioParams
  * in place — the chain never rebuilds for parameter changes.
+ *
+ * The host owns every connection OUT of `output`: when it rewires the chain
+ * it disconnects all of them. Do not connect `output` to anything inside the
+ * effect (a feedback path, say); take such a tap from a node before it.
  */
 export interface NativeEffectInstance {
   input: AudioNode;
@@ -93,7 +97,9 @@ interface RegistryState {
  * dependent pins); with a module-level map an effect registered through one
  * copy would be unknown to hosts using the other.
  */
-const REGISTRY_KEY = Symbol.for('@waveform-playlist/core/effect-registry');
+// Versioned: every copy that shares the state must agree on its shape. A
+// change to `RegistryState` needs a new key.
+const REGISTRY_KEY = Symbol.for('@waveform-playlist/core/effect-registry/v1');
 
 function registryState(): RegistryState {
   const holder = globalThis as unknown as Record<symbol, RegistryState | undefined>;
@@ -227,11 +233,11 @@ export function createEffectInstance(
       '[waveform-playlist] effect "' +
         type +
         '" has a prepare() step that has not completed on this audio context — ' +
-        "await editor.prepareEffect('" +
+        "await prepareEffect('" +
         type +
-        "') (or prepareEffect('" +
+        "', audioContext) before creating it (on <daw-editor>: await editor.prepareEffect('" +
         type +
-        "', audioContext)) before adding it. Original error: " +
+        "') before addEffect). Original error: " +
         (err instanceof Error ? err.message : String(err))
     ) as Error & { cause?: unknown };
     // Keep the original (its name, type and stack) reachable: the hint is a
@@ -239,6 +245,16 @@ export function createEffectInstance(
     hinted.cause = err;
     throw hinted;
   }
-  instance.applyParams(merged);
+  try {
+    instance.applyParams(merged);
+  } catch (err) {
+    // The caller never sees this instance, so nobody else can release it.
+    try {
+      instance.dispose?.();
+    } catch {
+      // The applyParams error is the one to report.
+    }
+    throw err;
+  }
   return { instance, params: merged, wetParam: definition.wetParam };
 }

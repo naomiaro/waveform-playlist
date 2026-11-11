@@ -128,12 +128,12 @@ describe('useDynamicEffects — WAM entries', () => {
     );
   });
 
-  it('native addEffect entries carry kind "native"', () => {
+  it('native addEffect entries carry kind "tone"', () => {
     const { result } = renderHook(() => useDynamicEffects());
     act(() => {
       void result.current.addEffect('reverb');
     });
-    expect(result.current.effects.getSnapshot()[0].kind).toBe('native');
+    expect(result.current.effects.getSnapshot()[0].kind).toBe('tone');
   });
 
   it('removeEffect on a wam entry destroys the plugin', async () => {
@@ -190,8 +190,7 @@ describe('useDynamicEffects — WAM entries', () => {
 
     await expect(addPromise).rejects.toThrow(/unmounted/);
     expect(destroy).toHaveBeenCalled();
-    // Hook already unmounted — result.current is frozen at the last render before
-    // unmount, which never saw the plugin land (the guard fired before setActiveEffects).
+    // The rack was disposed while the plugin was loading: it was never appended.
     expect(result.current.effects.getSnapshot().some((e) => e.kind === 'wam')).toBe(false);
   });
 

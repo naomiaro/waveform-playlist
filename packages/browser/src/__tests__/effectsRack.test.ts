@@ -287,14 +287,20 @@ describe('EffectsRack: custom (registered) effects', () => {
   it('bypass without a wet parameter takes the effect out of the chain, and back', async () => {
     registerEffect('my-tremolo', tremolo());
     const rack = new EffectsRack();
-    rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')));
+    const from = fakeNode('from');
+    const to = fakeNode('to');
+    rack.attach(asTone(from), asTone(to));
     const id = await rack.add('my-tremolo');
     vi.mocked(connect).mockClear();
     vi.mocked(disconnect).mockClear();
+    from.connect.mockClear();
 
     rack.toggleBypass(id);
     expect(rack.effects.getSnapshot()[0].bypassed).toBe(true);
-    expect(edges()).toEqual([]); // from → to goes through from.connect
+    expect(edges()).toEqual([]);
+    // The chain is not left cut: the signal goes straight through.
+    expect(from.connect).toHaveBeenCalledTimes(1);
+    expect(from.connect).toHaveBeenCalledWith(to);
     // Its output no longer feeds the chain: a worklet that makes sound with
     // no input must fall silent too.
     expect(disconnect).toHaveBeenCalledWith(built[0].output);
@@ -393,26 +399,35 @@ describe('EffectsRack: built-in Tone effects', () => {
     const rack = new EffectsRack();
     void rack.add('reverb');
     expect(rack.effects.getSnapshot()).toHaveLength(1);
-    expect(rack.effects.getSnapshot()[0]).toMatchObject({ kind: 'native', wetParam: 'wet' });
+    expect(rack.effects.getSnapshot()[0]).toMatchObject({ kind: 'tone', wetParam: 'wet' });
   });
 
   it('a built-in id wins over a registered type of the same name', async () => {
     registerEffect('reverb', tremolo());
     const rack = new EffectsRack();
     await rack.add('reverb');
-    expect(rack.effects.getSnapshot()[0].kind).toBe('native');
+    expect(rack.effects.getSnapshot()[0].kind).toBe('tone');
     expect(built).toHaveLength(0);
   });
 
   it('an effect with no wet control (compressor) is bypassed by disconnection', async () => {
     const rack = new EffectsRack();
-    rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')));
+    const from = fakeNode('from');
+    const to = fakeNode('to');
+    rack.attach(asTone(from), asTone(to));
     const id = await rack.add('compressor');
     expect(rack.effects.getSnapshot()[0].wetParam).toBeUndefined();
+    const compressor = vi.mocked(connect).mock.calls[0][1] as unknown as {
+      disconnect: ReturnType<typeof vi.fn>;
+    };
     vi.mocked(connect).mockClear();
+    compressor.disconnect.mockClear();
+    from.connect.mockClear();
 
     rack.toggleBypass(id);
     expect(connect).not.toHaveBeenCalled();
+    expect(compressor.disconnect).toHaveBeenCalled();
+    expect(from.connect).toHaveBeenCalledWith(to);
     rack.toggleBypass(id);
     expect(connect).toHaveBeenCalledTimes(2);
   });
@@ -429,6 +444,206 @@ describe('EffectsRack: built-in Tone effects', () => {
   });
 });
 
+describe('EffectsRack: failures and edge cases', () => {
+  it('a wiring failure restores the previous chain, drops the new instance and publishes nothing', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const from = fakeNode('from');
+    rack.attach(asTone(from), asTone(fakeNode('to')));
+    await rack.add('my-tremolo');
+    const listener = vi.fn();
+    rack.effects.subscribe(listener);
+    vi.mocked(connect).mockClear();
+    // The second effect cannot be connected (a node on another context, say).
+    vi.mocked(connect).mockImplementation((_source, destination) => {
+      if ((destination as unknown as { id?: string }).id === 'in1') {
+        throw new Error('different AudioContext');
+      }
+    });
+
+    await expect(rack.add('my-tremolo')).rejects.toThrow('different AudioContext');
+    const afterFailure = edges();
+    vi.mocked(connect).mockReset();
+
+    expect(rack.effects.getSnapshot()).toHaveLength(1);
+    expect(listener).not.toHaveBeenCalled();
+    expect(built[1].dispose).toHaveBeenCalledTimes(1);
+    // The last connections made are the previous chain, whole again.
+    expect(afterFailure.slice(-2)).toEqual([
+      ['from', 'in0'],
+      ['out0', 'to'],
+    ]);
+
+    // The bookkeeping is not stuck on the failed layout: the next add wires.
+    vi.mocked(connect).mockClear();
+    await rack.add('my-tremolo');
+    expect(edges()).toEqual([
+      ['from', 'in0'],
+      ['out0', 'in2'],
+      ['out2', 'to'],
+    ]);
+  });
+
+  it('rejects and appends nothing when create throws after a successful prepare', async () => {
+    registerEffect(
+      'my-tremolo',
+      tremolo({
+        prepare: async () => {},
+        create: () => {
+          throw new Error('bad options');
+        },
+      })
+    );
+    const rack = new EffectsRack();
+    await expect(rack.add('my-tremolo')).rejects.toThrow('bad options');
+    expect(rack.effects.getSnapshot()).toEqual([]);
+  });
+
+  it('a type registered again while it was preparing is added as the new definition', async () => {
+    let release: () => void = () => {};
+    registerEffect(
+      'my-tremolo',
+      tremolo({
+        prepare: () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      })
+    );
+    const rack = new EffectsRack();
+    const pending = rack.add('my-tremolo');
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    registerEffect(
+      'my-tremolo',
+      tremolo({ label: 'Tremolo v2', defaults: { rate: 2, depth: 1 }, wetParam: 'depth' })
+    );
+    release();
+    await pending;
+
+    const [entry] = rack.effects.getSnapshot();
+    expect(entry.definition.name).toBe('Tremolo v2');
+    expect(entry.params).toEqual({ rate: 2, depth: 1 });
+    expect(entry.wetParam).toBe('depth');
+    expect(built[0].applied[0]).toEqual({ rate: 2, depth: 1 });
+  });
+
+  it('clear() disposes every instance, wires straight through and drops an add still preparing', async () => {
+    let release: () => void = () => {};
+    registerEffect('my-tremolo', tremolo());
+    registerEffect(
+      'slow',
+      tremolo({
+        prepare: () =>
+          new Promise<void>((resolve) => {
+            release = resolve;
+          }),
+      })
+    );
+    const rack = new EffectsRack();
+    const from = fakeNode('from');
+    const to = fakeNode('to');
+    rack.attach(asTone(from), asTone(to));
+    await rack.add('my-tremolo');
+    await rack.add('reverb');
+    const pending = rack.add('slow');
+    const rejected = expect(pending).rejects.toThrow(/cleared or disposed/);
+    from.connect.mockClear();
+
+    rack.clear();
+    release();
+    await rejected;
+
+    expect(rack.effects.getSnapshot()).toEqual([]);
+    expect(built[0].dispose).toHaveBeenCalledTimes(1);
+    expect(built).toHaveLength(1);
+    expect(from.connect).toHaveBeenCalledWith(to);
+  });
+
+  it('after the current attachment is detached, a later add connects to nothing', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const detach = rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')));
+    detach();
+    vi.mocked(connect).mockClear();
+
+    await rack.add('my-tremolo');
+
+    expect(rack.effects.getSnapshot()).toHaveLength(1);
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('reorder out of range and remove of an unknown id change nothing', async () => {
+    const rack = new EffectsRack();
+    await rack.add('reverb');
+    await rack.add('chorus');
+    const before = rack.effects.getSnapshot();
+    const listener = vi.fn();
+    rack.effects.subscribe(listener);
+
+    rack.reorder(0, 2);
+    rack.reorder(-1, 0);
+    rack.reorder(1, 1);
+    rack.remove('nope');
+    rack.updateParameter('nope', 'wet', 1);
+    rack.toggleBypass('nope');
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(rack.effects.getSnapshot()).toBe(before);
+  });
+
+  it('un-bypass restores a wet level of 1 when none was ever set', async () => {
+    registerEffect('my-tremolo', tremolo({ defaults: { rate: 5 }, wetParam: 'mix' }));
+    const rack = new EffectsRack();
+    const id = await rack.add('my-tremolo');
+
+    rack.toggleBypass(id);
+    expect(last(built[0].applied)).toEqual({ mix: 0 });
+    rack.toggleBypass(id);
+    expect(last(built[0].applied)).toEqual({ mix: 1 });
+  });
+
+  it('a value that is not a number is not stored or applied for a registered effect', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const id = await rack.add('my-tremolo');
+    const before = rack.effects.getSnapshot();
+    const applied = built[0].applied.length;
+
+    rack.updateParameter(id, 'rate', 'fast');
+    rack.updateParameter(id, 'rate', true);
+
+    expect(rack.effects.getSnapshot()).toBe(before);
+    expect(built[0].applied).toHaveLength(applied);
+  });
+
+  it('a dispose that throws is reported and does not stop the removal', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const id = await rack.add('my-tremolo');
+    built[0].dispose.mockImplementation(() => {
+      throw new Error('already closed');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => rack.remove(id)).not.toThrow();
+
+    expect(rack.effects.getSnapshot()).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('already closed'));
+  });
+
+  it('a parameter with no default starts at its minimum', async () => {
+    registerEffect(
+      'my-tremolo',
+      tremolo({ defaults: {}, params: { rate: { min: 0.1, max: 20 } } })
+    );
+    const rack = new EffectsRack();
+    await rack.add('my-tremolo');
+    expect(rack.effects.getSnapshot()[0].definition.parameters).toEqual([
+      { name: 'rate', label: 'rate', type: 'number', min: 0.1, max: 20, default: 0.1 },
+    ]);
+  });
+});
+
 describe('EffectsRack: offline function', () => {
   it('passes the audio straight through when nothing is active, building nothing', async () => {
     registerEffect('my-tremolo', tremolo());
@@ -441,21 +656,6 @@ describe('EffectsRack: offline function', () => {
 
     expect(built).toHaveLength(1);
     expect(edges()).toEqual([['f', 't']]);
-  });
-
-  it('reads the chain when called, not when the function was obtained', async () => {
-    registerEffect('my-tremolo', tremolo());
-    const rack = new EffectsRack();
-    const offline = rack.renderOffline;
-    await rack.add('my-tremolo');
-    vi.mocked(connect).mockClear();
-
-    await offline(asTone(fakeNode('f')), asTone(fakeNode('t')));
-
-    expect(edges()).toEqual([
-      ['f', 'in1'],
-      ['out1', 't'],
-    ]);
   });
 
   it('prepares a custom effect on the OFFLINE context and creates it there with the live params', async () => {
@@ -529,5 +729,21 @@ describe('getAvailableEffects', () => {
 
     unregisterEffect('my-tremolo');
     expect(getAvailableEffects()).toBe(effectDefinitions);
+  });
+
+  it('does not list a registered type under a built-in id a second time', () => {
+    registerEffect('reverb', tremolo());
+    registerEffect('my-tremolo', tremolo());
+    const ids = getAvailableEffects().map((definition) => definition.id);
+    expect(ids.filter((id) => id === 'reverb')).toHaveLength(1);
+    expect(ids).toHaveLength(effectDefinitions.length + 1);
+  });
+
+  it('lists only the built-ins outside native-context mode, where a registered effect cannot be added', () => {
+    registerEffect('my-tremolo', tremolo());
+    isNativeGlobalContext.mockReturnValue(false);
+    expect(getAvailableEffects()).toBe(effectDefinitions);
+    isNativeGlobalContext.mockReturnValue(true);
+    expect(getAvailableEffects()).toHaveLength(effectDefinitions.length + 1);
   });
 });

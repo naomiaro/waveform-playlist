@@ -17,7 +17,11 @@ export interface UseDynamicEffectsReturn {
    * list changes, so a slider step re-renders that component only.
    */
   effects: ValueSource<ActiveEffect[]>;
-  /** The built-in effects, then every type registered with `registerEffect()`. */
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
 
   /**
@@ -65,8 +69,8 @@ export interface UseDynamicEffectsReturn {
 /**
  * Hook for managing a dynamic chain of audio effects with real-time parameter
  * updates. Everything it returns keeps its identity for the life of the
- * component (`masterEffects` follows `fftSize`; `availableEffects` follows
- * the registry).
+ * component (`masterEffects` follows `fftSize`; `availableEffects` is read from the
+ * registry on each render of the caller).
  */
 export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsReturn {
   const [rack] = useState(() => new EffectsRack());

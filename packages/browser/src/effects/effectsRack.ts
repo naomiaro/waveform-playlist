@@ -33,11 +33,11 @@ export interface ActiveEffect {
   instanceId: string;
   effectId: string;
   /**
-   * 'native' = built-in Tone.js effect; 'wam' = hosted WAM plugin;
+   * 'tone' = built-in Tone.js effect; 'wam' = hosted WAM plugin;
    * 'custom' = a type registered with `registerEffect()` from
    * `@waveform-playlist/core`.
    */
-  kind: 'native' | 'wam' | 'custom';
+  kind: 'tone' | 'wam' | 'custom';
   /** Module URL for wam entries. */
   url?: string;
   definition: EffectDefinition;
@@ -63,6 +63,9 @@ const NATIVE_CONTEXT_HINT =
 
 const NO_EFFECTS: ActiveEffect[] = [];
 
+/** `wiredKey` while the graph is not known to match any list. No list has this key. */
+const UNWIRED = '\u0000unwired';
+
 function message(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -72,7 +75,7 @@ export class EffectsRack {
   private readonly instances = new Map<string, EffectInstance>();
   private attachment: { from: ToneAudioNode; to: ToneAudioNode | AudioNode } | null = null;
   private wiredKey = '';
-  /** Bumped by dispose(): an add that was awaiting across it is dropped. */
+  /** Bumped by clear(): an add that was awaiting across it is dropped. */
   private generation = 0;
 
   /** The effects in chain order. A new array on every change. */
@@ -84,10 +87,29 @@ export class EffectsRack {
     return this.handle.source.getSnapshot();
   }
 
+  /**
+   * Wire the graph for `next` if its topology differs, then publish it. If
+   * the wiring throws (a node on another context, for instance) the previous
+   * list is wired back and nothing is published, so the list always describes
+   * what is connected.
+   */
   private commit(next: ActiveEffect[]): void {
-    const key = chainTopologyKey(next);
-    if (key !== this.wiredKey) {
-      this.wire(next, true);
+    if (chainTopologyKey(next) !== this.wiredKey) {
+      const previous = this.list();
+      try {
+        this.wire(next, true);
+      } catch (err) {
+        try {
+          this.wire(previous, true);
+        } catch (restoreErr) {
+          // wiredKey is UNWIRED now, so the next change wires from scratch.
+          console.warn(
+            '[waveform-playlist] Could not restore an effects chain after a failed change: ' +
+              message(restoreErr)
+          );
+        }
+        throw err;
+      }
     }
     this.handle.publish(next);
   }
@@ -106,10 +128,15 @@ export class EffectsRack {
    * with nothing connected to its input must fall silent as well).
    */
   private wire(effects: ActiveEffect[], rewire: boolean): void {
-    this.wiredKey = chainTopologyKey(effects);
+    const key = chainTopologyKey(effects);
     const attachment = this.attachment;
-    if (!attachment) return;
+    if (!attachment) {
+      this.wiredKey = key;
+      return;
+    }
     const { from, to } = attachment;
+    // Until every connection below is made, the graph matches no list.
+    this.wiredKey = UNWIRED;
 
     if (rewire) {
       try {
@@ -123,14 +150,15 @@ export class EffectsRack {
     const chain = this.audibleInstances(effects);
     if (chain.length === 0) {
       from.connect(to);
-      return;
+    } else {
+      let current: ToneAudioNode | AudioNode = from;
+      for (const instance of chain) {
+        connect(current, instance.input);
+        current = instance.output;
+      }
+      connect(current, to);
     }
-    let current: ToneAudioNode | AudioNode = from;
-    for (const instance of chain) {
-      connect(current, instance.input);
-      current = instance.output;
-    }
-    connect(current, to);
+    this.wiredKey = key;
   }
 
   /**
@@ -162,7 +190,14 @@ export class EffectsRack {
 
   private append(instance: EffectInstance, entry: Omit<ActiveEffect, 'instanceId'>): string {
     this.instances.set(instance.instanceId, instance);
-    this.commit([...this.list(), { ...entry, instanceId: instance.instanceId }]);
+    try {
+      this.commit([...this.list(), { ...entry, instanceId: instance.instanceId }]);
+    } catch (err) {
+      // Not in the list, so nothing else could ever remove or dispose it.
+      this.instances.delete(instance.instanceId);
+      instance.dispose();
+      throw err;
+    }
     return instance.instanceId;
   }
 
@@ -182,7 +217,7 @@ export class EffectsRack {
       const instance = createEffectInstance(builtIn, params);
       return this.append(instance, {
         effectId,
-        kind: 'native',
+        kind: 'tone',
         definition: builtIn,
         params,
         bypassed: false,
@@ -213,17 +248,27 @@ export class EffectsRack {
       throw new Error(
         '[waveform-playlist] addEffect("' +
           effectId +
-          '") aborted: the effects chain was disposed before the effect was ready.'
+          '") aborted: the effects chain was cleared or disposed before the effect was ready.'
       );
     }
-    const instance = createCustomEffectInstance(effectId, audioContext, registered.defaults);
+    // The type may have been registered again during the await. The instance
+    // is created from the current definition, so the entry must describe it.
+    const definition = getEffectDefinitions().get(effectId);
+    if (!definition) {
+      throw new Error(
+        '[waveform-playlist] addEffect("' +
+          effectId +
+          '") aborted: the effect type was unregistered before the effect was ready.'
+      );
+    }
+    const instance = createCustomEffectInstance(effectId, audioContext, definition.defaults);
     return this.append(instance, {
       effectId,
       kind: 'custom',
-      definition: toEffectDefinition(effectId, registered),
-      params: { ...registered.defaults },
+      definition: toEffectDefinition(effectId, definition),
+      params: { ...definition.defaults },
       bypassed: false,
-      ...(registered.wetParam !== undefined ? { wetParam: registered.wetParam } : {}),
+      ...(definition.wetParam !== undefined ? { wetParam: definition.wetParam } : {}),
     });
   };
 
@@ -253,7 +298,7 @@ export class EffectsRack {
         );
       }
       throw new Error(
-        '[waveform-playlist] addWamEffect aborted: the effects chain was disposed (hook unmounted) before the plugin finished loading.'
+        '[waveform-playlist] addWamEffect aborted: the effects chain was cleared or disposed (hook unmounted) before the plugin finished loading.'
       );
     }
     const instance = createWamEffectInstance(plugin);
@@ -293,6 +338,9 @@ export class EffectsRack {
   updateParameter = (instanceId: string, name: string, value: EffectParameterValue): void => {
     const effect = this.list().find((entry) => entry.instanceId === instanceId);
     if (!effect) return;
+    // A registered effect's parameters are numbers. Storing anything else
+    // would show a value the effect is not using.
+    if (effect.kind === 'custom' && typeof value !== 'number') return;
     // The wet level of an effect bypassed in place is stored, not applied:
     // applying it would make the bypassed effect audible.
     if (!(effect.bypassed && name === effect.wetParam)) {
@@ -341,21 +389,25 @@ export class EffectsRack {
     this.commit(next);
   };
 
-  /** Remove and dispose every effect. */
+  /**
+   * Remove and dispose every effect. An add that is still waiting (a
+   * registered effect's `prepare`, a WAM plugin loading) is dropped too: its
+   * promise rejects and nothing is appended after the clear.
+   */
   clear = (): void => {
+    this.generation++;
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
     if (this.list().length > 0) this.commit(NO_EFFECTS);
   };
 
   /**
-   * For the owner going away: clear(), and drop any add still in flight. The
-   * list and the instances go together, so a remount (StrictMode, an
-   * `<Activity>` shown again) never finds entries whose instances are gone.
-   * The rack stays usable.
+   * For the owner going away: the same as clear(). The list and the
+   * instances go together, so a remount (StrictMode, an `<Activity>` shown
+   * again) never finds entries whose instances are gone. The rack stays
+   * usable.
    */
   dispose = (): void => {
-    this.generation++;
     this.clear();
   };
 
@@ -370,7 +422,7 @@ export class EffectsRack {
   renderOffline: OfflineRackFunction = async (from, to) => {
     // Bypassed entries are left out offline whichever way they are bypassed.
     const entries = this.list().filter((effect) => !effect.bypassed);
-    if (entries.some((effect) => effect.kind !== 'native') && !isNativeGlobalContext()) {
+    if (entries.some((effect) => effect.kind !== 'tone') && !isNativeGlobalContext()) {
       throw new Error(
         '[waveform-playlist] WAV export with WAM or custom effects requires a native AudioContext. ' +
           NATIVE_CONTEXT_HINT

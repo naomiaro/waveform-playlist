@@ -106,6 +106,28 @@ describe('effect registry', () => {
   });
 });
 
+describe('createEffectInstance', () => {
+  it('disposes the instance when applying its initial params throws', () => {
+    const dispose = vi.fn();
+    registerEffect(
+      'custom-boost',
+      boost({
+        create: () => ({
+          input: {} as AudioNode,
+          output: {} as AudioNode,
+          applyParams: () => {
+            throw new Error('bad param');
+          },
+          dispose,
+        }),
+      })
+    );
+
+    expect(() => createEffectInstance('custom-boost', mockAudioContext())).toThrow('bad param');
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('prepareEffect', () => {
   function registerWorkletEffect(prepare: (ctx: BaseAudioContext) => Promise<void>) {
     registerEffect('worklet-fx', boost({ prepare }));
@@ -142,6 +164,31 @@ describe('prepareEffect', () => {
     await expect(prepareEffect('worklet-fx', ctx)).rejects.toBe(boom);
     await expect(prepareEffect('worklet-fx', ctx)).resolves.toBeUndefined();
     expect(prepare).toHaveBeenCalledTimes(2);
+  });
+
+  it('a failed prepare of an old definition does not forget the newer one', async () => {
+    let failFirst: (err: Error) => void = () => {};
+    const first = vi.fn(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          failFirst = reject;
+        })
+    );
+    const second = vi.fn(async () => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ctx = mockAudioContext();
+
+    registerWorkletEffect(first);
+    const stale = prepareEffect('worklet-fx', ctx);
+    registerWorkletEffect(second);
+    await prepareEffect('worklet-fx', ctx);
+    failFirst(new Error('old module 404'));
+    await expect(stale).rejects.toThrow('old module 404');
+
+    // The newer definition's record survived the old one's failure.
+    expect(needsPrepare('worklet-fx', ctx)).toBe(false);
+    await prepareEffect('worklet-fx', ctx);
+    expect(second).toHaveBeenCalledTimes(1);
   });
 
   it('a prepare that throws synchronously rejects instead of throwing', async () => {

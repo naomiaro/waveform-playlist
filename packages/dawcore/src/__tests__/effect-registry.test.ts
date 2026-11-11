@@ -6,6 +6,7 @@ import {
   prepareEffect,
   needsPrepare,
   ensureEffectPrepared,
+  unregisterEffect,
 } from '@waveform-playlist/core';
 import { _resetEffectRegistryForTests } from '../effects/effect-registry';
 
@@ -217,6 +218,26 @@ describe('effect registry', () => {
     const defs = getEffectDefinitions();
     defs.delete('native-gain');
     expect(getEffectDefinitions().has('native-gain')).toBe(true);
+  });
+});
+
+// The registry is shared (core): an app can register under a built-in's name
+// before this package loads, and the module can be evaluated more than once.
+describe('built-in registration', () => {
+  it('does not overwrite a type the app registered first, and does not warn', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const mine = { ...getEffectDefinitions().get('native-gain')!, label: 'My Gain' };
+    unregisterEffect('native-gain');
+    registerEffect('native-gain', mine);
+    unregisterEffect('native-delay');
+
+    vi.resetModules();
+    await import('../effects/effect-registry');
+
+    expect(getEffectDefinitions().get('native-gain')).toBe(mine);
+    // A built-in that was missing is registered by the second evaluation.
+    expect(getEffectDefinitions().has('native-delay')).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

@@ -129,8 +129,19 @@ function biquadDefinition(spec: BiquadFilterSpec): NativeEffectDefinition {
   };
 }
 
+/**
+ * Built-ins yield to whatever is already registered under their name: an app
+ * may have registered its own `native-gain` through core before this module
+ * loaded, and loading the module twice (HMR) must not warn about overwrites.
+ */
+function registerBuiltIn(type: string, definition: NativeEffectDefinition): void {
+  if (!getEffectDefinitions().has(type)) {
+    registerEffect(type, definition);
+  }
+}
+
 function registerBuiltIns(): void {
-  registerEffect('native-gain', {
+  registerBuiltIn('native-gain', {
     label: 'Gain',
     category: 'dynamics',
     defaults: { gain: 1 },
@@ -144,10 +155,10 @@ function registerBuiltIns(): void {
   });
 
   for (const [type, definition] of Object.entries(BIQUAD_FILTERS)) {
-    registerEffect(type, biquadDefinition(definition));
+    registerBuiltIn(type, biquadDefinition(definition));
   }
 
-  registerEffect('native-compressor', {
+  registerBuiltIn('native-compressor', {
     label: 'Compressor',
     category: 'dynamics',
     defaults: { threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25 },
@@ -170,7 +181,7 @@ function registerBuiltIns(): void {
     },
   });
 
-  registerEffect('native-stereo-panner', {
+  registerBuiltIn('native-stereo-panner', {
     label: 'Stereo Panner',
     category: 'spatial',
     defaults: { pan: 0 },
@@ -183,7 +194,7 @@ function registerBuiltIns(): void {
     },
   });
 
-  registerEffect('native-delay', {
+  registerBuiltIn('native-delay', {
     label: 'Delay',
     category: 'delay',
     defaults: { delayTime: 0.25, feedback: 0.4, wet: 0.35 },

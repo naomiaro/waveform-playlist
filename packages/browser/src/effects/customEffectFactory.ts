@@ -7,6 +7,7 @@
  */
 import { connect, disconnect } from 'tone';
 import type { InputNode } from 'tone';
+import { isNativeGlobalContext } from '@waveform-playlist/playout';
 import {
   createEffectInstance as createRegisteredEffect,
   getEffectDefinitions,
@@ -64,11 +65,14 @@ export function toEffectDefinition(
 let availableCache: { custom: EffectDefinition[]; list: EffectDefinition[] } | null = null;
 
 /**
- * The built-in effects followed by every registered custom effect. Returns
- * the same array until the registry changes, so it is safe to read during
- * render.
+ * The effects that can be added right now: the built-in effects, followed by
+ * every registered custom effect when the app is in native-context mode (a
+ * registered effect cannot be added without it). Returns the same array until
+ * that set changes, so it is safe to read during render. It is a read, not a
+ * subscription: a type registered later appears the next time this is called.
  */
 export function getAvailableEffects(): EffectDefinition[] {
+  if (!isNativeGlobalContext()) return effectDefinitions;
   const custom: EffectDefinition[] = [];
   getEffectDefinitions().forEach((definition, type) => {
     if (!getEffectDefinition(type)) custom.push(toEffectDefinition(type, definition));

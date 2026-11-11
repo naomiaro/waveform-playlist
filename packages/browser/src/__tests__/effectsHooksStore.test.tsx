@@ -67,7 +67,7 @@ vi.mock('tone', () => {
 });
 
 import React, { StrictMode, useEffect } from 'react';
-import { connect } from 'tone';
+import { connect, disconnect } from 'tone';
 import type { Gain, ToneAudioNode, Volume } from 'tone';
 import { registerEffect, unregisterEffect, getEffectDefinitions } from '@waveform-playlist/core';
 import { useDynamicEffects } from '../hooks/useDynamicEffects';
@@ -209,6 +209,7 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
 
   it('under StrictMode an effect added on mount ends up in the list exactly once, with its instance', async () => {
     registerBoost();
+    const aborted: string[] = [];
     let api: ReturnType<typeof useDynamicEffects> | undefined;
     function Root() {
       const fx = useDynamicEffects();
@@ -216,8 +217,9 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
       const { addEffect } = fx;
       useEffect(() => {
         void addEffect('reverb');
-        addEffect('my-boost').catch(() => {
+        addEffect('my-boost').catch((err: unknown) => {
           // The first (discarded) mount's add is dropped by the cleanup.
+          aborted.push(String(err));
         });
       }, [addEffect]);
       return null;
@@ -230,6 +232,9 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
       );
     });
 
+    // Proof that the effects really ran twice: the first mount's add was dropped.
+    expect(aborted).toHaveLength(1);
+    expect(aborted[0]).toMatch(/cleared or disposed/);
     const list = api!.effects.getSnapshot();
     expect(list.map((e) => e.effectId).sort()).toEqual(['my-boost', 'reverb']);
     // Every listed entry has a live instance: wiring them reaches each one.
@@ -238,6 +243,54 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
       api!.masterEffects(node('master') as Volume, node('destination') as ToneAudioNode, false);
     });
     expect(connect).toHaveBeenCalledTimes(3);
+  });
+
+  it('the master effects cleanup detaches the chain and disposes the analyser', async () => {
+    registerBoost();
+    const { result } = renderHook(() => useDynamicEffects());
+    await act(async () => {
+      await result.current.addEffect('my-boost');
+    });
+    let cleanup: void | (() => void);
+    act(() => {
+      cleanup = result.current.masterEffects(
+        node('master') as Volume,
+        node('destination') as ToneAudioNode,
+        false
+      );
+    });
+    const analyser = result.current.analyserRef.current as unknown as {
+      dispose: ReturnType<typeof vi.fn>;
+    };
+    expect(analyser).not.toBeNull();
+    vi.mocked(disconnect).mockClear();
+
+    act(() => (cleanup as () => void)());
+
+    // The chain tail is cut from that analyser, which is then disposed.
+    expect(vi.mocked(disconnect).mock.calls.some((call) => (call[1] as unknown) === analyser)).toBe(
+      true
+    );
+    expect(analyser.dispose).toHaveBeenCalledTimes(1);
+    expect(result.current.analyserRef.current).toBeNull();
+    // Detached: a later change connects to nothing.
+    vi.mocked(connect).mockClear();
+    await act(async () => {
+      await result.current.addEffect('reverb');
+    });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
+  it('clearAllEffects empties the chain and disposes its instances', async () => {
+    registerBoost();
+    const { result } = renderHook(() => useDynamicEffects());
+    await act(async () => {
+      await result.current.addEffect('my-boost');
+      await result.current.addEffect('reverb');
+    });
+    act(() => result.current.clearAllEffects());
+    expect(result.current.effects.getSnapshot()).toEqual([]);
+    expect(disposeNative).toHaveBeenCalledTimes(1);
   });
 
   it('unmount disposes the instances and empties the list', async () => {
@@ -312,6 +365,40 @@ describe('useTrackDynamicEffects: one source per track', () => {
     act(() => result.current.removeEffectFromTrack('t1', boost));
     expect(ids()).toEqual(['reverb']);
     expect(disposeNative).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearTrackEffects empties that track only', async () => {
+    const { result } = renderHook(() => useTrackDynamicEffects());
+    await act(async () => {
+      await result.current.addEffectToTrack('t1', 'reverb');
+      await result.current.addEffectToTrack('t2', 'chorus');
+    });
+    act(() => result.current.clearTrackEffects('t1'));
+    expect(result.current.getTrackEffects('t1').getSnapshot()).toEqual([]);
+    expect(result.current.getTrackEffects('t2').getSnapshot()).toHaveLength(1);
+  });
+
+  it('the offline function obtained before a change renders the chain as it is at export', async () => {
+    registerBoost();
+    const { result } = renderHook(() => useTrackDynamicEffects());
+    const offline = result.current.createOfflineTrackEffectsFunction('t1');
+    await act(async () => {
+      await result.current.addEffectToTrack('t1', 'my-boost');
+    });
+    const offlineContext = {
+      createGain: vi.fn(() => ({ gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() })),
+    };
+    const trackInput = {
+      name: 'offlineInput',
+      context: { rawContext: offlineContext },
+    } as unknown as Gain;
+    vi.mocked(connect).mockClear();
+
+    await offline(trackInput, node('offlineFader') as ToneAudioNode, true);
+
+    // input → boost → fader: the effect added after `offline` was obtained.
+    expect(offlineContext.createGain).toHaveBeenCalledTimes(1);
+    expect(connect).toHaveBeenCalledTimes(2);
   });
 
   it('returns the same offline function for the same track', () => {

@@ -22,7 +22,7 @@ import { loadWamModule } from './loadWam';
 /** Structural subset of ActiveEffect / TrackActiveEffect used offline. */
 export interface OfflineChainEntry {
   instanceId: string;
-  kind: 'native' | 'wam' | 'custom';
+  kind: 'tone' | 'wam' | 'custom';
   definition: EffectDefinition;
   params: Record<string, number | string | boolean>;
 }
@@ -46,7 +46,7 @@ export async function buildOfflineChain(
   };
   try {
     for (const entry of entries) {
-      if (entry.kind === 'native') {
+      if (entry.kind === 'tone') {
         instances.push(createEffectInstance(entry.definition, entry.params));
         continue;
       }

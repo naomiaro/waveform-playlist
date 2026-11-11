@@ -70,7 +70,7 @@ function nativeEntry(id: string, effectId: string): OfflineChainEntry {
   definition.parameters.forEach((p) => {
     params[p.name] = p.default;
   });
-  return { instanceId: id, kind: 'native', definition, params };
+  return { instanceId: id, kind: 'tone', definition, params };
 }
 
 function wamEntry(id: string): OfflineChainEntry {
@@ -120,9 +120,9 @@ describe('buildOfflineChain / connectOfflineChain', () => {
     expect(calls).toHaveLength(3);
     expect(calls[0][0]).toBe(from);
     expect(calls[0][1]).toBe(instances[0].input);
-    expect(calls[1][0]).toBe(instances[0].input);
+    expect(calls[1][0]).toBe(instances[0].output);
     expect(calls[1][1]).toBe(instances[1].input);
-    expect(calls[2][0]).toBe(instances[1].input);
+    expect(calls[2][0]).toBe(instances[1].output);
     expect(calls[2][1]).toBe(to);
   });
 

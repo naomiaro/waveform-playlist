@@ -122,13 +122,13 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     );
   });
 
-  it('native addEffectToTrack entries carry kind "native"', () => {
+  it('native addEffectToTrack entries carry kind "tone"', () => {
     const { result } = renderHook(() => useTrackDynamicEffects());
     act(() => {
       void result.current.addEffectToTrack('t1', 'reverb');
     });
     const entries = result.current.getTrackEffects('t1').getSnapshot();
-    expect(entries[0]?.kind).toBe('native');
+    expect(entries[0]?.kind).toBe('tone');
   });
 
   it('removeEffectFromTrack destroys the wam plugin', async () => {

@@ -63,7 +63,11 @@ export interface UseTrackDynamicEffectsReturn {
    */
   createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction;
 
-  /** The built-in effects, then every type registered with `registerEffect()`. */
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
 }
 
@@ -76,7 +80,7 @@ interface TrackRacks {
 /**
  * Hook for managing effects per track. Each track has its own chain.
  * Everything it returns keeps its identity for the life of the component
- * (`availableEffects` follows the registry).
+ * (`availableEffects` is read from the registry on each render of the caller).
  */
 export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   const [store] = useState<TrackRacks>(() => ({
