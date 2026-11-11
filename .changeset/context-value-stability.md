@@ -6,4 +6,4 @@ Keep the provider's context values stable across renders. `usePlaylistControls()
 
 Also fixes dropped updates: two of `setTrackMute` / `setTrackSolo` / `setTrackVolume` / `setTrackPan` called in the same batch previously kept only the last one.
 
-Behaviour change: a track setter called with an index that has no track state yet (for example while tracks are still loading) is now ignored instead of creating a partial state entry.
+The default track controls are now disabled while their track is still loading (no mixer state yet, e.g. under `deferEngineRebuild`), instead of accepting clicks that could not take effect. A track setter called for such a track is ignored. The volume and pan sliders gain `aria-label`s ("Volume", "Pan") and the Mute/Solo buttons expose `aria-pressed`.

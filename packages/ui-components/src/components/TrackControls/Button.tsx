@@ -26,6 +26,11 @@ export const Button = styled.button.attrs({
     box-shadow 0.15s ease-in-out;
   cursor: pointer;
 
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   ${(props) => {
     if (props.$variant === 'danger') {
       return `

@@ -259,6 +259,9 @@ interface DefaultTrackControlsProps {
   trackCount: number;
   /** Attach to the drag grip element (the `handleRef` from SortableTrackControls). */
   gripRef?: (element: Element | null) => void;
+  /** True while the track has no mixer state yet (still loading): the mixer
+   *  and reorder controls cannot take effect, so they render disabled. */
+  disabled: boolean;
 }
 
 /**
@@ -285,6 +288,7 @@ function DefaultTrackControls({
   reorderTrack,
   trackCount,
   gripRef,
+  disabled,
 }: DefaultTrackControlsProps) {
   return (
     <Controls
@@ -331,12 +335,16 @@ function DefaultTrackControls({
       <ButtonGroup>
         <Button
           $variant={trackState.muted ? 'danger' : 'outline'}
+          aria-pressed={trackState.muted}
+          disabled={disabled}
           onClick={() => setTrackMute(trackIndex, !trackState.muted)}
         >
           Mute
         </Button>
         <Button
           $variant={trackState.soloed ? 'info' : 'outline'}
+          aria-pressed={trackState.soloed}
+          disabled={disabled}
           onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
         >
           Solo
@@ -349,6 +357,8 @@ function DefaultTrackControls({
           max="1"
           step="0.01"
           value={trackState.volume}
+          aria-label="Volume"
+          disabled={disabled}
           onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
         />
         <VolumeUpIcon />
@@ -360,6 +370,8 @@ function DefaultTrackControls({
           max="1"
           step="0.01"
           value={trackState.pan}
+          aria-label="Pan"
+          disabled={disabled}
           onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
         />
         <span>R</span>
@@ -369,8 +381,8 @@ function DefaultTrackControls({
           style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)' }}
           gripRef={gripRef as React.Ref<HTMLButtonElement>}
           onGripClick={(e) => e.stopPropagation()}
-          upDisabled={trackIndex === 0}
-          downDisabled={trackIndex === trackCount - 1}
+          upDisabled={disabled || trackIndex === 0}
+          downDisabled={disabled || trackIndex === trackCount - 1}
           onMoveUp={(e) => {
             e.stopPropagation();
             reorderTrack(track.id, trackIndex - 1);
@@ -753,6 +765,10 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
               trackReordering,
               reorderTrack,
               trackCount: peaksDataArray.length,
+              // No mixer state yet means the provider is still loading this
+              // track (deferEngineRebuild): the engine does not know it, so a
+              // mute/solo/volume/pan change could not take effect.
+              disabled: trackStates[trackIndex] === undefined,
             };
 
             const trackControlContent = renderTrackControls ? (
