@@ -126,7 +126,7 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
   const totalCount = configs.length;
 
   // For immediate mode: store loaded AudioBuffers by config index
-  const [loadedBuffers, setLoadedBuffers] = useState<Map<number, AudioBuffer>>(new Map());
+  const [loadedBuffers, setLoadedBuffers] = useState<Map<number, AudioBuffer>>(() => new Map());
 
   // Stable track/clip IDs across rebuilds (immediate mode)
   const stableIdsRef = useRef<Map<number, { trackId: string; clipId: string }>>(new Map());

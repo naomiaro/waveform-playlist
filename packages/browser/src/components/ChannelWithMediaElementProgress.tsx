@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import {
   SmartChannel,
@@ -21,13 +21,18 @@ interface BackgroundProps {
   readonly $width: number;
 }
 
-const Background = styled.div<BackgroundProps>`
+// Geometry and colour go through .attrs() as inline styles: interpolated in the
+// template they generate one CSS class per distinct value (every zoom step).
+const Background = styled.div.attrs<BackgroundProps>((props) => ({
+  style: {
+    top: `${props.$top}px`,
+    width: `${props.$width}px`,
+    height: `${props.$height}px`,
+    background: props.$color,
+  },
+}))<BackgroundProps>`
   position: absolute;
-  top: ${(props) => props.$top}px;
   left: 0;
-  width: ${(props) => props.$width}px;
-  height: ${(props) => props.$height}px;
-  background: ${(props) => props.$color};
   z-index: 0;
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -37,17 +42,25 @@ interface ProgressOverlayProps {
   readonly $color: string;
   readonly $height: number;
   readonly $top: number;
+  readonly $width: number;
 }
 
-const ProgressOverlay = styled.div<ProgressOverlayProps>`
+const ProgressOverlay = styled.div.attrs<ProgressOverlayProps>((props) => ({
+  style: {
+    top: `${props.$top}px`,
+    width: `${props.$width}px`,
+    height: `${props.$height}px`,
+    background: props.$color,
+    transform: 'scaleX(0)',
+  },
+}))<ProgressOverlayProps>`
   position: absolute;
-  top: ${(props) => props.$top}px;
   left: 0;
-  height: ${(props) => props.$height}px;
-  background: ${(props) => props.$color};
   pointer-events: none;
   z-index: 1;
-  will-change: width;
+  transform-origin: left;
+  /* scaleX changes are composite-only (GPU) — no layout reflow per frame */
+  will-change: transform;
 `;
 
 const ChannelContainer = styled.div`
@@ -82,82 +95,48 @@ export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementPr
 
   const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
 
-  useEffect(() => {
-    const updateProgress = () => {
-      if (progressRef.current) {
-        // Get current time from the ref
-        const currentTime = currentTimeRef.current ?? 0;
+  const channelWidth = smartChannelProps.length;
 
-        // Convert current time to samples
-        const currentSample = currentTime * sampleRate;
-
-        // Calculate clip bounds in samples
-        const clipEndSample = clipStartSample + clipDurationSamples;
-
-        // Calculate how much of this clip has been played
-        let progressWidth = 0;
-
-        if (currentSample <= clipStartSample) {
-          // Playhead is before this clip - no progress
-          progressWidth = 0;
-        } else if (currentSample >= clipEndSample) {
-          // Playhead is past this clip - full progress
-          progressWidth = smartChannelProps.length;
-        } else {
-          // Playhead is within this clip - partial progress
-          const playedSamples = currentSample - clipStartSample;
-          progressWidth = Math.floor(playedSamples / samplesPerPixel);
-        }
-
-        progressRef.current.style.width = `${progressWidth}px`;
-      }
-
-      if (isPlaying) {
-        animationFrameRef.current = requestAnimationFrame(updateProgress);
-      }
-    };
-
-    if (isPlaying) {
-      animationFrameRef.current = requestAnimationFrame(updateProgress);
-    } else {
-      // When stopped, update once to show final position
-      updateProgress();
-    }
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
+  // Played fraction of the channel, 0..1. The overlay is as wide as the channel
+  // and scaled horizontally, so a frame changes only its transform.
+  const computeRatio = useCallback(() => {
+    const currentSample = (currentTimeRef.current ?? 0) * sampleRate;
+    if (channelWidth <= 0 || currentSample <= clipStartSample) return 0;
+    if (currentSample >= clipStartSample + clipDurationSamples) return 1;
+    const playedPixels = (currentSample - clipStartSample) / samplesPerPixel;
+    return Math.min(1, playedPixels / channelWidth);
   }, [
-    isPlaying,
+    currentTimeRef,
     sampleRate,
     samplesPerPixel,
     clipStartSample,
     clipDurationSamples,
-    smartChannelProps.length,
-    currentTimeRef,
+    channelWidth,
   ]);
 
-  // Also update when not playing (for seeks, stops, etc.)
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    const updateProgress = () => {
+      if (progressRef.current) {
+        progressRef.current.style.transform = `scaleX(${computeRatio()})`;
+      }
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+    };
+    animationFrameRef.current = requestAnimationFrame(updateProgress);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, [isPlaying, computeRatio]);
+
+  // When not playing, update after every render (seeks, stops, zoom changes).
   useEffect(() => {
     if (!isPlaying && progressRef.current) {
-      const currentTime = currentTimeRef.current ?? 0;
-      const currentSample = currentTime * sampleRate;
-      const clipEndSample = clipStartSample + clipDurationSamples;
-
-      let progressWidth = 0;
-      if (currentSample <= clipStartSample) {
-        progressWidth = 0;
-      } else if (currentSample >= clipEndSample) {
-        progressWidth = smartChannelProps.length;
-      } else {
-        const playedSamples = currentSample - clipStartSample;
-        progressWidth = Math.floor(playedSamples / samplesPerPixel);
-      }
-
-      progressRef.current.style.width = `${progressWidth}px`;
+      progressRef.current.style.transform = `scaleX(${computeRatio()})`;
     }
   });
 
@@ -180,13 +159,14 @@ export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementPr
         $color={backgroundCss}
         $height={waveHeight}
         $top={smartChannelProps.index * waveHeight}
-        $width={smartChannelProps.length}
+        $width={channelWidth}
       />
       <ProgressOverlay
         ref={progressRef}
         $color={progressColor}
         $height={waveHeight}
         $top={smartChannelProps.index * waveHeight}
+        $width={channelWidth}
       />
       <ChannelContainer>
         <SmartChannel {...smartChannelProps} isSelected={true} transparentBackground />

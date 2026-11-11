@@ -1,6 +1,7 @@
 import React, {
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useMemo,
@@ -549,13 +550,36 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
+  const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
+
   const handleScrollContainerRef = useCallback(
     (element: HTMLDivElement | null) => {
       scrollContainerRef.current = element;
+      setScrollContainerElement(element);
       setScrollContainer(element);
     },
     [setScrollContainer]
   );
+
+  // Fill the visible scroll container when requested — indefinitePlayback
+  // implies it (endless playback needs an endless-looking timeline);
+  // fillViewport requests the layout alone.
+  const fillsContainer = indefinitePlayback || fillViewport;
+
+  // The container's width is state, measured in a layout effect (so the first
+  // paint already fills it) and kept current by a ResizeObserver. Reading
+  // clientWidth in the render body instead forced layout on every render while
+  // recording, was 0 on the first render and never followed a container resize.
+  const [scrollContainerWidth, setScrollContainerWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (!fillsContainer || !scrollContainerElement) return;
+    const measure = () => setScrollContainerWidth(scrollContainerElement.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(scrollContainerElement);
+    return () => observer.disconnect();
+  }, [fillsContainer, scrollContainerElement]);
 
   // Calculate dimensions — derive duration directly from tracks prop to prevent width
   // shift. The `duration` state is set in an effect and lags tracks by at least one render.
@@ -572,12 +596,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         ? duration
         : DEFAULT_EMPTY_TRACK_DURATION;
 
-  // Fill the visible scroll container when requested — indefinitePlayback
-  // implies it (endless playback needs an endless-looking timeline);
-  // fillViewport requests the layout alone.
-  if (indefinitePlayback || fillViewport) {
-    const containerWidth = scrollContainerRef.current?.clientWidth ?? 0;
-    const minContainerDuration = (containerWidth * samplesPerPixel) / sampleRate;
+  if (fillsContainer) {
+    const minContainerDuration = (scrollContainerWidth * samplesPerPixel) / sampleRate;
     displayDuration = Math.max(displayDuration, minContainerDuration);
   }
 

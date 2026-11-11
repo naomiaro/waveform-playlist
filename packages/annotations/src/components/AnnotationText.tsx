@@ -168,26 +168,6 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   renderAnnotationItem,
 }) => {
   const activeAnnotationRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const prevActiveIdRef = useRef<string | undefined>(undefined);
-
-  // Track component renders and scroll position
-  useEffect(() => {
-    // Render tracking removed
-  });
-
-  // Track scroll changes
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      // Scroll tracking removed
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
 
   // Auto-scroll to active annotation when it changes
   useEffect(() => {
@@ -199,8 +179,6 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
         container: scrollActiveContainer,
       } as ScrollIntoViewOptions);
     }
-
-    prevActiveIdRef.current = activeAnnotationId;
   }, [activeAnnotationId, shouldScrollToActive, scrollActivePosition, scrollActiveContainer]);
 
   const formatTime = (seconds: number): string => {
@@ -254,7 +232,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   };
 
   return (
-    <Container ref={containerRef} $height={height}>
+    <Container $height={height}>
       {annotations.map((annotation, index) => {
         const isActive = annotation.id === activeAnnotationId;
         const handleClick = () => onAnnotationClick?.(annotation);

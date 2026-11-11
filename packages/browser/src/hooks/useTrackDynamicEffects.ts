@@ -76,7 +76,7 @@ export interface UseTrackDynamicEffectsReturn {
 export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
   // Track effects state per track (for UI)
   const [trackEffectsState, setTrackEffectsState] = useState<Map<string, TrackActiveEffect[]>>(
-    new Map()
+    () => new Map()
   );
 
   // Track effect instances per track (for audio processing)

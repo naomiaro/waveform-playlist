@@ -93,3 +93,53 @@ A function that already connected its last node to the second argument needs no 
 - `toneTrack.connectEffects(node)` → `toneTrack.connectEffects(input, output)`.
 
 The [effects guide](./guides/effects.md#track-signal-chain-and-panning) describes the new signal chain.
+
+## `PlayoutProvider`, `usePlayoutStatus` and `usePlayoutStatusUpdate` are removed
+
+**Package:** `@waveform-playlist/ui-components`.
+
+These three exports were a standalone playback-status context (`progress`, `isPlaying`, `selectionStart`, `selectionEnd` and their setters) left over from before the playlist providers existed. Nothing in Waveform Playlist read or wrote it, so it never reflected real playback.
+
+**Find:** `PlayoutProvider`, `usePlayoutStatus` or `usePlayoutStatusUpdate` imported from `@waveform-playlist/ui-components`.
+
+**Replace with:** the hooks of the provider you already render, from `@waveform-playlist/browser`. Delete the `<PlayoutProvider>` wrapper.
+
+| Removed | Inside `WaveformPlaylistProvider` | Inside `MediaElementPlaylistProvider` |
+| --- | --- | --- |
+| `usePlayoutStatus().isPlaying` | `usePlaybackAnimation().isPlaying` | `useMediaElementAnimation().isPlaying` |
+| `usePlayoutStatus().progress` | `usePlaybackAnimation().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
+| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `usePlaylistState().selectionStart` / `.selectionEnd` | no selection in this provider |
+| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()` | `useMediaElementControls().play()` / `.pause()` |
+| `usePlayoutStatusUpdate().setProgress(t)` | `usePlaylistControls().seekTo(t)` | `useMediaElementControls().seekTo(t)` |
+| `usePlayoutStatusUpdate().setSelection(start, end)` | `usePlaylistControls().setSelection(start, end)` | no selection in this provider |
+
+```tsx
+// Before
+import { PlayoutProvider, usePlayoutStatus } from '@waveform-playlist/ui-components';
+
+function Status() {
+  const { isPlaying, selectionStart, selectionEnd } = usePlayoutStatus();
+  // ...
+}
+
+// After
+import { usePlaybackAnimation, usePlaylistState } from '@waveform-playlist/browser';
+
+function Status() {
+  const { isPlaying } = usePlaybackAnimation();
+  const { selectionStart, selectionEnd } = usePlaylistState();
+  // ...
+}
+```
+
+If you used the context on its own, without a playlist provider, to hold your own state, replace it with a React context of your own; there is no drop-in export.
+
+## `TimeInput` reports a change only after an edit
+
+**Packages:** `@waveform-playlist/ui-components` (`TimeInput`, `SelectionTimeInputs`), `@waveform-playlist/browser` (`SelectionTimeInputs`).
+
+`TimeInput` used to call `onChange` on every blur, with the displayed text parsed back to a number. Moving focus through the input without typing therefore rounded the value to the display format (a selection start of `1.23456` became `1.235`). `onChange` now fires on blur only if the text was edited. `SelectionTimeInputs` calls `onSelectionChange` under the same condition.
+
+**Find:** `onChange` handlers on `<TimeInput>` and `onSelectionChange` handlers on `<SelectionTimeInputs>` that rely on being called when the input merely loses focus.
+
+**Replace with:** an `onBlur` listener on a wrapping element if you need to know that focus left. No change is needed if the handler only stores the value.

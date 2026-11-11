@@ -20,6 +20,7 @@ import type { PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
 import { useShallowStable } from './hooks/useShallowStable';
+import { createAnnotationLookup } from './utils/annotationLookup';
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -226,6 +227,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Ref for animation loop (avoids restarting loop on annotation change)
   const annotationsRef = useRef<AnnotationData[]>(annotations);
   annotationsRef.current = annotations;
+  // Per-frame lookups for the animation loop (cached; see annotationLookup.ts)
+  const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
 
   const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
   const [continuousPlay, setContinuousPlayState] = useState(
@@ -387,9 +390,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       // Handle annotation playback
       const currentAnnotations = annotationsRef.current;
       if (currentAnnotations.length > 0) {
-        const currentAnnotation = currentAnnotations.find(
-          (ann) => time >= ann.start && time < ann.end
-        );
+        const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
         if (continuousPlayRef.current) {
           if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
@@ -401,8 +402,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           }
         } else {
           if (activeAnnotationIdRef.current) {
-            const activeAnnotation = currentAnnotations.find(
-              (ann) => ann.id === activeAnnotationIdRef.current
+            const activeAnnotation = annotationLookup.byId(
+              currentAnnotations,
+              activeAnnotationIdRef.current
             );
             if (activeAnnotation && time >= activeAnnotation.end) {
               playoutRef.current?.stop();
@@ -430,7 +432,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     };
 
     startAnimationFrameLoop(updateTime);
-  }, [setActiveAnnotationId, sampleRate, startAnimationFrameLoop]);
+  }, [setActiveAnnotationId, sampleRate, startAnimationFrameLoop, annotationLookup]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 

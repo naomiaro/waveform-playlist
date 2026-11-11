@@ -56,7 +56,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   // State
   const [trackSpectrogramOverrides, setTrackSpectrogramOverrides] = useState<
     Map<string, TrackSpectrogramOverrides>
-  >(new Map());
+  >(() => new Map());
 
   // OffscreenCanvas registry for worker-rendered spectrograms
   const spectrogramCanvasRegistryRef = useRef<

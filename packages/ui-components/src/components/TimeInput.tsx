@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { formatTime, parseTime, type TimeFormat } from '../utils/timeFormat';
 import { BaseInput, ScreenReaderOnly } from '../styled/index';
 
@@ -16,7 +16,8 @@ export interface TimeInputProps {
  * TimeInput - A styled input for time values with format support
  *
  * Uses BaseInput for consistent theming. Displays time in the specified
- * format and parses user input on blur.
+ * format and parses user input on blur. `onChange` fires only when the text
+ * was edited, so moving focus through the input never rounds the value.
  */
 export const TimeInput: React.FC<TimeInputProps> = ({
   id,
@@ -27,27 +28,25 @@ export const TimeInput: React.FC<TimeInputProps> = ({
   onChange,
   readOnly = false,
 }) => {
-  const [displayValue, setDisplayValue] = useState('');
-
-  // Update display value when value or format changes
-  useEffect(() => {
-    const formatted = formatTime(value, format);
-    setDisplayValue(formatted);
-  }, [value, format, id]);
+  // Only an in-progress edit is state; otherwise the display is derived from the props.
+  // The draft remembers the format it was typed in: text typed as hh:mm:ss must not
+  // be parsed as seconds, so a format change abandons the edit.
+  const [draft, setDraft] = useState<{ text: string; format: TimeFormat } | null>(null);
+  const activeDraft = draft?.format === format ? draft : null;
+  const displayValue = activeDraft?.text ?? formatTime(value, format);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newDisplayValue = e.target.value;
-    setDisplayValue(newDisplayValue);
+    setDraft({ text: e.target.value, format });
   };
 
   const handleBlur = () => {
-    // Parse the display value and notify parent
-    if (onChange) {
-      const parsedValue = parseTime(displayValue, format);
-      onChange(parsedValue);
-    }
-    // Re-format to ensure consistent display
-    setDisplayValue(formatTime(value, format));
+    if (draft === null) return;
+    // Dropping the draft returns the display to the formatted prop; the parent
+    // decides whether the parsed value becomes the new prop.
+    setDraft(null);
+    // Nothing was typed in this format, so there is nothing to report.
+    if (activeDraft === null) return;
+    onChange?.(parseTime(activeDraft.text, format));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
