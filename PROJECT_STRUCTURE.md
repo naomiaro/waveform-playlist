@@ -103,15 +103,14 @@ All clip positions and durations are stored as **integer sample counts** (not fl
 interface AudioClip {
   id: string;
   audioBuffer: AudioBuffer;
-  startSample: number; // Position on timeline (samples)
-  durationSamples: number; // Clip duration (samples)
-  offsetSamples: number; // Trim start position (samples)
+  startSample: number;        // Position on timeline (samples)
+  durationSamples: number;    // Clip duration (samples)
+  offsetSamples: number;      // Trim start position (samples)
   // ...
 }
 ```
 
 **Why samples instead of seconds?**
-
 - ✅ Eliminates floating-point precision errors
 - ✅ Perfect pixel alignment in rendering (no 1-pixel gaps)
 - ✅ Mathematically exact calculations (all integers)
@@ -119,11 +118,10 @@ interface AudioClip {
 
 **User-Facing API:**
 Users can still create clips using seconds via `createClipFromSeconds()` helper:
-
 ```typescript
 const clip = createClipFromSeconds({
   audioBuffer,
-  startTime: 5.0, // Converted to samples internally
+  startTime: 5.0,    // Converted to samples internally
   duration: 10.0,
   offset: 2.5,
 });
@@ -241,8 +239,8 @@ const clip = createClipFromSeconds({
   - **Pattern:** Components access theme via `props.theme.propertyName` in styled components
     ```typescript
     const Header = styled.div`
-      background: ${(props) => props.theme.clipHeaderBackgroundColor};
-      color: ${(props) => props.theme.clipHeaderTextColor};
+      background: ${props => props.theme.clipHeaderBackgroundColor};
+      color: ${props => props.theme.clipHeaderTextColor};
     `;
     ```
   - **Benefits:**
@@ -416,14 +414,12 @@ The browser package includes utilities for loading pre-computed waveform data in
 **Location:** `packages/browser/src/waveformDataLoader.ts`
 
 **Functions:**
-
 - `loadWaveformData(src)` - Load .dat or .json waveform file, returns WaveformData instance
 - `waveformDataToPeaks(waveformData, channelIndex)` - Convert to our Peaks format (Int8Array/Int16Array)
 - `loadPeaksFromWaveformData(src, channelIndex)` - Combined load + convert
 - `getWaveformDataMetadata(src)` - Get metadata without full conversion
 
 **Generating BBC Peaks:**
-
 ```bash
 # Install audiowaveform (macOS)
 brew install audiowaveform
@@ -491,7 +487,6 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Tech:** React, AudioWorklet (via `@waveform-playlist/worklets`)
 - **Install:** `npm install @waveform-playlist/recording` (auto-installs `@waveform-playlist/worklets`)
 - **Structure:**
-
   ```
   src/
   ├── hooks/             # Custom hooks
@@ -587,7 +582,6 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Browser package defines `SpectrogramIntegrationContext` (nullable)
   - Spectrogram package provides `SpectrogramProvider` that fills this context
   - When no provider present, all spectrogram features are skipped (zero runtime cost)
-
   ```typescript
   // With spectrogram:
   <WaveformPlaylistProvider tracks={tracks}>
@@ -601,7 +595,6 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
     <Waveform />
   </WaveformPlaylistProvider>
   ```
-
 - **Peer Dependencies:** React, @waveform-playlist/browser
 - **Example:** `website/src/components/examples/MirSpectrogramExample.tsx`
 
@@ -741,7 +734,6 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 ```
 
 **Engine State Flow:**
-
 ```
 Hook calls engine method (e.g., engine.moveClip())
     ↓
@@ -799,9 +791,9 @@ export interface PlaybackAnimationContextValue {
   isPlaying: boolean;
   currentTime: number;
   currentTimeRef: React.RefObject<number>;
-  playbackStartTimeRef: React.RefObject<number>; // context.currentTime when playback started
-  audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
-  getPlaybackTime: () => number; // Current time from engine (auto-wraps at loops)
+  playbackStartTimeRef: React.RefObject<number>;   // context.currentTime when playback started
+  audioStartPositionRef: React.RefObject<number>;   // Audio position when playback started
+  getPlaybackTime: () => number;                     // Current time from engine (auto-wraps at loops)
 }
 
 // 2. User interaction state - UI components (includes engine-mirrored state)
@@ -818,7 +810,7 @@ export interface PlaylistStateContextValue {
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
-  indefinitePlayback: boolean; // Whether playback continues past end of audio
+  indefinitePlayback: boolean;       // Whether playback continues past end of audio
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -1196,9 +1188,8 @@ const trackConfigs = [
 **Two-Phase Loading:**
 
 1. **Step 1:** Load all audio files once, store in Map by ID
-
    ```typescript
-   const fileBuffers = new Map(loadedFiles.map((f) => [f.id, f.buffer]));
+   const fileBuffers = new Map(loadedFiles.map(f => [f.id, f.buffer]));
    ```
 
 2. **Step 2:** Create tracks by referencing loaded buffers via `fileId`
@@ -1207,7 +1198,6 @@ const trackConfigs = [
    ```
 
 **Benefits:**
-
 - ✅ Each audio file loaded only once
 - ✅ Multiple clips can reference the same file without reloading
 - ✅ Easy to copy/paste clip configurations
@@ -1329,7 +1319,9 @@ function MyPlaylist() {
 **Option 2: Individual Hooks (Advanced)**
 
 ```typescript
-import { useTimeFormat } from '@waveform-playlist/browser/hooks';
+import {
+  useTimeFormat,
+} from "@waveform-playlist/browser/hooks";
 
 const { formatTime } = useTimeFormat();
 ```
@@ -1352,12 +1344,12 @@ See `website/src/components/examples/` for 20 complete examples covering minimal
 
 ### Data Attributes
 
-| Attribute               | Purpose                   |
-| ----------------------- | ------------------------- |
-| `data-clip-id`          | Draggable clip headers    |
-| `data-boundary-edge`    | Trim handles (left/right) |
-| `data-clip-container`   | Clip wrapper              |
-| `data-scroll-container` | Playhead click target     |
+| Attribute | Purpose |
+|-----------|---------|
+| `data-clip-id` | Draggable clip headers |
+| `data-boundary-edge` | Trim handles (left/right) |
+| `data-clip-container` | Clip wrapper |
+| `data-scroll-container` | Playhead click target |
 
 ### pointer-events Architecture
 
