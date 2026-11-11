@@ -69,6 +69,13 @@ const examples = [
     icon: <GaugeIcon weight="light" aria-hidden="true" />,
   },
   {
+    title: 'Media Element Annotations',
+    description: 'Streamed audio. Synced text. No decode.',
+    path: 'media-element-annotations',
+    category: 'tools',
+    icon: <TextAaIcon weight="light" aria-hidden="true" />,
+  },
+  {
     title: 'Effects',
     description: 'Transform. Distort. Elevate.',
     path: 'effects',
