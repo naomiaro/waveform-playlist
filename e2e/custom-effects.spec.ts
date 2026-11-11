@@ -211,10 +211,17 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
     const entry = rack.getByRole('group', { name: TREMOLO });
     await expect(entry).toBeVisible();
 
+    // The audio is 16 seconds long and playback stops at its end. Checked
+    // first in every block below, so that a run slow enough to get there
+    // fails by saying so, not with "no signal".
+    const pause = page.getByRole('button', { name: 'Pause' });
+    const stillPlaying = () => expect(pause).toBeEnabled({ timeout: 500 });
+
     await page.getByRole('button', { name: 'Play' }).click();
     // The mix passes through the worklet node while it is in the chain, and
     // on to the destination.
     await expect(async () => {
+      await stillPlaying();
       expect(await tremoloOutputRms(page)).toBeGreaterThan(0.01);
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 15_000 });
@@ -223,6 +230,7 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
     // dry mix is still heard (the bypass did not cut the chain).
     await entry.getByRole('button', { name: 'On', exact: true }).click();
     await expect(async () => {
+      await stillPlaying();
       expect(await tremoloOutputRms(page)).toBe(0);
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 10_000 });
@@ -232,19 +240,27 @@ test.describe('Custom effects (registerEffect) in the React hooks', () => {
     await expect(entry.getByRole('button', { name: 'On', exact: true })).toBeVisible();
     await waitForFreshAudio(page);
     await expect(async () => {
+      await stillPlaying();
       expect(await tremoloOutputRms(page)).toBeGreaterThan(0.01);
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 15_000 });
 
-    // Removed: the mix is still heard. Read only audio from after the removal.
+    // Removed: nothing leaves the node any more, and the mix is still heard.
+    // Read only audio from after the removal.
     await entry.getByRole('button', { name: 'Remove' }).click();
     await expect(entry).toHaveCount(0);
     await waitForFreshAudio(page);
     await expect(async () => {
+      await stillPlaying();
+      expect(await tremoloOutputRms(page)).toBe(0);
       expect(await outputRms(page)).toBeGreaterThan(0.01);
     }).toPass({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Stop' }).click();
+    // Stop has taken effect, and a round trip to the page after it means
+    // every console message logged before now has been delivered.
+    await expect(page.getByRole('button', { name: 'Play' })).toBeEnabled();
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
     expect(errors).toEqual([]);
   });
 
