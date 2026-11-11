@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { usePlaybackAnimation, usePlaylistControls } from '../WaveformPlaylistContext';
+import { usePlayFromSelectionOrCursor } from './usePlayFromSelectionOrCursor';
 import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts';
 
 export interface UsePlaybackShortcutsOptions {
@@ -63,6 +64,8 @@ export const usePlaybackShortcuts = (
 
   const { isPlaying } = usePlaybackAnimation();
   const { setCurrentTime, play, pause, stop } = usePlaylistControls();
+  // Space starts playback exactly as the Play button does.
+  const playFromSelectionOrCursor = usePlayFromSelectionOrCursor();
 
   /**
    * Toggle between play and pause.
@@ -71,9 +74,11 @@ export const usePlaybackShortcuts = (
     if (isPlaying) {
       pause();
     } else {
-      play();
+      playFromSelectionOrCursor().catch((err) => {
+        console.warn('[waveform-playlist] Playback failed to start: ' + String(err));
+      });
     }
-  }, [isPlaying, play, pause]);
+  }, [isPlaying, playFromSelectionOrCursor, pause]);
 
   /**
    * Stop playback and return to start position.

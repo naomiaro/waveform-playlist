@@ -589,6 +589,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
+  // True while the bounded play in progress is the highlighted selection itself
+  // (its start and end are the selection's). Set by play(). Selection playback
+  // ignores continuous play; anything else, including an annotation clicked
+  // while a selection is highlighted elsewhere, follows it.
+  const isSelectionPlayRef = useRef(false);
   const {
     isLoopEnabled,
     loopStart,
@@ -1433,12 +1438,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         cb(frameData);
       }
 
-      // Handle annotation playback based on continuous play mode
+      // Handle annotation playback based on continuous play mode.
+      // Skipped on the frame that reaches a bounded play's end: the end check
+      // below stops there, and the active annotation must not move on first.
       const currentAnnotations = annotationsRef.current;
-      if (currentAnnotations.length > 0) {
+      const reachedBoundedEnd =
+        playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current;
+      if (currentAnnotations.length > 0 && !reachedBoundedEnd) {
         const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
-        if (continuousPlayRef.current) {
+        // Playing the selection takes continuous play out of the picture:
+        // playback is not cut at annotation boundaries, whichever way the
+        // toggle is set. The active annotation still follows the playhead.
+        if (continuousPlayRef.current || isSelectionPlayRef.current) {
           // Continuous play ON: update active annotation, let audio play to the end
           if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
             setActiveAnnotationId(currentAnnotation.id);
@@ -1534,15 +1546,28 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
-  // Restart animation loop and reschedule playout when continuousPlay changes during playback
-  // This ensures the loop always has the current continuousPlay value
-  // and removes duration limits when switching to continuous play
+  // Two jobs, during playback only:
+  //  - restart the animation loop whenever its closure changes (e.g. `duration`),
+  //    so the running loop always has current values;
+  //  - when continuous play is switched ON, reschedule the audio without an end,
+  //    so it runs past the annotation it was bounded to.
+  // The reschedule is tied to that false -> true transition, not to the current
+  // value: this effect also runs when playback starts and when the loop is
+  // rebuilt, and with continuous play already on those used to stop and restart
+  // the audio as well (every Play started twice; a duration change restarted it).
+  //
+  // While the selection is what is playing, continuous play has no effect at
+  // all: the loop does not cut playback at annotation boundaries (see the loop)
+  // and switching the toggle reschedules nothing.
+  const prevContinuousPlayRef = useRef(continuousPlay);
   useEffect(() => {
+    const continuousPlayTurnedOn =
+      continuousPlay && !prevContinuousPlayRef.current && !isSelectionPlayRef.current;
+    prevContinuousPlayRef.current = continuousPlay;
+
     const reschedulePlayback = async () => {
       if (isPlaying && animationFrameRef.current && engineRef.current) {
-        // When toggling continuous play ON, reschedule playout without duration limit
-        // so audio continues past the current annotation boundary
-        if (continuousPlay) {
+        if (continuousPlayTurnedOn) {
           const currentPos = currentTimeRef.current;
 
           // Stop current playout (which may have duration limit + pause callback).
@@ -1557,11 +1582,26 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           playbackStartTimeRef.current = timeNow;
           audioStartPositionRef.current = currentPos;
 
-          // Play without duration - will play to end of track
-          engineRef.current.play(currentPos);
+          // What continuous play removes is the end of the annotation being
+          // played. Only an end that IS the active annotation's end is dropped
+          // (the loop's own end check with it, or it would stop playback there
+          // anyway). Any other bounded play, such as a programmatic
+          // play(start, duration), keeps its end.
+          const boundedEnd = playbackEndTimeRef.current;
+          const activeId = activeAnnotationIdRef.current;
+          const activeAnnotation = activeId
+            ? annotationLookup.byId(annotationsRef.current, activeId)
+            : undefined;
+          const endsWithAnnotation =
+            boundedEnd !== null &&
+            activeAnnotation !== undefined &&
+            Math.abs(boundedEnd - activeAnnotation.end) < 1e-6;
+          const endTime = endsWithAnnotation ? null : boundedEnd;
+          playbackEndTimeRef.current = endTime;
+          engineRef.current.play(currentPos, endTime ?? undefined);
           startAnimationLoop();
         } else {
-          // Just restart animation loop for continuous play OFF
+          // Nothing about the audio changed: only refresh the loop.
           stopAnimationLoop();
           startAnimationLoop();
         }
@@ -1580,6 +1620,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     stopAnimationLoop,
     animationFrameRef,
     getAudioContextTime,
+    annotationLookup,
   ]);
 
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
@@ -1627,6 +1668,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     async (startTime?: number, playDuration?: number) => {
       const actualStartTime = startTime ?? currentTimeRef.current;
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
+
+      // Is this the highlighted selection being played, start to end?
+      const selectionStartNow = selectionStartRef.current ?? 0;
+      const selectionEndNow = selectionEndRef.current ?? 0;
+      isSelectionPlayRef.current =
+        endTime !== undefined &&
+        selectionEndNow > selectionStartNow &&
+        Math.abs(actualStartTime - selectionStartNow) < 1e-6 &&
+        Math.abs(endTime - selectionEndNow) < 1e-6;
       const requestId = ++playRequestIdRef.current;
 
       const engine = engineRef.current;
@@ -1714,7 +1764,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [startAnimationLoop, stopAnimationLoop, setCurrentTimeRefs, getAudioContextTime]
+    [
+      startAnimationLoop,
+      stopAnimationLoop,
+      setCurrentTimeRefs,
+      getAudioContextTime,
+      selectionStartRef,
+      selectionEndRef,
+    ]
   );
 
   const pause = useCallback(() => {

@@ -212,7 +212,7 @@ interface PlaybackAnimationContextValue {
 
 ```typescript
 interface PlaylistStateContextValue {
-  continuousPlay: boolean;
+  continuousPlay: boolean;             // annotation playback: off = stop at the annotation's end, on = continue. No effect on selection playback (Play/Space with a selection plays it start to end)
   linkEndpoints: boolean;
   annotationsEditable: boolean;
   isAutomaticScroll: boolean;
@@ -1071,6 +1071,7 @@ interface KeyboardShortcut {
 
 function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybackShortcutsReturn;
 // Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind)
+// Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor
 // A shortcut is skipped when the focused control uses the key itself, however it got focus:
 //   - input (every type, incl. range and checkbox), textarea, select, contenteditable: every key
 //   - Escape while a modal <dialog> or [aria-modal="true"] is open

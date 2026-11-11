@@ -6,25 +6,12 @@ import {
   usePlaylistControls,
   usePlaylistData,
 } from '../WaveformPlaylistContext';
+import { usePlayFromSelectionOrCursor } from '../hooks/usePlayFromSelectionOrCursor';
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
-  const { selectionStart, selectionEnd, isLoopEnabled } = usePlaylistState();
-  const { play } = usePlaylistControls();
-
-  const handleClick = async () => {
-    const hasSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
-
-    if (hasSelection && !isLoopEnabled) {
-      // Without loop: Play selection region only, then stop
-      const duration = selectionEnd - selectionStart;
-      await play(selectionStart, duration);
-    } else {
-      // With loop or no selection: Play from current cursor position.
-      // Transport loop handles boundaries when loop is enabled.
-      await play(currentTimeRef.current ?? 0);
-    }
-  };
+  const { isPlaying } = usePlaybackAnimation();
+  // Shared with the Space shortcut: the selection if one is highlighted, else the cursor.
+  const handleClick = usePlayFromSelectionOrCursor();
 
   return (
     <BaseControlButton onClick={handleClick} disabled={isPlaying} className={className}>
