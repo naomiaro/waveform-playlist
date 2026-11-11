@@ -367,6 +367,16 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when `duration` state updates, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
 
+## Shortcuts Yield to the Focused Control (#710)
+
+`handleKeyboardEvent` (core) skips a shortcut when `keyBelongsToFocusedControl(event)`: text `input`/`textarea`/`select`/contenteditable keep every key; `Escape` belongs to an open modal `<dialog>` or `aria-modal` container, on the composed path OR anywhere in the document (clicking the dialog's padding leaves focus on `<body>`); `Space`/`Enter` belong to a focused native `<button>`, `<a href>` or `<summary>`, and every key to a focused non-text `<input>` (range, checkbox), while it is keyboard-operated. A control focused by a pointer click or drag does not keep `Space`/`Enter`, so click-Mute-then-Space and drag-volume-then-Space still play.
+
+- Before this, `preventDefault` on the keydown blocked the button's own activation: a keyboard user could not press a focused Mute with Space, and Escape could not close the spectrogram settings modal.
+- Pointer-vs-keyboard is tracked by core's `observeFocusSource(document)` (capture `pointerdown`/`keydown`/`focusin`, ref-counted), started by `useKeyboardShortcuts` in its effect. Any `pointerdown` ends keyboard mode for the focused element, including one whose default is prevented (a clip drag does not move focus). Without an observer every focused button keeps its keys.
+- `:focus-visible` cannot do this job: Chromium makes the focused element match it as soon as any key is pressed, including the keydown being handled. Found when the "click, then Space" e2e test failed.
+- ARIA-role-only widgets (`role="button"` divs: dnd-kit clip headers and sortable handles, which only have a `PointerSensor`) are deliberately NOT covered; yielding to them would make Space dead on a Tab-focused clip header.
+- Covered by core's `keyboard.test.ts` and `e2e/keyboard-focus.spec.ts`.
+
 ## jsdom Keyboard Event Testing Quirks
 
 - `new KeyboardEvent()` has `target: null` in jsdom — use `Object.defineProperty(event, 'target', { value: document.body })` when calling handlers directly (not via `dispatchEvent`)
