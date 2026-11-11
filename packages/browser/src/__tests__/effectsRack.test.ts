@@ -145,6 +145,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('EffectsRack: custom (registered) effects', () => {
@@ -447,6 +448,96 @@ describe('EffectsRack: failures and edge cases', () => {
     ]);
   });
 
+  it('a remove whose rewire fails changes nothing: the effect stays, alive and listed', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')));
+    const first = await rack.add('my-tremolo');
+    await rack.add('my-tremolo');
+    const before = rack.effects.getSnapshot();
+    vi.mocked(connect).mockClear();
+    // Wiring the chain without the first effect fails once.
+    vi.mocked(connect).mockImplementationOnce(() => {
+      throw new Error('cannot connect');
+    });
+
+    expect(() => rack.remove(first)).toThrow('cannot connect');
+
+    expect(rack.effects.getSnapshot()).toBe(before);
+    expect(built[0].dispose).not.toHaveBeenCalled();
+    // The restored graph is the listed chain, both effects in it.
+    expect(edges().slice(-3)).toEqual([
+      ['from', 'in0'],
+      ['out0', 'in1'],
+      ['out1', 'to'],
+    ]);
+
+    // A second attempt goes through.
+    rack.remove(first);
+    expect(rack.effects.getSnapshot()).toHaveLength(1);
+    expect(built[0].dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('clear() always ends empty, even when the graph cannot be rewired', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const from = fakeNode('from');
+    rack.attach(asTone(from), asTone(fakeNode('to')));
+    await rack.add('my-tremolo');
+    from.connect.mockImplementation(() => {
+      throw new Error('dead node');
+    });
+
+    expect(() => rack.clear()).toThrow('dead node');
+
+    expect(rack.effects.getSnapshot()).toEqual([]);
+    expect(built[0].dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('when even the restore fails, the next change wires the whole chain again', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')));
+    const first = await rack.add('my-tremolo');
+    await rack.add('my-tremolo');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(connect).mockImplementation(() => {
+      throw new Error('context closed');
+    });
+
+    expect(() => rack.reorder(0, 1)).toThrow('context closed');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Could not restore'));
+    vi.mocked(connect).mockReset();
+
+    // A parameter change never rewires a chain that is wired. This one is
+    // not: the graph was left cut, and the rack knows it.
+    rack.updateParameter(first, 'rate', 9);
+
+    expect(edges()).toEqual([
+      ['from', 'in0'],
+      ['out0', 'in1'],
+      ['out1', 'to'],
+    ]);
+  });
+
+  it('an attach that cannot be wired is not kept', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    await rack.add('my-tremolo');
+    vi.mocked(connect).mockImplementationOnce(() => {
+      throw new Error('different AudioContext');
+    });
+
+    expect(() => rack.attach(asTone(fakeNode('from')), asTone(fakeNode('to')))).toThrow(
+      'different AudioContext'
+    );
+    vi.mocked(connect).mockClear();
+
+    // Not attached: a later change connects to nothing.
+    await rack.add('my-tremolo');
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('rejects and appends nothing when create throws after a successful prepare', async () => {
     registerEffect(
       'my-tremolo',
@@ -529,6 +620,7 @@ describe('EffectsRack: failures and edge cases', () => {
     // A stand-in for FinalizationRegistry: collection cannot be forced here.
     const registered: Array<{ target: object; held: unknown }> = [];
     let onCollected: (held: unknown) => void = () => {};
+    // Restored by afterEach (vi.unstubAllGlobals), also when an assertion fails.
     vi.stubGlobal(
       'FinalizationRegistry',
       class {
@@ -555,7 +647,6 @@ describe('EffectsRack: failures and edge cases', () => {
     onCollected(registered[0].held);
 
     expect(built[0].dispose).toHaveBeenCalledTimes(1);
-    vi.unstubAllGlobals();
   });
 
   it('after the current attachment is detached, a later add connects to nothing', async () => {

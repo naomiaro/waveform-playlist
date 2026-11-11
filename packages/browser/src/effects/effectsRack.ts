@@ -207,8 +207,17 @@ export class EffectsRack {
    * removes its own edges.
    */
   attach = (from: ToneAudioNode, to: ToneAudioNode | AudioNode): (() => void) => {
+    const previous = this.attachment;
     this.attachment = { from, to };
-    this.wire(this.list(), false);
+    try {
+      this.wire(this.list(), false);
+    } catch (err) {
+      // The caller gets no detach function, so the rack must not keep wiring
+      // into these nodes.
+      this.attachment = previous;
+      this.wiredKey = UNWIRED;
+      throw err;
+    }
     return () => {
       // Effect instances outlive the nodes they are attached to (a track is
       // rebuilt, its effects are not). Without this each rebuild would leave
@@ -364,13 +373,16 @@ export class EffectsRack {
   };
 
   remove = (instanceId: string): void => {
+    const next = this.list().filter((effect) => effect.instanceId !== instanceId);
+    // Rewire first, dispose after: if the rewire throws, the previous chain
+    // is restored with this instance still alive in it, and the list still
+    // describes what is connected.
+    if (next.length !== this.list().length) this.commit(next);
     const instance = this.instances.get(instanceId);
     if (instance) {
-      instance.dispose();
       this.instances.delete(instanceId);
+      instance.dispose();
     }
-    const next = this.list().filter((effect) => effect.instanceId !== instanceId);
-    if (next.length !== this.list().length) this.commit(next);
   };
 
   /** Set a parameter on the live effect. Never rewires the chain. */
@@ -435,9 +447,25 @@ export class EffectsRack {
    */
   clear = (): void => {
     this.generation++;
+    let failure: unknown;
+    let failed = false;
+    try {
+      // Rewire to the empty chain while the instances are still alive.
+      if (this.list().length > 0) this.commit(NO_EFFECTS);
+    } catch (err) {
+      failed = true;
+      failure = err;
+    }
     this.instances.forEach((instance) => instance.dispose());
     this.instances.clear();
-    if (this.list().length > 0) this.commit(NO_EFFECTS);
+    if (failed) {
+      // clear() is the way out of a broken chain, so it always ends empty:
+      // the instances are gone whatever the graph did, and the list says so.
+      // The next change wires from scratch.
+      this.wiredKey = UNWIRED;
+      this.handle.publish(NO_EFFECTS);
+      throw failure;
+    }
   };
 
   /**
