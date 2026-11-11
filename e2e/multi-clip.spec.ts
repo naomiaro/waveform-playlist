@@ -486,6 +486,27 @@ test.describe('Multi-Clip Example', () => {
       await expectSelection(box!.x, 300);
     });
 
+    test('the secondary mouse button does not start a selection', async ({ page }) => {
+      const row = page.locator('[data-track-row]').first();
+      await expect(row).toBeVisible();
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await row.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const y = box!.y + box!.height - 10;
+
+      await page.mouse.move(box!.x + 300, y);
+      await page.mouse.down({ button: 'right' });
+      await page.mouse.move(box!.x + 500, y, { steps: 5 });
+      await page.mouse.up({ button: 'right' });
+      // Moves afterwards, no button held.
+      await page.mouse.move(box!.x + 600, y, { steps: 5 });
+      await page.waitForTimeout(200);
+
+      await expect(page.locator('[data-selection]')).toHaveCount(0);
+    });
+
     test('clip z-index is lower than playhead z-index', async ({ page }) => {
       // Selection should render above clips but below playhead
       // We verify clips have lower z-index than playhead as a proxy for correct layering

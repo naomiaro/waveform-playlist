@@ -296,6 +296,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   );
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Primary button only: a right-click opens the context menu and its
+    // release may never be delivered.
+    if (e.button !== 0) return;
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
     const x = e.clientX - rect.left;
     const clickTime = (x * samplesPerPixel) / sampleRate;
@@ -344,8 +347,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   // overlay clamp to its ends.
   const dragTimeAt = (clientX: number): number | null => {
     const element = dragElementRef.current;
-    if (!element) return null;
-    return (clampedOffsetX(element, clientX) * samplesPerPixel) / sampleRate;
+    const x = element ? clampedOffsetX(element, clientX) : null;
+    return x === null ? null : (x * samplesPerPixel) / sampleRate;
   };
 
   const handleDragMove = (e: MouseEvent) => {

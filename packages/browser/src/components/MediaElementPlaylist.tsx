@@ -188,6 +188,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      // Primary button only: a right-click opens the context menu and its
+      // release may never be delivered.
+      if (e.button !== 0) return;
       const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
       const x = e.clientX - rect.left;
       const clickTime = (x * samplesPerPixel) / sampleRate;
@@ -207,8 +210,8 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   // released anywhere. Positions outside the overlay clamp to its ends.
   const dragTimeAt = (clientX: number): number | null => {
     const element = dragElementRef.current;
-    if (!element) return null;
-    return (clampedOffsetX(element, clientX) * samplesPerPixel) / sampleRate;
+    const x = element ? clampedOffsetX(element, clientX) : null;
+    return x === null ? null : (x * samplesPerPixel) / sampleRate;
   };
 
   const handleDragMove = (e: MouseEvent) => {
@@ -240,8 +243,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     const endTime = dragTimeAt(e.clientX);
     if (endTime === null) return;
 
-    const start = Math.min(selectionStart, endTime);
-    const end = Math.max(selectionStart, endTime);
+    const anchor = mouseDownTimeRef.current;
+    const start = Math.min(anchor, endTime);
+    const end = Math.max(anchor, endTime);
 
     // If it's just a click (not a drag), seek to that position
     if (Math.abs(end - start) < 0.1) {
