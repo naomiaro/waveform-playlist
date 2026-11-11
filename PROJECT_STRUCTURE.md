@@ -655,7 +655,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Move uses incremental deltas with `skipAdapter` (60fps); trim accumulates delta and calls engine once on drop
 - **Effects Chain (`src/effects/`):**
   - `effects-chain-controller.ts` — `EffectsChainController`, an ordered effect chain wired between owned input/output gain nodes; chain operations (add/remove/move/bypass) are kind-agnostic (`'native' | 'wam'`)
-  - `effect-registry.ts` — `registerEffect` / `getEffectDefinitions` / `createEffectInstance` with five `native-*` built-in effects (BaseAudioContext nodes)
+  - `effect-registry.ts` — the `native-*` built-in effects (BaseAudioContext nodes), registered on import through the shared registry in `@waveform-playlist/core` (`packages/core/src/effects/registry.ts`: `registerEffect` / `getEffectDefinitions` / `prepareEffect` / `createEffectInstance`, also used by the React effects hooks)
   - `effects-manager.ts` — `EffectsManager`, per-editor ownership of the master chain + per-track chains, wiring into the transport's `connectTrackEffects` (pre-fader track insert) / `connectMasterOutput` hooks, GUI lifecycle cache, persistence (`getEffectsState()` / `setEffectsState()`), and the WAM transport bridge
   - `optional-modules.ts` — dynamic imports of the optional `@dawcore/wam` / `@dawcore/faust` peers with install-hint rethrow (the `@dawcore/midi` pattern)
   - Element API: `addEffect` / `addWamPlugin(url)` / `addFaustEffect(dspCode)` / `removeEffect` / `setEffectParams` / `setEffectBypassed` / `moveEffect` / `openEffectGui` / `closeEffectGui` on `<daw-editor>` (master chain) and `<daw-track>` (delegates to the editor); `daw-effect-*` events
