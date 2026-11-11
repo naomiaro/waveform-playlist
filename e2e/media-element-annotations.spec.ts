@@ -56,14 +56,13 @@ test.describe('Media Element Annotations Example', () => {
     const box4 = page.locator('[data-scroll-container]').getByText('4', { exact: true });
 
     // First show that time advances on this page: with continuous play off the
-    // same box stops by itself. Without this, "still playing" below would also
+    // same box (annotation 4, 2.68 seconds long) stops by itself. Without this, "still playing" below would also
     // hold for audio that never started.
     await continuousPlay.uncheck();
     await box4.click();
     await expect(pause).toBeEnabled({ timeout: 10000 });
     await expect(play).toBeEnabled({ timeout: 10000 });
 
-    // Annotation 4 is 2.68 seconds long.
     await continuousPlay.check();
     await box4.click();
     await expect(pause).toBeEnabled({ timeout: 10000 });
