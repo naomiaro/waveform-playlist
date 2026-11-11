@@ -110,7 +110,7 @@ export const TrackMenu: React.FC<TrackMenuProps> = ({ items: itemsProp }) => {
       });
     };
 
-    // Refine once the dropdown has mounted and has actual dimensions
+    // Measure again on the next frame, once the dropdown has been laid out
     scheduleUpdate();
 
     // Capture phase: scroll events don't bubble, and the scrolling ancestor may be

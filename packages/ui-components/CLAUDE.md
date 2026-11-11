@@ -188,7 +188,7 @@ Firefox enforces a `will-change` memory budget of 3× document surface area. Onl
 - Opens to the **right** of the trigger button (not below) since controls column is narrow
 - Falls back to left if viewport edge reached
 - `window.addEventListener('scroll', handler, { capture: true, passive: true })` — capture phase catches scrolls from any ancestor, not just window
-- Scroll, resize and the post-open refinement (dropdown ref is null on first render) share one `requestAnimationFrame` slot: at most one `getBoundingClientRect()` per frame, cancelled on close
+- Scroll, resize and the post-open refinement (dropdown ref is null on first render) share one `requestAnimationFrame` slot, cancelled on close: scroll and resize measure at most once per frame (the open itself measures synchronously as well)
 - `top`/`left` go through `.attrs()` as inline style (#696) — never interpolate them in the template
 - **Never put function-derived `items` in effect deps** — `itemsProp(close)` creates a new array each render, causing infinite `setState` → render → effect loops
 - Escape key closes the menu

@@ -127,6 +127,18 @@ describe('TrackMenu position', () => {
     });
   });
 
+  it('cancels a pending measurement and stops listening when unmounted while open', () => {
+    const { measure, unmount } = openMenu();
+    fireEvent.scroll(window);
+    measure.mockClear();
+
+    unmount();
+    flushFrames();
+    fireEvent.scroll(window);
+    flushFrames();
+    expect(measure).not.toHaveBeenCalled();
+  });
+
   it('cancels a pending measurement when the menu closes', () => {
     const { button, measure } = openMenu();
     fireEvent.scroll(window);
