@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import type { UseDynamicEffectsReturn } from '@waveform-playlist/browser';
+import { useActiveEffects, type UseDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 import { EffectSelector } from './EffectSelector';
 import { EffectPanel } from './EffectPanel';
 
@@ -83,7 +83,7 @@ export const EffectRack: React.FC<EffectRackProps> = ({
   title = 'Master Effects Chain',
 }) => {
   const {
-    activeEffects,
+    effects,
     availableEffects,
     addEffect,
     removeEffect,
@@ -91,6 +91,9 @@ export const EffectRack: React.FC<EffectRackProps> = ({
     toggleBypass,
     clearAllEffects,
   } = effectsManager;
+  // The only component that follows the master chain: a slider step
+  // re-renders this rack, not the page.
+  const activeEffects = useActiveEffects(effects);
 
   return (
     <RackContainer>

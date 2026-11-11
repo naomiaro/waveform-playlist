@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
-import { effectCategories } from '@waveform-playlist/browser/tone';
+import { effectCategories, useActiveEffects } from '@waveform-playlist/browser/tone';
 
 // Compact button for track controls
 const EffectsButton = styled.button<{ $hasEffects: boolean }>`
@@ -314,7 +314,7 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
   effectsManager,
 }) => {
   const {
-    trackEffectsState,
+    getTrackEffects,
     availableEffects,
     addEffectToTrack,
     removeEffectFromTrack,
@@ -325,7 +325,7 @@ export const TrackEffectControls: React.FC<TrackEffectControlsProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [selectedEffect, setSelectedEffect] = useState<string>('');
 
-  const activeEffects = trackEffectsState.get(trackId) || [];
+  const activeEffects = useActiveEffects(getTrackEffects(trackId));
 
   const handleAdd = () => {
     if (selectedEffect) {

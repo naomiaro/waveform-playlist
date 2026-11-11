@@ -444,6 +444,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   const { exportWav } = useExportWav();
 
   // Get the offline effects functions when needed
+  // Both are stable: they read the chains when the export runs.
   const offlineEffectsFunction = applyEffectsToExport ? createOfflineMasterEffects() : undefined;
   const createOfflineTrackEffects = applyEffectsToExport
     ? trackEffectsManager.createOfflineTrackEffectsFunction
@@ -497,12 +498,17 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
   // Render custom track controls using the track effects manager
-  const renderTrackControls = (trackIndex: number) => (
-    <CustomTrackControls
-      trackIndex={trackIndex}
-      trackEffectsManager={trackEffectsManager}
-      onDeleteTrack={onDeleteTrack}
-    />
+  // Stable, so the track control panels are not re-rendered by this
+  // component's own renders.
+  const renderTrackControls = useCallback(
+    (trackIndex: number) => (
+      <CustomTrackControls
+        trackIndex={trackIndex}
+        trackEffectsManager={trackEffectsManager}
+        onDeleteTrack={onDeleteTrack}
+      />
+    ),
+    [trackEffectsManager, onDeleteTrack]
   );
 
   // Handle dropped/selected audio files
@@ -638,7 +644,7 @@ export function EffectsExample() {
 
   // Create track effects manager
   const trackEffectsManager = useTrackDynamicEffects();
-  const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction, trackEffectsState } = trackEffectsManager;
+  const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction } = trackEffectsManager;
 
   // Track configurations - Albert Kader "Ubiquitous" minimal techno
   const audioConfigs = React.useMemo(() => [
