@@ -72,7 +72,40 @@ export interface CreatedNativeEffect {
   wetParam?: string;
 }
 
-const registry = new Map<string, NativeEffectDefinition>();
+interface PreparedRecord {
+  /** The definition this preparation ran for — a re-registered type must
+   *  prepare again with its new definition. */
+  definition: NativeEffectDefinition;
+  promise: Promise<void>;
+  settled: boolean;
+}
+
+interface RegistryState {
+  definitions: Map<string, NativeEffectDefinition>;
+  /** Per-context preparation state. Weak: an OfflineAudioContext (one per
+   *  export) must not be kept alive by the registry. */
+  prepared: WeakMap<BaseAudioContext, Map<string, PreparedRecord>>;
+}
+
+/**
+ * The registry lives on `globalThis`, not in this module. An app can end up
+ * with two copies of this package (its own version, and the exact version a
+ * dependent pins); with a module-level map an effect registered through one
+ * copy would be unknown to hosts using the other.
+ */
+const REGISTRY_KEY = Symbol.for('@waveform-playlist/core/effect-registry');
+
+function registryState(): RegistryState {
+  const holder = globalThis as unknown as Record<symbol, RegistryState | undefined>;
+  const existing = holder[REGISTRY_KEY];
+  if (existing) return existing;
+  const created: RegistryState = { definitions: new Map(), prepared: new WeakMap() };
+  holder[REGISTRY_KEY] = created;
+  return created;
+}
+
+const registry = registryState().definitions;
+const prepared = registryState().prepared;
 
 export function registerEffect(type: string, definition: NativeEffectDefinition): void {
   if (registry.has(type)) {
@@ -93,18 +126,6 @@ export function unregisterEffect(type: string): boolean {
 export function getEffectDefinitions(): Map<string, NativeEffectDefinition> {
   return new Map(registry);
 }
-
-interface PreparedRecord {
-  /** The definition this preparation ran for — a re-registered type must
-   *  prepare again with its new definition. */
-  definition: NativeEffectDefinition;
-  promise: Promise<void>;
-  settled: boolean;
-}
-
-/** Per-context preparation state. Weak: an OfflineAudioContext (one per
- *  export) must not be kept alive by the registry. */
-const prepared = new WeakMap<BaseAudioContext, Map<string, PreparedRecord>>();
 
 /**
  * Run a registered effect's `prepare` hook for one context, once. Concurrent

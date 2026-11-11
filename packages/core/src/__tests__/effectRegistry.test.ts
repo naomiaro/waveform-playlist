@@ -67,6 +67,20 @@ describe('effect registry', () => {
     expect(getEffectDefinitions().get('custom-boost')!.label).toBe('Replaced');
   });
 
+  it('is shared by every copy of the module (an app can install two)', async () => {
+    vi.resetModules();
+    const secondCopy = await import('../effects/registry');
+    expect(secondCopy.registerEffect).not.toBe(registerEffect);
+
+    secondCopy.registerEffect('custom-boost', boost());
+    expect(getEffectDefinitions().has('custom-boost')).toBe(true);
+
+    const ctx = mockAudioContext();
+    registerEffect('worklet-fx', boost({ prepare: async () => {} }));
+    await prepareEffect('worklet-fx', ctx);
+    expect(secondCopy.needsPrepare('worklet-fx', ctx)).toBe(false);
+  });
+
   it('getEffectDefinitions returns a copy', () => {
     registerEffect('custom-boost', boost());
     getEffectDefinitions().delete('custom-boost');
