@@ -61,6 +61,7 @@ There are two ways to compile and load it. Both produce the same sound.
 
 ```bash
 npm install -D @grame/faustwasm
+mkdir -p public/faust   # the CLI does not create missing parent directories
 npx faust2wasm-ts tremolo.dsp public/faust/tremolo
 ```
 
@@ -225,7 +226,7 @@ Loading from another origin needs CORS headers (`Access-Control-Allow-Origin`) o
 This is a description of what you would be shipping, not legal advice.
 
 - **Your effect** (`dsp-module.wasm`, `dsp-meta.json`) is yours. The Faust standard libraries it uses have their own terms, listed in `dsp-meta.json`; the library code that carries an LGPL licence comes with the Faust exception permitting compiled output under any licence.
-- **The faustwasm runtime** (`faustwasm/index.js`, in both routes) is LGPL. Precompiling removes the multi-megabyte compiler, not this runtime. Keeping it as its own file, as the compilers write it, is also the form the LGPL asks for: a user can replace it with another build.
+- **The faustwasm runtime** (`faustwasm/index.js`, in both routes) is LGPL. Precompiling removes the multi-megabyte compiler, not this runtime. Keeping it as its own file, as the compilers write it, is what lets a user replace it with another build, which the LGPL requires. The LGPL's other conditions — shipping the licence text and notices, and making the library's source available — still apply to you, and the compiled folder does not include a licence file.
 - **faust2wam's plugin files** (`index.js`, `descriptor.json`, route B) are LGPL-3.0.
 - **faust-ui** (route B, unless removed) is GPL-3.0-or-later.
 - **The WAM SDK** is MIT.

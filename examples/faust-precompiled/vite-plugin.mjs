@@ -20,7 +20,12 @@ const TYPES = {
 };
 
 async function ensureCompiled() {
-  if (fs.existsSync(path.join(compiledDir, 'worklet', 'dsp-module.wasm'))) return;
+  // Both targets must be complete; each is moved into place only after its
+  // whole build succeeded (compile.mjs), so existence means usable.
+  const complete =
+    fs.existsSync(path.join(compiledDir, 'worklet', 'dsp-module.wasm')) &&
+    fs.existsSync(path.join(compiledDir, 'wam', 'index.js'));
+  if (complete) return;
   const { compileWorklet, compileWam } = await import('./compile.mjs');
   const dsp = path.join(here, 'tremolo.dsp');
   compileWorklet(dsp, path.join(compiledDir, 'worklet'));

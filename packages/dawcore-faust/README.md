@@ -4,7 +4,7 @@ In-browser [Faust](https://faust.grame.fr/) DSP compilation to [WAM 2.0](https:/
 
 This package is framework-agnostic (no Lit, no React). `@dawcore/components` consumes it as an **optional peer dependency** — `<daw-track>.addFaustEffect()` dynamic-imports it on first use, so consumers who never compile Faust load **zero compiler bytes** (the Faust compiler is ~2.5 MB gzipped of WebAssembly, bundled inside [`@shren/faust2wam`](https://www.npmjs.com/package/@shren/faust2wam)).
 
-> **Only for live compilation.** Use this package when the Faust source is written or supplied while your app is running — a live-coding tool, a DSP playground, user-authored effects. If your effects are known when you build your app, you might as well compile them in advance and skip this package entirely: see the [Precompiled Faust Effects guide](https://naomiaro.github.io/waveform-playlist/docs/faust-effects). Precompiled effects download a few kilobytes instead of the compiler, need no bundler configuration, and ship no GPL code.
+> **Only for live compilation.** Use this package when the Faust source is written or supplied while your app is running — a live-coding tool, a DSP playground, user-authored effects. If your effects are known when you build your app, you might as well compile them in advance and skip this package entirely: see the [Precompiled Faust Effects guide](https://naomiaro.github.io/waveform-playlist/docs/faust-effects). Precompiled effects download the effect plus a ~190 kB runtime instead of the ~8 MB compiler, need no bundler configuration, and can be shipped with no GPL code (the runtime is still LGPL).
 
 ## Installation
 

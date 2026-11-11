@@ -99,26 +99,44 @@ export function stripFaustUi(wamDir) {
   fs.writeFileSync(indexPath, stripped);
 }
 
+/**
+ * Build into a sibling temp folder and move it into place only when every
+ * step succeeded — a failure partway (say, in stripFaustUi) must never leave
+ * a half-written or still-GPL folder where the last good one was.
+ */
+function buildAtomically(outDir, build) {
+  const staging = outDir + '.tmp';
+  fs.rmSync(staging, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(outDir), { recursive: true });
+  try {
+    build(staging);
+    fs.rmSync(outDir, { recursive: true, force: true });
+    fs.renameSync(staging, outDir);
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
 /** `faust2wam` → a static WAM plugin directory without faust-ui. */
 export function compileWam(dspFile, outDir) {
-  fs.rmSync(outDir, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(outDir), { recursive: true });
-  run(FAUST2WAM, [dspFile, outDir]);
-  // fftw/ is only for -fft plugins; host/ is faust2wam's standalone test page.
-  removeAll(outDir, ['fftw', 'host', 'types.d.ts']);
-  pruneDevFiles(outDir);
-  stripFaustUi(outDir);
+  buildAtomically(outDir, (staging) => {
+    run(FAUST2WAM, [dspFile, staging]);
+    // fftw/ is only for -fft plugins; host/ is faust2wam's standalone test page.
+    removeAll(staging, ['fftw', 'host', 'types.d.ts']);
+    pruneDevFiles(staging);
+    stripFaustUi(staging);
+  });
 }
 
 /** `faust2wasm` → wasm + metadata + the faustwasm runtime. */
 export function compileWorklet(dspFile, outDir) {
-  fs.rmSync(outDir, { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(outDir), { recursive: true });
-  run(FAUST2WASM, [dspFile, outDir]);
-  // index.html / index.js / create-node.js are faustwasm's standalone demo
-  // page; the demos here create the node themselves.
-  removeAll(outDir, ['index.html', 'index.js', 'create-node.js']);
-  pruneDevFiles(outDir);
+  buildAtomically(outDir, (staging) => {
+    run(FAUST2WASM, [dspFile, staging]);
+    // index.html / index.js / create-node.js are faustwasm's standalone demo
+    // page; the demos here create the node themselves.
+    removeAll(staging, ['index.html', 'index.js', 'create-node.js']);
+    pruneDevFiles(staging);
+  });
 }
 
 function listFiles(dir, base = dir) {
