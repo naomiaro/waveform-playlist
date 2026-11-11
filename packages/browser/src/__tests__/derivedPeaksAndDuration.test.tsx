@@ -2,10 +2,16 @@
 //
 // #692: `peaksDataArray` and `duration` are derived from `tracks` during
 // render instead of being written by effects. So they are correct in the same
-// render that sees the new tracks, an edit to one clip leaves the other clips'
-// peak arrays alone, and a `tracks` change renders consumers once.
+// render that sees the new tracks, and an edit to one clip leaves the other
+// clips' peak arrays alone.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+vi.mock('../workers/peaksWorker', () => ({
+  createPeaksWorker: vi.fn(),
+}));
+
+import { createPeaksWorker } from '../workers/peaksWorker';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
@@ -207,6 +213,36 @@ describe('peaks and duration are derived from tracks (#692)', () => {
 
     expect(latest().peaksDataArray).toEqual([]);
     expect(latest().duration).toBe(0);
+  });
+
+  it('fills in a decoded clip when its worker job finishes, with no tracks change', async () => {
+    let finishJob: (waveformData: WaveformData) => void = () => {};
+    vi.mocked(createPeaksWorker).mockImplementation(() => ({
+      generate: () =>
+        new Promise<WaveformData>((resolve) => {
+          finishJob = resolve;
+        }),
+      isTerminated: () => false,
+      terminate: () => {},
+    }));
+    const audioBuffer = {
+      length: SAMPLE_RATE * 2,
+      duration: 2,
+      sampleRate: SAMPLE_RATE,
+      numberOfChannels: 1,
+      getChannelData: () => new Float32Array(SAMPLE_RATE * 2),
+    } as unknown as AudioBuffer;
+    mount([makeTrack('t1', [makeClip('a', { waveformData: undefined, audioBuffer })])]);
+    await waitFor(() => expect(latest().isReady).toBe(true));
+    expect(latest().peaksDataArray[0][0].peaks.length).toBe(0);
+    const tracksBefore = latest().tracks;
+
+    await act(async () => {
+      finishJob(makeWaveformData(400));
+    });
+
+    expect(latest().tracks).toBe(tracksBefore);
+    expect(latest().peaksDataArray[0][0].peaks.length).toBeGreaterThan(0);
   });
 
   it('no longer exposes audioBuffers', async () => {

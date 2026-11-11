@@ -5,6 +5,7 @@
 // `tracks` change over already-generated buffers (every pointer move of a
 // trim) must not set state, and must not start the job again.
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import React from 'react';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../workers/peaksWorker', () => ({
@@ -148,6 +149,49 @@ describe('useWaveformDataCache', () => {
 
     rerender({ tracks: [makeTrack('t1', [{ id: 'a', audioBuffer: buffer }])] });
     await waitFor(() => expect(worker.generate).toHaveBeenCalledTimes(2));
+  });
+
+  it('under StrictMode ends up with one live job, and its result bumps the version', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Like the real worker: terminate() rejects the jobs still pending.
+    const workers: Array<{ jobs: Deferred[]; terminated: boolean }> = [];
+    vi.mocked(createPeaksWorker).mockImplementation(() => {
+      const state = { jobs: [] as Deferred[], terminated: false };
+      workers.push(state);
+      return {
+        generate: () =>
+          new Promise((resolve, reject) => {
+            state.jobs.push({ resolve, reject });
+          }),
+        isTerminated: () => state.terminated,
+        terminate: () => {
+          state.terminated = true;
+          for (const job of state.jobs) job.reject(new Error('Worker terminated'));
+        },
+      } as any;
+    });
+    const buffer = makeBuffer();
+    const waveformData = { scale: 128 } as any;
+    const tracks = [makeTrack('t1', [{ id: 'a', audioBuffer: buffer }])];
+
+    const { result } = renderHook(() => useWaveformDataCache(tracks, 128), {
+      wrapper: React.StrictMode,
+    });
+    await act(async () => {});
+
+    // First mount's worker was terminated by the simulated unmount; the
+    // remount started the job again on a second worker.
+    expect(workers).toHaveLength(2);
+    expect(workers[0].terminated).toBe(true);
+    expect(workers[1].terminated).toBe(false);
+    expect(workers[1].jobs).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+
+    await act(async () => {
+      workers[1].jobs[0].resolve(waveformData);
+    });
+    expect(result.current.getWaveformData(buffer)).toBe(waveformData);
+    expect(result.current.version).toBe(1);
   });
 
   it('does not set state or warn for a job that settles after unmount', async () => {

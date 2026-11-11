@@ -35,7 +35,7 @@ export interface DerivePeaksOptions {
 /** What a clip's typed arrays were computed from. */
 interface PeakInputs {
   waveformData: WaveformData | undefined;
-  /** Only read when path A is absent or failed; `undefined` otherwise. */
+  /** Compared only when path A is absent or failed (`usesGenerated`). */
   generated: WaveformData | undefined;
   offsetSamples: number;
   durationSamples: number;

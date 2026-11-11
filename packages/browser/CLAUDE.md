@@ -132,7 +132,7 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Peak resolution order (`src/utils/derivePeaks.ts`):** (1) `clip.waveformData` (external pre-computed), (2) worker result for `clip.audioBuffer`, (3) empty peaks while worker runs.
 
-**Peaks and duration are derived during render, never set by an effect (#692).** `duration = useMemo(timelineDuration(tracks))`; `peaksDataArray = useMemo(derivePeaks(...))` over `tracks`, `samplesPerPixel`, `mono` and the worker hook's `version`. `derivePeaks` is a pure function that takes the previous pass (`PeaksCache`, held in `peaksCacheRef`) and reuses three identities, each of which something downstream is keyed on: a clip's typed arrays (`Channel` redraws when they change), its `ClipPeaks` object, and its track's array. The typed arrays are reused while the clip's source waveform data, `offsetSamples`, `durationSamples`, `sampleRate`, `samplesPerPixel` and `mono` are unchanged — keyed on the waveform data's identity, not the clip id, because split clips share one buffer. So a trim gives new arrays to the trimmed clip only, and a move gives a new `ClipPeaks` with the same arrays. Do not add a field to `ClipPeaks` without adding it to `sameClipPeaks`, or a change to it will not reach the screen. Measured on `/examples/multi-clip` (14 canvases) during a trim: 26 canvas redraws and 3 React commits per pointer move before, 1 and 1 after.
+**Peaks and duration are derived during render, never set by an effect (#692).** `duration = useMemo(timelineDuration(tracks))`; `peaksDataArray = useMemo(derivePeaks(...))` over `tracks`, `samplesPerPixel`, `mono` and the worker hook's `version`. `derivePeaks` is a pure function that takes the previous pass (`PeaksCache`, held in `peaksCacheRef`) and reuses three identities, each of which something downstream is keyed on: a clip's typed arrays (`Channel` redraws when they change), its `ClipPeaks` object, and its track's array. The typed arrays are reused while the clip's source waveform data, `offsetSamples`, `durationSamples`, `sampleRate`, `samplesPerPixel` and `mono` are unchanged. Entries are found by clip id and compared on the waveform data's identity (split clips share one buffer but differ in offset and duration); a clip that gets a new id always recomputes. So a trim gives new arrays to the trimmed clip only, and a move gives a new `ClipPeaks` with the same arrays. Do not add a field to `ClipPeaks` without adding it to `sameClipPeaks`, or a change to it will not reach the screen. Measured on `/examples/multi-clip` (14 canvases) during a trim: 26 canvas redraws and 3 React commits per pointer move before, 1 and 1 after.
 
 **`useWaveformDataCache` has one piece of state, `version`.** Results live in a `WeakMap<AudioBuffer, WaveformData>` read during render through the stable `getWaveformData(buffer)`; `version` is bumped when a job finishes and is the dependency that makes the peaks memo look again. A `tracks` change over already-generated buffers sets no state (the old `Map<clipId, WaveformData>` state was rebuilt on every `tracks` change, one extra render per trim move). A job keeps running across `tracks` changes; only unmount forgets in-flight jobs, because terminating the worker rejects them (a StrictMode remount then starts them again).
 
@@ -140,7 +140,7 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 ## Pre-Computed Peaks Rate Mismatch
 
-When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in `derivePeaks` converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Worker cache (Path B) replaces these on the next render cycle. `createClip` (called by both direct callers and `createClipFromSeconds`) logs a per-clip warning with the clip name.
+When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after `audioBuffer` decodes at hardware rate), Path A in `derivePeaks` converts `offsetSamples`, `durationSamples`, and `samplesPerPixel` to the waveformData's sample space using `ratio = wdRate / clipRate`. This prevents blank peaks when the clip is rebuilt at the decoded audio rate. Path A wins whenever it succeeds, and the worker skips clips that have `waveformData`, so these peaks stay until the clip loses its `waveformData`. `createClip` (called by both direct callers and `createClipFromSeconds`) logs a per-clip warning with the clip name.
 
 ## Playlist Loading Detection
 
@@ -341,13 +341,12 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Why:** When a recording is split into many clips sharing the same `AudioBuffer`, per-clip generation causes duplicate `Float32Array.slice()` allocations and OOM on large timelines.
 
-**Implementation:** Three `WeakMap<AudioBuffer, ...>` refs:
+**Implementation:** Two `WeakMap<AudioBuffer, ...>` refs:
 
-- `generatedByBufferRef` — cached results (`WaveformData`)
+- `generatedByBufferRef` — results (`WaveformData`), read during render via `getWaveformData(buffer)`
 - `inflightByBufferRef` — in-flight worker promises
-- `subscribersByBufferRef` — clip IDs waiting for a buffer's result
 
-**Pattern:** Generate once per buffer, fan out the result to all subscriber clip IDs via `setCache()`. `WeakMap` allows GC when `AudioBuffer` is released.
+**Pattern:** Generate once per buffer; every clip sharing it finds the result by buffer when `version` bumps. `WeakMap` allows GC when `AudioBuffer` is released.
 
 ## MIDI Clip Rendering Pipeline
 
