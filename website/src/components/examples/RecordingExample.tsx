@@ -28,6 +28,7 @@ import {
   usePlaylistData,
   usePlaylistControls,
   usePlaylistState,
+  useSelection,
   KeyboardShortcuts,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
@@ -168,11 +169,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo, setRecordingActive } = usePlaylistControls();
   const {
     isAutomaticScroll,
-    selectionStart,
-    selectionEnd,
     isLoopEnabled,
     selectedTrackId: providerSelectedTrackId,
   } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
 
   // Sync local → provider when local state changes (e.g. auto-create track)
   useEffect(() => {

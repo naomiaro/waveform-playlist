@@ -108,7 +108,7 @@ These three exports were a standalone playback-status context (`progress`, `isPl
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `usePlayoutStatus().isPlaying`                        | `usePlaybackAnimation().isPlaying`                                                      | `useMediaElementAnimation().isPlaying`                        |
 | `usePlayoutStatus().progress`                         | `usePlaybackAnimation().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
-| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `usePlaylistState().selectionStart` / `.selectionEnd`                                   | no selection in this provider                                 |
+| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `useSelection().selectionStart` / `.selectionEnd`                                       | no selection in this provider                                 |
 | `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()`                                             | `useMediaElementControls().play()` / `.pause()`               |
 | `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaylistControls().seekTo(t)`                                                       | `useMediaElementControls().seekTo(t)`                         |
 | `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaylistControls().setSelection(start, end)`                                        | no selection in this provider                                 |
@@ -123,11 +123,11 @@ function Status() {
 }
 
 // After
-import { usePlaybackAnimation, usePlaylistState } from '@waveform-playlist/browser';
+import { usePlaybackAnimation, useSelection } from '@waveform-playlist/browser';
 
 function Status() {
   const { isPlaying } = usePlaybackAnimation();
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   // ...
 }
 ```
@@ -202,6 +202,35 @@ Two related values on `usePlaylistData()` keep their names and types but are now
 - `peaksDataArray` keeps the identity of everything that did not change: a clip's `peaks`, its entry, and its track's array. It is safe to use them as memo or effect dependencies.
 - `<Waveform>` no longer renders the text "Loading waveform..." before the first peaks; clips render at once and their waveforms fill in.
 - `<Waveform className="…">` now sets the class on the playlist's outermost element (the one with `data-playlist-state`). Before, the class was only on the "Loading waveform..." placeholder and disappeared once the playlist rendered, so check that a class you pass there has the styles you want on the whole playlist.
+
+## `selectionStart` and `selectionEnd` move from `usePlaylistState()` to `useSelection()`
+
+**Package:** `@waveform-playlist/browser`.
+
+The selection changes on every pointer move of a selection drag; nothing else in `usePlaylistState()` does. While it was part of that hook's value, every component that called `usePlaylistState()` for any field (an annotation list reading `annotations`, a loop button reading `isLoopEnabled`) re-rendered on every pointer move. It now has its own context and hook. `usePlaylistState()` no longer has `selectionStart` or `selectionEnd`; reading them from it gives `undefined` (a type error in TypeScript).
+
+**Find:** `selectionStart` or `selectionEnd` destructured or read from `usePlaylistState()`.
+
+**Replace with:** `useSelection()`, and keep `usePlaylistState()` for the other fields:
+
+```tsx
+// Before
+import { usePlaylistState } from '@waveform-playlist/browser';
+
+const { selectionStart, selectionEnd, isLoopEnabled } = usePlaylistState();
+
+// After
+import { usePlaylistState, useSelection } from '@waveform-playlist/browser';
+
+const { selectionStart, selectionEnd } = useSelection();
+const { isLoopEnabled } = usePlaylistState();
+```
+
+`setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` has no selection state and is unchanged.
+
+A component that calls `useSelection()` re-renders on every pointer move of a drag, so call it in the smallest component that shows the selection, not in a component that also renders a long list.
+
+Fixed along the way: dragging a selection from right to left now selects the whole dragged range. Before, the range collapsed to the last pointer movement.
 
 ## Keyboard shortcuts yield to the focused control
 

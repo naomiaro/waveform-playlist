@@ -35,6 +35,7 @@ import {
   usePlaybackAnimation,
   usePlaylistData,
   usePlaylistState,
+  useSelection,
   KeyboardShortcuts,
   ClipInteractionProvider,
   type TimeFormat,
@@ -250,7 +251,7 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
 
 // Custom Selection Time Inputs using Radix UI
 const CustomSelectionInputs: React.FC = () => {
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { setSelection } = usePlaylistControls();
   const { timeFormat } = usePlaylistData();
   const format = timeFormat as TimeFormat;
@@ -295,7 +296,8 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
   const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
   const { currentTimeRef } = usePlaybackAnimation();
   const { duration, masterVolume, timeFormat } = usePlaylistData();
-  const { isAutomaticScroll, selectionStart, selectionEnd, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { isAutomaticScroll, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const format = timeFormat as TimeFormat;
 
   // Navigation handlers using seekTo
@@ -585,6 +587,7 @@ export function FlexibleApiExample() {
               <li><Text size="2" color="gray"><code>usePlaybackAnimation()</code> - Get <code>currentTime</code> for live position</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistData()</code> - Get <code>duration</code>, <code>sampleRate</code>, etc.</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistState()</code> - Get/set <code>timeFormat</code>, <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.</Text></li>
+              <li><Text size="2" color="gray"><code>useSelection()</code> - Get <code>selectionStart</code> and <code>selectionEnd</code></Text></li>
               <li><Text size="2" color="gray"><code>useTimeFormat()</code> - Get <code>formatTime</code> and <code>parseTime</code> for time display/input</Text></li>
               <li><Text size="2" color="gray"><code>renderPlayhead</code> - Custom playhead with triangle marker (see <code>PlayheadWithMarker</code>)</Text></li>
               <li><Text size="2" color="gray">Radix UI components (<code>Button</code>, <code>Slider</code>, <code>Switch</code>, <code>Select</code>)</Text></li>

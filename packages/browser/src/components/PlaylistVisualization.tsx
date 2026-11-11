@@ -121,7 +121,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
   const { isPlaying } = usePlaybackAnimation();
-  const { selectionStart, selectedTrackId, indefinitePlayback, fillViewport } = usePlaylistState();
+  const { selectedTrackId, indefinitePlayback, fillViewport } = usePlaylistState();
   const {
     setSelection,
     play,
@@ -340,9 +340,12 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const x = e.clientX - rect.left;
     const moveTime = (x * samplesPerPixel) / sampleRate;
 
-    const start = Math.min(selectionStart, moveTime);
-    const end = Math.max(selectionStart, moveTime);
-    setSelection(start, end);
+    // The anchor is where the drag began. It comes from a ref, not from the
+    // selection state: this component does not subscribe to the selection
+    // (#733), and `selectionStart` stops being the anchor as soon as the
+    // pointer passes to the left of it.
+    const anchor = mouseDownTimeRef.current;
+    setSelection(Math.min(anchor, moveTime), Math.max(anchor, moveTime));
   };
 
   const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -365,8 +368,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const x = e.clientX - rect.left;
     const endTime = (x * samplesPerPixel) / sampleRate;
 
-    const start = Math.min(selectionStart, endTime);
-    const end = Math.max(selectionStart, endTime);
+    const anchor = mouseDownTimeRef.current;
+    const start = Math.min(anchor, endTime);
+    const end = Math.max(anchor, endTime);
 
     if (Math.abs(end - start) < 0.1) {
       setCurrentTime(start);

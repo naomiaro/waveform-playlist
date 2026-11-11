@@ -144,7 +144,7 @@ When `clip.waveformData.sample_rate` differs from `clip.sampleRate` (e.g., after
 
 ## Memo Boundaries in the Visualization (#693)
 
-`PlaylistVisualization` is a shell: sizes, the shared vertical layout, the selection-drag pointer handlers and `PlaylistInfoContext`. It reads selection state for those handlers, so it re-renders on every pointer move of a selection drag (and on every active-annotation change, since both live in `PlaylistStateContext`). What it renders is split so that this is cheap:
+`PlaylistVisualization` is a shell: sizes, the shared vertical layout, the selection-drag pointer handlers and `PlaylistInfoContext`. It does not subscribe to the selection (#733, next section), but it still re-renders on every `currentTime` change (it reads `isPlaying` from the animation context, so a seek and every move of a leftward selection drag) and on every active-annotation change. What it renders is split so that this is cheap:
 
 - `TrackRows` → `TrackRow` → `ClipView` (`components/TrackRows.tsx`) and `TrackControlsColumn` → `DefaultTrackControls` are `React.memo`. They take NO selection, cursor or annotation state. Their props are primitives, stable callbacks, and the identity-stable pieces of `peaksDataArray` from `derivePeaks` (#692).
 - `SelectionOverlay`, `PlayheadOverlay`, `AnnotationBoxesOverlay`, `LoopRegionOverlay` (`components/VisualizationOverlays.tsx`) read that state from context themselves.
@@ -158,6 +158,18 @@ Rules when changing these files:
 4. `renderTrackControls(trackIndex)` is called inside the memoized column, so it runs when the column's props change (tracks, mixer state, layout, the selected track, `onRemoveTrack`, the spectrogram integration, the function itself) and not on time-selection or cursor changes. An `onRemoveTrack` or `renderTrackControls` with a new identity per consumer render re-renders every panel, as before; consumers get the benefit only with stable functions.
 
 `visualizationMemoBoundaries.test.tsx` counts renders with wrappers around the real `Clip`, `SmartChannel`, `Track`, `Controls` and `SmartScale`. `SmartChannel` is the proxy for `ChannelWithProgress` renders including context-triggered ones. Measured on `/examples/multi-clip` (7 tracks, 13 clips): about 440 component renders per pointer move of a selection drag before, 31 (dragging right) and 63 (dragging left) after.
+
+## Selection Has Its Own Context (#733)
+
+`selectionStart` / `selectionEnd` live in `SelectionContext` (`useSelection()`), not in `PlaylistStateContext`. They are the only state that changes on every pointer move of a selection drag; in the state value they re-rendered every `usePlaylistState()` consumer per move (annotation list, annotation boxes, loop button, a consumer's own app component).
+
+- Call `useSelection()` only in a component that shows or uses the selection: `SelectionOverlay`, `PlayheadOverlay`, `SelectionTimeInputs`, `SetLoopRegionButton`, and `usePlayFromSelectionOrCursor` (so `PlayButton` and `KeyboardShortcuts` render per move; measured about 0.04 ms together, dev build).
+- The provider itself still renders per move (selection is its React state); its `children` are stable, so only context consumers follow.
+- `PlaylistVisualization`'s drag handlers take the anchor from `mouseDownTimeRef` (set at mouse-down), never from `selectionStart`. `selectionStart` is `min(anchor, pointer)`, so it stops being the anchor once the pointer passes left of it: until #733 a leftward drag selected only the last pointer movement.
+- `MediaElementPlaylistProvider` has no selection in any context; `MediaElementPlaylist` keeps it in local state with a fixed start, so it needed neither change.
+- Not split yet: `currentTime` from `isPlaying` in the animation context. `setSelection` also sets `currentTime`, so a LEFTWARD drag still re-renders every `usePlaybackAnimation()` consumer per move.
+
+Measured per move of a rightward drag (dev build, `probes/select733.cjs`, which adds render time to the fiber-walk count): multi-clip 31 components to 9; annotations example (15 annotations) 369 to 17, React render at 4x CPU throttle 19.8 ms to 1.5 ms. Leftward: multi-clip 63 to 54, annotations 371 to 370. Guarded by `contextValueStability.test.tsx` (identities and render counts) and the drag-direction tests in `e2e/multi-clip.spec.ts`.
 
 ## Playlist Loading Detection
 
@@ -249,7 +261,7 @@ A `tracks` change that needs a full rebuild disposes the engine, then creates th
 
 **All engine-owned state uses the `onEngineState()` hook pattern:**
 
-- `useSelectionState` — selectionStart, selectionEnd
+- `useSelectionState` — selectionStart, selectionEnd (published through `SelectionContext`, #733)
 - `useLoopState` — isLoopEnabled, loopStart, loopEnd
 - `useSelectedTrack` — selectedTrackId
 - `useZoomControls` — samplesPerPixel, canZoomIn, canZoomOut

@@ -721,7 +721,9 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     ├─→ PlaybackAnimationContext (60fps updates)
     │   └─→ isPlaying, currentTime, currentTimeRef
     ├─→ PlaylistStateContext (user interactions)
-    │   └─→ selection, loop, selectedTrackId, annotations, etc.
+    │   └─→ loop, selectedTrackId, annotations, etc.
+    ├─→ SelectionContext (every pointer move of a selection drag)
+    │   └─→ selectionStart, selectionEnd
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
     └─→ PlaylistDataContext (static/infrequent updates)
@@ -759,7 +761,7 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-The provider uses **4 separate contexts** to optimize performance by isolating different update frequencies:
+The provider uses **5 separate contexts** to optimize performance by isolating different update frequencies:
 
 1. **PlaybackAnimationContext** - High-frequency (60fps)
    - Only animation subscribers (Playhead, automatic scroll)
@@ -769,11 +771,15 @@ The provider uses **4 separate contexts** to optimize performance by isolating d
    - State that changes on user actions
    - UI components subscribe here
 
-3. **PlaylistControlsContext** - Stable functions
+3. **SelectionContext** - The selected time range (`useSelection()`)
+   - Changes on every pointer move of a selection drag
+   - Only components that show or use the selection subscribe
+
+4. **PlaylistControlsContext** - Stable functions
    - Doesn't cause re-renders when accessed
    - All control functions
 
-4. **PlaylistDataContext** - Static/infrequent
+5. **PlaylistDataContext** - Static/infrequent
    - Audio buffers, duration, sample rate
    - Changes rarely after initialization
 
@@ -792,7 +798,7 @@ The provider uses **4 separate contexts** to optimize performance by isolating d
 
 ### Context Splitting for Performance (2025-01-21)
 
-The `WaveformPlaylistProvider` uses **4 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when high-frequency values (like `currentTime` at 60fps) update.
+The `WaveformPlaylistProvider` uses **5 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when high-frequency values (like `currentTime` at 60fps) update.
 
 **Architecture:**
 
@@ -816,14 +822,18 @@ export interface PlaylistStateContextValue {
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
   indefinitePlayback: boolean;       // Whether playback continues past end of audio
   canUndo: boolean;
   canRedo: boolean;
+}
+
+// 2b. The selection - changes on every pointer move of a selection drag
+export interface SelectionContextValue {
+  selectionStart: number;
+  selectionEnd: number;
 }
 
 // 3. Control functions - Stable, don't cause re-renders
@@ -967,7 +977,7 @@ See `packages/browser/src/hooks/` for hook implementations.
 
 ### Component State (React useState)
 
-State lives in `WaveformPlaylistContext` and is distributed across the 4 split contexts:
+State lives in `WaveformPlaylistContext` and is distributed across the 5 split contexts:
 
 ```typescript
 // PlaybackAnimationContext
@@ -977,6 +987,8 @@ const [currentTime, setCurrentTime] = useState(0);
 // PlaylistStateContext
 const [continuousPlay, setContinuousPlay] = useState(false);
 const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
+
+// SelectionContext (mirrored from the engine by useSelectionState)
 const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
 
@@ -990,6 +1002,7 @@ Access contexts using specialized hooks:
 ```typescript
 const { isPlaying, currentTime } = usePlaybackAnimation();
 const { continuousPlay, annotations } = usePlaylistState();
+const { selectionStart, selectionEnd } = useSelection();
 const { play, pause, setContinuousPlay } = usePlaylistControls();
 const { duration, tracks } = usePlaylistData();
 ```

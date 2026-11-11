@@ -21,6 +21,7 @@ const counts = vi.hoisted(() => ({
   track: {} as Record<string, number>,
   controls: 0,
   scale: 0,
+  shell: 0,
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
@@ -45,6 +46,12 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
       counts.controls++;
       return createElement(actual.Controls, props);
     },
+    // Rendered unconditionally by `PlaylistVisualization`, so this counts the
+    // shell's own renders (#733).
+    Playlist: (props: React.ComponentProps<typeof actual.Playlist>) => {
+      counts.shell++;
+      return createElement(actual.Playlist, props);
+    },
     SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
       counts.scale++;
       return createElement(actual.SmartScale, props);
@@ -57,6 +64,7 @@ import {
   usePlaylistControls,
   usePlaylistData,
   usePlaylistState,
+  useSelection,
 } from '../WaveformPlaylistContext';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -138,6 +146,7 @@ let probe: {
   controls: ReturnType<typeof usePlaylistControls>;
   data: ReturnType<typeof usePlaylistData>;
   state: ReturnType<typeof usePlaylistState>;
+  selection: ReturnType<typeof useSelection>;
 };
 
 const ProbeChild: React.FC = () => {
@@ -145,6 +154,7 @@ const ProbeChild: React.FC = () => {
     controls: usePlaylistControls(),
     data: usePlaylistData(),
     state: usePlaylistState(),
+    selection: useSelection(),
   };
   return null;
 };
@@ -162,6 +172,7 @@ function resetCounts() {
   counts.track = {};
   counts.controls = 0;
   counts.scale = 0;
+  counts.shell = 0;
 }
 
 function totalOf(record: Record<string, number>): number {
@@ -256,7 +267,10 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setSelection(0.1, 0.5);
     });
 
-    expect(probe.state.selectionEnd).toBe(0.5);
+    expect(probe.selection.selectionEnd).toBe(0.5);
+    // The shell does not subscribe to the selection (#733). A leftward drag
+    // still renders it: the cursor moves, and it reads the animation context.
+    expect(counts.shell).toBe(0);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);
@@ -278,7 +292,7 @@ describe('visualization memo boundaries (#693)', () => {
       probe.controls.setSelection(0.2, 0.6);
     });
 
-    expect(probe.state.selectionStart).toBe(0.2);
+    expect(probe.selection.selectionStart).toBe(0.2);
     expect(counts.clip).toEqual({});
     expect(counts.track).toEqual({});
     expect(counts.channel).toBe(0);

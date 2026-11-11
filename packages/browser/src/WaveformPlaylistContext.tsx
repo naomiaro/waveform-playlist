@@ -141,8 +141,6 @@ export interface PlaylistStateContextValue {
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
   selectedTrackId: string | null; // ID of currently selected track for editing operations
   // Loop region (separate from selection) - Audacity-style loop points
   loopStart: number;
@@ -157,6 +155,16 @@ export interface PlaylistStateContextValue {
   canUndo: boolean;
   /** Whether redo is available */
   canRedo: boolean;
+}
+
+/**
+ * The selected time range, in seconds. Apart from the state context because it
+ * is the only state that changes on every pointer move of a selection drag
+ * (#733). `selectionStart === selectionEnd` means nothing is selected.
+ */
+export interface SelectionContextValue {
+  selectionStart: number;
+  selectionEnd: number;
 }
 
 export interface PlaylistControlsContextValue {
@@ -282,13 +290,14 @@ export interface PlaylistDataContextValue {
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
-// Create the 4 separate contexts
+// Create the 5 separate contexts
 // Shared default so an omitted `controls` prop keeps one identity across
 // renders — a fresh object here would invalidate the data context every render.
 const DEFAULT_CONTROLS = { show: false, width: 0 };
 
 const PlaybackAnimationContext = createContext<PlaybackAnimationContextValue | null>(null);
 const PlaylistStateContext = createContext<PlaylistStateContextValue | null>(null);
+const SelectionContext = createContext<SelectionContextValue | null>(null);
 const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
 const PlaylistDataContext = createContext<PlaylistDataContextValue | null>(null);
 
@@ -1949,8 +1958,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isLoopEnabled,
       annotations,
       activeAnnotationId,
-      selectionStart,
-      selectionEnd,
       selectedTrackId,
       loopStart,
       loopEnd,
@@ -1967,8 +1974,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isLoopEnabled,
       annotations,
       activeAnnotationId,
-      selectionStart,
-      selectionEnd,
       selectedTrackId,
       loopStart,
       loopEnd,
@@ -1977,6 +1982,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       canUndo,
       canRedo,
     ]
+  );
+
+  // Its own context: these two change on every pointer move of a selection
+  // drag, and nothing else in the state value does (#733).
+  const selectionValue: SelectionContextValue = useMemo(
+    () => ({ selectionStart, selectionEnd }),
+    [selectionStart, selectionEnd]
   );
 
   const setCurrentTimeControl = useCallback(
@@ -2151,11 +2163,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     <ThemeProvider theme={mergedTheme}>
       <PlaybackAnimationContext.Provider value={animationValue}>
         <PlaylistStateContext.Provider value={stateValue}>
-          <PlaylistControlsContext.Provider value={controlsValue}>
-            <PlaylistDataContext.Provider value={dataValue}>
-              {children}
-            </PlaylistDataContext.Provider>
-          </PlaylistControlsContext.Provider>
+          <SelectionContext.Provider value={selectionValue}>
+            <PlaylistControlsContext.Provider value={controlsValue}>
+              <PlaylistDataContext.Provider value={dataValue}>
+                {children}
+              </PlaylistDataContext.Provider>
+            </PlaylistControlsContext.Provider>
+          </SelectionContext.Provider>
         </PlaylistStateContext.Provider>
       </PlaybackAnimationContext.Provider>
     </ThemeProvider>
@@ -2177,6 +2191,19 @@ export const usePlaylistState = () => {
   const context = useContext(PlaylistStateContext);
   if (!context) {
     throw new Error('usePlaylistState must be used within WaveformPlaylistProvider');
+  }
+  return context;
+};
+
+/**
+ * The selected time range. A component that calls this re-renders on every
+ * pointer move of a selection drag, so call it in the smallest component that
+ * shows the selection.
+ */
+export const useSelection = () => {
+  const context = useContext(SelectionContext);
+  if (!context) {
+    throw new Error('useSelection must be used within WaveformPlaylistProvider');
   }
   return context;
 };

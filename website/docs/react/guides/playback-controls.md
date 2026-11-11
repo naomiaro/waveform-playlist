@@ -252,10 +252,11 @@ Toggles the looping behavior.
 ### Programmatic Control
 
 ```tsx
-import { usePlaylistState, usePlaylistControls } from '@waveform-playlist/browser';
+import { usePlaylistState, useSelection, usePlaylistControls } from '@waveform-playlist/browser';
 
 function CustomLoopControls() {
-  const { isLoopEnabled, loopStart, loopEnd, selectionStart, selectionEnd } = usePlaylistState();
+  const { isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { setLoopEnabled, setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
 
   const hasSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
@@ -333,10 +334,10 @@ function LoopExample() {
 Play only the selected region:
 
 ```tsx
-import { usePlaylistState, usePlaylistControls } from '@waveform-playlist/browser';
+import { useSelection, usePlaylistControls } from '@waveform-playlist/browser';
 
 function PlaySelection() {
-  const { selectionStart, selectionEnd } = usePlaylistState();
+  const { selectionStart, selectionEnd } = useSelection();
   const { play } = usePlaylistControls();
 
   const playSelectedRegion = () => {

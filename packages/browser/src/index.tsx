@@ -6,6 +6,7 @@ export {
   WaveformPlaylistProvider,
   usePlaybackAnimation,
   usePlaylistState,
+  useSelection,
   usePlaylistControls,
   usePlaylistData,
   usePlaylistDataOptional,

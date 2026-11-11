@@ -208,6 +208,18 @@ interface PlaybackAnimationContextValue {
 }
 ```
 
+### useSelection()
+
+```typescript
+// The selected time range in seconds. Its own context: it changes on every
+// pointer move of a selection drag. NOT on usePlaylistState().
+// WaveformPlaylistProvider only. Set it with usePlaylistControls().setSelection(start, end).
+interface SelectionContextValue {
+  selectionStart: number;       // selectionStart === selectionEnd: nothing selected
+  selectionEnd: number;
+}
+```
+
 ### usePlaylistState()
 
 ```typescript
@@ -219,8 +231,6 @@ interface PlaylistStateContextValue {
   isLoopEnabled: boolean;
   annotations: AnnotationData[];
   activeAnnotationId: string | null;
-  selectionStart: number;
-  selectionEnd: number;
   selectedTrackId: string | null;
   loopStart: number;
   loopEnd: number;
