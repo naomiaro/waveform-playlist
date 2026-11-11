@@ -87,16 +87,6 @@ function isNonTextInput(element: Element): boolean {
   );
 }
 
-/**
- * A `<select>` shown as a dropdown. A list box (`multiple` or `size` > 1) has
- * no popup and uses Space to toggle options, so it keeps every key.
- */
-function isDropdown(element: Element): boolean {
-  if (element.tagName !== 'SELECT') return false;
-  const size = Number(element.getAttribute('size') ?? '1');
-  return !element.hasAttribute('multiple') && !(size > 1);
-}
-
 /** Controls that take text or use most keys themselves: no shortcut fires on them. */
 function ownsAllKeys(element: Element): boolean {
   const tag = element.tagName;
@@ -227,17 +217,18 @@ function isKeyboardOperated(element: Element): boolean {
  * True when the key already means something to the control that has focus, so
  * a global shortcut must leave it alone:
  *
- * - text fields and contenteditable keep every key;
+ * - text fields, `<select>` and contenteditable keep every key, however they
+ *   got focus. A focused dropdown works as it does everywhere else: Space and
+ *   the arrow keys open or change it;
  * - Escape belongs to an open modal dialog, wherever focus is;
  * - Space and Enter belong to a focused `<button>`, link or `<summary>`, and
- *   every key belongs to a focused `<select>`, slider, checkbox or other
- *   non-text input.
+ *   every key belongs to a focused slider, checkbox or other non-text input.
  *
- * One exception, for Space only: a control that got focus from a pointer click
- * or drag keeps focus without the user having navigated to it, and Space is
- * the transport key, so it stays a shortcut there. Clicking Mute, dragging a
- * volume slider or picking a value from a dropdown, and then pressing Space,
- * still plays. Enter always goes to the focused control.
+ * One exception, for Space only, and only for buttons, links, sliders and
+ * checkboxes: one that got focus from a pointer click or drag keeps focus
+ * without the user having navigated to it, and Space is the transport key, so
+ * it stays a shortcut there. Clicking Mute or dragging a volume slider, and
+ * then pressing Space, still plays. Enter always goes to the focused control.
  *
  * `handleKeyboardEvent` applies this itself. It is exported for listeners that
  * match keys on their own.
@@ -254,8 +245,8 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   // Space on a control the user only clicked or dragged stays a shortcut.
   const isPointerSpace = event.key === ' ' && !isKeyboardOperated(focused);
 
-  // Sliders, checkboxes and dropdowns keep every key (except that Space).
-  if (isNonTextInput(focused) || isDropdown(focused)) return !isPointerSpace;
+  // Sliders and checkboxes keep every key (except that Space).
+  if (isNonTextInput(focused)) return !isPointerSpace;
   if (ownsAllKeys(focused)) return true;
   if ((event.key === ' ' || event.key === 'Enter') && isActivatable(focused)) {
     return !isPointerSpace;

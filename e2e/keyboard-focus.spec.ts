@@ -55,7 +55,7 @@ test.describe('Shortcuts and focused controls', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('Space is still play/pause after using a dropdown with the pointer', async ({
+  test('a dropdown that was clicked keeps Space: it does not start playback', async ({
     page,
     baseURL,
   }) => {
@@ -66,15 +66,13 @@ test.describe('Shortcuts and focused controls', () => {
     await select.scrollIntoViewIfNeeded();
     await select.click();
     await expect(select).toBeFocused();
-    // Escape belongs to the dropdown (it closes the list) and must not be a shortcut.
+    // Close the list; the dropdown keeps focus.
     await page.keyboard.press('Escape');
     await expect(select).toBeFocused();
 
+    // Space belongs to the focused dropdown (it opens the list), not to play/pause.
     await page.keyboard.press('Space');
-    // Play is disabled while playing.
-    await expect(page.getByRole('button', { name: 'Play', exact: true }).first()).toBeDisabled({
-      timeout: 10000,
-    });
+    await expectNotPlaying(page);
   });
 
   test.describe('multi-clip', () => {
