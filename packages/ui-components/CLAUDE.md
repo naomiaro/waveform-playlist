@@ -93,6 +93,8 @@
 
 `Channel.tsx` stamps each canvas with `canvas.dataset.drawVersion` after drawing. The `useLayoutEffect` skips canvases whose stamp matches the current `drawVersion` fingerprint (derived from data, bits, colors, dimensions, drawMode). Only newly mounted canvases (no stamp) or canvases after a parameter change (stamp mismatch) get redrawn. Without this, changing `visibleChunkIndices` redraws ALL mounted chunks — causing 23ms+ spikes with multiple tracks at fine zoom.
 
+**Also applied in `PianoRollChannel` and `TimeScale` (#699).** All three build the stamp the same way: primitives that affect the drawing, plus `useIdentityVersion(value)` (`src/hooks/useIdentityVersion.ts`) for the array or map being drawn, so a replacement with equal contents still redraws. Anything that changes a canvas's `width`/`height` attribute must be in the stamp, because resizing a canvas clears it (`TimeScale` includes `widthX` for that reason). Two inputs are kept stable so the stamp does not change needlessly: `SmartChannel` passes one module-level empty array when a piano-roll channel has no notes, and `SmartScale` computes tick positions in a memo that does not depend on `renderTick` (labels are built in a second memo), so an inline `renderTick` re-renders labels without redrawing tick canvases. `TimeScale` sorts the ticks once per tick map and binary-searches each chunk's range. `canvasDrawVersionStamping.test.tsx` mocks `useVisibleChunkIndices` to simulate scrolling and counts `clearRect` per chunk.
+
 ## Horizontal Virtual Scrolling (Phase 4)
 
 **Decision:** Viewport-aware canvas rendering — only mount canvas chunks visible in the scroll container + buffer.

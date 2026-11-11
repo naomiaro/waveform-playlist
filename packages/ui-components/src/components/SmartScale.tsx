@@ -76,6 +76,21 @@ const TimeStamp = styled.div.attrs<TimeStampProps>((props) => ({
   color: ${(props) => props.theme.timeColor}; /* Use theme color instead of inheriting */
 `;
 
+interface TickLabel {
+  /** Stable React key for the label element */
+  id: string;
+  pix: number;
+  text: string;
+  /** Which scale produced it; selects the default label element */
+  mode: 'beats' | 'temporal';
+}
+
+interface TickLayout {
+  widthX: number;
+  canvasInfo: Map<number, number>;
+  labels: TickLabel[];
+}
+
 export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) => {
   const { samplesPerPixel, sampleRate, duration, timeScaleHeight } =
     useContext(PlaylistInfoContext);
@@ -84,13 +99,17 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) =
   // Pre-compute tick data for beats & bars mode using integer PPQN math.
   // This avoids millisecond-based modular arithmetic which breaks
   // with non-integer beat durations (e.g., 119 BPM → 504.20ms per beat).
-  const tickData = useMemo<PrecomputedTickData>(() => {
+  //
+  // Tick positions and label text only. `renderTick` is not an input, so a
+  // consumer passing an inline `renderTick` does not rebuild the tick map, and
+  // the tick canvases (keyed on that map's identity) are not redrawn.
+  const tickLayout = useMemo<TickLayout>(() => {
     const widthX = secondsToPixels(duration / 1000, samplesPerPixel, sampleRate);
 
     if (beatsAndBars && beatsAndBars.scaleMode === 'beats') {
       const { bpm, timeSignature, ticksPerBar: tpBar, ticksPerBeat: tpBeat } = beatsAndBars;
       const canvasInfo = new Map<number, number>();
-      const timeMarkersWithPositions: Array<{ pix: number; element: React.ReactNode }> = [];
+      const labels: TickLabel[] = [];
 
       // Total duration in PPQN ticks
       const durationSeconds = duration / 1000;
@@ -144,27 +163,16 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) =
         canvasInfo.set(pix, tickHeight);
 
         if (isLabelTick) {
-          const label = ticksToBarBeatLabel(tick, timeSignature);
-          const element = renderTick ? (
-            <React.Fragment key={`bb-${tick}`}>{renderTick(label, pix)}</React.Fragment>
-          ) : (
-            <div
-              key={`bb-${tick}`}
-              style={{
-                position: 'absolute',
-                left: `${pix + 4}px`,
-                fontSize: '0.75rem',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {label}
-            </div>
-          );
-          timeMarkersWithPositions.push({ pix, element });
+          labels.push({
+            id: `bb-${tick}`,
+            pix,
+            text: ticksToBarBeatLabel(tick, timeSignature),
+            mode: 'beats',
+          });
         }
       }
 
-      return { widthX, canvasInfo, timeMarkersWithPositions };
+      return { widthX, canvasInfo, labels };
     }
 
     // Temporal mode — iterate using timeinfo-based millisecond steps,
@@ -172,7 +180,7 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) =
     const config = getScaleInfo(samplesPerPixel);
     const { marker, bigStep, smallStep } = config;
     const canvasInfo = new Map<number, number>();
-    const timeMarkersWithPositions: Array<{ pix: number; element: React.ReactNode }> = [];
+    const labels: TickLabel[] = [];
     const pixPerSec = sampleRate / samplesPerPixel;
 
     let counter = 0;
@@ -180,17 +188,12 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) =
       const pix = Math.floor(i);
 
       if (counter % marker === 0) {
-        const timestamp = formatTime(counter);
-
-        const element = renderTick ? (
-          <React.Fragment key={`timestamp-${counter}`}>{renderTick(timestamp, pix)}</React.Fragment>
-        ) : (
-          <TimeStamp key={timestamp} $left={pix}>
-            {timestamp}
-          </TimeStamp>
-        );
-
-        timeMarkersWithPositions.push({ pix, element });
+        labels.push({
+          id: `timestamp-${counter}`,
+          pix,
+          text: formatTime(counter),
+          mode: 'temporal',
+        });
         canvasInfo.set(pix, timeScaleHeight);
       } else if (counter % bigStep === 0) {
         canvasInfo.set(pix, Math.floor(timeScaleHeight / 2));
@@ -201,8 +204,39 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) =
       counter += smallStep;
     }
 
-    return { widthX, canvasInfo, timeMarkersWithPositions };
-  }, [beatsAndBars, duration, samplesPerPixel, sampleRate, timeScaleHeight, renderTick]);
+    return { widthX, canvasInfo, labels };
+  }, [beatsAndBars, duration, samplesPerPixel, sampleRate, timeScaleHeight]);
+
+  // Label elements. Rebuilt when `renderTick` changes; the tick map is not.
+  const tickData = useMemo<PrecomputedTickData>(
+    () => ({
+      widthX: tickLayout.widthX,
+      canvasInfo: tickLayout.canvasInfo,
+      timeMarkersWithPositions: tickLayout.labels.map(({ id, pix, text, mode }) => ({
+        pix,
+        element: renderTick ? (
+          <React.Fragment key={id}>{renderTick(text, pix)}</React.Fragment>
+        ) : mode === 'beats' ? (
+          <div
+            key={id}
+            style={{
+              position: 'absolute',
+              left: `${pix + 4}px`,
+              fontSize: '0.75rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {text}
+          </div>
+        ) : (
+          <TimeStamp key={id} $left={pix}>
+            {text}
+          </TimeStamp>
+        ),
+      })),
+    }),
+    [tickLayout, renderTick]
+  );
 
   return <StyledTimeScale tickData={tickData} />;
 };

@@ -1,0 +1,254 @@
+// #699: PianoRollChannel and TimeScale redrew every mounted canvas chunk whenever
+// the set of visible chunks changed. Like Channel, they now stamp each canvas
+// with the parameters it was drawn with and skip the ones that are current.
+import React from 'react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render as rtlRender, cleanup, screen } from '@testing-library/react';
+import { ThemeProvider } from 'styled-components';
+import type { MidiNoteData } from '@waveform-playlist/core';
+
+// Without a ScrollViewportProvider every chunk is "visible". The tests control
+// the visible set directly to simulate scrolling.
+let visibleChunks: number[] = [];
+vi.mock('../contexts/ScrollViewport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contexts/ScrollViewport')>()),
+  useVisibleChunkIndices: () => visibleChunks,
+}));
+
+import { PianoRollChannel } from '../components/PianoRollChannel';
+import { SmartChannel } from '../components/SmartChannel';
+import { StyledTimeScale, type PrecomputedTickData } from '../components/TimeScale';
+import { SmartScale } from '../components/SmartScale';
+import { defaultTheme } from '../wfpl-theme';
+
+// TimeScale reads its tick colour from the theme.
+const Themed: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ThemeProvider theme={defaultTheme}>{children}</ThemeProvider>
+);
+const render = (ui: React.ReactElement) => rtlRender(ui, { wrapper: Themed });
+
+interface ChunkLog {
+  clears: number;
+  fillRects: Array<[number, number, number, number]>;
+  roundRects: number;
+}
+
+/** Draw calls per chunk index (the canvas's data-index). */
+let log: Map<number, ChunkLog>;
+
+function chunkLog(canvas: HTMLCanvasElement): ChunkLog {
+  const index = Number(canvas.dataset.index);
+  let entry = log.get(index);
+  if (!entry) {
+    entry = { clears: 0, fillRects: [], roundRects: 0 };
+    log.set(index, entry);
+  }
+  return entry;
+}
+
+beforeEach(() => {
+  log = new Map();
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+    this: HTMLCanvasElement
+  ) {
+    const entry = chunkLog(this);
+    return {
+      resetTransform() {},
+      scale() {},
+      beginPath() {},
+      fill() {},
+      clearRect() {
+        entry.clears++;
+      },
+      fillRect(x: number, y: number, w: number, h: number) {
+        entry.fillRects.push([x, y, w, h]);
+      },
+      roundRect() {
+        entry.roundRects++;
+      },
+    } as unknown as CanvasRenderingContext2D;
+  } as unknown as HTMLCanvasElement['getContext']);
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+const clears = () =>
+  Object.fromEntries([...log.entries()].sort(([a], [b]) => a - b).map(([i, e]) => [i, e.clears]));
+
+const NOTES: MidiNoteData[] = [
+  { midi: 60, name: 'C4', time: 0.5, duration: 0.5, velocity: 0.8 },
+  { midi: 64, name: 'E4', time: 25, duration: 0.5, velocity: 0.8 },
+  { midi: 67, name: 'G4', time: 45, duration: 0.5, velocity: 0.8 },
+];
+
+// 48 px per second: chunk 0 = 0..20.8 s, chunk 1 = ..41.7 s, chunk 2 = ..62.5 s
+const pianoProps = {
+  index: 0,
+  midiNotes: NOTES,
+  length: 3000,
+  waveHeight: 80,
+  devicePixelRatio: 1,
+  samplesPerPixel: 1000,
+  sampleRate: 48000,
+  clipOffsetSeconds: 0,
+};
+
+describe('PianoRollChannel', () => {
+  it('draws only the chunk that scrolled into view', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<PianoRollChannel {...pianoProps} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+
+    visibleChunks = [1, 2];
+    rerender(<PianoRollChannel {...pianoProps} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1, 2: 1 });
+    expect(log.get(2)!.roundRects).toBe(1);
+  });
+
+  it('redraws every chunk when a drawing parameter changes', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<PianoRollChannel {...pianoProps} />);
+
+    rerender(<PianoRollChannel {...pianoProps} isSelected />);
+    expect(clears()).toEqual({ 0: 2, 1: 2 });
+
+    rerender(<PianoRollChannel {...pianoProps} isSelected samplesPerPixel={500} />);
+    expect(clears()).toEqual({ 0: 3, 1: 3 });
+  });
+
+  it('redraws when the notes are replaced, even by an equal list', () => {
+    visibleChunks = [0];
+    const { rerender } = render(<PianoRollChannel {...pianoProps} />);
+    rerender(<PianoRollChannel {...pianoProps} midiNotes={[...NOTES]} />);
+    expect(clears()).toEqual({ 0: 2 });
+  });
+
+  it('does not redraw on a re-render with the same props', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<PianoRollChannel {...pianoProps} />);
+    rerender(<PianoRollChannel {...pianoProps} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+  });
+});
+
+describe('SmartChannel in piano-roll mode without notes', () => {
+  it('does not redraw on re-render (the empty note list keeps its identity)', () => {
+    visibleChunks = [0];
+    const props = {
+      index: 0,
+      data: new Int8Array(0),
+      bits: 8 as const,
+      length: 500,
+      renderMode: 'piano-roll' as const,
+    };
+    const { rerender } = render(<SmartChannel {...props} />);
+    rerender(<SmartChannel {...props} />);
+    rerender(<SmartChannel {...props} />);
+    expect(clears()).toEqual({ 0: 1 });
+  });
+});
+
+function tickData(canvasInfo: Map<number, number>, label = 'a'): PrecomputedTickData {
+  return {
+    widthX: 3000,
+    canvasInfo,
+    timeMarkersWithPositions: [{ pix: 0, element: <span key="m">{label}</span> }],
+  };
+}
+
+describe('TimeScale', () => {
+  const TICKS = new Map<number, number>([
+    [0, 15],
+    [500, 7],
+    [1000, 15],
+    [1250, 3],
+    [2999, 7],
+  ]);
+
+  it('draws each tick in its own chunk, at the chunk-local x', () => {
+    visibleChunks = [0, 1, 2];
+    render(<StyledTimeScale tickData={tickData(TICKS)} />);
+
+    expect(log.get(0)!.fillRects).toEqual([
+      [0, 0, 1, 15],
+      [500, 8, 1, 7],
+    ]);
+    expect(log.get(1)!.fillRects).toEqual([
+      [0, 0, 1, 15],
+      [250, 12, 1, 3],
+    ]);
+    expect(log.get(2)!.fillRects).toEqual([[999, 8, 1, 7]]);
+  });
+
+  it('draws the same ticks when the map is not in pixel order', () => {
+    visibleChunks = [0, 1, 2];
+    const unsorted = new Map([...TICKS.entries()].reverse());
+    render(<StyledTimeScale tickData={tickData(unsorted)} />);
+
+    expect(log.get(0)!.fillRects).toHaveLength(2);
+    expect(log.get(1)!.fillRects).toEqual([
+      [0, 0, 1, 15],
+      [250, 12, 1, 3],
+    ]);
+    expect(log.get(2)!.fillRects).toEqual([[999, 8, 1, 7]]);
+  });
+
+  it('draws only the chunk that scrolled into view', () => {
+    visibleChunks = [0, 1];
+    const data = tickData(TICKS);
+    const { rerender } = render(<StyledTimeScale tickData={data} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+
+    visibleChunks = [1, 2];
+    rerender(<StyledTimeScale tickData={data} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1, 2: 1 });
+  });
+
+  it('does not redraw when only the labels change', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<StyledTimeScale tickData={tickData(TICKS, 'a')} />);
+    rerender(<StyledTimeScale tickData={tickData(TICKS, 'b')} />);
+
+    expect(screen.getByText('b')).toBeDefined();
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+  });
+
+  it('redraws when the width changes (resizing a canvas clears it)', () => {
+    visibleChunks = [0];
+    const { rerender } = render(<StyledTimeScale tickData={tickData(TICKS)} />);
+    rerender(<StyledTimeScale tickData={{ ...tickData(TICKS), widthX: 800 }} />);
+    expect(clears()).toEqual({ 0: 2 });
+  });
+
+  it('redraws when the ticks change', () => {
+    visibleChunks = [0];
+    const { rerender } = render(<StyledTimeScale tickData={tickData(TICKS)} />);
+    rerender(<StyledTimeScale tickData={tickData(new Map(TICKS))} />);
+    expect(clears()).toEqual({ 0: 2 });
+  });
+});
+
+describe('SmartScale', () => {
+  // Default PlaylistInfo: 30 s at 48 px per second = 1440 px = two chunks.
+  it('does not redraw the ticks when renderTick is a new function', () => {
+    visibleChunks = [0, 1];
+    const { rerender } = render(<SmartScale renderTick={(label) => <i>{'one ' + label}</i>} />);
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+    expect(screen.getByText('one 0:00')).toBeDefined();
+
+    rerender(<SmartScale renderTick={(label) => <i>{'two ' + label}</i>} />);
+    expect(screen.getByText('two 0:00')).toBeDefined();
+    expect(clears()).toEqual({ 0: 1, 1: 1 });
+  });
+
+  it('renders default labels and the same ticks without renderTick', () => {
+    visibleChunks = [0, 1];
+    render(<SmartScale />);
+    expect(screen.getByText('0:00')).toBeDefined();
+    expect(log.get(0)!.fillRects.length).toBeGreaterThan(0);
+    expect(log.get(1)!.fillRects.length).toBeGreaterThan(0);
+  });
+});

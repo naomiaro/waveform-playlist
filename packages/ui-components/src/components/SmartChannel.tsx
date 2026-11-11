@@ -35,6 +35,10 @@ export interface SmartChannelProps {
   clipOffsetSeconds?: number;
 }
 
+// One empty list for every piano-roll channel without notes. An inline `[]`
+// would be a new array on each render and force a redraw.
+const EMPTY_MIDI_NOTES: MidiNoteData[] = [];
+
 export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   isSelected,
   transparentBackground,
@@ -135,7 +139,7 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
     return (
       <PianoRollChannel
         index={props.index}
-        midiNotes={midiNotes ?? []}
+        midiNotes={midiNotes ?? EMPTY_MIDI_NOTES}
         length={props.length}
         waveHeight={waveHeight}
         devicePixelRatio={devicePixelRatio}
