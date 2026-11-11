@@ -508,7 +508,11 @@ interface UseDynamicEffectsReturn {
    * list changes, so a slider step re-renders that component only.
    */
   effects: ValueSource<ActiveEffect[]>;
-  /** The built-in effects, then every type registered with `registerEffect()`. */
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
   /**
    * Adds a built-in effect or a registered custom effect by id. A built-in is
@@ -529,9 +533,16 @@ interface UseDynamicEffectsReturn {
   /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
   getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
-  updateParameter: (instanceId: string, paramName: string, value: number | string | boolean) => void;
+  /** Set a parameter on the live effect. For a registered custom effect a
+   *  value that is not a number is ignored. */
+  updateParameter: (instanceId: string, paramName: string, value: EffectParameterValue) => void;
   toggleBypass: (instanceId: string) => void;
   reorderEffects: (fromIndex: number, toIndex: number) => void;
+  /**
+   * Remove and dispose every effect. An add that is still waiting (a
+   * registered effect's `prepare`, a WAM plugin loading) is dropped too: its
+   * promise rejects and nothing is appended after the clear.
+   */
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
   /**
@@ -547,19 +558,21 @@ interface UseDynamicEffectsReturn {
   analyserRef: RefObject<Analyser | null>;
 }
 
+type EffectParameterValue = number | string | boolean;
+
 interface ActiveEffect {
   instanceId: string;
   effectId: string;
   /**
-   * 'native' = built-in Tone.js effect; 'wam' = hosted WAM plugin;
+   * 'tone' = built-in Tone.js effect; 'wam' = hosted WAM plugin;
    * 'custom' = a type registered with `registerEffect()` from
    * `@waveform-playlist/core`.
    */
-  kind: 'native' | 'wam' | 'custom';
+  kind: 'tone' | 'wam' | 'custom';
   /** Module URL for wam entries. */
   url?: string;
   definition: EffectDefinition;
-  params: Record<string, number | string | boolean>;
+  params: Record<string, EffectParameterValue>;
   bypassed: boolean;
   /**
    * The effect's wet/dry parameter, when it has one. Bypass sets it to 0 and
@@ -570,7 +583,9 @@ interface ActiveEffect {
 }
 ```
 
-The hook does not re-render when the chain changes. Everything it returns keeps its identity for the life of the component (`masterEffects` follows `fftSize`; `availableEffects` follows the registry).
+The hook does not re-render when the chain changes. Everything it returns keeps its identity for the life of the component (`masterEffects` follows `fftSize`; `availableEffects` is read from the registry each time the calling component renders, not subscribed: register custom effects before the component that shows the picker renders; adding by id does not depend on it). Call the hook once and pass its result down: a second call creates a second, empty chain.
+
+The chains are state: they survive a StrictMode remount, Fast Refresh and a hidden `<Activity>` with their lists and live instances; the hooks run no cleanup on unmount. Add defaults on mount behind a ref guard (an unguarded mount effect adds twice under StrictMode in development). After a real unmount the instances are disposed when the chain is garbage-collected (`FinalizationRegistry`; best effort, not prompt, not guaranteed); call `clearAllEffects()` / `clearTrackEffects(trackId)` to dispose them at a known moment. A clear also drops an add still in flight: its promise rejects with "…aborted: the effects chain was cleared before …". An unmount does not abort an add. If a change cannot be wired (a node on another AudioContext), the previous chain is restored, the new instance is disposed, the list is not changed and the add rejects. A type re-registered while its `prepare` was running is added as the new definition.
 
 ### useTrackDynamicEffects
 
@@ -608,10 +623,12 @@ interface UseTrackDynamicEffectsReturn {
     trackId: string,
     instanceId: string,
     paramName: string,
-    value: number | string | boolean
+    value: EffectParameterValue
   ) => void;
   toggleBypass: (trackId: string, instanceId: string) => void;
   reorderTrackEffects: (trackId: string, fromIndex: number, toIndex: number) => void;
+  /** Remove and dispose every effect of one track. An add to that track that
+   *  is still waiting is dropped too: its promise rejects. */
   clearTrackEffects: (trackId: string) => void;
   /**
    * The effects function to give a track (`track.effects`). The same function
@@ -626,7 +643,11 @@ interface UseTrackDynamicEffectsReturn {
    * an effect the live chain has.
    */
   createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction;
-  /** The built-in effects, then every type registered with `registerEffect()`. */
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
 }
 
@@ -716,9 +737,11 @@ interface CustomEffectInstance extends EffectInstance {
 }
 
 /**
- * The built-in effects followed by every registered custom effect. Returns
- * the same array until the registry changes, so it is safe to read during
- * render.
+ * The effects that can be added right now: the built-in effects, followed by
+ * every registered custom effect when the app is in native-context mode (a
+ * registered effect cannot be added without it). Returns the same array until
+ * that set changes, so it is safe to read during render. It is a read, not a
+ * subscription: a type registered later appears the next time this is called.
  */
 function getAvailableEffects(): EffectDefinition[];
 
@@ -733,7 +756,7 @@ function createCustomEffectInstance(
 
 ### Effect registry (`@waveform-playlist/core`)
 
-*Shared by `<daw-editor>` and the React effects hooks: one `registerEffect()` call serves both. The registry state lives on `globalThis`, so two installed copies of core share it. `@dawcore/components` no longer exports these; importing it still registers its `native-*` built-ins. In React a registered type is added with `addEffect(id)` / `addEffectToTrack(trackId, id)` and requires native-context mode (`configureGlobalContext({ nativeAudioContext: true })`); `prepare` is awaited by `addEffect` on the live context and by WAV export on the offline context. With `<daw-editor>`, call `await editor.prepareEffect(type)` before the synchronous `addEffect()`.*
+*Shared by `<daw-editor>` and the React effects hooks: one `registerEffect()` call serves both. The registry state lives on `globalThis`, so two installed copies of core share it. `@dawcore/components` no longer exports these; importing it still registers its `native-*` built-ins, each only if that name is not already registered. In React a registered type is added with `addEffect(id)` / `addEffectToTrack(trackId, id)` and requires native-context mode (`configureGlobalContext({ nativeAudioContext: true })`); `prepare` is awaited by `addEffect` on the live context and by WAV export on the offline context. With `<daw-editor>`, call `await editor.prepareEffect(type)` before the synchronous `addEffect()`.*
 
 ```typescript
 function registerEffect(type: string, definition: NativeEffectDefinition): void;
@@ -750,7 +773,10 @@ function prepareEffect(type: string, audioContext: BaseAudioContext): Promise<vo
 function needsPrepare(type: string, audioContext: BaseAudioContext): boolean;
 /** Await a type's preparation until it holds for the definition registered now. */
 function ensureEffectPrepared(type: string, audioContext: BaseAudioContext): Promise<void>;
-/** Throws for an unknown type. */
+/** Throws for an unknown type. A `create` throw on a context where the type's
+ *  `prepare` has not completed is rethrown with a hint (original in `cause`).
+ *  An instance whose initial `applyParams` throws is disposed before the
+ *  error is rethrown. */
 function createEffectInstance(
   type: string,
   audioContext: BaseAudioContext,
@@ -768,8 +794,15 @@ interface EffectParamDef {
   label?: string;
 }
 
-/** A live, wired effect. `input`/`output` are the chain attachment points
- *  (the same node for single-node effects). */
+/**
+ * A live, wired effect. `input`/`output` are the chain attachment points
+ * (the same node for single-node effects). `applyParams` updates AudioParams
+ * in place — the chain never rebuilds for parameter changes.
+ *
+ * The host owns every connection OUT of `output`: when it rewires the chain
+ * it disconnects all of them. Do not connect `output` to anything inside the
+ * effect (a feedback path, say); take such a tap from a node before it.
+ */
 interface NativeEffectInstance {
   input: AudioNode;
   output: AudioNode;
@@ -1798,7 +1831,7 @@ createEffectChain(effects: EffectInstance[]): {
   output: ToneAudioNode | AudioNode;
   dispose: () => void;
 };
-getAvailableEffects(): EffectDefinition[]; // built-ins, then registered custom types
+getAvailableEffects(): EffectDefinition[]; // built-ins, then (native-context mode only) registered custom types
 // The registry functions (registerEffect, a different createEffectInstance, …)
 // are from `@waveform-playlist/core` — see "Effect registry" above.
 

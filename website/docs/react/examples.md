@@ -139,17 +139,36 @@ Host third-party [Web Audio Modules (WAM 2.0)](https://www.webaudiomodules.com/)
 [View WAM! Kick It Up a Notch](/examples/wam-effects)
 
 ```tsx
-import { useDynamicEffects, useActiveEffects, WamEffectGui } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import {
+  useDynamicEffects,
+  useActiveEffects,
+  WamEffectGui,
+  type UseDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
 
-function MasterRack() {
-  const { effects, addWamEffect, getWamPlugin } = useDynamicEffects();
+const DELAY_URL =
+  'https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js';
+
+function App({ tracks }: { tracks: ClipTrack[] }) {
+  // One useDynamicEffects() call owns the master chain; pass its result down.
+  const masterFx = useDynamicEffects();
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+      <MasterRack masterFx={masterFx} />
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+function MasterRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
+  const { effects, addWamEffect, getWamPlugin } = masterFx;
   const activeEffects = useActiveEffects(effects);
 
   return (
     <div>
-      <button onClick={() => addWamEffect('https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js')}>
-        + Simple Delay
-      </button>
+      <button onClick={() => addWamEffect(DELAY_URL).catch(console.error)}>+ Simple Delay</button>
       {activeEffects.map((effect) =>
         effect.kind === 'wam' ? (
           <WamEffectGui key={effect.instanceId} plugin={getWamPlugin(effect.instanceId)} />

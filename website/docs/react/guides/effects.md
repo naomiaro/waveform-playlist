@@ -295,7 +295,27 @@ function EffectsRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
 
 `addEffect(id)` returns a `Promise<string>` that resolves with the new entry's `instanceId`. A built-in effect is in the chain before the call returns; the promise is there for [custom effects](#custom-effects), which may load a worklet first. An id that is neither a built-in nor a registered type rejects.
 
-`availableEffects` lists the built-in effects followed by every registered custom effect.
+`availableEffects` lists the effects that can be added: the built-in effects and, when the app is in native AudioContext mode, the [custom effects](#custom-effects) registered so far. It is read when the component that called the hook renders and is not a subscription, so a type registered after that render appears only on that component's next render. Adding by id does not depend on the list: `addEffect('my-id')` works for any registered type.
+
+### Lifetime of a chain
+
+A chain behaves like React state: it survives a StrictMode remount, Fast Refresh and a hidden `<Activity>`, with its list and its live effect instances.
+
+- To add default effects once on mount, guard the effect with a ref. An unguarded `useEffect(() => { addEffect('reverb'); }, [])` adds two reverbs under StrictMode in development, as any non-idempotent effect on surviving state does.
+
+  ```tsx
+  const addedDefaults = useRef(false);
+  useEffect(() => {
+    if (addedDefaults.current) return;
+    addedDefaults.current = true;
+    addEffect('reverb').catch(console.error);
+  }, [addEffect]);
+  ```
+
+- When the component that owns the hook unmounts for good, its effect instances are not disposed at that moment. They are disposed when the chain is garbage-collected, which is best effort: not prompt and not guaranteed. To release them at a known moment (an AudioWorklet that keeps processing, a WAM plugin), call `clearAllEffects()`, or `clearTrackEffects(trackId)` for each track, before the component goes away.
+- `clearAllEffects()` and `clearTrackEffects(trackId)` also drop an add that is still in flight (a custom effect's `prepare`, a WAM plugin loading): its promise rejects with an "aborted: the effects chain was cleared" error and nothing is appended. An unmount does not abort an add.
+
+If a change cannot be wired (for example an effect whose nodes belong to another AudioContext), the previous chain is restored, the new instance is disposed, the list is left as it was, and the add rejects.
 
 ### Per-Track Effects
 
@@ -373,16 +393,44 @@ Bypassed effects are left out of a WAV export.
 Pass the offline effects functions to `useExportWav()` or `ExportWavButton`. Both hooks always return a function, the same one on every call, and it reads the chain when the export runs. With no active effect it passes the audio straight through.
 
 ```tsx
-import { useExportWav } from '@waveform-playlist/browser/tone';
+import { usePlaylistData } from '@waveform-playlist/browser';
+import {
+  useExportWav,
+  type UseDynamicEffectsReturn,
+  type UseTrackDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
 
-const { exportWav } = useExportWav();
-const { createOfflineEffectsFunction } = masterFx;
-const { createOfflineTrackEffectsFunction } = trackFx;
+// Rendered inside WaveformPlaylistProvider. masterFx and trackFx are the
+// objects returned by the single useDynamicEffects() / useTrackDynamicEffects()
+// calls in the component that renders the provider.
+function ExportButton({
+  masterFx,
+  trackFx,
+}: {
+  masterFx: UseDynamicEffectsReturn;
+  trackFx: UseTrackDynamicEffectsReturn;
+}) {
+  const { tracks, trackStates } = usePlaylistData();
+  const { exportWav, isExporting } = useExportWav();
 
-await exportWav(tracks, trackStates, {
-  effectsFunction: createOfflineEffectsFunction(),
-  createOfflineTrackEffects: createOfflineTrackEffectsFunction,
-});
+  const handleExport = async () => {
+    try {
+      await exportWav(tracks, trackStates, {
+        filename: 'mix',
+        effectsFunction: masterFx.createOfflineEffectsFunction(),
+        createOfflineTrackEffects: trackFx.createOfflineTrackEffectsFunction,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <button onClick={handleExport} disabled={isExporting}>
+      Export WAV
+    </button>
+  );
+}
 ```
 
 The export rejects if an effect in the live chain cannot be rebuilt on the offline context. It does not render without it.
@@ -413,6 +461,12 @@ This example is a tremolo written as an AudioWorklet processor. The processor fi
 
 ```javascript
 // public/worklets/demo-tremolo-processor.js
+// A hand-written AudioWorklet effect for the custom-effect demo: tremolo
+// (amplitude modulation). Loaded with audioWorklet.addModule() from the
+// effect definition's prepare() hook, once per AudioContext.
+//
+// Kept short for the demo: rate and depth are read once per block, so a fast
+// slider move can click. A production effect would smooth them.
 class DemoTremoloProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
@@ -424,6 +478,13 @@ class DemoTremoloProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.phase = 0;
+    this.alive = true;
+    // The effect's dispose() posts this. Until then the processor must keep
+    // returning true: in Chrome a processor that returned false while nothing
+    // was connected (the effect bypassed) is not started again on reconnect.
+    this.port.onmessage = (event) => {
+      if (event.data === 'dispose') this.alive = false;
+    };
   }
 
   process(inputs, outputs, parameters) {
@@ -443,12 +504,16 @@ class DemoTremoloProcessor extends AudioWorkletProcessor {
       }
     }
     this.phase = (this.phase + frames * step) % (2 * Math.PI);
-    return true;
+    // false only after dispose(): otherwise every removed tremolo would keep
+    // running until the page closes.
+    return this.alive;
   }
 }
 
 registerProcessor('demo-tremolo', DemoTremoloProcessor);
 ```
+
+The processor keeps returning `true` from `process()` until the effect's `dispose` tells it to stop over the port. Do not return `false` as a way to stop while the effect may be used again: in Chrome, a processor that returned `false` while nothing was connected to it (the effect bypassed by disconnection) did not run again when it was reconnected.
 
 The definition tells the hooks how to load and build it:
 
@@ -460,6 +525,10 @@ export const DEMO_TREMOLO = 'demo-tremolo';
 
 const MODULE_URL = '/worklets/demo-tremolo-processor.js';
 
+/**
+ * Register a custom effect backed by an AudioWorkletNode. One registration
+ * serves the React effects hooks and `<daw-editor>`.
+ */
 export function registerDemoTremolo(): void {
   if (getEffectDefinitions().has(DEMO_TREMOLO)) return;
 
@@ -488,7 +557,12 @@ export function registerDemoTremolo(): void {
             if (param && params[name] !== undefined) param.value = params[name];
           }
         },
-        dispose: () => node.disconnect(),
+        // Lets the processor stop; a worklet that returns true from process()
+        // runs until the page closes otherwise.
+        dispose: () => {
+          node.port.postMessage('dispose');
+          node.disconnect();
+        },
       };
     },
   });
@@ -507,24 +581,57 @@ The fields of a definition (`NativeEffectDefinition` from `@waveform-playlist/co
 | `prepare(audioContext)` | No | Async setup that must finish before `create` can run on a context, typically `audioWorklet.addModule(url)`. It must be safe to run more than once on the same context. |
 | `wetParam` | No | Name of the effect's wet/dry parameter. When set, bypass sets that parameter to 0 and leaves the effect connected. When omitted, bypass disconnects the effect. |
 
+The host owns every connection out of the returned `output` node and disconnects all of them when it rewires the chain. Do not connect `output` to anything inside the effect (a feedback path, for example); take such a tap from a node before it.
+
 ### Add it
 
 ```tsx
-import { useDynamicEffects, useTrackDynamicEffects } from '@waveform-playlist/browser/tone';
+import type {
+  UseDynamicEffectsReturn,
+  UseTrackDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
 import { registerDemoTremolo, DEMO_TREMOLO } from './demoTremoloEffect';
 
-registerDemoTremolo(); // module scope, or before the first render
+// Module scope: registered before any component that shows a picker renders.
+registerDemoTremolo();
 
-const { addEffect, updateParameter } = useDynamicEffects();
-const { addEffectToTrack } = useTrackDynamicEffects();
+// masterFx and trackFx come from the single useDynamicEffects() /
+// useTrackDynamicEffects() calls in the component that renders the provider
+// (see the App components above).
+function TremoloButtons({
+  masterFx,
+  trackFx,
+  trackId,
+}: {
+  masterFx: UseDynamicEffectsReturn;
+  trackFx: UseTrackDynamicEffectsReturn;
+  trackId: string;
+}) {
+  const addToMaster = async () => {
+    try {
+      const instanceId = await masterFx.addEffect(DEMO_TREMOLO);
+      masterFx.updateParameter(instanceId, 'rate', 8);
+    } catch (err) {
+      console.error(err); // e.g. the app is not in native AudioContext mode
+    }
+  };
 
-const id = await addEffect(DEMO_TREMOLO); // master chain
-updateParameter(id, 'rate', 8);
+  const addToTrack = () => {
+    trackFx.addEffectToTrack(trackId, DEMO_TREMOLO).catch(console.error);
+  };
 
-await addEffectToTrack(trackId, DEMO_TREMOLO); // one track
+  return (
+    <>
+      <button onClick={addToMaster}>Tremolo on master</button>
+      <button onClick={addToTrack}>Tremolo on this track</button>
+    </>
+  );
+}
 ```
 
-`addEffect` awaits the definition's `prepare` hook on the live context and then creates the effect, so there is no separate prepare call in React. The entry has `kind: 'custom'`. Its sliders, bypass, reorder and remove work like any other entry, and the type appears at the end of `availableEffects`.
+`addEffect` awaits the definition's `prepare` hook on the live context and then creates the effect, so there is no separate prepare call in React. The entry has `kind: 'custom'`. Its sliders, bypass, reorder and remove work like any other entry. Its parameters are numbers: `updateParameter` ignores a value that is not a number for a custom effect. In native AudioContext mode the type is listed after the built-ins in `availableEffects`; register custom effects before the component that shows the picker renders, because the list is read at render and does not follow later registrations.
+
+If the type is registered again while `prepare` is running, the effect is added from the new definition.
 
 A built-in id wins over a registered type of the same name, so pick an id that does not collide with the [built-in ids](#available-effects).
 

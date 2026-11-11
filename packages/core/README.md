@@ -132,14 +132,28 @@ registerEffect('my-tremolo', {
       input: node,
       output: node,
       applyParams: (params) => {
-        if (params.rate !== undefined) node.parameters.get('rate').value = params.rate;
-        if (params.depth !== undefined) node.parameters.get('depth').value = params.depth;
+        for (const name of ['rate', 'depth']) {
+          const param = node.parameters.get(name); // AudioParam | undefined
+          const value = params[name];
+          if (param && value !== undefined) param.value = value;
+        }
       },
-      dispose: () => node.disconnect(),
+      // Tell the processor to stop (it returns false from process() once it
+      // has received this message), then disconnect.
+      dispose: () => {
+        node.port.postMessage('dispose');
+        node.disconnect();
+      },
     };
   },
 });
 ```
+
+The two hosts await `prepare` differently. The React `addEffect(type)` is async and awaits it itself. `<daw-editor>`'s `addEffect(type)` is synchronous, so for a definition with `prepare` call `await editor.prepareEffect(type)` first. Both await it for their offline exports.
+
+The host owns every connection out of the instance's `output` and disconnects all of them when it rewires the chain, so do not connect `output` to anything inside the effect (take a feedback tap from a node before it).
+
+For an AudioWorklet effect, let `dispose` stop the processor with a port message, as above; a processor that always returns `true` from `process()` runs until the page closes. Do not have the processor return `false` whenever it is idle: in Chrome, a processor that returned `false` while nothing was connected to it (the effect bypassed by disconnection) did not run again when reconnected.
 
 A definition with a `wetParam` is bypassed by setting that parameter to 0; one without is disconnected while bypassed. Also exported: `unregisterEffect`, `getEffectDefinitions`, `prepareEffect`, `ensureEffectPrepared`, `needsPrepare`, `createEffectInstance`, and the types `NativeEffectDefinition`, `NativeEffectInstance` and `EffectParamDef`.
 
