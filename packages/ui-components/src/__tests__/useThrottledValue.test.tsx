@@ -57,17 +57,63 @@ describe('useThrottledValue', () => {
     expect(result.current).toBe(1);
   });
 
-  it('sets no state after unmount', () => {
+  it('unsubscribes and drops its pending timer on unmount', () => {
+    const handle = createValueSource(0);
+    let subscriptions = 0;
+    const source = {
+      getSnapshot: handle.source.getSnapshot,
+      subscribe(listener: (value: number) => void) {
+        subscriptions++;
+        const remove = handle.source.subscribe(listener);
+        return () => {
+          subscriptions--;
+          remove();
+        };
+      },
+    };
+    const { unmount } = renderHook(() => useThrottledValue(source, { updateRate: 10 }));
+    act(() => {
+      handle.publish(1);
+      handle.publish(2); // inside the interval: schedules the trailing update
+    });
+    expect(subscriptions).toBe(1);
+    expect(vi.getTimerCount()).toBe(1);
+
+    unmount();
+
+    expect(subscriptions).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('an infinite updateRate passes every value through', () => {
     const { source, publish } = createValueSource(0);
-    const { result, unmount } = renderHook(() => useThrottledValue(source, { updateRate: 10 }));
+    const { result } = renderHook(() => useThrottledValue(source, { updateRate: Infinity }));
+    for (let i = 1; i <= 5; i++) {
+      act(() => {
+        publish(i);
+      });
+      expect(result.current).toBe(i);
+    }
+  });
+
+  it('follows a changed updateRate', () => {
+    const { source, publish } = createValueSource(0);
+    const { result, rerender } = renderHook(
+      ({ updateRate }) => useThrottledValue(source, { updateRate }),
+      { initialProps: { updateRate: 1 } }
+    );
     act(() => {
       publish(1);
       publish(2);
     });
-    unmount();
-    publish(3);
-    vi.advanceTimersByTime(1000);
     expect(result.current).toBe(1);
+
+    rerender({ updateRate: Infinity });
+    expect(result.current).toBe(2);
+    act(() => {
+      publish(3);
+    });
+    expect(result.current).toBe(3);
   });
 
   it('switches to a new source', () => {

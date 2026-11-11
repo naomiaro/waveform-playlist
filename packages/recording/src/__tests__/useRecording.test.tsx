@@ -609,6 +609,77 @@ describe('useRecording', () => {
     expect(restarted.peaks[0]).toHaveLength(0);
   });
 
+  it('publishes what arrived since the last frame when it pauses', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await nextFrame();
+    const progress = result.current.progress;
+    const before = progress.getSnapshot();
+
+    // A flush and a pause inside one frame: the loop is cancelled before it
+    // would have published the flush.
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(512).fill(0.3)], channelCount: 1 },
+      } as MessageEvent);
+      result.current.pauseRecording();
+    });
+
+    expect(progress.getSnapshot().peaks).not.toBe(before.peaks);
+
+    // A flush that was already queued when the pause was sent still shows.
+    const paused = progress.getSnapshot();
+    act(() => {
+      mockWorkletNode.port.onmessage!({
+        data: { channels: [new Float32Array(128).fill(0.3)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    expect(progress.getSnapshot().peaks).not.toBe(paused.peaks);
+    expect(progress.getSnapshot().duration).toBe(paused.duration);
+  });
+
+  it('continues from the paused duration on resume', async () => {
+    const stream = createMockStream();
+    const { result } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await nextFrame();
+    await nextFrame();
+    act(() => result.current.pauseRecording());
+    const pausedAt = result.current.progress.getSnapshot().duration;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    });
+    expect(result.current.progress.getSnapshot().duration).toBe(pausedAt);
+
+    act(() => result.current.resumeRecording());
+    await nextFrame();
+
+    const resumed = result.current.progress.getSnapshot().duration;
+    expect(resumed).toBeGreaterThanOrEqual(pausedAt);
+    expect(resumed).toBeLessThan(pausedAt + 0.07);
+  });
+
+  it('publishes nothing after unmount', async () => {
+    const stream = createMockStream();
+    const { result, unmount } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await nextFrame();
+    const listener = vi.fn();
+    result.current.progress.subscribe(listener);
+
+    unmount();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('returns no per-frame values of its own', () => {
     const { result } = renderHook(() => useRecording(createMockStream()));
     expect(Object.keys(result.current).sort()).toEqual([

@@ -67,6 +67,15 @@ async function litSegments(page: Page, index: number): Promise<number> {
   }, index);
 }
 
+/** React commits during the next `ms` milliseconds. */
+async function commitsDuring(page: Page, ms: number): Promise<number> {
+  await page.evaluate(() => {
+    (window as unknown as { __commits: number }).__commits = 0;
+  });
+  await page.waitForTimeout(ms);
+  return page.evaluate(() => (window as unknown as { __commits: number }).__commits);
+}
+
 const INPUT_METER = 0;
 const OUTPUT_METER = 1;
 
@@ -78,6 +87,12 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
   await page.goto(`${baseURL}/examples/recording`);
   await expect(page.getByRole('button', { name: '+ New Track' })).toBeVisible({ timeout: 30000 });
 }
+
+// The synthetic microphone is an oscillator on its own AudioContext, created
+// when the page asks for the microphone on load, before any click. Without
+// this flag that context sometimes stays suspended (about 1 run in 30) and the
+// "microphone" is silent.
+test.use({ launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
 
 test.describe('Recording example', () => {
   test('the input meter follows the microphone without rendering React', async ({
@@ -96,15 +111,13 @@ test.describe('Recording example', () => {
       expect(readings.size).toBeGreaterThan(1);
     }).toPass({ timeout: 10000 });
 
-    // Levels arrive ~60 times a second. Nothing on the page may render for them.
-    await page.evaluate(() => {
-      (window as unknown as { __commits: number }).__commits = 0;
-    });
-    await page.waitForTimeout(2000);
-    const commits = await page.evaluate(
-      () => (window as unknown as { __commits: number }).__commits
-    );
-    expect(commits).toBeLessThan(10);
+    // Levels arrive ~60 times a second (about 120 in two seconds, which is
+    // what this page committed before #695). Nothing may render for them. A
+    // window is retried so that an unrelated one-off render (a late effect of
+    // page load) does not fail the test; rendering per level fails every window.
+    await expect(async () => {
+      expect(await commitsDuring(page, 2000)).toBeLessThan(10);
+    }).toPass({ timeout: 15000 });
   });
 
   test('a take shows a growing preview, becomes a clip, and plays back through the output meter', async ({
@@ -136,17 +149,13 @@ test.describe('Recording example', () => {
       expect(box!.width).toBeGreaterThan(firstWidth + 20);
     }).toPass({ timeout: 10000 });
 
-    // While recording, React renders about once per frame (the preview clip),
-    // not once per source of 60 Hz data.
-    await page.evaluate(() => {
-      (window as unknown as { __commits: number }).__commits = 0;
-    });
-    await page.waitForTimeout(2000);
-    const commits = await page.evaluate(
-      () => (window as unknown as { __commits: number }).__commits
-    );
-    expect(commits).toBeGreaterThan(20);
-    expect(commits).toBeLessThan(180);
+    // While recording, React renders about once per frame (the preview clip):
+    // about 120 commits in two seconds. It was about 360 before #695.
+    await expect(async () => {
+      const commits = await commitsDuring(page, 2000);
+      expect(commits).toBeGreaterThan(20);
+      expect(commits).toBeLessThan(150);
+    }).toPass({ timeout: 15000 });
 
     await page.getByRole('button', { name: 'Stop' }).click();
     await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible({

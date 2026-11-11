@@ -276,6 +276,11 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   const levels = meterSnapshot ? meterSnapshot.levels : (levelsProp ?? NO_LEVELS);
   const peakLevels = meterSnapshot ? meterSnapshot.peakLevels : peakLevelsProp;
   const containerRef = useRef<HTMLDivElement>(null);
+  // Set while a meter is attached: writes the current value to every segment.
+  const redrawRef = useRef<(() => void) | null>(null);
+  // The segments are remounted when the component switches between a meter and
+  // the `levels` prop, so nothing the subscription drew outlives the meter.
+  const sourceKey = meter ? 'meter' : 'props';
 
   const channelCount = meter ? meterChannelCount : levels.length;
   const labels = channelLabels ?? getDefaultLabels(channelCount);
@@ -379,9 +384,25 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       }
     };
 
-    draw(meter.getSnapshot());
-    return meter.subscribe((value) => draw(value));
+    redrawRef.current = () => {
+      for (const states of drawn) states.fill(255);
+      draw(meter.getSnapshot());
+    };
+    const unsubscribe = meter.subscribe((value) => draw(value));
+    return () => {
+      unsubscribe();
+      redrawRef.current = null;
+    };
   }, [meter, channelCount, renderThresholds, segmentColors, coloredInactive, orientation]);
+
+  // After every commit, write the current value again. React only writes the
+  // styles that differ from its previous render, which is not always what the
+  // subscription last drew: a value published between a render and its commit
+  // would otherwise be overwritten by the older render's styles and stay
+  // wrong until that segment next changes.
+  useLayoutEffect(() => {
+    redrawRef.current?.();
+  });
 
   const renderChannel = (channelIndex: number) => {
     const level = levels[channelIndex] ?? 0;
@@ -460,6 +481,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       // Horizontal: channels stacked vertically, scale below
       return (
         <MeterContainer
+          key={sourceKey}
           ref={containerRef}
           className={className}
           $orientation={orientation}
@@ -477,6 +499,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
     return (
       <MeterContainer
+        key={sourceKey}
         ref={containerRef}
         className={className}
         $orientation={orientation}
@@ -492,6 +515,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   // Single channel: channel on left, scale on right (vertical) or below (horizontal)
   return (
     <MeterContainer
+      key={sourceKey}
       ref={containerRef}
       className={className}
       $orientation={orientation}

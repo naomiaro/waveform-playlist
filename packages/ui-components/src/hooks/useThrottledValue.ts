@@ -4,6 +4,8 @@ import type { MeterLevels, MeterSource, ValueSource } from '@waveform-playlist/c
 export interface UseThrottledValueOptions {
   /**
    * The most times per second the component may re-render with a new value.
+   * `Infinity` passes every value through. Zero, a negative number or `NaN`
+   * is treated as 1.
    * Default: 10
    */
   updateRate?: number;
@@ -31,7 +33,8 @@ export function useThrottledValue<T>(
   }));
 
   useEffect(() => {
-    const interval = 1000 / (Number.isFinite(updateRate) && updateRate > 0 ? updateRate : 1);
+    // 1000 / Infinity is 0: no throttling.
+    const interval = 1000 / (updateRate > 0 ? updateRate : 1);
     // Far enough in the past that the first change is shown straight away.
     let lastUpdate = -Infinity;
     let timer: ReturnType<typeof setTimeout> | null = null;

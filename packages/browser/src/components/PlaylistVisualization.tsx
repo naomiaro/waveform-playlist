@@ -209,8 +209,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     return modes;
   }, [tracks, spectrogram]);
 
-  // The recording, reduced to what track heights depend on. `recordingState`
-  // itself is a new object on every recording frame.
+  // The recording, reduced to what the layout depends on: numbers that change
+  // rarely, read through selectors. `recordingState` itself is usually a new
+  // object literal on every render of the consumer.
   const recordingProgress = recordingState?.isRecording ? recordingState.progress : undefined;
   const recordingLayout = useRecordingLayout(
     recordingProgress,

@@ -1128,7 +1128,7 @@ const { duration } = useRecordingProgress(progress);
 const value = useThrottledValue(anySource); // generic form
 
 // 3. Full-rate React state.
-const levels = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
+const { levels } = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
 
 // 4. Draw it yourself, without rendering.
 useEffect(() => meter.subscribe(({ levels }) => drawBars(levels)), [meter]);

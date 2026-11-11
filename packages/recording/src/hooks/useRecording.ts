@@ -300,7 +300,7 @@ export function useRecording(
       return stopPromiseRef.current ?? null;
     }
     // Freeze the duration tick immediately so the live-preview width
-    // (durationSamples = duration * sampleRate) doesn't keep growing
+    // (progress.duration * sampleRate) doesn't keep growing
     // during the worklet stop handshake / queue drain. isStoppingRef
     // stops the rAF tick from rescheduling; cancelling animationFrameRef
     // kills any frame already queued.
@@ -435,9 +435,12 @@ export function useRecording(
         animationFrameRef.current = null;
       }
       isPausedRef.current = true;
+      // The loop that publishes once per frame has just been cancelled: show
+      // what arrived since its last frame.
+      publishProgress();
       setIsPaused(true);
     }
-  }, []);
+  }, [publishProgress]);
 
   // Resume recording — same ref-based guards as pauseRecording.
   const resumeRecording = useCallback(() => {

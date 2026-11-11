@@ -164,6 +164,61 @@ describe('SegmentedVUMeter with a meter source', () => {
     expect(activeCounts(container)).toEqual([0]);
   });
 
+  it('shows the levels prop again once the meter is removed', () => {
+    const { source, publish } = createValueSource(silentMeterLevels(1));
+    const { container, rerender } = renderWithTheme(
+      <SegmentedVUMeter meter={source} levels={[0]} segmentCount={12} showScale={false} />
+    );
+    act(() => {
+      publish(levelsOf([1.0]));
+    });
+    expect(activeCounts(container)).toEqual([10]);
+
+    rerender(
+      <ThemeProvider theme={defaultTheme}>
+        <SegmentedVUMeter levels={[0]} segmentCount={12} showScale={false} />
+      </ThemeProvider>
+    );
+
+    // Nothing the subscription drew may be left behind.
+    expect(activeCounts(container)).toEqual([0]);
+    expect(container.querySelectorAll('[data-peak]').length).toBe(0);
+  });
+
+  it('redraws the current value after every render', () => {
+    const { source, publish } = createValueSource(silentMeterLevels(1));
+    const { container, rerender } = renderWithTheme(
+      <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+    );
+    act(() => {
+      publish(levelsOf([1.0], [0]));
+    });
+    const withProps = (className: string) => (
+      <ThemeProvider theme={defaultTheme}>
+        <SegmentedVUMeter
+          meter={source}
+          segmentCount={12}
+          showScale={false}
+          className={className}
+        />
+      </ThemeProvider>
+    );
+    // A render at the current value, so React's own record of the styles is
+    // "lit" and the next render gives it nothing to write.
+    rerender(withProps('a'));
+    // Simulate a commit that wrote an older render's styles over the drawn
+    // ones (a publish landing between a render and its commit).
+    container.querySelectorAll<HTMLElement>('[data-segment]').forEach((segment) => {
+      segment.style.backgroundColor = 'rgba(128, 128, 128, 0.2)';
+      segment.style.opacity = '1';
+    });
+    expect(activeCounts(container)).toEqual([0]);
+
+    rerender(withProps('b'));
+
+    expect(activeCounts(container)).toEqual([10]);
+  });
+
   it('stops listening when it unmounts', () => {
     const handle = createValueSource(silentMeterLevels(1));
     const unsubscribe = vi.fn();

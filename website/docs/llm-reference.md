@@ -866,7 +866,7 @@ function useRecordingProgress(
 ): RecordingProgress;
 
 // 3. Full-rate React state.
-const levels = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
+const { levels } = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
 
 // 4. Direct DOM or canvas drawing.
 useEffect(() => meter.subscribe(({ levels }) => draw(levels)), [meter]);
