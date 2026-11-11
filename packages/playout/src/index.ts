@@ -15,8 +15,6 @@ export {
 export type { SoundFontSample, PlaybackRateParams, LoopAndEnvelopeParams } from './SoundFontCache';
 export type { TonePlayoutOptions, EffectsFunction } from './TonePlayout';
 export type { ToneTrackOptions, TrackEffectsFunction } from './ToneTrack';
-export { createTrackPanStage, panMatrix } from './trackPan';
-export type { TrackPanStage, PanMatrix } from './trackPan';
 
 // Export global AudioContext manager
 export {

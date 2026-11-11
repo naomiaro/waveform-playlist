@@ -8,13 +8,19 @@ import {
   NoiseSynth,
   Part,
   ToneAudioNode,
+  connect,
   getDestination,
   getContext,
 } from 'tone';
 import type { SynthOptions } from 'tone';
-import { Track, gainToDb, type MidiNoteData } from '@waveform-playlist/core';
+import {
+  Track,
+  gainToDb,
+  createPanStage,
+  type MidiNoteData,
+  type PanStage,
+} from '@waveform-playlist/core';
 import type { TrackEffectsFunction } from './ToneTrack';
-import { createTrackPanStage, type TrackPanStage } from './trackPan';
 
 /**
  * Shared interface for tracks managed by TonePlayout.
@@ -102,7 +108,7 @@ export class MidiToneTrack implements PlayableTrack {
   /** Pre-fader summing point: voices → inputGain → [effects] → volume. */
   private inputGain: Gain;
   private volumeNode: Volume;
-  private panStage: TrackPanStage;
+  private panStage: PanStage;
   private muteGain: Gain;
   private track: Track;
   private effectsCleanup?: () => void;
@@ -114,10 +120,14 @@ export class MidiToneTrack implements PlayableTrack {
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
     // Synth voices are mono: the balance stage keeps a stereo effect stereo.
-    this.panStage = createTrackPanStage(options.track.stereoPan, 1);
+    this.panStage = createPanStage(
+      getContext().rawContext as BaseAudioContext,
+      options.track.stereoPan,
+      1
+    );
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
     this.volumeNode.connect(this.panStage.input);
-    this.panStage.output.connect(this.muteGain);
+    connect(this.panStage.output, this.muteGain);
 
     // Melodic: PolySynth with basic Synth voice
     this.synth = new PolySynth(Synth, options.synthOptions);

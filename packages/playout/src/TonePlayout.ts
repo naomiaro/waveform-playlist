@@ -162,11 +162,22 @@ export class TonePlayout {
   /**
    * Replace clips on a track, preserving the track's audio graph.
    * Only works for ToneTrack (audio clips), not MidiToneTrack.
+   * `sourceChannelCount` (max channel count across the new clips) re-selects
+   * the track's pan law; omit to leave it unchanged.
    */
-  replaceTrackClips(trackId: string, newClips: ClipInfo[], newStartTime?: number): boolean {
+  replaceTrackClips(
+    trackId: string,
+    newClips: ClipInfo[],
+    newStartTime?: number,
+    sourceChannelCount?: number
+  ): boolean {
     const track = this.tracks.get(trackId);
     if (!track || !('replaceClips' in track)) return false;
-    (track as ToneTrack).replaceClips(newClips, newStartTime);
+    const toneTrack = track as ToneTrack;
+    toneTrack.replaceClips(newClips, newStartTime);
+    if (sourceChannelCount !== undefined) {
+      toneTrack.setSourceChannelCount(sourceChannelCount);
+    }
     return true;
   }
 

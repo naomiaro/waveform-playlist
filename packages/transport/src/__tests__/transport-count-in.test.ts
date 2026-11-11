@@ -14,12 +14,8 @@ function mockAudioContext(currentTime = 0): AudioContext {
       connect: vi.fn(),
       disconnect: vi.fn(),
     })),
-    createStereoPanner: vi.fn(() => ({
-      pan: { value: 0 },
-      channelCount: 1,
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    })),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createChannelMerger: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
     createBufferSource: vi.fn(() => ({
       buffer: null,
       connect: vi.fn(),

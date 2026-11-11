@@ -651,12 +651,12 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 #### `@dawcore/transport`
 
-- **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling with zero dependencies. Tone.js remains available only for effects (consumer-side, optional).
+- **Purpose:** Native Web Audio transport — replaces Tone.js Transport/scheduling without Tone.js. Tone.js remains available only for effects (consumer-side, optional).
 - **Architecture:** Layered — core (clock/scheduler/timer) → timeline (samples/ticks/tempo: `TempoMap`, `MeterMap`, branded `Tick`/`Sample` types) → audio (track nodes, `ClipPlayer`, metronome) → transport (orchestrator) → adapter (`NativePlayoutAdapter`, the `PlayoutAdapter` bridge for `PlaylistEngine`)
 - **Scheduler:** Sliding-window event generation driven by a Web Worker `setTimeout` tick (25 ms; keeps its cadence in a hidden tab) with ~200ms lookahead; integer-tick loop boundaries (no float drift at loop wrap)
 - **Effects insertion hooks:** `connectTrackEffects(trackId, input, output)` inserts any AudioNode chain (native, WAM, Tone.js) on a track as a pre-fader insert (clips → chain → volume → pan → mute); `connectMasterOutput(node)` / `disconnectMasterOutput()` do the same between the master gain and `audioContext.destination`. The transport has zero knowledge of plugin types.
 - **Events:** `seek(time)` emits a `seek` event (`{ seconds }`) — consumed by the WAM transport bridge among others
-- **Dependencies:** None (zero runtime deps; `@waveform-playlist/core`/`engine` are type-only devDeps)
+- **Dependencies:** `@waveform-playlist/core` (runtime — the shared pan stage `createPanStage` and `trackChannelCount`); `@waveform-playlist/engine` is a type-only devDep
 - **Location:** `packages/transport/`
 
 #### `@dawcore/spectrogram`

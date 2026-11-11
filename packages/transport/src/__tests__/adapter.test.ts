@@ -28,15 +28,6 @@ function createMockGainNode() {
   };
 }
 
-function createMockPannerNode() {
-  return {
-    pan: { value: 0 },
-    channelCount: 1,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
-}
-
 function mockAudioContext(): AudioContext {
   const ctx = {
     sampleRate: 48000,
@@ -44,7 +35,8 @@ function mockAudioContext(): AudioContext {
     state: 'suspended',
     destination: { connect: vi.fn(), disconnect: vi.fn() },
     createGain: vi.fn(() => createMockGainNode()),
-    createStereoPanner: vi.fn(() => createMockPannerNode()),
+    createChannelSplitter: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+    createChannelMerger: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
     createBufferSource: vi.fn(() => createMockSource()),
     resume: vi.fn(() => {
       // Simulate AudioContext advancing after resume (needed for warmup wait)

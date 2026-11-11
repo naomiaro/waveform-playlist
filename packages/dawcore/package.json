@@ -45,7 +45,7 @@
     "@dawcore/midi": ">=0.0.1",
     "@dawcore/transport": ">=0.0.16",
     "@dawcore/wam": ">=0.0.1",
-    "@waveform-playlist/core": ">=12.0.0",
+    "@waveform-playlist/core": ">=12.7.0",
     "@waveform-playlist/engine": ">=13.5.0",
     "@waveform-playlist/worklets": ">=12.0.0"
   },

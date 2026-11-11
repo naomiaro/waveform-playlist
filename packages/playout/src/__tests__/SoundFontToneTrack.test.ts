@@ -54,19 +54,23 @@ const { mockPartInstances, createdGainNodes, mockRawContext } = vi.hoisted(() =>
   };
 });
 
-// The pan stage has its own unit tests (trackPan.test.ts) and is verified
-// against the real Tone graph in a browser; here it is a stub.
+// The pan stage has its own unit tests in core (panStage.test.ts) and is
+// verified against the real Tone graph in a browser; here it is a stub.
 const mockPanStage = {
   input: { name: 'pan-in' },
   output: { name: 'pan-out', connect: vi.fn() },
   setPan: vi.fn(),
+  setSourceChannelCount: vi.fn(),
   dispose: vi.fn(),
 };
-vi.mock('../trackPan', () => ({
-  createTrackPanStage: vi.fn(() => mockPanStage),
+vi.mock('@waveform-playlist/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
+  createPanStage: vi.fn(() => mockPanStage),
 }));
 
 vi.mock('tone', () => ({
+  // Tone's connect(src, dst) helper — used for the native → Tone edge.
+  connect: vi.fn((src: { connect: (dst: unknown) => void }, dst: unknown) => src.connect(dst)),
   Volume: vi.fn().mockImplementation(function () {
     return {
       chain: vi.fn(),

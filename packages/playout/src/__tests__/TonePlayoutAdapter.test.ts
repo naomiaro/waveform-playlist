@@ -701,6 +701,32 @@ describe('createToneAdapter', () => {
     });
   });
 
+  describe('updateTrack (pan law, #669)', () => {
+    it('passes the track source channel count with the clip update', () => {
+      const adapter = createToneAdapter();
+      const mono = makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [mono])]);
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.replaceTrackClips.mockReturnValue(true);
+
+      // A stereo clip joins the mono track: the law must follow.
+      const stereo = makeClip({
+        id: 'a2',
+        startSample: 44100,
+        durationSamples: 44100,
+        audioBuffer: { numberOfChannels: 2, duration: 1, sampleRate: 44100 } as AudioBuffer,
+      });
+      adapter.updateTrack!('t1', makeTrack('t1', [mono, stereo]));
+
+      expect(instance.replaceTrackClips).toHaveBeenLastCalledWith(
+        't1',
+        expect.any(Array),
+        expect.any(Number),
+        2
+      );
+    });
+  });
+
   describe('updateTrack (companion MIDI)', () => {
     it('re-adds only the MIDI half after replaceTrackClips updates audio in place', () => {
       const adapter = createToneAdapter();
