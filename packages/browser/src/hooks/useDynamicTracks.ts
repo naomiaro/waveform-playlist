@@ -102,6 +102,9 @@ export function useDynamicTracks(): UseDynamicTracksReturn {
   const abortControllersRef = useRef(new Map<string, AbortController>());
 
   useEffect(() => {
+    // Cleared on every setup: StrictMode runs setup, cleanup, setup on one
+    // instance, and a mark left by that cleanup dropped every later decode.
+    cancelledRef.current = false;
     const controllers = abortControllersRef.current;
     return () => {
       cancelledRef.current = true;

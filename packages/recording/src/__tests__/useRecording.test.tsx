@@ -680,6 +680,25 @@ describe('useRecording', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  // While paused, a message that was already queued publishes directly. With
+  // the handler still attached after unmount, such a message reached
+  // `progress` subscribers that outlive the hook.
+  it('detaches the worklet handler on unmount, paused or not', async () => {
+    const stream = createMockStream();
+    const { result, unmount } = renderHook(() => useRecording(stream));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      result.current.pauseRecording();
+    });
+    expect(mockWorkletNode.port.onmessage).not.toBeNull();
+
+    unmount();
+
+    expect(mockWorkletNode.port.onmessage).toBeNull();
+  });
+
   it('returns no per-frame values of its own', () => {
     const { result } = renderHook(() => useRecording(createMockStream()));
     expect(Object.keys(result.current).sort()).toEqual([

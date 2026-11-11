@@ -5,6 +5,7 @@ import {
   usePlaylistState,
   usePlaylistControls,
 } from '../WaveformPlaylistContext';
+import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationListView, type AnnotationListCommonProps } from './AnnotationListView';
 
 export type { OnAnnotationUpdateFn } from '../types/annotations';
@@ -31,12 +32,14 @@ export interface PlaylistAnnotationListProps extends AnnotationListCommonProps {
 export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = (props) => {
   const { annotations, annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations } = usePlaylistControls();
+  const { setAnnotations, annotationPreview } = usePlaylistControls();
+  // While an edge is dragged with the preview, the times in the list follow it.
+  const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
   return (
     <AnnotationListView
       {...props}
-      annotations={annotations}
+      annotations={shownAnnotations}
       activeAnnotationId={activeAnnotationId}
       editable={annotationsEditable}
       linkEndpoints={linkEndpoints}

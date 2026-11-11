@@ -216,9 +216,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   defaultAnnotationDuration = 3.0,
   minAnnotationDuration = 0.5,
 }) => {
-  const { samplesPerPixel, duration, controls } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
   const { annotations, linkEndpoints } = usePlaylistState();
-  const { setAnnotations, play } = usePlaylistControls();
+  const { setAnnotations, play, annotationPreview } = usePlaylistControls();
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
   const { currentTimeRef } = usePlaybackAnimation();
@@ -230,7 +230,11 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
     annotations,
     onAnnotationsChange: setAnnotations,
+    // The drag is shown through the preview and reported once, on release,
+    // so this component does not re-render on every pointer move.
+    preview: annotationPreview,
     samplesPerPixel,
+    sampleRate,
     duration,
     linkEndpoints,
   });

@@ -302,18 +302,24 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
 
   // The three handlers below are props of every memoized row. Their
   // dependencies do not change when only the active annotation does.
+  // The handlers below are props of every memoized row. They read the list
+  // through a ref so that a change to one annotation (each move of an edge
+  // drag) re-renders that annotation's row and not all of them.
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+
   const handleTextEdit = useCallback(
     (index: number, newText: string) => {
       if (!editable || !onAnnotationUpdate) return;
 
-      const updatedAnnotations = [...annotations];
+      const updatedAnnotations = [...annotationsRef.current];
       updatedAnnotations[index] = {
         ...updatedAnnotations[index],
         lines: newText.split('\n'),
       };
       onAnnotationUpdate(updatedAnnotations);
     },
-    [annotations, editable, onAnnotationUpdate]
+    [editable, onAnnotationUpdate]
   );
 
   const handleIdEdit = useCallback(
@@ -323,25 +329,25 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
       const trimmedId = newId.trim();
       if (!trimmedId) return; // Don't allow empty IDs
 
-      const updatedAnnotations = [...annotations];
+      const updatedAnnotations = [...annotationsRef.current];
       updatedAnnotations[index] = {
         ...updatedAnnotations[index],
         id: trimmedId,
       };
       onAnnotationUpdate(updatedAnnotations);
     },
-    [annotations, editable, onAnnotationUpdate]
+    [editable, onAnnotationUpdate]
   );
 
   const handleControlClick = useCallback(
     (control: AnnotationAction, index: number) => {
       if (!onAnnotationUpdate) return;
 
-      const annotationsCopy = [...annotations];
+      const annotationsCopy = [...annotationsRef.current];
       control.action(annotationsCopy[index], index, annotationsCopy, annotationListConfig || {});
       onAnnotationUpdate(annotationsCopy);
     },
-    [annotations, annotationListConfig, onAnnotationUpdate]
+    [annotationListConfig, onAnnotationUpdate]
   );
 
   return (

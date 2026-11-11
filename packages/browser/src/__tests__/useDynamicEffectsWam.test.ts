@@ -146,8 +146,9 @@ describe('useDynamicEffects — WAM entries', () => {
   });
 
   it('addWamEffect works under StrictMode double-invoked effects', async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.StrictMode, null, children);
+    // StrictMode itself as the wrapper: a function component that returns
+    // <StrictMode> does not get this hook's effects double-invoked.
+    const wrapper = React.StrictMode;
     const { result } = renderHook(() => useDynamicEffects(), { wrapper });
     let id = '';
     await act(async () => {
@@ -297,5 +298,61 @@ describe('useDynamicEffects — WAM entries', () => {
     await expect(offline!(masterVolume, destination, true)).rejects.toThrow(
       /nativeAudioContext: true/
     );
+  });
+
+  // #704 close-out: a parameter change used to disconnect and reconnect the
+  // whole live chain (the rebuild effect was keyed on the effect list, which
+  // is replaced on every change).
+  describe('chain rewiring', () => {
+    function setup() {
+      const view = renderHook(() => useDynamicEffects());
+      act(() => {
+        view.result.current.addEffect('reverb');
+        view.result.current.addEffect('chorus');
+      });
+      const mockVolume = { connect: vi.fn(), disconnect: vi.fn() };
+      const mockDestination = { connect: vi.fn() } as unknown as ToneAudioNode;
+      act(() => {
+        view.result.current.masterEffects(mockVolume as unknown as Volume, mockDestination, false);
+      });
+      mockVolume.disconnect.mockClear();
+      vi.mocked(connect).mockClear();
+      return { ...view, mockVolume };
+    }
+
+    it('a parameter change updates the list and leaves the graph alone', () => {
+      const { result, mockVolume } = setup();
+      const id = result.current.activeEffects[0].instanceId;
+
+      act(() => result.current.updateParameter(id, 'wet', 0.3));
+      act(() => result.current.updateParameter(id, 'decay', 2));
+
+      expect(result.current.activeEffects[0].params.wet).toBe(0.3);
+      expect(mockVolume.disconnect).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('bypassing a native effect (wet to 0) leaves the graph alone', () => {
+      const { result, mockVolume } = setup();
+
+      act(() => result.current.toggleBypass(result.current.activeEffects[0].instanceId));
+
+      expect(result.current.activeEffects[0].bypassed).toBe(true);
+      expect(mockVolume.disconnect).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('adding, removing and reordering each rewire the chain', () => {
+      const { result, mockVolume } = setup();
+
+      act(() => result.current.addEffect('phaser'));
+      expect(mockVolume.disconnect).toHaveBeenCalledTimes(1);
+
+      act(() => result.current.reorderEffects(0, 2));
+      expect(mockVolume.disconnect).toHaveBeenCalledTimes(2);
+
+      act(() => result.current.removeEffect(result.current.activeEffects[0].instanceId));
+      expect(mockVolume.disconnect).toHaveBeenCalledTimes(3);
+    });
   });
 });

@@ -14,6 +14,8 @@ import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData } from '@waveform-playlist/core';
+import { createValueSource } from '@waveform-playlist/core';
+import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
@@ -61,6 +63,12 @@ export interface MediaElementControlsContextValue {
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
+  /**
+   * Where an annotation edge drag shows its moves while it is in progress.
+   * The built-in annotation boxes publish to it; read it in a custom
+   * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
+   */
+  annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
   setAutomaticScroll: (enabled: boolean) => void;
   setScrollContainer: (element: HTMLDivElement | null) => void;
@@ -513,6 +521,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [continuousPlay, annotations, activeAnnotationId, playbackRate, isAutomaticScroll]
   );
 
+  // Created once: the annotations as an edge drag in progress would leave them.
+  const [annotationPreview] = useState<AnnotationPreviewHandle>(() =>
+    createValueSource<AnnotationData[] | null>(null)
+  );
+
   // Stable callback ref for onAnnotationsChange to avoid re-creating controls context
   const onAnnotationsChangeRef = useRef(onAnnotationsChange);
   onAnnotationsChangeRef.current = onAnnotationsChange;
@@ -543,6 +556,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setPlaybackRate,
       setContinuousPlay,
       setAnnotations,
+      annotationPreview,
       setActiveAnnotationId,
       setAutomaticScroll: (enabled: boolean) => {
         setIsAutomaticScroll(enabled);
@@ -558,6 +572,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setPlaybackRate,
       setContinuousPlay,
       setAnnotations,
+      annotationPreview,
       setActiveAnnotationId,
       setScrollContainer,
     ]

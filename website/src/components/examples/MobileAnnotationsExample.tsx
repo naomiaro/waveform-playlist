@@ -280,9 +280,9 @@ interface MobileAnnotationsContentProps {
 }
 
 const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
-  const { samplesPerPixel, duration, controls } = usePlaylistData();
+  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
   const { annotations, linkEndpoints, continuousPlay } = usePlaylistState();
-  const { setAnnotations, setActiveAnnotationId, play } = usePlaylistControls();
+  const { setAnnotations, setActiveAnnotationId, play, annotationPreview } = usePlaylistControls();
 
   // Use touch-optimized sensors with 250ms delay
   const sensors = useDragSensors({ touchOptimized: true });
@@ -290,7 +290,11 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
     annotations,
     onAnnotationsChange: setAnnotations,
+    // The drag is shown through the preview and reported once, on release,
+    // so this component does not re-render on every pointer move.
+    preview: annotationPreview,
     samplesPerPixel,
+    sampleRate,
     duration,
     linkEndpoints,
   });

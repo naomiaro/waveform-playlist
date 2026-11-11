@@ -144,6 +144,7 @@ interface MediaElementControlsContextValue {
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
   setAutomaticScroll: (enabled: boolean) => void;
   setScrollContainer: (element: HTMLDivElement | null) => void;
@@ -318,6 +319,7 @@ interface PlaylistControlsContextValue {
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
 
   // Loop controls
@@ -616,6 +618,34 @@ function loadWamModule(): Promise<typeof import('@dawcore/wam')>;
 ---
 
 ## Editing Hooks
+
+### useAnnotationDragHandlers
+
+```typescript
+type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>; // from @waveform-playlist/core
+
+function useAnnotationDragHandlers(options: {
+  annotations: AnnotationData[];
+  onAnnotationsChange: (annotations: AnnotationData[]) => void;
+  samplesPerPixel: number;
+  sampleRate?: number; // default 48000; pass the provider's
+  duration: number;
+  linkEndpoints: boolean;
+  preview?: AnnotationPreviewHandle; // `annotationPreview` from usePlaylistControls() / useMediaElementControls()
+}): {
+  onDragStart: (event: DragStartEvent) => void;
+  onDragMove: (event: DragMoveEvent) => void;
+  onDragEnd: (event: DragEndEvent) => void;
+};
+
+// The annotations to draw: the previewed ones while an edge is dragged, else `annotations`.
+function useAnnotationsWithPreview(
+  annotations: AnnotationData[],
+  preview: AnnotationPreviewHandle
+): AnnotationData[];
+```
+
+With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way a cancelled drag (Escape) restores every annotation the drag moved. `MediaElementWaveform`'s built-in boxes always drag with the preview.
 
 ### useClipDragHandlers
 

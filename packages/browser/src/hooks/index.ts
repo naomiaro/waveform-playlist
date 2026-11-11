@@ -22,6 +22,8 @@ export type { UndoControls, UseUndoStateProps } from './useUndoState';
 export { useClipDragHandlers } from './useClipDragHandlers';
 
 export { useAnnotationDragHandlers } from './useAnnotationDragHandlers';
+export type { AnnotationPreviewHandle } from './useAnnotationDragHandlers';
+export { useAnnotationsWithPreview } from './useAnnotationsWithPreview';
 
 export { useDragSensors } from './useDragSensors';
 export type { DragSensorOptions } from './useDragSensors';

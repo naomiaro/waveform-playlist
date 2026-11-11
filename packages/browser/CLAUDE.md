@@ -80,6 +80,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Pattern:** Effects are created via factory, chained in series, support real-time parameter updates without rebuilding the chain.
 
+**A chain is rewired only when its wiring changes.** Both hooks keep the effect list in state, and the list is replaced on every parameter change. The rewire effect compares `chainTopologyKey(effects)` (`src/effects/chainTopology.ts`: the instance ids in order, bypassed WAM entries left out), so a slider step or a native bypass (wet to 0) touches no node; the per-track hook keeps one key per track and rewires only the track whose key changed. Until the #704 close-out the effect was keyed on the list itself: 13 `connect` and 12 `disconnect` calls per slider step on the effects example, and every track with effects was rewired by a change on one. Anything new that changes what is connected (not how it sounds) must be part of the key.
+
 **Effects must be built on the shared context.** `createEffectInstance` (`effectFactory.ts`) calls playout's `getGlobalContext()` before constructing the Tone effect. Tone nodes belong to whatever context is current at construction, and playout's global context only replaces Tone's default one when first requested — which the provider does after its engine loads. An effect added before that (a default effect on mount, as the effects example does) was built on Tone's default context and could never be wired to a track: `InvalidAccessError: cannot connect to an AudioNode belonging to a different AudioContext`, playlist stuck in `loading`. Any new code that constructs Tone nodes ahead of the provider needs the same call first.
 
 **Bypass Pattern:** When bypassing, store original wet value and set to 0. On re-enable, restore original wet value (not always 1).
@@ -137,6 +139,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 **`useWaveformDataCache` has one piece of state, `version`.** Results live in a `WeakMap<AudioBuffer, WaveformData>` read during render through the stable `getWaveformData(buffer)`; `version` is bumped when a job finishes and is the dependency that makes the peaks memo look again. A `tracks` change over already-generated buffers sets no state (the old `Map<clipId, WaveformData>` state was rebuilt on every `tracks` change, one extra render per trim move). A job keeps running across `tracks` changes; only unmount forgets in-flight jobs, because terminating the worker rejects them (a StrictMode remount then starts them again).
 
 **Automatic:** Any clip with `audioBuffer` (loaded or recorded) gets worker treatment — no opt-in needed.
+
+**A failed job is retried on the next `tracks` change, three attempts per buffer.** A crashed worker is replaced, so a retry can succeed; a buffer that can never succeed (a CSP that blocks blob workers) used to be copied and sent again on every `tracks` change, i.e. every pointer move of a trim. Rejections caused by the unmount's `terminate()` are not counted.
 
 ## Pre-Computed Peaks Rate Mismatch
 
@@ -197,6 +201,20 @@ Measured (dev build, 4x CPU throttle, `probes/select740.cjs`, which charges each
 - `useAnnotationDragHandlers` defaults `sampleRate` to 48000; every caller must pass the real rate (the MediaElement player did not, so a boundary on a 44100 Hz file moved about 8% less than the pointer; `e2e/media-element-annotations.spec.ts`).
 
 Measured on `/examples/media-element-annotations` (15 annotations, dev build, `probes/select744.cjs … play`), per annotation boundary: 220 components / about 14 ms at 4x CPU throttle before; 81 / 8 ms with the shared memoized list and boxes; 45 / 4.5 ms with the annotation state out of the waveform shell.
+
+## Annotation Edge Drag: Preview Source, One Report per Drag
+
+Both providers create one `annotationPreview` (`ValueSourceHandle<AnnotationData[] | null>`, in the controls value, stable). `useAnnotationDragHandlers({ preview })` publishes each move to it and calls `onAnnotationsChange` once, on release; without `preview` it reports every move, as before. The components that draw annotations read `useAnnotationsWithPreview(annotations, annotationPreview)`: `AnnotationBoxesOverlay`, `MediaElementAnnotationBoxes`, `PlaylistAnnotationList`, `MediaElementAnnotationList`. Nothing else follows the preview: the engine, the animation loop's annotation lookup and `KeyboardShortcuts` see the committed annotations until release.
+
+- Each move is applied to the RESULT OF THE PREVIOUS MOVE (the preview's snapshot, or the current `annotations` without one), not to the annotations at drag start. That is what lets an edge dragged into a separated neighbour pick it up and carry it along with Link endpoints on (#747, tried by hand by the maintainer); computing from the drag-start snapshot, as dawcore's `AnnotationDragHandler` does, loses that and failed `e2e/media-element-annotations.spec.ts`. The snapshot (`dragRef.current.snapshot`) is kept for Escape only: it is restored (no preview) or the preview is dropped (with one), so every annotation the drag moved goes back (maintainer's decision, 2026-11-11).
+- The release commits and clears inside one `flushSync`. Cleared first, or committed in a later render than the clear, the boxes would show the old positions for a frame.
+- The hook's handlers read `annotations` and `onAnnotationsChange` through refs, so they keep their identity for the whole drag.
+- `AnnotationText` (annotations package) reads the list through a ref in its edit and control handlers. They are props of every memoized row; built from the array they re-rendered all rows whenever one annotation changed.
+- Known edge: with a preview, the release commits the previewed array as a whole, so a change made to `annotations` by something else during the drag (a keyboard nudge, a text edit) is overwritten. Without a preview each move builds on the current `annotations` and such a change survives.
+- Not covered by a unit test: the `flushSync` on release (two plain calls pass every test; a missing frame cannot be seen in jsdom).
+- The WebAudio side has no built-in drag wiring: the consumer calls the hook (see the annotations examples), so the gain there is opt-in. The MediaElement boxes always use the preview.
+
+Measured on `/examples/annotations` (15 annotations, dev build, 4x CPU throttle, `probes/close704.cjs … boundary`), per pointer move: 312 components / 18 ms React render before (all under the example's own root component, which holds the annotations); 47 / 4 ms after (the list shell and the boxes shell with the items that moved).
 
 ## Playlist Loading Detection
 
@@ -573,9 +591,9 @@ Measured on the recording example (4 tracks, dev build, fiber-walk probe): idle 
 
 **Detection:** `isIncrementalAdd` is computed during render by comparing `prevTracksRef` with current tracks. Uses reference equality on individual track objects — if all previous tracks are unchanged and only new ones were appended, the incremental path is used.
 
-**When incremental:** File drops, new empty tracks, any append where existing tracks are untouched. Calls `engine.addTrack()` per new track, updates trackStates (duration and peaks are derived from `tracks`). No engine dispose/rebuild.
+**When incremental:** `incrementalTrackChange(prevTracks, tracks)` (`src/utils/incrementalTrackChange.ts`) returns `{ added, filled }`: tracks appended (file drops, new empty tracks), and tracks that had NO clips and now have some (a `useDynamicTracks` placeholder whose audio arrived; a first take recorded into an empty track). Tracks that were already there must keep their index, with new tracks after them (the engine appends an added track and `trackStates` is positional), otherwise it is a rebuild. Filled tracks are applied BEFORE added ones: an add is mirrored to the parent, and a parent that stores what it is given would otherwise get the placeholder back. Added tracks go through `engine.addTrack()`, filled ones through `engine.updateTrack(id, track)` with mirroring to `onTracksChange` suppressed (`suppressTracksMirrorRef`: the parent already has them) and `engine.clearHistory()` afterwards, as a rebuild did (undo must not go back to an empty placeholder), followed by `onUndoEngineState(engine.getState())` because `clearHistory` emits no statechange. The filled track's name replaces the placeholder's in `trackStates`. No engine dispose/rebuild. Before this, each decoded file was a full rebuild.
 
-**When full rebuild:** Recording adds clip to existing track (modifies track object), effects change, any existing track modified.
+**When full rebuild:** a track that already has clips is replaced (recording into a track with content, effects change, a consumer edit), a track removed, an empty track renamed.
 
 **`skipEngineDisposeRef` integration:** `isIncrementalAdd` joins `isEngineTracks` and `isDraggingRef` in preventing the effect cleanup from disposing the engine.
 

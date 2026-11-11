@@ -8,6 +8,7 @@ import {
   useMediaElementData,
 } from '../MediaElementPlaylistContext';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
+import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
 import type {
   AnnotationData,
@@ -42,7 +43,11 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
 }) => {
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations, activeAnnotationId } = useMediaElementState();
-  const { play, setActiveAnnotationId, setAnnotations } = useMediaElementControls();
+  const { play, setActiveAnnotationId, setAnnotations, annotationPreview } =
+    useMediaElementControls();
+  // The drag publishes its moves to the preview and reports once, on
+  // release; the boxes follow the preview meanwhile.
+  const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
   const { duration, sampleRate, samplesPerPixel } = useMediaElementData();
 
   // A prop of every memoized box: its dependencies do not change when only
@@ -75,6 +80,7 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
     annotations,
     onAnnotationsChange: handleAnnotationUpdate,
+    preview: annotationPreview,
     samplesPerPixel,
     sampleRate,
     duration,
@@ -91,7 +97,7 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
       modifiers={editable ? HORIZONTAL_ONLY : NO_MODIFIERS}
     >
       <AnnotationBoxes
-        annotations={annotations}
+        annotations={shownAnnotations}
         activeAnnotationId={activeAnnotationId}
         editable={editable}
         width={width}

@@ -140,8 +140,9 @@ describe('useTrackDynamicEffects — WAM entries', () => {
   });
 
   it('addWamEffectToTrack works under StrictMode double-invoked effects', async () => {
-    const wrapper = ({ children }: { children: React.ReactNode }) =>
-      React.createElement(React.StrictMode, null, children);
+    // StrictMode itself as the wrapper: a function component that returns
+    // <StrictMode> does not get this hook's effects double-invoked.
+    const wrapper = React.StrictMode;
     const { result } = renderHook(() => useTrackDynamicEffects(), { wrapper });
     let id = '';
     await act(async () => {
@@ -353,5 +354,74 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     await expect(offline!(graphEnd, masterGainNode, true)).rejects.toThrow(
       /nativeAudioContext: true/
     );
+  });
+
+  // #704 close-out: one parameter change on one track used to disconnect and
+  // reconnect the chain of every track that has effects.
+  describe('chain rewiring', () => {
+    function setup() {
+      const view = renderHook(() => useTrackDynamicEffects());
+      act(() => {
+        view.result.current.addEffectToTrack('t1', 'reverb');
+        view.result.current.addEffectToTrack('t2', 'chorus');
+      });
+      const inputs = {
+        t1: { connect: vi.fn(), disconnect: vi.fn() },
+        t2: { connect: vi.fn(), disconnect: vi.fn() },
+      };
+      const fader = { connect: vi.fn() } as unknown as ToneAudioNode;
+      act(() => {
+        view.result.current.getTrackEffectsFunction('t1')?.(
+          inputs.t1 as unknown as Gain,
+          fader,
+          false
+        );
+        view.result.current.getTrackEffectsFunction('t2')?.(
+          inputs.t2 as unknown as Gain,
+          fader,
+          false
+        );
+      });
+      inputs.t1.disconnect.mockClear();
+      inputs.t2.disconnect.mockClear();
+      vi.mocked(connect).mockClear();
+      return { ...view, inputs };
+    }
+    const firstId = (result: { current: ReturnType<typeof useTrackDynamicEffects> }, t: string) =>
+      result.current.trackEffectsState.get(t)![0].instanceId;
+
+    it('a parameter change updates the list and leaves every graph alone', () => {
+      const { result, inputs } = setup();
+      const id = firstId(result, 't1');
+
+      act(() => result.current.updateTrackEffectParameter('t1', id, 'wet', 0.3));
+
+      expect(result.current.trackEffectsState.get('t1')![0].params.wet).toBe(0.3);
+      expect(inputs.t1.disconnect).not.toHaveBeenCalled();
+      expect(inputs.t2.disconnect).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    });
+
+    it('bypassing a native effect leaves every graph alone', () => {
+      const { result, inputs } = setup();
+
+      act(() => result.current.toggleBypass('t1', firstId(result, 't1')));
+
+      expect(result.current.trackEffectsState.get('t1')![0].bypassed).toBe(true);
+      expect(inputs.t1.disconnect).not.toHaveBeenCalled();
+      expect(connect).not.toHaveBeenCalled();
+    });
+
+    it("adding or removing an effect rewires that track's chain only", () => {
+      const { result, inputs } = setup();
+
+      act(() => result.current.addEffectToTrack('t1', 'phaser'));
+      expect(inputs.t1.disconnect).toHaveBeenCalledTimes(1);
+      expect(inputs.t2.disconnect).not.toHaveBeenCalled();
+
+      act(() => result.current.removeEffectFromTrack('t2', firstId(result, 't2')));
+      expect(inputs.t1.disconnect).toHaveBeenCalledTimes(1);
+      expect(inputs.t2.disconnect).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -251,6 +251,9 @@ function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnota
   } = useAnnotationDragHandlers({
     annotations,
     onAnnotationsChange,
+    // from usePlaylistControls(): the drag is shown through the preview and
+    // onAnnotationsChange is called once, on release
+    preview: annotationPreview,
     /* ... */
   });
 

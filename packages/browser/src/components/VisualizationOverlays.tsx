@@ -23,6 +23,7 @@ import {
 } from '../WaveformPlaylistContext';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
+import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
 
 /** The highlighted selection range. Renders nothing for a collapsed selection. */
@@ -129,8 +130,10 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
 }) => {
   const { annotations, annotationsEditable, continuousPlay } = usePlaylistState();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setActiveAnnotationId, play } = usePlaylistControls();
+  const { setActiveAnnotationId, play, annotationPreview } = usePlaylistControls();
   const { sampleRate, samplesPerPixel } = usePlaylistData();
+  // While an edge is dragged with the preview, the boxes follow the drag.
+  const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
   // A prop of every memoized box: its dependencies do not change when only
   // the active annotation does.
@@ -153,7 +156,7 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
 
   return (
     <AnnotationBoxes
-      annotations={annotations}
+      annotations={shownAnnotations}
       activeAnnotationId={activeAnnotationId}
       editable={annotationsEditable}
       width={width}

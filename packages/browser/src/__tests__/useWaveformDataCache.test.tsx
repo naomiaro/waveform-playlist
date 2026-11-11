@@ -151,6 +151,62 @@ describe('useWaveformDataCache', () => {
     await waitFor(() => expect(worker.generate).toHaveBeenCalledTimes(2));
   });
 
+  // A buffer whose generation can never succeed (a CSP that blocks blob
+  // workers, a buffer that crashes the worker) was started again on every
+  // `tracks` change, i.e. on every pointer move of a trim, copying its channel
+  // data each time.
+  it('gives up on a buffer after three failed attempts', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { worker, jobs } = mockWorker();
+    const buffer = makeBuffer();
+    const tracksOf = () => [makeTrack('t1', [{ id: 'a', audioBuffer: buffer }])];
+
+    const { rerender } = renderHook(({ tracks }) => useWaveformDataCache(tracks, 128), {
+      initialProps: { tracks: tracksOf() },
+    });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await waitFor(() => expect(worker.generate).toHaveBeenCalledTimes(attempt + 1));
+      await act(async () => {
+        jobs[attempt].reject(new Error('boom'));
+      });
+      rerender({ tracks: tracksOf() });
+    }
+
+    for (let i = 0; i < 5; i++) rerender({ tracks: tracksOf() });
+    await act(async () => {});
+
+    expect(worker.generate).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(console.warn).mock.lastCall?.[0]).toMatch(/giving up/i);
+  });
+
+  it('a failure on one buffer does not stop another from being generated', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { worker, jobs } = mockWorker();
+    const bad = makeBuffer();
+    const good = makeBuffer();
+
+    const { rerender } = renderHook(({ tracks }) => useWaveformDataCache(tracks, 128), {
+      initialProps: { tracks: [makeTrack('t1', [{ id: 'a', audioBuffer: bad }])] },
+    });
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await waitFor(() => expect(worker.generate).toHaveBeenCalledTimes(attempt + 1));
+      await act(async () => {
+        jobs[attempt].reject(new Error('boom'));
+      });
+      rerender({ tracks: [makeTrack('t1', [{ id: 'a', audioBuffer: bad }])] });
+    }
+
+    rerender({
+      tracks: [
+        makeTrack('t1', [
+          { id: 'a', audioBuffer: bad },
+          { id: 'b', audioBuffer: good },
+        ]),
+      ],
+    });
+    await waitFor(() => expect(worker.generate).toHaveBeenCalledTimes(4));
+  });
+
   it('under StrictMode ends up with one live job, and its result bumps the version', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // Like the real worker: terminate() rejects the jobs still pending.

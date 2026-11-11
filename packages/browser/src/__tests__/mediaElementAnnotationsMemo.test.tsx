@@ -28,7 +28,9 @@ import type { MediaElementPlayout } from '@waveform-playlist/media-element-playo
 // the visualization rendered".
 const counts = vi.hoisted(() => ({ channel: 0 }));
 // The options the boxes hand to the boundary-drag hook, latest last.
-const dragOptions = vi.hoisted(() => [] as { sampleRate?: number; linkEndpoints?: boolean }[]);
+const dragOptions = vi.hoisted(
+  () => [] as { sampleRate?: number; linkEndpoints?: boolean; preview?: unknown }[]
+);
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -248,6 +250,34 @@ describe('MediaElement annotation boxes (#744)', () => {
     const options = dragOptions[dragOptions.length - 1];
     expect(options.sampleRate).toBe(SAMPLE_RATE);
     expect(options.linkEndpoints).toBe(true);
+  });
+
+  // #704 close-out: the built-in boxes drag with the provider's preview, so
+  // onAnnotationsChange is called once per drag and not once per move.
+  it('boundary drags publish to the provider preview', async () => {
+    await mount(<MediaElementWaveform editable />);
+
+    expect(dragOptions[dragOptions.length - 1].preview).toBe(probe.controls.annotationPreview);
+  });
+
+  it('a previewed move renders the box it moves, and the list is given the previewed annotations', async () => {
+    await mount(<MediaElementWaveform editable />);
+    const committed = probe.state.annotations;
+    const previewed = committed.map((a, i) => (i === 1 ? { ...a, end: a.end - 0.25 } : a));
+    boxRenders = {};
+
+    await act(async () => {
+      probe.controls.annotationPreview.publish(previewed);
+    });
+
+    expect(Object.keys(boxRenders)).toEqual([committed[1].id]);
+    expect(lastList().annotations).toBe(previewed);
+    expect(probe.state.annotations).toBe(committed);
+
+    await act(async () => {
+      probe.controls.annotationPreview.publish(null);
+    });
+    expect(lastList().annotations).toBe(committed);
   });
 
   it('the boxes follow the editable prop and the label function', async () => {

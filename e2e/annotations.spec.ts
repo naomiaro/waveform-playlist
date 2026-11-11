@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Annotations example tests
@@ -73,6 +73,104 @@ test.describe('Annotations Example', () => {
       const count = await draggableHandles.count();
       // Each annotation has 2 draggable handles (start and end)
       expect(count).toBeGreaterThan(0);
+    });
+  });
+
+  // #704 close-out: an edge drag is shown through the provider's preview and
+  // reported once, on release.
+  test.describe('Dragging an annotation edge', () => {
+    // The right edge of the box labelled `id`: the first handle to the right
+    // of its label.
+    const rightEdgeOf = async (page: Page, id: string) => {
+      const container = page.locator('[data-scroll-container]');
+      const label = container.getByText(id, { exact: true });
+      await expect(label).toBeVisible();
+      const labelBox = await label.boundingBox();
+      expect(labelBox).toBeTruthy();
+      const centre = labelBox!.x + labelBox!.width / 2;
+      const boxes = await container
+        .locator('[aria-roledescription="draggable"]')
+        .evaluateAll((elements) =>
+          elements.map((element) => {
+            const rect = element.getBoundingClientRect();
+            return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2, height: rect.height };
+          })
+        );
+      // A clip is a draggable too, and much taller than a handle.
+      const edges = boxes.filter((b) => b.height < 60 && b.x > centre).sort((a, b) => a.x - b.x);
+      expect(edges.length).toBeGreaterThan(0);
+      return edges[0];
+    };
+    // "0:09.240 - 0:11.920" from the list row of an annotation.
+    const timesOf = async (page: Page, id: string) => {
+      // The id is the label of the box too; the list comes after the waveform.
+      const row = page.getByText(id, { exact: true }).last().locator('xpath=..');
+      const text = ((await row.textContent()) ?? '').replace(id, '');
+      const match = text.match(/(\d+:\d{2}\.\d{3})\s*-\s*(\d+:\d{2}\.\d{3})/);
+      expect(match, 'times in "' + text + '"').toBeTruthy();
+      return { start: match![1], end: match![2] };
+    };
+    const pressAndMove = async (page: Page, from: { x: number; y: number }, distance: number) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      for (let i = 1; i <= 12; i++) {
+        await page.mouse.move(from.x + (distance * i) / 12, from.y);
+        await page.waitForTimeout(30);
+      }
+    };
+
+    test.beforeEach(async ({ page }) => {
+      await expect(
+        page.locator('[data-scroll-container] [aria-roledescription="draggable"]')
+      ).toHaveCount(31);
+    });
+
+    test('the list and the linked neighbour follow the drag, and keep it on release', async ({
+      page,
+    }) => {
+      const before = await timesOf(page, 'f000004');
+      const start = await rightEdgeOf(page, 'f000004');
+
+      await pressAndMove(page, start, -40);
+
+      // Still held: the list already shows the new time, and the linked
+      // neighbour's start with it.
+      let during = before;
+      await expect(async () => {
+        during = await timesOf(page, 'f000004');
+        expect(during.end).not.toBe(before.end);
+        expect((await timesOf(page, 'f000005')).start).toBe(during.end);
+      }).toPass({ timeout: 5000 });
+
+      await page.mouse.up();
+
+      await expect(async () => {
+        const moved = await rightEdgeOf(page, 'f000004');
+        expect(Math.abs(start.x - moved.x - 40)).toBeLessThanOrEqual(2);
+        expect((await timesOf(page, 'f000004')).end).toBe(during.end);
+        expect((await timesOf(page, 'f000005')).start).toBe(during.end);
+      }).toPass({ timeout: 5000 });
+    });
+
+    test('Escape puts back every annotation the drag moved', async ({ page }) => {
+      const four = await timesOf(page, 'f000004');
+      const five = await timesOf(page, 'f000005');
+      const start = await rightEdgeOf(page, 'f000004');
+
+      await pressAndMove(page, start, -40);
+      await expect(async () => {
+        expect((await timesOf(page, 'f000005')).start).not.toBe(five.start);
+      }).toPass({ timeout: 5000 });
+
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+
+      await expect(async () => {
+        expect(await timesOf(page, 'f000004')).toEqual(four);
+        expect(await timesOf(page, 'f000005')).toEqual(five);
+        const back = await rightEdgeOf(page, 'f000004');
+        expect(Math.abs(start.x - back.x)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 5000 });
     });
   });
 

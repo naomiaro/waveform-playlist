@@ -310,6 +310,64 @@ const { activeAnnotationId } = useActiveAnnotation();
 
 A component that calls `useActiveAnnotation()` re-renders at every annotation boundary during playback, so call it in a small component that shows the active annotation, not in the component that renders the whole page.
 
+## Dragging an annotation edge: one `onAnnotationsChange` per drag in the MediaElement player, and Escape restores everything
+
+**Package:** `@waveform-playlist/browser`.
+
+Two behaviour changes, neither of them a type error:
+
+1. **`MediaElementWaveform` / `MediaElementPlaylist`:** while an annotation edge is dragged, `onAnnotationsChange` (and `onAnnotationUpdate`) used to be called on every pointer move. They are now called once, when the edge is released, with the final annotations. During the drag the boxes and the annotation list follow a preview that does not go through your state.
+2. **Escape during the drag** (both players, `useAnnotationDragHandlers`) restores every annotation the drag moved. Before, only the dragged annotation was restored.
+
+**Find:** code that relies on `onAnnotationsChange` firing during a drag in the MediaElement player (for example to show the dragged time somewhere of your own).
+
+**Replace with:** read the preview. `annotationPreview` is on `useMediaElementControls()` and `usePlaylistControls()`:
+
+```tsx
+import {
+  useMediaElementState,
+  useMediaElementControls,
+  useAnnotationsWithPreview,
+} from '@waveform-playlist/browser';
+
+function DraggedTimes() {
+  const { annotations } = useMediaElementState();
+  const { annotationPreview } = useMediaElementControls();
+  // The previewed annotations while an edge is dragged, `annotations` otherwise.
+  const shown = useAnnotationsWithPreview(annotations, annotationPreview);
+  // ...
+}
+```
+
+**Optional, for `WaveformPlaylistProvider`:** if you call `useAnnotationDragHandlers` yourself, nothing changes until you pass the preview; `onAnnotationsChange` is still called per move. To get one call per drag and stop re-rendering your component on every move:
+
+```tsx
+// Before
+const { setAnnotations } = usePlaylistControls();
+const handlers = useAnnotationDragHandlers({
+  annotations,
+  onAnnotationsChange: setAnnotations,
+  samplesPerPixel,
+  duration,
+  linkEndpoints,
+});
+
+// After
+const { setAnnotations, annotationPreview } = usePlaylistControls();
+const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
+const handlers = useAnnotationDragHandlers({
+  annotations,
+  onAnnotationsChange: setAnnotations,
+  preview: annotationPreview,
+  samplesPerPixel,
+  sampleRate,
+  duration,
+  linkEndpoints,
+});
+```
+
+The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow the preview by themselves. A custom annotation renderer needs `useAnnotationsWithPreview` to follow it.
+
 ## Keyboard shortcuts yield to the focused control
 
 **Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useKeyboardShortcuts`, `usePlaybackShortcuts`, `<KeyboardShortcuts>`).
