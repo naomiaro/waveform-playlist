@@ -9,8 +9,6 @@ import { test, expect } from '@playwright/test';
  * re-renders it then.
  */
 
-const TIME = /^\d{2}:\d{2}:\d{2}\.\d{3}$/;
-
 test.describe('Flexible API Example', () => {
   test.beforeEach(async ({ page, baseURL }) => {
     await page.goto(`${baseURL}/examples/flexible-api`);
@@ -19,7 +17,7 @@ test.describe('Flexible API Example', () => {
   });
 
   test('the time display follows the skip buttons while stopped', async ({ page }) => {
-    const time = page.locator('span').filter({ hasText: TIME }).first();
+    const time = page.getByTestId('time-display');
     await expect(time).toHaveText('00:00:00.000');
 
     await page.getByRole('button', { name: 'Skip +5s' }).click();
@@ -33,10 +31,11 @@ test.describe('Flexible API Example', () => {
   });
 
   test('the time display follows a click on the waveform while stopped', async ({ page }) => {
-    const time = page.locator('span').filter({ hasText: TIME }).first();
+    const time = page.getByTestId('time-display');
     await expect(time).toHaveText('00:00:00.000');
 
     const row = page.locator('[data-track-row]').first();
+    await row.scrollIntoViewIfNeeded();
     await expect(row).toBeVisible();
     let box: { x: number; y: number; width: number; height: number } | null = null;
     await expect(async () => {

@@ -240,7 +240,7 @@ describe('annotation boxes (#740)', () => {
     expect(lastProps.n4.editable).toBe(true);
   });
 
-  it('a label function is asked on every render of the row, so it may read outside state', async () => {
+  it('a box whose label changed renders even when its active state did not', async () => {
     let prefix = 'A';
     await mount({ getLabel: (annotation, index) => prefix + index + ':' + annotation.id });
     expect(lastProps.n3.label).toBe('A2:n3');
@@ -250,7 +250,8 @@ describe('annotation boxes (#740)', () => {
       probe.controls.setActiveAnnotationId('n1');
     });
 
-    // n3 is neither the old nor the new active box, and still gets its new label.
+    // n3 is neither the old nor the new active box; the memo must not hide a
+    // changed label.
     expect(lastProps.n3.label).toBe('B2:n3');
   });
 });
