@@ -602,7 +602,7 @@ interface UseClipDragHandlersOptions {
 }
 ```
 
-Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. Cancel is handled inside `onDragEnd` via `event.canceled` — reverts React state for boundary trims, resets `isDraggingRef`. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop).
+Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. Cancel is handled inside `onDragEnd` via `event.canceled` — reverts React state for boundary trims, resets `isDraggingRef`. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop). The three handlers keep their identity while `tracks` and `onTracksChange` change (they are read through refs); they are re-created only when `samplesPerPixel` or the sample rate changes.
 
 ### useDragSensors
 
@@ -623,11 +623,14 @@ Returns configured PointerSensor descriptors for DragDropProvider's `sensors` pr
 
 ```typescript
 class ClipCollisionModifier extends Modifier {
-  static configure(options: { tracks: ClipTrack[]; samplesPerPixel: number }): PluginDescriptor;
+  static configure(options: {
+    tracks: ClipTrack[] | (() => ClipTrack[]);
+    samplesPerPixel: number;
+  }): PluginDescriptor;
 }
 ```
 
-Collision detection modifier for clip moves — constrains horizontal drag to prevent overlapping clips. Passed to DragDropProvider's `modifiers` array alongside `RestrictToHorizontalAxis`.
+Collision detection modifier for clip moves — constrains horizontal drag to prevent overlapping clips. Passed to DragDropProvider's `modifiers` array alongside `RestrictToHorizontalAxis`. `tracks` may be a function that returns the current tracks (reading a ref, for example): the configured modifier then keeps its identity while tracks change, so a memoised `modifiers` array is not rebuilt on every edit.
 
 ### SnapToGridModifier
 

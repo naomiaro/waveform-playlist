@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { Modifiers } from '@dnd-kit/abstract';
@@ -79,6 +79,14 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     return undefined;
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, sampleRate, samplesPerPixel]);
 
+  // Handlers and modifiers read tracks through this ref, so their identity does
+  // not change when tracks do. A boundary trim replaces tracks on every pointer
+  // move; keyed on tracks, the handlers and the modifiers array handed to
+  // DragDropProvider were rebuilt mid-drag.
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
+  const getTracks = useCallback(() => tracksRef.current, []);
+
   // Sensors
   const sensors = useDragSensors({ touchOptimized });
 
@@ -107,12 +115,13 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         return; // clip handler guards also skip this kind
       }
       const trackIndex = data?.trackIndex;
-      if (trackIndex !== undefined && tracks[trackIndex]) {
-        setSelectedTrackId(tracks[trackIndex].id);
+      const track = trackIndex !== undefined ? tracksRef.current[trackIndex] : undefined;
+      if (track) {
+        setSelectedTrackId(track.id);
       }
       handleDragStart(event);
     },
-    [handleDragStart, tracks, setSelectedTrackId]
+    [handleDragStart, setSelectedTrackId]
   );
 
   // Publish the live track-reorder preview. dnd-kit fires dragover on every
@@ -198,9 +207,9 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       );
     }
 
-    mods.push(ClipCollisionModifier.configure({ tracks, samplesPerPixel }));
+    mods.push(ClipCollisionModifier.configure({ tracks: getTracks, samplesPerPixel }));
     return mods;
-  }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, tracks, samplesPerPixel, sampleRate]);
+  }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, getTracks, samplesPerPixel, sampleRate]);
 
   return (
     <ClipInteractionContextProvider value={true}>

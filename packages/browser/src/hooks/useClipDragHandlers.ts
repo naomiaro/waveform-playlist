@@ -1,8 +1,9 @@
 import React from 'react';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
+import { sortedClipsOf } from '../utils/sortedClips';
 import { usePlaylistData } from '../WaveformPlaylistContext';
 
 interface UseClipDragHandlersOptions {
@@ -19,6 +20,26 @@ interface UseClipDragHandlersOptions {
   snapSamplePosition?: (samplePosition: number) => number;
 }
 
+/** A track's clips in timeline order, and where the clip at `clipIndex` sits in it. */
+function trimOrderFor(clips: readonly AudioClip[], clipIndex: number) {
+  const sortedClips = sortedClipsOf(clips);
+  return { clips, sortedClips, sortedIndex: sortedClips.indexOf(clips[clipIndex]) };
+}
+
+/** Whether every clip except the one at `clipIndex` is the same object in both arrays. */
+function sameNeighbours(
+  a: readonly AudioClip[],
+  b: readonly AudioClip[],
+  clipIndex: number
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (i !== clipIndex && a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 /**
  * Custom hook for handling clip drag operations (movement and trimming)
  *
@@ -33,6 +54,9 @@ interface UseClipDragHandlersOptions {
  * visual feedback (using cumulative deltas from the original clip snapshot). `isDraggingRef`
  * prevents loadAudio from rebuilding the engine during the drag, so the engine keeps the
  * original clip positions. On drag end, `engine.trimClip()` commits the final delta.
+ *
+ * The returned handlers keep their identity while `tracks` and `onTracksChange` change
+ * (both are read through refs), so they are safe to pass straight to `DragDropProvider`.
  *
  * @example
  * ```tsx
@@ -68,6 +92,25 @@ export function useClipDragHandlers({
   // Store snap function in ref so onDragMove doesn't need it as a dependency
   const snapSamplePositionRef = React.useRef(snapSamplePosition);
   snapSamplePositionRef.current = snapSamplePosition;
+  // The handlers read tracks and onTracksChange through refs. A trim calls
+  // onTracksChange on every pointer move; with `tracks` as a dependency all
+  // three handlers were re-created per move and handed to DragDropProvider
+  // mid-drag.
+  const tracksRef = React.useRef(tracks);
+  tracksRef.current = tracks;
+  const onTracksChangeRef = React.useRef(onTracksChange);
+  onTracksChangeRef.current = onTracksChange;
+  // The trimmed clip's neighbours in timeline order. A trim replaces only the
+  // dragged clip, and collision constraints keep it between the same two
+  // neighbours, so the order found at drag start normally holds for the drag
+  // and is not re-sorted on every pointer move. `clips` is the array it was
+  // computed from: if any OTHER clip of the track has been replaced since (an
+  // undo during the drag, a recording landing on the track), it is recomputed.
+  const trimOrderRef = React.useRef<{
+    clips: readonly AudioClip[];
+    sortedClips: AudioClip[];
+    sortedIndex: number;
+  } | null>(null);
   // Store original clip state when drag starts (for cumulative delta application)
   const originalClipStateRef = React.useRef<{
     offsetSamples: number;
@@ -106,7 +149,7 @@ export function useClipDragHandlers({
         return;
       }
 
-      const track = tracks[data.trackIndex];
+      const track = tracksRef.current[data.trackIndex];
       const clip = track?.clips[data.clipIndex];
 
       if (clip) {
@@ -116,6 +159,7 @@ export function useClipDragHandlers({
           durationSamples: clip.durationSamples,
           startSample: clip.startSample,
         };
+        trimOrderRef.current = trimOrderFor(track.clips, data.clipIndex);
         // Signal provider to skip loadAudio rebuilds during the drag
         isDraggingRef.current = true;
         // Group the drag into one undo step
@@ -128,7 +172,7 @@ export function useClipDragHandlers({
         }
       }
     },
-    [tracks, isDraggingRef, engineRef]
+    [isDraggingRef, engineRef]
   );
 
   const onDragMove = React.useCallback(
@@ -148,7 +192,7 @@ export function useClipDragHandlers({
       if (!data.boundary) return;
 
       // Need original clip state to apply cumulative delta
-      if (!originalClipStateRef.current) return;
+      if (!originalClipStateRef.current || !trimOrderRef.current) return;
 
       const { boundary, trackIndex, clipIndex } = data;
 
@@ -161,17 +205,19 @@ export function useClipDragHandlers({
 
       // Get original clip state (stored on drag start)
       const originalClip = originalClipStateRef.current;
+      const currentClips = tracksRef.current[trackIndex]?.clips;
+      if (currentClips && !sameNeighbours(trimOrderRef.current.clips, currentClips, clipIndex)) {
+        trimOrderRef.current = trimOrderFor(currentClips, clipIndex);
+      }
+      const { sortedClips, sortedIndex } = trimOrderRef.current;
       const snapFn = snapSamplePositionRef.current;
 
       // Track the effective delta after snapping (for engine.trimClip on drag end)
       let effectiveDelta = sampleDelta;
 
       // Update tracks in real-time during drag
-      const newTracks = tracks.map((track, tIdx) => {
+      const newTracks = tracksRef.current.map((track, tIdx) => {
         if (tIdx !== trackIndex) return track;
-
-        const sortedClips = [...track.clips].sort((a, b) => a.startSample - b.startSample);
-        const sortedIndex = sortedClips.findIndex((clip) => clip === track.clips[clipIndex]);
 
         const newClips = track.clips.map((clip, cIdx) => {
           if (cIdx !== clipIndex) return clip;
@@ -223,9 +269,9 @@ export function useClipDragHandlers({
       });
 
       lastBoundaryDeltaRef.current = effectiveDelta;
-      onTracksChange(newTracks);
+      onTracksChangeRef.current(newTracks);
     },
-    [tracks, onTracksChange, samplesPerPixel, sampleRate]
+    [samplesPerPixel, sampleRate]
   );
 
   const onDragEnd = React.useCallback(
@@ -248,7 +294,7 @@ export function useClipDragHandlers({
           if (cancelData) {
             const { trackIndex, clipIndex } = cancelData;
             const original = originalClipStateRef.current;
-            const revertedTracks = tracks.map((track, tIdx) => {
+            const revertedTracks = tracksRef.current.map((track, tIdx) => {
               if (tIdx !== trackIndex) return track;
               const newClips = track.clips.map((clip, cIdx) => {
                 if (cIdx !== clipIndex) return clip;
@@ -261,11 +307,12 @@ export function useClipDragHandlers({
               });
               return { ...track, clips: newClips };
             });
-            onTracksChange(revertedTracks);
+            onTracksChangeRef.current(revertedTracks);
           }
         }
         isDraggingRef.current = false;
         originalClipStateRef.current = null;
+        trimOrderRef.current = null;
         lastBoundaryDeltaRef.current = 0;
         // Cancel aborts the transaction — no undo step pushed
         engineRef.current?.abortTransaction();
@@ -283,6 +330,8 @@ export function useClipDragHandlers({
       if (!data) {
         // Transaction was opened in onDragStart — abort to prevent leak
         isDraggingRef.current = false;
+        originalClipStateRef.current = null;
+        trimOrderRef.current = null;
         engineRef.current?.abortTransaction();
         return;
       }
@@ -295,7 +344,7 @@ export function useClipDragHandlers({
         ? lastBoundaryDeltaRef.current
         : event.operation.transform.x * samplesPerPixel;
 
-      const trackId = tracks[trackIndex]?.id;
+      const trackId = tracksRef.current[trackIndex]?.id;
 
       // Boundary trim: onDragMove updated React state per-frame for visuals.
       // isDraggingRef prevented loadAudio from rebuilding the engine, so the
@@ -315,6 +364,7 @@ export function useClipDragHandlers({
           engineRef.current.commitTransaction();
         }
         originalClipStateRef.current = null;
+        trimOrderRef.current = null;
         lastBoundaryDeltaRef.current = 0;
         return;
       }
@@ -332,7 +382,7 @@ export function useClipDragHandlers({
         engineRef.current.commitTransaction();
       }
     },
-    [tracks, onTracksChange, samplesPerPixel, engineRef, isDraggingRef]
+    [samplesPerPixel, engineRef, isDraggingRef]
   );
 
   return {

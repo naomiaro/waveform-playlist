@@ -268,6 +268,16 @@ The `soundFontCache` prop is deliberately EXCLUDED from the `loadAudio` effect d
 
 **`skipEngineDisposeRef` must include `isDraggingRef`:** During drag, `onDragMove` triggers `loadAudio` re-runs (because `tracks` is in deps). The previous effect's cleanup checks `skipEngineDisposeRef` — if it only checks `isEngineTracks` (which is `false` during drag), it disposes the engine on the first drag move.
 
+## Stable Drag Handlers and Modifiers (#694)
+
+A boundary trim calls `onTracksChange` on every pointer move, so anything keyed on `tracks` is rebuilt per move. Three things are therefore read through refs instead:
+
+- `useClipDragHandlers` reads `tracks` and `onTracksChange` from refs; `onDragStart`/`onDragMove`/`onDragEnd` change identity only with `samplesPerPixel`/`sampleRate`.
+- `ClipInteractionProvider` passes `ClipCollisionModifier.configure({ tracks: getTracks, … })` with a stable getter (the option accepts `ClipTrack[] | (() => ClipTrack[])`), so the `modifiers` array handed to `DragDropProvider` is not rebuilt mid-drag.
+- Clip order: `sortedClipsOf(clips)` (`src/utils/sortedClips.ts`) caches the sorted copy per clips array in a `WeakMap`; during a move the array is not replaced, so `ClipCollisionModifier.apply` sorts once. A trim replaces the array every move, so `onDragStart` records the trimmed clip's `sortedClips`/`sortedIndex` once in `trimOrderRef`; only the neighbours are read from it (`constrainBoundaryTrim`). Each move checks, by identity, that every other clip of the track is still the one the order was computed from, and recomputes if not (an undo during the trim, a recording landing on the track).
+
+`useKeyboardShortcuts` likewise keeps the latest `shortcuts` in a ref and subscribes to `keydown` once per `enabled` value; callers build the array inline. Guarded by `stableDragHandlers.test.tsx`, which mocks `@dnd-kit/react`'s `DragDropProvider` to capture the props it is given.
+
 ## @dnd-kit/react v0.5.0 Event API Quirks
 
 - **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.
