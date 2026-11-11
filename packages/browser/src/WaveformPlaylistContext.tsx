@@ -1117,7 +1117,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           if (suppressEngineStopMirrorRef.current) return;
           setIsPlaying(false);
           stopAnimationFrameLoop();
-          const stoppedAt = engine.getCurrentTime();
+          // The engine rewound to where its play began. For the selection,
+          // return to the selection start instead (see play()): a play that
+          // resumed part-way must not leave the cursor inside the selection.
+          let stoppedAt = engine.getCurrentTime();
+          if (isSelectionPlayRef.current) {
+            stoppedAt = playStartPositionRef.current;
+            engine.seek(stoppedAt);
+          }
           setCurrentTimeRefs(stoppedAt);
           setCurrentTime(stoppedAt);
         });
@@ -1636,12 +1643,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       const engine = engineRef.current;
       const request = pendingResumeRef.current;
       if (request && engine) {
-        const { position, endTime } = request;
-
-        const timeNow = getAudioContextTime();
-        playbackStartTimeRef.current = timeNow;
-        audioStartPositionRef.current = position;
-
         if (!audioInitializedRef.current) {
           // The request STAYS in the slot across this await, so whatever
           // happens meanwhile is unambiguous: stop()/pause()/a newer play()
@@ -1653,6 +1654,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
           audioInitializedRef.current = true;
         }
+
+        // Read the request only now: setSelection may have re-pointed it (in
+        // place, keeping its identity) while init() was pending.
+        const { position, endTime } = request;
+        playbackStartTimeRef.current = getAudioContextTime();
+        audioStartPositionRef.current = position;
 
         pendingResumeRef.current = null;
         engine.play(position, endTime);
@@ -1685,6 +1692,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         actualStartTime >= selectionStartNow - 1e-6 &&
         actualStartTime < selectionEndNow &&
         Math.abs(endTime - selectionEndNow) < 1e-6;
+      // Where a Stop (or the play finishing) returns the cursor. For the
+      // selection that is its start even when this play resumed part-way in:
+      // otherwise the cursor would land back inside the selection and every
+      // later Play would repeat only the tail.
+      const playStartPosition = isSelectionPlayRef.current ? selectionStartNow : actualStartTime;
       const requestId = ++playRequestIdRef.current;
 
       const engine = engineRef.current;
@@ -1693,7 +1705,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // resume effect starts it when the new engine is assigned. isPlaying
         // stays false until audio actually starts (#675).
         if (engineBuildInFlightRef.current) {
-          playStartPositionRef.current = actualStartTime;
+          playStartPositionRef.current = playStartPosition;
           setCurrentTimeRefs(actualStartTime);
           playbackEndTimeRef.current = endTime ?? null;
           pendingResumeRef.current = { position: actualStartTime, endTime };
@@ -1703,7 +1715,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // A direct play supersedes anything queued for a rebuild.
       pendingResumeRef.current = null;
 
-      playStartPositionRef.current = actualStartTime;
+      playStartPositionRef.current = playStartPosition;
 
       // Update currentTimeRef to match the actual start position
       // This ensures the animation loop starts from the correct position
@@ -1812,6 +1824,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // No engine while a rebuild is in flight — the UI state still resets
     // (see pause()).
     engineRef.current?.stop();
+    // The engine rewinds to where ITS play began; for a selection resumed
+    // part-way that is not the selection start. Keep the two in step.
+    if (isSelectionPlayRef.current) engineRef.current?.seek(playStartPositionRef.current);
     setIsPlaying(false);
     stopAnimationLoop();
 
@@ -1933,12 +1948,34 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setCurrentTimeRefs(start);
       setCurrentTime(start);
 
-      // A play queued behind an engine rebuild follows the cursor too, and
-      // loses the end of whatever bounded play it was going to resume.
-      if (pendingResumeRef.current) {
-        pendingResumeRef.current = { position: start };
-        playbackEndTimeRef.current = null;
-        isSelectionPlayRef.current = false;
+      // What playback does from here, if it is running or queued. A new
+      // highlighted range is played start to end, as the Play button would
+      // (looping on: open-ended, the transport's loop handles the bounds). A
+      // plain cursor move carries on open-ended from the new position.
+      const playsRange = end > start && !(isLoopEnabledRef.current ?? false);
+      const endTime = playsRange ? end : undefined;
+
+      // Whatever bounded play was running or queued (a selection, an
+      // annotation) is over, so nothing of it may outlive it. Its end stopped
+      // playback at once when the new position was past it; its active
+      // annotation did the same through the loop's stop-at-annotation-end;
+      // and its play-start position is where a later Stop would have
+      // returned the cursor.
+      const replaceBoundedPlay = () => {
+        playbackEndTimeRef.current = endTime ?? null;
+        isSelectionPlayRef.current = playsRange;
+        playStartPositionRef.current = start;
+        if (activeAnnotationIdRef.current !== null) setActiveAnnotationId(null);
+      };
+
+      // A play queued behind an engine rebuild follows the selection too. The
+      // request is changed IN PLACE: a resume parked in init() recognises its
+      // request by identity, and a new object would strand it (#675, rule 4).
+      const queued = pendingResumeRef.current;
+      if (queued) {
+        queued.position = start;
+        queued.endTime = endTime;
+        replaceBoundedPlay();
       }
 
       if (isPlayingRef.current && engineRef.current) {
@@ -1955,20 +1992,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.stop();
         suppressEngineStopMirrorRef.current = false;
         engineRef.current.seek(start);
-        // The restart below is open-ended from the new position: whatever
-        // bounded play was running (a selection, an annotation) is over, so
-        // nothing of it may outlive it. Its end stopped playback at once when
-        // the new position was past it; its active annotation did the same
-        // through the loop's stop-at-annotation-end; and its play-start
-        // position is where a later stop would have returned the cursor.
-        playbackEndTimeRef.current = null;
-        isSelectionPlayRef.current = false;
-        playStartPositionRef.current = start;
-        if (activeAnnotationIdRef.current !== null) setActiveAnnotationId(null);
-        engineRef.current.play(start);
+        replaceBoundedPlay();
+        engineRef.current.play(start, endTime);
       }
     },
-    [setSelectionEngine, setCurrentTimeRefs, setActiveAnnotationId]
+    [setSelectionEngine, setCurrentTimeRefs, setActiveAnnotationId, isLoopEnabledRef]
   );
 
   // Memoize setScrollContainer callback

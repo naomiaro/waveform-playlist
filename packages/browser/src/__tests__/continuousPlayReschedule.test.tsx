@@ -563,6 +563,35 @@ describe('continuous play and audio rescheduling', () => {
       expect(probe.isPlaying).toBe(true);
     });
 
+    it('a new selection made during playback plays from its start to its end', async () => {
+      // Something else is playing (annotation "a"); a range is then selected,
+      // for example by typing new selection times.
+      const { log, setNow } = await mount(false);
+      await act(async () => {
+        await probe.play(1, 1);
+      });
+      await wait(60);
+      setNow(1.5);
+      await wait(40);
+      log.length = 0;
+
+      await act(async () => {
+        probe.setSelection(1.6, 3.5);
+      });
+      await wait(60);
+      expect(log).toEqual(['stop', 'play(1.6,3.5)']);
+      // It is selection playback: not cut at the end of annotation "a" (2 s)
+      // although continuous play is off...
+      for (const time of [1.9, 2.1, 3.4]) {
+        setNow(time);
+        await wait(60);
+        expect(probe.isPlaying).toBe(true);
+      }
+      // ...and it stops at the new selection's end.
+      setNow(3.55);
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+    });
+
     it('ends selection playback: continuous play applies again', async () => {
       // Playing selection 1.5 s -> 4 s, then the cursor is moved to 1.2 s.
       const { setNow } = await mount(false);

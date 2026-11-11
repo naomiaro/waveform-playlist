@@ -393,7 +393,7 @@ Waveform Playlist supports common keyboard shortcuts:
 
 | Key | Action |
 |-----|--------|
-| Space | Play/Pause toggle. Starts playback exactly as the Play button does: the highlighted selection if there is one (and looping is off), otherwise from the cursor. If playback was paused part-way through the selection, both resume from the cursor and stop at the selection's end |
+| Space | Play/Pause toggle. Starts playback exactly as the Play button does: the highlighted selection if there is one (and looping is off), otherwise from the cursor. If the cursor is inside the selection (playback was paused there, for example), both resume from the cursor and stop at the selection's end; Stop, or the selection finishing, returns the cursor to the selection's start |
 | Home | Go to start |
 | End | Go to end |
 

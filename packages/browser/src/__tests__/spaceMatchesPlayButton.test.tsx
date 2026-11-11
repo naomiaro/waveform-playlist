@@ -52,12 +52,18 @@ interface LoggingAdapter {
   /** `play(start,end)` and `stop` calls, in order. */
   log: string[];
   setNow(seconds: number): void;
+  /** Report that a bounded play finished, as the Tone and native adapters do. */
+  finishBoundedPlay(): void;
 }
 
 function createLoggingAdapter(): LoggingAdapter {
   const log: string[] = [];
   let now = 0;
+  let onEnded: (() => void) | null = null;
   const adapter = {
+    onPlaybackEnded(callback: (() => void) | null) {
+      onEnded = callback;
+    },
     audioContext: {
       currentTime: 0,
       sampleRate: SAMPLE_RATE,
@@ -96,6 +102,7 @@ function createLoggingAdapter(): LoggingAdapter {
     setNow: (seconds) => {
       now = seconds;
     },
+    finishBoundedPlay: () => onEnded?.(),
   };
 }
 
@@ -220,6 +227,54 @@ describe.each([
 
     await start();
     expect(lastPlay(log)).toBe('play(2,4)');
+  });
+
+  describe('after a resume, the selection can still be played from its start', () => {
+    /** Selection 2 s -> 4 s, paused at 3 s, resumed: play(3,4) is running. */
+    async function resumeInsideSelection() {
+      const mounted = await mount();
+      await act(async () => {
+        probe.setSelection(2, 4);
+      });
+      await wait(30);
+      await start();
+      mounted.setNow(3);
+      await wait(40);
+      await act(async () => {
+        probe.pause();
+      });
+      await wait(30);
+      await start();
+      expect(lastPlay(mounted.log)).toBe('play(3,4)');
+      return mounted;
+    }
+
+    it('when Stop is pressed during the resumed play', async () => {
+      const { log } = await resumeInsideSelection();
+      await act(async () => {
+        probe.stop();
+      });
+      await wait(30);
+      log.length = 0;
+
+      await start();
+      expect(lastPlay(log)).toBe('play(2,4)');
+    });
+
+    it('when the engine itself ends the resumed play at the selection end', async () => {
+      // The Tone and native adapters report the end of a bounded play; the
+      // engine then stops on its own and rewinds to where ITS play began (3 s).
+      const { log, finishBoundedPlay } = await resumeInsideSelection();
+      await act(async () => {
+        finishBoundedPlay();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(probe.isPlaying).toBe(false));
+      log.length = 0;
+
+      await start();
+      expect(lastPlay(log)).toBe('play(2,4)');
+    });
   });
 
   it('with the cursor outside the selection, plays the selection from its start', async () => {
