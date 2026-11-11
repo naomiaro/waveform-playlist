@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { handleKeyboardEvent } from '@waveform-playlist/core';
+import { handleKeyboardEvent, observeFocusSource } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 
 // Re-export from core for backwards compatibility
@@ -53,9 +53,13 @@ export const useKeyboardShortcuts = (options: UseKeyboardShortcutsOptions): void
     const handleKeyDown = (event: KeyboardEvent) =>
       handleKeyboardEvent(event, shortcutsRef.current, true);
     window.addEventListener('keydown', handleKeyDown);
+    // Lets the handler tell a clicked button (Space stays a shortcut) from one
+    // reached with Tab (Space activates the button).
+    const stopObservingFocus = observeFocusSource(document);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      stopObservingFocus();
     };
   }, [enabled]);
 };

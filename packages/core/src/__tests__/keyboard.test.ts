@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { handleKeyboardEvent, getShortcutLabel, matchesKeyBinding } from '../keyboard';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import {
+  handleKeyboardEvent,
+  getShortcutLabel,
+  matchesKeyBinding,
+  observeFocusSource,
+} from '../keyboard';
 import type { KeyboardShortcut } from '../keyboard';
 
 function makeKeyboardEvent(
@@ -75,6 +80,290 @@ describe('handleKeyboardEvent', () => {
     Object.defineProperty(event, 'target', { value: div });
     handleKeyboardEvent(event, shortcuts, true);
     expect(action).not.toHaveBeenCalled();
+  });
+
+  describe('keys that belong to the focused control (#710)', () => {
+    let escape: Mock<() => void>;
+    let zero: Mock<() => void>;
+    let all: KeyboardShortcut[];
+
+    beforeEach(() => {
+      escape = vi.fn();
+      zero = vi.fn();
+      all = [
+        { key: ' ', action },
+        { key: 'Escape', action: escape },
+        { key: '0', action: zero },
+      ];
+    });
+
+    /** A keydown whose target is `el`; `path` simulates what composedPath() reports. */
+    function keydownOn(el: Element, key: string, path?: EventTarget[]) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: path ? path[path.length - 1] : el });
+      if (path) Object.defineProperty(event, 'composedPath', { value: () => path });
+      return event;
+    }
+
+    /** Makes `el.matches(selector)` answer for the pseudo-classes the handler asks about. */
+    function withPseudo(el: Element, answers: Record<string, boolean>) {
+      const original = el.matches.bind(el);
+      el.matches = (selector: string) =>
+        selector in answers ? answers[selector] : original(selector);
+      return el;
+    }
+
+    it('leaves every key to a <select>', () => {
+      const select = document.createElement('select');
+      for (const key of [' ', 'Escape', '0']) {
+        const event = keydownOn(select, key);
+        handleKeyboardEvent(event, all, true);
+        expect(event.defaultPrevented).toBe(false);
+      }
+      expect(action).not.toHaveBeenCalled();
+      expect(escape).not.toHaveBeenCalled();
+      expect(zero).not.toHaveBeenCalled();
+    });
+
+    it('leaves Escape to an open modal dialog, wherever focus is inside it', () => {
+      const dialog = withPseudo(document.createElement('dialog'), { ':modal': true });
+      dialog.setAttribute('open', '');
+      const inner = document.createElement('div');
+      dialog.appendChild(inner);
+      document.body.appendChild(dialog);
+
+      const event = keydownOn(inner, 'Escape');
+      handleKeyboardEvent(event, all, true);
+      expect(escape).not.toHaveBeenCalled();
+      expect(event.defaultPrevented).toBe(false);
+
+      // Other shortcuts still work with focus inside the dialog.
+      handleKeyboardEvent(keydownOn(inner, '0'), all, true);
+      expect(zero).toHaveBeenCalledTimes(1);
+      dialog.remove();
+    });
+
+    it('leaves Escape to an aria-modal container', () => {
+      const modal = document.createElement('div');
+      modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+      const inner = document.createElement('div');
+      modal.appendChild(inner);
+      document.body.appendChild(modal);
+      handleKeyboardEvent(keydownOn(inner, 'Escape'), all, true);
+      expect(escape).not.toHaveBeenCalled();
+      modal.remove();
+    });
+
+    it('still handles Escape in a non-modal or closed dialog', () => {
+      const nonModal = withPseudo(document.createElement('dialog'), { ':modal': false });
+      nonModal.setAttribute('open', '');
+      document.body.appendChild(nonModal);
+      handleKeyboardEvent(keydownOn(nonModal, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(1);
+
+      const closed = withPseudo(document.createElement('dialog'), { ':modal': true });
+      document.body.appendChild(closed);
+      handleKeyboardEvent(keydownOn(closed, 'Escape'), all, true);
+      expect(escape).toHaveBeenCalledTimes(2);
+      nonModal.remove();
+      closed.remove();
+    });
+
+    describe('buttons and links', () => {
+      let stopObserving: () => void;
+      let host: HTMLElement;
+
+      beforeEach(() => {
+        stopObserving = observeFocusSource(document);
+        host = document.createElement('div');
+        document.body.appendChild(host);
+      });
+
+      afterEach(() => {
+        stopObserving();
+        host.remove();
+      });
+
+      /** The events a real click produces, up to the focus change. */
+      function focusWithPointer(el: HTMLElement, pressedOn: Element = el) {
+        pressedOn.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+        el.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
+      }
+
+      /** Tab onto the element: a keydown, then the focus change. */
+      function focusWithKeyboard(el: HTMLElement) {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+        el.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
+      }
+
+      function make(kind: string): HTMLElement {
+        const el = document.createElement(kind === 'role' ? 'div' : kind);
+        if (kind === 'a') el.setAttribute('href', '#x');
+        if (kind === 'role') el.setAttribute('role', 'button');
+        host.appendChild(el);
+        return el;
+      }
+
+      describe.each(['button', 'summary', 'a', 'role'])('%s', (kind) => {
+        it('keeps Space and Enter when it was focused from the keyboard', () => {
+          const el = make(kind);
+          focusWithKeyboard(el);
+          const enter = vi.fn();
+          const withEnter = [...all, { key: 'Enter', action: enter }];
+          for (const key of [' ', 'Enter']) {
+            const event = keydownOn(el, key);
+            handleKeyboardEvent(event, withEnter, true);
+            expect(event.defaultPrevented).toBe(false);
+          }
+          expect(action).not.toHaveBeenCalled();
+          expect(enter).not.toHaveBeenCalled();
+        });
+
+        it('gives Space to the shortcut when it was focused with the pointer', () => {
+          const el = make(kind);
+          focusWithPointer(el);
+          const event = keydownOn(el, ' ');
+          handleKeyboardEvent(event, all, true);
+          expect(action).toHaveBeenCalledTimes(1);
+          expect(event.defaultPrevented).toBe(true);
+          // and again: the element is still the pointer-focused one
+          handleKeyboardEvent(keydownOn(el, ' '), all, true);
+          expect(action).toHaveBeenCalledTimes(2);
+        });
+
+        it('does not keep other keys', () => {
+          const el = make(kind);
+          focusWithKeyboard(el);
+          handleKeyboardEvent(keydownOn(el, '0'), all, true);
+          handleKeyboardEvent(keydownOn(el, 'Escape'), all, true);
+          expect(zero).toHaveBeenCalledTimes(1);
+          expect(escape).toHaveBeenCalledTimes(1);
+        });
+      });
+
+      it('counts a press on a child of the button as pointer focus', () => {
+        const button = make('button');
+        const icon = document.createElement('span');
+        button.appendChild(icon);
+        focusWithPointer(button, icon);
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it('treats focus moved by script after a click elsewhere as keyboard focus', () => {
+        // Click "open menu"; the menu then focuses its first item.
+        const opener = make('button');
+        const item = make('button');
+        opener.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+        item.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
+        handleKeyboardEvent(keydownOn(item, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
+      });
+
+      it('a pointer-focused button reached again with Tab keeps its keys', () => {
+        const button = make('button');
+        const other = make('button');
+        focusWithPointer(button);
+        focusWithKeyboard(other);
+        focusWithKeyboard(button);
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
+      });
+
+      it('treats a link without href as plain content', () => {
+        const a = document.createElement('a');
+        host.appendChild(a);
+        focusWithKeyboard(a);
+        handleKeyboardEvent(keydownOn(a, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it('sees through shadow DOM: the inner button is the focused element', () => {
+        const shadowHost = document.createElement('div');
+        host.appendChild(shadowHost);
+        const root = shadowHost.attachShadow({ mode: 'open' });
+        const inner = document.createElement('button');
+        root.appendChild(inner);
+
+        focusWithKeyboard(inner);
+        handleKeyboardEvent(
+          keydownOn(inner, ' ', [inner, root, shadowHost, document.body]),
+          all,
+          true
+        );
+        expect(action).not.toHaveBeenCalled();
+
+        focusWithPointer(inner);
+        handleKeyboardEvent(
+          keydownOn(inner, ' ', [inner, root, shadowHost, document.body]),
+          all,
+          true
+        );
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('observeFocusSource', () => {
+      it('without it, a clicked button still keeps Space (the accessible default)', () => {
+        const button = document.createElement('button');
+        document.body.appendChild(button);
+        button.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+        button.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).not.toHaveBeenCalled();
+        button.remove();
+      });
+
+      it('is reference counted per document and forgets its state when the last stops', () => {
+        const add = vi.spyOn(document, 'addEventListener');
+        const remove = vi.spyOn(document, 'removeEventListener');
+        const stopA = observeFocusSource(document);
+        const stopB = observeFocusSource(document);
+        expect(add).toHaveBeenCalledTimes(3);
+
+        const button = document.createElement('button');
+        document.body.appendChild(button);
+        button.dispatchEvent(new Event('pointerdown', { bubbles: true, composed: true }));
+        button.dispatchEvent(new Event('focusin', { bubbles: true, composed: true }));
+
+        stopA();
+        stopA(); // idempotent
+        expect(remove).not.toHaveBeenCalled();
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1);
+
+        stopB();
+        expect(remove).toHaveBeenCalledTimes(3);
+        handleKeyboardEvent(keydownOn(button, ' '), all, true);
+        expect(action).toHaveBeenCalledTimes(1); // state forgotten: the button keeps Space
+        button.remove();
+        add.mockRestore();
+        remove.mockRestore();
+      });
+    });
+
+    it('looks through shadow DOM: the real target is the first entry of composedPath()', () => {
+      // At a document listener, event.target is retargeted to the shadow host.
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+
+      const input = document.createElement('input');
+      handleKeyboardEvent(keydownOn(input, ' ', [input, host, document.body]), all, true);
+      expect(action).not.toHaveBeenCalled();
+
+      // A modal dialog further up the composed path still owns Escape.
+      const dialog = withPseudo(document.createElement('dialog'), { ':modal': true });
+      dialog.setAttribute('open', '');
+      const span = document.createElement('span');
+      handleKeyboardEvent(
+        keydownOn(span, 'Escape', [span, host, dialog, document.body]),
+        all,
+        true
+      );
+      expect(escape).not.toHaveBeenCalled();
+      host.remove();
+    });
   });
 
   it('calls preventDefault when shortcut.preventDefault is true', () => {

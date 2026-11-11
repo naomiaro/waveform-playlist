@@ -367,6 +367,10 @@ const sourceEnd = Math.min(waveformData.length, Math.ceil(targetEnd * ratio));
 
 **Mid-playback `duration` changes already restart the animation loop** — the `reschedulePlayback` effect depends on `startAnimationLoop`, whose identity changes when `duration` state updates, so the running loop is stopped/restarted with the fresh closure. "Stale duration in the loop" is not a real failure mode (disproven while investigating #590); don't add refs/restarts for it.
 
+## Shortcuts Yield to the Focused Control (#710)
+
+`handleKeyboardEvent` (core) skips a shortcut when the key belongs to the focused control: `input`/`textarea`/`select`/contenteditable keep every key; `Escape` belongs to an open modal `<dialog>` or `aria-modal` container on the composed path; `Space`/`Enter` belong to a focused button, link or `role=button`-like control unless it was focused by a pointer click, so click-Mute-then-Space still plays. Pointer-vs-keyboard focus is tracked by core's `observeFocusSource(document)` (capture `pointerdown`/`keydown`/`focusin`, ref-counted), which `useKeyboardShortcuts` starts in its effect; `:focus-visible` cannot be used because Chromium makes the focused element match it as soon as any key is pressed, including the keydown being handled. Before this, `preventDefault` on the keydown blocked the button's own activation: a keyboard user could not press a focused Mute with Space, and Escape could not close the spectrogram settings modal. An unsupported `:modal` selector falls back to "the dialog keeps Escape". Covered by core's `keyboard.test.ts` and `e2e/keyboard-focus.spec.ts`.
+
 ## jsdom Keyboard Event Testing Quirks
 
 - `new KeyboardEvent()` has `target: null` in jsdom — use `Object.defineProperty(event, 'target', { value: document.body })` when calling handlers directly (not via `dispatchEvent`)

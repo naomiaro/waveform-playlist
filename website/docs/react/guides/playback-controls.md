@@ -397,6 +397,16 @@ Waveform Playlist supports common keyboard shortcuts:
 | Home | Go to start |
 | End | Go to end |
 
+### Shortcuts and focused controls
+
+A shortcut does not fire for a key that the focused control uses itself:
+
+- Text fields, `<select>` and `contenteditable` elements keep every key.
+- `Escape` closes an open modal dialog (`<dialog>` opened with `showModal()`, or an `aria-modal="true"` container) and does not also stop playback.
+- `Space` and `Enter` activate a button, link or similar control that has focus, so every control can be operated with Tab and Space. The exception is a control that got focus from a pointer click: it keeps focus without having been navigated to, so `Space` is still play/pause there.
+
+This applies to every shortcut handled through `useKeyboardShortcuts` / `<KeyboardShortcuts>`, including `additionalShortcuts`, and looks through shadow DOM.
+
 ## Complete Example
 
 ```tsx
