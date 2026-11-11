@@ -44,6 +44,7 @@ import {
   useAnimationFrameLoop,
   useWaveformDataCache,
 } from './hooks';
+import { useShallowStable } from './hooks/useShallowStable';
 
 // Types
 export interface ClipPeaks {
@@ -282,6 +283,10 @@ export interface PlaylistDataContextValue {
 }
 
 // Create the 4 separate contexts
+// Shared default so an omitted `controls` prop keeps one identity across
+// renders — a fresh object here would invalidate the data context every render.
+const DEFAULT_CONTROLS = { show: false, width: 0 };
+
 const PlaybackAnimationContext = createContext<PlaybackAnimationContextValue | null>(null);
 const PlaylistStateContext = createContext<PlaylistStateContextValue | null>(null);
 const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
@@ -374,8 +379,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
   automaticScroll = false,
-  theme: userTheme,
-  controls = { show: false, width: 0 },
+  theme: userThemeProp,
+  controls: controlsProp = DEFAULT_CONTROLS,
   annotationList,
   effects,
   onReady,
@@ -395,6 +400,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   createAdapter,
   children,
 }) => {
+  // Inline object literals from the parent get a new identity per render;
+  // keep the previous one while the contents are unchanged so the memoized
+  // context values and the merged theme below are not invalidated.
+  const controls = useShallowStable(controlsProp);
+  const userTheme = useShallowStable(userThemeProp);
+
   // Default progressBarWidth to barWidth + barGap (fills gaps)
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
 
@@ -1754,77 +1765,65 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
       // If currently playing, restart at the new position.
       // play() handles stop+seek+restart internally.
-      if (isPlaying && engineRef.current) {
+      if (isPlayingRef.current && engineRef.current) {
         play(clampedTime);
       }
     },
-    [duration, isPlaying, play, setCurrentTimeRefs]
+    [duration, play, setCurrentTimeRefs]
   );
 
   // Track controls
-  const setTrackMute = useCallback(
-    (trackIndex: number, muted: boolean) => {
-      const trackId = tracksRef.current[trackIndex]?.id;
-      if (!trackId) return;
+  const setTrackMute = useCallback((trackIndex: number, muted: boolean) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
 
-      const newStates = [...trackStates];
-      newStates[trackIndex] = { ...newStates[trackIndex], muted };
-      setTrackStates(newStates);
+    setTrackStates((prev) =>
+      prev.map((state, i) => (i === trackIndex ? { ...state, muted } : state))
+    );
 
-      if (engineRef.current) {
-        engineRef.current.setTrackMute(trackId, muted);
-      }
-    },
-    [trackStates]
-  );
+    if (engineRef.current) {
+      engineRef.current.setTrackMute(trackId, muted);
+    }
+  }, []);
 
-  const setTrackSolo = useCallback(
-    (trackIndex: number, soloed: boolean) => {
-      const trackId = tracksRef.current[trackIndex]?.id;
-      if (!trackId) return;
+  const setTrackSolo = useCallback((trackIndex: number, soloed: boolean) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
 
-      const newStates = [...trackStates];
-      newStates[trackIndex] = { ...newStates[trackIndex], soloed };
-      setTrackStates(newStates);
+    setTrackStates((prev) =>
+      prev.map((state, i) => (i === trackIndex ? { ...state, soloed } : state))
+    );
 
-      if (engineRef.current) {
-        engineRef.current.setTrackSolo(trackId, soloed);
-      }
-    },
-    [trackStates]
-  );
+    if (engineRef.current) {
+      engineRef.current.setTrackSolo(trackId, soloed);
+    }
+  }, []);
 
-  const setTrackVolume = useCallback(
-    (trackIndex: number, volume: number) => {
-      const trackId = tracksRef.current[trackIndex]?.id;
-      if (!trackId) return;
+  const setTrackVolume = useCallback((trackIndex: number, volume: number) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
 
-      const newStates = [...trackStates];
-      newStates[trackIndex] = { ...newStates[trackIndex], volume };
-      setTrackStates(newStates);
+    setTrackStates((prev) =>
+      prev.map((state, i) => (i === trackIndex ? { ...state, volume } : state))
+    );
 
-      if (engineRef.current) {
-        engineRef.current.setTrackVolume(trackId, volume);
-      }
-    },
-    [trackStates]
-  );
+    if (engineRef.current) {
+      engineRef.current.setTrackVolume(trackId, volume);
+    }
+  }, []);
 
-  const setTrackPan = useCallback(
-    (trackIndex: number, pan: number) => {
-      const trackId = tracksRef.current[trackIndex]?.id;
-      if (!trackId) return;
+  const setTrackPan = useCallback((trackIndex: number, pan: number) => {
+    const trackId = tracksRef.current[trackIndex]?.id;
+    if (!trackId) return;
 
-      const newStates = [...trackStates];
-      newStates[trackIndex] = { ...newStates[trackIndex], pan };
-      setTrackStates(newStates);
+    setTrackStates((prev) =>
+      prev.map((state, i) => (i === trackIndex ? { ...state, pan } : state))
+    );
 
-      if (engineRef.current) {
-        engineRef.current.setTrackPan(trackId, pan);
-      }
-    },
-    [trackStates]
-  );
+    if (engineRef.current) {
+      engineRef.current.setTrackPan(trackId, pan);
+    }
+  }, []);
 
   const reorderTrack = useCallback(
     (trackId: string, toIndex: number) => {
@@ -1866,7 +1865,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setCurrentTimeRefs(start);
       setCurrentTime(start);
 
-      if (isPlaying && engineRef.current) {
+      if (isPlayingRef.current && engineRef.current) {
         // Stop + seek before restarting playback from selection start.
         // engine.stop() resets _currentTime and _isPlaying, creating a window
         // where getCurrentTime() returns wrong value. seek() immediately
@@ -1883,7 +1882,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.play(start);
       }
     },
-    [isPlaying, setSelectionEngine, setCurrentTimeRefs]
+    [setSelectionEngine, setCurrentTimeRefs]
   );
 
   // Memoize setScrollContainer callback
@@ -2158,7 +2157,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   // Merge user theme with default theme
-  const mergedTheme = { ...defaultTheme, ...userTheme };
+  const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
 
   return (
     <ThemeProvider theme={mergedTheme}>

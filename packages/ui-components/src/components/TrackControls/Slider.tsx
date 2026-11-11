@@ -42,6 +42,19 @@ export const Slider = styled(BaseSlider)`
     border-radius: 3px;
   }
 
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &:disabled::-webkit-slider-thumb {
+    cursor: not-allowed;
+  }
+
+  &:disabled::-moz-range-thumb {
+    cursor: not-allowed;
+  }
+
   &:focus::-webkit-slider-runnable-track {
     background: ${(props) => props.theme.inputBorder};
   }

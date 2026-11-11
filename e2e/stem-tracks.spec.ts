@@ -454,3 +454,57 @@ test.describe('Stem Tracks Example', () => {
     });
   });
 });
+
+/**
+ * The stem page shows placeholder tracks immediately and decodes audio in the
+ * background (`useAudioTracks({ immediate: true })` + `deferEngineRebuild`).
+ * Until loading finishes the provider has no mixer state for the tracks and the
+ * engine does not know them, so the default track controls must be disabled.
+ */
+test.describe('Stem Tracks Example — track controls while loading', () => {
+  test('mute, solo, volume and pan are disabled until tracks have loaded', async ({
+    page,
+    baseURL,
+  }) => {
+    // Let the first stem through and hold the rest, so one track is on screen
+    // while the playlist as a whole is still loading.
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await page.route('**/media/audio/AlbertKader_Whiptails/**', async (route) => {
+      if (!route.request().url().includes('01_Loop1')) {
+        await released;
+      }
+      await route.continue();
+    });
+
+    await page.goto(`${baseURL}/examples/stem-tracks`);
+    await page.waitForSelector('h1:has-text("Stem Tracks")', { timeout: 30000 });
+
+    const mute = page.getByRole('button', { name: 'Mute' }).first();
+    const solo = page.getByRole('button', { name: 'Solo' }).first();
+    const volume = page.getByRole('slider', { name: 'Volume', exact: true }).first();
+    const pan = page.getByRole('slider', { name: 'Pan', exact: true }).first();
+
+    await expect(mute).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(0);
+    await expect(mute).toBeDisabled();
+    await expect(solo).toBeDisabled();
+    await expect(volume).toBeDisabled();
+    await expect(pan).toBeDisabled();
+
+    release();
+    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+
+    await expect(mute).toBeEnabled();
+    await expect(solo).toBeEnabled();
+    await expect(volume).toBeEnabled();
+    await expect(pan).toBeEnabled();
+
+    // Mute is a toggle: its pressed state is exposed, not only its colour.
+    await expect(mute).toHaveAttribute('aria-pressed', 'false');
+    await mute.click();
+    await expect(mute).toHaveAttribute('aria-pressed', 'true');
+  });
+});

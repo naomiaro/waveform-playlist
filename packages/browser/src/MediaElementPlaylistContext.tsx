@@ -19,6 +19,7 @@ import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
+import { useShallowStable } from './hooks/useShallowStable';
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -85,6 +86,10 @@ export interface MediaElementDataContextValue {
 }
 
 // Create contexts
+// Shared default so an omitted `controls` prop keeps one identity across
+// renders — a fresh object here would invalidate the data context every render.
+const DEFAULT_CONTROLS = { show: false, width: 0 };
+
 const MediaElementAnimationContext = createContext<MediaElementAnimationContextValue | null>(null);
 const MediaElementStateContext = createContext<MediaElementStateContextValue | null>(null);
 const MediaElementControlsContext = createContext<MediaElementControlsContextValue | null>(null);
@@ -171,8 +176,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
-  theme: userTheme,
-  controls = { show: false, width: 0 },
+  theme: userThemeProp,
+  controls: controlsProp = DEFAULT_CONTROLS,
   annotationList,
   barWidth = 1,
   barGap = 0,
@@ -185,6 +190,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   createPlayout,
   children,
 }) => {
+  // Inline object literals from the parent get a new identity per render;
+  // keep the previous one while the contents are unchanged so the memoized
+  // context values and the merged theme below are not invalidated.
+  const controls = useShallowStable(controlsProp);
+  const userTheme = useShallowStable(userThemeProp);
+
   const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
 
   // State
@@ -584,7 +595,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ]
   );
 
-  const mergedTheme = { ...defaultTheme, ...userTheme };
+  const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
 
   return (
     <ThemeProvider theme={mergedTheme}>
