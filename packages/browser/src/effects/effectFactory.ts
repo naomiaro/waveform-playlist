@@ -31,7 +31,11 @@ import type { EffectDefinition } from './effectDefinitions';
 
 // Type for effect instance with common methods
 export interface EffectInstance {
-  effect: ToneAudioNode | AudioNode; // Tone.js effect, or a native node (WAM plugins)
+  /** Where the chain connects into the effect. */
+  input: ToneAudioNode | AudioNode;
+  /** Where the chain continues from. The same node as `input` for a Tone.js
+   *  effect or a WAM plugin; a registered custom effect may have two. */
+  output: ToneAudioNode | AudioNode;
   id: string;
   instanceId: string;
   dispose: () => void;
@@ -122,7 +126,8 @@ export function createEffectInstance(
   const effectRecord = effect as unknown as Record<string, { value?: unknown } | unknown>;
 
   return {
-    effect,
+    input: effect,
+    output: effect,
     id: definition.id,
     instanceId,
 
@@ -208,12 +213,12 @@ export function createEffectChain(effects: EffectInstance[]): {
 
   // Connect effects in series
   for (let i = 0; i < effects.length - 1; i++) {
-    connect(effects[i].effect, effects[i + 1].effect);
+    connect(effects[i].output, effects[i + 1].input);
   }
 
   return {
-    input: effects[0].effect,
-    output: effects[effects.length - 1].effect,
+    input: effects[0].input,
+    output: effects[effects.length - 1].output,
     dispose() {
       effects.forEach((e) => e.dispose());
     },

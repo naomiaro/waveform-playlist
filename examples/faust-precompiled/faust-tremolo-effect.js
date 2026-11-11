@@ -1,4 +1,5 @@
-// A precompiled Faust effect as a dawcore custom effect.
+// A precompiled Faust effect as a custom effect. One registration serves
+// <daw-editor> and the React effects hooks (useDynamicEffects).
 //
 // `tremolo.dsp` was compiled ahead of time with faustwasm's CLI:
 //
@@ -7,7 +8,7 @@
 // which wrote `dsp-module.wasm`, `dsp-meta.json` and a copy of the faustwasm
 // runtime (`faustwasm/index.js`). Nothing is compiled in the browser, and
 // @dawcore/faust is not involved.
-import { registerEffect } from '@dawcore/components';
+import { registerEffect } from '@waveform-playlist/core';
 
 /**
  * Register the effect type. `baseUrl` is where the compiled folder is served
@@ -40,7 +41,7 @@ export async function registerFaustTremolo(baseUrl) {
     },
 
     // Runs once per AudioContext — the live one, and the OfflineAudioContext
-    // that exportAudio() creates. createNode() registers the processor on that
+    // of every export. createNode() registers the processor on that
     // context; the node it returns is not needed.
     prepare: async (ctx) => {
       const node = await generator.createNode(

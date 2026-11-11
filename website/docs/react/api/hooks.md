@@ -1052,7 +1052,9 @@ Both effects hooks also host third-party [WAM 2.0](https://www.webaudiomodules.c
 
 ### useDynamicEffects
 
-Manage master effects chain with real-time parameter updates.
+Manage master effects chain with real-time parameter updates. The hook does not re-render when the chain changes, and everything it returns keeps its identity for the life of the component (`masterEffects` follows `fftSize`; `availableEffects` is read from the registry each time the calling component renders). Read the chain with [`useActiveEffects`](#useactiveeffects).
+
+The chains are state: they survive a StrictMode remount, Fast Refresh and a hidden `<Activity>` with their lists and live instances; the hooks run no cleanup on unmount. Add defaults on mount behind a ref guard (an unguarded mount effect adds twice under StrictMode in development). After a real unmount the instances are disposed when the chain is garbage-collected (`FinalizationRegistry`; best effort, not prompt, not guaranteed); call `clearAllEffects()` / `clearTrackEffects(trackId)` to dispose them at a known moment. A clear also drops an add still in flight: its promise rejects with "…aborted: the effects chain was cleared before …". An unmount does not abort an add. If a change cannot be wired (a node on another AudioContext), the previous chain is restored, the new instance is disposed, the list is not changed and the add rejects. A type re-registered while its `prepare` was running is added as the new definition. See [Lifetime of a chain](/docs/react/guides/effects#lifetime-of-a-chain).
 
 ```typescript
 function useDynamicEffects(fftSize?: number): UseDynamicEffectsReturn; // default: 256
@@ -1062,51 +1064,92 @@ function useDynamicEffects(fftSize?: number): UseDynamicEffectsReturn; // defaul
 
 ```typescript
 interface UseDynamicEffectsReturn {
-  activeEffects: ActiveEffect[];
+  /**
+   * The master chain, in order. Read it with `useActiveEffects(effects)` in
+   * the component that draws the rack: this hook does not re-render when the
+   * list changes, so a slider step re-renders that component only.
+   */
+  effects: ValueSource<ActiveEffect[]>;
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
-  addEffect: (effectId: string) => void;
+  /**
+   * Adds a built-in effect or a registered custom effect by id. A built-in is
+   * in the chain before this returns. A registered type is added once its
+   * `prepare` hook has run on the audio context, and requires native-context
+   * mode (`configureGlobalContext({ nativeAudioContext: true })`).
+   * Resolves with the new entry's instanceId; rejects for an unknown id.
+   */
+  addEffect: (effectId: string) => Promise<string>;
   /**
    * Hosts a WAM plugin from a module URL and appends it to the master chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
    * WAM entries render in offline WAV export (re-instantiated on the offline context).
+   * Resolves with the new entry's instanceId.
    */
   addWamEffect: (url: string, initialState?: unknown) => Promise<string>;
   /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
   getWamPlugin: (instanceId: string) => WamPluginInstance | undefined;
   removeEffect: (instanceId: string) => void;
-  updateParameter: (instanceId: string, paramName: string, value: number | string | boolean) => void;
+  /** Set a parameter on the live effect. For a registered custom effect a
+   *  value that is not a number is ignored. */
+  updateParameter: (instanceId: string, paramName: string, value: EffectParameterValue) => void;
   toggleBypass: (instanceId: string) => void;
   reorderEffects: (fromIndex: number, toIndex: number) => void;
+  /**
+   * Remove and dispose every effect. An add that is still waiting (a
+   * registered effect's `prepare`, a WAM plugin loading) is dropped too: its
+   * promise rejects and nothing is appended after the clear.
+   */
   clearAllEffects: () => void;
   masterEffects: EffectsFunction;
   /**
-   * Creates a fresh effects function for offline rendering. Native effects are
-   * re-created on the offline context; WAM entries are re-instantiated from
-   * their URL-cached factories with the live instance's state transferred.
-   * The returned function may be async and may reject — a WAV export never
+   * Returns the effects function for offline rendering (the same function on
+   * every call). It rebuilds the chain as it is when the export runs:
+   * built-in effects are re-created on the offline context, WAM entries
+   * re-instantiated with the live instance's state, registered custom effects
+   * prepared and created there; with no active effect it passes the audio
+   * straight through. It is async and may reject — a WAV export never
    * silently renders without an effect the live chain has.
    */
-  createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
+  createOfflineEffectsFunction: () => OfflineEffectsFunction;
   analyserRef: RefObject<Analyser | null>;
 }
+
+type EffectParameterValue = number | string | boolean;
 
 interface ActiveEffect {
   instanceId: string;
   effectId: string;
-  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
-  kind: 'native' | 'wam';
+  /**
+   * 'tone' = built-in Tone.js effect; 'wam' = hosted WAM plugin;
+   * 'custom' = a type registered with `registerEffect()` from
+   * `@waveform-playlist/core`.
+   */
+  kind: 'tone' | 'wam' | 'custom';
   /** Module URL for wam entries. */
   url?: string;
   definition: EffectDefinition;
-  params: Record<string, number | string | boolean>;
+  params: Record<string, EffectParameterValue>;
   bypassed: boolean;
+  /**
+   * The effect's wet/dry parameter, when it has one. Bypass sets it to 0 and
+   * leaves the effect in the chain; an effect without one is bypassed by
+   * disconnecting it.
+   */
+  wetParam?: string;
 }
 ```
 
+`ValueSource` is from `@waveform-playlist/core` (see [Value sources](#value-sources)).
+
 ### useTrackDynamicEffects
 
-Per-track effects management.
+Per-track effects management. Each track id has its own chain. The hook does not re-render when a chain changes. The chains have the same lifetime as the master chain (see above): they survive a remount, and `clearTrackEffects(trackId)` disposes one track's effects.
 
 ```typescript
 function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn;
@@ -1116,47 +1159,283 @@ function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn;
 
 ```typescript
 interface UseTrackDynamicEffectsReturn {
-  trackEffectsState: Map<string, TrackActiveEffect[]>;
-  addEffectToTrack: (trackId: string, effectId: string) => void;
   /**
-   * Hosts a WAM plugin from a module URL and appends it to a track's effect chain.
+   * One track's chain, in order. The same source is returned for the same
+   * track id. Read it with `useActiveEffects(getTrackEffects(trackId))` in
+   * the component that draws that track's effects: this hook does not
+   * re-render when a chain changes.
+   */
+  getTrackEffects: (trackId: string) => ValueSource<TrackActiveEffect[]>;
+  /**
+   * Adds a built-in effect or a registered custom effect to a track by id. A
+   * built-in is in the chain before this returns. A registered type is added
+   * once its `prepare` hook has run on the audio context, and requires
+   * native-context mode. Resolves with the new entry's instanceId; rejects
+   * for an unknown id.
+   */
+  addEffectToTrack: (trackId: string, effectId: string) => Promise<string>;
+  /**
+   * Hosts a WAM plugin from a module URL and appends it to a track's chain.
    * Requires native-context mode — call configureGlobalContext({ nativeAudioContext: true })
    * from @waveform-playlist/playout before any audio initialization.
    * WAM entries render in offline WAV export (re-instantiated on the offline context).
+   * Resolves with the new entry's instanceId.
    */
   addWamEffectToTrack: (trackId: string, url: string, initialState?: unknown) => Promise<string>;
-  /** Live plugin handle for a hosted WAM entry on a track (for GUI mounting via WamEffectGui). */
+  /** Live plugin handle for a hosted WAM entry (for GUI mounting via WamEffectGui). */
   getTrackWamPlugin: (trackId: string, instanceId: string) => WamPluginInstance | undefined;
   removeEffectFromTrack: (trackId: string, instanceId: string) => void;
   updateTrackEffectParameter: (
     trackId: string,
     instanceId: string,
     paramName: string,
-    value: number | string | boolean
+    value: EffectParameterValue
   ) => void;
   toggleBypass: (trackId: string, instanceId: string) => void;
+  reorderTrackEffects: (trackId: string, fromIndex: number, toIndex: number) => void;
+  /** Remove and dispose every effect of one track. An add to that track that
+   *  is still waiting is dropped too: its promise rejects. */
   clearTrackEffects: (trackId: string) => void;
-  getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction | undefined;
   /**
-   * Creates a fresh effects function for a track for offline rendering. Native
-   * effects are re-created on the offline context; WAM entries are
-   * re-instantiated with the live instance's state transferred. May reject —
-   * a WAV export never silently renders without an effect the live chain has.
+   * The effects function to give a track (`track.effects`). The same function
+   * is returned for the same track id.
    */
-  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction | undefined;
+  getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
+  /**
+   * Returns a track's effects function for offline rendering (the same
+   * function for the same track id). It rebuilds the chain as it is when the
+   * export runs; with no active effect it passes the audio straight through.
+   * It is async and may reject — a WAV export never silently renders without
+   * an effect the live chain has.
+   */
+  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction;
+  /**
+   * The effects that can be added: the built-ins, then (in native-context
+   * mode) every type registered with `registerEffect()`. Read when the calling
+   * component renders, so register custom effects before it does.
+   */
   availableEffects: EffectDefinition[];
 }
 
-interface TrackActiveEffect {
+/** An entry of a track's chain. The same shape as a master-chain entry. */
+type TrackActiveEffect = ActiveEffect;
+```
+
+### useActiveEffects
+
+Subscribe a component to one effects chain.
+
+```typescript
+/**
+ * The effects of one chain, as React state: `effects` from
+ * `useDynamicEffects()`, or `getTrackEffects(trackId)` from
+ * `useTrackDynamicEffects()`. The calling component re-renders when that
+ * chain changes (an effect added, removed, moved, bypassed, or a parameter
+ * set), so call it in the component that draws the chain, not at the root of
+ * the page.
+ */
+function useActiveEffects(effects: ValueSource<ActiveEffect[]>): ActiveEffect[];
+```
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import {
+  useDynamicEffects,
+  useTrackDynamicEffects,
+  useActiveEffects,
+  type UseDynamicEffectsReturn,
+  type UseTrackDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
+
+function App({ tracks }: { tracks: ClipTrack[] }) {
+  // Call each hook once and pass the result down. A second call creates a
+  // second, empty set of chains.
+  const masterFx = useDynamicEffects();
+  const trackFx = useTrackDynamicEffects();
+
+  // (Give each track `effects: trackFx.getTrackEffectsFunction(track.id)` to
+  // make its chain audible; see the effects guide.)
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+      <MasterRack masterFx={masterFx} />
+      {tracks.map((track) => (
+        <TrackRack key={track.id} trackId={track.id} trackFx={trackFx} />
+      ))}
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+function MasterRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
+  const activeEffects = useActiveEffects(masterFx.effects);
+  return (
+    <ul>
+      {activeEffects.map((effect) => (
+        <li key={effect.instanceId}>{effect.definition.name}</li>
+      ))}
+    </ul>
+  );
+}
+
+function TrackRack({
+  trackId,
+  trackFx,
+}: {
+  trackId: string;
+  trackFx: UseTrackDynamicEffectsReturn;
+}) {
+  const trackEffects = useActiveEffects(trackFx.getTrackEffects(trackId));
+  return (
+    <ul>
+      {trackEffects.map((effect) => (
+        <li key={effect.instanceId}>{effect.definition.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### getAvailableEffects
+
+```typescript
+/**
+ * The effects that can be added right now: the built-in effects, followed by
+ * every registered custom effect when the app is in native-context mode (a
+ * registered effect cannot be added without it). Returns the same array until
+ * that set changes, so it is safe to read during render. It is a read, not a
+ * subscription: a type registered later appears the next time this is called.
+ */
+function getAvailableEffects(): EffectDefinition[];
+```
+
+Both hooks return this list as `availableEffects`, read when the calling component renders. Register custom effects before the component that shows the picker renders. Adding by id (`addEffect('my-id')`) does not depend on the list. Effects that belong to another library's own catalogue in the shared registry are not listed: when `@dawcore/components` is loaded on the same page, its `native-*` effects stay out of the React list (they are marked `builtIn`), and can still be added by id.
+
+### Effect types
+
+```typescript
+type ParameterType = 'number' | 'select' | 'boolean';
+
+interface EffectParameter {
+  name: string;
+  label: string;
+  type: ParameterType;
+  min?: number;
+  max?: number;
+  step?: number;
+  default: number | string | boolean;
+  unit?: string;
+  options?: { value: string | number; label: string }[];
+}
+
+/** The categories the built-in effects use. */
+type BuiltInEffectCategory =
+  | 'delay'
+  | 'reverb'
+  | 'modulation'
+  | 'distortion'
+  | 'filter'
+  | 'dynamics'
+  | 'spatial'
+  | 'wam';
+
+/** The known names, or any other string. */
+type EffectCategory = BuiltInEffectCategory | (string & {});
+
+interface EffectDefinition {
+  id: string;
+  name: string;
+  /**
+   * The built-in effects use the listed categories and WAM plugins use
+   * `'wam'`; a registered custom effect may name any category of its own.
+   */
+  category: EffectCategory;
+  description: string;
+  parameters: EffectParameter[];
+}
+
+interface EffectInstance {
+  /** Where the chain connects into the effect. */
+  input: ToneAudioNode | AudioNode;
+  /** Where the chain continues from. The same node as `input` for a Tone.js
+   *  effect or a WAM plugin; a registered custom effect may have two. */
+  output: ToneAudioNode | AudioNode;
+  id: string;
   instanceId: string;
-  effectId: string;
-  /** 'native' = built-in Tone effect; 'wam' = hosted WAM plugin. */
-  kind: 'native' | 'wam';
-  /** Module URL for wam entries. */
-  url?: string;
-  definition: EffectDefinition;
-  params: Record<string, number | string | boolean>;
-  bypassed: boolean;
+  dispose: () => void;
+  setParameter: (name: string, value: number | string | boolean) => void;
+  getParameter: (name: string) => number | string | boolean | undefined;
+  connect: (destination: InputNode) => void;
+  disconnect: () => void;
+}
+
+interface CustomEffectInstance extends EffectInstance {
+  kind: 'custom';
+  /** What the registered definition's `create` returned. */
+  native: NativeEffectInstance; // from @waveform-playlist/core
+}
+```
+
+### Custom effects
+
+A type registered with `registerEffect()` from `@waveform-playlist/core` can be added by id with `addEffect(id)` / `addEffectToTrack(trackId, id)`. It requires native-context mode. `addEffect` awaits the definition's `prepare` itself; with `<daw-editor>`, whose `addEffect()` is synchronous, call `await editor.prepareEffect(type)` first. See the [Custom Effects guide](/docs/react/guides/effects#custom-effects).
+
+```typescript
+// From @waveform-playlist/core
+function registerEffect(type: string, definition: NativeEffectDefinition): void;
+function unregisterEffect(type: string): boolean;
+function getEffectDefinitions(): Map<string, NativeEffectDefinition>;
+
+interface NativeEffectDefinition {
+  label: string;
+  category: string;
+  defaults: Record<string, number>;
+  params: Record<string, EffectParamDef>;
+  /** Name of the wet/dry param, when the effect has one. Bypass zeroes it;
+   *  effects without one are bypassed by disconnection. */
+  wetParam?: string;
+  /** Async setup that must finish before `create` can run on a context
+   *  (typically `audioContext.audioWorklet.addModule(url)`). Runs once per
+   *  context, including the OfflineAudioContext of every export. Must be safe
+   *  to run more than once on the same context. */
+  prepare?: (audioContext: BaseAudioContext) => Promise<void>;
+  create: (audioContext: BaseAudioContext, params: Record<string, number>) => NativeEffectInstance;
+  /**
+   * Set by a host library on the effects of its own catalogue (dawcore's
+   * `native-*`), never by an app. A host lists its own catalogue plus what
+   * the app registered: the React effect picker leaves these out. The effect
+   * can still be added by id anywhere.
+   */
+  builtIn?: boolean;
+}
+
+interface EffectParamDef {
+  min: number;
+  max: number;
+  step?: number;
+  /** 's', 'ms', 'Hz', 'dB', '%' … */
+  unit?: string;
+  /** Display name for a parameter panel. Defaults to the parameter's key. */
+  label?: string;
+}
+
+/**
+ * A live, wired effect. `input`/`output` are the chain attachment points
+ * (the same node for single-node effects). `applyParams` updates AudioParams
+ * in place — the chain never rebuilds for parameter changes.
+ *
+ * The host owns every connection OUT of `output`: when it rewires the chain
+ * it disconnects all of them. Do not connect `output` to anything inside the
+ * effect (a feedback path, say); take such a tap from a node before it.
+ */
+interface NativeEffectInstance {
+  input: AudioNode;
+  output: AudioNode;
+  applyParams: (params: Record<string, number>) => void;
+  dispose?: () => void;
+  getState?: () => Promise<unknown>;
+  createGui?: () => Promise<HTMLElement>;
+  destroyGui?: (gui: HTMLElement) => void;
+  getParameterInfo?: () => Promise<unknown>;
 }
 ```
 

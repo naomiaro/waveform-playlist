@@ -108,3 +108,53 @@ Why not the built-in nodes:
 - **Tone.js `Panner`** wraps a `StereoPannerNode` with a fixed channel count. On Tone's default context (standardized-audio-context) that setting cannot be changed, so a mono track's panner is locked to one channel and a stereo effect on the track is summed to mono before it is panned.
 
 The stage implements the same two laws as `StereoPannerNode` (`panMatrix(pan, sourceChannelCount)` is the pure math) but takes the law from the caller — the channel count of the track's source material — and always passes stereo through. It works on any `AudioContext` or `OfflineAudioContext`, and on the raw context behind Tone.js.
+
+## Effect registry
+
+`registerEffect(type, definition)` makes a custom effect (an `AudioWorkletNode`, or any chain of native nodes) available by id to both hosts in this project: `<daw-editor>` (`editor.addEffect(type)`) and the React effects hooks (`addEffect(type)` from `useDynamicEffects()`). Both render it in their offline exports.
+
+```typescript
+import { registerEffect } from '@waveform-playlist/core';
+
+registerEffect('my-tremolo', {
+  label: 'Tremolo',
+  category: 'modulation',
+  defaults: { rate: 6, depth: 0.8 },
+  params: {
+    rate: { min: 0.1, max: 20, step: 0.1, unit: 'Hz' },
+    depth: { min: 0, max: 1, step: 0.01 },
+  },
+  // Optional. Runs once per audio context, the offline one of an export included.
+  prepare: (audioContext) => audioContext.audioWorklet.addModule('/worklets/tremolo.js'),
+  create: (audioContext) => {
+    const node = new AudioWorkletNode(audioContext, 'my-tremolo');
+    return {
+      input: node,
+      output: node,
+      applyParams: (params) => {
+        for (const name of ['rate', 'depth']) {
+          const param = node.parameters.get(name); // AudioParam | undefined
+          const value = params[name];
+          if (param && value !== undefined) param.value = value;
+        }
+      },
+      // Tell the processor to stop (it returns false from process() once it
+      // has received this message), then disconnect.
+      dispose: () => {
+        node.port.postMessage('dispose');
+        node.disconnect();
+      },
+    };
+  },
+});
+```
+
+The two hosts await `prepare` differently. The React `addEffect(type)` is async and awaits it itself. `<daw-editor>`'s `addEffect(type)` is synchronous, so for a definition with `prepare` call `await editor.prepareEffect(type)` first. Both await it for their offline exports.
+
+The host owns every connection out of the instance's `output` and disconnects all of them when it rewires the chain, so do not connect `output` to anything inside the effect (take a feedback tap from a node before it).
+
+For an AudioWorklet effect, let `dispose` stop the processor with a port message, as above; a processor that always returns `true` from `process()` runs until the page closes. Do not have the processor return `false` whenever it is idle: in Chrome, a processor that returned `false` while nothing was connected to it (the effect bypassed by disconnection) did not run again when reconnected.
+
+A definition with a `wetParam` is bypassed by setting that parameter to 0; one without is disconnected while bypassed. Also exported: `unregisterEffect`, `getEffectDefinitions`, `prepareEffect`, `ensureEffectPrepared`, `needsPrepare`, `createEffectInstance`, and the types `NativeEffectDefinition`, `NativeEffectInstance` and `EffectParamDef`.
+
+The registry is stored on `globalThis`, so an effect registered through one installed copy of this package is visible to a host that uses another copy.

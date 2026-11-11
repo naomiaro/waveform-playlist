@@ -31,7 +31,8 @@ export function createWamEffectInstance(plugin: WamPluginInstance): WamEffectIns
     kind: 'wam',
     plugin,
     url: plugin.url,
-    effect: node,
+    input: node,
+    output: node,
     id: 'wam:' + (plugin.descriptor?.name ?? plugin.url ?? 'plugin'),
     instanceId,
     dispose: () => {

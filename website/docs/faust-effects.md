@@ -50,12 +50,12 @@ There are two ways to compile and load it. Both produce the same sound.
 | Compiler | `faust2wasm` from `@grame/faustwasm` | `faust2wam` from `@shren/faust2wam` |
 | Loads with | `registerEffect()` + about 30 lines of glue | `addWamPlugin(url)` — no glue |
 | Web components | Yes | Yes |
-| React | Not yet — there is no hook for a custom worklet effect | Yes (`addWamEffect(url)`) |
+| React | Yes (`addEffect(id)`) | Yes (`addWamEffect(url)`) |
 | Output size | about 200 kB | about 310 kB (after removing what you don't need) |
 | Needs `@dawcore/wam` | No | Yes |
 | GPL code in the output | No | Yes unless you remove `faust-ui` (shown below) |
 
-## Route A — an AudioWorklet effect (web components)
+## Route A — an AudioWorklet effect (web components and React)
 
 ### Compile
 
@@ -77,8 +77,14 @@ No Faust toolchain is needed; the compiler runs as WebAssembly inside Node. The 
 
 ### Register it
 
+`registerEffect` comes from `@waveform-playlist/core`. One registration serves both `<daw-editor>` and the React effects hooks. Web-component users and React users both need `@waveform-playlist/core` as a direct dependency for this import:
+
+```bash
+npm install @waveform-playlist/core
+```
+
 ```javascript
-import { registerEffect } from '@dawcore/components';
+import { registerEffect } from '@waveform-playlist/core';
 
 export async function registerFaustTremolo(baseUrl) {
   // A runtime URL import — the two comments stop Vite and webpack from
@@ -95,7 +101,7 @@ export async function registerFaustTremolo(baseUrl) {
   const sampleSize = meta.compile_options.includes('-double') ? 8 : 4;
 
   registerEffect('faust-tremolo', {
-    label: 'Tremolo (Faust)',
+    label: 'Tremolo (Faust, precompiled)',
     category: 'modulation',
     defaults: { rate: 5, depth: 0.5 },
     params: {
@@ -103,7 +109,7 @@ export async function registerFaustTremolo(baseUrl) {
       depth: { min: 0, max: 1, step: 0.01 },
     },
 
-    // Once per AudioContext — including the offline one exportAudio() creates.
+    // Once per AudioContext — the live one, and the offline one of every export.
     // createNode() registers the processor on that context.
     prepare: async (ctx) => {
       const node = await generator.createNode(ctx, processorName, factory, false, 512, processorName);
@@ -132,7 +138,7 @@ export async function registerFaustTremolo(baseUrl) {
 }
 ```
 
-### Use it
+### Load it — web components
 
 ```javascript
 await registerFaustTremolo('/faust/tremolo/');
@@ -152,6 +158,48 @@ const buffer = await editor.exportAudio(); // the effect renders offline too
 From here it is an ordinary effect: reorder, bypass and remove work, `getEffectsState()` / `setEffectsState()` save and restore it, and `openEffectGui(id, container)` shows a parameter panel built from `params`.
 
 `FaustMonoAudioWorkletNode` extends the browser's own `AudioWorkletNode`, so the editor must run on a native `AudioContext`. `NativePlayoutAdapter` always does. On the Tone.js adapter, call `configureGlobalContext({ nativeAudioContext: true })` from `@waveform-playlist/playout` before creating the adapter (not available in Firefox — see [WAM Plugins](./wam-plugins.md#browser-support-tone-backends)).
+
+### Load it — React
+
+```tsx
+import { configureGlobalContext } from '@waveform-playlist/playout';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useDynamicEffects } from '@waveform-playlist/browser/tone';
+import { registerFaustTremolo } from './faust-tremolo-effect';
+
+// Module scope, before anything creates the audio context: a worklet effect
+// needs native AudioContext mode.
+configureGlobalContext({ nativeAudioContext: true });
+
+// Register once for the whole app. Adding the effect waits for this.
+const registered = registerFaustTremolo('/faust/tremolo/');
+
+function App({ tracks }) {
+  const { addEffect, updateParameter, masterEffects } = useDynamicEffects();
+
+  const addTremolo = async () => {
+    try {
+      await registered;
+      // Runs the definition's prepare step on the audio context, then adds it.
+      const id = await addEffect('faust-tremolo');
+      updateParameter(id, 'depth', 0.8);
+    } catch (err) {
+      // The compiled files failed to load, or the app is not in native
+      // AudioContext mode.
+      console.error(err);
+    }
+  };
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterEffects}>
+      <button onClick={addTremolo}>Add tremolo</button>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+The registration is the same one the web components use. There is no separate prepare step: `addEffect` awaits the definition's `prepare` on the live context before it creates the effect, and rejects if the app is not in native AudioContext mode. Adding by id, as here, works as soon as the registration has finished. `availableEffects` is different: it is read when the component that called the hook renders, so if you list the effect in a picker, finish registering (`await registered`) before that component renders. For one track, use `addEffectToTrack(trackId, 'faust-tremolo')` from `useTrackDynamicEffects()`. A WAV export made with `useExportWav()` renders the effect: the offline effects function runs `prepare` on the export's offline context. See [Custom effects](./react/guides/effects.md#custom-effects) for the rack UI, bypass and export wiring.
 
 ## Route B — a WAM plugin (web components and React)
 
@@ -202,13 +250,38 @@ await track.openEffectGui(id, document.querySelector('#fx-panel'));
 ### Load it — React
 
 ```tsx
+import { useState } from 'react';
+import { configureGlobalContext } from '@waveform-playlist/playout';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 import { useDynamicEffects, WamEffectGui } from '@waveform-playlist/browser/tone';
 
-const { addWamEffect, getWamPlugin } = useDynamicEffects();
+// Module scope, before anything creates the audio context.
+configureGlobalContext({ nativeAudioContext: true });
 
-const id = await addWamEffect(new URL('/faust/tremolo-wam/index.js', location.href).href);
-// <WamEffectGui plugin={getWamPlugin(id)} /> renders the plugin's GUI, or the
-// generic parameter panel when it has none.
+function App({ tracks }) {
+  // One call: its masterEffects goes to the provider, and the same object
+  // adds the plugin and hands out its GUI handle.
+  const { addWamEffect, getWamPlugin, masterEffects } = useDynamicEffects();
+  const [instanceId, setInstanceId] = useState(null);
+
+  const addTremolo = async () => {
+    try {
+      const url = new URL('/faust/tremolo-wam/index.js', location.href).href;
+      setInstanceId(await addWamEffect(url));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterEffects}>
+      <button onClick={addTremolo}>Add tremolo</button>
+      {/* The plugin's own GUI, or the generic parameter panel when it has none. */}
+      {instanceId && <WamEffectGui plugin={getWamPlugin(instanceId)} />}
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
 ```
 
 WAM hosting in React needs native AudioContext mode; see [WAM Plugins](./wam-plugins.md) for the setup, per-track effects and WAV export.

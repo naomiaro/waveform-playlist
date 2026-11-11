@@ -6,7 +6,8 @@ import {
   getEffectDefinitions,
   needsPrepare,
   prepareEffect,
-} from './effect-registry';
+} from '@waveform-playlist/core';
+import './effect-registry'; // registers the native-* built-ins
 import type { EffectChainItem, EffectState, SerializedEffectEntry } from './types';
 
 const PREFIX = '[waveform-playlist] ';

@@ -23,13 +23,17 @@ import {
   useAudioTracks,
   useDynamicEffects,
   useTrackDynamicEffects,
+  useActiveEffects,
   WamEffectGui,
   ExportWavButton,
   type ActiveEffect,
   type TrackActiveEffect,
+  type UseDynamicEffectsReturn,
+  type UseTrackDynamicEffectsReturn,
 } from '@waveform-playlist/browser/tone';
 import { fetchWamLibrary, fetchWamDescriptor, type WamLibraryEntry } from '@dawcore/wam';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { registerDemoTremolo } from './demoTremoloEffect';
 import {
   Container,
   Banner,
@@ -77,6 +81,12 @@ import {
 const wamSupported = typeof window !== 'undefined' && supportsNativeContextMode();
 if (typeof window !== 'undefined' && wamSupported) {
   configureGlobalContext({ nativeAudioContext: true });
+}
+
+// A custom effect (an AudioWorkletNode) registered once for the whole app. It
+// then appears in `availableEffects` and is added by id like a built-in.
+if (typeof window !== 'undefined') {
+  registerDemoTremolo();
 }
 
 const COMMUNITY_MANIFEST = 'https://www.webaudiomodules.com/community/plugins.json';
@@ -212,13 +222,15 @@ const RackEntry: React.FC<RackEntryProps> = ({
   const params = isWam ? [] : toParamViews(effect);
 
   return (
-    <EntryCard>
+    <EntryCard role="group" aria-label={effect.definition.name}>
       <EntryHeader>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <EntryName style={{ opacity: effect.bypassed ? 0.5 : 1 }}>
             {effect.definition.name}
           </EntryName>
-          <Badge $kind={effect.kind}>{isWam ? 'WAM' : effect.definition.category}</Badge>
+          <Badge $kind={isWam ? 'wam' : 'native'}>
+            {isWam ? 'WAM' : effect.definition.category}
+          </Badge>
         </div>
         <HeaderButtons>
           {isWam && (
@@ -252,6 +264,7 @@ const RackEntry: React.FC<RackEntryProps> = ({
                   <ParamName>{p.label}</ParamName>
                   <ParamSlider
                     type="range"
+                    aria-label={p.label}
                     min={p.min}
                     max={p.max}
                     step={p.step}
@@ -291,14 +304,18 @@ const Rack: React.FC<RackProps> = ({ title, count, availableEffects, onAddNative
   };
 
   return (
-    <Panel>
+    <Panel role="group" aria-label={title}>
       <PanelTitle>
         {title}
         {count > 0 && <CountBadge>{count}</CountBadge>}
       </PanelTitle>
       <Row style={{ marginBottom: 12 }}>
-        <Select value={selected} onChange={(e) => setSelected(e.target.value)}>
-          <option value="">Add built-in effect…</option>
+        <Select
+          aria-label="Effect to add"
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+        >
+          <option value="">Add effect…</option>
           {availableEffects.map((eff) => (
             <option key={eff.id} value={eff.id}>
               {eff.name}
@@ -311,6 +328,82 @@ const Rack: React.FC<RackProps> = ({ title, count, availableEffects, onAddNative
       </Row>
       {children}
     </Panel>
+  );
+};
+
+// The two racks are the only components that follow the effect lists
+// (useActiveEffects). The hooks themselves do not re-render the page when a
+// chain changes, so a slider step re-renders one rack.
+
+interface MasterRackProps {
+  masterFx: UseDynamicEffectsReturn;
+  onError: (effectId: string, err: unknown) => void;
+}
+
+const MasterRack: React.FC<MasterRackProps> = ({ masterFx, onError }) => {
+  const entries = useActiveEffects(masterFx.effects);
+  return (
+    <Rack
+      title="Master chain"
+      count={entries.length}
+      availableEffects={masterFx.availableEffects}
+      onAddNative={(effectId) => {
+        masterFx.addEffect(effectId).catch((err) => onError(effectId, err));
+      }}
+    >
+      {entries.length === 0 ? (
+        <EmptyState>No master effects. Add an effect or a community WAM above.</EmptyState>
+      ) : (
+        entries.map((effect) => (
+          <RackEntry
+            key={effect.instanceId}
+            effect={effect}
+            getPlugin={() => masterFx.getWamPlugin(effect.instanceId)}
+            onParam={(name, value) => masterFx.updateParameter(effect.instanceId, name, value)}
+            onToggleBypass={() => masterFx.toggleBypass(effect.instanceId)}
+            onRemove={() => masterFx.removeEffect(effect.instanceId)}
+          />
+        ))
+      )}
+    </Rack>
+  );
+};
+
+interface TrackRackProps {
+  trackFx: UseTrackDynamicEffectsReturn;
+  trackId: string;
+  trackName: string;
+  onError: (effectId: string, err: unknown) => void;
+}
+
+const TrackRack: React.FC<TrackRackProps> = ({ trackFx, trackId, trackName, onError }) => {
+  const entries = useActiveEffects(trackFx.getTrackEffects(trackId));
+  return (
+    <Rack
+      title={trackName + ' chain'}
+      count={entries.length}
+      availableEffects={trackFx.availableEffects}
+      onAddNative={(effectId) => {
+        trackFx.addEffectToTrack(trackId, effectId).catch((err) => onError(effectId, err));
+      }}
+    >
+      {entries.length === 0 ? (
+        <EmptyState>No effects on this track yet.</EmptyState>
+      ) : (
+        entries.map((effect) => (
+          <RackEntry
+            key={effect.instanceId}
+            effect={effect}
+            getPlugin={() => trackFx.getTrackWamPlugin(trackId, effect.instanceId)}
+            onParam={(name, value) =>
+              trackFx.updateTrackEffectParameter(trackId, effect.instanceId, name, value)
+            }
+            onToggleBypass={() => trackFx.toggleBypass(trackId, effect.instanceId)}
+            onRemove={() => trackFx.removeEffectFromTrack(trackId, effect.instanceId)}
+          />
+        ))
+      )}
+    </Rack>
   );
 };
 
@@ -432,7 +525,7 @@ interface WamControlsProps {
   loading: boolean;
   loadedCount: number;
   totalCount: number;
-  offlineMaster?: ReturnType<ReturnType<typeof useDynamicEffects>['createOfflineEffectsFunction']>;
+  offlineMaster: ReturnType<ReturnType<typeof useDynamicEffects>['createOfflineEffectsFunction']>;
   createOfflineTrackEffects: ReturnType<
     typeof useTrackDynamicEffects
   >['createOfflineTrackEffectsFunction'];
@@ -461,7 +554,7 @@ const WamControls: React.FC<WamControlsProps> = ({
         filename="wam-mix"
         mode="master"
         applyEffects
-        effectsFunction={offlineMaster ?? undefined}
+        effectsFunction={offlineMaster}
         createOfflineTrackEffects={createOfflineTrackEffects}
       />
       {loading && (
@@ -515,9 +608,8 @@ export function WamEffectsExample() {
   const { getTrackEffectsFunction } = trackFx;
 
   // Attach per-track effects functions so WAM/native inserts can be added live.
-  // Depend on the stable callback, not the whole `trackFx` object (a fresh object
-  // every render) — otherwise this memo recomputes on every render, producing new
-  // track objects and forcing a full engine rebuild on every interaction.
+  // New track objects mean an engine rebuild, so this must only recompute
+  // when `tracks` does.
   const tracksWithEffects = useMemo(
     () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
     [tracks, getTrackEffectsFunction]
@@ -526,12 +618,8 @@ export function WamEffectsExample() {
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
   const selectedTrackName = selectedTrack?.name ?? 'Track';
 
-  // Recompute offline export functions only when the effect chains change.
-  const { createOfflineEffectsFunction } = masterFx;
-  const offlineMaster = useMemo(
-    () => createOfflineEffectsFunction(),
-    [createOfflineEffectsFunction]
-  );
+  // The same function on every call: it reads the chain when the export runs.
+  const offlineMaster = masterFx.createOfflineEffectsFunction();
 
   // Destructure stable callbacks to satisfy exhaustive-deps.
   const { addWamEffect } = masterFx;
@@ -575,8 +663,13 @@ export function WamEffectsExample() {
     [addWamEffect, addWamEffectToTrack, selectedTrackId, selectedTrackName]
   );
 
-  const masterEntries = masterFx.activeEffects;
-  const trackEntries = trackFx.trackEffectsState.get(selectedTrackId) ?? [];
+  const handleAddError = useCallback((effectId: string, err: unknown) => {
+    setStatus({
+      tone: 'error',
+      text:
+        'Could not add "' + effectId + '": ' + (err instanceof Error ? err.message : String(err)),
+    });
+  }, []);
 
   if (error) {
     return (
@@ -602,7 +695,11 @@ export function WamEffectsExample() {
         </Banner>
       )}
 
-      {status && <StatusLine $tone={status.tone}>{status.text}</StatusLine>}
+      {status && (
+        <StatusLine role={status.tone === 'error' ? 'alert' : 'status'} $tone={status.tone}>
+          {status.text}
+        </StatusLine>
+      )}
 
       <LibraryBrowser
         wamEnabled={wamActive}
@@ -612,36 +709,18 @@ export function WamEffectsExample() {
       />
 
       <RacksRow>
-        <Rack
-          title="Master chain"
-          count={masterEntries.length}
-          availableEffects={masterFx.availableEffects}
-          onAddNative={masterFx.addEffect}
-        >
-          {masterEntries.length === 0 ? (
-            <EmptyState>
-              No master effects. Add a built-in effect or a community WAM above.
-            </EmptyState>
-          ) : (
-            masterEntries.map((effect) => (
-              <RackEntry
-                key={effect.instanceId}
-                effect={effect}
-                getPlugin={() => masterFx.getWamPlugin(effect.instanceId)}
-                onParam={(name, value) => masterFx.updateParameter(effect.instanceId, name, value)}
-                onToggleBypass={() => masterFx.toggleBypass(effect.instanceId)}
-                onRemove={() => masterFx.removeEffect(effect.instanceId)}
-              />
-            ))
-          )}
-        </Rack>
+        <MasterRack masterFx={masterFx} onError={handleAddError} />
 
         <div>
           <Row style={{ marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: 'var(--ifm-color-content-secondary, #666)' }}>
               Track rack:
             </span>
-            <Select value={selectedTrackId} onChange={(e) => setSelectedTrackId(e.target.value)}>
+            <Select
+              aria-label="Track rack"
+              value={selectedTrackId}
+              onChange={(e) => setSelectedTrackId(e.target.value)}
+            >
               {tracks.map((track) => (
                 <option key={track.id} value={track.id}>
                   {track.name}
@@ -649,34 +728,14 @@ export function WamEffectsExample() {
               ))}
             </Select>
           </Row>
-          <Rack
-            title={selectedTrackName + ' chain'}
-            count={trackEntries.length}
-            availableEffects={trackFx.availableEffects}
-            onAddNative={(effectId) => trackFx.addEffectToTrack(selectedTrackId, effectId)}
-          >
-            {trackEntries.length === 0 ? (
-              <EmptyState>No effects on this track yet.</EmptyState>
-            ) : (
-              trackEntries.map((effect) => (
-                <RackEntry
-                  key={effect.instanceId}
-                  effect={effect}
-                  getPlugin={() => trackFx.getTrackWamPlugin(selectedTrackId, effect.instanceId)}
-                  onParam={(name, value) =>
-                    trackFx.updateTrackEffectParameter(
-                      selectedTrackId,
-                      effect.instanceId,
-                      name,
-                      value
-                    )
-                  }
-                  onToggleBypass={() => trackFx.toggleBypass(selectedTrackId, effect.instanceId)}
-                  onRemove={() => trackFx.removeEffectFromTrack(selectedTrackId, effect.instanceId)}
-                />
-              ))
-            )}
-          </Rack>
+          {selectedTrackId && (
+            <TrackRack
+              trackFx={trackFx}
+              trackId={selectedTrackId}
+              trackName={selectedTrackName}
+              onError={handleAddError}
+            />
+          )}
         </div>
       </RacksRow>
 

@@ -3,7 +3,8 @@ import {
   createEffectInstance,
   ensureEffectPrepared,
   getEffectDefinitions,
-} from '../effects/effect-registry';
+} from '@waveform-playlist/core';
+import '../effects/effect-registry'; // registers the native-* built-ins
 import { loadWamModule, loadFaustModule } from '../effects/optional-modules';
 import type { SerializedEffectEntry } from '../effects/types';
 

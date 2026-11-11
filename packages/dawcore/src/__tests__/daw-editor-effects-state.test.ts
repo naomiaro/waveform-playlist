@@ -14,7 +14,8 @@ const { ensureWamHost, createWamInstance, createWamTransportBridge } = vi.hoiste
 
 vi.mock('@dawcore/wam', () => ({ ensureWamHost, createWamInstance, createWamTransportBridge }));
 
-import { registerEffect } from '../effects/effect-registry';
+import { registerEffect } from '@waveform-playlist/core';
+import '../effects/effect-registry';
 
 beforeAll(async () => {
   await import('../elements/daw-editor');

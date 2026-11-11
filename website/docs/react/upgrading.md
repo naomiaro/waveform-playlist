@@ -627,3 +627,337 @@ publish({ duration: seconds, peaks: nextPeaks });
 ```
 
 **Behaviour change:** while a take is recording, the displayed timeline used to end exactly 10 seconds after the take and grow on every frame. It now grows in 10-second steps and ends between 10 and 20 seconds after the take, so the track rows are not resized on every frame.
+
+## `activeEffects` is replaced by `effects` and `useActiveEffects()`
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`useDynamicEffects()` no longer returns `activeEffects`. The effect list is replaced on every parameter change, and while it was React state of the hook, the component that called `useDynamicEffects()` (usually the root of the page) re-rendered on every slider step. The hook now returns `effects`, a source (`ValueSource<ActiveEffect[]>` from `@waveform-playlist/core`), and does not re-render when the chain changes. Everything else it returns keeps its identity between renders. Reading `activeEffects` from it gives `undefined` (a type error in TypeScript).
+
+**Find:** `activeEffects` destructured or read from `useDynamicEffects()`.
+
+**Replace with:** `effects` from the hook, and the new `useActiveEffects(effects)` hook in the component that draws the rack:
+
+```tsx
+// Before
+import { useDynamicEffects } from '@waveform-playlist/browser/tone';
+
+const { activeEffects, removeEffect } = useDynamicEffects();
+
+// After
+import { useDynamicEffects, useActiveEffects } from '@waveform-playlist/browser/tone';
+
+const { effects, removeEffect } = useDynamicEffects();
+const activeEffects = useActiveEffects(effects);
+```
+
+Both versions are lines from the body of one component. That is the smallest change, and that component re-renders on every chain change as it did before. Keep a single `useDynamicEffects()` call per master chain, the one whose `masterEffects` is given to `<WaveformPlaylistProvider effects={…}>`: a second call creates a second, empty chain. To stop the page re-rendering, move the `useActiveEffects()` call into the rack component:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import {
+  useDynamicEffects,
+  useActiveEffects,
+  type UseDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
+
+function App({ tracks }: { tracks: ClipTrack[] }) {
+  const masterFx = useDynamicEffects();
+
+  return (
+    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+      <MasterRack masterFx={masterFx} />
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+function MasterRack({ masterFx }: { masterFx: UseDynamicEffectsReturn }) {
+  const activeEffects = useActiveEffects(masterFx.effects);
+
+  return (
+    <ul>
+      {activeEffects.map((effect) => (
+        <li key={effect.instanceId}>
+          {effect.definition.name}
+          <button onClick={() => masterFx.removeEffect(effect.instanceId)}>Remove</button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+A component that calls `useActiveEffects()` re-renders when the chain changes (an effect added, removed, moved, bypassed, or a parameter set).
+
+`ActiveEffect.kind` changed as well: see the next entry. `ActiveEffect` has a new optional `wetParam`.
+
+**Behaviour change:** built-in effects with no wet control (compressor, limiter, gate, 3-band EQ) are now disconnected from the chain while bypassed. Before, `toggleBypass` did nothing audible for them during playback.
+
+## `ActiveEffect.kind`: `'native'` is renamed `'tone'`, and `'custom'` is added
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`ActiveEffect['kind']` (and `TrackActiveEffect['kind']`, the same type) was `'native' | 'wam'`. It is now `'tone' | 'wam' | 'custom'`:
+
+- `'tone'` is a built-in Tone.js effect. This is the value that used to be `'native'`.
+- `'wam'` is a hosted WAM plugin, unchanged.
+- `'custom'` is new: a type registered with `registerEffect()` from `@waveform-playlist/core`.
+
+The rename removes a clash. In `@waveform-playlist/core` and `@dawcore/components`, "native" means a registry effect built from native Web Audio nodes; in the React hooks it meant a Tone.js effect, which is the opposite. With registry effects now usable in React, the built-in entries are named for what they are.
+
+**Find:** `kind === 'native'`, `kind !== 'native'`, `case 'native'` and `kind: 'native'` where the value is an `ActiveEffect` or `TrackActiveEffect` from `useDynamicEffects()` / `useTrackDynamicEffects()`.
+
+**Replace with:** `'tone'`, and handle `'custom'` wherever the code branches on every kind:
+
+```tsx
+// Before
+if (effect.kind === 'native') {
+  // built-in Tone.js effect
+} else {
+  // WAM plugin
+}
+
+// After
+if (effect.kind === 'tone') {
+  // built-in Tone.js effect
+} else if (effect.kind === 'wam') {
+  // WAM plugin
+} else {
+  // 'custom': a type registered with registerEffect()
+}
+```
+
+Do not change `kind: 'native'` in `<daw-editor>` code. `EffectState` and `SerializedEffectEntry` from `@dawcore/components` (`editor.getEffectsState()`, `editor.setEffectsState()`) still use `'native'` for a registry effect, and chains saved from `<daw-editor>` are unaffected.
+
+## Effect chains survive a remount, and unmount no longer disposes them
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`useDynamicEffects()` and `useTrackDynamicEffects()` used to dispose every effect instance when their component unmounted, and an `addWamEffect` that was still loading at that moment rejected. React runs the same cleanup for a real unmount, a StrictMode remount, Fast Refresh and a hidden `<Activity>`, and in the last three the chain has to be there afterwards. The hooks now have no cleanup: a chain keeps its list and its live instances across a remount, like any React state.
+
+What changes for your code:
+
+- **Releasing instances.** After a real unmount the instances are disposed when the chain is garbage-collected (a `FinalizationRegistry`). That is best effort: not prompt and not guaranteed. If an effect must stop at a known moment (an AudioWorklet that keeps processing, a WAM plugin), call `clearAllEffects()`, or `clearTrackEffects(trackId)` for each track, before the component goes away.
+- **Adds in flight.** An unmount no longer aborts an add. `clearAllEffects()` / `clearTrackEffects(trackId)` do: an add that is still waiting (a custom effect's `prepare`, a WAM plugin loading) rejects with an "aborted: the effects chain was cleared" error and nothing is appended.
+- **Default effects on mount.** The list survived a StrictMode remount before as well, so this is not new, but it is now the whole chain that survives: an unguarded mount effect adds its defaults twice in development, and both are live. Add defaults behind a ref guard.
+
+**Find:** `useEffect` calls with an empty or stable dependency list that call `addEffect(`, `addEffectToTrack(`, `addWamEffect(` or `addWamEffectToTrack(`; and code that relied on unmounting a component to stop its effects.
+
+**Replace with:**
+
+```tsx
+// Unguarded: two reverbs under StrictMode in development
+useEffect(() => {
+  addEffect('reverb');
+}, [addEffect]);
+
+// Guarded: one
+const addedDefaults = useRef(false);
+useEffect(() => {
+  if (addedDefaults.current) return;
+  addedDefaults.current = true;
+  addEffect('reverb').catch(console.error);
+}, [addEffect]);
+```
+
+```tsx
+// To dispose the effects at a known moment, for example when a panel that
+// owns the hooks is closed for good: call this from the handler that closes
+// it. Do not call it from an effect cleanup, which also runs on a StrictMode
+// remount and Fast Refresh.
+masterFx.clearAllEffects();
+tracks.forEach((track) => trackFx.clearTrackEffects(track.id));
+```
+
+## `trackEffectsState` is replaced by `getTrackEffects(trackId)`
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`useTrackDynamicEffects()` no longer returns `trackEffectsState` (a `Map` of every track's effects), for the same reason as the entry above. It returns `getTrackEffects(trackId)`, which gives one track's chain as a source; the same source is returned for the same track id. The `TrackEffectsState` type is removed. New: `reorderTrackEffects(trackId, fromIndex, toIndex)`.
+
+**Find:** `trackEffectsState`, and the type `TrackEffectsState`.
+
+**Replace with:** `useActiveEffects(getTrackEffects(trackId))` in the component that draws that track's effects:
+
+```tsx
+// Before
+import { useTrackDynamicEffects } from '@waveform-playlist/browser/tone';
+
+const { trackEffectsState } = useTrackDynamicEffects();
+const trackEffects = trackEffectsState.get(trackId) ?? [];
+
+// After
+import {
+  useTrackDynamicEffects,
+  useActiveEffects,
+  type UseTrackDynamicEffectsReturn,
+} from '@waveform-playlist/browser/tone';
+
+// The component that called useTrackDynamicEffects() before still does, once,
+// and passes the result to one component per track.
+function TrackEffectsPanel({ trackIds }: { trackIds: string[] }) {
+  const trackFx = useTrackDynamicEffects();
+
+  return (
+    <>
+      {trackIds.map((trackId) => (
+        <TrackEffects key={trackId} trackId={trackId} trackFx={trackFx} />
+      ))}
+    </>
+  );
+}
+
+function TrackEffects({
+  trackId,
+  trackFx,
+}: {
+  trackId: string;
+  trackFx: UseTrackDynamicEffectsReturn;
+}) {
+  const trackEffects = useActiveEffects(trackFx.getTrackEffects(trackId));
+
+  return (
+    <ul>
+      {trackEffects.map((effect) => (
+        <li key={effect.instanceId}>{effect.definition.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+The "Before" lines are from the body of the component that called the hook. Keep one `useTrackDynamicEffects()` call for the app, the one whose `getTrackEffectsFunction(track.id)` is given to each track as `effects`: a second call creates a second, empty set of chains.
+
+`useActiveEffects()` is a hook, so it cannot be called in a loop over tracks: give each track its own component, as above. A track with no effects gives an empty array. `TrackActiveEffect` is now the same type as `ActiveEffect`.
+
+`getTrackEffectsFunction(trackId)` now returns the same function for the same track id and never `undefined`.
+
+## `addEffect` and `addEffectToTrack` return a promise
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`addEffect(effectId)` and `addEffectToTrack(trackId, effectId)` returned `void`. They now return `Promise<string>`, resolving with the new entry's `instanceId`. A built-in effect is still in the chain before the call returns, so code that does not use the return value keeps working. An id that is neither a built-in effect nor a type registered with `registerEffect()` now rejects; before, it logged a console error and did nothing.
+
+**Find:** `addEffect(` and `addEffectToTrack(`.
+
+**Replace with:** handle the rejection wherever the id is not a constant you know to be valid, and `await` the call if you need the id:
+
+```tsx
+// Before
+addEffect(effectId);
+
+// After
+addEffect(effectId).catch((err) => showError(err));
+
+// or, to use the new entry (inside an async function, such as an event handler)
+const handleAddReverb = async () => {
+  const instanceId = await addEffect('reverb');
+  updateParameter(instanceId, 'decay', 3);
+};
+```
+
+The promise also rejects when the chain could not be wired with the new effect (the previous chain is restored and nothing is added), and when `clearAllEffects()` / `clearTrackEffects(trackId)` ran while a custom effect was still preparing. For a custom effect, `updateParameter` ignores a value that is not a number.
+
+`availableEffects` used to be the fixed list of built-ins. It now also lists registered custom types, only in native-context mode, and it is read when the component that called the hook renders: register custom effects before the component that shows the picker renders.
+
+The promise exists because the same functions now add custom effects (types registered with `registerEffect()` from `@waveform-playlist/core`), whose `prepare` step is asynchronous. See [Custom Effects](./guides/effects.md#custom-effects).
+
+## Offline effects functions are never `undefined`
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`createOfflineEffectsFunction()` and `createOfflineTrackEffectsFunction(trackId)` returned `undefined` when the chain had no active effect, and a new function on every call that captured the chain as it was at that moment. They now always return a function: the same one on every call (per track id for the track variant), which reads the chain when the export runs. With no active effect it passes the audio straight through.
+
+**Find:** `createOfflineEffectsFunction(` and `createOfflineTrackEffectsFunction(`, in particular an `undefined` check on the result, or code that calls them again to pick up a changed chain.
+
+**Replace with:**
+
+```tsx
+// Before: undefined meant "no effects"
+const offlineEffects = createOfflineEffectsFunction();
+const hasEffects = offlineEffects !== undefined;
+
+// After: ask the chain
+const offlineEffects = createOfflineEffectsFunction();
+const hasEffects = effects.getSnapshot().some((effect) => !effect.bypassed);
+```
+
+```tsx
+// Before: called at export time so that it saw the current chain
+<ExportWavButton effectsFunction={createOfflineEffectsFunction()} />
+
+// After: unchanged code, but the value is stable and may be created once
+const offlineEffects = createOfflineEffectsFunction();
+<ExportWavButton effectsFunction={offlineEffects} />
+```
+
+Passing `undefined` as `effectsFunction` (to export without the master chain) still works; the hooks just no longer do it for you.
+
+## `EffectInstance.effect` is replaced by `input` and `output`
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+An `EffectInstance` (returned by `createEffectInstance` and `createWamEffectInstance`) had one node, `effect`. It now has `input` (where the chain connects in) and `output` (where it continues from), because a registered custom effect can have two different nodes. For a Tone.js effect and a WAM plugin they are the same node.
+
+**Find:** `.effect` read from an `EffectInstance` or `WamEffectInstance`.
+
+**Replace with:**
+
+```tsx
+// Before
+const instance = createEffectInstance(definition);
+source.connect(instance.effect);
+instance.effect.connect(destination);
+
+// After
+import { connect } from 'tone';
+
+const instance = createEffectInstance(definition);
+connect(source, instance.input);
+connect(instance.output, destination);
+```
+
+The nodes are typed `ToneAudioNode | AudioNode`, so use Tone's `connect()` helper, which accepts both, or `instance.connect(destination)` for the outgoing side.
+
+Also changed: `EffectDefinition['category']` is now `EffectCategory`, the known category names or any other string (a registered custom effect names its own). `BuiltInEffectCategory` is the closed union it used to be. An exhaustive `switch` over `category` needs a `default` case.
+
+## Web components: the effect registry moves from `@dawcore/components` to `@waveform-playlist/core`
+
+**Packages:** `@dawcore/components`, `@waveform-playlist/core`.
+
+This entry is for code that uses `<daw-editor>`. It is listed here because the registry is now shared: one `registerEffect()` call makes a custom effect available to `<daw-editor>` and to the React effects hooks.
+
+`@dawcore/components` no longer exports `registerEffect`, `getEffectDefinitions`, `prepareEffect`, `createEffectInstance`, or the types `EffectDefinition`, `EffectParamDef` and `EffectInstance`. They are exported from `@waveform-playlist/core`, where two of the types have new names. `@dawcore/components` still exports `EffectState` and `SerializedEffectEntry`, the element method `editor.prepareEffect(type)` is unchanged, and the `native-*` built-ins are still registered when `@dawcore/components` is imported (each only if that name is not already registered, so a type you registered under a `native-*` name first is kept).
+
+**Find:** imports of any of these names from `@dawcore/components`.
+
+**Replace with:** the same import from `@waveform-playlist/core`, added to your `package.json` as a direct dependency:
+
+| From `@dawcore/components`      | From `@waveform-playlist/core`  |
+| ------------------------------- | ------------------------------- |
+| `registerEffect`                | `registerEffect`                |
+| `getEffectDefinitions`          | `getEffectDefinitions`          |
+| `prepareEffect`                 | `prepareEffect`                 |
+| `createEffectInstance`          | `createEffectInstance`          |
+| `EffectDefinition` (type)       | `NativeEffectDefinition` (type) |
+| `EffectInstance` (type)         | `NativeEffectInstance` (type)   |
+| `EffectParamDef` (type)         | `EffectParamDef` (type)         |
+
+```typescript
+// Before
+import { registerEffect, type EffectDefinition } from '@dawcore/components';
+
+const definition: EffectDefinition = { /* … */ };
+registerEffect('my-effect', definition);
+
+// After
+import { registerEffect, type NativeEffectDefinition } from '@waveform-playlist/core';
+
+const definition: NativeEffectDefinition = { /* … */ };
+registerEffect('my-effect', definition);
+```
+
+The definition shape is unchanged apart from one addition: `EffectParamDef` has an optional `label`. New in core: `unregisterEffect(type)`. One rule of `NativeEffectInstance` is now stated and relied on by both hosts: the host owns every connection out of `output` and disconnects all of them when it rewires the chain, so do not connect `output` to anything inside the effect (take a feedback tap from a node before it).
+
+Do not confuse core's `createEffectInstance(type, audioContext, params)` with the `createEffectInstance(definition, initialParams)` exported from `@waveform-playlist/browser/tone`; the second one builds a built-in Tone.js effect.

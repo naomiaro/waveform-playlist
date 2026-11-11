@@ -29,7 +29,7 @@ describe('createWamEffectInstance', () => {
     const plugin = makePlugin();
     const inst = createWamEffectInstance(plugin);
     expect(inst.kind).toBe('wam');
-    expect(inst.effect).toBe(plugin.audioNode);
+    expect(inst.input).toBe(plugin.audioNode);
     expect(inst.url).toBe(plugin.url);
     expect(inst.instanceId).toMatch(/^wam_/);
   });
