@@ -20,7 +20,6 @@ import {
   type MidiNoteData,
   type PanStage,
 } from '@waveform-playlist/core';
-import { getUnderlyingAudioParam } from './fades';
 import type { TrackEffectsFunction } from './ToneTrack';
 
 /**
@@ -393,8 +392,8 @@ export class MidiToneTrack implements PlayableTrack {
   setMute(muted: boolean): void {
     this.track.muted = muted;
     const value = muted ? 0 : 1;
-    const audioParam = getUnderlyingAudioParam(this.muteGain.gain);
-    audioParam?.setValueAtTime(value, 0);
+    // Native param behind the Tone Gain (see ToneTrack.setMute).
+    this.muteGain.input.gain.setValueAtTime(value, 0);
     this.muteGain.gain.value = value;
   }
 

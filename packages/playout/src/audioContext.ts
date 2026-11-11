@@ -24,8 +24,10 @@ export interface AudioContextOptions {
    * (Firefox), where Tone.js Listener initialization would throw.
    */
   nativeAudioContext?: boolean;
-  /** Desired sample rate. Creates a standardized-audio-context AudioContext
-   *  at this rate, bypassing Tone.js 15.1.22's limitation. Cross-browser safe. */
+  /** Desired sample rate. Honoured in native mode, and in the default mode
+   *  with Tone.js 15.5.x (`tone@next`). Tone.js 15.1.22 ignores it in the
+   *  default mode: the context runs at the hardware rate and a warning is
+   *  logged. The return value is always the rate actually in use. */
   sampleRate?: number;
   /** Latency hint passed to the AudioContext constructor. */
   latencyHint?: AudioContextLatencyCategory | number;
@@ -113,14 +115,21 @@ export function configureGlobalContext(options: AudioContextOptions): number {
     );
   }
 
-  // Default (standardized-audio-context) path. latencyHint IS supported by
-  // Tone's Context constructor (unlike sampleRate, which Tone 15.1.22 drops).
-  // Tone's ContextOptions types it category-only, but runtime forwards numeric
-  // seconds to the underlying AudioContext constructor unchanged — cast.
+  // Default (standardized-audio-context) path. Both options are handed to
+  // Tone's Context constructor:
+  // - latencyHint: Tone's ContextOptions types it category-only, but runtime
+  //   forwards numeric seconds to the AudioContext constructor unchanged — cast.
+  // - sampleRate: honoured by Tone 15.5.x (the `next` line); Tone 15.1.22
+  //   drops it and its ContextOptions type has no such field, hence the
+  //   loosely typed object. The mismatch warning below covers 15.1.22.
+  const contextOptions: { latencyHint?: AudioContextLatencyCategory; sampleRate?: number } = {
+    ...(options.latencyHint !== undefined
+      ? { latencyHint: options.latencyHint as AudioContextLatencyCategory }
+      : {}),
+    ...(options.sampleRate !== undefined ? { sampleRate: options.sampleRate } : {}),
+  };
   globalToneContext =
-    options.latencyHint !== undefined
-      ? new Context({ latencyHint: options.latencyHint as AudioContextLatencyCategory })
-      : new Context();
+    Object.keys(contextOptions).length > 0 ? new Context(contextOptions) : new Context();
   setContext(globalToneContext);
   const actualRate = (globalToneContext.rawContext as AudioContext).sampleRate;
   if (options.sampleRate !== undefined && options.sampleRate !== actualRate) {

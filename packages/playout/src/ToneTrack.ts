@@ -16,7 +16,6 @@ import {
   type Fade,
   type PanStage,
 } from '@waveform-playlist/core';
-import { getUnderlyingAudioParam } from './fades';
 
 /**
  * Wires a track's effects, PRE-FADER (#660): connect `trackInput` through
@@ -588,9 +587,9 @@ export class ToneTrack {
     // even when the AudioContext is suspended. Setting .gain.value on the Tone.js
     // Signal wrapper doesn't propagate to the underlying AudioParam until the
     // context resumes, causing a brief audio glitch (e.g., all tracks audible
-    // before solo muting takes effect).
-    const audioParam = getUnderlyingAudioParam(this.muteGain.gain);
-    audioParam?.setValueAtTime(value, 0);
+    // before solo muting takes effect). `Gain.input` is the native GainNode
+    // (public Tone API), so no private field is involved.
+    this.muteGain.input.gain.setValueAtTime(value, 0);
     this.muteGain.gain.value = value;
   }
 

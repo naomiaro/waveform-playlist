@@ -73,3 +73,46 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:unit
+
+  # Tone.js's stable line rarely releases; `next` is the 15.5.x prerelease
+  # line that the `tone ^15.0.0` peer range also admits (#671). This job
+  # compiles every package against its types and runs the unit tests,
+  # including playout's toneInternals contract test, which reads the installed
+  # build for the private fields playout depends on. `next` is a moving tag: a
+  # failure here on an unrelated PR means upstream published a change we need
+  # to look at.
+  tone-next:
+    runs-on: ubuntu-latest
+    name: Unit Tests (tone@next)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Override Tone.js version
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            pkg.pnpm = pkg.pnpm || {};
+            pkg.pnpm.overrides = { ...pkg.pnpm.overrides, tone: 'next' };
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+          pnpm install --no-frozen-lockfile
+          node -e "console.log('Testing against tone@' + require('./packages/playout/node_modules/tone/package.json').version)"
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run unit tests
+        run: pnpm test:unit

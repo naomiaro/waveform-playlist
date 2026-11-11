@@ -27,6 +27,14 @@ Waveform Playlist requires the following peer dependencies:
 | `tone` | ^15.0.0 | Web Audio framework |
 | `@dnd-kit/react` | ^0.5.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 
+### Which Tone.js version?
+
+`npm install tone` gives you the stable release (15.1.x). That is the default, and what the examples on this site run.
+
+Tone.js also publishes a prerelease line, `npm install tone@next` (15.5.x), which is where its fixes land between the infrequent stable releases. Waveform Playlist supports both: every pull request is built and unit-tested against each. With `tone@next`, `configureGlobalContext({ sampleRate })` from `@waveform-playlist/playout` is honoured on the default audio context; on 15.1.x the context keeps the hardware sample rate.
+
+`next` is a moving tag, so pin an exact version if you use it.
+
 ## Additional Packages
 
 Depending on your needs, you may want to install additional packages:

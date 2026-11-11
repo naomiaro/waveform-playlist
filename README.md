@@ -35,6 +35,8 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 > - MediaElement path: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout`
 > - Custom adapter: `npm install @waveform-playlist/browser` and pass `createAdapter` (no `tone`).
 >
+> **Tone.js versions:** the stable release (`npm install tone`, currently 15.1.x) is the default and what the examples use. The prerelease line (`npm install tone@next`, 15.5.x) is also supported: every pull request builds and runs the unit tests against both. Tone's stable line rarely releases, so `next` is where upstream fixes land — with it, `configureGlobalContext({ sampleRate })` is honoured on the default audio context, where 15.1.x keeps the hardware rate.
+>
 > The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
 >
 > **v14:** effects, WAV export, output metering, and the `useAudioTracks`/`useDynamicTracks` loaders import from `@waveform-playlist/browser/tone`.
