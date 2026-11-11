@@ -311,7 +311,7 @@ describe('continuous play and audio rescheduling', () => {
     expect(log).toEqual(['stop', 'play(0,)']);
   });
 
-  describe('with a selection highlighted, continuous play has no effect', () => {
+  describe('while the selection is playing, continuous play has no effect', () => {
     /** Highlights 1.5 s -> 4 s and plays it, as the Play button does. */
     async function playSelection(continuous: boolean) {
       const mounted = await mount(continuous);
@@ -375,25 +375,55 @@ describe('continuous play and audio rescheduling', () => {
       setNow(3.2);
       await waitFor(() => expect(probe.activeAnnotationId).toBe('b'));
     });
+  });
 
-    it('an annotation played while a selection is highlighted stops at its own end', async () => {
-      // Selection highlighted elsewhere (5 s -> 6 s); annotation "a" clicked.
-      const { setNow } = await mount(false);
+  describe('an annotation played while a selection is highlighted elsewhere', () => {
+    /** Selection 5 s -> 6 s stays highlighted; annotation "a" (1 s -> 2 s) is played. */
+    async function playAnnotationA(continuous: boolean) {
+      const mounted = await mount(continuous);
       await act(async () => {
         probe.setSelection(5, 6);
       });
       await wait(30);
+      mounted.log.length = 0;
       await act(async () => {
-        await probe.play(1, 1);
+        // What a click on the annotation does: bounded only when continuous play is off.
+        await probe.play(1, continuous ? undefined : 1);
       });
       await wait(60);
-      setNow(1.5);
+      mounted.setNow(1.5);
+      await wait(40);
       await waitFor(() => expect(probe.activeAnnotationId).toBe('a'));
+      return mounted;
+    }
 
+    it('continuous play off: stops at the annotation end, highlight stays on it', async () => {
+      const { setNow } = await playAnnotationA(false);
       setNow(2.05);
       await waitFor(() => expect(probe.isPlaying).toBe(false));
       // The highlight does not move on at the stopping frame.
       expect(probe.activeAnnotationId).toBe('a');
+    });
+
+    it('continuous play on: plays on past the annotation', async () => {
+      const { setNow } = await playAnnotationA(true);
+      setNow(2.5);
+      await waitFor(() => expect(probe.activeAnnotationId).toBeNull());
+      expect(probe.isPlaying).toBe(true);
+    });
+
+    it('ticking continuous play midway extends it, selection or not', async () => {
+      const { log, setNow } = await playAnnotationA(false);
+      log.length = 0;
+      await act(async () => {
+        probe.setContinuousPlay(true);
+      });
+      await wait(60);
+      expect(log).toEqual(['stop', 'play(1.5,)']);
+
+      setNow(2.5);
+      await waitFor(() => expect(probe.activeAnnotationId).toBeNull());
+      expect(probe.isPlaying).toBe(true);
     });
   });
 });

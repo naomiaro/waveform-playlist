@@ -589,11 +589,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
-  /** A selection is highlighted (non-empty). Reads refs, so it is safe in the loop. */
-  const hasSelection = useCallback(
-    () => (selectionEndRef.current ?? 0) > (selectionStartRef.current ?? 0),
-    [selectionStartRef, selectionEndRef]
-  );
+  // True while the bounded play in progress is the highlighted selection itself
+  // (its start and end are the selection's). Set by play(). Selection playback
+  // ignores continuous play; anything else, including an annotation clicked
+  // while a selection is highlighted elsewhere, follows it.
+  const isSelectionPlayRef = useRef(false);
   const {
     isLoopEnabled,
     loopStart,
@@ -1447,10 +1447,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       if (currentAnnotations.length > 0 && !reachedBoundedEnd) {
         const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
 
-        // A highlighted selection takes continuous play out of the picture:
+        // Playing the selection takes continuous play out of the picture:
         // playback is not cut at annotation boundaries, whichever way the
         // toggle is set. The active annotation still follows the playhead.
-        if (continuousPlayRef.current || hasSelection()) {
+        if (continuousPlayRef.current || isSelectionPlayRef.current) {
           // Continuous play ON: update active annotation, let audio play to the end
           if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
             setActiveAnnotationId(currentAnnotation.id);
@@ -1542,7 +1542,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     getPlaybackTime,
     setCurrentTimeRefs,
     annotationLookup,
-    hasSelection,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -1557,13 +1556,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // rebuilt, and with continuous play already on those used to stop and restart
   // the audio as well (every Play started twice; a duration change restarted it).
   //
-  // While a selection is highlighted, continuous play has no effect at all:
-  // the loop does not cut playback at annotation boundaries (see the loop) and
-  // switching the toggle reschedules nothing.
+  // While the selection is what is playing, continuous play has no effect at
+  // all: the loop does not cut playback at annotation boundaries (see the loop)
+  // and switching the toggle reschedules nothing.
   const prevContinuousPlayRef = useRef(continuousPlay);
   useEffect(() => {
     const continuousPlayTurnedOn =
-      continuousPlay && !prevContinuousPlayRef.current && !hasSelection();
+      continuousPlay && !prevContinuousPlayRef.current && !isSelectionPlayRef.current;
     prevContinuousPlayRef.current = continuousPlay;
 
     const reschedulePlayback = async () => {
@@ -1622,7 +1621,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     animationFrameRef,
     getAudioContextTime,
     annotationLookup,
-    hasSelection,
   ]);
 
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
@@ -1670,6 +1668,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     async (startTime?: number, playDuration?: number) => {
       const actualStartTime = startTime ?? currentTimeRef.current;
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
+
+      // Is this the highlighted selection being played, start to end?
+      const selectionStartNow = selectionStartRef.current ?? 0;
+      const selectionEndNow = selectionEndRef.current ?? 0;
+      isSelectionPlayRef.current =
+        endTime !== undefined &&
+        selectionEndNow > selectionStartNow &&
+        Math.abs(actualStartTime - selectionStartNow) < 1e-6 &&
+        Math.abs(endTime - selectionEndNow) < 1e-6;
       const requestId = ++playRequestIdRef.current;
 
       const engine = engineRef.current;
@@ -1757,7 +1764,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [startAnimationLoop, stopAnimationLoop, setCurrentTimeRefs, getAudioContextTime]
+    [
+      startAnimationLoop,
+      stopAnimationLoop,
+      setCurrentTimeRefs,
+      getAudioContextTime,
+      selectionStartRef,
+      selectionEndRef,
+    ]
   );
 
   const pause = useCallback(() => {

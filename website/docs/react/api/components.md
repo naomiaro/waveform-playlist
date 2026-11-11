@@ -332,7 +332,7 @@ Toggle for continuous play, which governs annotation playback:
 - **Off:** playing an annotation stops at that annotation's end.
 - **On:** playback continues through the following annotations.
 
-Switching it on while an annotation is playing lets playback continue past that annotation. While a selection is highlighted the toggle has no effect: the selection plays from its start to its end either way. It is not the loop control; see `LoopButton`.
+Switching it on while an annotation is playing lets playback continue past that annotation. Playing the selection (the Play button or Space with a selection highlighted) is not affected by the toggle: the selection plays from its start to its end either way. An annotation you click follows the toggle even while a selection is highlighted elsewhere, and the selection stays highlighted. It is not the loop control; see `LoopButton`.
 
 ```tsx
 <ContinuousPlayCheckbox />

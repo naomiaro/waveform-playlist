@@ -212,7 +212,7 @@ interface PlaybackAnimationContextValue {
 
 ```typescript
 interface PlaylistStateContextValue {
-  continuousPlay: boolean;             // annotation playback: off = stop at the annotation's end, on = continue. No effect while a selection is highlighted (the selection plays start to end)
+  continuousPlay: boolean;             // annotation playback: off = stop at the annotation's end, on = continue. No effect on selection playback (Play/Space with a selection plays it start to end)
   linkEndpoints: boolean;
   annotationsEditable: boolean;
   isAutomaticScroll: boolean;
