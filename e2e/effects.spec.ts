@@ -11,6 +11,29 @@ import { test, expect } from '@playwright/test';
  * - Export with effects
  */
 
+/** A mono 16-bit PCM WAV holding a 220 Hz sine. */
+function sineWav(seconds: number, sampleRate = 48000): Buffer {
+  const frames = Math.round(seconds * sampleRate);
+  const buffer = Buffer.alloc(44 + frames * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + frames * 2, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20); // PCM
+  buffer.writeUInt16LE(1, 22); // mono
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < frames; i++) {
+    const sample = Math.sin((2 * Math.PI * 220 * i) / sampleRate) * 0.3;
+    buffer.writeInt16LE(Math.round(sample * 32767), 44 + i * 2);
+  }
+  return buffer;
+}
+
 test.describe('Effects Example', () => {
   test.beforeEach(async ({ page, baseURL }) => {
     await page.goto(`${baseURL}/examples/effects`);
@@ -169,6 +192,39 @@ test.describe('Effects Example', () => {
     test('FX button shows effect count', async ({ page }) => {
       // FX buttons should show count (e.g., "FX 1")
       await expect(page.getByRole('button', { name: 'FX 1' }).first()).toBeVisible();
+    });
+
+    // #752: track effects reach the adapter through the provider's
+    // `trackEffects` prop, so `tracks` is passed as it is and an added file is
+    // applied to the running engine. A full rebuild shows as the playlist
+    // leaving the "ready" state.
+    test('adding a file does not rebuild the engine', async ({ page }) => {
+      const fxButtons = page.getByRole('button', { name: /FX/ });
+      await expect(fxButtons).toHaveCount(4);
+
+      await page.evaluate(() => {
+        const playlist = document.querySelector('[data-playlist-state]')!;
+        const seen: string[] = [];
+        (window as unknown as { __playlistStates: string[] }).__playlistStates = seen;
+        new MutationObserver(() => {
+          seen.push(playlist.getAttribute('data-playlist-state') ?? 'missing');
+        }).observe(playlist, { attributes: true, attributeFilter: ['data-playlist-state'] });
+      });
+
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'tone.wav',
+        mimeType: 'audio/wav',
+        buffer: sineWav(0.5),
+      });
+
+      await expect(fxButtons).toHaveCount(5, { timeout: 10000 });
+      await expect(page.locator('[data-playlist-state="ready"]')).toBeVisible();
+      // Give a rebuild, if one were started, time to show.
+      await page.waitForTimeout(500);
+      const states = await page.evaluate(
+        () => (window as unknown as { __playlistStates: string[] }).__playlistStates
+      );
+      expect(states).toEqual([]);
     });
   });
 
