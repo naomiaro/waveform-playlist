@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { registerEffect, getEffectDefinitions, createEffectInstance, prepareEffect, needsPrepare, ensureEffectPrepared } from '@waveform-playlist/core';
+import {
+  registerEffect,
+  getEffectDefinitions,
+  createEffectInstance,
+  prepareEffect,
+  needsPrepare,
+  ensureEffectPrepared,
+} from '@waveform-playlist/core';
 import { _resetEffectRegistryForTests } from '../effects/effect-registry';
 
 function mockParam(value = 0) {
