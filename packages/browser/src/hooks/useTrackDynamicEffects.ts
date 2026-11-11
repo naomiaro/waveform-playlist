@@ -55,12 +55,13 @@ export interface UseTrackDynamicEffectsReturn {
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
 
   /**
-   * Creates a fresh effects function for a track for offline rendering, from
-   * the chain as it is when called (`undefined` when the track has no active
-   * effect). The returned function is async and may reject —
-   * a WAV export never silently renders without an effect the live chain has.
+   * Returns a track's effects function for offline rendering (the same
+   * function for the same track id). It rebuilds the chain as it is when the
+   * export runs; with no active effect it passes the audio straight through.
+   * It is async and may reject — a WAV export never silently renders without
+   * an effect the live chain has.
    */
-  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction | undefined;
+  createOfflineTrackEffectsFunction: (trackId: string) => OfflineTrackEffectsFunction;
 
   /** The built-in effects, then every type registered with `registerEffect()`. */
   availableEffects: EffectDefinition[];
@@ -69,6 +70,7 @@ export interface UseTrackDynamicEffectsReturn {
 interface TrackRacks {
   racks: Map<string, EffectsRack>;
   effectsFunctions: Map<string, TrackEffectsFunction>;
+  offlineFunctions: Map<string, OfflineTrackEffectsFunction>;
 }
 
 /**
@@ -77,7 +79,11 @@ interface TrackRacks {
  * (`availableEffects` follows the registry).
  */
 export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
-  const [store] = useState<TrackRacks>(() => ({ racks: new Map(), effectsFunctions: new Map() }));
+  const [store] = useState<TrackRacks>(() => ({
+    racks: new Map(),
+    effectsFunctions: new Map(),
+    offlineFunctions: new Map(),
+  }));
 
   const rackFor = useCallback(
     (trackId: string): EffectsRack => {
@@ -129,12 +135,13 @@ export function useTrackDynamicEffects(): UseTrackDynamicEffectsReturn {
         return effectsFunction;
       },
 
-      createOfflineTrackEffectsFunction: (
-        trackId: string
-      ): OfflineTrackEffectsFunction | undefined => {
-        const offline = store.racks.get(trackId)?.createOfflineFunction();
-        if (!offline) return undefined;
-        return (trackInput, faderInput) => offline(trackInput, faderInput);
+      createOfflineTrackEffectsFunction: (trackId: string): OfflineTrackEffectsFunction => {
+        const existing = store.offlineFunctions.get(trackId);
+        if (existing) return existing;
+        const offline: OfflineTrackEffectsFunction = (trackInput, faderInput) =>
+          rackFor(trackId).renderOffline(trackInput, faderInput);
+        store.offlineFunctions.set(trackId, offline);
+        return offline;
       },
     }),
     [store, rackFor]

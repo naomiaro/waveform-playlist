@@ -145,10 +145,10 @@ describe('useDynamicEffects: the list is a source, not hook state', () => {
     for (const key of Object.keys(first) as Array<keyof typeof first>) {
       expect(result.current[key], key).toBe(first[key]);
     }
-    // Stable, and still reads the chain as it is when called.
-    expect(result.current.createOfflineEffectsFunction()).toBeTypeOf('function');
-    act(() => result.current.clearAllEffects());
-    expect(result.current.createOfflineEffectsFunction()).toBeUndefined();
+    // The offline function itself is the same on every call.
+    expect(result.current.createOfflineEffectsFunction()).toBe(
+      first.createOfflineEffectsFunction()
+    );
   });
 
   it('useActiveEffects re-renders its own component with each new list', async () => {
@@ -314,13 +314,11 @@ describe('useTrackDynamicEffects: one source per track', () => {
     expect(disposeNative).toHaveBeenCalledTimes(1);
   });
 
-  it('the offline track function is undefined for a track without active effects', async () => {
-    const { result } = renderHook(() => useTrackDynamicEffects());
-    expect(result.current.createOfflineTrackEffectsFunction('t1')).toBeUndefined();
-    await act(async () => {
-      await result.current.addEffectToTrack('t1', 'reverb');
-    });
-    expect(result.current.createOfflineTrackEffectsFunction('t1')).toBeTypeOf('function');
-    expect(result.current.createOfflineTrackEffectsFunction('t2')).toBeUndefined();
+  it('returns the same offline function for the same track', () => {
+    const { result, rerender } = renderHook(() => useTrackDynamicEffects());
+    const first = result.current.createOfflineTrackEffectsFunction('t1');
+    rerender();
+    expect(result.current.createOfflineTrackEffectsFunction('t1')).toBe(first);
+    expect(result.current.createOfflineTrackEffectsFunction('t2')).not.toBe(first);
   });
 });

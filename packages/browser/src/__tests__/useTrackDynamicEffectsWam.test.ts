@@ -322,14 +322,21 @@ describe('useTrackDynamicEffects — WAM entries', () => {
     expect(cloneDestroy).toHaveBeenCalled();
   });
 
-  it('createOfflineTrackEffectsFunction excludes bypassed wam entries (undefined when nothing remains)', async () => {
+  it('the offline track function leaves out a bypassed wam entry and passes the audio straight through', async () => {
     const { result } = renderHook(() => useTrackDynamicEffects());
     let id = '';
     await act(async () => {
       id = await result.current.addWamEffectToTrack('t1', 'https://example.com/p/index.js');
     });
     act(() => result.current.toggleBypass('t1', id));
-    expect(result.current.createOfflineTrackEffectsFunction('t1')).toBeUndefined();
+    vi.mocked(connect).mockClear();
+    const trackInput = { context: { rawContext: {} } } as unknown as Gain;
+    const fader = {} as unknown as ToneAudioNode;
+
+    await result.current.createOfflineTrackEffectsFunction('t1')(trackInput, fader, true);
+
+    expect(cloneInstanceInto).not.toHaveBeenCalled();
+    expect(vi.mocked(connect).mock.calls).toEqual([[trackInput, fader]]);
   });
 
   it('the offline track function rejects when the wam clone fails (fail-loud export)', async () => {

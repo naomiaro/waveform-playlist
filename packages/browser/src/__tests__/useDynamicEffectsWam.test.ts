@@ -266,14 +266,21 @@ describe('useDynamicEffects — WAM entries', () => {
     expect(cloneDestroy).toHaveBeenCalled();
   });
 
-  it('createOfflineEffectsFunction excludes bypassed wam entries (undefined when nothing remains)', async () => {
+  it('the offline function leaves out a bypassed wam entry and passes the audio straight through', async () => {
     const { result } = renderHook(() => useDynamicEffects());
     let id = '';
     await act(async () => {
       id = await result.current.addWamEffect('https://example.com/p/index.js');
     });
     act(() => result.current.toggleBypass(id));
-    expect(result.current.createOfflineEffectsFunction()).toBeUndefined();
+    vi.mocked(connect).mockClear();
+    const master = { context: { rawContext: {} } } as unknown as Volume;
+    const destination = {} as unknown as ToneAudioNode;
+
+    await result.current.createOfflineEffectsFunction()(master, destination, true);
+
+    expect(cloneInstanceInto).not.toHaveBeenCalled();
+    expect(vi.mocked(connect).mock.calls).toEqual([[master, destination]]);
   });
 
   it('the offline function rejects when the wam clone fails (fail-loud export)', async () => {

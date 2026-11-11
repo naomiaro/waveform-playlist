@@ -430,13 +430,32 @@ describe('EffectsRack: built-in Tone effects', () => {
 });
 
 describe('EffectsRack: offline function', () => {
-  it('is undefined when nothing is audible', async () => {
+  it('passes the audio straight through when nothing is active, building nothing', async () => {
     registerEffect('my-tremolo', tremolo());
     const rack = new EffectsRack();
-    expect(rack.createOfflineFunction()).toBeUndefined();
     const id = await rack.add('my-tremolo');
     rack.toggleBypass(id);
-    expect(rack.createOfflineFunction()).toBeUndefined();
+    vi.mocked(connect).mockClear();
+
+    await rack.renderOffline(asTone(fakeNode('f')), asTone(fakeNode('t')));
+
+    expect(built).toHaveLength(1);
+    expect(edges()).toEqual([['f', 't']]);
+  });
+
+  it('reads the chain when called, not when the function was obtained', async () => {
+    registerEffect('my-tremolo', tremolo());
+    const rack = new EffectsRack();
+    const offline = rack.renderOffline;
+    await rack.add('my-tremolo');
+    vi.mocked(connect).mockClear();
+
+    await offline(asTone(fakeNode('f')), asTone(fakeNode('t')));
+
+    expect(edges()).toEqual([
+      ['f', 'in1'],
+      ['out1', 't'],
+    ]);
   });
 
   it('prepares a custom effect on the OFFLINE context and creates it there with the live params', async () => {
@@ -450,7 +469,7 @@ describe('EffectsRack: offline function', () => {
     const to = fakeNode('offlineTo', offlineContext);
     vi.mocked(connect).mockClear();
 
-    const cleanup = await rack.createOfflineFunction()!(asTone(from), asTone(to));
+    const cleanup = await rack.renderOffline(asTone(from), asTone(to));
 
     expect(prepare.mock.calls.map((c) => c[0])).toEqual([liveContext, offlineContext]);
     expect(built).toHaveLength(2);
@@ -478,7 +497,7 @@ describe('EffectsRack: offline function', () => {
     const offlineContext = { offline: true };
 
     await expect(
-      rack.createOfflineFunction()!(
+      rack.renderOffline(
         asTone(fakeNode('f', offlineContext)),
         asTone(fakeNode('t', offlineContext))
       )
@@ -489,7 +508,7 @@ describe('EffectsRack: offline function', () => {
     registerEffect('my-tremolo', tremolo());
     const rack = new EffectsRack();
     await rack.add('my-tremolo');
-    const offline = rack.createOfflineFunction()!;
+    const offline = rack.renderOffline;
     isNativeGlobalContext.mockReturnValue(false);
     await expect(offline(asTone(fakeNode('f')), asTone(fakeNode('t')))).rejects.toThrow(
       /nativeAudioContext: true/

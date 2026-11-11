@@ -360,35 +360,27 @@ export class EffectsRack {
   };
 
   /**
-   * A function that builds this chain again on an offline context, for WAV
-   * export; `undefined` when no effect is active. Built-ins are re-created,
-   * WAM plugins re-instantiated with the live plugin's state, registered
-   * effects prepared and created on the offline context. It rejects rather
-   * than render without an effect the live chain has.
+   * Builds this chain again on an offline context, for WAV export, from the
+   * chain as it is when called: built-ins are re-created, WAM plugins
+   * re-instantiated with the live plugin's state, registered effects prepared
+   * and created on the offline context. With no active effect it connects
+   * `from` straight to `to`. It rejects rather than render without an effect
+   * the live chain has. Resolves with the cleanup for the offline instances.
    */
-  createOfflineFunction = (): OfflineRackFunction | undefined => {
+  renderOffline: OfflineRackFunction = async (from, to) => {
     // Bypassed entries are left out offline whichever way they are bypassed.
     const entries = this.list().filter((effect) => !effect.bypassed);
-    if (entries.length === 0) return undefined;
-    const needsNativeContext = entries.some((effect) => effect.kind !== 'native');
-
-    return async (from, to) => {
-      if (needsNativeContext && !isNativeGlobalContext()) {
-        throw new Error(
-          '[waveform-playlist] WAV export with WAM or custom effects requires a native AudioContext. ' +
-            NATIVE_CONTEXT_HINT
-        );
-      }
-      // Tone nodes inside the offline build are created on the current
-      // (offline) global context; its rawContext hosts the native ones.
-      const rawContext = from.context.rawContext as unknown as BaseAudioContext;
-      const { instances, dispose } = await buildOfflineChain(
-        entries,
-        this.getWamPlugin,
-        rawContext
+    if (entries.some((effect) => effect.kind !== 'native') && !isNativeGlobalContext()) {
+      throw new Error(
+        '[waveform-playlist] WAV export with WAM or custom effects requires a native AudioContext. ' +
+          NATIVE_CONTEXT_HINT
       );
-      connectOfflineChain(from, instances, to);
-      return dispose;
-    };
+    }
+    // Tone nodes inside the offline build are created on the current
+    // (offline) global context; its rawContext hosts the native ones.
+    const rawContext = from.context.rawContext as unknown as BaseAudioContext;
+    const { instances, dispose } = await buildOfflineChain(entries, this.getWamPlugin, rawContext);
+    connectOfflineChain(from, instances, to);
+    return dispose;
   };
 }

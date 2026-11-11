@@ -48,14 +48,15 @@ export interface UseDynamicEffectsReturn {
   masterEffects: EffectsFunction;
 
   /**
-   * Creates a fresh effects function for offline rendering, from the chain as
-   * it is when called (`undefined` when no effect is active). Built-in
-   * effects are re-created on the offline context, WAM entries re-instantiated
-   * with the live instance's state, registered custom effects prepared and
-   * created there. The returned function is async and may reject — a WAV
-   * export never silently renders without an effect the live chain has.
+   * Returns the effects function for offline rendering (the same function on
+   * every call). It rebuilds the chain as it is when the export runs:
+   * built-in effects are re-created on the offline context, WAM entries
+   * re-instantiated with the live instance's state, registered custom effects
+   * prepared and created there; with no active effect it passes the audio
+   * straight through. It is async and may reject — a WAV export never
+   * silently renders without an effect the live chain has.
    */
-  createOfflineEffectsFunction: () => OfflineEffectsFunction | undefined;
+  createOfflineEffectsFunction: () => OfflineEffectsFunction;
 
   // Analyser for visualization
   analyserRef: React.RefObject<Analyser | null>;
@@ -94,10 +95,10 @@ export function useDynamicEffects(fftSize: number = 256): UseDynamicEffectsRetur
     [rack, fftSize]
   );
 
-  const createOfflineEffectsFunction = useCallback((): OfflineEffectsFunction | undefined => {
-    const offline = rack.createOfflineFunction();
-    if (!offline) return undefined;
-    return (masterGainNode, destination) => offline(masterGainNode, destination);
+  const createOfflineEffectsFunction = useMemo(() => {
+    const offline: OfflineEffectsFunction = (masterGainNode, destination) =>
+      rack.renderOffline(masterGainNode, destination);
+    return () => offline;
   }, [rack]);
 
   const availableEffects = getAvailableEffects();
