@@ -693,7 +693,38 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [samplesPerPixel, duration]);
 
   // Track pending playback resume after tracks change
-  const pendingResumeRef = useRef<{ position: number } | null>(null);
+  // A play that must start once the engine being built is ready: playback
+  // that was running when a rebuild began, or a play() requested while one
+  // was in flight (#675). `endTime` is set for duration-limited playback.
+  const pendingResumeRef = useRef<{ position: number; endTime?: number } | null>(null);
+  // True from the moment a full engine build starts until its engine is
+  // assigned to engineRef (or the build fails / is superseded). While it is
+  // true and engineRef is null, play() queues instead of no-opping.
+  const engineBuildInFlightRef = useRef(false);
+  // Bumped each time a freshly built engine is assigned. The resume effect
+  // depends on it: the `tracks` change that starts a rebuild fires BEFORE the
+  // async build finishes, so `tracks` alone cannot trigger the resume.
+  const [engineEpoch, setEngineEpoch] = useState(0);
+
+  // Dispose the current engine ahead of a rebuild, leaving nothing reachable
+  // through engineRef. If the engine is PLAYING at this moment, queue a resume
+  // for its replacement. The engine is asked directly because isPlayingRef is
+  // only as fresh as the last render: a play() whose init() resolves after
+  // React has committed the new `tracks` but before this effect runs starts
+  // the old engine and calls setIsPlaying(true) — and the effect would still
+  // read isPlayingRef === false (#675).
+  const disposeEngineKeepingPlayback = useCallback(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (engine.getState().isPlaying && !pendingResumeRef.current) {
+      pendingResumeRef.current = {
+        position: engine.getCurrentTime(),
+        endTime: playbackEndTimeRef.current ?? undefined,
+      };
+    }
+    engine.dispose();
+    engineRef.current = null;
+  }, []);
 
   // Load audio from clips (only when tracks change)
   useEffect(() => {
@@ -843,17 +874,27 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     const resumePosition = currentTimeRef.current;
 
     // Stop current playback and animation before disposing
-    if (engineRef.current && wasPlaying) {
-      // Suppressed: resumePlayback() (below) restarts from resumePosition once
-      // the rebuilt engine is ready — an unguarded mirror would clobber the
-      // refs with this (old, about-to-be-replaced) engine's rewound position
-      // in the meantime. See suppressEngineStopMirrorRef declaration.
-      suppressEngineStopMirrorRef.current = true;
-      engineRef.current.stop();
-      suppressEngineStopMirrorRef.current = false;
+    if (wasPlaying) {
+      // The previous effect's cleanup has usually disposed and cleared the
+      // engine already; stop it only if it is still here.
+      if (engineRef.current) {
+        // Suppressed: resumePlayback() (below) restarts from resumePosition once
+        // the rebuilt engine is ready — an unguarded mirror would clobber the
+        // refs with this (old, about-to-be-replaced) engine's rewound position
+        // in the meantime. See suppressEngineStopMirrorRef declaration.
+        suppressEngineStopMirrorRef.current = true;
+        engineRef.current.stop();
+        suppressEngineStopMirrorRef.current = false;
+      }
       stopAnimationFrameLoop();
-      // Mark that we need to resume playback after playout is rebuilt
-      pendingResumeRef.current = { position: resumePosition };
+      // Mark that we need to resume playback after playout is rebuilt. A play
+      // queued during the previous (superseded) build keeps its own request.
+      if (!pendingResumeRef.current) {
+        pendingResumeRef.current = {
+          position: resumePosition,
+          endTime: playbackEndTimeRef.current ?? undefined,
+        };
+      }
     }
 
     let cancelled = false;
@@ -906,10 +947,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }));
         });
 
-        // Dispose old engine before creating new one
-        if (engineRef.current) {
-          engineRef.current.dispose();
-        }
+        // Dispose old engine before creating new one. Clear the ref with it:
+        // the new adapter is created asynchronously below, and until the new
+        // engine is assigned nothing may reach the disposed one (#675 — a
+        // play() in this window used to run against it and wedge isPlaying).
+        disposeEngineKeepingPlayback();
 
         // Reset tracks version tracking for the new engine
         lastTracksVersionRef.current = 0;
@@ -925,6 +967,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           sampleRate: sampleRateProp,
         });
         if (cancelled) {
+          // Superseded: the next effect run owns engineBuildInFlightRef now.
           adapter.dispose();
           return;
         }
@@ -1060,6 +1103,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         suppressTracksMirroring = false;
         lastTracksVersionRef.current = engine.getState().tracksVersion;
         engineRef.current = engine;
+        engineBuildInFlightRef.current = false;
+        // Starts any play queued for this engine (see the resume effect).
+        setEngineEpoch((epoch) => epoch + 1);
 
         setIsReady(true);
 
@@ -1089,15 +1135,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           }
           adapterRef.current = null;
         }
+        if (!cancelled) {
+          // No engine is coming: a queued play would otherwise wait forever
+          // and fire on some later, unrelated rebuild.
+          engineBuildInFlightRef.current = false;
+          pendingResumeRef.current = null;
+        }
         console.warn('[waveform-playlist] Error loading audio: ' + String(error));
         onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     };
 
+    engineBuildInFlightRef.current = true;
     loadAudio();
 
     return () => {
       cancelled = true;
+      engineBuildInFlightRef.current = false;
       // Skip disposal when the next render's guard will keep the engine alive.
       // skipEngineDisposeRef is set during the render phase (before this cleanup runs).
       if (skipEngineDisposeRef.current) {
@@ -1106,7 +1160,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       }
       stopAnimationFrameLoop();
       if (engineRef.current) {
-        engineRef.current.dispose();
+        // Never leave a disposed engine reachable (#675).
+        disposeEngineKeepingPlayback();
         adapterRef.current = null;
       }
     };
@@ -1512,8 +1567,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
   useEffect(() => {
     const resumePlayback = async () => {
-      if (pendingResumeRef.current && engineRef.current) {
-        const { position } = pendingResumeRef.current;
+      // engineRef is null while a rebuild is in flight — the pending play
+      // stays queued until the run triggered by engineEpoch.
+      const engine = engineRef.current;
+      if (pendingResumeRef.current && engine) {
+        const { position, endTime } = pendingResumeRef.current;
         pendingResumeRef.current = null;
 
         const timeNow = getAudioContextTime();
@@ -1521,11 +1579,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         audioStartPositionRef.current = position;
 
         if (!audioInitializedRef.current) {
-          await engineRef.current.init();
+          await engine.init();
+          if (engineRef.current !== engine) {
+            // Replaced again during init: hand the play to the next engine
+            // (unless a newer request already took the slot).
+            if (!pendingResumeRef.current) {
+              pendingResumeRef.current = { position, endTime };
+            }
+            return;
+          }
           audioInitializedRef.current = true;
         }
 
-        engineRef.current.play(position);
+        engine.play(position, endTime);
         setIsPlaying(true);
         startAnimationLoop();
       }
@@ -1536,14 +1602,30 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(false);
       stopAnimationLoop();
     });
-  }, [tracks, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
+  }, [tracks, engineEpoch, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
 
   // Playback controls
   const play = useCallback(
     async (startTime?: number, playDuration?: number) => {
-      if (!engineRef.current) return;
-
       const actualStartTime = startTime ?? currentTimeRef.current;
+      const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
+
+      const engine = engineRef.current;
+      if (!engine) {
+        // The engine is being rebuilt (tracks changed). Queue the play: the
+        // resume effect starts it when the new engine is assigned. isPlaying
+        // stays false until audio actually starts (#675).
+        if (engineBuildInFlightRef.current) {
+          playStartPositionRef.current = actualStartTime;
+          setCurrentTimeRefs(actualStartTime);
+          playbackEndTimeRef.current = endTime ?? null;
+          pendingResumeRef.current = { position: actualStartTime, endTime };
+        }
+        return;
+      }
+      // A direct play supersedes anything queued for a rebuild.
+      pendingResumeRef.current = null;
+
       playStartPositionRef.current = actualStartTime;
 
       // Update currentTimeRef to match the actual start position
@@ -1559,9 +1641,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Suppressed: seek()+play() below immediately re-establish the correct
       // position — see suppressEngineStopMirrorRef declaration.
       suppressEngineStopMirrorRef.current = true;
-      engineRef.current.stop();
+      engine.stop();
       suppressEngineStopMirrorRef.current = false;
-      engineRef.current.seek(actualStartTime);
+      engine.seek(actualStartTime);
       stopAnimationLoop();
 
       // Record timing for accurate position tracking using the adapter's AudioContext
@@ -1570,8 +1652,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       audioStartPositionRef.current = actualStartTime;
 
       // Set playback end time if playing with duration (e.g., selection playback)
-      playbackEndTimeRef.current =
-        playDuration !== undefined ? actualStartTime + playDuration : null;
+      playbackEndTimeRef.current = endTime ?? null;
 
       // Don't set up playback complete callback for annotations
       // The animation loop handles stopping at annotation boundaries
@@ -1580,13 +1661,23 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Ensure AudioContext is resumed (requires user gesture, no-op after first call).
       // Guarded by ref so subsequent plays skip the await entirely.
       if (!audioInitializedRef.current) {
-        await engineRef.current.init();
+        await engine.init();
+        if (engineRef.current !== engine) {
+          // A rebuild disposed this engine while init() was pending. Hand the
+          // play to its replacement instead of starting a dead engine.
+          pendingResumeRef.current = { position: actualStartTime, endTime };
+          if (engineRef.current) {
+            // The replacement is already assigned, so its epoch run has
+            // passed — ask for another.
+            setEngineEpoch((epoch) => epoch + 1);
+          }
+          return;
+        }
         audioInitializedRef.current = true;
       }
 
-      const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
       try {
-        engineRef.current.play(actualStartTime, endTime);
+        engine.play(actualStartTime, endTime);
       } catch (err) {
         console.warn('[waveform-playlist] Playback failed to start:', err);
         stopAnimationLoop();
@@ -1599,6 +1690,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   const pause = useCallback(() => {
+    // Cancels a play still queued behind an engine rebuild.
+    pendingResumeRef.current = null;
     if (!engineRef.current) return;
 
     // Get current position from engine (auto-wraps at loop boundaries)
@@ -1614,6 +1707,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [stopAnimationLoop, getPlaybackTime, setCurrentTimeRefs]);
 
   const stop = useCallback(() => {
+    // Cancels a play still queued behind an engine rebuild.
+    pendingResumeRef.current = null;
     if (!engineRef.current) return;
 
     engineRef.current.stop();
