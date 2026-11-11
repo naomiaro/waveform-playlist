@@ -94,6 +94,70 @@ describe('updateAnnotationBoundaries', () => {
     expect(result[1].start).toBeCloseTo(1.5); // snapped to prev.end
   });
 
+  it('linked mode: an end within the link threshold of the next start closes the gap', () => {
+    // 5 ms apart: counted as linked. The two edges must end up at the same
+    // time, not 5 ms apart for the rest of the drag.
+    const result = updateAnnotationBoundaries({
+      annotationIndex: 0,
+      newTime: 2.6,
+      isDraggingStart: false,
+      annotations: [ann('a', 0, 1.995), ann('b', 2, 4)],
+      duration: 10,
+      linkEndpoints: true,
+    });
+    expect(result[0].end).toBe(2.6);
+    expect(result[1].start).toBe(2.6);
+  });
+
+  it('linked mode: a start within the link threshold of the previous end closes the gap', () => {
+    const result = updateAnnotationBoundaries({
+      annotationIndex: 1,
+      newTime: 1.4,
+      isDraggingStart: true,
+      annotations: [ann('a', 0, 1.995), ann('b', 2, 4)],
+      duration: 10,
+      linkEndpoints: true,
+    });
+    expect(result[1].start).toBe(1.4);
+    expect(result[0].end).toBe(1.4);
+  });
+
+  it('linked mode: dragging an end into a separated neighbour pixel by pixel leaves no gap', () => {
+    // One pixel at 1024 samples per pixel and 44100 Hz. Whether a move lands
+    // inside the threshold before reaching the neighbour depends on where the
+    // drag started, so try many starting points.
+    const pixel = 1024 / 44100;
+    for (let offset = 0; offset < 40; offset++) {
+      let annotations = [ann('a', 0, 5 + offset * 0.001), ann('b', 5.5, 8)];
+      const originalEnd = annotations[0].end;
+      for (let move = 1; move <= 40; move++) {
+        annotations = updateAnnotationBoundaries({
+          annotationIndex: 0,
+          newTime: originalEnd + move * pixel,
+          isDraggingStart: false,
+          annotations,
+          duration: 60,
+          linkEndpoints: true,
+        });
+      }
+      expect(annotations[1].start).toBe(annotations[0].end);
+      expect(annotations[0].end).toBeGreaterThan(5.5);
+    }
+  });
+
+  it('linked mode: the linked neighbour keeps its minimum duration', () => {
+    const result = updateAnnotationBoundaries({
+      annotationIndex: 0,
+      newTime: 3.98,
+      isDraggingStart: false,
+      annotations: [ann('a', 0, 2), ann('b', 2, 4)],
+      duration: 10,
+      linkEndpoints: true,
+    });
+    expect(result[1].start).toBeCloseTo(3.9);
+    expect(result[1].end).toBe(4);
+  });
+
   it('unlinked mode: colliding start pushes previous end back', () => {
     const result = updateAnnotationBoundaries({
       annotationIndex: 1,
