@@ -38,6 +38,10 @@ interface WaveformPlaylistProviderProps {
     controls?: AnnotationAction[];
   };
   effects?: EffectsFunction;
+  /** A track's effects function by track id (`getTrackEffectsFunction` from
+   *  `useTrackDynamicEffects()`). Tracks carry no `effects` field. Called when a
+   *  track's audio graph is built; a new function identity rebuilds nothing. */
+  trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   onReady?: () => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** Called when engine clip operations (move/trim/split) update tracks */
@@ -434,6 +438,9 @@ function useAudioTracks(
 };
 
 interface AudioTrackConfig {
+  /** Track id. Optional (generated if absent); must be unique. Give one to key
+   *  the provider's `trackEffects` lookup on an id the app knows up front. */
+  id?: string;
   src?: string;
   audioBuffer?: AudioBuffer;
   name?: string;
@@ -442,7 +449,6 @@ interface AudioTrackConfig {
   volume?: number;
   pan?: number;
   color?: string;
-  effects?: TrackEffectsFunction;
   startTime?: number;
   duration?: number;
   offset?: number;
@@ -631,8 +637,9 @@ interface UseTrackDynamicEffectsReturn {
    *  is still waiting is dropped too: its promise rejects. */
   clearTrackEffects: (trackId: string) => void;
   /**
-   * The effects function to give a track (`track.effects`). The same function
-   * is returned for the same track id.
+   * The effects function of a track. The same function is returned for the
+   * same track id. Pass this function itself to the provider:
+   * `<WaveformPlaylistProvider trackEffects={getTrackEffectsFunction}>`.
    */
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
   /**

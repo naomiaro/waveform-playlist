@@ -201,7 +201,7 @@ The pan stage implements the same two laws — its output matches a `StereoPanne
 
 The Tone.js adapter (`@waveform-playlist/playout`) and both offline renderers use the same stage, so pan positions and levels match across backends and between playback and export.
 
-**Note:** `ClipTrack.effects` (the Tone.js-oriented per-track effects function used by `@waveform-playlist/playout`) is not read by `NativePlayoutAdapter` — it's silently ignored. Use `connectTrackEffects`/`connectMasterOutput` for effects with the native transport, or use `TonePlayoutAdapter` if a track still relies on `ClipTrack.effects`.
+**Note:** tracks carry no effects. Use `connectTrackEffects`/`connectMasterOutput` for effects with the native transport. (The Tone.js adapter in `@waveform-playlist/playout` additionally accepts a `trackEffects` lookup of closure-style effects functions; `NativePlayoutAdapter` has no equivalent.)
 
 ## API
 

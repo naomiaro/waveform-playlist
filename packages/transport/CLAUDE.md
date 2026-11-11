@@ -259,7 +259,7 @@ When a clip starts before `loopEnd` and extends past it, `generate()` clamps `du
 
 ### Effects Compatibility
 
-`ClipTrack.effects` (`TrackEffectsFunction`) is a Tone.js-oriented API and is **not supported** by `NativePlayoutAdapter`. Use `transport.connectTrackEffects(trackId, input, output)` instead. Consumers using `ClipTrack.effects` must switch to the `connectTrackEffects` API or continue using `TonePlayoutAdapter`.
+Closure-style track effects (`TrackEffectsFunction`, given to the Tone adapter as `createToneAdapter({ trackEffects })` since #752; `ClipTrack` has no `effects` field any more) are a Tone.js-oriented API and are **not supported** by `NativePlayoutAdapter`. Use `transport.connectTrackEffects(trackId, input, output)` instead.
 
 ### Offline Rendering (WAV Export)
 

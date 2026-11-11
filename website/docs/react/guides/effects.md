@@ -319,10 +319,9 @@ If a change cannot be wired (for example an effect whose nodes belong to another
 
 ### Per-Track Effects
 
-`useTrackDynamicEffects()` keeps one chain per track id. Give each track its effects function, and read one track's chain with `useActiveEffects(getTrackEffects(trackId))`.
+`useTrackDynamicEffects()` keeps one chain per track id. Pass its `getTrackEffectsFunction` to the provider's `trackEffects` prop, and read one track's chain with `useActiveEffects(getTrackEffects(trackId))`.
 
 ```tsx
-import { useMemo } from 'react';
 import {
   useTrackDynamicEffects,
   useActiveEffects,
@@ -331,16 +330,11 @@ import {
 
 function App() {
   const trackFx = useTrackDynamicEffects();
-  const { getTrackEffectsFunction } = trackFx;
 
-  // getTrackEffectsFunction returns the same function for the same track id.
-  const tracksWithEffects = useMemo(
-    () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
-    [tracks, getTrackEffectsFunction]
-  );
-
+  // The provider looks a track's effects function up by track id. `tracks` is
+  // passed as it is: do not copy the track objects to attach anything to them.
   return (
-    <WaveformPlaylistProvider tracks={tracksWithEffects}>
+    <WaveformPlaylistProvider tracks={tracks} trackEffects={trackFx.getTrackEffectsFunction}>
       {tracks.map((track) => (
         <TrackRack key={track.id} trackId={track.id} trackFx={trackFx} />
       ))}

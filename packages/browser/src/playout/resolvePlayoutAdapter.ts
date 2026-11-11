@@ -1,5 +1,9 @@
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import type { EffectsFunction, SoundFontCache } from '@waveform-playlist/playout';
+import type {
+  EffectsFunction,
+  SoundFontCache,
+  TrackEffectsFunction,
+} from '@waveform-playlist/playout';
 
 /** Options for {@link resolvePlayoutAdapter}. */
 export interface ResolvePlayoutAdapterOptions {
@@ -7,6 +11,8 @@ export interface ResolvePlayoutAdapterOptions {
   createAdapter?: () => PlayoutAdapter;
   /** Master effects function — forwarded to the default Tone.js adapter only. */
   effects?: EffectsFunction;
+  /** Per-track effects lookup by track id — forwarded to the default Tone.js adapter only. */
+  trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** SoundFont cache — forwarded to the default Tone.js adapter only. */
   soundFontCache?: SoundFontCache;
   /** Desired AudioContext sample rate — configures the global Tone context (default path only). */
@@ -53,5 +59,9 @@ export async function resolvePlayoutAdapter(
       );
     }
   }
-  return mod.createToneAdapter({ effects: opts.effects, soundFontCache: opts.soundFontCache });
+  return mod.createToneAdapter({
+    effects: opts.effects,
+    trackEffects: opts.trackEffects,
+    soundFontCache: opts.soundFontCache,
+  });
 }

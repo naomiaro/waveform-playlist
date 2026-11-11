@@ -124,6 +124,22 @@ Custom theme object. See [Theming Guide](/docs/react/guides/theming).
 
 Master effects chain function from `useDynamicEffects()`.
 
+#### `trackEffects`
+
+**Type:** `(trackId: string) => TrackEffectsFunction | undefined`
+
+Returns the effects function of a track, looked up by track id. Pass `getTrackEffectsFunction` from `useTrackDynamicEffects()`:
+
+```tsx
+const trackFx = useTrackDynamicEffects();
+
+<WaveformPlaylistProvider tracks={tracks} trackEffects={trackFx.getTrackEffectsFunction}>
+```
+
+Tracks are plain data and have no `effects` field; pass `tracks` as they are. The provider calls the function when it builds a track's audio graph, using the function from the latest render, so a new function identity (an inline arrow) rebuilds nothing. If it returns a different effects function for a track that is already built, that takes effect the next time the track is built.
+
+Like `effects`, this prop is used by the default Tone.js adapter only. With `createAdapter`, pass the same function to your own `createToneAdapter({ trackEffects })`.
+
 ### Annotations
 
 #### `annotationList`
@@ -444,6 +460,7 @@ interface WaveformPlaylistProviderProps {
 
   // Audio
   effects?: EffectsFunction;
+  trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
 
   // Annotations
   annotationList?: {

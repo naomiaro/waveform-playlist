@@ -17,7 +17,22 @@ import { now } from 'tone';
 import { getGlobalAudioContext, getGlobalContext, isNativeGlobalContext } from './audioContext';
 
 export interface ToneAdapterOptions {
+  /** Master effects chain. */
   effects?: EffectsFunction;
+  /**
+   * Returns the effects function of a track, or `undefined` for none. Called
+   * with the track's id each time the adapter builds that track's audio graph:
+   * `setTracks`, `addTrack`, a SoundFont swap, and an `updateTrack` that
+   * builds rather than edits in place (a MIDI half, or a track that had no
+   * audio clips before). An `updateTrack` that only changes the clips of an
+   * existing audio track keeps its graph and does not ask.
+   *
+   * Return the same function for the same id for as long as the track exists.
+   * A track with audio and MIDI clips can have its MIDI half rebuilt alone: if
+   * the answer has become `undefined` by then, that half plays without the
+   * chain the audio half still has.
+   */
+  trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** When provided, MIDI clips use SoundFont sample playback instead of PolySynth */
   soundFontCache?: SoundFontCache;
   /** Pulses per quarter note. Defaults to 192 (Tone.js native). */
@@ -131,13 +146,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     p.addTrack({
       clips: clipInfos,
       track: trackObj,
-      effects: track.effects,
+      effects: options?.trackEffects?.(track.id),
       channelCount: trackChannelCount(track),
     });
   }
 
   function midiHalfEffects(p: TonePlayout, track: ClipTrack): TrackEffectsFunction | undefined {
-    const trackEffects = track.effects as TrackEffectsFunction | undefined;
+    const trackEffects = options?.trackEffects?.(track.id);
     if (!trackEffects || midiPlayoutTrackId(track) === track.id) {
       return trackEffects;
     }

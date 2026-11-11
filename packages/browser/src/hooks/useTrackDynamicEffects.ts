@@ -49,8 +49,9 @@ export interface UseTrackDynamicEffectsReturn {
   clearTrackEffects: (trackId: string) => void;
 
   /**
-   * The effects function to give a track (`track.effects`). The same function
-   * is returned for the same track id.
+   * The effects function of a track. The same function is returned for the
+   * same track id. Pass this function itself to the provider:
+   * `<WaveformPlaylistProvider trackEffects={getTrackEffectsFunction}>`.
    */
   getTrackEffectsFunction: (trackId: string) => TrackEffectsFunction;
 

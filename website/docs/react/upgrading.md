@@ -56,7 +56,7 @@ A track's effects now run before its volume, pan and mute: `clips â†’ effects â†
 
 ### Track effects functions
 
-**Find:** every function passed as a track's `effects` option (a `TrackEffectsFunction` from `@waveform-playlist/playout`) and every `OfflineTrackEffectsFunction` passed to WAV export (`@waveform-playlist/browser`).
+**Find:** every track effects function (a `TrackEffectsFunction` from `@waveform-playlist/playout`; how it reaches a track is covered [below](#track-effects-are-passed-to-the-provider-not-set-on-tracks)) and every `OfflineTrackEffectsFunction` passed to WAV export (`@waveform-playlist/browser`).
 
 The arguments were `(graphEnd, masterGainNode, isOffline)`. They are now `(trackInput, faderInput, isOffline)`: the shape is the same, but the second argument is the input of the track's own fader, not the master bus.
 
@@ -827,11 +827,93 @@ function TrackEffects({
 }
 ```
 
-The "Before" lines are from the body of the component that called the hook. Keep one `useTrackDynamicEffects()` call for the app, the one whose `getTrackEffectsFunction(track.id)` is given to each track as `effects`: a second call creates a second, empty set of chains.
+The "Before" lines are from the body of the component that called the hook. Keep one `useTrackDynamicEffects()` call for the app, the one whose `getTrackEffectsFunction` is passed to the provider's `trackEffects` prop (see [the entry below](#track-effects-are-passed-to-the-provider-not-set-on-tracks)): a second call creates a second, empty set of chains.
 
 `useActiveEffects()` is a hook, so it cannot be called in a loop over tracks: give each track its own component, as above. A track with no effects gives an empty array. `TrackActiveEffect` is now the same type as `ActiveEffect`.
 
 `getTrackEffectsFunction(trackId)` now returns the same function for the same track id and never `undefined`.
+
+## Track effects are passed to the provider, not set on tracks
+
+**Packages:** `@waveform-playlist/core`, `@waveform-playlist/playout`, `@waveform-playlist/browser`.
+
+A track no longer carries its effects function. `ClipTrack.effects` is removed, and so is `effects` in `AudioTrackConfig` (the configs of `useAudioTracks`). The provider has a `trackEffects` prop instead, and `createToneAdapter` a `trackEffects` option: a function from a track id to that track's effects function (or `undefined` for none).
+
+Why: attaching the function meant copying every track object whenever `tracks` changed. The provider recognises a change it can apply to the running engine by the identity of the track objects, so with the copies every clip move, trim and split, and every added file, disposed the engine and built a new one.
+
+An `effects` field left on a track object is ignored at runtime: the chain is silently not connected. TypeScript reports it only where the object is checked against `ClipTrack` directly.
+
+**Find:** `effects:` inside a `tracks.map(` (usually a `tracksWithEffects` memo), `effects` in an `AudioTrackConfig`, and `.effects` read from a track.
+
+**Replace with:** the `trackEffects` prop, and `tracks` passed through unchanged:
+
+```tsx
+// Before
+const { getTrackEffectsFunction } = useTrackDynamicEffects();
+
+const tracksWithEffects = useMemo(
+  () => tracks.map((track) => ({ ...track, effects: getTrackEffectsFunction(track.id) })),
+  [tracks, getTrackEffectsFunction]
+);
+
+<WaveformPlaylistProvider tracks={tracksWithEffects} onTracksChange={setTracks}>
+
+// After
+const { getTrackEffectsFunction } = useTrackDynamicEffects();
+
+<WaveformPlaylistProvider
+  tracks={tracks}
+  trackEffects={getTrackEffectsFunction}
+  onTracksChange={setTracks}
+>
+```
+
+Delete the memo.
+
+A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. `AudioTrackConfig` has a new optional `id` for this: the track built from the config gets that id (without it an id is generated, as before, and is on `tracks[i].id` once the track exists). Ids must be unique: `useAudioTracks` warns about duplicates but still builds the tracks with the ids as given. An empty string counts as no id. Tracks added with `useDynamicTracks` always get generated ids; read them from `tracks`.
+
+```tsx
+// Before
+const { tracks } = useAudioTracks([
+  { src: 'vocals.mp3', name: 'Vocals', effects: vocalReverb },
+  { src: 'drums.mp3', name: 'Drums' },
+]);
+
+<WaveformPlaylistProvider tracks={tracks}>
+
+// After
+const { tracks } = useAudioTracks([
+  { id: 'vocals', src: 'vocals.mp3', name: 'Vocals' },
+  { id: 'drums', src: 'drums.mp3', name: 'Drums' },
+]);
+
+// Module level, or memoized: any stable object.
+const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
+  vocals: vocalReverb,
+};
+
+<WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
+```
+
+**When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built, and a track with both audio and MIDI clips can have only its MIDI half rebuilt (a clip edit, a SoundFont arriving): if the answer has become `undefined` by then, the MIDI half plays without the chain the audio half still has. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
+
+**With your own adapter:** the provider's `trackEffects` prop, like `effects`, reaches the default Tone.js adapter only. If you pass `createAdapter`, give the function to the adapter yourself:
+
+```tsx
+// Before
+<WaveformPlaylistProvider tracks={tracksWithEffects} createAdapter={() => createToneAdapter()}>
+
+// After
+<WaveformPlaylistProvider
+  tracks={tracks}
+  createAdapter={() => createToneAdapter({ trackEffects: getTrackEffectsFunction })}
+>
+```
+
+Also removed:
+
+- The `TrackEffectsFunction` type exported from `@waveform-playlist/core` (it only typed the removed field). **Find:** `TrackEffectsFunction` imported from `@waveform-playlist/core`. **Replace with:** the same name from `@waveform-playlist/playout`.
+- The deprecated `WaveformTrack` type from `@waveform-playlist/browser`. **Replace with:** `ClipTrack` from `@waveform-playlist/core`.
 
 ## `addEffect` and `addEffectToTrack` return a promise
 

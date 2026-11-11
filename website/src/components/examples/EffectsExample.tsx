@@ -723,15 +723,6 @@ export function EffectsExample() {
     setTracks(prevTracks => [...prevTracks, ...newTracks]);
   }, []);
 
-  // Create tracks with effects functions attached
-  // Always attach effects function to allow dynamic effect addition during playback
-  const tracksWithEffects = React.useMemo(() => {
-    return tracks.map(track => ({
-      ...track,
-      effects: getTrackEffectsFunction(track.id),
-    }));
-  }, [tracks, getTrackEffectsFunction]);
-
   if (loadError) {
     return (
       <Container>
@@ -747,7 +738,8 @@ export function EffectsExample() {
       <EffectRack effectsManager={effectsManager} />
 
       <WaveformPlaylistProvider
-        tracks={tracksWithEffects}
+        tracks={tracks}
+        trackEffects={getTrackEffectsFunction}
         sampleRate={48000}
         onTracksChange={setTracks}
         samplesPerPixel={512}

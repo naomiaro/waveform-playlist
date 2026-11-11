@@ -2,14 +2,13 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ClipTrack,
   type Fade,
-  type TrackEffectsFunction,
   type WaveformDataObject,
   type RenderMode,
   type SpectrogramConfig,
   type ColorMapValue,
 } from '@waveform-playlist/core';
 import * as Tone from 'tone';
-import { buildTrackFromConfig } from './buildTrackFromConfig';
+import { buildTrackFromConfig, duplicateTrackIds } from './buildTrackFromConfig';
 
 /**
  * Configuration for a single audio track to load
@@ -23,6 +22,14 @@ import { buildTrackFromConfig } from './buildTrackFromConfig';
  * and duration are derived from the waveform data automatically.
  */
 export interface AudioTrackConfig {
+  /**
+   * The id of the track built from this config. Optional: without it an id is
+   * generated and kept for the config's position. Give one when the app needs
+   * to refer to the track before it exists, e.g. in the provider's
+   * `trackEffects` lookup. Must be unique among the configs: duplicates are
+   * warned about, not repaired. An empty string counts as no id.
+   */
+  id?: string;
   /** URL to audio file - used if audioBuffer not provided */
   src?: string;
   /** Pre-loaded AudioBuffer - skips fetch/decode if provided */
@@ -33,7 +40,6 @@ export interface AudioTrackConfig {
   volume?: number;
   pan?: number;
   color?: string;
-  effects?: TrackEffectsFunction;
   // Multi-clip support
   startTime?: number; // When the clip starts on the timeline (default: 0)
   duration?: number; // Duration of the clip (default: full audio duration)
@@ -124,6 +130,16 @@ export function useAudioTracks(configs: AudioTrackConfig[], options: UseAudioTra
   const [loadedCount, setLoadedCount] = useState(0);
 
   const totalCount = configs.length;
+
+  useEffect(() => {
+    const duplicates = duplicateTrackIds(configs);
+    if (duplicates.length > 0) {
+      console.warn(
+        '[waveform-playlist] useAudioTracks: track ids must be unique, but these are used more than once: ' +
+          duplicates.join(', ')
+      );
+    }
+  }, [configs]);
 
   // For immediate mode: store loaded AudioBuffers by config index
   const [loadedBuffers, setLoadedBuffers] = useState<Map<number, AudioBuffer>>(() => new Map());
