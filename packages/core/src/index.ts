@@ -11,3 +11,4 @@ export * from './annotations/boundaries';
 export * from './annotations/shortcuts';
 export * from './panStage';
 export * from './valueSource';
+export * from './effects/registry';

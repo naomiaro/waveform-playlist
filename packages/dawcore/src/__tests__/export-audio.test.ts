@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exportAudioImpl, type ExportAudioHost } from '../interactions/export-audio';
 import type { SerializedEffectEntry } from '../effects/types';
-import { registerEffect, _resetEffectRegistryForTests } from '../effects/effect-registry';
+import { registerEffect } from '@waveform-playlist/core';
+import { _resetEffectRegistryForTests } from '../effects/effect-registry';
 
 const { ensureWamHost, createWamInstance, createWamInstanceFromFactory } = vi.hoisted(() => ({
   ensureWamHost: vi.fn(),

@@ -134,18 +134,7 @@ export type {
   LoadFilesResult,
 } from './events';
 
-// Effects (chain core — element APIs land in #418)
-export {
-  registerEffect,
-  getEffectDefinitions,
-  createEffectInstance,
-  prepareEffect,
-} from './effects/effect-registry';
-export type {
-  EffectDefinition,
-  EffectParamDef,
-  EffectInstance,
-  EffectState,
-  SerializedEffectEntry,
-} from './effects/types';
+// Effects. The registry (registerEffect, prepareEffect, …) and the definition
+// types live in @waveform-playlist/core, shared with the React hooks.
+export type { EffectState, SerializedEffectEntry } from './effects/types';
 export type { ExportOptions, ExportAudioHost } from './interactions/export-audio';

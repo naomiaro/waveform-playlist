@@ -1,154 +1,23 @@
-import type { CreatedEffect, EffectDefinition, EffectInstance, EffectParamDef } from './types';
+/**
+ * dawcore's built-in `native-*` effects. The registry itself lives in
+ * `@waveform-playlist/core` (shared with the React effects hooks); importing
+ * this module registers the built-ins there.
+ */
+import {
+  getEffectDefinitions,
+  registerEffect,
+  unregisterEffect,
+  type EffectParamDef,
+  type NativeEffectDefinition,
+} from '@waveform-playlist/core';
 
 const MAX_DELAY_SECONDS = 10;
 
-let registry = new Map<string, EffectDefinition>();
-
-export function registerEffect(type: string, definition: EffectDefinition): void {
-  if (registry.has(type)) {
-    console.warn(
-      '[waveform-playlist] registerEffect: overwriting existing effect type "' + type + '"'
-    );
-  }
-  registry.set(type, definition);
-}
-
-/** A copy — mutating the returned map does not affect the registry. */
-export function getEffectDefinitions(): Map<string, EffectDefinition> {
-  return new Map(registry);
-}
-
-interface PreparedRecord {
-  /** The definition this preparation ran for — a re-registered type must
-   *  prepare again with its new definition. */
-  definition: EffectDefinition;
-  promise: Promise<void>;
-  settled: boolean;
-}
-
-/** Per-context preparation state. Weak: an OfflineAudioContext (one per
- *  export) must not be kept alive by the registry. */
-const prepared = new WeakMap<BaseAudioContext, Map<string, PreparedRecord>>();
-
-/**
- * Run a registered effect's `prepare` hook for one context, once. Concurrent
- * and later calls share the same run; a failed run is forgotten so the next
- * call retries. Resolves immediately for definitions without a hook, and for
- * unknown types (creating the effect reports those).
- */
-export function prepareEffect(type: string, audioContext: BaseAudioContext): Promise<void> {
-  const definition = registry.get(type);
-  if (!definition?.prepare) {
-    return Promise.resolve();
-  }
-  const forContext = prepared.get(audioContext) ?? new Map<string, PreparedRecord>();
-  prepared.set(audioContext, forContext);
-  const existing = forContext.get(type);
-  if (existing && existing.definition === definition) {
-    return existing.promise;
-  }
-
-  const prepare = definition.prepare;
-  const record: PreparedRecord = {
-    definition,
-    settled: false,
-    // The async wrapper turns a synchronous throw into a rejection.
-    promise: (async () => prepare(audioContext))().then(
-      () => {
-        record.settled = true;
-      },
-      (err: unknown) => {
-        if (forContext.get(type) === record) {
-          forContext.delete(type);
-        }
-        throw err;
-      }
-    ),
-  };
-  forContext.set(type, record);
-  return record.promise;
-}
-
-function isPrepared(
-  type: string,
-  definition: EffectDefinition,
-  audioContext: BaseAudioContext
-): boolean {
-  const record = prepared.get(audioContext)?.get(type);
-  return record !== undefined && record.definition === definition && record.settled;
-}
-
-/**
- * Whether `type` has a prepare hook that has not completed on this context
- * for its CURRENT definition. Synchronous, so async callers can skip the
- * await (and stay synchronous) for the common case of effects without one.
- */
-export function needsPrepare(type: string, audioContext: BaseAudioContext): boolean {
-  const definition = registry.get(type);
-  return definition?.prepare !== undefined && !isPrepared(type, definition, audioContext);
-}
-
-/**
- * Await a type's preparation until it holds for the definition registered
- * NOW. A type re-registered while its old definition was preparing would
- * otherwise reach `create` unprepared. Rejects with the hook's own error.
- */
-export async function ensureEffectPrepared(
-  type: string,
-  audioContext: BaseAudioContext
-): Promise<void> {
-  while (needsPrepare(type, audioContext)) {
-    await prepareEffect(type, audioContext);
-  }
-}
-
-export function createEffectInstance(
-  type: string,
-  audioContext: BaseAudioContext,
-  params: Record<string, number> = {}
-): CreatedEffect {
-  const definition = registry.get(type);
-  if (!definition) {
-    throw new Error(
-      '[waveform-playlist] createEffectInstance: unknown effect type "' +
-        type +
-        '". Available types: ' +
-        [...registry.keys()].join(', ')
-    );
-  }
-  const merged = { ...definition.defaults, ...params };
-  let instance: EffectInstance;
-  try {
-    instance = definition.create(audioContext, merged);
-  } catch (err) {
-    if (!definition.prepare || isPrepared(type, definition, audioContext)) {
-      throw err;
-    }
-    // The likeliest cause by far: an AudioWorklet module that was never
-    // added to THIS context. Name the fix; keep the original message.
-    const hinted = new Error(
-      '[waveform-playlist] effect "' +
-        type +
-        '" has a prepare() step that has not completed on this audio context — ' +
-        "await editor.prepareEffect('" +
-        type +
-        "') (or prepareEffect('" +
-        type +
-        "', audioContext)) before adding it. Original error: " +
-        (err instanceof Error ? err.message : String(err))
-    ) as Error & { cause?: unknown };
-    // Keep the original (its name, type and stack) reachable: the hint is a
-    // guess at the cause, and `create` may have thrown for a real bug.
-    hinted.cause = err;
-    throw hinted;
-  }
-  instance.applyParams(merged);
-  return { instance, params: merged, wetParam: definition.wetParam };
-}
-
 /** Test-only: restore the registry to just the built-ins. */
 export function _resetEffectRegistryForTests(): void {
-  registry = new Map();
+  for (const type of getEffectDefinitions().keys()) {
+    unregisterEffect(type);
+  }
   registerBuiltIns();
 }
 
@@ -237,7 +106,7 @@ const BIQUAD_FILTERS: Record<string, BiquadFilterSpec> = {
   },
 };
 
-function biquadDefinition(spec: BiquadFilterSpec): EffectDefinition {
+function biquadDefinition(spec: BiquadFilterSpec): NativeEffectDefinition {
   const names = Object.keys(spec.defaults) as BiquadParam[];
   return {
     label: spec.label,
@@ -261,7 +130,7 @@ function biquadDefinition(spec: BiquadFilterSpec): EffectDefinition {
 }
 
 function registerBuiltIns(): void {
-  registry.set('native-gain', {
+  registerEffect('native-gain', {
     label: 'Gain',
     category: 'dynamics',
     defaults: { gain: 1 },
@@ -275,10 +144,10 @@ function registerBuiltIns(): void {
   });
 
   for (const [type, definition] of Object.entries(BIQUAD_FILTERS)) {
-    registry.set(type, biquadDefinition(definition));
+    registerEffect(type, biquadDefinition(definition));
   }
 
-  registry.set('native-compressor', {
+  registerEffect('native-compressor', {
     label: 'Compressor',
     category: 'dynamics',
     defaults: { threshold: -24, knee: 30, ratio: 12, attack: 0.003, release: 0.25 },
@@ -301,7 +170,7 @@ function registerBuiltIns(): void {
     },
   });
 
-  registry.set('native-stereo-panner', {
+  registerEffect('native-stereo-panner', {
     label: 'Stereo Panner',
     category: 'spatial',
     defaults: { pan: 0 },
@@ -314,7 +183,7 @@ function registerBuiltIns(): void {
     },
   });
 
-  registry.set('native-delay', {
+  registerEffect('native-delay', {
     label: 'Delay',
     category: 'delay',
     defaults: { delayTime: 0.25, feedback: 0.4, wet: 0.35 },
