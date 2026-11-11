@@ -76,7 +76,7 @@ import { useIntegratedRecording } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function RecordingControls({ tracks, setTracks, selectedTrackId }) {
-  const { isRecording, levels, peakLevels, startRecording, stopRecording, requestMicAccess } =
+  const { isRecording, meter, startRecording, stopRecording, requestMicAccess } =
     useIntegratedRecording(tracks, setTracks, selectedTrackId);
 
   return (
@@ -85,7 +85,7 @@ function RecordingControls({ tracks, setTracks, selectedTrackId }) {
       <button onClick={isRecording ? stopRecording : startRecording}>
         {isRecording ? 'Stop' : 'Record'}
       </button>
-      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+      <SegmentedVUMeter meter={meter} />
     </>
   );
 }

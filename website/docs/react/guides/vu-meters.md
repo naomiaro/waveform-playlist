@@ -21,7 +21,36 @@ Peak responds instantly to transients — if a drum hit clips, you'll see it. RM
 
 Both hooks use an AudioWorklet processor that measures every audio sample — no transient is missed, even between animation frames. This guarantees accurate clipping detection for recording.
 
-By default, the `SegmentedVUMeter` component displays peak levels. Pass `rmsLevels` instead of `levels` if you want an RMS meter.
+By default, the `SegmentedVUMeter` component displays peak levels. Pass `rmsLevels` as its `levels` prop if you want an RMS meter (see [Choosing Peak vs RMS](#choosing-peak-vs-rms)).
+
+## Levels Are a Source, Not State
+
+Levels change about 60 times a second. If the hooks returned them as React state, the component that calls the hook, and everything it renders, would re-render at that rate. So `useMicrophoneLevel`, `useOutputMeter` and `useIntegratedRecording` return a `meter` instead: an object with a stable identity that publishes each new reading. The hook's component does not re-render when levels change.
+
+```typescript
+// From @waveform-playlist/core
+interface MeterLevels {
+  levels: number[];     // Per-channel peak levels (0–1)
+  peakLevels: number[]; // Per-channel held peak levels (0–1)
+  rmsLevels: number[];  // Per-channel RMS levels (0–1)
+}
+
+interface MeterSource {
+  subscribe(listener: (levels: MeterLevels) => void): () => void; // returns unsubscribe
+  getSnapshot(): MeterLevels;
+}
+```
+
+There are four ways to read a meter:
+
+| How | Re-renders | Use for |
+|-----|-----------|---------|
+| `<SegmentedVUMeter meter={meter} />` | None | The built-in meter. It writes each reading straight to the DOM |
+| `useMeterLevels(meter, { updateRate })` | At most `updateRate` a second (default 10) | Values you need in render: text readouts, clipping indicators, simple custom bars |
+| `useSyncExternalStore(meter.subscribe, meter.getSnapshot)` | Every reading (~60 a second) | Full-rate state, when a small component really needs it |
+| `meter.subscribe(callback)` in an effect | None | Drawing to the DOM or a canvas yourself |
+
+`useMeterLevels` is exported from `@waveform-playlist/ui-components`. `useSyncExternalStore` is React's own hook.
 
 ## Built-In Components
 
@@ -32,13 +61,18 @@ A professional LED-segment style meter with multi-channel support:
 ```tsx
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
+// Live: pass the meter from a hook. The component does not re-render per reading.
+<SegmentedVUMeter meter={meter} />
+
+// Or drive it with values you hold yourself.
 <SegmentedVUMeter levels={[leftLevel, rightLevel]} peakLevels={[leftPeak, rightPeak]} />
 ```
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `levels` | `number[]` | — | Per-channel levels (0–1) |
-| `peakLevels` | `number[]` | — | Per-channel peak levels (0–1) |
+| `meter` | `MeterSource` | — | A live meter from `useMicrophoneLevel`, `useOutputMeter` or `useIntegratedRecording`. Takes precedence over `levels` / `peakLevels` |
+| `levels` | `number[]` | — | Per-channel levels (0–1), for a meter driven by props |
+| `peakLevels` | `number[]` | — | Per-channel peak levels (0–1), used with `levels` |
 | `channelLabels` | `string[]` | Auto | Labels per channel (auto: M, L/R, 1/2/3...) |
 | `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Meter orientation |
 | `segmentCount` | `number` | `24` | Number of LED segments |
@@ -53,7 +87,7 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 ## Input Metering
 
-The `useMicrophoneLevel` hook provides real-time microphone input levels. Set `channelCount: 2` to get per-channel stereo data:
+The `useMicrophoneLevel` hook meters a microphone stream. Set `channelCount: 2` to get per-channel stereo data:
 
 ```tsx
 import {
@@ -64,13 +98,13 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function InputMeter() {
   const { stream, hasPermission, requestAccess } = useMicrophoneAccess();
-  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
 
   if (!hasPermission) {
     return <button onClick={() => requestAccess()}>Enable Microphone</button>;
   }
 
-  return <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+  return <SegmentedVUMeter meter={meter} />;
 }
 ```
 
@@ -85,12 +119,17 @@ function InputMeter() {
 
 | Property | Type | Description |
 |----------|------|-------------|
+| `meter` | `MeterSource` | The live levels; see [Levels Are a Source, Not State](#levels-are-a-source-not-state) |
+| `resetPeak` | `() => void` | Reset all held peak levels to 0 |
+| `error` | `Error \| null` | Meter setup error (worklet failed to load, for example) |
+
+Each reading from `meter` holds:
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `levels` | `number[]` | Per-channel true peak levels (0–1) |
 | `peakLevels` | `number[]` | Per-channel held peak levels (0–1) — highest value seen since last reset |
 | `rmsLevels` | `number[]` | Per-channel RMS levels (0–1) — average signal power |
-| `level` | `number` | Single scalar peak level (channel 0 for mono, max across channels for multi) |
-| `peakLevel` | `number` | Single scalar held peak level |
-| `resetPeak` | `() => void` | Reset all held peak levels to 0 |
 
 ## Output Metering
 
@@ -101,8 +140,8 @@ import { useOutputMeter } from '@waveform-playlist/browser/tone';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function OutputMeter() {
-  const { levels, peakLevels } = useOutputMeter({ channelCount: 2 });
-  return <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+  const { meter } = useOutputMeter({ channelCount: 2 });
+  return <SegmentedVUMeter meter={meter} />;
 }
 ```
 
@@ -112,38 +151,48 @@ function OutputMeter() {
 |--------|------|---------|-------------|
 | `channelCount` | `number` | `2` | Number of channels to meter |
 | `updateRate` | `number` | `60` | Update frequency in Hz |
+| `isPlaying` | `boolean` | `false` | Pass the playlist's `isPlaying`. When it turns false, all levels reset to zero |
 
-The hook returns `levels` (true peak), `peakLevels` (held peak), `rmsLevels`, and `resetPeak` with the same shape as `useMicrophoneLevel`.
+The hook returns `meter`, `resetPeak` and `error`, with the same shapes as `useMicrophoneLevel`.
 
 ## Choosing Peak vs RMS
 
-Both hooks expose peak and RMS — choose based on your use case:
+Every reading holds both peak and RMS — choose based on your use case. `<SegmentedVUMeter meter={meter} />` draws peak with the held-peak marker. For an RMS meter, read the values with `useMeterLevels` and pass `rmsLevels` as `levels`:
 
 ```tsx
+import { SegmentedVUMeter, useMeterLevels } from '@waveform-playlist/ui-components';
+
 // Peak meter (default) — best for recording and clipping detection
-<SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+<SegmentedVUMeter meter={meter} />
 
 // RMS meter — best for showing perceived loudness
-<SegmentedVUMeter levels={rmsLevels} />
+function RmsMeter({ meter }) {
+  const { rmsLevels } = useMeterLevels(meter, { updateRate: 30 });
+  return <SegmentedVUMeter levels={rmsLevels} />;
+}
 
 // Both side by side — useful for dynamics processing UI
 <div style={{ display: 'flex', gap: '1rem' }}>
-  <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
-  <SegmentedVUMeter levels={rmsLevels} />
+  <SegmentedVUMeter meter={meter} />
+  <RmsMeter meter={meter} />
 </div>
 ```
 
+Keep `useMeterLevels` in a small component of its own, as `RmsMeter` does, so only that component re-renders.
+
 ## Building a Custom Meter
 
-Both hooks return `levels` as an array of normalized 0–1 values per channel. You can convert these to dB using `normalizedToDb` from `@waveform-playlist/core`:
+Each reading's `levels` is an array of normalized 0–1 values per channel. You can convert these to dB using `normalizedToDb` from `@waveform-playlist/core`. This meter reads the values in render through `useMeterLevels`:
 
 ```tsx
 import { useMicrophoneLevel, useMicrophoneAccess } from '@waveform-playlist/recording';
+import { useMeterLevels } from '@waveform-playlist/ui-components';
 import { normalizedToDb } from '@waveform-playlist/core';
 
 function CustomMeter() {
   const { stream } = useMicrophoneAccess();
-  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { levels } = useMeterLevels(meter, { updateRate: 20 });
   const channelLabels = ['L', 'R'];
 
   return (
@@ -180,6 +229,35 @@ function CustomMeter() {
 
 This pattern works identically with `useOutputMeter` for playback metering.
 
+For a meter that should move on every reading, skip React state and draw from a subscription:
+
+```tsx
+function BarMeter({ meter }: { meter: MeterSource }) {
+  const barRef = useRef<HTMLDivElement>(null);
+
+  useEffect(
+    () =>
+      meter.subscribe(({ levels }) => {
+        if (barRef.current) {
+          barRef.current.style.transform = `scaleY(${Math.max(...levels)})`;
+        }
+      }),
+    [meter]
+  );
+
+  return (
+    <div style={{ width: 20, height: 200, background: '#333' }}>
+      <div
+        ref={barRef}
+        style={{ height: '100%', background: 'green', transformOrigin: 'bottom', transform: 'scaleY(0)' }}
+      />
+    </div>
+  );
+}
+```
+
+`MeterSource` is a type from `@waveform-playlist/core`.
+
 ## Customizing SegmentedVUMeter
 
 ### Custom Color Scheme
@@ -188,8 +266,7 @@ Override the default color stops with your own:
 
 ```tsx
 <SegmentedVUMeter
-  levels={levels}
-  peakLevels={peakLevels}
+  meter={meter}
   colorStops={[
     { dB: -1, color: '#ff0000' },
     { dB: -6, color: '#ffaa00' },
@@ -208,25 +285,20 @@ The default `dBRange` is `[-50, 5]`, allowing above-0 dB display for output mete
 By default, inactive segments are a flat dark color. Enable `coloredInactive` to show them in their dimmed color at 15% opacity — this gives a visual preview of the full color scale:
 
 ```tsx
-<SegmentedVUMeter levels={levels} coloredInactive />
+<SegmentedVUMeter meter={meter} coloredInactive />
 ```
 
 ### Horizontal Orientation
 
 ```tsx
-<SegmentedVUMeter
-  levels={levels}
-  peakLevels={peakLevels}
-  orientation="horizontal"
-/>
+<SegmentedVUMeter meter={meter} orientation="horizontal" />
 ```
 
 ### Sizing and Scale
 
 ```tsx
 <SegmentedVUMeter
-  levels={levels}
-  peakLevels={peakLevels}
+  meter={meter}
   segmentCount={16}
   segmentWidth={30}
   segmentHeight={6}
@@ -245,17 +317,16 @@ For multi-channel audio interfaces, set `channelCount` higher:
 
 ```tsx
 // 4-channel input metering
-const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 4 });
+const { meter } = useMicrophoneLevel(stream, { channelCount: 4 });
 
 // SegmentedVUMeter auto-labels channels as 1, 2, 3, 4
 <SegmentedVUMeter
-  levels={levels}
-  peakLevels={peakLevels}
+  meter={meter}
   channelLabels={['Front L', 'Front R', 'Rear L', 'Rear R']}
 />
 ```
 
-When `channelCount` is 1, the scalar `level` and `peakLevel` return values are identical to `levels[0]` and `peakLevels[0]`. When `channelCount` is greater than 1, the scalar values are the maximum across all channels.
+There is no single scalar level any more (the `level` and `peakLevel` return values were removed). For one number across all channels, take the maximum: `Math.max(...levels)` and `Math.max(...peakLevels)`.
 
 ## Next Steps
 

@@ -237,3 +237,228 @@ A shortcut no longer fires for a key that the focused control uses itself. This 
 Do this only where it helps pointer users and the button is still reachable with `Tab`; a keyboard user who pressed the button loses their place when it blurs. The built-in Play, Pause and Stop buttons need nothing: they are disabled while they do not apply, so focus leaves them on click.
 
 If you call `handleKeyboardEvent` yourself, the rule is applied for you. For your own key listeners, `keyBelongsToFocusedControl(event)` from `@waveform-playlist/core` answers the same question.
+
+## Meter levels and recording progress are sources, not state
+
+**Packages:** `@waveform-playlist/browser` (`useOutputMeter`, `<Waveform recordingState>`), `@waveform-playlist/recording` (`useMicrophoneLevel`, `useRecording`, `useIntegratedRecording`). New types in `@waveform-playlist/core`; new hooks in `@waveform-playlist/ui-components` and `@waveform-playlist/recording`.
+
+Meter levels change about 60 times a second, and a recording's elapsed time and preview peaks change every animation frame. The hooks used to return them as React state, so the component that called the hook re-rendered at that rate. They now return a **source**: an object with a stable identity, `subscribe(listener)` and `getSnapshot()`. The hook's component no longer re-renders when the value changes.
+
+```typescript
+// From @waveform-playlist/core
+interface ValueSource<T> {
+  subscribe(listener: (value: T) => void): () => void; // returns unsubscribe
+  getSnapshot(): T;
+}
+type MeterSource = ValueSource<{ levels: number[]; peakLevels: number[]; rmsLevels: number[] }>;
+type RecordingProgressSource = ValueSource<{ duration: number; peaks: (Int8Array | Int16Array)[] }>;
+```
+
+The five entries below each replace removed fields. They all use the same four ways to read a source:
+
+| You had                                              | Use                                                                                              |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `<SegmentedVUMeter levels={…} peakLevels={…} />`     | `<SegmentedVUMeter meter={meter} />` (new prop; draws to the DOM, no re-render)                  |
+| values read in render (labels, custom bars)          | `useMeterLevels(meter)` / `useRecordingProgress(progress)`: state, 10 updates a second by default |
+| values that must be state at full rate               | `useSyncExternalStore(source.subscribe, source.getSnapshot)`                                     |
+| an effect that depended on the value                 | `source.subscribe(callback)` inside the effect                                                   |
+
+`useMeterLevels` and the generic `useThrottledValue` are exported from `@waveform-playlist/ui-components`; `useRecordingProgress` from `@waveform-playlist/recording`. All three take `{ updateRate }` (updates per second).
+
+`SegmentedVUMeter`'s `levels` and `peakLevels` props still work. The `meter` prop is an addition, and needs no migration by itself.
+
+### `useOutputMeter`
+
+`levels`, `peakLevels` and `rmsLevels` are removed from the return value. It is now `{ meter, resetPeak, error }`.
+
+**Find:** `useOutputMeter(`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { levels, peakLevels } = useOutputMeter({ channelCount: 2, isPlaying });
+<SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+
+// After
+const { meter } = useOutputMeter({ channelCount: 2, isPlaying });
+<SegmentedVUMeter meter={meter} />;
+```
+
+If you read the numbers in render:
+
+```tsx
+// Before
+const { levels, peakLevels, rmsLevels } = useOutputMeter({ channelCount: 2 });
+
+// After
+import { useMeterLevels } from '@waveform-playlist/ui-components';
+
+const { meter } = useOutputMeter({ channelCount: 2 });
+const { levels, peakLevels, rmsLevels } = useMeterLevels(meter);
+```
+
+### `useMicrophoneLevel`
+
+`levels`, `peakLevels`, `rmsLevels` and the scalars `level` and `peakLevel` are removed. The return value is now `{ meter, resetPeak, error }`.
+
+**Find:** `useMicrophoneLevel(`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+<SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+
+// After
+const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
+<SegmentedVUMeter meter={meter} />;
+```
+
+The scalars have no direct replacement. Take the maximum across channels:
+
+```tsx
+// Before
+const { level, peakLevel } = useMicrophoneLevel(stream);
+
+// After
+const { meter } = useMicrophoneLevel(stream);
+const { levels, peakLevels } = useMeterLevels(meter);
+const level = Math.max(...levels);
+const peakLevel = Math.max(...peakLevels);
+```
+
+### `useRecording`
+
+`duration` and `peaks` are removed and replaced by `progress`, a `RecordingProgressSource`. The deprecated `level` and `peakLevel` (always `0`) are removed with no replacement; use `useMicrophoneLevel`.
+
+**Find:** `useRecording(`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { isRecording, duration, peaks, audioBuffer } = useRecording(stream);
+
+// After
+import { useRecordingProgress } from '@waveform-playlist/recording';
+
+const { isRecording, progress, audioBuffer } = useRecording(stream);
+const { duration, peaks } = useRecordingProgress(progress);
+```
+
+`useRecordingProgress` re-renders its component 10 times a second by default. If you only passed the values to `<Waveform recordingState>`, do not call it; pass `progress` itself (see below). After a stop, `progress.getSnapshot().duration` is the length of the recorded buffer, the same as `audioBuffer.duration`.
+
+### `useIntegratedRecording`
+
+`duration`, `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels` and `recordingPeaks` are removed. Two sources replace them: `meter` (the microphone levels) and `progress` (the take's elapsed time and preview peaks).
+
+**Find:** `useIntegratedRecording(`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { isRecording, duration, levels, peakLevels, recordingPeaks } = useIntegratedRecording(
+  tracks,
+  setTracks,
+  selectedTrackId,
+  { currentTime }
+);
+
+<SegmentedVUMeter levels={levels} peakLevels={peakLevels} />;
+<span>{duration.toFixed(1)}s</span>;
+
+// After
+const { isRecording, meter, progress } = useIntegratedRecording(
+  tracks,
+  setTracks,
+  selectedTrackId,
+  { currentTime }
+);
+
+<SegmentedVUMeter meter={meter} />;
+<ElapsedTime progress={progress} />;
+
+// A small component of its own, so only the label re-renders.
+function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
+  const { duration } = useRecordingProgress(progress);
+  return <span>{duration.toFixed(1)}s</span>;
+}
+```
+
+An effect that depended on `duration` (auto-scrolling to follow the take, for example) becomes a subscription:
+
+```tsx
+// Before
+useEffect(() => {
+  if (isRecording) followTake(duration);
+}, [isRecording, duration]);
+
+// After
+useEffect(() => {
+  if (!isRecording) return;
+  followTake(progress.getSnapshot().duration);
+  return progress.subscribe(({ duration }) => followTake(duration));
+}, [isRecording, progress]);
+```
+
+### `<Waveform recordingState>`
+
+Applies to the `recordingState` prop of `<Waveform>` and `<PlaylistVisualization>`. `durationSamples` and `peaks` are removed; pass the `progress` source from `useRecording` or `useIntegratedRecording` instead. Only the live preview clip follows it frame by frame.
+
+**Find:** `recordingState=`.
+
+**Replace with:**
+
+```tsx
+// Before
+<Waveform
+  recordingState={
+    isRecording
+      ? {
+          isRecording: true,
+          trackId: selectedTrackId,
+          startSample,
+          durationSamples: Math.floor(duration * sampleRate),
+          peaks: recordingPeaks,
+          bits: 16,
+          latencyOffset,
+        }
+      : undefined
+  }
+/>
+
+// After
+<Waveform
+  recordingState={
+    isRecording
+      ? {
+          isRecording: true,
+          trackId: selectedTrackId,
+          startSample,
+          progress,
+          bits: 16,
+          latencyOffset,
+        }
+      : undefined
+  }
+/>
+```
+
+If you produce the take's data yourself instead of using the recording hooks, build a source with `createValueSource` from `@waveform-playlist/core` and publish a new `{ duration, peaks }` object for each update:
+
+```tsx
+import { createValueSource, type RecordingProgress } from '@waveform-playlist/core';
+
+const { source: progress, publish } = createValueSource<RecordingProgress>({
+  duration: 0,
+  peaks: [new Int16Array(0)],
+});
+
+// On each update. Publish new objects and arrays; do not change the old ones in place.
+publish({ duration: seconds, peaks: nextPeaks });
+```
+
+**Behaviour change:** while a take is recording, the displayed timeline used to end exactly 10 seconds after the take and grow on every frame. It now grows in 10-second steps and ends between 10 and 20 seconds after the take, so the track rows are not resized on every frame.

@@ -54,7 +54,11 @@ import {
   useMicrophoneAccess,
   useRecording,
   useMicrophoneLevel,
+  useRecordingProgress,
 } from '@waveform-playlist/recording';
+
+// Throttled React state from a meter or any other value source
+import { useMeterLevels, useThrottledValue } from '@waveform-playlist/ui-components';
 
 // Annotation hooks
 import {
@@ -696,15 +700,14 @@ interface UseIntegratedRecordingReturn {
   // Recording state
   isRecording: boolean;
   isPaused: boolean;
-  duration: number;
 
-  // Microphone levels (scalar — max across channels)
-  level: number;        // Current peak level (0-1)
-  peakLevel: number;    // Held peak level with decay (0-1)
+  // Live microphone levels: { levels, peakLevels, rmsLevels } per channel (0-1).
+  // A source, not state: the hook does not re-render as levels change.
+  meter: MeterSource;
 
-  // Per-channel levels (for multi-channel VU meters)
-  levels: number[];     // Per-channel peak levels (0-1)
-  peakLevels: number[]; // Per-channel held peak levels (0-1)
+  // Elapsed time and live-preview peaks of the take: { duration, peaks }.
+  // A source, not state. Pass it to <Waveform recordingState={{ …, progress }} />.
+  progress: RecordingProgressSource;
 
   // Device management
   stream: MediaStream | null;
@@ -721,13 +724,12 @@ interface UseIntegratedRecordingReturn {
   requestMicAccess: () => Promise<void>;
   changeDevice: (deviceId: string) => Promise<void>;
 
-  // Live waveform data
-  recordingPeaks: (Int8Array | Int16Array)[];  // Per-channel live peaks
-
   // Error handling
   error: Error | null;
 }
 ```
+
+`meter` and `progress` keep the same identity for the life of the hook. See [Value sources](#value-sources) for how to read them.
 
 #### Example
 
@@ -739,16 +741,14 @@ function RecordingControls() {
 
   const {
     isRecording,
-    duration,
-    levels,
-    peakLevels,
+    meter,
+    progress,
     devices,
     hasPermission,
     startRecording,
     stopRecording,
     requestMicAccess,
     changeDevice,
-    recordingPeaks,
     error,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
@@ -764,10 +764,16 @@ function RecordingControls() {
       <button onClick={isRecording ? stopRecording : startRecording}>
         {isRecording ? 'Stop' : 'Record'}
       </button>
-      {isRecording && <span>Recording: {duration.toFixed(1)}s</span>}
-      <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+      {isRecording && <ElapsedTime progress={progress} />}
+      <SegmentedVUMeter meter={meter} />
     </div>
   );
+}
+
+// Only this small component re-renders as the take grows (10 times a second).
+function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
+  const { duration } = useRecordingProgress(progress);
+  return <span>Recording: {duration.toFixed(1)}s</span>;
 }
 ```
 
@@ -1044,11 +1050,11 @@ function useRecording(
 ): {
   isRecording: boolean;
   isPaused: boolean;
-  duration: number;
-  peaks: (Int8Array | Int16Array)[];
+  /** Elapsed time and live-preview peaks: { duration, peaks }. A source, not
+   *  state; published once per animation frame while recording. After a stop,
+   *  duration is the recorded buffer's length. */
+  progress: RecordingProgressSource;
   audioBuffer: AudioBuffer | null;
-  level: number;
-  peakLevel: number;
   /** Resolves true when the capture pipeline actually started. */
   startRecording: () => Promise<boolean>;
   stopRecording: () => Promise<AudioBuffer | null>;
@@ -1056,6 +1062,17 @@ function useRecording(
   resumeRecording: () => void;
   error: Error | null;
 };
+```
+
+### useRecordingProgress
+
+A recording's elapsed time and preview peaks as React state, at most `updateRate` times a second. Use it for slow displays such as an elapsed-time label. The live waveform takes the source itself (`<Waveform recordingState={{ …, progress }} />`).
+
+```typescript
+function useRecordingProgress(
+  progress: RecordingProgressSource,
+  options?: { updateRate?: number } // Default: 10 (updates per second)
+): RecordingProgress; // { duration: number; peaks: (Int8Array | Int16Array)[] }
 ```
 
 ### useMicrophoneLevel
@@ -1068,14 +1085,56 @@ function useMicrophoneLevel(
     updateRate?: number;    // Default: 60 (Hz)
   }
 ): {
-  level: number;          // 0-1 peak level (max across channels, for backwards compatibility)
-  peakLevel: number;      // 0-1 held peak with decay (max across channels)
-  levels: number[];       // Per-channel peak levels (0-1)
-  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
-  rmsLevels: number[];    // Per-channel RMS levels (0-1)
+  meter: MeterSource;     // Live { levels, peakLevels, rmsLevels } per channel (0-1); a source, not state
   resetPeak: () => void;  // Reset all held peak levels
+  error: Error | null;    // Meter setup error
 };
 ```
+
+### Value sources
+
+Meter levels and recording progress change about 60 times a second. Held in React state, they would re-render the component that calls the hook at that rate. The hooks return a source instead, and the hook's component does not re-render when the value changes.
+
+```typescript
+// From @waveform-playlist/core
+interface ValueSource<T> {
+  subscribe(listener: (value: T) => void): () => void; // returns unsubscribe
+  getSnapshot(): T; // same object until the next change
+}
+
+interface MeterLevels {
+  levels: number[];     // Per-channel smoothed peak levels (0-1)
+  peakLevels: number[]; // Per-channel held peak levels since the last reset (0-1)
+  rmsLevels: number[];  // Per-channel RMS levels (0-1)
+}
+type MeterSource = ValueSource<MeterLevels>;
+
+interface RecordingProgress {
+  duration: number;                  // Elapsed seconds
+  peaks: (Int8Array | Int16Array)[]; // Per-channel preview peaks
+}
+type RecordingProgressSource = ValueSource<RecordingProgress>;
+```
+
+Four ways to read one:
+
+```tsx
+// 1. Hand it to the component that draws it.
+<SegmentedVUMeter meter={meter} />
+
+// 2. Throttled React state: at most `updateRate` renders a second (default 10).
+const { levels, peakLevels, rmsLevels } = useMeterLevels(meter, { updateRate: 10 });
+const { duration } = useRecordingProgress(progress);
+const value = useThrottledValue(anySource); // generic form
+
+// 3. Full-rate React state.
+const levels = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
+
+// 4. Draw it yourself, without rendering.
+useEffect(() => meter.subscribe(({ levels }) => drawBars(levels)), [meter]);
+```
+
+`useMeterLevels` and `useThrottledValue` come from `@waveform-playlist/ui-components`; `useRecordingProgress` from `@waveform-playlist/recording`.
 
 ### useOutputMeter
 
@@ -1101,10 +1160,9 @@ interface UseOutputMeterOptions {
 
 ```typescript
 interface UseOutputMeterReturn {
-  levels: number[];       // Per-channel peak output levels (0-1)
-  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
-  rmsLevels: number[];    // Per-channel RMS output levels (0-1)
+  meter: MeterSource;     // Live { levels, peakLevels, rmsLevels } per channel (0-1); a source, not state
   resetPeak: () => void;  // Reset all peak hold indicators
+  error: Error | null;    // Meter setup error
 }
 ```
 
@@ -1112,9 +1170,12 @@ interface UseOutputMeterReturn {
 
 ```tsx
 import { useOutputMeter } from '@waveform-playlist/browser/tone';
+import { useMeterLevels } from '@waveform-playlist/ui-components';
 
 function OutputMeter() {
-  const { levels, peakLevels, resetPeak } = useOutputMeter({ channelCount: 2 });
+  const { meter, resetPeak } = useOutputMeter({ channelCount: 2 });
+  // Text readout: 10 renders a second is enough.
+  const { levels, peakLevels } = useMeterLevels(meter);
 
   return (
     <div>

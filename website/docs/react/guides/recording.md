@@ -135,20 +135,28 @@ Default constraints optimize for recording quality:
 The main hook for recording functionality. It requires a `MediaStream` from `useMicrophoneAccess`:
 
 ```tsx
-import { useRecording, useMicrophoneAccess } from '@waveform-playlist/recording';
+import {
+  useRecording,
+  useRecordingProgress,
+  useMicrophoneAccess,
+} from '@waveform-playlist/recording';
 
 function RecordingControls() {
   const { stream } = useMicrophoneAccess();
   const {
     isRecording,
     isPaused,
-    duration,
+    progress,
     audioBuffer,
     startRecording,
     stopRecording,
     pauseRecording,
     resumeRecording,
   } = useRecording(stream);
+  // Elapsed time changes every animation frame, so the hook returns it as a
+  // source (`progress`) and does not re-render for it. useRecordingProgress
+  // turns it into state at 10 updates a second, which is enough for a label.
+  const { duration } = useRecordingProgress(progress);
 
   return (
     <div>
@@ -301,17 +309,21 @@ For WAV file export, use the `useExportWav` hook or `ExportWavButton` component 
 
 ### useMicrophoneLevel Hook
 
-Display real-time input levels. Pass `channelCount: 2` to monitor stereo inputs:
+`useMicrophoneLevel` returns a `meter`: a source of `{ levels, peakLevels, rmsLevels }` that changes about 60 times a second. The hook does not re-render when it changes. The simplest display is `<SegmentedVUMeter meter={meter} />` from `@waveform-playlist/ui-components`, which draws each value straight to the DOM.
+
+To build your own display from values in render, read the meter with `useMeterLevels`, which re-renders at most 10 times a second by default. Pass `channelCount: 2` to monitor stereo inputs:
 
 ```tsx
 import { useMicrophoneAccess, useMicrophoneLevel } from '@waveform-playlist/recording';
+import { useMeterLevels } from '@waveform-playlist/ui-components';
 
 function LevelMeter() {
   const { stream } = useMicrophoneAccess();
-  const { levels, peakLevels } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
+  const { levels, peakLevels } = useMeterLevels(meter, { updateRate: 20 });
 
   // levels: number[] (per-channel peak levels, 0-1)
-  // peakLevels: number[] (per-channel held peak levels with decay, 0-1)
+  // peakLevels: number[] (per-channel held peak levels, 0-1)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -352,7 +364,8 @@ Warn users when audio is too loud:
 
 ```tsx
 function ClippingIndicator({ stream }: { stream: MediaStream | null }) {
-  const { peakLevels } = useMicrophoneLevel(stream);
+  const { meter } = useMicrophoneLevel(stream);
+  const { peakLevels } = useMeterLevels(meter);
   const isClipping = peakLevels.some((peak) => peak > 0.95);
 
   return (
@@ -449,7 +462,7 @@ For the live waveform preview to match the finalized clip, pass the **same** val
 ```tsx
 const LATENCY = 0.023; // your measured latency, in seconds
 
-const { isRecording, recordingPeaks, ... } =
+const { isRecording, progress, ... } =
   useIntegratedRecording(tracks, setTracks, selectedTrackId, {
     currentTime,
     latencyOffset: LATENCY,
@@ -459,13 +472,12 @@ const { isRecording, recordingPeaks, ... } =
   recordingState={isRecording ? {
     isRecording,
     trackId: selectedTrackId,
-    // startSample/durationSamples are derived by the consumer — see the full
-    // recording example. Typically: startSample = recordingStartSample (the
-    // captured record-start position) and
-    // durationSamples = Math.floor(duration * sampleRate).
+    // startSample is derived by the consumer: the timeline position captured
+    // when recording started — see the full recording example.
     startSample,
-    durationSamples,
-    peaks: recordingPeaks,
+    // The take's elapsed time and peaks, as a source. Only the preview clip
+    // follows it frame by frame; this component does not re-render.
+    progress,
     bits: 16,
     latencyOffset: LATENCY, // must match the value above
   } : undefined}
@@ -563,9 +575,19 @@ import {
   usePlaybackAnimation,
 } from '@waveform-playlist/browser';
 import { ExportWavButton } from '@waveform-playlist/browser/tone';
-import { useIntegratedRecording } from '@waveform-playlist/recording';
+import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
-import { createTrack, type ClipTrack } from '@waveform-playlist/core';
+import {
+  createTrack,
+  type ClipTrack,
+  type RecordingProgressSource,
+} from '@waveform-playlist/core';
+
+// Only this label re-renders as the take grows (10 times a second).
+function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
+  const { duration } = useRecordingProgress(progress);
+  return <>{duration.toFixed(1)}s</>;
+}
 
 function RecordingControls({
   tracks,
@@ -582,9 +604,8 @@ function RecordingControls({
 
   const {
     isRecording,
-    duration,
-    levels,
-    peakLevels,
+    meter,
+    progress,
     hasPermission,
     startRecording,
     stopRecording,
@@ -619,11 +640,17 @@ function RecordingControls({
   return (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
       <button onClick={handleRecord}>
-        {isRecording ? `Stop (${duration.toFixed(1)}s)` : 'Record'}
+        {isRecording ? (
+          <>
+            Stop (<ElapsedTime progress={progress} />)
+          </>
+        ) : (
+          'Record'
+        )}
       </button>
       <button onClick={handleAddTrack}>+ Add Track</button>
       {hasPermission && (
-        <SegmentedVUMeter levels={levels} peakLevels={peakLevels} />
+        <SegmentedVUMeter meter={meter} />
       )}
     </div>
   );
