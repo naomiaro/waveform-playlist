@@ -57,6 +57,8 @@ export function createAnnotationLookup<T extends TimedAnnotation>(): AnnotationL
     atTime(annotations, time) {
       sync(annotations);
       if (!ordered) return annotations.find((annotation) => contains(annotation, time));
+      // NaN compares false both ways and would look like a hit to the search below.
+      if (Number.isNaN(time)) return undefined;
 
       // Playback moves forward, so the last hit is nearly always still the answer.
       if (lastIndex >= 0 && contains(annotations[lastIndex], time)) return annotations[lastIndex];

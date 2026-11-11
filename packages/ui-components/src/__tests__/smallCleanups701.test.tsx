@@ -157,6 +157,42 @@ describe('TimeInput', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('commits an edit on Enter', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <TimeInput id="t" label="Start" value={1} format="thousandths" onChange={onChange} />
+    );
+    const input = inputOf(container);
+    input.focus();
+    fireEvent.change(input, { target: { value: '4' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
+  it('keeps an in-progress edit when the value changes underneath it', () => {
+    const { container, rerender } = render(
+      <TimeInput id="t" label="Start" value={1} format="thousandths" />
+    );
+    const input = inputOf(container);
+    fireEvent.change(input, { target: { value: '2.5' } });
+    rerender(<TimeInput id="t" label="Start" value={9} format="thousandths" />);
+    expect(input.value).toBe('2.5');
+  });
+
+  it('abandons an edit when the format changes, rather than parsing it in the new format', () => {
+    const onChange = vi.fn();
+    const ui = (format: 'hh:mm:ss.uuu' | 'seconds') => (
+      <TimeInput id="t" label="Start" value={7} format={format} onChange={onChange} />
+    );
+    const { container, rerender } = render(ui('hh:mm:ss.uuu'));
+    const input = inputOf(container);
+    fireEvent.change(input, { target: { value: '00:00:05.000' } });
+    rerender(ui('seconds'));
+    expect(input.value).toBe('7');
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('blurs on Enter', () => {
     const { container } = render(<TimeInput id="t" label="Start" value={1} format="thousandths" />);
     const input = inputOf(container);

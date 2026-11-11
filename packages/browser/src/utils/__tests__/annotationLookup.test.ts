@@ -77,6 +77,16 @@ describe('annotation lookup: atTime', () => {
     }
   });
 
+  it('finds nothing for a NaN or infinite time, as find does', () => {
+    const list = ordered(8);
+    const lookup = createAnnotationLookup<Ann>();
+    expect(lookup.atTime(list, 2.5)?.id).toBe('a1'); // prime the cached hit
+    for (const time of [NaN, Infinity, -Infinity]) {
+      expect(lookup.atTime(list, time)).toBe(findAtTime(list, time));
+      expect(lookup.atTime(list, time)).toBeUndefined();
+    }
+  });
+
   it('prefers the first of two overlapping annotations, as find does', () => {
     // b is found first at t=3; at t=6 the earlier-indexed a also contains the time.
     const list: Ann[] = [

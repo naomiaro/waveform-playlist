@@ -29,19 +29,24 @@ export const TimeInput: React.FC<TimeInputProps> = ({
   readOnly = false,
 }) => {
   // Only an in-progress edit is state; otherwise the display is derived from the props.
-  const [draft, setDraft] = useState<string | null>(null);
-  const displayValue = draft ?? formatTime(value, format);
+  // The draft remembers the format it was typed in: text typed as hh:mm:ss must not
+  // be parsed as seconds, so a format change abandons the edit.
+  const [draft, setDraft] = useState<{ text: string; format: TimeFormat } | null>(null);
+  const activeDraft = draft?.format === format ? draft : null;
+  const displayValue = activeDraft?.text ?? formatTime(value, format);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDraft(e.target.value);
+    setDraft({ text: e.target.value, format });
   };
 
   const handleBlur = () => {
-    if (draft === null) return; // nothing was typed, so there is nothing to report
+    if (draft === null) return;
     // Dropping the draft returns the display to the formatted prop; the parent
     // decides whether the parsed value becomes the new prop.
     setDraft(null);
-    onChange?.(parseTime(draft, format));
+    // Nothing was typed in this format, so there is nothing to report.
+    if (activeDraft === null) return;
+    onChange?.(parseTime(activeDraft.text, format));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
