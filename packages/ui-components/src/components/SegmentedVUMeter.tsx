@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import styled from 'styled-components';
-import { normalizedToDb } from '@waveform-playlist/core';
+import { normalizedToDb, type MeterLevels, type MeterSource } from '@waveform-playlist/core';
 
 export interface ColorStop {
   dB: number;
@@ -8,7 +8,14 @@ export interface ColorStop {
 }
 
 export interface SegmentedVUMeterProps {
-  levels: number[];
+  /**
+   * A live meter (`useOutputMeter().meter`, `useMicrophoneLevel().meter`).
+   * The component draws each new value straight to the DOM and does not
+   * re-render for it. Takes precedence over `levels` / `peakLevels`.
+   */
+  meter?: MeterSource;
+  /** Per-channel levels (0-1) for a meter driven by props. */
+  levels?: number[];
   peakLevels?: number[];
   channelLabels?: string[];
   orientation?: 'vertical' | 'horizontal';
@@ -55,6 +62,45 @@ function getColorForDb(dB: number, colorStops: ColorStop[]): string {
   }
   return colorStops[colorStops.length - 1].color;
 }
+
+/** Index of the threshold closest to `dB`: where the peak marker sits. */
+function closestThresholdIndex(thresholds: number[], dB: number): number {
+  let index = -1;
+  let minDist = Infinity;
+  for (let i = 0; i < thresholds.length; i++) {
+    const dist = Math.abs(thresholds[i] - dB);
+    if (dist < minDist) {
+      minDist = dist;
+      index = i;
+    }
+  }
+  return index;
+}
+
+interface SegmentVisual {
+  backgroundColor: string;
+  opacity: string;
+  boxShadow: string;
+}
+
+/** The three style values that depend on a segment's state. */
+function segmentVisual(
+  active: boolean,
+  isPeak: boolean,
+  color: string,
+  coloredInactive: boolean
+): SegmentVisual {
+  return {
+    backgroundColor: isPeak ? PEAK_COLOR : active || coloredInactive ? color : INACTIVE_COLOR,
+    opacity: isPeak || active ? '1' : coloredInactive ? String(INACTIVE_OPACITY) : '1',
+    boxShadow: active || isPeak ? `0 0 4px ${isPeak ? PEAK_COLOR : color}40` : 'none',
+  };
+}
+
+const NO_LEVELS: number[] = [];
+const subscribeToNothing = () => () => {};
+/** Channel-count selector result when there is no `meter` prop. */
+const NO_METER = -1;
 
 function computeThresholds(segmentCount: number, dBRange: [number, number]): number[] {
   const safeCount = Math.max(2, segmentCount);
@@ -106,16 +152,7 @@ const Segment = styled.div.attrs<SegmentStyleProps>((props) => ({
     ...(props.$orientation === 'horizontal'
       ? { marginRight: `${props.$gap}px` }
       : { marginBottom: `${props.$gap}px` }),
-    backgroundColor: props.$isPeak
-      ? PEAK_COLOR
-      : props.$active || props.$coloredInactive
-        ? props.$color
-        : INACTIVE_COLOR,
-    opacity: props.$isPeak || props.$active ? 1 : props.$coloredInactive ? INACTIVE_OPACITY : 1,
-    boxShadow:
-      props.$active || props.$isPeak
-        ? `0 0 4px ${props.$isPeak ? PEAK_COLOR : props.$color}40`
-        : 'none',
+    ...segmentVisual(props.$active, props.$isPeak, props.$color, props.$coloredInactive),
   },
 }))<SegmentStyleProps>`
   border-radius: 1px;
@@ -200,8 +237,9 @@ const ScaleLabelHorizontal = styled.div.attrs<ScaleLabelHorizontalAllProps>((pro
 // --- Component ---
 
 const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
-  levels,
-  peakLevels,
+  meter,
+  levels: levelsProp,
+  peakLevels: peakLevelsProp,
   channelLabels,
   orientation = 'vertical',
   segmentCount = 24,
@@ -215,10 +253,38 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   labelColor,
   className,
 }) => {
-  const labels = channelLabels ?? getDefaultLabels(levels.length);
-  const resolvedLabelColor = labelColor ?? DEFAULT_LABEL_COLOR;
+  // With a meter, the only thing that re-renders this component is a change
+  // in the number of channels (a microphone's count is known once its stream
+  // is set up). Levels are drawn by the subscription further down.
+  // The source's functions are called as methods, so one written as a class works.
+  const subscribeToMeter = useCallback(
+    (onChange: () => void) => (meter ? meter.subscribe(onChange) : subscribeToNothing()),
+    [meter]
+  );
+  const getMeterChannelCount = useCallback(
+    () => (meter ? meter.getSnapshot().levels.length : NO_METER),
+    [meter]
+  );
+  const meterChannelCount = useSyncExternalStore(
+    subscribeToMeter,
+    getMeterChannelCount,
+    getMeterChannelCount
+  );
+  // Read during render so the first paint, and any later render, shows the
+  // same values the subscription last drew.
+  const meterSnapshot: MeterLevels | null = meter ? meter.getSnapshot() : null;
+  const levels = meterSnapshot ? meterSnapshot.levels : (levelsProp ?? NO_LEVELS);
+  const peakLevels = meterSnapshot ? meterSnapshot.peakLevels : peakLevelsProp;
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Set while a meter is attached: writes the current value to every segment.
+  const redrawRef = useRef<(() => void) | null>(null);
+  // The segments are remounted when the component switches between a meter and
+  // the `levels` prop, so nothing the subscription drew outlives the meter.
+  const sourceKey = meter ? 'meter' : 'props';
 
-  const channelCount = levels.length;
+  const channelCount = meter ? meterChannelCount : levels.length;
+  const labels = channelLabels ?? getDefaultLabels(channelCount);
+  const resolvedLabelColor = labelColor ?? DEFAULT_LABEL_COLOR;
 
   if (
     process.env.NODE_ENV !== 'production' &&
@@ -275,23 +341,75 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
     [thresholds, orientation]
   );
 
-  const renderChannel = (channelIndex: number) => {
-    const level = levels[channelIndex];
-    const levelDb = normalizedToDb(level);
-    const peakDb = peakLevels != null ? normalizedToDb(peakLevels[channelIndex]) : null;
+  // Both inputs are stable between level updates, so the colours are looked
+  // up once per threshold set rather than once per segment per frame.
+  const segmentColors = useMemo(
+    () => renderThresholds.map((threshold) => getColorForDb(threshold, colorStops)),
+    [renderThresholds, colorStops]
+  );
 
-    // Find closest threshold index for peak (in render order)
-    let peakSegmentIndex = -1;
-    if (peakDb != null) {
-      let minDist = Infinity;
-      for (let i = 0; i < renderThresholds.length; i++) {
-        const dist = Math.abs(renderThresholds[i] - peakDb);
-        if (dist < minDist) {
-          minDist = dist;
-          peakSegmentIndex = i;
+  // Draw each published value directly: only segments whose state changed are
+  // touched, and React does not render.
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!meter || !container) return;
+
+    const channels = Array.from(container.querySelectorAll<HTMLElement>('[data-channel]')).map(
+      (channel) => Array.from(channel.querySelectorAll<HTMLElement>('[data-segment]'))
+    );
+    // What each segment currently shows: bit 0 lit, bit 1 peak marker.
+    // 255 = unknown, so the first pass writes every segment.
+    const drawn = channels.map((segments) => new Uint8Array(segments.length).fill(255));
+
+    const draw = (value: MeterLevels) => {
+      for (let ch = 0; ch < channels.length; ch++) {
+        const segments = channels[ch];
+        const levelDb = normalizedToDb(value.levels[ch] ?? 0);
+        const peak = value.peakLevels[ch];
+        const peakIndex =
+          peak === undefined ? -1 : closestThresholdIndex(renderThresholds, normalizedToDb(peak));
+        for (let i = 0; i < segments.length; i++) {
+          const active = levelDb >= renderThresholds[i];
+          const isPeak = i === peakIndex;
+          const state = (active ? 1 : 0) | (isPeak ? 2 : 0);
+          if (drawn[ch][i] === state) continue;
+          drawn[ch][i] = state;
+          const segment = segments[i];
+          const visual = segmentVisual(active, isPeak, segmentColors[i], coloredInactive);
+          segment.style.backgroundColor = visual.backgroundColor;
+          segment.style.opacity = visual.opacity;
+          segment.style.boxShadow = visual.boxShadow;
+          segment.toggleAttribute('data-peak', isPeak);
         }
       }
-    }
+    };
+
+    redrawRef.current = () => {
+      for (const states of drawn) states.fill(255);
+      draw(meter.getSnapshot());
+    };
+    const unsubscribe = meter.subscribe((value) => draw(value));
+    return () => {
+      unsubscribe();
+      redrawRef.current = null;
+    };
+  }, [meter, channelCount, renderThresholds, segmentColors, coloredInactive, orientation]);
+
+  // After every commit, write the current value again. React only writes the
+  // styles that differ from its previous render, which is not always what the
+  // subscription last drew: a value published between a render and its commit
+  // would otherwise be overwritten by the older render's styles and stay
+  // wrong until that segment next changes.
+  useLayoutEffect(() => {
+    redrawRef.current?.();
+  });
+
+  const renderChannel = (channelIndex: number) => {
+    const level = levels[channelIndex] ?? 0;
+    const levelDb = normalizedToDb(level);
+    const peak = peakLevels?.[channelIndex];
+    const peakSegmentIndex =
+      peak === undefined ? -1 : closestThresholdIndex(renderThresholds, normalizedToDb(peak));
 
     return (
       <ChannelColumn key={channelIndex} $orientation={orientation} data-channel>
@@ -302,7 +420,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
           {renderThresholds.map((threshold, segIdx) => {
             const active = levelDb >= threshold;
             const isPeak = segIdx === peakSegmentIndex;
-            const color = getColorForDb(threshold, colorStops);
+            const color = segmentColors[segIdx];
 
             return (
               <Segment
@@ -316,7 +434,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
                 $orientation={orientation}
                 $coloredInactive={coloredInactive}
                 data-segment
-                {...(isPeak ? { 'data-peak': true } : {})}
+                {...(isPeak ? { 'data-peak': '' } : {})}
               />
             );
           })}
@@ -363,6 +481,8 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       // Horizontal: channels stacked vertically, scale below
       return (
         <MeterContainer
+          key={sourceKey}
+          ref={containerRef}
           className={className}
           $orientation={orientation}
           data-meter-orientation={orientation}
@@ -379,6 +499,8 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
 
     return (
       <MeterContainer
+        key={sourceKey}
+        ref={containerRef}
         className={className}
         $orientation={orientation}
         data-meter-orientation={orientation}
@@ -393,6 +515,8 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   // Single channel: channel on left, scale on right (vertical) or below (horizontal)
   return (
     <MeterContainer
+      key={sourceKey}
+      ref={containerRef}
       className={className}
       $orientation={orientation}
       data-meter-orientation={orientation}

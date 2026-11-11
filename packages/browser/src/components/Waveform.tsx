@@ -9,6 +9,7 @@ import { usePlaylistState } from '../WaveformPlaylistContext';
 import { useClipInteractionEnabled } from '../contexts/ClipInteractionContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
+import type { VisualizationRecordingState } from './visualizationLayout';
 import { PlaylistAnnotationList } from './PlaylistAnnotationList';
 
 export interface WaveformProps {
@@ -57,20 +58,7 @@ export interface WaveformProps {
    *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
   trackReordering?: boolean;
   // Live recording state for real-time waveform preview
-  recordingState?: {
-    isRecording: boolean;
-    trackId: string; // Which track is being recorded into
-    startSample: number; // Where recording started
-    durationSamples: number; // Current recording length
-    peaks: (Int8Array | Int16Array)[]; // Per-channel live peaks data
-    bits: 8 | 16; // Bit depth of peak values
-    /**
-     * Latency offset (seconds) to skip in the live preview. Absolute replacement
-     * for the auto-computed outputLatency + lookAhead value. Pass the same value
-     * given to useIntegratedRecording so preview and finalized clip match.
-     */
-    latencyOffset?: number;
-  };
+  recordingState?: VisualizationRecordingState;
 }
 
 /**

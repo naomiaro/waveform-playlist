@@ -22,6 +22,7 @@ const ROUTES = [
   '/examples/mobile-annotations',
   '/examples/mobile-multi-clip',
   '/examples/multi-clip',
+  '/examples/recording',
   '/examples/stem-tracks',
   '/examples/waveform-data',
 ];

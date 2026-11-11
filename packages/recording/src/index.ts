@@ -10,6 +10,7 @@ export {
   useMicrophoneAccess,
   useMicrophoneLevel,
   useIntegratedRecording,
+  useRecordingProgress,
 } from './hooks';
 export type {
   UseMicrophoneLevelOptions,

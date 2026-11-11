@@ -73,7 +73,7 @@ const normalized = gainToNormalized(rawPeak);
 
 ## Multi-Channel Recording Pipeline
 
-**Data flow:** Worklet sends `channels: Float32Array[]` → `useRecording` accumulates per-channel chunks in `recordedChunksRef[ch][]` → per-channel peaks in `(Int8Array | Int16Array)[]` → `useIntegratedRecording` passes through as `recordingPeaks` → `PlaylistVisualization` renders one `ChannelWithProgress` per channel.
+**Data flow:** Worklet sends `channels: Float32Array[]` → `useRecording` accumulates per-channel chunks in `recordedChunksRef[ch][]` → per-channel peaks in `(Int8Array | Int16Array)[]`, published in `progress` → `useIntegratedRecording` passes `progress` through → the visualization's `RecordingPreviewClip` subscribes and renders one `ChannelWithProgress` per channel.
 
 **Stream channel auto-detection:** `useRecording.startRecording()` reads `stream.getAudioTracks()[0].getSettings().channelCount` to match the mic's actual capability. The `channelCount` option is a fallback, not the primary source. Logs a warning when falling back.
 
@@ -87,9 +87,17 @@ const normalized = gainToNormalized(rawPeak);
 
 **Rule:** Never use `source.channelCount` to detect mic channels — it defaults to 2 per Web Audio spec, regardless of the mic's actual capability. Use `stream.getAudioTracks()[0].getSettings().channelCount` instead.
 
+## Levels and Progress Are Sources, Not State (#695)
+
+`useMicrophoneLevel` returns `{ meter, resetPeak, error }` and `useRecording` returns `progress` in place of `duration` and `peaks`; `useIntegratedRecording` passes both through. `meter` (`MeterSource`) and `progress` (`RecordingProgressSource`) are core `ValueSource`s with a stable identity, and none of the three hooks re-renders its component as they change. Before this, a component using `useIntegratedRecording` re-rendered from three independent ~60 Hz sources (meter messages, the duration rAF, peak messages).
+
+- **Meter:** each worklet message goes through core's `readMeterMessage` and is published at once. The held peak lives in the published snapshot (`resetPeak` publishes the same levels with the held peaks zeroed); the smoothed peak is a ref.
+- **Progress is published once per animation frame.** The worklet handler only writes `peaksRef` (a new outer array per message); the duration loop writes `durationRef` and calls `publishProgress`, which publishes `{ duration, peaks }` when either changed. So duration and peaks always arrive together, and several flushes in one frame are one notification. `pauseRecording` publishes once as it cancels the loop, and while paused a message that was already queued publishes directly. `startRecording` publishes the reset (duration 0, one empty array per stream channel) before `isRecording` turns true, and the stop path publishes the buffer's duration.
+- **Reading them:** `<SegmentedVUMeter meter={meter} />` and `<Waveform recordingState={{ …, progress }} />` subscribe themselves. For values in render, `useMeterLevels(meter)` (ui-components) and `useRecordingProgress(progress)` (here) are throttled state, 10 updates a second by default. In tests, `await` an animation frame before reading `progress.getSnapshot()` after a worklet message.
+
 ## Shared Duration Loop (useRecording)
 
-**Pattern:** `startDurationLoop` is a stable `useCallback([], [])` that runs a rAF loop reading from refs (`isRecordingRef`, `isPausedRef`, `startTimeRef`). Called by both `startRecording` (fresh start) and `resumeRecording` (adjusts `startTimeRef` before calling). Callers set `startTimeRef.current` before invoking.
+**Pattern:** `startDurationLoop` is a stable `useCallback` (its one dependency, `publishProgress`, is stable) that runs a rAF loop reading from refs (`isRecordingRef`, `isPausedRef`, `isStoppingRef`, `startTimeRef`) and publishing the progress once per frame. Called by both `startRecording` (fresh start) and `resumeRecording` (adjusts `startTimeRef` before calling). Callers set `startTimeRef.current` before invoking.
 
 ## No UI Component Exports
 
@@ -149,4 +157,4 @@ After `await Promise.race([stopAck, timeout])` resolves, drain the event-loop qu
 
 ## Freeze Duration rAF at Top of `stopRecording`
 
-The live preview's *width* in the React example is `duration * sampleRate` — driven by a rAF tick separate from the peaks. If the tick keeps running through the stop handshake/drain, the preview container keeps growing while peaks are skipped → empty peaks rendered into an ever-widening container. At the top of `stopRecording`: `isPausedRef.current = true` + `cancelAnimationFrame(animationFrameRef.current)`. The tick checks `isPausedRef` and returns without rescheduling.
+The live preview's *width* is `progress.duration * sampleRate`, written by the duration rAF tick. If the tick keeps running through the stop handshake/drain, the preview container keeps growing while peaks are skipped → empty peaks rendered into an ever-widening container. At the top of `stopRecording`: `isStoppingRef.current = true` + `cancelAnimationFrame(animationFrameRef.current)`. The tick checks `isStoppingRef` (and, separately, `isPausedRef`) and returns without rescheduling.

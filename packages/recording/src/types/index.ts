@@ -2,6 +2,8 @@
  * Types for the recording package
  */
 
+import type { RecordingProgressSource } from '@waveform-playlist/core';
+
 export interface RecordingState {
   isRecording: boolean;
   isPaused: boolean;
@@ -60,20 +62,17 @@ export interface UseRecordingReturn {
   // State
   isRecording: boolean;
   isPaused: boolean;
-  duration: number;
-  peaks: (Int8Array | Int16Array)[];
+  /**
+   * Elapsed time and live-preview peaks of the take. Its identity is stable
+   * for the life of the hook, and the hook does NOT re-render as they change
+   * (once per animation frame while recording). Pass it to
+   * `<Waveform recordingState={{ …, progress }} />`, call
+   * `progress.subscribe()`, or use `useRecordingProgress(progress)` for
+   * throttled React state. After a stop, `duration` is the recorded buffer's
+   * length; the next start resets both.
+   */
+  progress: RecordingProgressSource;
   audioBuffer: AudioBuffer | null;
-  /**
-   * @deprecated Always 0 — VU levels come from `useMicrophoneLevel`
-   * (meter-processor worklet), not this hook. Will be removed in the next
-   * major version.
-   */
-  level: number;
-  /**
-   * @deprecated Always 0 — use `useMicrophoneLevel`'s `peakLevel` instead.
-   * Will be removed in the next major version.
-   */
-  peakLevel: number;
 
   // Controls
   /** Start capturing. Resolves `true` when the capture pipeline actually

@@ -91,6 +91,8 @@ waveform-playlist/
 - **Utilities:**
   - `clipTimeHelpers.ts` — `clipStartTime`, `clipEndTime`, `clipOffsetTime`, `clipDurationTime`, `clipPixelWidth` (sample-to-seconds/pixel conversions)
   - `dBUtils.ts` — `dBToNormalized`, `normalizedToDb`, `gainToNormalized` (dB ↔ 0-1 conversions for VU meters)
+  - `valueSource.ts` — `ValueSource<T>` (`subscribe` + `getSnapshot`), `createValueSource()`, `MeterLevels`/`MeterSource`, `RecordingProgress`/`RecordingProgressSource`, `silentMeterLevels()` (values that change ~60 times a second and are kept out of UI state)
+  - `utils/meterLevels.ts` — `readMeterMessage()` (one meter-worklet message → `MeterLevels`; shared by `useOutputMeter` and `useMicrophoneLevel`)
   - `beatsAndBars.ts` — `PPQN` (192), `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid`, `ticksToBarBeatLabel`
   - `keyboard.ts` — `KeyboardShortcut` type, `handleKeyboardEvent()` (matches event to shortcut array), `getShortcutLabel()` (human-readable label from shortcut definition)
   - `spectrogramCanvasId.ts` — `buildSpectrogramCanvasId()`/`parseSpectrogramCanvasId()`: the canonical `${clipId}-ch${channelIndex}-chunk${chunkIndex}` canvas-ID contract, single-sourced here (zero-dependency, already a dependency of every producer/consumer) so `@waveform-playlist/spectrogram`, `@dawcore/spectrogram`, and the `<daw-spectrogram>` element can't drift on the format (#560)
@@ -182,7 +184,7 @@ const clip = createClipFromSeconds({
   │   ├── Selection.tsx          # Selection overlay
   │   ├── LoopRegion.tsx         # Loop region overlay
   │   ├── FadeOverlay.tsx        # Fade in/out visualization
-  │   ├── SegmentedVUMeter.tsx   # LED-style VU meter (multi-channel)
+  │   ├── SegmentedVUMeter.tsx   # LED-style VU meter (multi-channel; `meter` source or `levels` props)
   │   ├── ErrorBoundary.tsx      # PlaylistErrorBoundary (plain CSS)
   │   ├── AudioPosition.tsx      # Current time display
   │   ├── TimeInput.tsx          # Time value input
@@ -261,7 +263,8 @@ const clip = createClipFromSeconds({
   - `SpectrogramLabels` - Frequency axis labels
   - `FadeOverlay` - Fade in/out visualization
   - `LoopRegion` - Loop region overlay
-  - `SegmentedVUMeter` - LED-style VU meter (horizontal/vertical, multi-channel, configurable dB range/color stops/peak hold)
+  - `SegmentedVUMeter` - LED-style VU meter (horizontal/vertical, multi-channel, configurable dB range/color stops/peak hold). Takes a `MeterSource` (`meter` prop, drawn directly to the DOM) or `levels`/`peakLevels` props
+  - `useThrottledValue` / `useMeterLevels` (`src/hooks/useThrottledValue.ts`) - a `ValueSource` as React state, at most `updateRate` times a second
   - `PlaylistErrorBoundary` - Error boundary with plain CSS (no ThemeProvider dependency)
   - `TimeInput` / `SelectionTimeInputs` - Time value inputs
   - `TimeScale` / `SmartScale` - Timeline ruler (`getScaleInfo()` exported for grid calculations)
@@ -308,8 +311,9 @@ const clip = createClipFromSeconds({
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
   │   ├── useLoopState.ts               # Loop state (engine delegation + onEngineState)
   │   ├── useMasterVolume.ts            # Master volume (engine delegation + onEngineState)
-  │   ├── useOutputMeter.ts             # Master bus output VU metering via worklet
+  │   ├── useOutputMeter.ts             # Master bus output VU metering via worklet (returns a MeterSource)
   │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts
+  │   ├── useRecordingLayout.ts         # Channel count and stepped timeline end of a take in progress
   │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
   │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
   │   ├── useTimeFormat.ts              # Time formatting
@@ -498,7 +502,8 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   │   ├── useRecording.ts
   │   ├── useMicrophoneAccess.ts
   │   ├── useMicrophoneLevel.ts
-  │   └── useIntegratedRecording.ts
+  │   ├── useIntegratedRecording.ts
+  │   └── useRecordingProgress.ts
   ├── types/             # TypeScript types
   │   └── index.ts
   ├── utils/             # Utilities
@@ -528,15 +533,16 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 - **Hooks:**
   - `useIntegratedRecording` - Combined recording + track management (mic access, VU meter, clip creation)
-    - Returns: `isRecording`, `isPaused`, `duration`, `levels`, `peakLevels`, `rmsLevels`, `error`
+    - Returns: `isRecording`, `isPaused`, `meter` (`MeterSource`), `progress` (`RecordingProgressSource`), `error`
     - Methods: `startRecording()`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `requestMicAccess()`, `changeDevice()`
   - `useRecording` - Low-level recording lifecycle with AudioWorklet
-    - Returns: `isRecording`, `isPaused`, `duration`, `peaks`, `audioBuffer`
+    - Returns: `isRecording`, `isPaused`, `progress` (`RecordingProgressSource`: `{ duration, peaks }`), `audioBuffer`
     - Methods: `startRecording()`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`
   - `useMicrophoneAccess` - Device enumeration, permission handling, hot-plug detection
     - Returns: `stream`, `devices`, `hasPermission`, `requestAccess()`, `stopStream()`, `error`
   - `useMicrophoneLevel` - Real-time per-channel level monitoring via meter-processor worklet
-    - Returns: `level`, `peakLevel`, `levels`, `peakLevels`, `rmsLevels`, `resetPeak()`, `error`
+    - Returns: `meter` (`MeterSource`: `{ levels, peakLevels, rmsLevels }`), `resetPeak()`, `error`
+  - `useRecordingProgress` - A `RecordingProgressSource` as throttled React state (default 10 updates a second)
 
 - **Important Patterns:**
   1. **AudioWorklet Debugging** - console.log in worklets doesn't appear in browser console
@@ -946,7 +952,7 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useUndoState` - Undo/redo canUndo/canRedo (engine delegation + onEngineState)
 - `useZoomControls` - Zoom samplesPerPixel/canZoomIn/Out (engine delegation + onEngineState)
 - `useTimeFormat` - Time formatting and format selection
-- `useOutputMeter` - Master bus output VU metering via AudioWorklet
+- `useOutputMeter` - Master bus output VU metering via AudioWorklet (returns a `MeterSource`, not state)
 - `useWaveformDataCache` - Web worker peak generation and cache
 - `useDragSensors` - @dnd-kit sensor configuration
 

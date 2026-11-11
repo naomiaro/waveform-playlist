@@ -819,6 +819,59 @@ import { calculateDuration, clampSeekPosition, findClosestZoomIndex } from '@wav
 
 ## Recording (`@waveform-playlist/recording`)
 
+### Value sources (`@waveform-playlist/core`)
+
+Meter levels and recording progress change about 60 times a second. The hooks
+return them as a source, not as React state, so the component that calls the
+hook does not re-render when they change.
+
+```typescript
+interface ValueSource<T> {
+  /** Call listener with each new value. Returns the unsubscribe function. */
+  subscribe(listener: (value: T) => void): () => void;
+  /** The latest value. The same object is returned until the next change. */
+  getSnapshot(): T;
+}
+
+interface MeterLevels {
+  levels: number[];       // Per-channel smoothed peak levels (0-1)
+  peakLevels: number[];   // Per-channel held peak levels since the last reset (0-1)
+  rmsLevels: number[];    // Per-channel RMS levels (0-1)
+}
+type MeterSource = ValueSource<MeterLevels>;
+
+interface RecordingProgress {
+  duration: number;                   // Elapsed recording time in seconds
+  peaks: (Int8Array | Int16Array)[];  // Per-channel min/max peak pairs for the live preview
+}
+type RecordingProgressSource = ValueSource<RecordingProgress>;
+```
+
+Ways to read a source:
+
+```typescript
+// 1. Hand it to a component that draws it: no re-render of your component.
+<SegmentedVUMeter meter={meter} />
+<Waveform recordingState={{ isRecording: true, trackId, startSample, progress, bits: 16 }} />
+
+// 2. Throttled React state (default 10 updates per second).
+import { useMeterLevels, useThrottledValue } from '@waveform-playlist/ui-components';
+import { useRecordingProgress } from '@waveform-playlist/recording';
+
+function useThrottledValue<T>(source: ValueSource<T>, options?: { updateRate?: number }): T;
+function useMeterLevels(meter: MeterSource, options?: { updateRate?: number }): MeterLevels;
+function useRecordingProgress(
+  progress: RecordingProgressSource,
+  options?: { updateRate?: number }
+): RecordingProgress;
+
+// 3. Full-rate React state.
+const { levels } = useSyncExternalStore(meter.subscribe, meter.getSnapshot);
+
+// 4. Direct DOM or canvas drawing.
+useEffect(() => meter.subscribe(({ levels }) => draw(levels)), [meter]);
+```
+
 ### useIntegratedRecording
 
 ```typescript
@@ -849,12 +902,12 @@ interface IntegratedRecordingOptions {
 interface UseIntegratedRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
-  duration: number;
-  level: number;
-  peakLevel: number;
-  levels: number[];       // Per-channel peak levels (0-1); length = metered channel count
-  peakLevels: number[];   // Per-channel held peak levels (0-1)
-  rmsLevels: number[];    // Per-channel RMS levels (0-1)
+  /** Live microphone levels. Stable identity; the hook does not re-render as
+   *  they change. Array length = metered channel count. */
+  meter: MeterSource;
+  /** Elapsed time and live-preview peaks of the take. Stable identity; the
+   *  hook does not re-render as they change. Pass to <Waveform recordingState>. */
+  progress: RecordingProgressSource;
   error: Error | null;
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
@@ -868,7 +921,27 @@ interface UseIntegratedRecordingReturn {
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;   // Refused while recording (would record silence)
   changeDevice: (deviceId: string) => Promise<void>; // Refused while recording
-  recordingPeaks: (Int8Array | Int16Array)[];
+}
+```
+
+### useRecording
+
+```typescript
+function useRecording(stream: MediaStream | null, options?: RecordingOptions): UseRecordingReturn;
+
+interface UseRecordingReturn {
+  isRecording: boolean;
+  isPaused: boolean;
+  /** Elapsed time and live-preview peaks, published once per animation frame
+   *  while recording. After a stop, duration is the recorded buffer's length;
+   *  the next start resets both. */
+  progress: RecordingProgressSource;
+  audioBuffer: AudioBuffer | null;
+  startRecording: () => Promise<boolean>;
+  stopRecording: () => Promise<AudioBuffer | null>;
+  pauseRecording: () => void;
+  resumeRecording: () => void;
+  error: Error | null;
 }
 ```
 
@@ -909,11 +982,9 @@ function useMicrophoneLevel(
 ): UseMicrophoneLevelReturn;
 
 interface UseMicrophoneLevelReturn {
-  level: number;          // 0-1 peak level (max across channels)
-  peakLevel: number;      // 0-1 held peak with decay (max across channels)
-  levels: number[];       // Per-channel peak levels (0-1); length = detected mic channels (mono mirrored up to channelCount)
-  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
-  rmsLevels: number[];    // Per-channel RMS levels (0-1)
+  /** Live levels. Stable identity; the hook does not re-render as they change.
+   *  Array length = detected mic channels (mono repeated up to channelCount). */
+  meter: MeterSource;
   resetPeak: () => void;  // Reset held peaks
   error: Error | null;    // Meter setup error; cleared on successful re-setup
 }
@@ -957,10 +1028,11 @@ interface UseOutputMeterOptions {
 }
 
 interface UseOutputMeterReturn {
-  levels: number[];       // Per-channel peak output levels (0-1)
-  peakLevels: number[];   // Per-channel held peak levels with decay (0-1)
-  rmsLevels: number[];    // Per-channel RMS output levels (0-1)
+  /** Live output levels, one entry per channel. Stable identity; the hook
+   *  does not re-render as they change. */
+  meter: MeterSource;
   resetPeak: () => void;  // Reset all peak hold indicators
+  error: Error | null;    // Meter setup error
 }
 ```
 
@@ -973,7 +1045,12 @@ interface ColorStop {
 }
 
 interface SegmentedVUMeterProps {
-  levels: number[];
+  /** A live meter (useOutputMeter().meter, useMicrophoneLevel().meter). The
+   *  component draws each value straight to the DOM and does not re-render
+   *  for it. Takes precedence over levels / peakLevels. */
+  meter?: MeterSource;
+  /** Per-channel levels (0-1) for a meter driven by props. */
+  levels?: number[];
   peakLevels?: number[];
   channelLabels?: string[];
   orientation?: 'vertical' | 'horizontal';
@@ -984,6 +1061,8 @@ interface SegmentedVUMeterProps {
   segmentWidth?: number;
   segmentHeight?: number;
   segmentGap?: number;
+  coloredInactive?: boolean;
+  labelColor?: string;
   className?: string;
 }
 ```
@@ -1114,8 +1193,11 @@ interface WaveformProps {
     isRecording: boolean;
     trackId: string;
     startSample: number;
-    durationSamples: number;
-    peaks: (Int8Array | Int16Array)[];  // Per-channel live peaks
+    /** The take's elapsed time and per-channel preview peaks, from
+     *  useRecording / useIntegratedRecording. Only the preview clip follows
+     *  it frame by frame. While recording, the displayed timeline grows in
+     *  10-second steps. */
+    progress: RecordingProgressSource;
     bits: 8 | 16;                       // Bit depth of peak values
     /** Latency to skip in live preview, in seconds. Must match the latencyOffset passed to
      *  useIntegratedRecording so the preview aligns with the finalized clip.
