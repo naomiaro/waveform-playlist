@@ -401,10 +401,13 @@ Waveform Playlist supports common keyboard shortcuts:
 
 A shortcut does not fire for a key that the focused control uses itself:
 
-- Text fields, `<select>` dropdowns and `contenteditable` elements keep every key, however they got focus. A focused dropdown works as it does everywhere else: `Space` and the arrow keys open or change it.
+- Text fields, sliders, checkboxes and every other `<input>`, `<textarea>`, `<select>` dropdowns and `contenteditable` elements keep every key.
 - `Escape` closes an open modal dialog (`<dialog>` opened with `showModal()`, or an `aria-modal="true"` container) and does not also stop playback, wherever focus is.
-- `Space` and `Enter` activate a focused `<button>`, link or `<summary>`, and a focused slider, checkbox or other non-text `<input>` keeps every key, so every control can be operated with Tab and the keyboard.
-- The exception to the previous point is a control that got focus from a pointer click or drag: it keeps focus without having been navigated to, and `Space` is the transport key, so `Space` is still a shortcut there. `Enter` always goes to the focused control. Clicking Mute or dragging a volume slider, and then pressing `Space`, plays. Dropdowns are not part of this exception: after picking a value, click elsewhere (or press `Tab`) before using `Space` to play.
+- `Space` and `Enter` go to a focused `<button>`, link or `<summary>`.
+
+How the control got focus makes no difference. A control you clicked still has focus, so it behaves as it would on any other page: after clicking Mute, `Space` toggles Mute again; after picking a value from a dropdown, `Space` opens the dropdown. `Space` is play/pause when focus is not on a control. Click an empty part of the page, or press `Tab`, to move focus off one.
+
+The built-in Play, Pause and Stop buttons are disabled while they do not apply (Play while playing, for example), so focus leaves them when you click them and `Space` keeps working as play/pause.
 
 Elements that are only given a role (`<div role="button">`) are not covered: a shortcut still fires while one has focus.
 

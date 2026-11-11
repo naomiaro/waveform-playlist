@@ -2,8 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Keyboard shortcuts must not take a key that the focused control uses itself
- * (#710): Escape closes a modal dialog, and Space activates a button that was
- * reached with the keyboard.
+ * (#710): Escape closes a modal dialog, and Space goes to a focused button or
+ * dropdown, however it got focus.
  */
 
 const timeDisplay = (page: Page) => page.getByText(/\d{2}:\d{2}:\d{2}\.\d{3}/).first();
@@ -95,14 +95,29 @@ test.describe('Shortcuts and focused controls', () => {
       await expectNotPlaying(page);
     });
 
-    test('Space is still play/pause after clicking a button with the pointer', async ({ page }) => {
+    test('a clicked button still has focus, so Space activates it again', async ({ page }) => {
       const mute = page.getByRole('button', { name: 'Mute' }).first();
       await mute.click();
       await expect(mute).toHaveAttribute('aria-pressed', 'true');
+      await expect(mute).toBeFocused();
+
+      // Same as on any other page: Space goes to the focused button, not to play/pause.
+      await page.keyboard.press('Space');
+      await expect(mute).toHaveAttribute('aria-pressed', 'false');
+      await expectNotPlaying(page);
+    });
+
+    test('Space is play/pause once focus is off the control', async ({ page }) => {
+      const mute = page.getByRole('button', { name: 'Mute' }).first();
+      await mute.click();
+      await expect(mute).toHaveAttribute('aria-pressed', 'true');
+      // Clicking the Play button starts playback; it is disabled while playing,
+      // so focus returns to the page.
+      await page.getByRole('button', { name: 'Play', exact: true }).first().click();
+      await expectPlaying(page);
 
       await page.keyboard.press('Space');
-      await expectPlaying(page);
-      // The click's mute is untouched by the shortcut.
+      await expect(page.getByRole('button', { name: 'Play', exact: true }).first()).toBeEnabled();
       await expect(mute).toHaveAttribute('aria-pressed', 'true');
     });
   });

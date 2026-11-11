@@ -67,27 +67,10 @@ function matchesOr(element: Element, selector: string, fallback: boolean): boole
   }
 }
 
-/** `<input>` types that are not text entry: they use a few keys, not all of them. */
-const NON_TEXT_INPUT_TYPES = new Set([
-  'range',
-  'checkbox',
-  'radio',
-  'button',
-  'submit',
-  'reset',
-  'color',
-  'file',
-  'image',
-]);
-
-function isNonTextInput(element: Element): boolean {
-  return (
-    element.tagName === 'INPUT' &&
-    NON_TEXT_INPUT_TYPES.has((element.getAttribute('type') ?? 'text').toLowerCase())
-  );
-}
-
-/** Controls that take text or use most keys themselves: no shortcut fires on them. */
+/**
+ * Controls that take text or use many keys themselves (every `<input>` type,
+ * including sliders and checkboxes): no shortcut fires on them.
+ */
 function ownsAllKeys(element: Element): boolean {
   const tag = element.tagName;
   return (
@@ -136,99 +119,17 @@ function documentHasOpenModal(element: Element): boolean {
 }
 
 /**
- * How the focused element got focus. `:focus-visible` cannot answer this at
- * keydown time: Chromium makes the focused element match it as soon as any key
- * is pressed, so a button focused by a click matches during the very keydown
- * we are deciding about.
- *
- * `keyboardFocusedElement` is the element the user navigated to with the
- * keyboard (or that a script focused) and has not used a pointer since.
- */
-let pointerDownPath: EventTarget[] = [];
-let keyboardFocusedElement: EventTarget | null = null;
-const observedDocuments = new Map<Document, number>();
-
-function onPointerDown(event: Event): void {
-  pointerDownPath = event.composedPath();
-  // Any pointer use ends keyboard operation of the focused control, even when
-  // the press does not move focus (a drag whose pointerdown is cancelled).
-  keyboardFocusedElement = null;
-}
-
-function onFocusSourceKeyDown(): void {
-  // Focus that moves after a key press (Tab, arrow keys) is keyboard focus.
-  pointerDownPath = [];
-}
-
-function onFocusIn(event: Event): void {
-  const focused = event.composedPath()[0] ?? event.target;
-  // Pointer focus only when the pointer went down on the element itself (or
-  // inside it). Focus moved by script after a click elsewhere, such as the
-  // first item of a menu that was just opened, counts as keyboard focus.
-  const byPointer = focused !== null && pointerDownPath.includes(focused);
-  keyboardFocusedElement = byPointer ? null : focused;
-  pointerDownPath = [];
-}
-
-/**
- * Start recording whether focus arrives by pointer or by keyboard, so that
- * `handleKeyboardEvent` can let Space remain a shortcut on a button the user
- * merely clicked. Call it when shortcuts are set up and call the returned
- * function to stop. Safe to call more than once per document.
- *
- * Without it every focused button is treated as keyboard-focused: Space and
- * Enter always activate the button and never run a shortcut.
- */
-export function observeFocusSource(doc: Document = document): () => void {
-  const count = observedDocuments.get(doc) ?? 0;
-  observedDocuments.set(doc, count + 1);
-  if (count === 0) {
-    doc.addEventListener('pointerdown', onPointerDown, true);
-    doc.addEventListener('keydown', onFocusSourceKeyDown, true);
-    doc.addEventListener('focusin', onFocusIn, true);
-  }
-  let stopped = false;
-  return () => {
-    if (stopped) return;
-    stopped = true;
-    const remaining = (observedDocuments.get(doc) ?? 1) - 1;
-    if (remaining > 0) {
-      observedDocuments.set(doc, remaining);
-      return;
-    }
-    observedDocuments.delete(doc);
-    doc.removeEventListener('pointerdown', onPointerDown, true);
-    doc.removeEventListener('keydown', onFocusSourceKeyDown, true);
-    doc.removeEventListener('focusin', onFocusIn, true);
-    if (observedDocuments.size === 0) {
-      pointerDownPath = [];
-      keyboardFocusedElement = null;
-    }
-  };
-}
-
-/** The user is operating `element` from the keyboard (see `observeFocusSource`). */
-function isKeyboardOperated(element: Element): boolean {
-  // Not observing: assume keyboard, the accessible default.
-  return observedDocuments.size === 0 || element === keyboardFocusedElement;
-}
-
-/**
  * True when the key already means something to the control that has focus, so
  * a global shortcut must leave it alone:
  *
- * - text fields, `<select>` and contenteditable keep every key, however they
- *   got focus. A focused dropdown works as it does everywhere else: Space and
- *   the arrow keys open or change it;
+ * - `<input>` (every type), `<textarea>`, `<select>` and contenteditable keep
+ *   every key;
  * - Escape belongs to an open modal dialog, wherever focus is;
- * - Space and Enter belong to a focused `<button>`, link or `<summary>`, and
- *   every key belongs to a focused slider, checkbox or other non-text input.
+ * - Space and Enter belong to a focused `<button>`, link or `<summary>`.
  *
- * One exception, for Space only, and only for buttons, links, sliders and
- * checkboxes: one that got focus from a pointer click or drag keeps focus
- * without the user having navigated to it, and Space is the transport key, so
- * it stays a shortcut there. Clicking Mute or dragging a volume slider, and
- * then pressing Space, still plays. Enter always goes to the focused control.
+ * It makes no difference how the control got focus. A button the user clicked
+ * still has focus, so Space activates it again, exactly as it does on any
+ * other page; a shortcut only gets the key once focus is somewhere else.
  *
  * `handleKeyboardEvent` applies this itself. It is exported for listeners that
  * match keys on their own.
@@ -241,17 +142,8 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
   if (event.key === 'Escape' && (path.some(isOpenModal) || documentHasOpenModal(focused))) {
     return true;
   }
-
-  // Space on a control the user only clicked or dragged stays a shortcut.
-  const isPointerSpace = event.key === ' ' && !isKeyboardOperated(focused);
-
-  // Sliders and checkboxes keep every key (except that Space).
-  if (isNonTextInput(focused)) return !isPointerSpace;
   if (ownsAllKeys(focused)) return true;
-  if ((event.key === ' ' || event.key === 'Enter') && isActivatable(focused)) {
-    return !isPointerSpace;
-  }
-  return false;
+  return (event.key === ' ' || event.key === 'Enter') && isActivatable(focused);
 }
 
 /**
