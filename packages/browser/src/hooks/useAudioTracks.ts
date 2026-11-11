@@ -26,7 +26,8 @@ export interface AudioTrackConfig {
    * The id of the track built from this config. Optional: without it an id is
    * generated and kept for the config's position. Give one when the app needs
    * to refer to the track before it exists, e.g. in the provider's
-   * `trackEffects` lookup. Must be unique among the configs.
+   * `trackEffects` lookup. Must be unique among the configs: duplicates are
+   * warned about, not repaired. An empty string counts as no id.
    */
   id?: string;
   /** URL to audio file - used if audioBuffer not provided */

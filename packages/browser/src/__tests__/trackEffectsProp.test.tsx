@@ -8,7 +8,7 @@
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { TrackEffectsFunction } from '@waveform-playlist/playout';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
@@ -89,17 +89,23 @@ const Probe: React.FC = () => {
 };
 
 // What an app does: keep `tracks` in state, store what the provider reports.
+// `copyTracks` is what apps did before #752 to attach `effects` to each track.
 const App: React.FC<{
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
-}> = ({ trackEffects }) => {
+  copyTracks?: boolean;
+}> = ({ trackEffects, copyTracks = false }) => {
   const [tracks, setTracks] = useState<ClipTrack[]>(() => [
     makeTrack('t1', [makeClip('c1')]),
     makeTrack('t2', [makeClip('c2', SAMPLE_RATE * 8)]),
   ]);
   setAppTracks = setTracks;
+  const passed = useMemo(
+    () => (copyTracks ? tracks.map((track) => ({ ...track })) : tracks),
+    [tracks, copyTracks]
+  );
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      tracks={passed}
       onTracksChange={setTracks}
       sampleRate={SAMPLE_RATE}
       trackEffects={trackEffects}
@@ -142,6 +148,9 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(lookup('t2')).toBeUndefined();
   });
 
+  // Guards the design, not a regression: the provider must not implement the
+  // prop by attaching the function to the tracks it hands on (they come back
+  // through onTracksChange).
   it('does not put a function on the tracks it gives the engine or reports back', async () => {
     const reverb: TrackEffectsFunction = () => undefined;
     render(<App trackEffects={() => reverb} />);
@@ -174,6 +183,9 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(lookup('t1')).toBe(second);
   });
 
+  // The reason for the prop. This case passes with or without `trackEffects`
+  // (tracks passed through were always applied incrementally); the control
+  // case after it shows what copying the tracks costs.
   it('keeps one engine through clip edits and added tracks', async () => {
     const reverb: TrackEffectsFunction = () => undefined;
     render(<App trackEffects={() => reverb} />);
@@ -220,6 +232,27 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(adapter.setTracks).toHaveBeenCalledTimes(1);
   });
 
+  it('control: copied track objects rebuild the engine after every clip edit', async () => {
+    render(<App copyTracks />);
+    await waitFor(() => expect(isReady).toBe(true));
+    expect(h.createToneAdapter).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      engineRef.current!.moveClip('t1', 'c1', SAMPLE_RATE);
+    });
+    await settle();
+    await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(2));
+    expect(h.adapters[0].dispose).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      setAppTracks((tracks) => [...tracks, makeTrack('t3', [makeClip('c3')])]);
+    });
+    await settle();
+    await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(3));
+    expect(h.adapters[1].dispose).toHaveBeenCalledTimes(1);
+  });
+
+  // Checked by `pnpm typecheck` (vitest does not type-check).
   it('has no `effects` field on ClipTrack', () => {
     const track: ClipTrack = {
       ...makeTrack('t1', []),

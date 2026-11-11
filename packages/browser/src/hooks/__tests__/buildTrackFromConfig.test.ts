@@ -73,6 +73,18 @@ describe('buildTrackFromConfig', () => {
   });
 });
 
+describe('an empty config id', () => {
+  it('counts as no id: the generated one is used and kept', () => {
+    const ids = stableIds();
+    const config: AudioTrackConfig = { id: '', src: 'a.opus', name: 'A', duration: 5 };
+    const first = buildTrackFromConfig(config, 0, undefined, ids, 48000);
+    const second = buildTrackFromConfig(config, 0, undefined, ids, 48000);
+    expect(first?.id).not.toBe('');
+    expect(second?.id).toBe(first?.id);
+    expect(duplicateTrackIds([{ id: '' }, { id: '' }])).toEqual([]);
+  });
+});
+
 describe('duplicateTrackIds', () => {
   it('lists each config id that is used more than once', () => {
     expect(

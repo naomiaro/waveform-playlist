@@ -21,10 +21,15 @@ export interface ToneAdapterOptions {
   effects?: EffectsFunction;
   /**
    * Returns the effects function of a track, or `undefined` for none. Called
-   * with the track's id each time the adapter builds that track's audio graph
-   * (`setTracks`, `addTrack`, a MIDI track rebuilt by `updateTrack` or a
-   * SoundFont swap), so return the same function for the same id unless the
-   * chain should change at the next build.
+   * with the track's id each time the adapter builds that track's audio graph:
+   * `setTracks`, `addTrack`, a SoundFont swap, and an `updateTrack` that
+   * builds rather than edits in place (a MIDI half, or a track that had no
+   * audio clips before). An `updateTrack` that only changes the clips of an
+   * existing audio track keeps its graph and does not ask.
+   *
+   * Return the same function for the same id for as long as the track exists.
+   * A track with audio and MIDI clips can have its MIDI half rebuilt alone, so
+   * an answer that changes in between leaves the two halves disagreeing.
    */
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   /** When provided, MIDI clips use SoundFont sample playback instead of PolySynth */

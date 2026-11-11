@@ -83,7 +83,8 @@ export function buildTrackFromConfig(
   // Preserve stable IDs across rebuilds so React doesn't unmount/remount tracks.
   // An id given in the config always wins over the one generated for its index.
   const existingIds = stableIds.get(index);
-  const trackId = config.id ?? existingIds?.trackId ?? track.id;
+  // `||`: an empty string is no id (a falsy track id breaks every `if (id)`).
+  const trackId = config.id || existingIds?.trackId || track.id;
   const clipId = existingIds?.clipId ?? clip.id;
   if (!existingIds) {
     stableIds.set(index, { trackId: track.id, clipId });
@@ -97,7 +98,7 @@ export function duplicateTrackIds(configs: Pick<AudioTrackConfig, 'id'>[]): stri
   const seen = new Set<string>();
   const duplicates = new Set<string>();
   for (const { id } of configs) {
-    if (id === undefined) continue;
+    if (!id) continue;
     if (seen.has(id)) duplicates.add(id);
     seen.add(id);
   }

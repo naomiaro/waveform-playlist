@@ -239,6 +239,82 @@ describe('createToneAdapter', () => {
       expect(mockInstance.addTrack.mock.lastCall![0].effects).toBe(effectsFn);
     });
 
+    it('asks again when updateTrack builds a track that had no audio (a filled placeholder)', () => {
+      const effectsFn = vi.fn();
+      const trackEffects = vi.fn(() => effectsFn);
+      const adapter = createToneAdapter({ trackEffects });
+      adapter.setTracks([makeTrack('t1', [])]);
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      expect(mockInstance.addTrack).not.toHaveBeenCalled();
+
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.updateTrack!('t1', makeTrack('t1', [clip]));
+
+      expect(mockInstance.addTrack).toHaveBeenCalledTimes(1);
+      expect(mockInstance.addTrack.mock.lastCall![0].effects).toBe(effectsFn);
+    });
+
+    it('does not ask when updateTrack only replaces the clips of an audio track', () => {
+      const trackEffects = vi.fn(() => vi.fn());
+      const adapter = createToneAdapter({ trackEffects });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+      mockInstance.replaceTrackClips.mockReturnValue(true);
+      trackEffects.mockClear();
+
+      adapter.updateTrack!('t1', makeTrack('t1', [{ ...clip, startSample: 22050 }]));
+
+      expect(trackEffects).not.toHaveBeenCalled();
+      expect(mockInstance.addTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('asks again when updateTrack rebuilds a MIDI-only track', () => {
+      const effectsFn = vi.fn();
+      const adapter = createToneAdapter({ trackEffects: () => effectsFn });
+      const midiTrack = makeTrack('t1', [
+        makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 }),
+      ]);
+      adapter.setTracks([midiTrack]);
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+
+      adapter.updateTrack!('t1', midiTrack);
+
+      expect(mockInstance.addMidiTrack).toHaveBeenCalledTimes(2);
+      expect(mockInstance.addMidiTrack.mock.lastCall![0].effects).toBe(effectsFn);
+    });
+
+    it('asks again when a SoundFont swap rebuilds a MIDI track', () => {
+      const effectsFn = vi.fn();
+      const adapter = createToneAdapter({ trackEffects: () => effectsFn });
+      adapter.setTracks([
+        makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+      ]);
+      const mockInstance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0]
+        .value;
+
+      adapter.setSoundFontCache(loadedCache);
+
+      expect(mockInstance.addSoundFontTrack).toHaveBeenCalledTimes(1);
+      expect(mockInstance.addSoundFontTrack.mock.lastCall![0].effects).toBe(effectsFn);
+    });
+
+    it('asks again for the playout built after dispose', () => {
+      const effectsFn = vi.fn();
+      const adapter = createToneAdapter({ trackEffects: () => effectsFn });
+      const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([makeTrack('t1', [clip])]);
+      adapter.dispose();
+      adapter.setTracks([makeTrack('t1', [clip])]);
+
+      const results = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results;
+      expect(results).toHaveLength(2);
+      expect(results[1].value.addTrack.mock.lastCall![0].effects).toBe(effectsFn);
+    });
+
     it('ignores an `effects` field left on a track object', () => {
       const adapter = createToneAdapter();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
