@@ -70,6 +70,7 @@ export interface TrackState {
 
 import {
   BLOCKED,
+  playbackRefsValue,
   ActiveAnnotationContext,
   AnnotationEditingContext,
   AnnotationsContext,
@@ -1540,8 +1541,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Seek to a specific time - works whether playing or stopped
   const seekTo = useCallback(
     (time: number) => {
-      // Clamp time to valid range
-      const clampedTime = Math.max(0, Math.min(time, durationRef.current));
+      // Clamp to the audio. Where the transport may run past its end (an
+      // `indefinitePlayback` provider, a recording session) a finite time
+      // past the end is a valid position: Skip Backward from 30 s over 10 s
+      // of material must land at 25 s, not at 10 s. An infinite one
+      // (Fast Forward) still means the end of the audio.
+      const pastEndAllowed =
+        Number.isFinite(time) && (indefinitePlaybackRef.current || recordingActiveRef.current);
+      const upperLimit = pastEndAllowed ? Infinity : durationRef.current;
+      const clampedTime = Math.max(0, Math.min(time, upperLimit));
 
       // Update the current time state
       setCurrentTimeRefs(clampedTime);
@@ -1734,7 +1742,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Refs and stable functions: these two values never change. The first is
   // the part the MediaElement provider has too (#688).
   const refsValue: PlaybackRefsContextValue = useMemo(
-    () => ({ currentTimeRef, visualTimeRef, registerFrameCallback, unregisterFrameCallback }),
+    () =>
+      playbackRefsValue({
+        currentTimeRef,
+        visualTimeRef,
+        registerFrameCallback,
+        unregisterFrameCallback,
+      }),
     [currentTimeRef, visualTimeRef, registerFrameCallback, unregisterFrameCallback]
   );
 

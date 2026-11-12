@@ -26,6 +26,7 @@ import { useViewDefaults } from './providerInternals/useViewDefaults';
 import { useTimeFormat } from './hooks/useTimeFormat';
 import {
   BLOCKED,
+  playbackRefsValue,
   ActiveAnnotationContext,
   AnnotationEditingContext,
   AnnotationsContext,
@@ -195,6 +196,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [currentTime, setCurrentTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
+  // The speed the user chose, for a player that arrives later (see the init
+  // effect). Written by `setPlaybackRate` only.
+  const playbackRateRef = useRef(initialPlaybackRate);
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
@@ -446,6 +450,13 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
+        // The player was created at the `playbackRate` prop's speed. If the
+        // user has chosen another one since, this player replaces the one
+        // they chose it on: it plays at their speed, which is also what
+        // `usePlaybackRate()` (the speed select) goes on showing.
+        if (playbackRateRef.current !== initialPlaybackRate) {
+          playout.setPlaybackRate(playbackRateRef.current);
+        }
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own
@@ -726,7 +737,14 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // a range set during playback is played start to end, and a collapsed one
   // (a cursor move) carries on open-ended from there.
   const setSelection = useCallback(
-    (start: number, end: number) => {
+    (requestedStart: number, requestedEnd: number) => {
+      // Ordered and inside the audio, whoever asks: the highlight, the cursor
+      // and what Play plays must be one range (typed times can be reversed
+      // or past the end; the multitrack engine orders its pair too).
+      const length = latestAudioRef.current.waveformData.duration;
+      const clamp = (time: number) => Math.max(0, Math.min(time, length));
+      const start = clamp(Math.min(requestedStart, requestedEnd));
+      const end = clamp(Math.max(requestedStart, requestedEnd));
       const previous = selectionRef.current;
       if (previous.selectionStart !== start || previous.selectionEnd !== end) {
         selectionRef.current = { selectionStart: start, selectionEnd: end };
@@ -775,6 +793,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   const setPlaybackRate = useCallback((rate: number) => {
     const clampedRate = Math.max(0.5, Math.min(2.0, rate));
+    playbackRateRef.current = clampedRate;
     setPlaybackRateState(clampedRate);
     if (playoutRef.current) {
       playoutRef.current.setPlaybackRate(clampedRate);
@@ -801,12 +820,13 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Never changes. A media element reports the audible position, so the
   // position to draw is the playback position itself.
   const refsValue: PlaybackRefsContextValue = useMemo(
-    () => ({
-      currentTimeRef,
-      visualTimeRef: currentTimeRef,
-      registerFrameCallback,
-      unregisterFrameCallback,
-    }),
+    () =>
+      playbackRefsValue({
+        currentTimeRef,
+        visualTimeRef: currentTimeRef,
+        registerFrameCallback,
+        unregisterFrameCallback,
+      }),
     [registerFrameCallback, unregisterFrameCallback]
   );
 

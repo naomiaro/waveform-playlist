@@ -49,6 +49,7 @@ import {
   LoopButton,
 } from '../components/PlaybackControls';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
+import { usePlaybackShortcuts } from '../hooks/usePlaybackShortcuts';
 import {
   AudioPosition,
   AutomaticScrollCheckbox,
@@ -349,12 +350,17 @@ const useTimerFrames = () => {
   globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
 };
 
-const webAudio = (children: React.ReactNode, adapter = createFakeAdapter()) => (
+const webAudio = (
+  children: React.ReactNode,
+  adapter = createFakeAdapter(),
+  props: { indefinitePlayback?: boolean } = {}
+) => (
   <WaveformPlaylistProvider
     tracks={WEB_AUDIO_TRACKS}
     sampleRate={48000}
     samplesPerPixel={1024}
     createAdapter={() => adapter}
+    {...props}
   >
     {children}
   </WaveformPlaylistProvider>
@@ -998,5 +1004,192 @@ describe('the library transport under WaveformPlaylistProvider', () => {
       fireEvent.click(button('Skip Forward'));
     });
     await waitFor(() => expect(adapter.play).toHaveBeenCalledTimes(2));
+    // Each restart begins at the button's position, not just "again".
+    const lastStart = () => vi.mocked(adapter.play).mock.lastCall?.[0];
+    expect(lastStart()).toBe(1);
+    await act(async () => {
+      fireEvent.click(button('Fast Forward'));
+    });
+    await waitFor(() => expect(adapter.play).toHaveBeenCalledTimes(3));
+    expect(lastStart()).toBe(4);
+    await act(async () => {
+      fireEvent.click(button('Rewind'));
+    });
+    await waitFor(() => expect(adapter.play).toHaveBeenCalledTimes(4));
+    expect(lastStart()).toBe(0);
+  });
+});
+
+// Found by the review of the first version of this change; each behaviour was
+// chosen by the maintainer (2026-11-12).
+describe('review fixes', () => {
+  const MOVED = [
+    'playbackStartTimeRef',
+    'audioStartPositionRef',
+    'getPlaybackTime',
+    'getAudioContextTime',
+    'getLookAhead',
+    'getOutputLatency',
+    'playoutRef',
+    'isDraggingRef',
+  ] as const;
+
+  it('usePlaybackShortcuts throws under MediaElementPlaylistProvider, naming itself', () => {
+    const message = thrownBy(() => usePlaybackShortcuts(), mediaElement);
+    expect(message).toMatch(/^usePlaybackShortcuts needs WaveformPlaylistProvider/);
+  });
+
+  it('usePlaybackShortcuts still works under WaveformPlaylistProvider', () => {
+    expect(
+      thrownBy(
+        () => usePlaybackShortcuts(),
+        (child) => webAudio(child)
+      )
+    ).toBeNull();
+  });
+
+  it.each(MOVED)(
+    'reading %s from usePlaybackRefs() throws and names useEngineRefs, under either provider',
+    async (field) => {
+      useTimerFrames();
+      for (const wrap of [mediaElement, (child: React.ReactNode) => webAudio(child)]) {
+        const readers = makeReaders({ refs: usePlaybackRefs });
+        render(wrap(readers.children));
+        const refs = readers.values.refs as unknown as Record<string, unknown>;
+        expect(() => refs[field]).toThrow(
+          `${field} is no longer on usePlaybackRefs(): read it from useEngineRefs()`
+        );
+        // Not a field of the value: spreading or listing it does not trip the guard.
+        expect(Object.keys(refs).sort()).toEqual(SHARED_FIELDS.refs);
+        expect(() => ({ ...refs })).not.toThrow();
+        cleanup();
+      }
+    }
+  );
+
+  describe('seekTo past the end of the audio under WaveformPlaylistProvider (4 s of audio)', () => {
+    async function mountWebAudio(props: { indefinitePlayback?: boolean } = {}) {
+      useTimerFrames();
+      const readers = makeReaders({
+        controls: usePlaybackControls,
+        editor: useEditorControls,
+        currentTime: useCurrentTime,
+        timeline: usePlaylistTimeline,
+      });
+      render(
+        webAudio(
+          <>
+            <SkipBackwardButton skipAmount={5} />
+            <FastForwardButton />
+            {readers.children}
+          </>,
+          createFakeAdapter(),
+          props
+        )
+      );
+      await waitFor(() => expect(readers.values.timeline.isReady).toBe(true));
+      return readers;
+    }
+    const click = (name: string) =>
+      act(() => fireEvent.click(screen.getByRole('button', { name })));
+
+    it('is clamped to the end by default', async () => {
+      const readers = await mountWebAudio();
+      act(() => readers.values.controls.seekTo(30));
+      expect(readers.values.currentTime.currentTime).toBe(4);
+    });
+
+    it('is honoured with indefinitePlayback, so Skip Backward from 30 s lands at 25 s', async () => {
+      const readers = await mountWebAudio({ indefinitePlayback: true });
+      act(() => readers.values.controls.seekTo(30));
+      expect(readers.values.currentTime.currentTime).toBe(30);
+      click('Skip Backward');
+      expect(readers.values.currentTime.currentTime).toBe(25);
+      // Fast Forward still means the end of the audio.
+      click('Fast Forward');
+      expect(readers.values.currentTime.currentTime).toBe(4);
+      // Never before the start.
+      act(() => readers.values.controls.seekTo(-3));
+      expect(readers.values.currentTime.currentTime).toBe(0);
+    });
+
+    it('is honoured during a recording session, and clamped again after it', async () => {
+      const readers = await mountWebAudio();
+      act(() => readers.values.editor.setRecordingActive(true));
+      act(() => readers.values.controls.seekTo(30));
+      expect(readers.values.currentTime.currentTime).toBe(30);
+      click('Skip Backward');
+      expect(readers.values.currentTime.currentTime).toBe(25);
+      act(() => readers.values.editor.setRecordingActive(false));
+      act(() => readers.values.controls.seekTo(30));
+      expect(readers.values.currentTime.currentTime).toBe(4);
+    });
+  });
+
+  describe('setSelection under MediaElementPlaylistProvider (8 s of audio)', () => {
+    it('orders a reversed pair, so the highlight and Play agree', async () => {
+      const readers = makeReaders({
+        controls: usePlaybackControls,
+        selection: useSelection,
+        currentTime: useCurrentTime,
+      });
+      const fake = await mountMediaElement(
+        <>
+          <PlayButton />
+          {readers.children}
+        </>
+      );
+      act(() => readers.values.controls.setSelection(5, 2.5));
+      expect(readers.values.selection).toEqual({ selectionStart: 2.5, selectionEnd: 5 });
+      expect(readers.values.currentTime.currentTime).toBe(2.5);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+      });
+      expect(fake.play).toHaveBeenLastCalledWith(undefined, 2.5);
+      fake.time = 5.01;
+      await runFrame();
+      // It was a range: it ended by itself, cursor back at its start.
+      expect(readers.values.currentTime.currentTime).toBe(2.5);
+    });
+
+    it('clamps both times to the audio', async () => {
+      const readers = makeReaders({ controls: usePlaybackControls, selection: useSelection });
+      await mountMediaElement(readers.children);
+      act(() => readers.values.controls.setSelection(-2, 30));
+      expect(readers.values.selection).toEqual({ selectionStart: 0, selectionEnd: SECONDS });
+      act(() => readers.values.controls.setSelection(20, 30));
+      expect(readers.values.selection).toEqual({
+        selectionStart: SECONDS,
+        selectionEnd: SECONDS,
+      });
+    });
+  });
+
+  it('a replaced player is created at the speed the user chose, not at the prop', async () => {
+    const fakes: FakePlayout[] = [];
+    // The provider passes the rate to the factory's options only for the
+    // bundled engine; a custom playout is told through setPlaybackRate.
+    const createPlayout = () => {
+      const fake = createFakePlayout();
+      fakes.push(fake);
+      return fake as unknown as MediaElementPlayout;
+    };
+    const readers = makeReaders({ rate: usePlaybackRate });
+    const ui = (track: typeof TRACK) => (
+      <MediaElementPlaylistProvider track={track} createPlayout={createPlayout}>
+        {readers.children}
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(TRACK));
+    await waitFor(() => expect(fakes).toHaveLength(1));
+    await waitFor(() => expect(fakes[0].addTrack).toHaveBeenCalled());
+    act(() => readers.values.rate.setPlaybackRate(1.5));
+    expect(fakes[0].rate).toBe(1.5);
+
+    view.rerender(ui({ ...TRACK, name: 'Renamed' }));
+    await waitFor(() => expect(fakes).toHaveLength(2));
+    await waitFor(() => expect(fakes[1].addTrack).toHaveBeenCalled());
+    expect(readers.values.rate.playbackRate).toBe(1.5);
+    expect(fakes[1].rate).toBe(1.5);
   });
 });

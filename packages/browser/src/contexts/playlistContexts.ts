@@ -440,6 +440,42 @@ function useSlot<T>(context: React.Context<Slot<T>>, hookName: string, needs: st
 
 const EITHER = `${WEB_AUDIO} or ${MEDIA_ELEMENT}`;
 
+/** What `usePlaybackRefs()` returned until #688 and `useEngineRefs()` returns now. */
+const MOVED_TO_ENGINE_REFS: readonly (keyof EngineRefsContextValue)[] = [
+  'playbackStartTimeRef',
+  'audioStartPositionRef',
+  'getPlaybackTime',
+  'getAudioContextTime',
+  'getLookAhead',
+  'getOutputLatency',
+  'playoutRef',
+  'isDraggingRef',
+];
+
+/**
+ * INTERNAL: the value a provider puts in `PlaybackRefsContext`. `usePlaybackRefs()`
+ * kept its name when eight of its fields moved to `useEngineRefs()`, so a
+ * leftover `const { playoutRef } = usePlaybackRefs()` in plain JavaScript
+ * would read `undefined` and fail somewhere else, later. Each moved name is a
+ * getter that throws instead. The getters are not enumerable: the value still
+ * lists, spreads and compares as its four fields.
+ */
+export function playbackRefsValue(fields: PlaybackRefsContextValue): PlaybackRefsContextValue {
+  const value = { ...fields };
+  for (const name of MOVED_TO_ENGINE_REFS) {
+    Object.defineProperty(value, name, {
+      enumerable: false,
+      get() {
+        throw new Error(
+          `${name} is no longer on usePlaybackRefs(): read it from useEngineRefs() ` +
+            `(${WEB_AUDIO} only)`
+        );
+      },
+    });
+  }
+  return value;
+}
+
 /** `{ isPlaying }`. Re-renders on play, pause and stop. */
 export const useIsPlaying = () => useSlot(IsPlayingContext, 'useIsPlaying', EITHER);
 
@@ -560,6 +596,16 @@ export const usePlaybackRate = () => useSlot(PlaybackRateContext, 'usePlaybackRa
  */
 export const useMediaElementTrack = () =>
   useSlot(MediaElementTrackContext, 'useMediaElementTrack', MEDIA_ELEMENT);
+
+/**
+ * INTERNAL (not exported from the package): throws under
+ * MediaElementPlaylistProvider, in the name of a hook that reads only shared
+ * contexts but is not meant to run there. `usePlaybackShortcuts()` listens on
+ * the window; what keys do for the single-track player is not decided yet.
+ */
+export const useWebAudioProviderOnly = (hookName: string): void => {
+  useSlot(EditorControlsContext, hookName, WEB_AUDIO);
+};
 
 /**
  * INTERNAL (not exported from the package): the loop state, or `null` where

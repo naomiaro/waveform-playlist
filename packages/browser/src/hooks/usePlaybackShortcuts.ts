@@ -1,5 +1,9 @@
 import { useCallback } from 'react';
-import { usePlaybackControls, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useIsPlaying,
+  useWebAudioProviderOnly,
+} from '../contexts/playlistContexts';
 import { usePlayFromSelectionOrCursor } from './usePlayFromSelectionOrCursor';
 import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts';
 
@@ -62,6 +66,9 @@ export const usePlaybackShortcuts = (
 ): UsePlaybackShortcutsReturn => {
   const { enabled = true, additionalShortcuts = [], shortcuts: overrideShortcuts } = options;
 
+  // The keys act on the whole window, so this hook is not for a page that may
+  // hold several single-track players (maintainer's decision, #688).
+  useWebAudioProviderOnly('usePlaybackShortcuts');
   const { isPlaying } = useIsPlaying();
   const { seekTo, pause, stop } = usePlaybackControls();
   // Space starts playback exactly as the Play button does.
