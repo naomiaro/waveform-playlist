@@ -22,9 +22,14 @@ test.describe('Multi-Clip Example', () => {
   test('every track is an audio track (#756)', async ({ page }) => {
     const rows = page.locator('[data-track-row]');
     await expect(rows.first()).toBeVisible();
-    const total = await rows.count();
-    expect(total).toBeGreaterThan(0);
-    await expect(page.locator('[data-track-row][data-track-kind="audio"]')).toHaveCount(total);
+    // Retried as a whole: rows are still being added when the first one is
+    // visible, so a count read once can be one short of the next read.
+    await expect(async () => {
+      const total = await rows.count();
+      expect(total).toBeGreaterThan(0);
+      expect(await page.locator('[data-track-row][data-track-kind="audio"]').count()).toBe(total);
+      expect(await page.locator('[data-track-row]:not([data-track-kind="audio"])').count()).toBe(0);
+    }).toPass({ timeout: 10000 });
   });
 
   test.describe('Playhead Positioning', () => {
