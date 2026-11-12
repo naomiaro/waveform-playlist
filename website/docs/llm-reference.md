@@ -1582,9 +1582,9 @@ interface WaveformProps {
   className?: string;
   showClipHeaders?: boolean;      // Default: false
   gainScaledWaveforms?: boolean;  // Default: false. Draw each clip's waveform scaled by clip.gain (clamped)
-  interactiveClips?: boolean;     // Default: false
+  interactiveClips?: boolean;     // Default: false. Not needed under ClipInteractionProvider, which turns it on
   showFades?: boolean;
-  touchOptimized?: boolean;
+  touchOptimized?: boolean;       // Default: false. Wider clip trim handles. Not needed under <ClipInteractionProvider touchOptimized>; set it with your own DragDropProvider
   onRemoveTrack?: (trackIndex: number) => void;
   /** Enable vertical track reordering: a drag grip + move up/down buttons on
    *  each default track control panel. Drag requires ClipInteractionProvider;
@@ -1634,7 +1634,7 @@ import { ClipInteractionProvider } from '@waveform-playlist/browser';
 
 interface ClipInteractionProviderProps {
   snap?: boolean;                      // Default: false — enable snap-to-grid (auto-detects beats vs timescale from context)
-  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input
+  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input AND wider clip trim handles on descendant Waveforms
   children: React.ReactNode;
 }
 ```
@@ -1649,7 +1649,7 @@ import { useClipInteractionEnabled } from '@waveform-playlist/browser';
 function useClipInteractionEnabled(): boolean;
 ```
 
-Returns `true` when the component is inside a `ClipInteractionProvider`. Used internally by `Waveform` to auto-enable `interactiveClips`.
+Returns `true` when the component is inside a `ClipInteractionProvider`. The library does not need it: each clip reads the provider's context itself, which is what turns on `interactiveClips` (and, with `<ClipInteractionProvider touchOptimized>`, the wider trim handles) under the provider.
 
 ### KeyboardShortcuts
 

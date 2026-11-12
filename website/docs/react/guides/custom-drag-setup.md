@@ -298,6 +298,14 @@ const sensors = useDragSensors({ touchOptimized: true });
 
 This uses delay-based activation for touch events (distinguishes drag from scroll) while keeping distance-based activation for mouse/pen.
 
+The sensors do not change the size of the trim handles. With your own `DragDropProvider`, widen them with the `touchOptimized` prop of `Waveform`:
+
+```tsx
+<Waveform showClipHeaders interactiveClips touchOptimized />
+```
+
+`<ClipInteractionProvider touchOptimized>` does both by itself; the `Waveform` prop is only needed without it.
+
 ## Hook Reference
 
 ### `useDragSensors(options?)`

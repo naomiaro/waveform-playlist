@@ -42,7 +42,8 @@ The main visualization component that renders tracks and handles interactions.
 |------|------|---------|-------------|
 | `showClipHeaders` | `boolean` | `false` | Show clip name headers above waveforms |
 | `gainScaledWaveforms` | `boolean` | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height), so clips levelled with clip gain look the way they sound. Draw-time only — peaks are not regenerated |
-| `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips (requires @dnd-kit/react DragDropProvider setup) |
+| `interactiveClips` | `boolean` | `false` | Enable dragging/trimming interactions on clips. Not needed inside `ClipInteractionProvider`, which turns it on; set it when you use your own @dnd-kit/react `DragDropProvider` |
+| `touchOptimized` | `boolean` | `false` | Widen the clip trim handles for touch (24px instead of 8px). Not needed inside `<ClipInteractionProvider touchOptimized>`, which turns it on; set it when you use your own `DragDropProvider` with `useDragSensors({ touchOptimized: true })` |
 | `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
 | `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |
 | `trackReordering` | `boolean` | `false` | Show a drag grip + move up/down buttons on the default track control panel for vertical track reordering. Drag requires `ClipInteractionProvider`; the buttons work regardless |

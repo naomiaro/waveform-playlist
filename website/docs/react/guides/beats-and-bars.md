@@ -58,7 +58,7 @@ When `snap` is enabled, the provider reads from `BeatsAndBarsProvider` context:
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `snap` | `boolean` | `false` | Enable snap-to-grid (auto-detects beats vs timescale from context) |
-| `touchOptimized` | `boolean` | `false` | 250ms delay activation for touch input |
+| `touchOptimized` | `boolean` | `false` | 250ms delay activation for touch input, and wider clip trim handles |
 
 :::info Advanced: Manual DragDropProvider Setup
 
