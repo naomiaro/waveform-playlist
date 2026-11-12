@@ -37,10 +37,8 @@ import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistCo
 import { Waveform } from '../components/Waveform';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
-import {
-  ClipInteractionOptions,
-  useClipInteractionEnabled,
-} from '../contexts/ClipInteractionContext';
+// Through the package entry, so the export itself is covered.
+import { ClipInteractionOptions, useClipInteractionEnabled } from '../index';
 import { CLIP_BOUNDARY_WIDTH, CLIP_BOUNDARY_WIDTH_TOUCH } from '@waveform-playlist/ui-components';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -256,6 +254,56 @@ describe('clip interaction options have one source, the context (#690)', () => {
 
     expect(seen.props['clip-a']).toEqual({ touchOptimized: true, disableHeaderDrag: true });
     expect(enabledSeen).toBe(false);
+    expect(handleWidths(container)).toEqual([]);
+  });
+
+  it('touchOptimized without enabled, with nothing above: no trim handles at all', async () => {
+    const { container } = await mount((probe) => (
+      <ClipInteractionOptions touchOptimized>
+        {probe}
+        <Waveform showClipHeaders />
+      </ClipInteractionOptions>
+    ));
+
+    expect(seen.props['clip-a']).toEqual({ touchOptimized: true, disableHeaderDrag: true });
+    expect(handleWidths(container)).toEqual([]);
+  });
+
+  it('enabled switched on and off at runtime adds and removes the trim handles', async () => {
+    let enabled = false;
+    const { container, rerender } = await mount((probe) => (
+      <ClipInteractionOptions enabled={enabled}>
+        {probe}
+        <Waveform showClipHeaders />
+      </ClipInteractionOptions>
+    ));
+    expect(handleWidths(container)).toEqual([]);
+
+    enabled = true;
+    await act(async () => {
+      rerender();
+    });
+    expect(handleWidths(container)).toHaveLength(4);
+    expect(enabledSeen).toBe(true);
+
+    enabled = false;
+    await act(async () => {
+      rerender();
+    });
+    expect(handleWidths(container)).toEqual([]);
+    expect(enabledSeen).toBe(false);
+  });
+
+  it('the removed Waveform props are type errors and do nothing at runtime', async () => {
+    const { container } = await mount((probe) => (
+      <>
+        {probe}
+        {/* @ts-expect-error interactiveClips and touchOptimized were removed in #690 */}
+        <Waveform showClipHeaders interactiveClips touchOptimized />
+      </>
+    ));
+
+    expect(seen.props['clip-a']).toEqual({ touchOptimized: false, disableHeaderDrag: true });
     expect(handleWidths(container)).toEqual([]);
   });
 

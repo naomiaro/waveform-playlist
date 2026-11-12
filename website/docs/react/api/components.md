@@ -48,7 +48,14 @@ The main visualization component that renders tracks and handles interactions.
 
 Note: The `timescale` prop is set on `WaveformPlaylistProvider`, not on `Waveform`.
 
-Note: whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, is not a `Waveform` prop. Wrap the `Waveform` in `ClipInteractionProvider`, or, with your own `DragDropProvider`, in [`ClipInteractionOptions`](/docs/react/guides/custom-drag-setup#clipinteractionoptions).
+Note: whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, is not a `Waveform` prop. Wrap the `Waveform` in `ClipInteractionProvider`, or, with your own `DragDropProvider`, in `ClipInteractionOptions`:
+
+| `ClipInteractionOptions` prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled` | `boolean` | inherited, `false` at the top | Clips below can be dragged and trimmed |
+| `touchOptimized` | `boolean` | inherited, `false` at the top | Clips below get 24px trim handles instead of 8px |
+
+See [Custom Drag Setup](/docs/react/guides/custom-drag-setup#clipinteractionoptions).
 
 ### Usage
 
