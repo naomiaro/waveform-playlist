@@ -9,10 +9,9 @@ import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-libra
 import React from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaybackAnimation,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaylistState,
+  usePlaylistTimeline,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import { PlayButton } from '../components/PlaybackControls';
@@ -118,10 +117,9 @@ interface Probe {
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { setSelection, setCurrentTime, setLoopEnabled, stop, pause } = usePlaylistControls();
-  const { isReady } = usePlaylistData();
-  usePlaylistState();
+  const { isReady } = usePlaylistTimeline();
   probe = { isReady, isPlaying, setSelection, setCurrentTime, setLoopEnabled, stop, pause };
   return null;
 };

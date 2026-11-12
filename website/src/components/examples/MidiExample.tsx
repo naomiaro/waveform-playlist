@@ -17,8 +17,8 @@ import {
   ClearAllButton,
   AudioPosition,
   KeyboardShortcuts,
-  usePlaylistState,
   usePlaylistControls,
+  usePlaylistSettings,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -165,7 +165,7 @@ const StyledDropZone = styled(FileDropZone)`
 `;
 
 function AutoScrollToggle() {
-  const { isAutomaticScroll } = usePlaylistState();
+  const { isAutomaticScroll } = usePlaylistSettings();
   const { setAutomaticScroll } = usePlaylistControls();
 
   return (

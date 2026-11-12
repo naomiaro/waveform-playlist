@@ -310,13 +310,13 @@ useEffect(() => {
 
 ### React Hook
 
-Access the `isReady` state from the `usePlaylistData()` hook:
+Access the `isReady` state from the `usePlaylistTimeline()` hook:
 
 ```tsx
-import { usePlaylistData } from '@waveform-playlist/browser';
+import { usePlaylistTimeline } from '@waveform-playlist/browser';
 
 function LoadingIndicator() {
-  const { isReady, tracks } = usePlaylistData();
+  const { isReady, tracks } = usePlaylistTimeline();
 
   if (!isReady) {
     return <div>Loading tracks...</div>;

@@ -5,9 +5,11 @@ import { useClipSplitting } from '../hooks/useClipSplitting';
 import { useAnnotationKeyboardControls } from '../hooks/useAnnotationKeyboardControls';
 import {
   useActiveAnnotation,
-  usePlaylistData,
-  usePlaylistState,
   usePlaylistControls,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  usePlaybackRefs,
+  usePlaylistAnnotations,
 } from '../WaveformPlaylistContext';
 
 export interface KeyboardShortcutsProps {
@@ -43,8 +45,10 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   additionalShortcuts = [],
 }) => {
   // Clip splitting setup
-  const { tracks, samplesPerPixel, playoutRef, duration } = usePlaylistData();
-  const { annotations: annotationList, linkEndpoints, continuousPlay } = usePlaylistState();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { tracks, duration } = usePlaylistTimeline();
+  const { playoutRef } = usePlaybackRefs();
+  const { annotations: annotationList, linkEndpoints, continuousPlay } = usePlaylistAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play, undo, redo } =
     usePlaylistControls();

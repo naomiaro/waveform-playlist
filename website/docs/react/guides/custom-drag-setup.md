@@ -25,7 +25,9 @@ For standard clip interactions, use `ClipInteractionProvider` instead — it eli
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import {
-  usePlaylistData,
+  usePlaylistView,      // Only for the snap examples (sampleRate)
+  usePlaylistZoom,
+  usePlaybackRefs,
   usePlaylistControls,
   useClipDragHandlers,
   useDragSensors,
@@ -42,7 +44,8 @@ The minimal setup for interactive clips with collision detection:
 
 ```tsx
 function PlaylistWithDrag({ tracks, onTracksChange }) {
-  const { samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { playoutRef, isDraggingRef } = usePlaybackRefs();
   const { setSelectedTrackId } = usePlaylistControls();
 
   // Configure drag sensors (pointer activation with 1px distance threshold)
@@ -116,7 +119,9 @@ import {
 import { useBeatsAndBars } from '@waveform-playlist/ui-components';
 
 function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
-  const { samplesPerPixel, sampleRate, playoutRef, isDraggingRef } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { playoutRef, isDraggingRef } = usePlaybackRefs();
   const beatsAndBars = useBeatsAndBars();
 
   const { bpm, timeSignature, snapTo } = beatsAndBars;
@@ -356,8 +361,8 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 | `tracks` | `ClipTrack[]` | Yes | Current tracks state |
 | `onTracksChange` | `(tracks: ClipTrack[]) => void` | Yes | Callback when tracks change |
 | `samplesPerPixel` | `number` | Yes | Current zoom level |
-| `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `usePlaylistData().playoutRef` |
-| `isDraggingRef` | `MutableRefObject<boolean>` | Yes | Drag state ref from `usePlaylistData().isDraggingRef` |
+| `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `usePlaybackRefs().playoutRef` |
+| `isDraggingRef` | `MutableRefObject<boolean>` | Yes | Drag state ref from `usePlaybackRefs().isDraggingRef` |
 | `snapSamplePosition` | `(sample: number) => number` | No | Snap function for boundary trims |
 
 ### `ClipCollisionModifier.configure(options)`

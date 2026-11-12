@@ -24,13 +24,17 @@ import {
   // custom versions that are disabled during recording
   AudioPosition,
   ClipInteractionProvider,
-  usePlaybackAnimation,
   useCurrentTime,
-  usePlaylistData,
   usePlaylistControls,
-  usePlaylistState,
   useSelection,
   KeyboardShortcuts,
+  usePlaylistView,
+  usePlaylistSettings,
+  usePlaylistZoom,
+  usePlaybackRefs,
+  useLoop,
+  useSelectedTrackId,
+  useIsPlaying,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
@@ -165,15 +169,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   setSelectedTrackId,
   onAddTrack,
 }) => {
-  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   const { currentTime } = useCurrentTime();
-  const { sampleRate, samplesPerPixel, controls } = usePlaylistData();
+  const { sampleRate, controls } = usePlaylistView();
+  const { isAutomaticScroll } = usePlaylistSettings();
+  const { samplesPerPixel } = usePlaylistZoom();
   const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo, setRecordingActive } = usePlaylistControls();
-  const {
-    isAutomaticScroll,
-    isLoopEnabled,
-    selectedTrackId: providerSelectedTrackId,
-  } = usePlaylistState();
+  const { isLoopEnabled } = useLoop();
+  const { selectedTrackId: providerSelectedTrackId } = useSelectedTrackId();
   const { selectionStart, selectionEnd } = useSelection();
 
   // Sync local → provider when local state changes (e.g. auto-create track)

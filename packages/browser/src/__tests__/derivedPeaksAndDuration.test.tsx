@@ -15,7 +15,7 @@ import { createPeaksWorker } from '../workers/peaksWorker';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
-import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider, usePlaylistTimeline } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -91,14 +91,14 @@ function createFakeAdapter(): PlayoutAdapter {
   } as unknown as PlayoutAdapter;
 }
 
-type Data = ReturnType<typeof usePlaylistData>;
+type Data = ReturnType<typeof usePlaylistTimeline>;
 
-// Every render of the data consumer, in order. A render in which the peaks or
+// Every render of the timeline consumer, in order. A render in which the peaks or
 // the duration disagree with the tracks it was given is a stale render.
 let renders: Data[] = [];
 
 const ProbeChild: React.FC = () => {
-  renders.push(usePlaylistData());
+  renders.push(usePlaylistTimeline());
   return null;
 };
 

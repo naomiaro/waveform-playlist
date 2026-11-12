@@ -11,7 +11,7 @@ import React from 'react';
 import {
   WaveformPlaylistProvider,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistTimeline,
 } from '../WaveformPlaylistContext';
 import {
   AnnotationIntegrationContext,
@@ -98,11 +98,11 @@ const INTEGRATION = { AnnotationText: FakeAnnotationText } as unknown as Annotat
 
 let probe: {
   controls: ReturnType<typeof usePlaylistControls>;
-  data: ReturnType<typeof usePlaylistData>;
+  data: ReturnType<typeof usePlaylistTimeline>;
 };
 
 const ProbeChild: React.FC = () => {
-  probe = { controls: usePlaylistControls(), data: usePlaylistData() };
+  probe = { controls: usePlaylistControls(), data: usePlaylistTimeline() };
   return null;
 };
 

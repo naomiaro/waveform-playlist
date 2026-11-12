@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
-  usePlaybackAnimation,
   usePlaylistControls,
-  usePlaylistState,
   useSelection,
+  usePlaybackRefs,
+  useLoop,
 } from '../WaveformPlaylistContext';
 
 /**
@@ -20,9 +20,9 @@ import {
  * loop state when it is called.
  */
 export function usePlayFromSelectionOrCursor(): () => Promise<void> {
-  const { currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
   const { selectionStart, selectionEnd } = useSelection();
-  const { isLoopEnabled } = usePlaylistState();
+  const { isLoopEnabled } = useLoop();
   const { play } = usePlaylistControls();
 
   const latest = useRef({ selectionStart, selectionEnd, isLoopEnabled });

@@ -387,7 +387,7 @@ Bypassed effects are left out of a WAV export.
 Pass the offline effects functions to `useExportWav()` or `ExportWavButton`. Both hooks always return a function, the same one on every call, and it reads the chain when the export runs. With no active effect it passes the audio straight through.
 
 ```tsx
-import { usePlaylistData } from '@waveform-playlist/browser';
+import { usePlaylistTimeline, usePlaylistMixer } from '@waveform-playlist/browser';
 import {
   useExportWav,
   type UseDynamicEffectsReturn,
@@ -404,7 +404,8 @@ function ExportButton({
   masterFx: UseDynamicEffectsReturn;
   trackFx: UseTrackDynamicEffectsReturn;
 }) {
-  const { tracks, trackStates } = usePlaylistData();
+  const { tracks } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { exportWav, isExporting } = useExportWav();
 
   const handleExport = async () => {

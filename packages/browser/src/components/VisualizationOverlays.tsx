@@ -15,11 +15,14 @@ import {
 import {
   useActiveAnnotation,
   useCurrentTime,
-  usePlaybackAnimation,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaylistState,
   useSelection,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaybackRefs,
+  usePlaylistAnnotations,
+  useLoop,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
@@ -30,7 +33,8 @@ import { AnnotationBoxes } from './AnnotationBoxes';
 export const SelectionOverlay: React.FC = () => {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { selectionStart, selectionEnd } = useSelection();
-  const { sampleRate, samplesPerPixel } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   if (selectionStart === selectionEnd) return null;
 
@@ -55,14 +59,14 @@ const CustomPlayhead: React.FC<{
   sampleRate: number;
 }> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
   const {
-    isPlaying,
     currentTimeRef,
     visualTimeRef,
     playbackStartTimeRef,
     audioStartPositionRef,
     getPlaybackTime,
     getAudioContextTime,
-  } = usePlaybackAnimation();
+  } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only, so a seek while stopped moves a custom
   // playhead: the position below comes from the refs.
   useCurrentTime();
@@ -95,9 +99,10 @@ export interface PlayheadOverlayProps {
 /** The playhead: shown while playing, and at rest when no range is selected. */
 export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { selectionStart, selectionEnd } = useSelection();
-  const { sampleRate, samplesPerPixel } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   if (!isPlaying && selectionStart !== selectionEnd) return null;
 
@@ -128,10 +133,11 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
   width,
   getAnnotationBoxLabel,
 }) => {
-  const { annotations, annotationsEditable, continuousPlay } = usePlaylistState();
+  const { annotations, annotationsEditable, continuousPlay } = usePlaylistAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setActiveAnnotationId, play, annotationPreview } = usePlaylistControls();
-  const { sampleRate, samplesPerPixel } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
   // While an edge is dragged with the preview, the boxes follow the drag.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
@@ -176,9 +182,10 @@ export interface LoopRegionOverlayProps {
 /** The draggable loop region in the timescale. Renders nothing while looping is off. */
 export const LoopRegionOverlay: React.FC<LoopRegionOverlayProps> = ({ maxPosition }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
-  const { isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { setLoopRegion } = usePlaylistControls();
-  const { sampleRate, samplesPerPixel } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   if (!isLoopEnabled) return null;
 

@@ -46,7 +46,7 @@ vi.mock('../hooks/useDragSensors', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider, usePlaylistTimeline } from '../WaveformPlaylistContext';
 import { Waveform } from '../components/Waveform';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
@@ -130,7 +130,7 @@ function createFakeAdapter(): PlayoutAdapter {
 let isReady = false;
 let enabledSeen: boolean | null = null;
 const ReadyProbe: React.FC = () => {
-  isReady = usePlaylistData().isReady;
+  isReady = usePlaylistTimeline().isReady;
   enabledSeen = useClipInteractionEnabled();
   return null;
 };

@@ -231,7 +231,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
           zoomLevels: [samplesPerPixel],
           waveHeight,
           timeScaleHeight,
-          duration: duration * 1000,
           controls,
           barWidth,
           barGap,
@@ -248,7 +247,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
           onTracksMouseDown={handleMouseDown}
           scrollContainerRef={handleScrollContainerRef}
           isSelecting={isSelecting}
-          timescale={timeScaleHeight > 0 ? <SmartScale /> : undefined}
+          timescale={timeScaleHeight > 0 ? <SmartScale durationMs={duration * 1000} /> : undefined}
         >
           <>
             {peaksDataArray.map((trackClipPeaks, trackIndex) => {

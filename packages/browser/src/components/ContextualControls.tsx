@@ -9,18 +9,19 @@ import {
 import styled from 'styled-components';
 import {
   useCurrentTime,
-  usePlaybackAnimation,
-  usePlaylistState,
   useSelection,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistSettings,
+  usePlaylistMixer,
+  usePlaybackRefs,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 
 /**
  * Master volume control that uses the playlist context
  */
 export const MasterVolumeControl: React.FC<{ className?: string }> = ({ className }) => {
-  const { masterVolume } = usePlaylistData();
+  const { masterVolume } = usePlaylistMixer();
   const { setMasterVolume } = usePlaylistControls();
 
   return (
@@ -36,7 +37,7 @@ export const MasterVolumeControl: React.FC<{ className?: string }> = ({ classNam
  * Time format selector that uses the playlist context
  */
 export const TimeFormatSelect: React.FC<{ className?: string }> = ({ className }) => {
-  const { timeFormat } = usePlaylistData();
+  const { timeFormat } = usePlaylistSettings();
   const { setTimeFormat } = usePlaylistControls();
 
   return <BaseTimeFormatSelect value={timeFormat} onChange={setTimeFormat} className={className} />;
@@ -57,11 +58,11 @@ const PositionDisplay = styled.span`
  */
 export const AudioPosition: React.FC<{ className?: string }> = ({ className }) => {
   const timeRef = useRef<HTMLSpanElement>(null);
-  const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
-    usePlaybackAnimation();
+  const { currentTimeRef, registerFrameCallback, unregisterFrameCallback } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only: what is shown comes from the ref.
   useCurrentTime();
-  const { timeFormat: format } = usePlaylistData();
+  const { timeFormat: format } = usePlaylistSettings();
 
   // Register per-frame callback during playback — uses raw time for display
   useEffect(() => {
@@ -112,7 +113,7 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
  * Uses split contexts to avoid re-rendering during animation
  */
 export const AutomaticScrollCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { isAutomaticScroll } = usePlaylistState();
+  const { isAutomaticScroll } = usePlaylistSettings();
   const { setAutomaticScroll } = usePlaylistControls();
 
   return (

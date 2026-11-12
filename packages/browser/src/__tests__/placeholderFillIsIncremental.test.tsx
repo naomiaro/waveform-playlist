@@ -10,8 +10,9 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaylistData,
-  usePlaylistState,
+  usePlaylistTimeline,
+  usePlaylistMixer,
+  useUndoRedo,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -75,8 +76,9 @@ let probe: {
 };
 
 const ProbeChild: React.FC = () => {
-  const { trackStates, isReady } = usePlaylistData();
-  const { canUndo } = usePlaylistState();
+  const { isReady } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
+  const { canUndo } = useUndoRedo();
   probe = { trackStates, isReady, canUndo };
   return null;
 };

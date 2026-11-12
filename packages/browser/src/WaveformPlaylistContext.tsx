@@ -93,8 +93,22 @@ export interface FrameData {
   readonly samplesPerPixel: number;
 }
 
-export interface PlaybackAnimationContextValue {
+/**
+ * Whether playback is running. Its own context (#768): it is the only value of
+ * the playback state that changes on play, pause and stop, and a component
+ * that needs a ref or a frame callback (`usePlaybackRefs`) must not re-render
+ * with it.
+ */
+export interface IsPlayingContextValue {
   isPlaying: boolean;
+}
+
+/**
+ * Refs and functions that keep their identity for the life of the provider
+ * (#768). Reading this never causes a re-render: read a ref's `.current` in an
+ * event handler, an effect or a frame callback, not during render.
+ */
+export interface PlaybackRefsContextValue {
   currentTimeRef: React.RefObject<number>;
   /**
    * Visually-aligned playback time (engine.getAudibleTime() while playing;
@@ -125,28 +139,40 @@ export interface PlaybackAnimationContextValue {
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
   /** Unregister a per-frame callback. */
   unregisterFrameCallback: (id: string) => void;
+  /** The engine. `current` is null until the first build and during a rebuild. */
+  playoutRef: React.RefObject<PlaylistEngine | null>;
+  /** Ref set by useClipDragHandlers during boundary trim drags.
+   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
+  isDraggingRef: React.MutableRefObject<boolean>;
 }
 
-export interface PlaylistStateContextValue {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  annotationsEditable: boolean;
-  isAutomaticScroll: boolean;
-  isLoopEnabled: boolean;
+/**
+ * Annotations and the annotation settings (#768). Changes on an annotation
+ * edit and on a settings toggle; an edge drag that uses the preview source
+ * changes it once, on release.
+ */
+export interface PlaylistAnnotationsContextValue {
   annotations: AnnotationData[];
-  selectedTrackId: string | null; // ID of currently selected track for editing operations
-  // Loop region (separate from selection) - Audacity-style loop points
+  annotationsEditable: boolean;
+  linkEndpoints: boolean;
+  continuousPlay: boolean;
+}
+
+/** Loop region (separate from selection), Audacity-style loop points (#768). */
+export interface LoopContextValue {
+  isLoopEnabled: boolean;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback continues past the end of loaded audio instead of
-   *  auto-stopping (implies the fillViewport layout) */
-  indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container even when the
-   *  audio is shorter (layout only — no effect on playback) */
-  fillViewport: boolean;
-  /** Whether undo is available */
+}
+
+/** The track selected for editing operations (#768). */
+export interface SelectedTrackIdContextValue {
+  selectedTrackId: string | null;
+}
+
+/** Whether undo and redo are available (#768). Changes after an edit. */
+export interface UndoRedoContextValue {
   canUndo: boolean;
-  /** Whether redo is available */
   canRedo: boolean;
 }
 
@@ -209,7 +235,7 @@ export interface PlaylistControlsContextValue {
 
   /** INTERNAL wiring for ClipInteractionProvider: publishes/clears the live
    *  track-reorder drag preview. Custom drag integrations may call it, but
-   *  most consumers only ever READ trackDragPreview from usePlaylistData(). */
+   *  most consumers only ever READ trackDragPreview from useTrackReorderPreview(). */
   setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
 
   // Selection
@@ -267,59 +293,105 @@ export interface PlaylistControlsContextValue {
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
-export interface PlaylistDataContextValue {
-  duration: number;
-  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
-  trackStates: TrackState[];
-  tracks: ClipTrack[]; // Original tracks array with IDs
+/**
+ * View configuration (#768): what the provider was configured with. Changes
+ * on a prop change (and once when the real sample rate is known), never
+ * during an interaction.
+ */
+export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
   controls: { show: boolean; width: number };
-  playoutRef: React.RefObject<PlaylistEngine | null>;
-  samplesPerPixel: number;
-  timeFormat: TimeFormat;
-  masterVolume: number;
-  canZoomIn: boolean;
-  canZoomOut: boolean;
   barWidth: number;
   barGap: number;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
   roundedBars: boolean;
   /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
   progressBarWidth: number;
+  /** Whether tracks are rendered in mono mode */
+  mono: boolean;
+  /** Whether playback continues past the end of loaded audio instead of
+   *  auto-stopping (implies the fillViewport layout) */
+  indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container even when the
+   *  audio is shorter (layout only — no effect on playback) */
+  fillViewport: boolean;
+}
+
+/**
+ * The two settings a user toggles (#768). Apart from the view value because
+ * every clip overlay and the visualization shell read that one: a toggle here
+ * renders only the components that show the setting.
+ */
+export interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
+}
+
+/** The zoom level (#768). Changes on a zoom. */
+export interface PlaylistZoomContextValue {
+  samplesPerPixel: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+}
+
+/**
+ * What is on the timeline (#768). Changes on every clip operation, on every
+ * pointer move of a trim and on a zoom (the peaks are computed per zoom
+ * level), so call `usePlaylistTimeline()` only in a component
+ * that draws tracks or needs the timeline length during render.
+ */
+export interface PlaylistTimelineContextValue {
+  tracks: ClipTrack[]; // Original tracks array with IDs
+  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
+  duration: number;
   /** Whether the playlist has finished loading all tracks */
   isReady: boolean;
-  /** Internal: incremented after every track-reorder drag interaction ends.
-   *  PlaylistVisualization folds this into the track-controls slot `key` to
-   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
-   *  (see bumpTrackReorderEpoch in PlaylistControlsContextValue). */
-  trackReorderEpoch: number;
+  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
+}
+
+/** Mixer state (#768). Changes on every mute, solo, volume or pan change. */
+export interface PlaylistMixerContextValue {
+  trackStates: TrackState[];
+  masterVolume: number;
+}
+
+/** The live track-reorder drag (#768). Changes on every drag-over. */
+export interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Both playlist columns derive their display
    *  layout from it; custom renderTrackControls consumers can read it to
    *  mirror the preview in their own UI. */
   trackDragPreview: TrackDragPreview | null;
-  /** Whether tracks are rendered in mono mode */
-  mono: boolean;
-  /** Ref set by useClipDragHandlers during boundary trim drags.
-   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
-  isDraggingRef: React.MutableRefObject<boolean>;
-  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
+  /** Internal: incremented after every track-reorder drag interaction ends.
+   *  PlaylistVisualization folds this into the track-controls slot `key` to
+   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
+   *  (see bumpTrackReorderEpoch in PlaylistControlsContextValue). */
+  trackReorderEpoch: number;
 }
 
-// Create the 7 separate contexts
+// The contexts. Each holds fields that change together (#733, #740, #768).
 // Shared default so an omitted `controls` prop keeps one identity across
-// renders — a fresh object here would invalidate the data context every render.
+// renders — a fresh object here would invalidate the view context every render.
 const DEFAULT_CONTROLS = { show: false, width: 0 };
 
-const PlaybackAnimationContext = createContext<PlaybackAnimationContextValue | null>(null);
-const PlaylistStateContext = createContext<PlaylistStateContextValue | null>(null);
+const IsPlayingContext = createContext<IsPlayingContextValue | null>(null);
+const PlaybackRefsContext = createContext<PlaybackRefsContextValue | null>(null);
+const PlaylistAnnotationsContext = createContext<PlaylistAnnotationsContextValue | null>(null);
+const LoopContext = createContext<LoopContextValue | null>(null);
+const SelectedTrackIdContext = createContext<SelectedTrackIdContextValue | null>(null);
+const UndoRedoContext = createContext<UndoRedoContextValue | null>(null);
 const SelectionContext = createContext<SelectionContextValue | null>(null);
 const CurrentTimeContext = createContext<CurrentTimeContextValue | null>(null);
 const ActiveAnnotationContext = createContext<ActiveAnnotationContextValue | null>(null);
 const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
-const PlaylistDataContext = createContext<PlaylistDataContextValue | null>(null);
+const PlaylistViewContext = createContext<PlaylistViewContextValue | null>(null);
+const PlaylistSettingsContext = createContext<PlaylistSettingsContextValue | null>(null);
+const PlaylistZoomContext = createContext<PlaylistZoomContextValue | null>(null);
+const PlaylistTimelineContext = createContext<PlaylistTimelineContextValue | null>(null);
+const PlaylistMixerContext = createContext<PlaylistMixerContextValue | null>(null);
+const TrackReorderPreviewContext = createContext<TrackReorderPreviewContextValue | null>(null);
 
 export interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[]; // Updated to use clip-based model
@@ -1349,7 +1421,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   // Read the engine's scheduler lookahead (Tone adapter ~0.1s, native 0).
-  // Exposed through PlaybackAnimationContextValue so consumers (e.g., recording
+  // Exposed through PlaybackRefsContextValue so consumers (e.g., recording
   // live preview) compute audible-latency from the same source as the playhead.
   const getLookAhead = useCallback((): number => {
     return engineRef.current?.lookAhead ?? 0;
@@ -2011,14 +2083,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const sampleRate = sampleRateRef.current;
   const timeScaleHeight = timescale ? 30 : 0;
 
-  // Split context values for performance optimization
-  // Animation context only re-renders consumers when playback starts or
-  // stops, never during the animation loop itself, and not on a seek: the
-  // resting cursor position has its own context (#740)
+  // Context values, grouped by how often their fields change (#768). A
+  // subscription is to a whole value, so a field belongs with the fields that
+  // change when it does: a component that reads `sampleRate` must not render
+  // on every step of a volume slider.
 
-  const animationValue: PlaybackAnimationContextValue = useMemo(
+  // Changes on play, pause and stop only. Not on a seek: the resting cursor
+  // position has its own context (#740).
+  const isPlayingValue: IsPlayingContextValue = useMemo(() => ({ isPlaying }), [isPlaying]);
+
+  // Refs and stable functions: this value never changes.
+  const refsValue: PlaybackRefsContextValue = useMemo(
     () => ({
-      isPlaying,
       currentTimeRef,
       visualTimeRef,
       playbackStartTimeRef,
@@ -2029,9 +2105,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getOutputLatency,
       registerFrameCallback,
       unregisterFrameCallback,
+      playoutRef: engineRef,
+      isDraggingRef,
     }),
     [
-      isPlaying,
       currentTimeRef,
       visualTimeRef,
       playbackStartTimeRef,
@@ -2042,40 +2119,29 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getOutputLatency,
       registerFrameCallback,
       unregisterFrameCallback,
+      engineRef,
+      isDraggingRef,
     ]
   );
 
-  const stateValue: PlaylistStateContextValue = useMemo(
-    () => ({
-      continuousPlay,
-      linkEndpoints,
-      annotationsEditable,
-      isAutomaticScroll,
-      isLoopEnabled,
-      annotations,
-      selectedTrackId,
-      loopStart,
-      loopEnd,
-      indefinitePlayback,
-      fillViewport,
-      canUndo,
-      canRedo,
-    }),
-    [
-      continuousPlay,
-      linkEndpoints,
-      annotationsEditable,
-      isAutomaticScroll,
-      isLoopEnabled,
-      annotations,
-      selectedTrackId,
-      loopStart,
-      loopEnd,
-      indefinitePlayback,
-      fillViewport,
-      canUndo,
-      canRedo,
-    ]
+  const annotationsValue: PlaylistAnnotationsContextValue = useMemo(
+    () => ({ annotations, annotationsEditable, linkEndpoints, continuousPlay }),
+    [annotations, annotationsEditable, linkEndpoints, continuousPlay]
+  );
+
+  const loopValue: LoopContextValue = useMemo(
+    () => ({ isLoopEnabled, loopStart, loopEnd }),
+    [isLoopEnabled, loopStart, loopEnd]
+  );
+
+  const selectedTrackIdValue: SelectedTrackIdContextValue = useMemo(
+    () => ({ selectedTrackId }),
+    [selectedTrackId]
+  );
+
+  const undoRedoValue: UndoRedoContextValue = useMemo(
+    () => ({ canUndo, canRedo }),
+    [canUndo, canRedo]
   );
 
   // Its own context: these two change on every pointer move of a selection
@@ -2202,165 +2268,212 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     ]
   );
 
-  const dataValue: PlaylistDataContextValue = useMemo(
+  const viewValue: PlaylistViewContextValue = useMemo(
     () => ({
-      duration,
-      peaksDataArray,
-      trackStates,
-      tracks,
       sampleRate,
       waveHeight,
       timeScaleHeight,
       controls,
-      playoutRef: engineRef,
-      samplesPerPixel,
-      timeFormat,
-      masterVolume,
-      canZoomIn: zoom.canZoomIn,
-      canZoomOut: zoom.canZoomOut,
       barWidth,
       barGap,
       roundedBars,
       progressBarWidth,
-      isReady,
-      trackReorderEpoch,
-      trackDragPreview,
       mono,
-      isDraggingRef,
-      onTracksChange,
+      indefinitePlayback,
+      fillViewport,
     }),
     [
-      duration,
-      peaksDataArray,
-      trackStates,
-      tracks,
       sampleRate,
       waveHeight,
       timeScaleHeight,
       controls,
-      engineRef,
-      samplesPerPixel,
-      timeFormat,
-      masterVolume,
-      zoom.canZoomIn,
-      zoom.canZoomOut,
       barWidth,
       barGap,
       roundedBars,
       progressBarWidth,
-      isReady,
-      trackReorderEpoch,
-      trackDragPreview,
       mono,
-      isDraggingRef,
-      onTracksChange,
+      indefinitePlayback,
+      fillViewport,
     ]
+  );
+
+  const settingsValue: PlaylistSettingsContextValue = useMemo(
+    () => ({ timeFormat, isAutomaticScroll }),
+    [timeFormat, isAutomaticScroll]
+  );
+
+  const zoomValue: PlaylistZoomContextValue = useMemo(
+    () => ({ samplesPerPixel, canZoomIn: zoom.canZoomIn, canZoomOut: zoom.canZoomOut }),
+    [samplesPerPixel, zoom.canZoomIn, zoom.canZoomOut]
+  );
+
+  // Changes on every pointer move of a trim, and on a zoom (the peaks are
+  // computed per zoom level).
+  const timelineValue: PlaylistTimelineContextValue = useMemo(
+    () => ({ tracks, peaksDataArray, duration, isReady, onTracksChange }),
+    [tracks, peaksDataArray, duration, isReady, onTracksChange]
+  );
+
+  // Changes on every mute, solo, volume or pan change.
+  const mixerValue: PlaylistMixerContextValue = useMemo(
+    () => ({ trackStates, masterVolume }),
+    [trackStates, masterVolume]
+  );
+
+  // Changes on every drag-over of a track reorder.
+  const reorderPreviewValue: TrackReorderPreviewContextValue = useMemo(
+    () => ({ trackDragPreview, trackReorderEpoch }),
+    [trackDragPreview, trackReorderEpoch]
   );
 
   // Merge user theme with default theme
   const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
 
+  // Outermost: the values that change least. The order has no effect on
+  // behaviour (every value is committed together); it is for reading.
   return (
     <ThemeProvider theme={mergedTheme}>
-      <PlaybackAnimationContext.Provider value={animationValue}>
-        <PlaylistStateContext.Provider value={stateValue}>
-          <SelectionContext.Provider value={selectionValue}>
-            <CurrentTimeContext.Provider value={currentTimeValue}>
-              <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
-                <PlaylistControlsContext.Provider value={controlsValue}>
-                  <PlaylistDataContext.Provider value={dataValue}>
-                    {children}
-                  </PlaylistDataContext.Provider>
-                </PlaylistControlsContext.Provider>
-              </ActiveAnnotationContext.Provider>
-            </CurrentTimeContext.Provider>
-          </SelectionContext.Provider>
-        </PlaylistStateContext.Provider>
-      </PlaybackAnimationContext.Provider>
+      <PlaybackRefsContext.Provider value={refsValue}>
+        <PlaylistControlsContext.Provider value={controlsValue}>
+          <PlaylistViewContext.Provider value={viewValue}>
+            <PlaylistSettingsContext.Provider value={settingsValue}>
+              <PlaylistZoomContext.Provider value={zoomValue}>
+                <UndoRedoContext.Provider value={undoRedoValue}>
+                  <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
+                    <LoopContext.Provider value={loopValue}>
+                      <PlaylistAnnotationsContext.Provider value={annotationsValue}>
+                        <IsPlayingContext.Provider value={isPlayingValue}>
+                          <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
+                            <CurrentTimeContext.Provider value={currentTimeValue}>
+                              <SelectionContext.Provider value={selectionValue}>
+                                <TrackReorderPreviewContext.Provider value={reorderPreviewValue}>
+                                  <PlaylistMixerContext.Provider value={mixerValue}>
+                                    <PlaylistTimelineContext.Provider value={timelineValue}>
+                                      {children}
+                                    </PlaylistTimelineContext.Provider>
+                                  </PlaylistMixerContext.Provider>
+                                </TrackReorderPreviewContext.Provider>
+                              </SelectionContext.Provider>
+                            </CurrentTimeContext.Provider>
+                          </ActiveAnnotationContext.Provider>
+                        </IsPlayingContext.Provider>
+                      </PlaylistAnnotationsContext.Provider>
+                    </LoopContext.Provider>
+                  </SelectedTrackIdContext.Provider>
+                </UndoRedoContext.Provider>
+              </PlaylistZoomContext.Provider>
+            </PlaylistSettingsContext.Provider>
+          </PlaylistViewContext.Provider>
+        </PlaylistControlsContext.Provider>
+      </PlaybackRefsContext.Provider>
     </ThemeProvider>
   );
 };
 
-// Individual hooks for each context - use these for optimal performance
-// Components only re-render when their specific context data changes
+// One hook per context. A component re-renders only when the value of a
+// context it reads changes, so read the smallest group that has the field.
 
-export const usePlaybackAnimation = () => {
-  const context = useContext(PlaybackAnimationContext);
-  if (!context) {
-    throw new Error('usePlaybackAnimation must be used within WaveformPlaylistProvider');
+function useRequired<T>(context: React.Context<T | null>, hookName: string): T {
+  const value = useContext(context);
+  if (!value) {
+    throw new Error(`${hookName} must be used within WaveformPlaylistProvider`);
   }
-  return context;
-};
+  return value;
+}
 
-export const usePlaylistState = () => {
-  const context = useContext(PlaylistStateContext);
-  if (!context) {
-    throw new Error('usePlaylistState must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
+/** `{ isPlaying }`. Re-renders on play, pause and stop. */
+export const useIsPlaying = () => useRequired(IsPlayingContext, 'useIsPlaying');
+
+/**
+ * Refs and functions that never change identity: `currentTimeRef`,
+ * `visualTimeRef`, `registerFrameCallback`, `playoutRef` and the rest. Calling
+ * this never re-renders the component. Read `.current` in a handler, an effect
+ * or a frame callback; to re-render when the value behind a ref changes, also
+ * call the hook that carries it (`useCurrentTime()`, `useIsPlaying()`,
+ * `usePlaylistTimeline()`).
+ */
+export const usePlaybackRefs = () => useRequired(PlaybackRefsContext, 'usePlaybackRefs');
+
+/** Annotations and the annotation settings. Re-renders on an annotation edit. */
+export const usePlaylistAnnotations = () =>
+  useRequired(PlaylistAnnotationsContext, 'usePlaylistAnnotations');
+
+/** `{ isLoopEnabled, loopStart, loopEnd }`. Re-renders on a loop change. */
+export const useLoop = () => useRequired(LoopContext, 'useLoop');
+
+/** `{ selectedTrackId }`. Re-renders when another track is selected. */
+export const useSelectedTrackId = () => useRequired(SelectedTrackIdContext, 'useSelectedTrackId');
+
+/** `{ canUndo, canRedo }`. Re-renders after an edit. */
+export const useUndoRedo = () => useRequired(UndoRedoContext, 'useUndoRedo');
 
 /**
  * The selected time range. A component that calls this re-renders on every
  * pointer move of a selection drag, so call it in the smallest component that
  * shows the selection.
  */
-export const useSelection = () => {
-  const context = useContext(SelectionContext);
-  if (!context) {
-    throw new Error('useSelection must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
+export const useSelection = () => useRequired(SelectionContext, 'useSelection');
 
 /**
  * Where the cursor rests, in seconds. A component that calls this re-renders
  * on every seek, pause and stop, and on every pointer move of a selection drag
  * to the left. The value does not advance during playback: for a live position
- * read `currentTimeRef` from `usePlaybackAnimation()` or register a frame
- * callback there.
+ * read `currentTimeRef` from `usePlaybackRefs()` or register a frame callback
+ * there.
  */
-export const useCurrentTime = () => {
-  const context = useContext(CurrentTimeContext);
-  if (!context) {
-    throw new Error('useCurrentTime must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
+export const useCurrentTime = () => useRequired(CurrentTimeContext, 'useCurrentTime');
 
 /**
  * The id of the annotation that is playing or was last chosen, or `null`. A
  * component that calls this re-renders at every annotation boundary during
  * playback, so call it in the smallest component that shows the active one.
  */
-export const useActiveAnnotation = () => {
-  const context = useContext(ActiveAnnotationContext);
-  if (!context) {
-    throw new Error('useActiveAnnotation must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
+export const useActiveAnnotation = () =>
+  useRequired(ActiveAnnotationContext, 'useActiveAnnotation');
 
-export const usePlaylistControls = () => {
-  const context = useContext(PlaylistControlsContext);
-  if (!context) {
-    throw new Error('usePlaylistControls must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
-
-export const usePlaylistData = () => {
-  const context = useContext(PlaylistDataContext);
-  if (!context) {
-    throw new Error('usePlaylistData must be used within WaveformPlaylistProvider');
-  }
-  return context;
-};
+/** Actions. The value never changes, so calling this never re-renders. */
+export const usePlaylistControls = () =>
+  useRequired(PlaylistControlsContext, 'usePlaylistControls');
 
 /**
- * Like {@link usePlaylistData} but returns `null` instead of throwing when there
- * is no WaveformPlaylistProvider ancestor. Use this in hooks/components that may
- * also run in the MediaElement path (MediaElementPlaylistProvider), where the
- * WebAudio playlist context is absent.
+ * View configuration: `sampleRate`, `waveHeight`, `timeScaleHeight`,
+ * `controls`, bar style, `mono`, `indefinitePlayback`, `fillViewport`.
+ * Re-renders on a prop change.
  */
-export const usePlaylistDataOptional = () => useContext(PlaylistDataContext);
+export const usePlaylistView = () => useRequired(PlaylistViewContext, 'usePlaylistView');
+
+/** `{ timeFormat, isAutomaticScroll }`. Re-renders when the user changes either. */
+export const usePlaylistSettings = () =>
+  useRequired(PlaylistSettingsContext, 'usePlaylistSettings');
+
+/** `{ samplesPerPixel, canZoomIn, canZoomOut }`. Re-renders on a zoom. */
+export const usePlaylistZoom = () => useRequired(PlaylistZoomContext, 'usePlaylistZoom');
+
+/**
+ * `{ tracks, peaksDataArray, duration, isReady, onTracksChange }`. A component
+ * that calls this re-renders on every clip operation, on every pointer move of
+ * a trim and on a zoom.
+ */
+export const usePlaylistTimeline = () =>
+  useRequired(PlaylistTimelineContext, 'usePlaylistTimeline');
+
+/**
+ * `{ trackStates, masterVolume }`. A component that calls this re-renders on
+ * every mute, solo, volume or pan change (each step of a slider drag).
+ */
+export const usePlaylistMixer = () => useRequired(PlaylistMixerContext, 'usePlaylistMixer');
+
+/**
+ * `{ trackDragPreview, trackReorderEpoch }`. A component that calls this
+ * re-renders on every drag-over of a track reorder.
+ */
+export const useTrackReorderPreview = () =>
+  useRequired(TrackReorderPreviewContext, 'useTrackReorderPreview');
+
+/**
+ * INTERNAL (not exported from the package): like {@link usePlaylistView} and
+ * {@link usePlaylistZoom} but `null` when there is no WaveformPlaylistProvider
+ * above. For hooks that also run under MediaElementPlaylistProvider.
+ */
+export const usePlaylistViewOptional = () => useContext(PlaylistViewContext);
+export const usePlaylistZoomOptional = () => useContext(PlaylistZoomContext);

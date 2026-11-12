@@ -20,9 +20,10 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
-  usePlaylistData,
   usePlaylistControls,
   KeyboardShortcuts,
+  usePlaylistTimeline,
+  usePlaylistMixer,
 } from '@waveform-playlist/browser';
 import {
   ExportWavButton,
@@ -348,7 +349,8 @@ const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
   trackEffectsManager,
   onDeleteTrack,
 }) => {
-  const { tracks, trackStates } = usePlaylistData();
+  const { tracks } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { setTrackMute, setTrackSolo, setTrackVolume } = usePlaylistControls();
 
   const trackState = trackStates[trackIndex] || {
@@ -440,7 +442,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
-  const { tracks: contextTracks, trackStates } = usePlaylistData();
+  const { tracks: contextTracks } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { exportWav } = useExportWav();
 
   // Get the offline effects functions when needed

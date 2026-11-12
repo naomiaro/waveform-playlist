@@ -12,7 +12,13 @@ import {
   type WaveformPlaylistTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { useCurrentTime, usePlaybackAnimation, usePlaylistData } from '../WaveformPlaylistContext';
+import {
+  useCurrentTime,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaybackRefs,
+  useIsPlaying,
+} from '../WaveformPlaylistContext';
 
 const ChannelWrapper = styled.div`
   position: relative;
@@ -112,8 +118,8 @@ function playedRatio(
 
 /**
  * The played-portion overlay of one channel. It is the only part of a channel
- * that follows the cursor, so it alone subscribes to the animation and data
- * contexts (#693): a seek, or a selection whose start moves, re-renders these
+ * that follows the cursor, so it alone subscribes to the provider's contexts
+ * (#693): a seek, or a selection whose start moves, re-renders these
  * small overlays and not the channels (and their canvases' React trees) around
  * them.
  */
@@ -126,16 +132,13 @@ const ClipProgress: React.FC<ClipProgressProps> = ({
 }) => {
   const progressRef = useRef<HTMLDivElement>(null);
   const callbackId = useId();
-  const {
-    isPlaying,
-    currentTimeRef,
-    visualTimeRef,
-    registerFrameCallback,
-    unregisterFrameCallback,
-  } = usePlaybackAnimation();
+  const { currentTimeRef, visualTimeRef, registerFrameCallback, unregisterFrameCallback } =
+    usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only: the effect below reads the refs.
   useCurrentTime();
-  const { samplesPerPixel, sampleRate } = usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   // Use shared helper to compute clip pixel width (must match Clip.tsx sizing)
   // peaksData.length may be shorter than the clip when audio is shorter than configured duration

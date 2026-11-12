@@ -32,15 +32,18 @@ import {
   WaveformPlaylistProvider,
   Waveform,
   usePlaylistControls,
-  usePlaybackAnimation,
   useCurrentTime,
-  usePlaylistData,
-  usePlaylistState,
   useSelection,
   KeyboardShortcuts,
   ClipInteractionProvider,
   type TimeFormat,
   type ClipTrack,
+  usePlaylistSettings,
+  usePlaylistTimeline,
+  usePlaylistMixer,
+  usePlaybackRefs,
+  useLoop,
+  useIsPlaying,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
@@ -72,7 +75,8 @@ interface AnimatedTimeDisplayProps {
 const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ duration, format }) => {
   const timeRef = useRef<HTMLSpanElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const { isPlaying, currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackAnimation();
+  const { currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   // Where the cursor rests. It changes on a seek, a pause and a stop (not
   // during playback), which is when the stopped display below must update.
   const { currentTime } = useCurrentTime();
@@ -200,7 +204,7 @@ const GrungyTimestamp = styled.div<{ $left: number }>`
 
 // Custom Track Controls Component - compact horizontal layout
 const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) => {
-  const { trackStates } = usePlaylistData();
+  const { trackStates } = usePlaylistMixer();
   const { setTrackMute, setTrackSolo, setTrackVolume } = usePlaylistControls();
   const trackState = trackStates[trackIndex];
 
@@ -257,7 +261,7 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = useSelection();
   const { setSelection } = usePlaylistControls();
-  const { timeFormat } = usePlaylistData();
+  const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
   const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -298,9 +302,11 @@ interface FlexibleApiContentProps {
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
   const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
-  const { currentTimeRef } = usePlaybackAnimation();
-  const { duration, masterVolume, timeFormat } = usePlaylistData();
-  const { isAutomaticScroll, isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { timeFormat, isAutomaticScroll } = usePlaylistSettings();
+  const { duration } = usePlaylistTimeline();
+  const { masterVolume } = usePlaylistMixer();
+  const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { selectionStart, selectionEnd } = useSelection();
   const format = timeFormat as TimeFormat;
 
@@ -588,9 +594,9 @@ export function FlexibleApiExample() {
             </Text>
             <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
               <li><Text size="2" color="gray"><code>usePlaylistControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions</Text></li>
-              <li><Text size="2" color="gray"><code>usePlaybackAnimation()</code> - Get <code>isPlaying</code> and <code>currentTimeRef</code> for the live position</Text></li>
-              <li><Text size="2" color="gray"><code>usePlaylistData()</code> - Get <code>duration</code>, <code>sampleRate</code>, etc.</Text></li>
-              <li><Text size="2" color="gray"><code>usePlaylistState()</code> - Get/set <code>timeFormat</code>, <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.</Text></li>
+              <li><Text size="2" color="gray"><code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position</Text></li>
+              <li><Text size="2" color="gray"><code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get <code>duration</code>, <code>tracks</code>, <code>trackStates</code>, <code>masterVolume</code></Text></li>
+              <li><Text size="2" color="gray"><code>usePlaylistSettings()</code>, <code>usePlaylistView()</code> and <code>useLoop()</code> - Get <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>, and the loop region</Text></li>
               <li><Text size="2" color="gray"><code>useSelection()</code> - Get <code>selectionStart</code> and <code>selectionEnd</code></Text></li>
               <li><Text size="2" color="gray"><code>useTimeFormat()</code> - Get <code>formatTime</code> and <code>parseTime</code> for time display/input</Text></li>
               <li><Text size="2" color="gray"><code>renderPlayhead</code> - Custom playhead with triangle marker (see <code>PlayheadWithMarker</code>)</Text></li>

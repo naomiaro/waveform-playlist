@@ -2307,11 +2307,11 @@ The React packages are **not** being replaced — both surfaces coexist (see Pac
 | `@waveform-playlist/ui-components` (React)         | Merged into `@dawcore/components`                                             |
 | `WaveformPlaylistProvider` (React context)         | `<daw-editor>` element                                                        |
 | `usePlaylistControls()`                            | `element.play()`, `element.stop()`, etc.                                      |
-| `usePlaybackAnimation()` (`isPlaying`)             | `element.isPlaying`                                                           |
+| `useIsPlaying()`                                   | `element.isPlaying`                                                           |
 | `useSelection()`                                   | `element.selection`                                                           |
 | `useCurrentTime()`                                 | `element.currentTime`                                                         |
-| `usePlaylistData()`                                | `element.tracks`, `element.duration`, etc.                                    |
-| `usePlaybackAnimation()` (frame callbacks)         | `daw-timeupdate` event                                                        |
+| `usePlaylistTimeline()`                            | `element.tracks`, `element.duration`, etc.                                    |
+| `usePlaybackRefs()` (frame callbacks)              | `daw-timeupdate` event                                                        |
 | `onTracksChange` prop                              | `daw-tracks-change` event                                                     |
 | styled-components theme                            | CSS custom properties                                                         |
 | `@dnd-kit/react`                                   | `@dnd-kit/dom`                                                                |

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { usePlaylistDataOptional } from '../WaveformPlaylistContext';
+import { usePlaylistViewOptional, usePlaylistZoomOptional } from '../WaveformPlaylistContext';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
@@ -78,11 +78,12 @@ export function useAnnotationKeyboardControls({
 }: UseAnnotationKeyboardControlsOptions) {
   // Auto-scroll positioning needs samplesPerPixel/sampleRate. Prefer explicit
   // props (works in the MediaElement path); otherwise read them from the
-  // WaveformPlaylistProvider context when present. usePlaylistDataOptional()
-  // returns null instead of throwing, so this hook is safe outside that provider.
-  const playlistData = usePlaylistDataOptional();
-  const samplesPerPixel = samplesPerPixelProp ?? playlistData?.samplesPerPixel;
-  const sampleRate = sampleRateProp ?? playlistData?.sampleRate;
+  // WaveformPlaylistProvider contexts when present. The optional readers
+  // return null instead of throwing, so this hook is safe outside that provider.
+  const playlistView = usePlaylistViewOptional();
+  const playlistZoom = usePlaylistZoomOptional();
+  const samplesPerPixel = samplesPerPixelProp ?? playlistZoom?.samplesPerPixel;
+  const sampleRate = sampleRateProp ?? playlistView?.sampleRate;
 
   const activeIndex = useMemo(() => {
     if (!activeAnnotationId) return -1;

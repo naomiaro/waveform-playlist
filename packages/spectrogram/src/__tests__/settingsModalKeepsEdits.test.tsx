@@ -13,7 +13,7 @@ import {
   Waveform,
   SpectrogramIntegrationProvider,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistZoom,
   type SpectrogramIntegration,
 } from '@waveform-playlist/browser';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -116,7 +116,7 @@ let zoomIn: () => void = () => {};
 let samplesPerPixel = 0;
 const Probe: React.FC = () => {
   zoomIn = usePlaylistControls().zoomIn;
-  samplesPerPixel = usePlaylistData().samplesPerPixel;
+  samplesPerPixel = usePlaylistZoom().samplesPerPixel;
   return null;
 };
 

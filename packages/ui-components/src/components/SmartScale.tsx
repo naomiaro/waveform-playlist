@@ -24,6 +24,13 @@ function ticksToBarBeatLabel(ticks: number, timeSignature: [number, number], ppq
 }
 
 export interface SmartScaleProps {
+  /**
+   * Length of the timeline the scale covers, in milliseconds. A prop and not a
+   * field of `PlaylistInfoContext` (#768): the length changes on every pointer
+   * move of a trim at the end of the timeline, and every channel and track
+   * reads that context.
+   */
+  readonly durationMs: number;
   readonly renderTick?: (label: string, pixelPosition: number) => ReactNode;
 }
 
@@ -91,9 +98,11 @@ interface TickLayout {
   labels: TickLabel[];
 }
 
-export const SmartScale: FunctionComponent<SmartScaleProps> = ({ renderTick }) => {
-  const { samplesPerPixel, sampleRate, duration, timeScaleHeight } =
-    useContext(PlaylistInfoContext);
+export const SmartScale: FunctionComponent<SmartScaleProps> = ({
+  durationMs: duration,
+  renderTick,
+}) => {
+  const { samplesPerPixel, sampleRate, timeScaleHeight } = useContext(PlaylistInfoContext);
   const beatsAndBars = useBeatsAndBars();
 
   // Pre-compute tick data for beats & bars mode using integer PPQN math.

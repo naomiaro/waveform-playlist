@@ -11,12 +11,12 @@ import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaybackAnimation,
   useCurrentTime,
   useActiveAnnotation,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaylistState,
+  usePlaylistTimeline,
+  usePlaylistAnnotations,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -116,11 +116,11 @@ interface Probe {
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { currentTime } = useCurrentTime();
   const { play, setContinuousPlay, setSelection, stop } = usePlaylistControls();
-  const { isReady, duration } = usePlaylistData();
-  const { continuousPlay } = usePlaylistState();
+  const { isReady, duration } = usePlaylistTimeline();
+  const { continuousPlay } = usePlaylistAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   probe = {
     isReady,

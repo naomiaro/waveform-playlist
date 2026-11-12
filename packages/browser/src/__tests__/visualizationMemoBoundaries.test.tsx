@@ -21,6 +21,8 @@ const counts = vi.hoisted(() => ({
   track: {} as Record<string, number>,
   controls: 0,
   scale: 0,
+  // The timeline length the timescale was last given, in milliseconds.
+  scaleDurationMs: -1,
   shell: 0,
 }));
 
@@ -54,6 +56,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     },
     SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
       counts.scale++;
+      counts.scaleDurationMs = props.durationMs;
       return createElement(actual.SmartScale, props);
     },
   };
@@ -62,10 +65,12 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 import {
   WaveformPlaylistProvider,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaylistState,
   useSelection,
   useActiveAnnotation,
+  usePlaylistMixer,
+  usePlaylistTimeline,
+  usePlaylistZoom,
+  useSelectedTrackId,
 } from '../WaveformPlaylistContext';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { AudioPosition } from '../components/ContextualControls';
@@ -146,8 +151,10 @@ function createFakeAdapter(): PlayoutAdapter {
 
 let probe: {
   controls: ReturnType<typeof usePlaylistControls>;
-  data: ReturnType<typeof usePlaylistData>;
-  state: ReturnType<typeof usePlaylistState>;
+  data: ReturnType<typeof usePlaylistTimeline> &
+    ReturnType<typeof usePlaylistZoom> &
+    ReturnType<typeof usePlaylistMixer>;
+  state: ReturnType<typeof useSelectedTrackId>;
   selection: ReturnType<typeof useSelection>;
   activeAnnotationId: string | null;
 };
@@ -155,8 +162,8 @@ let probe: {
 const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaylistControls(),
-    data: usePlaylistData(),
-    state: usePlaylistState(),
+    data: { ...usePlaylistTimeline(), ...usePlaylistZoom(), ...usePlaylistMixer() },
+    state: useSelectedTrackId(),
     selection: useSelection(),
     activeAnnotationId: useActiveAnnotation().activeAnnotationId,
   };
@@ -228,6 +235,81 @@ afterEach(async () => {
     cleanup();
   });
   vi.restoreAllMocks();
+});
+
+describe('the shell and the channels follow only the groups they draw (#768)', () => {
+  it('a mixer change does not render the visualization shell', async () => {
+    await mount(threeTracks().tracks);
+
+    await act(async () => {
+      probe.controls.setTrackVolume(1, 0.5);
+      probe.controls.setMasterVolume(0.5);
+    });
+
+    expect(probe.data.trackStates[1].volume).toBe(0.5);
+    expect(counts.controls).toBe(1);
+    expect(counts.shell).toBe(0);
+    expect(counts.scale).toBe(0);
+  });
+
+  it('a loop change does not render the shell, a track, a clip or a control panel', async () => {
+    await mount(threeTracks().tracks);
+
+    await act(async () => {
+      probe.controls.setLoopRegion(0.2, 0.8);
+      probe.controls.setLoopEnabled(true);
+    });
+
+    expect(counts.shell).toBe(0);
+    expect(totalOf(counts.track)).toBe(0);
+    expect(totalOf(counts.clip)).toBe(0);
+    expect(counts.controls).toBe(0);
+  });
+
+  it('a time-format change and an automatic-scroll toggle re-render no clip, channel, track, panel or shell', async () => {
+    await mount(threeTracks().tracks);
+
+    await act(async () => {
+      probe.controls.setTimeFormat('seconds');
+      probe.controls.setAutomaticScroll(true);
+    });
+
+    expect(totalOf(counts.clip)).toBe(0);
+    expect(counts.channel).toBe(0);
+    expect(counts.shell).toBe(0);
+    expect(totalOf(counts.track)).toBe(0);
+    expect(counts.controls).toBe(0);
+  });
+
+  // The timeline length is not in `PlaylistInfoContext` any more: every
+  // channel reads that context, and the length changes on each pointer move
+  // of a trim at the end of the timeline.
+  it('trimming the clip that ends the timeline re-renders the channels of that clip only', async () => {
+    const { a, b, c, d } = threeTracks();
+    const { setTracks } = await mount([
+      makeTrack('t1', [a, b]),
+      makeTrack('t2', [c]),
+      makeTrack('t3', [d]),
+    ]);
+    const before = probe.data.duration;
+
+    const trimmed = { ...b, durationSamples: SAMPLE_RATE / 2 };
+    await act(async () => {
+      setTracks([makeTrack('t1', [a, trimmed]), makeTrack('t2', [c]), makeTrack('t3', [d])]);
+    });
+    await waitFor(() => expect(probe.data.duration).toBeLessThan(before));
+
+    expect(counts.clip.b).toBeGreaterThanOrEqual(1);
+    expect(counts.clip.a).toBeUndefined();
+    expect(counts.clip.c).toBeUndefined();
+    expect(counts.clip.d).toBeUndefined();
+    // One channel per clip in this fixture: only the trimmed clip's renders.
+    expect(counts.channel).toBe(counts.clip.b);
+    // The timescale is what draws the new length, and gets it in milliseconds.
+    expect(counts.scale).toBeGreaterThanOrEqual(1);
+    expect(counts.scaleDurationMs).toBe(probe.data.duration * 1000);
+    expect(counts.scaleDurationMs).toBe(2500);
+  });
 });
 
 describe('visualization memo boundaries (#693)', () => {

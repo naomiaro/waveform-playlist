@@ -26,9 +26,9 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaybackAnimation,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistTimeline,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -120,9 +120,9 @@ interface Probe {
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { play, setRecordingActive } = usePlaylistControls();
-  const { isReady } = usePlaylistData();
+  const { isReady } = usePlaylistTimeline();
   probe = {
     isPlaying,
     isReady,

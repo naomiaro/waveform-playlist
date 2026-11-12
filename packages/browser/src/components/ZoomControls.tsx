@@ -1,13 +1,13 @@
 import React from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
-import { usePlaylistControls, usePlaylistData } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistZoom } from '../WaveformPlaylistContext';
 
 export const ZoomInButton: React.FC<{ className?: string; disabled?: boolean }> = ({
   className,
   disabled,
 }) => {
   const { zoomIn } = usePlaylistControls();
-  const { canZoomIn } = usePlaylistData();
+  const { canZoomIn } = usePlaylistZoom();
 
   return (
     <BaseControlButton onClick={zoomIn} disabled={disabled || !canZoomIn} className={className}>
@@ -21,7 +21,7 @@ export const ZoomOutButton: React.FC<{ className?: string; disabled?: boolean }>
   disabled,
 }) => {
   const { zoomOut } = usePlaylistControls();
-  const { canZoomOut } = usePlaylistData();
+  const { canZoomOut } = usePlaylistZoom();
 
   return (
     <BaseControlButton onClick={zoomOut} disabled={disabled || !canZoomOut} className={className}>

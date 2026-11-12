@@ -21,7 +21,10 @@ const playlistControls = {
   setTrackDragPreview: vi.fn(),
 };
 vi.mock('../WaveformPlaylistContext', () => ({
-  usePlaylistData: () => playlistData,
+  usePlaylistView: () => playlistData,
+  usePlaylistZoom: () => playlistData,
+  usePlaylistTimeline: () => playlistData,
+  usePlaybackRefs: () => playlistData,
   usePlaylistControls: () => playlistControls,
 }));
 

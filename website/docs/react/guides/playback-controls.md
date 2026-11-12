@@ -37,14 +37,14 @@ These buttons automatically connect to the playlist context and update their sta
 
 ## Custom Playback Controls
 
-For custom UI, use `usePlaylistControls()` and `usePlaybackAnimation()`:
+For custom UI, use `usePlaylistControls()` and `useIsPlaying()`:
 
 ```tsx
-import { usePlaylistControls, usePlaybackAnimation } from '@waveform-playlist/browser';
+import { usePlaylistControls, useIsPlaying } from '@waveform-playlist/browser';
 
 function CustomControls() {
   const { play, pause, stop } = usePlaylistControls();
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
 
   return (
     <div>
@@ -104,14 +104,14 @@ function PositionDisplay() {
 
 ### Programmatic Access
 
-Access the resting cursor position from `useCurrentTime()` and duration from `usePlaylistData()`. `currentTime` changes on a seek, a pause and a stop; it does not advance during playback. For a display that runs during playback, use `<AudioPosition />` or register a frame callback with `usePlaybackAnimation()`.
+Access the resting cursor position from `useCurrentTime()` and duration from `usePlaylistTimeline()`. `currentTime` changes on a seek, a pause and a stop; it does not advance during playback. For a display that runs during playback, use `<AudioPosition />` or register a frame callback with `usePlaybackRefs()`.
 
 ```tsx
-import { useCurrentTime, usePlaylistData } from '@waveform-playlist/browser';
+import { useCurrentTime, usePlaylistTimeline } from '@waveform-playlist/browser';
 
 function CustomPosition() {
   const { currentTime } = useCurrentTime();
-  const { duration } = usePlaylistData();
+  const { duration } = usePlaylistTimeline();
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -162,10 +162,10 @@ function LoopControl() {
 Or control it programmatically:
 
 ```tsx
-import { usePlaylistState, usePlaylistControls } from '@waveform-playlist/browser';
+import { usePlaylistAnnotations, usePlaylistControls } from '@waveform-playlist/browser';
 
 function ContinuousPlayToggle() {
-  const { continuousPlay } = usePlaylistState();
+  const { continuousPlay } = usePlaylistAnnotations();
   const { setContinuousPlay } = usePlaylistControls();
 
   return (
@@ -252,10 +252,10 @@ Toggles the looping behavior.
 ### Programmatic Control
 
 ```tsx
-import { usePlaylistState, useSelection, usePlaylistControls } from '@waveform-playlist/browser';
+import { useLoop, useSelection, usePlaylistControls } from '@waveform-playlist/browser';
 
 function CustomLoopControls() {
-  const { isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { selectionStart, selectionEnd } = useSelection();
   const { setLoopEnabled, setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
 
@@ -369,10 +369,10 @@ function VolumeControl() {
 Or with a custom UI:
 
 ```tsx
-import { usePlaylistData, usePlaylistControls } from '@waveform-playlist/browser';
+import { usePlaylistMixer, usePlaylistControls } from '@waveform-playlist/browser';
 
 function CustomVolumeSlider() {
-  const { masterVolume } = usePlaylistData();
+  const { masterVolume } = usePlaylistMixer();
   const { setMasterVolume } = usePlaylistControls();
 
   return (

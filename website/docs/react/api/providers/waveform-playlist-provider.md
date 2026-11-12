@@ -254,11 +254,22 @@ const { tracks, loading } = useAudioTracks(configs, { immediate: true });
 
 The provider exposes state and controls through React Context. Access them using the provided hooks.
 
-### Playback Animation (usePlaybackAnimation)
+Each hook returns one group of fields that change together, and a component re-renders only when the value of a hook it calls changes. See [hooks.md](/docs/react/api/hooks#core-context-hooks) for what triggers each one and for the full interfaces with JSDoc comments.
+
+### Playing (useIsPlaying)
 
 ```typescript
-interface PlaybackAnimationContextValue {
+interface IsPlayingContextValue {
   isPlaying: boolean;
+}
+```
+
+### Playback refs (usePlaybackRefs)
+
+The value never changes, so calling this hook never re-renders the component.
+
+```typescript
+interface PlaybackRefsContextValue {
   currentTimeRef: RefObject<number>;
   /** Visually-aligned playback time (audible time while playing; raw position otherwise). */
   visualTimeRef: RefObject<number>;
@@ -276,10 +287,12 @@ interface PlaybackAnimationContextValue {
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
   /** Unregister a per-frame callback. */
   unregisterFrameCallback: (id: string) => void;
+  /** The engine. `current` is null until the first build and during a rebuild. */
+  playoutRef: RefObject<PlaylistEngine | null>;
+  /** true during boundary trim drags */
+  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
-
-See [hooks.md](/docs/react/api/hooks) for the full interface with JSDoc comments.
 
 ### Selection (useSelection)
 
@@ -299,7 +312,7 @@ interface CurrentTimeContextValue {
 }
 ```
 
-Changes on a seek, a pause, a stop and a selection whose start moves. For a live position during playback use `currentTimeRef` or a frame callback from `usePlaybackAnimation()`.
+Changes on a seek, a pause, a stop and a selection whose start moves. For a live position during playback use `currentTimeRef` or a frame callback from `usePlaybackRefs()`.
 
 ### Active annotation (useActiveAnnotation)
 
@@ -310,23 +323,41 @@ interface ActiveAnnotationContextValue {
 }
 ```
 
-### State (usePlaylistState)
+### Annotations (usePlaylistAnnotations)
 
 ```typescript
-interface PlaylistStateContextValue {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  annotationsEditable: boolean;
-  isAutomaticScroll: boolean;
-  isLoopEnabled: boolean;
+interface PlaylistAnnotationsContextValue {
   annotations: AnnotationData[];
-  selectedTrackId: string | null;
+  annotationsEditable: boolean;
+  linkEndpoints: boolean;
+  continuousPlay: boolean;
+}
+```
+
+### Loop (useLoop)
+
+```typescript
+interface LoopContextValue {
+  isLoopEnabled: boolean;
   loopStart: number;
   loopEnd: number;
-  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
-  indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container (layout only) */
-  fillViewport: boolean;
+}
+```
+
+### Selected track (useSelectedTrackId)
+
+```typescript
+interface SelectedTrackIdContextValue {
+  selectedTrackId: string | null;
+}
+```
+
+### Undo and redo (useUndoRedo)
+
+```typescript
+interface UndoRedoContextValue {
+  canUndo: boolean;
+  canRedo: boolean;
 }
 ```
 
@@ -376,32 +407,82 @@ interface PlaylistControlsContextValue {
 }
 ```
 
-### Data (usePlaylistData)
+### View (usePlaylistView)
+
+What the provider was configured with. Changes on a prop change, not on a settings click.
 
 ```typescript
-interface PlaylistDataContextValue {
-  duration: number;
-  peaksDataArray: TrackClipPeaks[];
-  trackStates: TrackState[];
-  tracks: ClipTrack[];
+interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
   controls: { show: boolean; width: number };
-  samplesPerPixel: number;
-  timeFormat: TimeFormat;
-  masterVolume: number;
-  canZoomIn: boolean;
-  canZoomOut: boolean;
   barWidth: number;
   barGap: number;
   roundedBars: boolean;
   progressBarWidth: number;
-  isReady: boolean;
   mono: boolean;
-  playoutRef: RefObject<PlaylistEngine | null>;  // from @waveform-playlist/engine
-  isDraggingRef: MutableRefObject<boolean>;       // true during boundary trim drags
+  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
+  indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container (layout only) */
+  fillViewport: boolean;
+}
+```
+
+### Settings (usePlaylistSettings)
+
+The two settings a user toggles. Changes when the user changes either.
+
+```typescript
+interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
+}
+```
+
+### Zoom (usePlaylistZoom)
+
+```typescript
+interface PlaylistZoomContextValue {
+  samplesPerPixel: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+}
+```
+
+### Timeline (usePlaylistTimeline)
+
+Changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level); also when loading finishes (`isReady`) and when peaks arrive.
+
+```typescript
+interface PlaylistTimelineContextValue {
+  tracks: ClipTrack[];
+  peaksDataArray: TrackClipPeaks[];
+  duration: number;
+  isReady: boolean;
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
+}
+```
+
+### Mixer (usePlaylistMixer)
+
+Changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered.
+
+```typescript
+interface PlaylistMixerContextValue {
+  trackStates: TrackState[];
+  masterVolume: number;
+}
+```
+
+### Track reorder preview (useTrackReorderPreview)
+
+```typescript
+interface TrackReorderPreviewContextValue {
+  /** Non-null while a track-reorder drag is live; null otherwise */
+  trackDragPreview: TrackDragPreview | null;
+  /** Incremented after every track-reorder drag ends */
+  trackReorderEpoch: number;
 }
 ```
 
@@ -505,5 +586,5 @@ interface WaveformPlaylistProviderProps {
 ## See Also
 
 - [Waveform Component](/docs/react/api/components#waveform)
-- [usePlaylistState Hook](/docs/react/api/hooks#useplayliststate)
+- [Core Context Hooks](/docs/react/api/hooks#core-context-hooks)
 - [usePlaylistControls Hook](/docs/react/api/hooks#useplaylistcontrols)
