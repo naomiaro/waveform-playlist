@@ -377,15 +377,31 @@ test.describe('Media Element Example', () => {
         await speed.evaluate((el) => [...(el as HTMLSelectElement).options].map((o) => o.value))
       ).toEqual(['0.5', '0.75', '1', '1.25', '1.5', '2']);
 
+      // The media element is not in the document, so the rate is read from
+      // what it does: the position advances about twice as fast as the clock.
+      const position = page.getByLabel('Audio position').first();
+      const seconds = async () => {
+        const [hours, minutes, rest] = ((await position.textContent()) ?? '').split(':');
+        return Number(hours) * 3600 + Number(minutes) * 60 + Number(rest);
+      };
+      const advanceOverOneSecond = async () => {
+        const before = await seconds();
+        await page.waitForTimeout(1000);
+        return (await seconds()) - before;
+      };
+
       await page.getByRole('button', { name: 'Play' }).first().click();
-      await expect(page.getByRole('button', { name: 'Pause' }).first()).toBeEnabled();
+      await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
+      const normal = await advanceOverOneSecond();
+      expect(normal).toBeGreaterThan(0.7);
+      expect(normal).toBeLessThan(1.4);
+
       await speed.selectOption('2');
-      await expect(async () => {
-        const rates = await page.evaluate(() =>
-          [...document.querySelectorAll('audio')].map((audio) => audio.playbackRate)
-        );
-        expect(rates).toContain(2);
-      }).toPass({ timeout: 5000 });
+      await expect(speed).toHaveValue('2');
+      await page.waitForTimeout(200);
+      const doubled = await advanceOverOneSecond();
+      expect(doubled).toBeGreaterThan(1.6);
+      expect(doubled).toBeLessThan(2.6);
       await page.getByRole('button', { name: 'Stop' }).first().click();
     });
 
