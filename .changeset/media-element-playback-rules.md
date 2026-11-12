@@ -10,7 +10,7 @@
 - A drag on the waveform moves the cursor to the start of the range; during playback a press moves playback at once and a drag selects nothing.
 - `duration` and the peaks come from the track's waveform data and are available on the first render. `useMediaElementData()` gains `isReady`; it and `onReady` now mean that the media element has loaded its metadata. A source that cannot be loaded is reported through `onError`.
 - A range and an annotation are also ended from the media element's `timeupdate` event, for a hidden tab where animation frames stop (covered by unit tests; not checked in a really hidden tab).
-- A media error during playback, or a play the browser refuses to start, ends playback instead of leaving `isPlaying` true (a refused start is not detected yet when the `audioContext` prop is used, #783). The provider does not put the source URL in the media error message.
+- A media error during playback, or a play the browser refuses to start, ends playback instead of leaving `isPlaying` true (not detected yet in one case: the `audioContext` prop with a context that is suspended and whose resume the browser leaves pending, #783). The provider does not put the source URL in the media error message.
 - `stop()` while already stopped does not move the cursor.
 - A custom `createPlayout` must implement `on()` and emit `loadedmetadata`.
 

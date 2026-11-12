@@ -70,7 +70,9 @@ export interface MediaElementTrackEvents {
    * policy: no user gesture), the source is not playable, or resuming the
    * AudioContext (or the start that follows it) failed. Not fired for a play
    * that was merely interrupted by a pause() or a newer play() (an
-   * `AbortError`), and not fired while a resume() stays pending: a browser
+   * `AbortError`), not fired for a play that was cancelled (pause, stop,
+   * load, dispose, a newer play) before its resume() failed, and not fired
+   * while a resume() stays pending: a browser
    * may leave it pending, instead of rejecting it, when there was no user
    * gesture.
    */
