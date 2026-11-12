@@ -162,15 +162,16 @@ function TrackSelector() {
 }
 ```
 
-In a playlist rendered by `<Waveform>`, pressing on a track's row or on its default track controls selects that track. The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
+In a playlist rendered by `<Waveform>`, a press on the waveform area of a track's row selects that track, and so does a click on its default track controls (apart from the remove, track menu and reorder buttons). The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
 
 ```css
 [data-track-row][data-selected='true'] {
   outline: 1px solid #63c75f;
+  outline-offset: -1px; /* rows touch: keep the outline inside the row */
 }
 ```
 
-The background of the selected track comes from the theme: `selectedTrackBackground` for the row and `selectedTrackControlsBackground` for its controls (see [Theming](./theming.md)).
+The selected track's colours come from the theme: `selectedTrackBackground` is the background behind its clips and `selectedTrackControlsBackground` the background of its controls (see [Theming](./theming.md)).
 
 ## Adding and Removing Tracks
 

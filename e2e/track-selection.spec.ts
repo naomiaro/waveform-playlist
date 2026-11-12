@@ -51,10 +51,11 @@ test.describe('Selecting a track by pressing on its row', () => {
     await both.click();
     await expect(both).toHaveCount(0);
 
-    // Open it again to see that the first track is in 'both' mode, then close it.
+    // Open it again to see that the first track is in 'both' mode, then close
+    // it with its own button (Escape would also reach the Stop shortcut).
     await menuButton.click();
     await expect(both).toBeChecked();
-    await page.keyboard.press('Escape');
+    await menuButton.click();
     await expect(both).toHaveCount(0);
 
     for (const index of [1, 2, 3, 0]) {
