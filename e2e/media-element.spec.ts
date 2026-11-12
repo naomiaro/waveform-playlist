@@ -1,6 +1,27 @@
 import { test, expect } from '@playwright/test';
 
 /**
+ * How fast the first player's position advances against the clock, over about
+ * a second. Both readings of each pair are taken inside the page, so runner
+ * delays between calls do not enter the ratio.
+ */
+async function playbackSpeed(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(async () => {
+    const element = document.querySelector('[aria-label="Audio position"]');
+    const read = () => {
+      const [hours, minutes, rest] = (element?.textContent ?? '').split(':');
+      return {
+        position: Number(hours) * 3600 + Number(minutes) * 60 + Number(rest),
+        clock: performance.now() / 1000,
+      };
+    };
+    const before = read();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const after = read();
+    return (after.position - before.position) / (after.clock - before.clock);
+  });
+}
+/**
  * Media Element Playout tests
  *
  * The Media Element example renders two independent players:
@@ -150,8 +171,8 @@ test.describe('Media Element Example', () => {
     });
 
     // #769: the provider's one animation loop draws the playhead and the
-    // progress overlay; they run no loop of their own. The page's own time
-    // display is the second request per frame.
+    // progress overlay; they run no loop of their own. Since #688 the time
+    // display is the library's AudioPosition, on the same loop.
     test('one provider loop moves the playhead and the progress overlay', async ({ page }) => {
       const player = page.locator('[data-scroll-container]').first();
       await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
@@ -204,9 +225,10 @@ test.describe('Media Element Example', () => {
         () => (window as unknown as { __raf: { calls: number; frames: number } }).__raf
       );
       expect(raf.frames).toBeGreaterThan(10);
-      // Two per frame: the provider's loop and the example's time display.
-      // (Four before #769: the playhead and the overlay had their own.)
-      expect(raf.calls / raf.frames).toBeLessThan(2.5);
+      // One per frame: the provider's loop. (Four before #769: the playhead
+      // and the overlay had their own; two until #688: the page's own time
+      // display.)
+      expect(raf.calls / raf.frames).toBeLessThan(1.5);
 
       await stop.click();
       await expect(async () => {
@@ -226,20 +248,19 @@ test.describe('Media Element Example', () => {
       const player = page.locator('[data-scroll-container]').first();
       await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
       const playhead = player.locator('[data-playhead]');
-      const timeDisplay = page.getByText(/^\d+:\d\d \/ \d+:\d\d$/).first();
+      const timeDisplay = page.getByLabel('Audio position').first();
       const play = page.getByRole('button', { name: /Play/ }).first();
       const stop = page.getByRole('button', { name: /Stop/ }).first();
       const playheadX = () =>
         playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
       const shownSeconds = async () => {
-        const [minutes, seconds] = ((await timeDisplay.textContent()) ?? '')
-          .split(' / ')[0]
-          .split(':');
-        return Number(minutes) * 60 + Number(seconds);
+        // hh:mm:ss.uuu, whole seconds
+        const [hours, minutes, seconds] = ((await timeDisplay.textContent()) ?? '').split(':');
+        return Number(hours) * 3600 + Number(minutes) * 60 + Math.floor(Number(seconds));
       };
 
       // At rest, before any Play: the cursor and the time display are at 8 s (of 16).
-      await expect(timeDisplay).toHaveText(/^0:08 \//, { timeout: 10000 });
+      await expect(timeDisplay).toHaveText('00:00:08.000', { timeout: 10000 });
       let restingX = 0;
       await expect(async () => {
         restingX = await playheadX();
@@ -368,10 +389,123 @@ test.describe('Media Element Example', () => {
       }).toPass({ timeout: 30000 });
     });
 
-    test('speed controls are visible', async ({ page }) => {
-      await expect(page.getByRole('button', { name: '0.5x' }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: '1x' }).first()).toBeVisible();
-      await expect(page.getByRole('button', { name: '2x' }).first()).toBeVisible();
+    // #688, part 2: the page's transport is the library's, on the shared hooks.
+    test('the speed dropdown lists the speeds and changes the playback rate', async ({ page }) => {
+      const speed = page.getByRole('combobox', { name: 'Playback speed' }).first();
+      await expect(speed).toBeVisible();
+      await expect(speed).toHaveValue('1');
+      expect(
+        await speed.evaluate((el) => [...(el as HTMLSelectElement).options].map((o) => o.value))
+      ).toEqual(['0.5', '0.75', '1', '1.25', '1.5', '2']);
+
+      // The media element is not in the document, so the rate is read from
+      // what it does: how fast the position advances against the clock.
+      const position = page.getByLabel('Audio position').first();
+      await page.getByRole('button', { name: 'Play' }).first().click();
+      await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
+      await page.waitForTimeout(200);
+      const normal = await playbackSpeed(page);
+      expect(normal).toBeGreaterThan(0.8);
+      expect(normal).toBeLessThan(1.2);
+
+      await speed.selectOption('2');
+      await expect(speed).toHaveValue('2');
+      await page.waitForTimeout(200);
+      const doubled = await playbackSpeed(page);
+      expect(doubled).toBeGreaterThan(1.7);
+      expect(doubled).toBeLessThan(2.3);
+      await page.getByRole('button', { name: 'Stop' }).first().click();
+    });
+
+    // Review of #688 part 2: a replaced player (here: the Preserve Pitch
+    // toggle recreates it) runs at the speed the user chose, which is what
+    // the dropdown goes on showing. Before, it ran at the provider's prop.
+    test('the chosen speed survives a replaced player', async ({ page }) => {
+      const speed = page.getByRole('combobox', { name: 'Playback speed' }).first();
+      const position = page.getByLabel('Audio position').first();
+      await speed.selectOption('2');
+      await page.getByRole('button', { name: 'Off', exact: true }).first().click();
+      await expect(speed).toHaveValue('2');
+
+      await page.getByRole('button', { name: 'Play' }).first().click();
+      await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
+      await page.waitForTimeout(200);
+      const replaced = await playbackSpeed(page);
+      expect(replaced).toBeGreaterThan(1.7);
+      expect(replaced).toBeLessThan(2.3);
+      await page.getByRole('button', { name: 'Stop' }).first().click();
+    });
+
+    test('Stop is disabled unless playing; after Pause the cursor stays where it paused', async ({
+      page,
+    }) => {
+      const play = page.getByRole('button', { name: 'Play' }).first();
+      const pause = page.getByRole('button', { name: 'Pause' }).first();
+      const stop = page.getByRole('button', { name: 'Stop' }).first();
+      const position = page.getByLabel('Audio position').first();
+
+      await expect(play).toBeEnabled();
+      await expect(pause).toBeDisabled();
+      await expect(stop).toBeDisabled();
+
+      await play.click();
+      await expect(stop).toBeEnabled();
+      await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
+      await pause.click();
+      await expect(stop).toBeDisabled();
+      await expect(play).toBeEnabled();
+      const paused = await position.textContent();
+      expect(paused).not.toBe('00:00:00.000');
+      await page.waitForTimeout(300);
+      await expect(position).toHaveText(paused ?? '');
+    });
+
+    // The library Play button plays a highlighted range and stops at its end
+    // with the cursor back at its start (#688; unit tests only until the page
+    // had a button that passes a duration).
+    test('Play plays a dragged selection and returns the cursor to its start', async ({ page }) => {
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      await player.scrollIntoViewIfNeeded();
+      const play = page.getByRole('button', { name: 'Play' }).first();
+      const position = page.getByLabel('Audio position').first();
+      const playhead = player.locator('[data-playhead]');
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await player.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass();
+      const y = box!.y + box!.height / 2;
+      // Left to right, about one second of audio wide.
+      await page.mouse.move(box!.x + 100, y);
+      await page.mouse.down();
+      await page.mouse.move(box!.x + 130, y, { steps: 5 });
+      await page.mouse.move(box!.x + 160, y, { steps: 5 });
+      await page.mouse.up();
+
+      let startX = 0;
+      await expect(async () => {
+        startX = await playheadX();
+        expect(Math.abs(startX - 100)).toBeLessThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
+      const startText = await position.textContent();
+      expect(startText).not.toBe('00:00:00.000');
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(startX + 5);
+      }).toPass({ timeout: 10000 });
+
+      // It stops by itself at the end of the range: Play is enabled again and
+      // the cursor is back at the start of the selection, not at its end.
+      await expect(play).toBeEnabled({ timeout: 15000 });
+      await expect(async () => {
+        expect(Math.abs((await playheadX()) - startX)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 5000 });
+      await expect(position).toHaveText(startText ?? '');
     });
   });
 });

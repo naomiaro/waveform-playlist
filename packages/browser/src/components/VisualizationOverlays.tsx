@@ -15,15 +15,18 @@ import {
 import {
   useActiveAnnotation,
   useCurrentTime,
-  usePlaylistControls,
   useSelection,
   usePlaylistView,
   usePlaylistZoom,
   usePlaybackRefs,
-  usePlaylistAnnotations,
   useLoop,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+  usePlaybackControls,
+  useEditorControls,
+  useEngineRefs,
+  useAnnotations,
+  useAnnotationEditing,
+} from '../contexts/playlistContexts';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
@@ -58,14 +61,9 @@ const CustomPlayhead: React.FC<{
   samplesPerPixel: number;
   sampleRate: number;
 }> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
-  const {
-    currentTimeRef,
-    visualTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    getPlaybackTime,
-    getAudioContextTime,
-  } = usePlaybackRefs();
+  const { currentTimeRef, visualTimeRef } = usePlaybackRefs();
+  const { playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime } =
+    useEngineRefs();
   const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only, so a seek while stopped moves a custom
   // playhead: the position below comes from the refs.
@@ -133,9 +131,10 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
   width,
   getAnnotationBoxLabel,
 }) => {
-  const { annotations, annotationsEditable, continuousPlay } = usePlaylistAnnotations();
+  const { annotations, continuousPlay } = useAnnotations();
+  const { annotationsEditable } = useAnnotationEditing();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setActiveAnnotationId, play, annotationPreview } = usePlaylistControls();
+  const { setActiveAnnotationId, play, annotationPreview } = usePlaybackControls();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   // While an edge is dragged with the preview, the boxes follow the drag.
@@ -183,7 +182,7 @@ export interface LoopRegionOverlayProps {
 export const LoopRegionOverlay: React.FC<LoopRegionOverlayProps> = ({ maxPosition }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
-  const { setLoopRegion } = usePlaylistControls();
+  const { setLoopRegion } = useEditorControls();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
 

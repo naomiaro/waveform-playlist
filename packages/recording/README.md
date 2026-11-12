@@ -226,7 +226,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
 
 **Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
 
-**Overdub with `@waveform-playlist/browser`:** call `usePlaylistControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
+**Overdub with `@waveform-playlist/browser`:** call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
 
 ### Types
 

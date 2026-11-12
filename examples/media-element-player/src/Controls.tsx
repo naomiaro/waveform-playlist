@@ -1,20 +1,11 @@
-import { useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import {
-  useMediaElementAnimation,
-  useMediaElementState,
-  useMediaElementControls,
-  useMediaElementData,
+  PlayButton,
+  PauseButton,
+  StopButton,
+  PlaybackRateSelect,
+  AudioPosition,
 } from '@waveform-playlist/browser';
-
-const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
 const Bar = styled.div`
   display: flex;
@@ -57,7 +48,8 @@ const Label = styled.span`
   color: #9a9aa6;
 `;
 
-const Time = styled.span`
+// The library's position display, in this page's colours.
+const Time = styled(AudioPosition)`
   font-family: 'Courier New', monospace;
   font-size: 0.95rem;
   color: #c49a6c;
@@ -71,50 +63,19 @@ interface ControlsProps {
 }
 
 export function Controls({ preservesPitch, onPreservesPitchChange }: ControlsProps) {
-  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
-  const { playbackRate } = useMediaElementState();
-  const { play, pause, stop, setPlaybackRate } = useMediaElementControls();
-  const { duration } = useMediaElementData();
-
-  // `currentTime` (React state) only updates on pause/stop/seek/end. For a smooth
-  // readout during playback, drive a DOM ref from `currentTimeRef` via rAF.
-  const timeRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      if (timeRef.current) {
-        timeRef.current.textContent = `${formatTime(currentTimeRef.current ?? 0)} / ${formatTime(duration)}`;
-      }
-      if (isPlaying) raf = requestAnimationFrame(tick);
-    };
-    if (isPlaying) raf = requestAnimationFrame(tick);
-    else tick();
-    return () => cancelAnimationFrame(raf);
-  }, [isPlaying, currentTimeRef, duration]);
-
   return (
     <Bar>
       <Group>
-        <Button onClick={() => play()} disabled={isPlaying}>
-          ▶ Play
-        </Button>
-        <Button onClick={() => pause()} disabled={!isPlaying}>
-          ⏸ Pause
-        </Button>
-        <Button onClick={() => stop()}>⏹ Stop</Button>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
       </Group>
 
-      <Time ref={timeRef}>
-        {formatTime(currentTimeRef.current ?? 0)} / {formatTime(duration)}
-      </Time>
+      <Time />
 
       <Group>
         <Label>Speed</Label>
-        {SPEEDS.map((rate) => (
-          <Button key={rate} $active={playbackRate === rate} onClick={() => setPlaybackRate(rate)}>
-            {rate}×
-          </Button>
-        ))}
+        <PlaybackRateSelect />
       </Group>
 
       <Group>

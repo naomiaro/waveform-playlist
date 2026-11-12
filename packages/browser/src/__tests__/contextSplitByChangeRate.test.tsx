@@ -11,16 +11,19 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import * as contextModule from '../WaveformPlaylistContext';
 import * as publicApi from '../index';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
+  useEngineRefs,
+  useAnnotations,
+  useAnnotationEditing,
   usePlaylistView,
   usePlaylistSettings,
   usePlaylistZoom,
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
-  usePlaylistAnnotations,
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
@@ -29,7 +32,7 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import type { AnnotationData, ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -99,17 +102,34 @@ const HOOKS = {
   timeline: usePlaylistTimeline,
   mixer: usePlaylistMixer,
   reorder: useTrackReorderPreview,
-  annotations: usePlaylistAnnotations,
+  annotations: useAnnotations,
+  annotationEditing: useAnnotationEditing,
   loop: useLoop,
   selectedTrack: useSelectedTrackId,
   undo: useUndoRedo,
   isPlaying: useIsPlaying,
   refs: usePlaybackRefs,
+  engineRefs: useEngineRefs,
   selection: useSelection,
   currentTime: useCurrentTime,
   activeAnnotation: useActiveAnnotation,
-  controls: usePlaylistControls,
+  controls: usePlaybackControls,
+  editorControls: useEditorControls,
 } as const;
+
+// The hooks both providers serve (#688); the rest need WaveformPlaylistProvider.
+const SHARED_HOOKS: HookName[] = [
+  'view',
+  'settings',
+  'zoom',
+  'annotations',
+  'isPlaying',
+  'refs',
+  'selection',
+  'currentTime',
+  'activeAnnotation',
+  'controls',
+];
 
 type HookName = keyof typeof HOOKS;
 const HOOK_NAMES = Object.keys(HOOKS) as HookName[];
@@ -217,27 +237,67 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('mixer')).toEqual(['masterVolume', 'trackStates']);
     expect(keys('reorder')).toEqual(['trackDragPreview', 'trackReorderEpoch']);
-    expect(keys('annotations')).toEqual(
-      ['annotations', 'annotationsEditable', 'continuousPlay', 'linkEndpoints'].sort()
-    );
+    expect(keys('annotations')).toEqual(['annotations', 'continuousPlay']);
+    expect(keys('annotationEditing')).toEqual(['annotationsEditable', 'linkEndpoints']);
     expect(keys('loop')).toEqual(['isLoopEnabled', 'loopEnd', 'loopStart']);
     expect(keys('selectedTrack')).toEqual(['selectedTrackId']);
     expect(keys('undo')).toEqual(['canRedo', 'canUndo']);
     expect(keys('isPlaying')).toEqual(['isPlaying']);
     expect(keys('refs')).toEqual(
+      ['currentTimeRef', 'visualTimeRef', 'registerFrameCallback', 'unregisterFrameCallback'].sort()
+    );
+    expect(keys('engineRefs')).toEqual(
       [
-        'currentTimeRef',
-        'visualTimeRef',
         'playbackStartTimeRef',
         'audioStartPositionRef',
         'getPlaybackTime',
         'getAudioContextTime',
         'getLookAhead',
         'getOutputLatency',
-        'registerFrameCallback',
-        'unregisterFrameCallback',
         'playoutRef',
         'isDraggingRef',
+      ].sort()
+    );
+    expect(keys('controls')).toEqual(
+      [
+        'play',
+        'pause',
+        'stop',
+        'seekTo',
+        'setSelection',
+        'setTimeFormat',
+        'setAutomaticScroll',
+        'setScrollContainer',
+        'scrollContainerRef',
+        'setContinuousPlay',
+        'setAnnotations',
+        'annotationPreview',
+        'setActiveAnnotationId',
+      ].sort()
+    );
+    expect(keys('editorControls')).toEqual(
+      [
+        'setCurrentTime',
+        'setTrackMute',
+        'setTrackSolo',
+        'setTrackVolume',
+        'setTrackPan',
+        'reorderTrack',
+        'bumpTrackReorderEpoch',
+        'setTrackDragPreview',
+        'setSelectedTrackId',
+        'zoomIn',
+        'zoomOut',
+        'setMasterVolume',
+        'setLinkEndpoints',
+        'setAnnotationsEditable',
+        'setLoopEnabled',
+        'setLoopRegion',
+        'setLoopRegionFromSelection',
+        'clearLoopRegion',
+        'undo',
+        'redo',
+        'setRecordingActive',
       ].sort()
     );
   });
@@ -250,27 +310,27 @@ describe('each hook returns its own group of fields (#768)', () => {
     expect(values.timeline.duration).toBe(1);
     expect(values.mixer.trackStates).toHaveLength(2);
     expect(values.annotations.annotations).toHaveLength(2);
-    expect(values.refs.playoutRef.current).not.toBeNull();
+    expect(values.engineRefs.playoutRef.current).not.toBeNull();
   });
 });
 
 describe('an action re-renders only the readers of the group it changes (#768)', () => {
   it('a track volume change: the mixer', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setTrackVolume(0, 0.4))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackVolume(0, 0.4))).toEqual(['mixer']);
     expect(values.mixer.trackStates[0].volume).toBe(0.4);
   });
 
   it('a mute, a solo and a pan change: the mixer', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setTrackMute(0, true))).toEqual(['mixer']);
-    expect(await rendered(() => values.controls.setTrackSolo(1, true))).toEqual(['mixer']);
-    expect(await rendered(() => values.controls.setTrackPan(1, -0.5))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackMute(0, true))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackSolo(1, true))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackPan(1, -0.5))).toEqual(['mixer']);
   });
 
   it('a master volume change: the mixer', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setMasterVolume(0.5))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setMasterVolume(0.5))).toEqual(['mixer']);
     expect(values.mixer.masterVolume).toBe(0.5);
   });
 
@@ -291,33 +351,39 @@ describe('an action re-renders only the readers of the group it changes (#768)',
 
   it('a zoom: the zoom value, and the timeline (peaks are per zoom level)', async () => {
     await mount();
-    expect(await rendered(() => values.controls.zoomIn())).toEqual(['timeline', 'zoom']);
+    expect(await rendered(() => values.editorControls.zoomIn())).toEqual(['timeline', 'zoom']);
     expect(values.zoom.samplesPerPixel).toBe(500);
     expect(values.zoom.canZoomIn).toBe(false);
   });
 
   it('a loop toggle and a loop region change: the loop', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setLoopEnabled(true))).toEqual(['loop']);
-    expect(await rendered(() => values.controls.setLoopRegion(0.2, 0.6))).toEqual(['loop']);
+    expect(await rendered(() => values.editorControls.setLoopEnabled(true))).toEqual(['loop']);
+    expect(await rendered(() => values.editorControls.setLoopRegion(0.2, 0.6))).toEqual(['loop']);
     expect(values.loop).toEqual({ isLoopEnabled: true, loopStart: 0.2, loopEnd: 0.6 });
   });
 
   it('selecting a track: the selected track id', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setSelectedTrackId('track-2'))).toEqual([
+    expect(await rendered(() => values.editorControls.setSelectedTrackId('track-2'))).toEqual([
       'selectedTrack',
     ]);
     expect(values.selectedTrack.selectedTrackId).toBe('track-2');
   });
 
-  it('annotation settings and annotation edits: the annotations', async () => {
+  // #688: continuous play is with the annotations (both providers have it);
+  // the two editing settings are WebAudio only and have their own value.
+  it('continuous play and annotation edits: the annotations; link endpoints and editable: the annotation editing', async () => {
     const { setAnnotations } = await mount();
     expect(await rendered(() => values.controls.setContinuousPlay(true))).toEqual(['annotations']);
-    expect(await rendered(() => values.controls.setLinkEndpoints(true))).toEqual(['annotations']);
-    expect(await rendered(() => values.controls.setAnnotationsEditable(true))).toEqual([
-      'annotations',
+    expect(values.annotations.continuousPlay).toBe(true);
+    expect(await rendered(() => values.editorControls.setLinkEndpoints(true))).toEqual([
+      'annotationEditing',
     ]);
+    expect(await rendered(() => values.editorControls.setAnnotationsEditable(true))).toEqual([
+      'annotationEditing',
+    ]);
+    expect(values.annotationEditing).toEqual({ annotationsEditable: true, linkEndpoints: true });
     expect(
       await rendered(() =>
         setAnnotations([{ ...ANNOTATIONS[0], lines: ['changed'] }, ANNOTATIONS[1]])
@@ -329,16 +395,24 @@ describe('an action re-renders only the readers of the group it changes (#768)',
   it('an edit and its undo: the undo state (and nothing that is not about tracks)', async () => {
     await mount();
     expect(values.undo).toEqual({ canUndo: false, canRedo: false });
-    const quiet: HookName[] = ['view', 'settings', 'zoom', 'loop', 'selectedTrack', 'annotations'];
+    const quiet: HookName[] = [
+      'view',
+      'settings',
+      'zoom',
+      'loop',
+      'selectedTrack',
+      'annotations',
+      'annotationEditing',
+    ];
 
     const afterEdit = await rendered(() => {
-      values.refs.playoutRef.current!.moveClip('track-1', 'track-1-clip', SAMPLE_RATE / 10);
+      values.engineRefs.playoutRef.current!.moveClip('track-1', 'track-1-clip', SAMPLE_RATE / 10);
     });
     expect(afterEdit).toContain('undo');
     expect(values.undo).toEqual({ canUndo: true, canRedo: false });
     for (const name of quiet) expect(afterEdit).not.toContain(name);
 
-    const afterUndo = await rendered(() => values.controls.undo());
+    const afterUndo = await rendered(() => values.editorControls.undo());
     expect(afterUndo).toContain('undo');
     expect(values.undo).toEqual({ canUndo: false, canRedo: true });
     for (const name of quiet) expect(afterUndo).not.toContain(name);
@@ -347,9 +421,13 @@ describe('an action re-renders only the readers of the group it changes (#768)',
   it('a track-reorder preview: the reorder preview', async () => {
     await mount();
     expect(
-      await rendered(() => values.controls.setTrackDragPreview({ trackId: 'track-1', toIndex: 1 }))
+      await rendered(() =>
+        values.editorControls.setTrackDragPreview({ trackId: 'track-1', toIndex: 1 })
+      )
     ).toEqual(['reorder']);
-    expect(await rendered(() => values.controls.bumpTrackReorderEpoch())).toEqual(['reorder']);
+    expect(await rendered(() => values.editorControls.bumpTrackReorderEpoch())).toEqual([
+      'reorder',
+    ]);
   });
 
   it('play: isPlaying only; pause: isPlaying and the resting position', async () => {
@@ -389,30 +467,35 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'loop',
       'selectedTrack',
       'annotations',
+      'annotationEditing',
       'reorder',
       'isPlaying',
       'refs',
+      'engineRefs',
       'selection',
       'activeAnnotation',
       'controls',
+      'editorControls',
     ] as HookName[]) {
       expect(names).not.toContain(quiet);
     }
   });
 });
 
-describe('the refs value never changes (#768)', () => {
-  it('keeps its identity through every kind of change', async () => {
+describe('the refs values never change (#768)', () => {
+  it('keep their identity through every kind of change', async () => {
     const { setTracks } = await mount();
     const before = values.refs;
     const rendersBefore = renders.refs;
+    const engineBefore = values.engineRefs;
+    const engineRendersBefore = renders.engineRefs;
 
     await act(async () => {
-      values.controls.setTrackVolume(0, 0.4);
-      values.controls.setLoopEnabled(true);
-      values.controls.setSelectedTrackId('track-2');
+      values.editorControls.setTrackVolume(0, 0.4);
+      values.editorControls.setLoopEnabled(true);
+      values.editorControls.setSelectedTrackId('track-2');
       values.controls.setTimeFormat('seconds');
-      values.controls.zoomIn();
+      values.editorControls.zoomIn();
     });
     await act(async () => {
       await values.controls.play(0);
@@ -427,6 +510,8 @@ describe('the refs value never changes (#768)', () => {
 
     expect(values.refs).toBe(before);
     expect(renders.refs).toBe(rendersBefore);
+    expect(values.engineRefs).toBe(engineBefore);
+    expect(renders.engineRefs).toBe(engineRendersBefore);
   });
 });
 
@@ -450,7 +535,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'usePlaylistTimeline',
     'usePlaylistMixer',
     'useTrackReorderPreview',
-    'usePlaylistAnnotations',
+    'useAnnotations',
     'useLoop',
     'useSelectedTrackId',
     'useUndoRedo',
@@ -471,8 +556,16 @@ describe('the hooks the groups replace are gone (#768)', () => {
       HOOKS[name]();
       return null;
     };
-    expect(() => render(<Reader />)).toThrow(
-      `${HOOKS[name].name} must be used within WaveformPlaylistProvider`
-    );
+    // A hook both providers serve names both (#688).
+    const provider = SHARED_HOOKS.includes(name)
+      ? 'WaveformPlaylistProvider or MediaElementPlaylistProvider'
+      : 'WaveformPlaylistProvider';
+    let message: string | null = null;
+    try {
+      render(<Reader />);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toBe(`${HOOKS[name].name} must be used within ${provider}`);
   });
 });

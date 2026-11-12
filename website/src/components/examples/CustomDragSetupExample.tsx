@@ -15,9 +15,9 @@ import {
   AudioPosition,
   useClipDragHandlers,
   useDragSensors,
-  usePlaylistControls,
+  useEditorControls,
   usePlaylistZoom,
-  usePlaybackRefs,
+  useEngineRefs,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -108,8 +108,8 @@ interface ClipDragSetupProps {
  */
 function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = usePlaybackRefs();
-  const { setSelectedTrackId } = usePlaylistControls();
+  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { setSelectedTrackId } = useEditorControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
   // so a swipe still scrolls. Mouse and pen are unaffected.

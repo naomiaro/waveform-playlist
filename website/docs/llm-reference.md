@@ -8,7 +8,7 @@ description: Machine-readable API reference for LLMs and coding agents. All Type
 
 This page contains all TypeScript interfaces extracted from source code. Designed for LLMs and coding agents — no prose, just types.
 
-**Source of truth:** `packages/browser/src/WaveformPlaylistContext.tsx`, `packages/browser/src/MediaElementPlaylistContext.tsx`
+**Source of truth:** `packages/browser/src/contexts/playlistContexts.ts` (context value types and hooks), `packages/browser/src/WaveformPlaylistContext.tsx`, `packages/browser/src/MediaElementPlaylistContext.tsx`
 
 **Requirements:** the React packages need `react` / `react-dom` `^19.0.0` and `styled-components` `^6.0.0`.
 
@@ -91,7 +91,7 @@ interface MediaElementPlaylistProviderProps {
   samplesPerPixel?: number;              // Default: 1024
   waveHeight?: number;                   // Default: 100
   timescale?: boolean;                   // Default: false
-  playbackRate?: number;                 // Default: 1 (range: 0.5–2.0)
+  playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false
   theme?: Partial<WaveformPlaylistTheme>;
@@ -116,87 +116,117 @@ interface MediaElementPlaylistProviderProps {
 
 ---
 
-## MediaElement Context Hooks
+## Context Hooks: either provider
 
-### useMediaElementAnimation()
-
-```typescript
-interface MediaElementAnimationContextValue {
-  isPlaying: boolean;
-  currentTime: number;
-  currentTimeRef: RefObject<number>;
-}
-```
-
-### useMediaElementState()
-
-```typescript
-interface MediaElementStateContextValue {
-  continuousPlay: boolean;
-  annotations: AnnotationData[];
-  activeAnnotationId: string | null;
-  playbackRate: number;
-  isAutomaticScroll: boolean;
-}
-```
-
-### useMediaElementControls()
-
-```typescript
-interface MediaElementControlsContextValue {
-  // Same rules as WaveformPlaylistProvider's controls.
-  // play: from startTime (default: the cursor); with playDuration it stops by itself and the
-  // cursor rests at the range's end, or at the selection's START when the range is the
-  // highlighted selection (start inside it, end at its end). Queued if the player does not exist yet.
-  play: (startTime?: number, playDuration?: number) => Promise<void>;
-  pause: () => void;
-  stop: () => void;                      // cursor returns to where playback started (not to 0); while already stopped it does not move
-  seekTo: (time: number) => void;        // while playing: restarts playback at `time`
-  setPlaybackRate: (rate: number) => void;
-  setContinuousPlay: (enabled: boolean) => void;
-  setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
-  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
-  setActiveAnnotationId: (id: string | null) => void;
-  setAutomaticScroll: (enabled: boolean) => void;
-  setScrollContainer: (element: HTMLDivElement | null) => void;
-  scrollContainerRef: RefObject<HTMLDivElement | null>;
-}
-```
-
-### useMediaElementData()
-
-```typescript
-interface MediaElementDataContextValue {
-  duration: number;                      // track.waveformData.duration, from the first render (never "0 until loaded")
-  isReady: boolean;                      // media element has loaded its metadata; false again while a replaced player loads. Do NOT gate Play on it: play() before ready is queued or started, and some browsers load metadata only on play
-  peaksDataArray: TrackClipPeaks[];
-  sampleRate: number;
-  waveHeight: number;
-  timeScaleHeight: number;
-  samplesPerPixel: number;
-  playoutRef: RefObject<MediaElementPlayout | null>; // .outputNode for effects bridge
-  controls: { show: boolean; width: number };
-  barWidth: number;
-  barGap: number;
-  roundedBars: boolean;
-  progressBarWidth: number;
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
-}
-```
-
----
-
-## WaveformPlaylist Context Hooks
-
-One hook per group of fields that change together; a component re-renders only for the hooks it calls. All require `WaveformPlaylistProvider`. The value types below are exported from `@waveform-playlist/browser`, with `ClipPeaks`, `TrackClipPeaks`, `TrackDragPreview`, `TrackState` and `FrameData`. They replace the three combined data / state / animation hooks of earlier majors — field-to-hook table in the [upgrade guide](./react/upgrading.md).
+Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider`; each hook reads the nearest one. Outside both: `<hook> must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider`. Interfaces copied from `packages/browser/src/contexts/playlistContexts.ts`; all value types are exported from `@waveform-playlist/browser`, with `ClipPeaks`, `TrackClipPeaks`, `TrackDragPreview`, `TrackState` and `FrameData`. Removed hooks and where their fields went: [upgrade guide](./react/upgrading.md#one-set-of-hooks-and-controls-for-both-providers).
 
 ### useIsPlaying()
 
 ```typescript
-// Re-renders on play, pause and stop.
+/**
+ * Whether playback is running. Its own context (#768): it is the only value of
+ * the playback state that changes on play, pause and stop, and a component
+ * that needs a ref or a frame callback (`usePlaybackRefs`) must not re-render
+ * with it.
+ */
 interface IsPlayingContextValue {
   isPlaying: boolean;
+}
+```
+
+### useCurrentTime()
+
+```typescript
+/**
+ * Where the cursor rests, in seconds: the position playback starts from. It
+ * changes on a seek, a pause, a stop (including playback reaching the end) and
+ * a selection whose start moves; it does NOT advance during playback (read
+ * `currentTimeRef`, or register a frame callback, for that). Apart from the
+ * other values so that a component reading `isPlaying` or a ref is not
+ * re-rendered by every seek, nor by every pointer move of a leftward selection
+ * drag (#740).
+ */
+interface CurrentTimeContextValue {
+  currentTime: number;
+}
+```
+
+### useSelection()
+
+```typescript
+/**
+ * The selected time range, in seconds. Apart from the state context because it
+ * is the only state that changes on every pointer move of a selection drag
+ * (#733). `selectionStart === selectionEnd` means nothing is selected.
+ */
+interface SelectionContextValue {
+  selectionStart: number;
+  selectionEnd: number;
+}
+```
+
+### useActiveAnnotation()
+
+```typescript
+/**
+ * The annotation that is playing or was last chosen. Its own context because
+ * it changes at every annotation boundary during playback (#740).
+ */
+interface ActiveAnnotationContextValue {
+  activeAnnotationId: string | null;
+}
+```
+
+### useAnnotations()
+
+```typescript
+/**
+ * The annotations and whether playback runs on past the end of one. Changes
+ * on an annotation edit and on the continuous-play toggle; an edge drag that
+ * uses the preview source changes it once, on release.
+ */
+interface AnnotationsContextValue {
+  annotations: AnnotationData[];
+  continuousPlay: boolean;
+}
+```
+
+### usePlaybackControls()
+
+```typescript
+/**
+ * The actions both providers have (#688). The value never changes, so reading
+ * it never re-renders.
+ */
+interface PlaybackControlsContextValue {
+  /**
+   * Starts playback at `startTime` (default: the cursor). With `playDuration`
+   * it stops by itself after that many seconds of audio.
+   */
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
+  pause: () => void;
+  /** Ends playback and returns the cursor to where playback started. */
+  stop: () => void;
+  /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
+  seekTo: (time: number) => void;
+  /** Sets the selected range and moves the cursor to its start. */
+  setSelection: (start: number, end: number) => void;
+
+  setTimeFormat: (format: TimeFormat) => void;
+
+  setAutomaticScroll: (enabled: boolean) => void;
+  setScrollContainer: (element: HTMLDivElement | null) => void;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+
+  setContinuousPlay: (enabled: boolean) => void;
+  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
+  /**
+   * Where an annotation edge drag shows its moves while it is in progress.
+   * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom
+   * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
+   */
+  annotationPreview: AnnotationPreviewHandle;
+  setActiveAnnotationId: (id: string | null) => void;
 }
 ```
 
@@ -204,131 +234,113 @@ interface IsPlayingContextValue {
 
 ```typescript
 interface FrameData {
-  readonly time: number;          // Raw engine time (state/logic — NOT visual positioning)
-  readonly visualTime: number;    // engine.getAudibleTime() while playing, raw time when resting (use for DOM positioning)
+  /** Raw engine time (for state/logic — NOT for visual positioning). */
+  readonly time: number;
+  /** Visually-aligned time for DOM positioning: engine.getAudibleTime() while
+   *  playing (matches speaker output), raw time when resting. */
+  readonly visualTime: number;
   readonly sampleRate: number;
   readonly samplesPerPixel: number;
 }
 
-// Refs and functions that keep their identity for the life of the provider.
-// Calling this hook NEVER re-renders the component. Read a ref's .current in an
-// event handler, an effect or a frame callback, not during render. A component
-// that shows the stopped position from currentTimeRef.current (in render, or in
-// an effect without deps) must ALSO call useCurrentTime(); one that needs to
-// follow play/stop calls useIsPlaying(); one that needs tracks/duration/isReady
-// calls usePlaylistTimeline(). TypeScript does not flag a missing call.
+/**
+ * Refs and functions that keep their identity for the life of the provider
+ * (#768). Reading this never causes a re-render: read a ref's `.current` in an
+ * event handler, an effect or a frame callback, not during render.
+ */
 interface PlaybackRefsContextValue {
-  currentTimeRef: RefObject<number>;   // live position; read it in callbacks and frame callbacks
-  /** Visually-aligned playback time: engine.getAudibleTime() (raw − outputLatency − engine.lookAhead) while playing, raw time when resting. */
-  visualTimeRef: RefObject<number>;
-  playbackStartTimeRef: RefObject<number>;   // context.currentTime when playback started
-  audioStartPositionRef: RefObject<number>;  // audio position when playback started
-  /** Raw playback time from engine (auto-wraps at loop boundaries). */
-  getPlaybackTime: () => number;
-  /** Current time of the adapter's AudioContext, in seconds. */
-  getAudioContextTime: () => number;
-  /** Current adapter scheduler lookahead (Tone ~0.1s, native 0). */
-  getLookAhead: () => number;
-  /** AudioContext.outputLatency from the playout adapter. */
-  getOutputLatency: () => number;
-  /** Register/unregister per-frame callbacks driven by the shared rAF loop. */
+  /** The playback position, in seconds. Advances during playback. */
+  currentTimeRef: React.RefObject<number>;
+  /**
+   * The position to DRAW. Under the WebAudio provider it is the audible
+   * position (the raw time less output latency and lookahead while playing);
+   * under the MediaElement provider it is `currentTimeRef` itself, because a
+   * media element reports the audible position.
+   */
+  visualTimeRef: React.RefObject<number>;
+  /** Register a per-frame callback driven by the provider's one animation loop. */
   registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  /** Unregister a per-frame callback. */
   unregisterFrameCallback: (id: string) => void;
-  /** The engine (PlaylistEngine from @waveform-playlist/engine). current is null until the first build and during a rebuild. */
-  playoutRef: RefObject<PlaylistEngine | null>;
-  /** Ref set during boundary trim drags — when true, loadAudio skips engine rebuild */
-  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
 
-### useSelection()
+### usePlaylistView()
 
 ```typescript
-// The selected time range in seconds. Its own context: it changes on every
-// pointer move of a selection drag.
-// WaveformPlaylistProvider only. Set it with usePlaylistControls().setSelection(start, end).
-interface SelectionContextValue {
-  selectionStart: number;       // selectionStart === selectionEnd: nothing selected
-  selectionEnd: number;
+/**
+ * View configuration (#768): what the provider was configured with. Changes
+ * on a prop change (and once when the real sample rate is known), never
+ * during an interaction.
+ */
+interface PlaylistViewContextValue {
+  sampleRate: number;
+  waveHeight: number;
+  timeScaleHeight: number;
+  controls: { show: boolean; width: number };
+  barWidth: number;
+  barGap: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
+  roundedBars: boolean;
+  /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
+  progressBarWidth: number;
+  /** Whether tracks are rendered in mono mode. Always false under the MediaElement provider. */
+  mono: boolean;
+  /** Whether playback continues past the end of loaded audio instead of
+   *  auto-stopping (implies the fillViewport layout). Always false under the
+   *  MediaElement provider. */
+  indefinitePlayback: boolean;
+  /** Whether the timeline visually fills the scroll container even when the
+   *  audio is shorter (layout only). Always false under the MediaElement provider. */
+  fillViewport: boolean;
 }
 ```
 
-### useCurrentTime()
+### usePlaylistSettings()
 
 ```typescript
-// Where the cursor rests, in seconds. Its own context: it changes on every seek,
-// pause and stop, and on every pointer move of a leftward selection drag.
-// It does NOT advance during playback (use currentTimeRef or registerFrameCallback
-// from usePlaybackRefs() for that).
-// WaveformPlaylistProvider only. Set it with usePlaylistControls().seekTo(t) or .setCurrentTime(t).
-interface CurrentTimeContextValue {
-  currentTime: number;
+/**
+ * The two settings a user toggles (#768). Apart from the view value because
+ * every clip overlay and the visualization shell read that one: a toggle here
+ * renders only the components that show the setting.
+ */
+interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 ```
 
-### useActiveAnnotation()
+### usePlaylistZoom()
 
 ```typescript
-// The annotation that is playing or was last chosen. Its own context: it changes
-// at every annotation boundary during playback.
-// WaveformPlaylistProvider only. Set it with usePlaylistControls().setActiveAnnotationId(id).
-interface ActiveAnnotationContextValue {
-  activeAnnotationId: string | null;
+/**
+ * The zoom level (#768). Changes on a zoom. Under the MediaElement provider
+ * the level is fixed: `canZoomIn` and `canZoomOut` are always false.
+ */
+interface PlaylistZoomContextValue {
+  samplesPerPixel: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
 }
 ```
 
-### usePlaylistAnnotations()
+---
+
+## Context Hooks: WaveformPlaylistProvider only
+
+Each throws under `MediaElementPlaylistProvider`, also when that provider is nested inside a `WaveformPlaylistProvider`: `<hook> needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`.
+
+### useEditorControls()
 
 ```typescript
-// Re-renders on an annotation edit and on an annotation settings toggle; an edge
-// drag that uses the preview source changes it once, on release.
-interface PlaylistAnnotationsContextValue {
-  annotations: AnnotationData[];
-  annotationsEditable: boolean;
-  linkEndpoints: boolean;
-  continuousPlay: boolean;             // annotation playback: off = stop at the annotation's end, on = continue. No effect on selection playback (Play/Space with a selection plays it start to end)
-}
-```
-
-### useLoop()
-
-```typescript
-// Loop region (separate from the selection). Re-renders on a loop change.
-interface LoopContextValue {
-  isLoopEnabled: boolean;
-  loopStart: number;
-  loopEnd: number;
-}
-```
-
-### useSelectedTrackId()
-
-```typescript
-// Re-renders when another track is selected.
-interface SelectedTrackIdContextValue {
-  selectedTrackId: string | null;
-}
-```
-
-### useUndoRedo()
-
-```typescript
-// Re-renders after an edit.
-interface UndoRedoContextValue {
-  canUndo: boolean;
-  canRedo: boolean;
-}
-```
-
-### usePlaylistControls()
-
-```typescript
-interface PlaylistControlsContextValue {
-  // Playback
-  play: (startTime?: number, playDuration?: number) => Promise<void>;
-  pause: () => void;
-  stop: () => void;
-  seekTo: (time: number) => void;
+/**
+ * The actions only the multitrack editor has (#688). The value never changes.
+ */
+interface EditorControlsContextValue {
+  /**
+   * Moves the cursor without touching playback. `seekTo` is the one to use
+   * from a control; this is for the view's own press and drag handling.
+   */
   setCurrentTime: (time: number) => void;
 
   // Track controls
@@ -336,17 +348,25 @@ interface PlaylistControlsContextValue {
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
-  /** Move a track to a new position in the track order (undoable). Purely
-   *  organizational — never rebuilds the audio adapter. Clamps toIndex, no-ops
-   *  on an unknown trackId or a same-index move. */
+
+  /** Move a track to a new index in the vertical track order. Purely
+   *  organizational — playback is not interrupted. The reordered tracks
+   *  array flows back through onTracksChange. */
   reorderTrack: (trackId: string, toIndex: number) => void;
 
-  // Selection
-  setSelection: (start: number, end: number) => void;
-  setSelectedTrackId: (trackId: string | null) => void;
+  /** Internal: call after every track-reorder DRAG interaction ends
+   *  (committed or canceled) to force PlaylistVisualization to remount the
+   *  track-controls slots, discarding any @dnd-kit sortable-plugin DOM
+   *  corruption. Not needed for button-driven reorderTrack calls (they never
+   *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
+  bumpTrackReorderEpoch: () => void;
 
-  // Time format
-  setTimeFormat: (format: TimeFormat) => void;
+  /** INTERNAL wiring for ClipInteractionProvider: publishes/clears the live
+   *  track-reorder drag preview. Custom drag integrations may call it, but
+   *  most consumers only ever READ trackDragPreview from useTrackReorderPreview(). */
+  setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
+
+  setSelectedTrackId: (trackId: string | null) => void;
 
   // Zoom
   zoomIn: () => void;
@@ -355,18 +375,9 @@ interface PlaylistControlsContextValue {
   // Master volume
   setMasterVolume: (volume: number) => void;
 
-  // Scroll
-  setAutomaticScroll: (enabled: boolean) => void;
-  setScrollContainer: (element: HTMLDivElement | null) => void;
-  scrollContainerRef: RefObject<HTMLDivElement | null>;
-
-  // Annotation controls
-  setContinuousPlay: (enabled: boolean) => void;
+  // Annotation editing
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
-  setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
-  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
-  setActiveAnnotationId: (id: string | null) => void;
 
   // Loop controls
   setLoopEnabled: (enabled: boolean) => void;
@@ -379,73 +390,77 @@ interface PlaylistControlsContextValue {
   redo: () => void;
 
   // Recording
-  /** Mark a recording session active/inactive. While active: (1) the end-of-audio
-   *  auto-stop is suppressed so overdub playback runs past existing material, and
-   *  (2) with an armedTrackId, that track's existing content is transiently muted
-   *  (punch-in replaces what the take overlaps) and restored when the session ends
-   *  — audio-only, the UI mute control is untouched. Auto-wired from the Waveform
-   *  recordingState prop; overdub flows should also call it eagerly (before play()). */
+  /** Mark a recording session active/inactive. While active: (1) the
+   *  end-of-audio auto-stop is suppressed so overdub playback runs past the
+   *  end of existing material, and (2) with an `armedTrackId`, that track's
+   *  existing content is transiently muted — punch-in recording replaces
+   *  whatever the take overlaps (#579), so the doomed material must not play
+   *  under the overdub; its previous mute state is restored when the session
+   *  ends (audio-only, the UI mute control is untouched). Wired automatically
+   *  from the Waveform / PlaylistVisualization `recordingState` prop; overdub
+   *  flows should also call it eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
 
-### usePlaylistView()
+### useEngineRefs()
 
 ```typescript
-// What the provider was configured with. Re-renders on a prop change (and once
-// when the real sample rate is known), not on a settings click, never during an
-// interaction.
-interface PlaylistViewContextValue {
-  sampleRate: number;
-  waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
-  barWidth: number;
-  barGap: number;
-  roundedBars: boolean;
-  progressBarWidth: number;
-  mono: boolean;
-  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
-  indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container (layout only) */
-  fillViewport: boolean;
+/**
+ * Refs and functions of the multitrack engine (#688). Like
+ * `usePlaybackRefs()`, the value never changes.
+ */
+interface EngineRefsContextValue {
+  // Refs for direct time calculation in animated components (avoids timing drift)
+  playbackStartTimeRef: React.RefObject<number>; // context.currentTime when playback started
+  audioStartPositionRef: React.RefObject<number>; // Audio position when playback started
+  /** Returns raw playback time from engine (auto-wraps at loop boundaries). */
+  getPlaybackTime: () => number;
+  /** Current time of the adapter's AudioContext, in seconds. */
+  getAudioContextTime: () => number;
+  /**
+   * Returns the current adapter scheduler lookahead (Tone ~0.1s, native 0).
+   * Use this for any audible-latency calculation that must match the playhead
+   * (e.g., recording live-preview peak slicing).
+   */
+  getLookAhead: () => number;
+  /**
+   * Returns the adapter AudioContext's output latency in seconds.
+   * Use this for audible-latency calculations (e.g., recording live-preview peak slicing).
+   */
+  getOutputLatency: () => number;
+  /** The engine. `current` is null until the first build and during a rebuild. */
+  playoutRef: React.RefObject<PlaylistEngine | null>;
+  /** Ref set by useClipDragHandlers during boundary trim drags.
+   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
+  isDraggingRef: React.MutableRefObject<boolean>;
 }
 ```
 
-### usePlaylistSettings()
+### useAnnotationEditing()
 
 ```typescript
-// The two settings a user toggles. Re-renders when the user changes either.
-// Apart from the view value because every clip's progress overlay and the
-// visualization read that one.
-interface PlaylistSettingsContextValue {
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
-}
-```
-
-### usePlaylistZoom()
-
-```typescript
-// Re-renders on a zoom.
-interface PlaylistZoomContextValue {
-  samplesPerPixel: number;
-  canZoomIn: boolean;
-  canZoomOut: boolean;
+/** Whether annotations can be edited, and how their edges behave (#688). */
+interface AnnotationEditingContextValue {
+  annotationsEditable: boolean;
+  linkEndpoints: boolean;
 }
 ```
 
 ### usePlaylistTimeline()
 
 ```typescript
-// Re-renders on every clip operation, on every pointer move of a trim and on a
-// zoom (peaksDataArray is computed per zoom level); also when loading finishes
-// (isReady) and when peaks arrive. Call it
-// only in a component that draws tracks or needs the timeline length during render.
+/**
+ * What is on the timeline (#768). Changes on every clip operation, on every
+ * pointer move of a trim and on a zoom (the peaks are computed per zoom
+ * level), so call `usePlaylistTimeline()` only in a component
+ * that draws tracks or needs the timeline length during render.
+ */
 interface PlaylistTimelineContextValue {
-  tracks: ClipTrack[];
-  peaksDataArray: TrackClipPeaks[];
+  tracks: ClipTrack[]; // Original tracks array with IDs
+  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
   duration: number;
+  /** Whether the playlist has finished loading all tracks */
   isReady: boolean;
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
@@ -454,8 +469,7 @@ interface PlaylistTimelineContextValue {
 ### usePlaylistMixer()
 
 ```typescript
-// Re-renders on every mute, solo, volume or pan change (each step of a slider
-// drag), and when tracks are added, removed or reordered.
+/** Mixer state (#768). Changes on every mute, solo, volume or pan change. */
 interface PlaylistMixerContextValue {
   trackStates: TrackState[];
   masterVolume: number;
@@ -465,13 +479,89 @@ interface PlaylistMixerContextValue {
 ### useTrackReorderPreview()
 
 ```typescript
-// Re-renders on every drag-over of a track reorder.
+/** The live track-reorder drag (#768). Changes on every drag-over. */
 interface TrackReorderPreviewContextValue {
-  /** Non-null while a track-reorder drag is live; null otherwise */
+  /** Non-null while a track-reorder drag is live: the dragged track and the
+   *  index it would drop at. Both playlist columns derive their display
+   *  layout from it; custom renderTrackControls consumers can read it to
+   *  mirror the preview in their own UI. */
   trackDragPreview: TrackDragPreview | null;
-  /** Incremented after every track-reorder drag ends. A custom renderTrackControls
-   *  that mounts SortableTrackControls itself folds it into its panel keys. */
+  /** Internal: incremented after every track-reorder drag interaction ends.
+   *  PlaylistVisualization folds this into the track-controls slot `key` to
+   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
+   *  (see bumpTrackReorderEpoch in EditorControlsContextValue). */
   trackReorderEpoch: number;
+}
+```
+
+### useLoop()
+
+```typescript
+/** Loop region (separate from selection), Audacity-style loop points (#768). */
+interface LoopContextValue {
+  isLoopEnabled: boolean;
+  loopStart: number;
+  loopEnd: number;
+}
+```
+
+### useSelectedTrackId()
+
+```typescript
+/** The track selected for editing operations (#768). */
+interface SelectedTrackIdContextValue {
+  selectedTrackId: string | null;
+}
+```
+
+### useUndoRedo()
+
+```typescript
+/** Whether undo and redo are available (#768). Changes after an edit. */
+interface UndoRedoContextValue {
+  canUndo: boolean;
+  canRedo: boolean;
+}
+```
+
+---
+
+## Context Hooks: MediaElementPlaylistProvider only
+
+Each throws under `WaveformPlaylistProvider`, also when that provider is nested inside a `MediaElementPlaylistProvider`.
+
+### usePlaybackRate()
+
+```typescript
+/** The playback speed and its setter (#688). Changes when the speed does. */
+interface PlaybackRateContextValue {
+  /** 0.5 to 2. */
+  playbackRate: number;
+  /** Clamped to 0.5–2. Stable identity. */
+  setPlaybackRate: (rate: number) => void;
+}
+```
+
+### useMediaElementTrack()
+
+```typescript
+/**
+ * The one track of a MediaElement player (#688). Changes when the track or the
+ * zoom level does, and when the player becomes ready.
+ */
+interface MediaElementTrackContextValue {
+  /** The length of the track's audio, from its waveform data. Never 0 for a real track. */
+  duration: number;
+  /**
+   * True once the media element has loaded its metadata, false again while a
+   * replaced player loads. Use this, not `duration`, as "the player can be used".
+   */
+  isReady: boolean;
+  peaksDataArray: TrackClipPeaks[];
+  fadeIn?: FadeConfig;
+  fadeOut?: FadeConfig;
+  /** The player. `current` is null until it has been created. */
+  playoutRef: React.RefObject<MediaElementPlayout | null>;
 }
 ```
 
@@ -1056,7 +1146,7 @@ function useAnnotationDragHandlers(options: {
   sampleRate?: number; // default 48000; pass the provider's
   duration: number;
   linkEndpoints: boolean;
-  preview?: AnnotationPreviewHandle; // `annotationPreview` from usePlaylistControls() / useMediaElementControls()
+  preview?: AnnotationPreviewHandle; // `annotationPreview` from usePlaybackControls() (either provider)
 }): {
   onDragStart: (event: DragStartEvent) => void;
   onDragMove: (event: DragMoveEvent) => void;
@@ -1086,7 +1176,7 @@ interface UseClipDragHandlersOptions {
   onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
-  /** Ref toggled during boundary trim drags. Obtain from usePlaybackRefs(). */
+  /** Ref toggled during boundary trim drags. Obtain from useEngineRefs(). */
   isDraggingRef: MutableRefObject<boolean>;
   /** Optional snap function for boundary trims — snaps a sample position to nearest grid line */
   snapSamplePosition?: (samplePos: number) => number;
@@ -1646,7 +1736,8 @@ interface KeyboardShortcut {
 }
 
 function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybackShortcutsReturn;
-// Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind)
+// WaveformPlaylistProvider only: throws when the nearest playlist provider is MediaElementPlaylistProvider.
+// Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind: seekTo(0))
 // Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor.
 // With the cursor inside the selection (e.g. paused there) both resume from the cursor to the selection's end.
 // setSelection(start, end) during playback: a range restarts and plays start -> end; a collapsed selection continues open-ended.
@@ -1708,16 +1799,44 @@ interface WaveformProps {
 ## Pre-built Components
 
 ```
-Buttons (from @waveform-playlist/browser):
+Under either provider (from @waveform-playlist/browser):
          PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton,
-         SkipBackwardButton, SkipForwardButton, LoopButton, SetLoopRegionButton,
-         ZoomInButton, ZoomOutButton, DownloadAnnotationsButton
-Buttons (from @waveform-playlist/browser/tone):
+         SkipBackwardButton, SkipForwardButton, ClearAllButton,
+         AudioPosition, TimeFormatSelect, SelectionTimeInputs, AutomaticScrollCheckbox,
+         ContinuousPlayCheckbox, DownloadAnnotationsButton (these two inside <AnnotationProvider>)
+MediaElementPlaylistProvider only (from @waveform-playlist/browser):
+         PlaybackRateSelect
+WaveformPlaylistProvider only (from @waveform-playlist/browser):
+         LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, MasterVolumeControl,
+         LinkEndpointsCheckbox, EditableCheckbox (these two inside <AnnotationProvider>), KeyboardShortcuts
+WaveformPlaylistProvider only (from @waveform-playlist/browser/tone):
          ExportWavButton
-Controls: MasterVolumeControl, TimeFormatSelect, AudioPosition, SelectionTimeInputs
-Checkboxes: AutomaticScrollCheckbox, ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox
 Playheads: Playhead, PlayheadWithMarker (from @waveform-playlist/ui-components)
 Error Handling: PlaylistErrorBoundary (from @waveform-playlist/ui-components)
+```
+
+```typescript
+// @waveform-playlist/browser: reads usePlaybackRate(). MediaElementPlaylistProvider only.
+const PlaybackRateSelect: React.FC<{ rates?: readonly number[]; className?: string }>;
+
+// @waveform-playlist/ui-components: the base component, driven by props.
+const DEFAULT_PLAYBACK_RATES: readonly number[]; // [0.5, 0.75, 1, 1.25, 1.5, 2]
+interface PlaybackRateSelectProps {
+  /** The current speed, where 1 is normal. */
+  value: number;
+  onChange: (rate: number) => void;
+  /** The speeds to offer, in the order to list them. */
+  rates?: readonly number[];
+  disabled?: boolean;
+  className?: string;
+}
+// A native <select> with aria-label="Playback speed". A current speed that is not
+// among `rates` is listed as an extra option.
+
+// StopButton is disabled unless playing. RewindButton / FastForwardButton /
+// SkipBackwardButton / SkipForwardButton call seekTo only: seekTo(0), seekTo(Infinity),
+// seekTo(currentTimeRef.current ± skipAmount) (skipAmount default 5).
+// FastForwardButton is disabled under a WaveformPlaylistProvider with indefinitePlayback.
 ```
 
 All button/control components connect to context automatically. No props required for basic usage. All accept `className` and `style`.
@@ -1774,7 +1893,7 @@ interface KeyboardShortcutsProps {
 }
 ```
 
-Self-closing component that sets up keyboard shortcuts declaratively. Must be inside `WaveformPlaylistProvider`. Reads all required data (tracks, sampleRate, samplesPerPixel, annotations, etc.) from context internally. Replaces manual `usePlaybackShortcuts` + `useClipSplitting` + `useAnnotationKeyboardControls` wiring.
+Self-closing component that sets up keyboard shortcuts declaratively. Must be inside `WaveformPlaylistProvider`; it throws when the nearest playlist provider is `MediaElementPlaylistProvider`. Reads all required data (tracks, sampleRate, samplesPerPixel, annotations, etc.) from context internally. Replaces manual `usePlaybackShortcuts` + `useClipSplitting` + `useAnnotationKeyboardControls` wiring.
 
 ### PlaylistErrorBoundary
 

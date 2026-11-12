@@ -148,7 +148,7 @@ const { tracks, loading, error } = useAudioTracks([
 ]);
 
 // Playback controls
-const { play, pause, stop, seekTo } = usePlaylistControls();
+const { play, pause, stop, seekTo } = usePlaybackControls();
 
 // Playback state, refs and per-frame callbacks for 60fps UI
 const { isPlaying } = useIsPlaying();

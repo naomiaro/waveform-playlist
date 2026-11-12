@@ -9,17 +9,16 @@ import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
-import {
-  useMediaElementInternals,
-  useMediaElementSelection,
-} from '../providerInternals/mediaElementInternalContexts';
+  useIsPlaying,
+  useCurrentTime,
+  usePlaybackRefs,
+  usePlaybackControls,
+  useMediaElementTrack,
+  useActiveAnnotation,
+  useSelection,
+} from '../contexts/playlistContexts';
 import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
 
 const SAMPLE_RATE = 44100;
@@ -83,24 +82,31 @@ function createFakePlayout() {
 }
 type FakePlayout = ReturnType<typeof createFakePlayout>;
 
+// The shared hooks (#688, part 2), grouped as the tests read them.
 let probe: {
-  animation: ReturnType<typeof useMediaElementAnimation>;
-  controls: ReturnType<typeof useMediaElementControls>;
-  data: ReturnType<typeof useMediaElementData>;
-  state: ReturnType<typeof useMediaElementState>;
-  internals: ReturnType<typeof useMediaElementInternals>;
-  selection: ReturnType<typeof useMediaElementSelection>;
+  animation: {
+    isPlaying: boolean;
+    currentTime: number;
+    currentTimeRef: React.RefObject<number>;
+  };
+  controls: ReturnType<typeof usePlaybackControls>;
+  data: ReturnType<typeof useMediaElementTrack>;
+  state: ReturnType<typeof useActiveAnnotation>;
+  selection: ReturnType<typeof useSelection>;
 };
 let firstRender: { duration: number; peaks: number; isReady: boolean } | null;
 
 const ProbeChild: React.FC = () => {
   probe = {
-    animation: useMediaElementAnimation(),
-    controls: useMediaElementControls(),
-    data: useMediaElementData(),
-    state: useMediaElementState(),
-    internals: useMediaElementInternals(),
-    selection: useMediaElementSelection(),
+    animation: {
+      isPlaying: useIsPlaying().isPlaying,
+      currentTime: useCurrentTime().currentTime,
+      currentTimeRef: usePlaybackRefs().currentTimeRef,
+    },
+    controls: usePlaybackControls(),
+    data: useMediaElementTrack(),
+    state: useActiveAnnotation(),
+    selection: useSelection(),
   };
   if (firstRender === null) {
     firstRender = {
@@ -339,7 +345,7 @@ describe('play(start, duration)', () => {
 
   it('a bounded play is not cut at annotation boundaries when it is the selection', async () => {
     const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
-    await act(async () => probe.internals.setSelection(1, 5));
+    await act(async () => probe.controls.setSelection(1, 5));
     await act(async () => {
       await probe.controls.play(1, 4);
     });
@@ -356,7 +362,7 @@ describe('play(start, duration)', () => {
 describe('the selection is played, and setting it moves the cursor', () => {
   it('setSelection moves the cursor and the player to the start', async () => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
 
     expect(probe.selection).toEqual({ selectionStart: 2, selectionEnd: 5 });
     expect(probe.animation.currentTime).toBe(2);
@@ -367,7 +373,7 @@ describe('the selection is played, and setting it moves the cursor', () => {
 
   it('playing the selection stops at its end and returns the cursor to its start', async () => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
     await act(async () => {
       await probe.controls.play(2, 3);
     });
@@ -381,7 +387,7 @@ describe('the selection is played, and setting it moves the cursor', () => {
 
   it('resumed inside the selection, Stop and the end both return to the selection start', async () => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
     await act(async () => {
       await probe.controls.play(2, 3);
     });
@@ -408,7 +414,7 @@ describe('the selection is played, and setting it moves the cursor', () => {
     const { playout } = await mount();
     await playing(playout(), 0, 1);
 
-    await act(async () => probe.internals.setSelection(3, 4));
+    await act(async () => probe.controls.setSelection(3, 4));
     expect(playout().play).toHaveBeenLastCalledWith(undefined, 3);
     expect(probe.animation.isPlaying).toBe(true);
 
@@ -420,12 +426,12 @@ describe('the selection is played, and setting it moves the cursor', () => {
 
   it('a collapsed selection during playback carries on open-ended from there', async () => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(1, 2));
+    await act(async () => probe.controls.setSelection(1, 2));
     await act(async () => {
       await probe.controls.play(1, 1);
     });
 
-    await act(async () => probe.internals.setSelection(6, 6));
+    await act(async () => probe.controls.setSelection(6, 6));
     expect(playout().play).toHaveBeenLastCalledWith(undefined, 6);
     playout().time = 7;
     await runFrame();
@@ -743,7 +749,7 @@ describe('ends of playback, the cases a mutation run found untested', () => {
 
   it('the selection ending on an annotation boundary keeps the highlight on the annotation that played', async () => {
     const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
-    await act(async () => probe.internals.setSelection(1, 2));
+    await act(async () => probe.controls.setSelection(1, 2));
     await act(async () => {
       await probe.controls.play(1, 1);
     });
@@ -769,7 +775,7 @@ describe('what counts as playing the selection', () => {
     { name: 'starts inside and ends at its end', start: 3, duration: 2, restsAt: 2 },
   ])('a play that $name rests at $restsAt', async ({ start, duration, restsAt }) => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
     await act(async () => {
       await probe.controls.play(start, duration);
     });
@@ -781,7 +787,7 @@ describe('what counts as playing the selection', () => {
 
   it('a seek during selection playback ends it: annotation ends stop playback again', async () => {
     const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
-    await act(async () => probe.internals.setSelection(1, 5));
+    await act(async () => probe.controls.setSelection(1, 5));
     await act(async () => {
       await probe.controls.play(1, 4);
     });
@@ -802,7 +808,7 @@ describe('setSelection, the remaining cases', () => {
     const { playout } = await mount();
     await playing(playout(), 1, 2);
     await act(async () => probe.controls.stop());
-    await act(async () => probe.internals.setSelection(4, 4));
+    await act(async () => probe.controls.setSelection(4, 4));
 
     await act(async () => probe.controls.stop());
     expect(probe.animation.currentTime).toBe(4);
@@ -817,7 +823,7 @@ describe('setSelection, the remaining cases', () => {
     playout().time = 1;
     await runFrame();
 
-    await act(async () => probe.internals.setSelection(5, 5));
+    await act(async () => probe.controls.setSelection(5, 5));
     expect(probe.state.activeAnnotationId).toBeNull();
     playout().time = 5.1;
     await runFrame();
@@ -844,7 +850,7 @@ describe('a queued play follows what happens before the player arrives', () => {
     await act(async () => {
       await probe.controls.play(1);
     });
-    await act(async () => probe.internals.setSelection(3, 4));
+    await act(async () => probe.controls.setSelection(3, 4));
     await deliver();
     expect(playout().play).toHaveBeenCalledExactlyOnceWith(undefined, 3);
     playout().time = 4;
@@ -883,7 +889,7 @@ describe('a hidden tab: no animation frames, the media element still reports its
 
   it('the selection ends from the timeupdate event and returns to its start', async () => {
     const { playout } = await mount();
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
     await act(async () => {
       await probe.controls.play(2, 3);
     });
@@ -995,7 +1001,7 @@ describe('review round 1 (#782)', () => {
   // Children's effects run before the provider's: the play arrives before the
   // provider has started creating its player.
   const PlayOnMount: React.FC<{ source: string }> = ({ source }) => {
-    const { play } = useMediaElementControls();
+    const { play } = usePlaybackControls();
     React.useEffect(() => {
       void play(2);
     }, [play, source]);
@@ -1160,7 +1166,7 @@ describe('review round 2 (#782)', () => {
       return playout;
     }) as unknown as () => MediaElementPlayout;
     const PlayOnMount: React.FC = () => {
-      const { play } = useMediaElementControls();
+      const { play } = usePlaybackControls();
       React.useEffect(() => {
         void play(2);
       }, [play]);
@@ -1212,7 +1218,7 @@ describe('review round 2 (#782)', () => {
 
   it('a queued selection resume keeps the selection start across a same-audio replacement', async () => {
     const { playout, deliver, changeTrack } = await mount({ holdPlayer: true });
-    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => probe.controls.setSelection(2, 5));
     // Resume part-way: the cursor is at 3.5, the selection starts at 2.
     await act(async () => {
       await probe.controls.play(3.5, 1.5);

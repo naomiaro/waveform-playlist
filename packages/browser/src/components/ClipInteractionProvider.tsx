@@ -12,12 +12,12 @@ import {
 import { useBeatsAndBars, getScaleInfo } from '@waveform-playlist/ui-components';
 
 import {
-  usePlaylistControls,
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
-  usePlaybackRefs,
-} from '../WaveformPlaylistContext';
+  useEngineRefs,
+  useEditorControls,
+} from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
@@ -53,9 +53,9 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, onTracksChange } = usePlaylistTimeline();
-  const { playoutRef, isDraggingRef } = usePlaybackRefs();
+  const { playoutRef, isDraggingRef } = useEngineRefs();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
-    usePlaylistControls();
+    useEditorControls();
   const beatsAndBars = useBeatsAndBars();
 
   // Derive snap mode from context: beats if provider is in beats mode with snap enabled,

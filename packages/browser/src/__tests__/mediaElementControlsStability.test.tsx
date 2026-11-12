@@ -10,13 +10,13 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
+  useCurrentTime,
+  usePlaybackControls,
+  useMediaElementTrack,
+  usePlaylistSettings,
+} from '../contexts/playlistContexts';
 
 const SAMPLE_RATE = 44100;
 const SOURCE_SCALE = 441;
@@ -55,7 +55,7 @@ function createFakePlayout() {
   };
 }
 
-type Controls = ReturnType<typeof useMediaElementControls>;
+type Controls = ReturnType<typeof usePlaybackControls>;
 
 let probe: {
   controls: Controls;
@@ -68,13 +68,13 @@ let probe: {
 let controlsSeen: Controls[] = [];
 
 const ProbeChild: React.FC = () => {
-  const controls = useMediaElementControls();
+  const controls = usePlaybackControls();
   probe = {
     controls,
-    isReady: useMediaElementData().isReady,
-    duration: useMediaElementData().duration,
-    currentTime: useMediaElementAnimation().currentTime,
-    isAutomaticScroll: useMediaElementState().isAutomaticScroll,
+    isReady: useMediaElementTrack().isReady,
+    duration: useMediaElementTrack().duration,
+    currentTime: useCurrentTime().currentTime,
+    isAutomaticScroll: usePlaylistSettings().isAutomaticScroll,
   };
   if (controlsSeen[controlsSeen.length - 1] !== controls) controlsSeen.push(controls);
   return null;

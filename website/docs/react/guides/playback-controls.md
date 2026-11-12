@@ -33,17 +33,29 @@ function Controls() {
 }
 ```
 
-These buttons automatically connect to the playlist context and update their state accordingly.
+These buttons automatically connect to the playlist context and update their state accordingly. Play is disabled while playing; Pause and Stop are disabled unless playing. Rewind, Fast Forward and the two skip buttons call `seekTo`, which clamps to the audio and, during playback, restarts playback at the new position.
+
+### Which controls work under which provider
+
+The controls read the nearest playlist provider.
+
+| Works under | Components |
+| --- | --- |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` |
+| `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
+| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton` (from `@waveform-playlist/browser/tone`) |
+
+A control used under a provider that does not serve it throws, for example "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
 ## Custom Playback Controls
 
-For custom UI, use `usePlaylistControls()` and `useIsPlaying()`:
+For custom UI, use `usePlaybackControls()` and `useIsPlaying()`. Both work under either provider:
 
 ```tsx
-import { usePlaylistControls, useIsPlaying } from '@waveform-playlist/browser';
+import { usePlaybackControls, useIsPlaying } from '@waveform-playlist/browser';
 
 function CustomControls() {
-  const { play, pause, stop } = usePlaylistControls();
+  const { play, pause, stop } = usePlaybackControls();
   const { isPlaying } = useIsPlaying();
 
   return (
@@ -72,10 +84,10 @@ By default, clicking on the waveform seeks to that position.
 ### Programmatic Seeking
 
 ```tsx
-import { usePlaylistControls } from '@waveform-playlist/browser';
+import { usePlaybackControls } from '@waveform-playlist/browser';
 
 function SeekControls() {
-  const { seekTo } = usePlaylistControls();
+  const { seekTo } = usePlaybackControls();
 
   return (
     <div>
@@ -99,12 +111,13 @@ import { AudioPosition } from '@waveform-playlist/browser';
 function PositionDisplay() {
   return <AudioPosition />;
 }
-// Displays: "0:00.000 / 3:45.123"
+// Displays the position only, in the provider's time format
+// (default hh:mm:ss.uuu), for example "00:00:08.000"
 ```
 
 ### Programmatic Access
 
-Access the resting cursor position from `useCurrentTime()` and duration from `usePlaylistTimeline()`. `currentTime` changes on a seek, a pause and a stop; it does not advance during playback. For a display that runs during playback, use `<AudioPosition />` or register a frame callback with `usePlaybackRefs()`.
+Access the resting cursor position from `useCurrentTime()` and duration from `usePlaylistTimeline()` (under `MediaElementPlaylistProvider`, from `useMediaElementTrack()`). `currentTime` changes on a seek, a pause and a stop; it does not advance during playback. For a display that runs during playback, use `<AudioPosition />` or register a frame callback with `usePlaybackRefs()`.
 
 ```tsx
 import { useCurrentTime, usePlaylistTimeline } from '@waveform-playlist/browser';
@@ -162,11 +175,11 @@ function LoopControl() {
 Or control it programmatically:
 
 ```tsx
-import { usePlaylistAnnotations, usePlaylistControls } from '@waveform-playlist/browser';
+import { useAnnotations, usePlaybackControls } from '@waveform-playlist/browser';
 
 function ContinuousPlayToggle() {
-  const { continuousPlay } = usePlaylistAnnotations();
-  const { setContinuousPlay } = usePlaylistControls();
+  const { continuousPlay } = useAnnotations();
+  const { setContinuousPlay } = usePlaybackControls();
 
   return (
     <label>
@@ -193,7 +206,36 @@ function ScrollControl() {
 }
 ```
 
+## Playback Speed
+
+`MediaElementPlaylistProvider` only. `PlaybackRateSelect` is a dropdown of speeds that reads and sets the provider's playback rate:
+
+```tsx
+import { PlaybackRateSelect } from '@waveform-playlist/browser';
+
+function SpeedControl() {
+  return <PlaybackRateSelect />;
+}
+
+// Or choose the speeds to offer:
+<PlaybackRateSelect rates={[0.75, 1, 1.5]} />;
+```
+
+Without `rates` it offers 0.5, 0.75, 1, 1.25, 1.5 and 2. For a custom control, read `usePlaybackRate()`:
+
+```tsx
+import { usePlaybackRate } from '@waveform-playlist/browser';
+
+function SpeedButtons() {
+  const { playbackRate, setPlaybackRate } = usePlaybackRate();
+  // setPlaybackRate clamps to 0.5–2
+  return <button onClick={() => setPlaybackRate(1.5)}>{playbackRate}×</button>;
+}
+```
+
 ## Loop Playback
+
+`WaveformPlaylistProvider` only; there is no loop under `MediaElementPlaylistProvider`.
 
 Waveform Playlist uses an Audacity-style loop system with a separate loop region from the selection. This allows you to:
 
@@ -252,12 +294,12 @@ Toggles the looping behavior.
 ### Programmatic Control
 
 ```tsx
-import { useLoop, useSelection, usePlaylistControls } from '@waveform-playlist/browser';
+import { useLoop, useSelection, useEditorControls } from '@waveform-playlist/browser';
 
 function CustomLoopControls() {
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { selectionStart, selectionEnd } = useSelection();
-  const { setLoopEnabled, setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
+  const { setLoopEnabled, setLoopRegionFromSelection, clearLoopRegion } = useEditorControls();
 
   const hasSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
   const hasLoopRegion = loopStart !== loopEnd && loopEnd > loopStart;
@@ -334,11 +376,11 @@ function LoopExample() {
 Play only the selected region:
 
 ```tsx
-import { useSelection, usePlaylistControls } from '@waveform-playlist/browser';
+import { useSelection, usePlaybackControls } from '@waveform-playlist/browser';
 
 function PlaySelection() {
   const { selectionStart, selectionEnd } = useSelection();
-  const { play } = usePlaylistControls();
+  const { play } = usePlaybackControls();
 
   const playSelectedRegion = () => {
     if (selectionStart !== selectionEnd) {
@@ -369,11 +411,11 @@ function VolumeControl() {
 Or with a custom UI:
 
 ```tsx
-import { usePlaylistMixer, usePlaylistControls } from '@waveform-playlist/browser';
+import { usePlaylistMixer, useEditorControls } from '@waveform-playlist/browser';
 
 function CustomVolumeSlider() {
   const { masterVolume } = usePlaylistMixer();
-  const { setMasterVolume } = usePlaylistControls();
+  const { setMasterVolume } = useEditorControls();
 
   return (
     <input
@@ -389,6 +431,8 @@ function CustomVolumeSlider() {
 ```
 
 ## Keyboard Shortcuts
+
+`<KeyboardShortcuts>` works under `WaveformPlaylistProvider` only. Nothing in the library installs keyboard shortcuts under `MediaElementPlaylistProvider`.
 
 Waveform Playlist supports common keyboard shortcuts:
 

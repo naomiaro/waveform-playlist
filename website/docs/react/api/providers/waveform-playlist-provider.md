@@ -256,6 +256,8 @@ The provider exposes state and controls through React Context. Access them using
 
 Each hook returns one group of fields that change together, and a component re-renders only when the value of a hook it calls changes. See [hooks.md](/docs/react/api/hooks#core-context-hooks) for what triggers each one and for the full interfaces with JSDoc comments.
 
+The hooks marked "either provider" below are the same hooks `MediaElementPlaylistProvider` serves, so a component written against them works under both. The others need `WaveformPlaylistProvider` and throw when the nearest playlist provider is a `MediaElementPlaylistProvider`.
+
 ### Playing (useIsPlaying)
 
 ```typescript
@@ -266,13 +268,28 @@ interface IsPlayingContextValue {
 
 ### Playback refs (usePlaybackRefs)
 
-The value never changes, so calling this hook never re-renders the component.
+Either provider. The value never changes, so calling this hook never re-renders the component.
 
 ```typescript
 interface PlaybackRefsContextValue {
+  /** The playback position, in seconds. Advances during playback. */
   currentTimeRef: RefObject<number>;
-  /** Visually-aligned playback time (audible time while playing; raw position otherwise). */
+  /** The position to draw: the audible position (the raw time less output
+   *  latency and lookahead) while playing, the raw position otherwise. */
   visualTimeRef: RefObject<number>;
+  /** Register a per-frame callback driven by the single animation loop. */
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  /** Unregister a per-frame callback. */
+  unregisterFrameCallback: (id: string) => void;
+}
+```
+
+### Engine refs (useEngineRefs)
+
+`WaveformPlaylistProvider` only. The value never changes.
+
+```typescript
+interface EngineRefsContextValue {
   playbackStartTimeRef: RefObject<number>;
   audioStartPositionRef: RefObject<number>;
   /** Returns current playback time from engine (auto-wraps at loop boundaries). */
@@ -283,10 +300,6 @@ interface PlaybackRefsContextValue {
   getLookAhead: () => number;
   /** Adapter AudioContext output latency in seconds. */
   getOutputLatency: () => number;
-  /** Register a per-frame callback driven by the single animation loop. */
-  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
-  /** Unregister a per-frame callback. */
-  unregisterFrameCallback: (id: string) => void;
   /** The engine. `current` is null until the first build and during a rebuild. */
   playoutRef: RefObject<PlaylistEngine | null>;
   /** true during boundary trim drags */
@@ -323,14 +336,25 @@ interface ActiveAnnotationContextValue {
 }
 ```
 
-### Annotations (usePlaylistAnnotations)
+### Annotations (useAnnotations)
+
+Either provider.
 
 ```typescript
-interface PlaylistAnnotationsContextValue {
+interface AnnotationsContextValue {
   annotations: AnnotationData[];
+  continuousPlay: boolean;
+}
+```
+
+### Annotation editing (useAnnotationEditing)
+
+`WaveformPlaylistProvider` only.
+
+```typescript
+interface AnnotationEditingContextValue {
   annotationsEditable: boolean;
   linkEndpoints: boolean;
-  continuousPlay: boolean;
 }
 ```
 
@@ -361,35 +385,54 @@ interface UndoRedoContextValue {
 }
 ```
 
-### Controls (usePlaylistControls)
+### Playback controls (usePlaybackControls)
+
+Either provider. The actions both providers have. The value never changes.
 
 ```typescript
-interface PlaylistControlsContextValue {
+interface PlaybackControlsContextValue {
   play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
+  /** Ends playback and returns the cursor to where playback started. */
   stop: () => void;
+  /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
   seekTo: (time: number) => void;
+  /** Sets the selected range and moves the cursor to its start. */
+  setSelection: (start: number, end: number) => void;
+  setTimeFormat: (format: TimeFormat) => void;
+  setAutomaticScroll: (enabled: boolean) => void;
+  setScrollContainer: (element: HTMLDivElement | null) => void;
+  scrollContainerRef: RefObject<HTMLDivElement | null>;
+  setContinuousPlay: (enabled: boolean) => void;
+  setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
+  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
+  setActiveAnnotationId: (id: string | null) => void;
+}
+```
+
+### Editor controls (useEditorControls)
+
+`WaveformPlaylistProvider` only. The actions only the multitrack editor has. The value never changes.
+
+```typescript
+interface EditorControlsContextValue {
+  /** Moves the cursor without touching playback. Use seekTo from a control. */
   setCurrentTime: (time: number) => void;
   setTrackMute: (trackIndex: number, muted: boolean) => void;
   setTrackSolo: (trackIndex: number, soloed: boolean) => void;
   setTrackVolume: (trackIndex: number, volume: number) => void;
   setTrackPan: (trackIndex: number, pan: number) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
-  setSelection: (start: number, end: number) => void;
+  /** Internal: call after every track-reorder drag interaction ends. */
+  bumpTrackReorderEpoch: () => void;
+  /** Internal wiring for ClipInteractionProvider. */
+  setTrackDragPreview: Dispatch<SetStateAction<TrackDragPreview | null>>;
   setSelectedTrackId: (trackId: string | null) => void;
-  setTimeFormat: (format: TimeFormat) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   setMasterVolume: (volume: number) => void;
-  setAutomaticScroll: (enabled: boolean) => void;
-  setScrollContainer: (element: HTMLDivElement | null) => void;
-  scrollContainerRef: RefObject<HTMLDivElement | null>;
-  setContinuousPlay: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
-  setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
-  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
-  setActiveAnnotationId: (id: string | null) => void;
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
@@ -587,4 +630,5 @@ interface WaveformPlaylistProviderProps {
 
 - [Waveform Component](/docs/react/api/components#waveform)
 - [Core Context Hooks](/docs/react/api/hooks#core-context-hooks)
-- [usePlaylistControls Hook](/docs/react/api/hooks#useplaylistcontrols)
+- [usePlaybackControls Hook](/docs/react/api/hooks#useplaybackcontrols)
+- [useEditorControls Hook](/docs/react/api/hooks#useeditorcontrols)

@@ -7,13 +7,14 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
   useActiveAnnotation,
   usePlaylistTimeline,
   usePlaylistZoom,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
@@ -107,14 +108,16 @@ const INTEGRATION = {
 } as unknown as AnnotationIntegration;
 
 let probe: {
-  controls: ReturnType<typeof usePlaylistControls>;
+  controls: ReturnType<typeof usePlaybackControls>;
+  editor: ReturnType<typeof useEditorControls>;
   data: ReturnType<typeof usePlaylistTimeline> & ReturnType<typeof usePlaylistZoom>;
   activeAnnotationId: string | null;
 };
 
 const ProbeChild: React.FC = () => {
   probe = {
-    controls: usePlaylistControls(),
+    controls: usePlaybackControls(),
+    editor: useEditorControls(),
     data: { ...usePlaylistTimeline(), ...usePlaylistZoom() },
     activeAnnotationId: useActiveAnnotation().activeAnnotationId,
   };
@@ -221,7 +224,7 @@ describe('annotation boxes (#740)', () => {
     const sppBefore = probe.data.samplesPerPixel;
 
     await act(async () => {
-      probe.controls.zoomIn();
+      probe.editor.zoomIn();
     });
 
     expect(probe.data.samplesPerPixel).not.toBe(sppBefore);
@@ -234,7 +237,7 @@ describe('annotation boxes (#740)', () => {
     expect(lastProps.n1.editable).toBe(false);
 
     await act(async () => {
-      probe.controls.setAnnotationsEditable(true);
+      probe.editor.setAnnotationsEditable(true);
     });
 
     expect(lastProps.n1.editable).toBe(true);

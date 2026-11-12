@@ -13,9 +13,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { useTheme } from 'styled-components';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
   usePlaylistView,
   usePlaylistSettings,
   usePlaylistTimeline,
@@ -26,7 +27,7 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -90,7 +91,8 @@ function createFakeAdapter(): PlayoutAdapter {
 // What the fake adapter reports as the playback position.
 let adapterTime = 0;
 
-type Controls = ReturnType<typeof usePlaylistControls>;
+type Controls = ReturnType<typeof usePlaybackControls>;
+type EditorControls = ReturnType<typeof useEditorControls>;
 type View = ReturnType<typeof usePlaylistView>;
 type Timeline = ReturnType<typeof usePlaylistTimeline>;
 type Mixer = ReturnType<typeof usePlaylistMixer>;
@@ -103,6 +105,7 @@ type Selection = ReturnType<typeof useSelection>;
 
 let probe: {
   controls: Controls;
+  editor: EditorControls;
   view: View;
   settings: ReturnType<typeof usePlaylistSettings>;
   timeline: Timeline;
@@ -161,7 +164,8 @@ const ActiveAnnotationProbeChild: React.FC = () => {
 
 const ProbeChild: React.FC = () => {
   probe = {
-    controls: usePlaylistControls(),
+    controls: usePlaybackControls(),
+    editor: useEditorControls(),
     view: usePlaylistView(),
     settings: usePlaylistSettings(),
     timeline: usePlaylistTimeline(),
@@ -175,7 +179,8 @@ const ProbeChild: React.FC = () => {
 // Calls actions only, as a transport button or a custom control does (#767).
 let controlsProbe: { renders: number };
 const ControlsProbeChild: React.FC = () => {
-  usePlaylistControls();
+  usePlaybackControls();
+  useEditorControls();
   controlsProbe = { renders: (controlsProbe?.renders ?? 0) + 1 };
   return null;
 };
@@ -184,7 +189,7 @@ const ControlsProbeChild: React.FC = () => {
 // which `duration` changes: before the provider's own effects have run.
 let seekFromLayoutEffect: { target: number } | null = null;
 const LayoutSeekChild: React.FC = () => {
-  const { seekTo } = usePlaylistControls();
+  const { seekTo } = usePlaybackControls();
   const { duration } = usePlaylistTimeline();
   React.useLayoutEffect(() => {
     if (seekFromLayoutEffect && duration === 2) seekTo(seekFromLayoutEffect.target);
@@ -256,24 +261,28 @@ describe('provider context values keep their identity (#691)', () => {
   it('controls value survives a provider re-render caused by a track-state change', async () => {
     await mount();
     const before = probe.controls;
+    const editorBefore = probe.editor;
 
     await act(async () => {
-      probe.controls.setTrackVolume(0, 0.4);
+      probe.editor.setTrackVolume(0, 0.4);
     });
 
     expect(probe.mixer.trackStates[0].volume).toBe(0.4);
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
   });
 
   it('controls value survives a selection change', async () => {
     await mount();
     const before = probe.controls;
+    const editorBefore = probe.editor;
 
     await act(async () => {
       probe.controls.setSelection(0.1, 0.5);
     });
 
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
   });
 
   it('view and timeline values and theme survive a parent re-render with unchanged props', async () => {
@@ -310,18 +319,21 @@ describe('provider context values keep their identity (#691)', () => {
   it('controls value survives play and pause', async () => {
     await mount();
     const before = probe.controls;
+    const editorBefore = probe.editor;
 
     await act(async () => {
       await probe.controls.play(0);
     });
     expect(probe.isPlaying).toBe(true);
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
 
     await act(async () => {
       probe.controls.pause();
     });
     expect(probe.isPlaying).toBe(false);
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
   });
 
   it('seekTo and setSelection captured before play still restart playback while playing', async () => {
@@ -354,10 +366,10 @@ describe('provider context values keep their identity (#691)', () => {
     await mount();
 
     await act(async () => {
-      probe.controls.setTrackMute(0, true);
-      probe.controls.setTrackVolume(0, 0.3);
-      probe.controls.setTrackPan(1, -0.5);
-      probe.controls.setTrackSolo(1, true);
+      probe.editor.setTrackMute(0, true);
+      probe.editor.setTrackVolume(0, 0.3);
+      probe.editor.setTrackPan(1, -0.5);
+      probe.editor.setTrackSolo(1, true);
     });
 
     expect(probe.mixer.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
@@ -393,7 +405,7 @@ describe('selection lives in its own context (#733)', () => {
     const selectionRendersBefore = selectionProbe.renders;
 
     await act(async () => {
-      probe.controls.setLoopRegion(0.2, 0.4);
+      probe.editor.setLoopRegion(0.2, 0.4);
     });
 
     expect(stateProbe.state.loopStart).toBe(0.2);
@@ -404,7 +416,7 @@ describe('selection lives in its own context (#733)', () => {
   it('useSelection throws outside the provider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<SelectionProbeChild />)).toThrow(
-      'useSelection must be used within WaveformPlaylistProvider'
+      'useSelection must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider'
     );
   });
 });
@@ -452,7 +464,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
     await mount();
 
     await act(async () => {
-      probe.controls.setCurrentTime(0.75);
+      probe.editor.setCurrentTime(0.75);
     });
 
     expect(currentTimeProbe.currentTime).toBe(0.75);
@@ -507,7 +519,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
   it('useCurrentTime throws outside the provider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<CurrentTimeProbeChild />)).toThrow(
-      'useCurrentTime must be used within WaveformPlaylistProvider'
+      'useCurrentTime must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider'
     );
   });
 });
@@ -539,7 +551,7 @@ describe('the active annotation lives in its own context (#740)', () => {
     const activeRendersBefore = activeAnnotationProbe.renders;
 
     await act(async () => {
-      probe.controls.setLoopRegion(0.2, 0.4);
+      probe.editor.setLoopRegion(0.2, 0.4);
     });
     await act(async () => {
       probe.controls.setSelection(0.1, 0.5);
@@ -553,7 +565,7 @@ describe('the active annotation lives in its own context (#740)', () => {
   it('useActiveAnnotation throws outside the provider', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<ActiveAnnotationProbeChild />)).toThrow(
-      'useActiveAnnotation must be used within WaveformPlaylistProvider'
+      'useActiveAnnotation must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider'
     );
   });
 });
@@ -566,6 +578,7 @@ describe('the controls value does not follow the timeline length or the time for
   it('controls value survives a change of duration', async () => {
     const { setTracks } = await mount();
     const before = probe.controls;
+    const editorBefore = probe.editor;
     expect(probe.timeline.duration).toBe(1);
 
     await act(async () => {
@@ -574,6 +587,7 @@ describe('the controls value does not follow the timeline length or the time for
     await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
   });
 
   it('a component that only calls actions does not render when the duration changes', async () => {
@@ -603,6 +617,7 @@ describe('the controls value does not follow the timeline length or the time for
   it('controls value survives a time-format change', async () => {
     await mount();
     const before = probe.controls;
+    const editorBefore = probe.editor;
 
     await act(async () => {
       probe.controls.setTimeFormat('seconds');
@@ -610,6 +625,7 @@ describe('the controls value does not follow the timeline length or the time for
 
     expect(probe.settings.timeFormat).toBe('seconds');
     expect(probe.controls).toBe(before);
+    expect(probe.editor).toBe(editorBefore);
   });
 
   it('a seekTo captured before the timeline grew clamps to the new end', async () => {

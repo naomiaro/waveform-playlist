@@ -20,12 +20,13 @@ const playlistControls = {
   bumpTrackReorderEpoch: vi.fn(),
   setTrackDragPreview: vi.fn(),
 };
-vi.mock('../WaveformPlaylistContext', () => ({
+vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contexts/playlistContexts')>()),
   usePlaylistView: () => playlistData,
   usePlaylistZoom: () => playlistData,
   usePlaylistTimeline: () => playlistData,
-  usePlaybackRefs: () => playlistData,
-  usePlaylistControls: () => playlistControls,
+  useEngineRefs: () => playlistData,
+  useEditorControls: () => playlistControls,
 }));
 
 // Capture what ClipInteractionProvider hands to dnd-kit.

@@ -134,6 +134,8 @@ function Status() {
 
 **Note:** `usePlaybackAnimation()` is removed later in this major. `isPlaying` is now on `useIsPlaying()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
 
+**Note:** `usePlaylistControls()`, `useMediaElementAnimation()` and `useMediaElementControls()`, named in the table above, are also removed later in this major, and `MediaElementPlaylistProvider` now has a selection. Under either provider use `useIsPlaying().isPlaying`, `useCurrentTime().currentTime` (or `currentTimeRef` from `usePlaybackRefs()`), `useSelection()`, and `play`, `pause`, `seekTo` and `setSelection` from `usePlaybackControls()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 If you used the context on its own, without a playlist provider, to hold your own state, replace it with a React context of your own; there is no drop-in export.
 
 ## `TimeInput` reports a change only after an edit
@@ -246,7 +248,7 @@ const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
 
-**Note:** `usePlaylistData()` is removed later in this major. `timeFormat` is now on `usePlaylistSettings()`, `waveHeight` and `timeScaleHeight` on `usePlaylistView()`, and `tracks` on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+**Note:** `usePlaylistData()` is removed later in this major. `timeFormat` is now on `usePlaylistSettings()`, `waveHeight` and `timeScaleHeight` on `usePlaylistView()`, and `tracks` on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields). `usePlaylistControls()` and `useMediaElementControls()` are removed later too: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 ## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
 
@@ -356,6 +358,8 @@ const { isLoopEnabled } = usePlaylistState();
 
 `setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` exposes no selection and its hooks are unchanged.
 
+**Note:** both statements are replaced later in this major. `setSelection` is now on `usePlaybackControls()`, and `useSelection()` works under either provider. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 A component that calls `useSelection()` re-renders on every pointer move of a drag, so call it in the smallest component that shows the selection, not in a component that also renders a long list.
 
 Fixed along the way: dragging a selection from right to left now selects the whole dragged range. Before, the range collapsed to the last pointer movement.
@@ -413,6 +417,8 @@ useEffect(() => {
 
 A custom `renderPlayhead` function needs no change: it is called again with the new `position` after a seek. `setCurrentTime(t)` and `seekTo(t)` stay on `usePlaylistControls()`. `useCurrentTime()` must be called inside `WaveformPlaylistProvider`; `useMediaElementAnimation()` is unchanged and still returns `currentTime`.
 
+**Note:** this paragraph is replaced later in this major. `seekTo(t)` is now on `usePlaybackControls()` and `setCurrentTime(t)` on `useEditorControls()`; `useMediaElementAnimation()` is removed and `useCurrentTime()` works under either provider. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 ## `activeAnnotationId` moves from `usePlaylistState()` to `useActiveAnnotation()`
 
 **Package:** `@waveform-playlist/browser`.
@@ -440,6 +446,8 @@ const { activeAnnotationId } = useActiveAnnotation();
 
 `setActiveAnnotationId(id)` stays on `usePlaylistControls()`. `useActiveAnnotation()` must be called inside `WaveformPlaylistProvider`; `useMediaElementState()` is unchanged and still returns `activeAnnotationId`.
 
+**Note:** this paragraph is replaced later in this major. `setActiveAnnotationId(id)` is now on `usePlaybackControls()`; `useMediaElementState()` is removed and `useActiveAnnotation()` works under either provider. The `annotations` field named in the note above is on `useAnnotations()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 A component that calls `useActiveAnnotation()` re-renders at every annotation boundary during playback, so call it in a small component that shows the active annotation, not in the component that renders the whole page.
 
 ## `usePlaylistData()`, `usePlaylistState()` and `usePlaybackAnimation()` are replaced by one hook per group of fields
@@ -451,6 +459,8 @@ Four hooks are removed from `@waveform-playlist/browser`: `usePlaylistData()`, `
 `usePlaylistControls()`, `useSelection()`, `useCurrentTime()` and `useActiveAnnotation()` are unchanged. The MediaElement hooks (`useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()`, `useMediaElementData()`) are unchanged.
 
 This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, `usePlaylistData()`, `usePlaylistState()` or `usePlaybackAnimation()`, use the hook from the tables below.
+
+**Note:** three hooks named in this entry are changed again later in this major, and the four MediaElement hooks are removed. `usePlaylistControls()` is replaced by `usePlaybackControls()` and `useEditorControls()`; `usePlaylistAnnotations()` by `useAnnotations()` and `useAnnotationEditing()`; `usePlaybackRefs()` keeps `currentTimeRef`, `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback`, and its other eight fields (`playoutRef` and `isDraggingRef` among them) are on `useEngineRefs()`. When migrating in one go, apply the tables below and then [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers), or go straight to the hook that entry names for each field.
 
 ### The new hooks
 
@@ -470,6 +480,8 @@ All of them are exported from `@waveform-playlist/browser` and must be called in
 | `useUndoRedo()`            | `canUndo`, `canRedo`                                                                                                                                                                                                                                | after an edit                                      |
 | `useIsPlaying()`           | `isPlaying`                                                                                                                                                                                                                                         | play, pause, stop                                  |
 | `usePlaybackRefs()`        | `currentTimeRef`, `visualTimeRef`, `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `registerFrameCallback`, `unregisterFrameCallback`, `playoutRef`, `isDraggingRef` | never (the value keeps its identity)               |
+
+**Note:** "must be called inside `WaveformPlaylistProvider`" is changed later in this major. `usePlaylistView()`, `usePlaylistSettings()`, `usePlaylistZoom()`, `useIsPlaying()` and `usePlaybackRefs()` can also be called inside `MediaElementPlaylistProvider`, and the message a hook throws names the provider or providers that serve it. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 The value types are exported too: `PlaylistViewContextValue`, `PlaylistSettingsContextValue`, `PlaylistZoomContextValue`, `PlaylistTimelineContextValue`, `PlaylistMixerContextValue`, `TrackReorderPreviewContextValue`, `PlaylistAnnotationsContextValue`, `LoopContextValue`, `SelectedTrackIdContextValue`, `UndoRedoContextValue`, `IsPlayingContextValue`, `PlaybackRefsContextValue`, and, for the unchanged hooks, `PlaylistControlsContextValue`, `SelectionContextValue`, `CurrentTimeContextValue` and `ActiveAnnotationContextValue`. `ClipPeaks`, `TrackClipPeaks` and `TrackDragPreview` are exported as well, so every field of these values can be named.
 
@@ -546,7 +558,7 @@ From `usePlaybackAnimation()`:
 
 The fields that left these hooks in earlier entries stay where those entries put them: `selectionStart` and `selectionEnd` on `useSelection()`, `currentTime` on `useCurrentTime()`, `activeAnnotationId` on `useActiveAnnotation()`. The setters (`setSelectedTrackId`, `setLoopEnabled`, `setMasterVolume`, `zoomIn`, `undo` and the rest) stay on `usePlaylistControls()`.
 
-`usePlaylistDataOptional()` has no public replacement. It existed so that `useAnnotationKeyboardControls` could run under either provider. Under `WaveformPlaylistProvider` that hook still reads `samplesPerPixel` and `sampleRate` itself; under `MediaElementPlaylistProvider` pass them as options, as before. If your own component called `usePlaylistDataOptional()` to work with or without a provider, take the values it needs as props.
+`usePlaylistDataOptional()` has no public replacement. It existed so that `useAnnotationKeyboardControls` could run under either provider. Under `WaveformPlaylistProvider` that hook still reads `samplesPerPixel` and `sampleRate` itself; under `MediaElementPlaylistProvider` pass them as options, as before. (Later in this major the hook reads them from `MediaElementPlaylistProvider` too; options that are passed still win. See the Behaviour list of [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).) If your own component called `usePlaylistDataOptional()` to work with or without a provider, take the values it needs as props.
 
 ```tsx
 // Before
@@ -724,6 +736,8 @@ const handlers = useAnnotationDragHandlers({
 });
 ```
 
+**Note:** the hooks in the two examples above are replaced later in this major. `annotationPreview` and `setAnnotations` are on `usePlaybackControls()` under either provider, and `annotations` is on `useAnnotations()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow the preview by themselves. A custom annotation renderer needs `useAnnotationsWithPreview` to follow it.
 
 ## MediaElement player: the provider owns the selection and runs the one animation loop
@@ -746,11 +760,15 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 
 **Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so playback stops, the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play, automatic scroll and the active annotation go back to their initial values. The selection is not yet readable or settable from outside the built-in components.
 
+**Note:** it is since a later entry: `useSelection()` reads it and `usePlaybackControls().setSelection` sets it. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+
 ## MediaElement player: Stop, the ends of playback, seeking and the selection follow the multitrack player's rules
 
 **Package:** `@waveform-playlist/browser`.
 
 `MediaElementPlaylistProvider` now plays, stops, seeks and selects the way `WaveformPlaylistProvider` does, so that one set of controls can mean the same thing under both. The hooks keep their names in this step. One signature changes (`play`), one field is added (`isReady`), and the meaning of `duration`, `onReady` and `onError` changes.
+
+**Note:** the hook names used in this entry (`useMediaElementControls()`, `useMediaElementData()`) are those of this step. The next entry removes them: the actions are on `usePlaybackControls()`, and `duration`, `isReady` and `playoutRef` on `useMediaElementTrack()`. The behaviour described here is unchanged by that. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 | What | Before | Now |
 | --- | --- | --- |
@@ -828,6 +846,389 @@ const handleError = useCallback((error: Error) => setProblem(error.message), [])
 ```
 
 A custom playout created from the package's own `MediaElementPlayout` class needs no change. One written from scratch needs `on(event, listener)`. The provider subscribes to four events: `loadedmetadata` must be emitted (without it the player is never ready); `timeupdate` (the position, used as the hidden-tab fallback), `error` and `playrejected` are optional to emit. `getTrack()` is no longer called.
+
+## One set of hooks and controls for both providers
+
+**Package:** `@waveform-playlist/browser` (and a new base component, `PlaybackRateSelect`, in `@waveform-playlist/ui-components`).
+
+`WaveformPlaylistProvider` and `MediaElementPlaylistProvider` now publish what they share through the same hooks, so a component written against `useIsPlaying()` or `usePlaybackControls()` works under either. The library's transport buttons, position display, time-format select, selection inputs and automatic-scroll checkbox are such components, and now work under `MediaElementPlaylistProvider` too.
+
+Six hooks are removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()` and `useMediaElementData()`. A leftover call to a removed hook fails at import (the export is missing), not silently: under webpack or Rspack the import is `undefined` and the call throws at the first render; in native ES modules and the Vite dev server the module fails to link ("does not provide an export named …"). TypeScript reports the import.
+
+`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()`. A leftover read of one of them from the `usePlaybackRefs()` value throws at that read, under either provider, for example: "getLookAhead is no longer on usePlaybackRefs(): read it from useEngineRefs() (WaveformPlaylistProvider only)". In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` therefore throws at the destructuring, on the component's first render. A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. The eight names are not enumerable on the value, so it still lists and spreads as its four fields; a spread copy (`{ ...refs }`) does not carry the guard, and a moved name read from the copy is `undefined`. Only a read throws: `'playoutRef' in refs` is `true`, and `refs.playoutRef?.current` throws like any other read. The message for `playoutRef` (under either provider) goes on to name `useMediaElementTrack().playoutRef`, which is where the MediaElement provider's player is.
+
+| Removed | Replace with |
+| --- | --- |
+| `usePlaylistControls()` | `usePlaybackControls()` (the actions both providers have) and `useEditorControls()` (the rest) |
+| `usePlaylistAnnotations()` | `useAnnotations()` and `useAnnotationEditing()` |
+| eight fields of `usePlaybackRefs()` | `useEngineRefs()`. `usePlaybackRefs()` stays, with four fields |
+| `useMediaElementAnimation()` | `useIsPlaying()`, `useCurrentTime()`, `usePlaybackRefs()` |
+| `useMediaElementState()` | `useAnnotations()`, `useActiveAnnotation()`, `usePlaybackRate()`, `usePlaylistSettings()` |
+| `useMediaElementControls()` | `usePlaybackControls()`, and `usePlaybackRate()` for `setPlaybackRate` |
+| `useMediaElementData()` | `useMediaElementTrack()`, `usePlaylistView()`, `usePlaylistZoom()` |
+
+This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, one of the removed hooks, use the hook from the tables below.
+
+### The hooks after this change
+
+All are exported from `@waveform-playlist/browser`.
+
+Under either provider:
+
+| Hook | Returns |
+| --- | --- |
+| `useIsPlaying()` | `isPlaying` |
+| `useCurrentTime()` | `currentTime` (where the cursor rests; it does not advance during playback) |
+| `useSelection()` | `selectionStart`, `selectionEnd` |
+| `useActiveAnnotation()` | `activeAnnotationId` |
+| `useAnnotations()` | `annotations`, `continuousPlay` |
+| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` |
+| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (the last three are always `false` under `MediaElementPlaylistProvider`) |
+| `usePlaylistSettings()` | `timeFormat`, `isAutomaticScroll` |
+| `usePlaylistZoom()` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` (the last two are always `false` under `MediaElementPlaylistProvider`) |
+
+`WaveformPlaylistProvider` only:
+
+| Hook | Returns |
+| --- | --- |
+| `useEditorControls()` | `setCurrentTime`, `setTrackMute`, `setTrackSolo`, `setTrackVolume`, `setTrackPan`, `reorderTrack`, `bumpTrackReorderEpoch`, `setTrackDragPreview`, `setSelectedTrackId`, `zoomIn`, `zoomOut`, `setMasterVolume`, `setLinkEndpoints`, `setAnnotationsEditable`, `setLoopEnabled`, `setLoopRegion`, `setLoopRegionFromSelection`, `clearLoopRegion`, `undo`, `redo`, `setRecordingActive` |
+| `useEngineRefs()` | `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef`, `isDraggingRef` |
+| `useAnnotationEditing()` | `annotationsEditable`, `linkEndpoints` |
+| `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()`, `useUndoRedo()` | unchanged |
+
+`MediaElementPlaylistProvider` only:
+
+| Hook | Returns |
+| --- | --- |
+| `usePlaybackRate()` | `playbackRate`, `setPlaybackRate` |
+| `useMediaElementTrack()` | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` |
+
+The values of `usePlaybackControls()`, `useEditorControls()`, `usePlaybackRefs()` and `useEngineRefs()` never change, so calling them never re-renders the component.
+
+Type names: `PlaylistControlsContextValue`, `PlaylistAnnotationsContextValue`, `MediaElementAnimationContextValue`, `MediaElementStateContextValue`, `MediaElementControlsContextValue` and `MediaElementDataContextValue` are removed. The new value types are `PlaybackControlsContextValue`, `EditorControlsContextValue`, `AnnotationsContextValue`, `AnnotationEditingContextValue`, `EngineRefsContextValue`, `PlaybackRateContextValue` and `MediaElementTrackContextValue`. `PlaybackRefsContextValue` keeps its name and has the four fields above.
+
+### Where each field of the removed hooks went
+
+**Find** (imports and calls; run each as a regular expression over your source):
+
+- `\busePlaylistControls\b`
+- `\busePlaylistAnnotations\b`
+- `\busePlaybackRefs\b` (the hook stays; check which fields each call reads)
+- `\buseMediaElement(Animation|State|Controls|Data)\b`
+- `\b(PlaylistControls|PlaylistAnnotations|MediaElement(Animation|State|Controls|Data))ContextValue\b`
+
+**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
+
+From `usePlaylistControls()`:
+
+| Field | Now from |
+| --- | --- |
+| `play` | `usePlaybackControls()` |
+| `pause` | `usePlaybackControls()` |
+| `stop` | `usePlaybackControls()` |
+| `seekTo` | `usePlaybackControls()` |
+| `setSelection` | `usePlaybackControls()` |
+| `setTimeFormat` | `usePlaybackControls()` |
+| `setAutomaticScroll` | `usePlaybackControls()` |
+| `setScrollContainer` | `usePlaybackControls()` |
+| `scrollContainerRef` | `usePlaybackControls()` |
+| `setContinuousPlay` | `usePlaybackControls()` |
+| `setAnnotations` | `usePlaybackControls()` |
+| `annotationPreview` | `usePlaybackControls()` |
+| `setActiveAnnotationId` | `usePlaybackControls()` |
+| `setCurrentTime` | `useEditorControls()` |
+| `setTrackMute` | `useEditorControls()` |
+| `setTrackSolo` | `useEditorControls()` |
+| `setTrackVolume` | `useEditorControls()` |
+| `setTrackPan` | `useEditorControls()` |
+| `reorderTrack` | `useEditorControls()` |
+| `bumpTrackReorderEpoch` | `useEditorControls()` |
+| `setTrackDragPreview` | `useEditorControls()` |
+| `setSelectedTrackId` | `useEditorControls()` |
+| `zoomIn` | `useEditorControls()` |
+| `zoomOut` | `useEditorControls()` |
+| `setMasterVolume` | `useEditorControls()` |
+| `setLinkEndpoints` | `useEditorControls()` |
+| `setAnnotationsEditable` | `useEditorControls()` |
+| `setLoopEnabled` | `useEditorControls()` |
+| `setLoopRegion` | `useEditorControls()` |
+| `setLoopRegionFromSelection` | `useEditorControls()` |
+| `clearLoopRegion` | `useEditorControls()` |
+| `undo` | `useEditorControls()` |
+| `redo` | `useEditorControls()` |
+| `setRecordingActive` | `useEditorControls()` |
+
+From `usePlaylistAnnotations()`:
+
+| Field | Now from |
+| --- | --- |
+| `annotations` | `useAnnotations()` |
+| `continuousPlay` | `useAnnotations()` |
+| `annotationsEditable` | `useAnnotationEditing()` |
+| `linkEndpoints` | `useAnnotationEditing()` |
+
+From `usePlaybackRefs()`:
+
+| Field | Now from |
+| --- | --- |
+| `currentTimeRef` | `usePlaybackRefs()` (unchanged) |
+| `visualTimeRef` | `usePlaybackRefs()` (unchanged) |
+| `registerFrameCallback` | `usePlaybackRefs()` (unchanged) |
+| `unregisterFrameCallback` | `usePlaybackRefs()` (unchanged) |
+| `playbackStartTimeRef` | `useEngineRefs()` |
+| `audioStartPositionRef` | `useEngineRefs()` |
+| `getPlaybackTime` | `useEngineRefs()` |
+| `getAudioContextTime` | `useEngineRefs()` |
+| `getLookAhead` | `useEngineRefs()` |
+| `getOutputLatency` | `useEngineRefs()` |
+| `playoutRef` | `useEngineRefs()` |
+| `isDraggingRef` | `useEngineRefs()` |
+
+From `useMediaElementAnimation()`:
+
+| Field | Now from |
+| --- | --- |
+| `isPlaying` | `useIsPlaying()` |
+| `currentTime` | `useCurrentTime()` |
+| `currentTimeRef` | `usePlaybackRefs()` |
+
+From `useMediaElementState()`:
+
+| Field | Now from |
+| --- | --- |
+| `annotations` | `useAnnotations()` |
+| `continuousPlay` | `useAnnotations()` |
+| `activeAnnotationId` | `useActiveAnnotation()` |
+| `playbackRate` | `usePlaybackRate()` |
+| `isAutomaticScroll` | `usePlaylistSettings()` |
+
+From `useMediaElementControls()`:
+
+| Field | Now from |
+| --- | --- |
+| `play` | `usePlaybackControls()` |
+| `pause` | `usePlaybackControls()` |
+| `stop` | `usePlaybackControls()` |
+| `seekTo` | `usePlaybackControls()` |
+| `setContinuousPlay` | `usePlaybackControls()` |
+| `setAnnotations` | `usePlaybackControls()` |
+| `annotationPreview` | `usePlaybackControls()` |
+| `setActiveAnnotationId` | `usePlaybackControls()` |
+| `setAutomaticScroll` | `usePlaybackControls()` |
+| `setScrollContainer` | `usePlaybackControls()` |
+| `scrollContainerRef` | `usePlaybackControls()` |
+| `setPlaybackRate` | `usePlaybackRate()` |
+
+From `useMediaElementData()`:
+
+| Field | Now from |
+| --- | --- |
+| `duration` | `useMediaElementTrack()` |
+| `isReady` | `useMediaElementTrack()` |
+| `peaksDataArray` | `useMediaElementTrack()` |
+| `fadeIn` | `useMediaElementTrack()` |
+| `fadeOut` | `useMediaElementTrack()` |
+| `playoutRef` | `useMediaElementTrack()` |
+| `sampleRate` | `usePlaylistView()` |
+| `waveHeight` | `usePlaylistView()` |
+| `timeScaleHeight` | `usePlaylistView()` |
+| `controls` | `usePlaylistView()` |
+| `barWidth` | `usePlaylistView()` |
+| `barGap` | `usePlaylistView()` |
+| `roundedBars` | `usePlaylistView()` |
+| `progressBarWidth` | `usePlaylistView()` |
+| `samplesPerPixel` | `usePlaylistZoom()` |
+
+New under `MediaElementPlaylistProvider`, with no earlier equivalent: `useSelection()`, `usePlaybackControls().setSelection`, `usePlaybackControls().setTimeFormat`, `usePlaylistSettings().timeFormat`, and `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback` on `usePlaybackRefs()`. There, `visualTimeRef` is the same ref as `currentTimeRef`.
+
+**A toolbar under `WaveformPlaylistProvider`:**
+
+```tsx
+// Before
+import { usePlaylistControls, useIsPlaying } from '@waveform-playlist/browser';
+
+function Toolbar() {
+  const { isPlaying } = useIsPlaying();
+  const { play, pause, stop, zoomIn, zoomOut, undo, redo } = usePlaylistControls();
+  // ...
+}
+
+// After
+import { usePlaybackControls, useEditorControls, useIsPlaying } from '@waveform-playlist/browser';
+
+function Toolbar() {
+  const { isPlaying } = useIsPlaying();
+  const { play, pause, stop } = usePlaybackControls();
+  const { zoomIn, zoomOut, undo, redo } = useEditorControls();
+  // ...
+}
+```
+
+**A component that reads the engine through `usePlaybackRefs()`:**
+
+```tsx
+// Before
+import { usePlaybackRefs } from '@waveform-playlist/browser';
+
+function LatencyReadout() {
+  const { currentTimeRef, playoutRef, getLookAhead, getOutputLatency } = usePlaybackRefs();
+  // ...
+}
+
+// After
+import { usePlaybackRefs, useEngineRefs } from '@waveform-playlist/browser';
+
+function LatencyReadout() {
+  const { currentTimeRef } = usePlaybackRefs();
+  const { playoutRef, getLookAhead, getOutputLatency } = useEngineRefs();
+  // ...
+}
+```
+
+`useClipDragHandlers({ engineRef, isDraggingRef, … })` takes both of its refs from `useEngineRefs()` now (`engineRef: playoutRef`).
+
+**A hand-built transport under `MediaElementPlaylistProvider`:** the library's buttons replace it. `AudioPosition` shows the position in the provider's time format and follows playback through the provider's animation loop, so the `requestAnimationFrame` loop goes too.
+
+```tsx
+// Before
+import { useEffect, useRef } from 'react';
+import {
+  useMediaElementAnimation,
+  useMediaElementState,
+  useMediaElementControls,
+} from '@waveform-playlist/browser';
+
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+function Controls() {
+  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
+  const { playbackRate } = useMediaElementState();
+  const { play, pause, stop, setPlaybackRate } = useMediaElementControls();
+
+  const timeRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      if (timeRef.current) timeRef.current.textContent = format(currentTimeRef.current ?? 0);
+      if (isPlaying) raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, currentTimeRef]);
+
+  return (
+    <div>
+      <button onClick={() => play()} disabled={isPlaying}>Play</button>
+      <button onClick={() => pause()} disabled={!isPlaying}>Pause</button>
+      <button onClick={() => stop()}>Stop</button>
+      <span ref={timeRef} />
+      {SPEEDS.map((rate) => (
+        <button key={rate} disabled={playbackRate === rate} onClick={() => setPlaybackRate(rate)}>
+          {rate}×
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// After
+import {
+  PlayButton,
+  PauseButton,
+  StopButton,
+  AudioPosition,
+  PlaybackRateSelect,
+} from '@waveform-playlist/browser';
+
+function Controls() {
+  return (
+    <div>
+      <PlayButton />
+      <PauseButton />
+      <StopButton />
+      <AudioPosition />
+      <PlaybackRateSelect />
+    </div>
+  );
+}
+```
+
+`PlaybackRateSelect` is new and works under `MediaElementPlaylistProvider` only. It is a native `<select>` labelled "Playback speed"; `rates` (optional) lists the speeds to offer, by default 0.5, 0.75, 1, 1.25, 1.5 and 2. To keep your own buttons instead, read `usePlaybackRate()`:
+
+```tsx
+const { playbackRate, setPlaybackRate } = usePlaybackRate();
+```
+
+**A component that reads `useMediaElementData()`:**
+
+```tsx
+// Before
+import { useMediaElementData } from '@waveform-playlist/browser';
+
+function Info() {
+  const { duration, isReady, playoutRef, sampleRate, samplesPerPixel } = useMediaElementData();
+  // ...
+}
+
+// After
+import { useMediaElementTrack, usePlaylistView, usePlaylistZoom } from '@waveform-playlist/browser';
+
+function Info() {
+  const { duration, isReady, playoutRef } = useMediaElementTrack();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  // ...
+}
+```
+
+### Which controls work where
+
+Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton`.
+
+`MediaElementPlaylistProvider` only: `PlaybackRateSelect`.
+
+`WaveformPlaylistProvider` only (they throw under `MediaElementPlaylistProvider`): `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, and `ExportWavButton` from `@waveform-playlist/browser/tone`.
+
+`MediaElementWaveform`, `MediaElementPlaylist` and `MediaElementAnnotationList` keep their names.
+
+### Behaviour
+
+- **`StopButton` is disabled unless playback is running, under both providers.** Before: no library Stop button worked under `MediaElementPlaylistProvider`, and the hand-built Stop on the MediaElement example pages was always enabled. Now: after Pause, `StopButton` is disabled and the cursor stays at the pause point. `stop()` called from code after a pause still returns the cursor to where playback started.
+- **`RewindButton`, `FastForwardButton`, `SkipBackwardButton` and `SkipForwardButton` call only `seekTo`.** Before: each called `setCurrentTime(t)` and then, when playing, `play(t)`; Fast Forward and Skip Forward read `duration` from `usePlaylistTimeline()` to clamp. Now: `seekTo(0)`, `seekTo(Infinity)` and `seekTo(currentTimeRef.current ± skipAmount)`. `seekTo` clamps (see the next item for `WaveformPlaylistProvider`) and, during playback, restarts playback at the new position.
+- **The `0` shortcut is `seekTo(0)`.** Before: `rewindToStart` of `usePlaybackShortcuts()` (the `0` key of the hook and of `<KeyboardShortcuts playback>`) called `setCurrentTime(0)` and then, when playing, `play(0)`. Now: it calls `seekTo(0)`, as `RewindButton` does.
+- **`seekTo` under `WaveformPlaylistProvider` accepts a position past the end of the audio in two modes.** Before: `seekTo(t)` always clamped `t` to 0…the length of the timeline. `SkipBackwardButton` did not go through it: it called `setCurrentTime(Math.max(0, currentTimeRef.current - skipAmount))`, and `setCurrentTime` does not clamp. Now: with the `indefinitePlayback` prop, or during a recording session (after `setRecordingActive(true)`, until `setRecordingActive(false)`), a finite `t` past the end of the audio is kept as it is. `seekTo(Infinity)` still means the end of the audio, in every mode. The result is never below 0. Otherwise `seekTo` clamps to the audio as before. So `seekTo` called from your code in those two modes can now put the cursor past the end, and Skip Backward from a position past the end lands where it did before this change (from 30 s over 10 s of audio, at 25 s). `SkipForwardButton` changes in those two modes: before, it stopped at the end of the audio (`Math.min(duration, …)`); now each press moves the cursor on by `skipAmount`, past the end, because there the transport has no end. `FastForwardButton` is disabled under a provider with `indefinitePlayback` (before: enabled, and it jumped to the end of the audio); it is not disabled by a recording session.
+- **`seekTo` under `WaveformPlaylistProvider` during playback, while the engine is being rebuilt.** Before: the cursor moved, and `play` was not called because there was no engine. Now: `seekTo` calls `play(t)` whenever playback is running, and `play` re-points the play that is waiting for the rebuilt engine to the new position. The re-pointed play is open-ended: if the waiting play was a selection or another range, its end is dropped, as for any `seekTo` during playback.
+- **`PlayButton` under `MediaElementPlaylistProvider` plays a highlighted selection as a range.** Before: no library Play button worked there, and a hand-built one calling `play()` played open-ended from the cursor. Now: as under `WaveformPlaylistProvider`, with a selection highlighted the button plays it and stops at its end (resuming from the cursor when the cursor is inside the selection), and plays from the cursor otherwise. There is no loop under `MediaElementPlaylistProvider`.
+- **`setSelection` under `MediaElementPlaylistProvider` orders and clamps its two times.** Before: `setSelection` was not public under this provider, and the provider stored the two times as it was given them (the drag on the waveform passed them ordered). Now: `usePlaybackControls().setSelection(a, b)` works there; the smaller time is the start, and both are clamped to 0…the length of the audio (the `duration` of the track's waveform data). `SelectionTimeInputs` works under this provider now, and a typed time can be past the end or after the other one; after the call the highlight, the cursor and what Play plays are one range. Two consequences: `setSelection(5, 100)` on 30 s of audio stores 5 to 30, so a following `play(5, 95)` is not recognised as playing the selection (it plays to the end of the audio and rests there; `play(5, 25)` is the selection); and a selection that is kept while the track changes to shorter audio is not clamped again until the next call.
+- **A replaced `MediaElementPlaylistProvider` player keeps the speed the user chose.** The provider replaces its player when the track or certain props change. Before: every new player ran at the speed of the `playbackRate` prop, while `playbackRate` in the provider's state (what a speed select shows) kept the speed chosen with `setPlaybackRate`. Now the latest instruction wins, for the audio and for the state alike: a new player is set to the speed last chosen with `setPlaybackRate` (which `PlaybackRateSelect` calls), and a `playbackRate` prop that changes after mount replaces that choice (the state takes the prop's value) until the user chooses again. Before, a changed prop changed the audio's speed and left the state at the old value. The bundled engine is created at the prop's speed, as before, and is told a speed with `setPlaybackRate` only when the current one differs from that prop (after a choice of the user). **A custom `createPlayout` is now told the current speed on every new player** (before: the provider told a custom player a speed only after the user had chosen one, and the prop never reached it): a speed set inside your factory is replaced by the prop's (default 1), so pass the speed as the prop. The provider's `setPlaybackRate` clamps to 0.5–2; the provider does not clamp the prop (the bundled engine's own setter clamps to 0.25–4, its constructor does not). Two orderings to know: a prop change and a `setPlaybackRate` call in the same event handler leave the prop's speed, whichever came first; and a child that answers a prop change by setting a speed must do so in a `useEffect`, not a `useLayoutEffect` (a child's layout effect runs before the provider records the new prop, so its speed shows in the select but the new player gets the prop's).
+- **Nested providers.** Before: the hooks of the two providers were different functions, so a `usePlaylist*` hook inside a `MediaElementPlaylistProvider` that was itself inside a `WaveformPlaylistProvider` read the outer provider. Now: a shared hook reads the nearest provider, and a hook the nearest provider does not serve throws, for example: "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it". The same holds the other way round for `usePlaybackRate()` and `useMediaElementTrack()`.
+- **A shared hook outside any provider.** Before: "useIsPlaying must be used within WaveformPlaylistProvider". Now: "useIsPlaying must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider". A hook that only one provider serves names that provider.
+- **`MediaElementPlaylistProvider` has a time format.** Before: none. Now: `usePlaylistSettings().timeFormat` and `usePlaybackControls().setTimeFormat`, default `'hh:mm:ss.uuu'`, read by `AudioPosition` and `TimeFormatSelect`.
+- **`KeyboardShortcuts` and `usePlaybackShortcuts()` are `WaveformPlaylistProvider` only**, before and now: both throw under `MediaElementPlaylistProvider`, also when that provider is nested inside a `WaveformPlaylistProvider` (before, the hook then drove the outer playlist) (now with "usePlaybackShortcuts needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it"). `usePlaybackShortcuts()` listens on the window, and what keys do for the single-track player is not decided ([#723](https://github.com/naomiaro/waveform-playlist/issues/723), [#730](https://github.com/naomiaro/waveform-playlist/issues/730)). `useKeyboardShortcuts()` reads no context, and `useAnnotationKeyboardControls()` does not throw there, so your own component can call either under `MediaElementPlaylistProvider`.
+- **`useAnnotationKeyboardControls()` under `MediaElementPlaylistProvider` reads `samplesPerPixel` and `sampleRate` from the provider.** Before: under that provider the hook scrolled to the active annotation only when `scrollContainerRef`, `samplesPerPixel` and `sampleRate` were all passed as options. Now: with a `scrollContainerRef` and without the other two it reads them from the provider and scrolls the active annotation into view. An option that is passed still wins. Inside nested providers it reads the nearest one.
+- **Some hooks and components that read only shared hooks no longer throw under the other provider**: `useClipDragHandlers()` under `MediaElementPlaylistProvider`, and `MediaElementAnnotationList` and `AnimatedMediaElementPlayhead` under `WaveformPlaylistProvider`. That is a consequence of the shared hooks, not a supported use.
+
+### What to check after the replacement of the MediaElement hooks
+
+A component re-renders only for the hooks it calls. The four removed hooks carried several groups of fields each, so a component moved to the new hooks can stop updating, with no type error. For the WebAudio hooks see [What to check after the replacement](#what-to-check-after-the-replacement) above.
+
+1. **`currentTimeRef.current` read while rendering.** A component that read `{ isPlaying, currentTimeRef }` from `useMediaElementAnimation()` and printed `currentTimeRef.current` during render was re-rendered by every seek, every pause and every move of a leftward selection drag, because `currentTime` was in the same value. After moving to `useIsPlaying()` and `usePlaybackRefs()` it re-renders on play, pause and stop only. Add `useCurrentTime()` and show its `currentTime`, or use `<AudioPosition />`.
+
+   ```tsx
+   // Before: re-rendered on every seek, because currentTime was in the same value
+   const { isPlaying, currentTimeRef } = useMediaElementAnimation();
+   return <span>{format(currentTimeRef.current ?? 0)}</span>;
+
+   // After: subscribe to what the label shows
+   const { currentTime } = useCurrentTime();
+   return <span>{format(currentTime)}</span>;
+   ```
+
+2. **A `useMediaElementState()` reader** no longer re-renders when the active annotation changes, unless it calls `useActiveAnnotation()`.
+3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
+4. **Under `WaveformPlaylistProvider`, a `usePlaylistAnnotations()` reader moved to `useAnnotations()`** no longer re-renders on the Editable and Link-endpoints toggles, unless it calls `useAnnotationEditing()`.
+5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek, and during a leftward selection drag it is called on every move.
 
 ## Keyboard shortcuts yield to the focused control
 

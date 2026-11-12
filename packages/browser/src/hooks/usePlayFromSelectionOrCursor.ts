@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import {
-  usePlaylistControls,
+  usePlaybackControls,
   useSelection,
   usePlaybackRefs,
-  useLoop,
-} from '../WaveformPlaylistContext';
+  useLoopOptional,
+} from '../contexts/playlistContexts';
 
 /**
  * The one way playback is started by the built-in controls, so the Play button
@@ -22,8 +22,9 @@ import {
 export function usePlayFromSelectionOrCursor(): () => Promise<void> {
   const { currentTimeRef } = usePlaybackRefs();
   const { selectionStart, selectionEnd } = useSelection();
-  const { isLoopEnabled } = useLoop();
-  const { play } = usePlaylistControls();
+  // No loop under the MediaElement provider.
+  const isLoopEnabled = useLoopOptional()?.isLoopEnabled ?? false;
+  const { play } = usePlaybackControls();
 
   const latest = useRef({ selectionStart, selectionEnd, isLoopEnabled });
   useEffect(() => {

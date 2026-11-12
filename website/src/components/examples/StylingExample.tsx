@@ -15,8 +15,8 @@ import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
   MediaElementWaveform,
-  useMediaElementControls,
-  useMediaElementAnimation,
+  PlayButton,
+  StopButton,
   loadWaveformData,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -57,25 +57,6 @@ const Code = styled.code`
   padding: 0.2rem 0.4rem;
   border-radius: 3px;
   font-size: 0.85em;
-`;
-
-const ControlButton = styled.button`
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
-  border-radius: 0.25rem;
-  background: var(--ifm-background-color, #fff);
-  color: var(--ifm-font-color-base, #1c1e21);
-  cursor: pointer;
-  font-size: 0.875rem;
-
-  &:hover:not(:disabled) {
-    background: var(--ifm-color-emphasis-100, #f0f0f0);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
 `;
 
 // Theme variants for demonstration
@@ -135,17 +116,10 @@ const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth
 const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.dat';
 
 function PlaybackControls({ loading }: { loading?: boolean }) {
-  const { play, stop } = useMediaElementControls();
-  const { isPlaying } = useMediaElementAnimation();
-
   return (
     <Controls>
-      <ControlButton onClick={() => play()} disabled={isPlaying}>
-        Play
-      </ControlButton>
-      <ControlButton onClick={() => stop()} disabled={!isPlaying}>
-        Stop
-      </ControlButton>
+      <PlayButton />
+      <StopButton />
       {loading && <span style={{ fontSize: '0.875rem', color: '#666' }}>Loading...</span>}
     </Controls>
   );

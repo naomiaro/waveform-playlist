@@ -35,7 +35,7 @@ import {
   type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/browser';
 import {
-  usePlaylistControls,
+  usePlaybackControls,
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
@@ -58,7 +58,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const { waveHeight, mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, isReady } = usePlaylistTimeline();
-  const { scrollContainerRef } = usePlaylistControls();
+  const { scrollContainerRef } = usePlaybackControls();
 
   // State
   const [trackSpectrogramOverrides, setTrackSpectrogramOverrides] = useState<

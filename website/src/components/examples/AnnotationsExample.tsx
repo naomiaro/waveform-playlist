@@ -30,7 +30,7 @@ import {
   EditableCheckbox,
   AudioPosition,
   Waveform,
-  usePlaylistControls,
+  usePlaybackControls,
   useAnnotationDragHandlers,
   useDragSensors,
   KeyboardShortcuts,
@@ -39,7 +39,8 @@ import {
   usePlaylistZoom,
   usePlaylistTimeline,
   usePlaybackRefs,
-  usePlaylistAnnotations,
+  useAnnotations,
+  useAnnotationEditing,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -221,8 +222,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   const { sampleRate, controls } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
-  const { annotations, linkEndpoints } = usePlaylistAnnotations();
-  const { setAnnotations, play, annotationPreview } = usePlaylistControls();
+  const { annotations } = useAnnotations();
+  const { linkEndpoints } = useAnnotationEditing();
+  const { setAnnotations, play, annotationPreview } = usePlaybackControls();
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
   const { currentTimeRef } = usePlaybackRefs();

@@ -8,8 +8,13 @@ import {
   type WaveformPlaylistTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { useMediaElementAnimation, useMediaElementData } from '../MediaElementPlaylistContext';
-import { useMediaElementInternals } from '../providerInternals/mediaElementInternalContexts';
+import {
+  useIsPlaying,
+  useCurrentTime,
+  usePlaybackRefs,
+  usePlaylistView,
+  usePlaylistZoom,
+} from '../contexts/playlistContexts';
 
 const ChannelWrapper = styled.div`
   position: relative;
@@ -77,30 +82,36 @@ export interface ChannelWithMediaElementProgressProps
   clipDurationSamples: number;
 }
 
+interface MediaElementProgressProps {
+  clipStartSample: number;
+  clipDurationSamples: number;
+  channelWidth: number;
+  top: number;
+  height: number;
+  color: string;
+}
+
 /**
- * SmartChannel wrapper for MediaElementPlaylistProvider with animated progress overlay.
- * Uses MediaElement context for time tracking instead of Tone.js audio context.
+ * The progress overlay of one channel. The only part of the channel that
+ * follows playback and the resting cursor (#688): a seek, a stop or a
+ * leftward selection drag renders this and not the waveform beside it.
  */
-export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementProgressProps> = ({
+const MediaElementProgress: React.FC<MediaElementProgressProps> = ({
   clipStartSample,
   clipDurationSamples,
-  ...smartChannelProps
+  channelWidth,
+  top,
+  height,
+  color,
 }) => {
   const progressRef = useRef<HTMLDivElement>(null);
   const frameCallbackId = useId();
-  const theme = useTheme() as WaveformPlaylistTheme;
-  const { waveHeight } = usePlaylistInfo();
-
-  // `isPlaying` comes with `currentTime` in one value, so this also renders on
-  // a seek, a pause and a stop, which is what draws the resting progress.
-  const { isPlaying } = useMediaElementAnimation();
-  const { samplesPerPixel, sampleRate } = useMediaElementData();
-  const { visualTimeRef, registerFrameCallback, unregisterFrameCallback } =
-    useMediaElementInternals();
-
-  const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
-
-  const channelWidth = smartChannelProps.length;
+  const { isPlaying } = useIsPlaying();
+  // Subscribed for the re-render only: the effect below reads the ref.
+  useCurrentTime();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { visualTimeRef, registerFrameCallback, unregisterFrameCallback } = usePlaybackRefs();
 
   // Played fraction of the channel, 0..1, at a time in seconds. The overlay is
   // as wide as the channel and scaled horizontally, so a frame changes only
@@ -136,6 +147,32 @@ export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementPr
     }
   });
 
+  return (
+    <ProgressOverlay
+      ref={progressRef}
+      $color={color}
+      $height={height}
+      $top={top}
+      $width={channelWidth}
+    />
+  );
+};
+
+/**
+ * SmartChannel wrapper for MediaElementPlaylistProvider with animated progress overlay.
+ * The channel itself reads no playback state; its `MediaElementProgress` child does.
+ */
+export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementProgressProps> = ({
+  clipStartSample,
+  clipDurationSamples,
+  ...smartChannelProps
+}) => {
+  const theme = useTheme() as WaveformPlaylistTheme;
+  const { waveHeight } = usePlaylistInfo();
+
+  const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
+  const channelWidth = smartChannelProps.length;
+
   // Get the draw mode from theme (defaults to 'inverted')
   const drawMode = theme?.waveformDrawMode || 'inverted';
 
@@ -148,21 +185,18 @@ export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementPr
   }
 
   const backgroundCss = waveformColorToCss(backgroundColor);
+  const top = smartChannelProps.index * waveHeight;
 
   return (
     <ChannelWrapper>
-      <Background
-        $color={backgroundCss}
-        $height={waveHeight}
-        $top={smartChannelProps.index * waveHeight}
-        $width={channelWidth}
-      />
-      <ProgressOverlay
-        ref={progressRef}
-        $color={progressColor}
-        $height={waveHeight}
-        $top={smartChannelProps.index * waveHeight}
-        $width={channelWidth}
+      <Background $color={backgroundCss} $height={waveHeight} $top={top} $width={channelWidth} />
+      <MediaElementProgress
+        clipStartSample={clipStartSample}
+        clipDurationSamples={clipDurationSamples}
+        channelWidth={channelWidth}
+        top={top}
+        height={waveHeight}
+        color={progressColor}
       />
       <ChannelContainer>
         <SmartChannel {...smartChannelProps} isSelected={true} transparentBackground />
