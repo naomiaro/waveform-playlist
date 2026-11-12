@@ -196,7 +196,13 @@ Width in pixels of progress bars.
 
 **Type:** `() => void`
 
-Called when the audio track is ready for playback.
+Called when the media element has loaded its metadata: it knows its length and can be played and seeked. Called once per player (the player is created again when the track or one of the player options changes). Not called for a source that cannot be loaded; see `onError`. Pass a stable function: a new identity creates the player again.
+
+#### `onError`
+
+**Type:** `(error: Error) => void`
+
+Called when the player could not be created (a missing optional peer, a throwing `createPlayout`) and when the media element reports an error (a source that cannot be loaded or decoded). The provider also logs a warning. Pass a stable function.
 
 ## Context Hooks
 
@@ -232,9 +238,13 @@ Playback and annotation controls.
 
 ```typescript
 interface MediaElementControlsContextValue {
-  play: (startTime?: number) => void;
+  // Starts at startTime (default: the cursor). With playDuration it stops by
+  // itself. Before the player exists the play is queued.
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
+  // Returns the cursor to where playback started.
   stop: () => void;
+  // During playback this restarts playback at `time`.
   seekTo: (time: number) => void;
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
@@ -253,7 +263,8 @@ Playlist data for rendering.
 
 ```typescript
 interface MediaElementDataContextValue {
-  duration: number;
+  duration: number; // the track's length, from its waveform data; known from the first render
+  isReady: boolean; // the media element has loaded its metadata
   peaksDataArray: TrackClipPeaks[];
   sampleRate: number;
   waveHeight: number;
