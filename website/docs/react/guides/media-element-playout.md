@@ -190,9 +190,10 @@ The key insight: `Tone.Gain.input` is a native `GainNode`, so `outputNode.connec
 The controls follow the same rules as `WaveformPlaylistProvider`'s:
 
 - `stop()`, the audio reaching its end, and an annotation reaching its end with continuous play off all return the cursor to where playback started. `seekTo(0)` rewinds.
-- `play(start, duration)` plays a range and stops; the cursor rests at the end of the range. When the range starts inside the highlighted selection and ends at its end, the cursor returns to the start of the selection instead.
-- `play()` called before the player exists is queued and starts when the player arrives.
-- `seekTo(time)` during playback restarts playback at `time`.
+- `play(start, duration)` plays a range and stops; the cursor rests at the end of the range. If an annotation is active and continuous play is off, playback stops at that annotation's end when it comes first.
+- `play()` called before the player exists is queued and starts when the player arrives. Do not wait for `isReady` before enabling Play.
+- If the browser refuses to start playback (no user gesture) or the media fails during playback, `isPlaying` goes back to `false`.
+- `seekTo(time)` during playback restarts playback at `time`. A `stop()` while already stopped does not move the cursor.
 - A drag on the waveform highlights a range and moves the cursor to its start. During playback a press moves playback there and a drag selects nothing.
 - `duration` is the length from the track's waveform data and is known from the first render. `isReady` (and the `onReady` prop) tell you that the media element has loaded; `onError` tells you that it could not.
 
@@ -202,7 +203,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 
 | Hook | Frequency | Key returns |
 |------|-----------|-------------|
-| `useMediaElementAnimation()` | On play/pause/stop/seek | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
+| `useMediaElementAnimation()` | On play/pause/stop/seek, and on each move of a leftward selection drag | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
 | `useMediaElementState()` | Medium | `playbackRate`, `annotations`, `activeAnnotationId`, `continuousPlay`, `isAutomaticScroll` |
 | `useMediaElementControls()` | Stable | `play`, `pause`, `stop`, `seekTo`, `setPlaybackRate`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `setContinuousPlay`, `setAutomaticScroll` |
 | `useMediaElementData()` | Stable | `duration`, `isReady`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `fadeIn`, `fadeOut`, `playoutRef` |
