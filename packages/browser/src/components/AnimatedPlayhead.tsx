@@ -6,7 +6,7 @@ import {
   usePlaylistZoom,
   usePlaybackRefs,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 
 const PlayheadLine = styled.div.attrs<{ $color: string; $width: number }>((props) => ({
   style: {

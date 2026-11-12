@@ -63,13 +63,15 @@ vi.mock('../providerInternals/useFrameCallbacks', async (importOriginal) => {
   };
 });
 
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
+  useIsPlaying,
+  useCurrentTime,
+  usePlaybackRefs,
+  usePlaybackControls,
+  useMediaElementTrack,
+  useActiveAnnotation,
+} from '../contexts/playlistContexts';
 import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
 
 const SAMPLE_RATE = 44100;
@@ -138,19 +140,28 @@ function createFakePlayout() {
   return fake;
 }
 
+// The shared hooks (#688), grouped as the tests read them.
 let probe: {
-  animation: ReturnType<typeof useMediaElementAnimation>;
-  controls: ReturnType<typeof useMediaElementControls>;
-  data: ReturnType<typeof useMediaElementData>;
-  state: ReturnType<typeof useMediaElementState>;
+  animation: {
+    isPlaying: boolean;
+    currentTime: number;
+    currentTimeRef: React.RefObject<number>;
+  };
+  controls: ReturnType<typeof usePlaybackControls>;
+  data: ReturnType<typeof useMediaElementTrack>;
+  state: ReturnType<typeof useActiveAnnotation>;
 };
 
 const ProbeChild: React.FC = () => {
   probe = {
-    animation: useMediaElementAnimation(),
-    controls: useMediaElementControls(),
-    data: useMediaElementData(),
-    state: useMediaElementState(),
+    animation: {
+      isPlaying: useIsPlaying().isPlaying,
+      currentTime: useCurrentTime().currentTime,
+      currentTimeRef: usePlaybackRefs().currentTimeRef,
+    },
+    controls: usePlaybackControls(),
+    data: useMediaElementTrack(),
+    state: useActiveAnnotation(),
   };
   return null;
 };
@@ -199,7 +210,7 @@ const SAVED: Record<string, { time: number; annotationId: string }> = {
   'long.mp3': { time: 12, annotationId: 'n2' },
 };
 const RestoreOnSource: React.FC<{ source: string }> = ({ source }) => {
-  const { seekTo, setActiveAnnotationId } = useMediaElementControls();
+  const { seekTo, setActiveAnnotationId } = usePlaybackControls();
   React.useEffect(() => {
     const saved = SAVED[source];
     if (!saved) return;
@@ -768,7 +779,7 @@ describe('MediaElement annotation playback goes through the shared loop step', (
   });
 });
 
-describe('MediaElement public hook values are unchanged by #769', () => {
+describe('what #769 shares between the providers stays internal', () => {
   it('the package entry does not export the internal hooks or contexts', async () => {
     const entry = (await import('../index')) as Record<string, unknown>;
     for (const name of [
@@ -786,57 +797,11 @@ describe('MediaElement public hook values are unchanged by #769', () => {
     ]) {
       expect(entry[name], name).toBeUndefined();
     }
-    expect(entry.useMediaElementAnimation).toBeDefined();
+    // The entry is the real one: a hook it does export is there.
+    expect(entry.useMediaElementTrack).toBeDefined();
   });
 
-  it('have exactly the documented fields', async () => {
-    await mount();
-    expect(Object.keys(probe.animation).sort()).toEqual(
-      ['currentTime', 'currentTimeRef', 'isPlaying'].sort()
-    );
-    expect(Object.keys(probe.state).sort()).toEqual(
-      [
-        'activeAnnotationId',
-        'annotations',
-        'continuousPlay',
-        'isAutomaticScroll',
-        'playbackRate',
-      ].sort()
-    );
-    expect(Object.keys(probe.controls).sort()).toEqual(
-      [
-        'annotationPreview',
-        'pause',
-        'play',
-        'scrollContainerRef',
-        'seekTo',
-        'setActiveAnnotationId',
-        'setAnnotations',
-        'setAutomaticScroll',
-        'setContinuousPlay',
-        'setPlaybackRate',
-        'setScrollContainer',
-        'stop',
-      ].sort()
-    );
-    expect(Object.keys(probe.data).sort()).toEqual(
-      [
-        'barGap',
-        'barWidth',
-        'controls',
-        'isReady',
-        'duration',
-        'fadeIn',
-        'fadeOut',
-        'peaksDataArray',
-        'playoutRef',
-        'progressBarWidth',
-        'roundedBars',
-        'sampleRate',
-        'samplesPerPixel',
-        'timeScaleHeight',
-        'waveHeight',
-      ].sort()
-    );
-  });
+  // The fields of each hook under this provider are pinned in
+  // sharedPlaybackInterface.test.tsx ("each returns exactly its documented
+  // fields", "the MediaElement-only hooks return exactly their documented fields").
 });

@@ -9,15 +9,15 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
   useCurrentTime,
   useActiveAnnotation,
-  usePlaylistControls,
+  usePlaybackControls,
   usePlaylistTimeline,
-  usePlaylistAnnotations,
+  useAnnotations,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -118,9 +118,9 @@ let probe: Probe;
 const ProbeChild: React.FC = () => {
   const { isPlaying } = useIsPlaying();
   const { currentTime } = useCurrentTime();
-  const { play, setContinuousPlay, setSelection, stop } = usePlaylistControls();
+  const { play, setContinuousPlay, setSelection, stop } = usePlaybackControls();
   const { isReady, duration } = usePlaylistTimeline();
-  const { continuousPlay } = usePlaylistAnnotations();
+  const { continuousPlay } = useAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   probe = {
     isReady,

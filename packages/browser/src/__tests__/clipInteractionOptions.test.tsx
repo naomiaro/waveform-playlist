@@ -46,7 +46,8 @@ vi.mock('../hooks/useDragSensors', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider, usePlaylistTimeline } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import { Waveform } from '../components/Waveform';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';

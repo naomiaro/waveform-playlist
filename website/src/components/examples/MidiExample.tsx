@@ -17,7 +17,7 @@ import {
   ClearAllButton,
   AudioPosition,
   KeyboardShortcuts,
-  usePlaylistControls,
+  usePlaybackControls,
   usePlaylistSettings,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -166,7 +166,7 @@ const StyledDropZone = styled(FileDropZone)`
 
 function AutoScrollToggle() {
   const { isAutomaticScroll } = usePlaylistSettings();
-  const { setAutomaticScroll } = usePlaylistControls();
+  const { setAutomaticScroll } = usePlaybackControls();
 
   return (
     <ToggleLabel>

@@ -14,14 +14,15 @@ import {
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type { Peaks } from '@waveform-playlist/core';
 import {
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-} from '../MediaElementPlaylistContext';
-import {
-  useMediaElementInternals,
-  useMediaElementSelection,
-} from '../providerInternals/mediaElementInternalContexts';
+  useIsPlaying,
+  useCurrentTime,
+  useSelection,
+  usePlaybackControls,
+  usePlaybackRefs,
+  usePlaylistView,
+  usePlaylistZoom,
+  useMediaElementTrack,
+} from '../contexts/playlistContexts';
 import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
 import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
@@ -43,7 +44,11 @@ const CustomMediaElementPlayhead: React.FC<{
   samplesPerPixel: number;
   sampleRate: number;
 }> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
-  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
+  const { isPlaying } = useIsPlaying();
+  const { currentTimeRef } = usePlaybackRefs();
+  // Subscribed for the re-render only, so a seek while stopped moves a custom
+  // playhead: the position below comes from the ref.
+  useCurrentTime();
 
   return renderPlayhead({
     position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
@@ -68,8 +73,9 @@ const MediaElementSelectionOverlay = React.memo(function MediaElementSelectionOv
 }: {
   color: string;
 }) {
-  const { selectionStart, selectionEnd } = useMediaElementSelection();
-  const { sampleRate, samplesPerPixel } = useMediaElementData();
+  const { selectionStart, selectionEnd } = useSelection();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   if (selectionStart === selectionEnd) return null;
 
@@ -124,29 +130,20 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  // MediaElement context hooks
-  const { isPlaying } = useMediaElementAnimation();
+  // Not the resting cursor position (`useCurrentTime()`): the playhead and the
+  // progress overlay follow that themselves, so a seek or a leftward selection
+  // drag does not render the waveform (#688).
+  const { isPlaying } = useIsPlaying();
   // No annotation state here: it changes at every annotation boundary during
   // playback, and only MediaElementAnnotationBoxes needs it (#744).
-  const { setScrollContainer } = useMediaElementControls();
-  const {
-    duration,
-    peaksDataArray,
-    sampleRate,
-    waveHeight,
-    timeScaleHeight,
-    samplesPerPixel,
-    controls,
-    barWidth,
-    barGap,
-    roundedBars,
-    fadeIn,
-    fadeOut,
-  } = useMediaElementData();
+  const { setScrollContainer, setSelection } = usePlaybackControls();
+  const { duration, peaksDataArray, fadeIn, fadeOut } = useMediaElementTrack();
+  const { sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars } =
+    usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   // The selection is the provider's (#769); this component only writes it,
   // and MediaElementSelectionOverlay reads it.
-  const { setSelection } = useMediaElementInternals();
   const [isSelecting, setIsSelecting] = useState(false);
 
   // Local ref for scroll container - also register with context for auto-scroll

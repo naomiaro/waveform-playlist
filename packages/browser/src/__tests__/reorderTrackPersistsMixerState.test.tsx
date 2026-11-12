@@ -20,12 +20,12 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
+  useEditorControls,
   usePlaylistTimeline,
   usePlaylistMixer,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -102,7 +102,7 @@ let probe: {
 const ProbeChild: React.FC = () => {
   const { tracks, isReady } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
-  const { reorderTrack } = usePlaylistControls();
+  const { reorderTrack } = useEditorControls();
   probe = { tracks, trackStates, isReady, reorderTrack };
   return null;
 };

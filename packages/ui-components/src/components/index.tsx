@@ -19,6 +19,7 @@ export * from './SpectrogramChannel';
 export * from './SpectrogramLabels';
 export * from './SmartScale';
 export * from './TimeFormatSelect';
+export * from './PlaybackRateSelect';
 export * from './TimeInput';
 export * from './TimeScale';
 export * from './Track';

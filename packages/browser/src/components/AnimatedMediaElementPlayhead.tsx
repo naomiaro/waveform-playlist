@@ -1,7 +1,12 @@
 import React, { useRef, useEffect, useId } from 'react';
 import styled from 'styled-components';
-import { useMediaElementAnimation, useMediaElementData } from '../MediaElementPlaylistContext';
-import { useMediaElementInternals } from '../providerInternals/mediaElementInternalContexts';
+import {
+  useIsPlaying,
+  useCurrentTime,
+  usePlaybackRefs,
+  usePlaylistView,
+  usePlaylistZoom,
+} from '../contexts/playlistContexts';
 
 const PlayheadLine = styled.div<{ $color: string; $width: number }>`
   position: absolute;
@@ -31,12 +36,13 @@ export const AnimatedMediaElementPlayhead: React.FC<AnimatedMediaElementPlayhead
   // Per instance: two playlists under one provider each have a playhead.
   const frameCallbackId = useId();
 
-  // `isPlaying` comes with `currentTime` in one value, so this also renders on
-  // a seek, a pause and a stop, which is what places the resting playhead.
-  const { isPlaying } = useMediaElementAnimation();
-  const { samplesPerPixel, sampleRate, progressBarWidth } = useMediaElementData();
-  const { visualTimeRef, registerFrameCallback, unregisterFrameCallback } =
-    useMediaElementInternals();
+  const { isPlaying } = useIsPlaying();
+  // Subscribed for the re-render only: the resting-position effect below
+  // reads the ref, and must run again on a seek, a pause and a stop.
+  useCurrentTime();
+  const { sampleRate, progressBarWidth } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { visualTimeRef, registerFrameCallback, unregisterFrameCallback } = usePlaybackRefs();
 
   useEffect(() => {
     if (isPlaying) {

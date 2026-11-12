@@ -3,9 +3,11 @@ import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
   MediaElementWaveform,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementState,
+  useAnnotations,
+  usePlaybackControls,
+  PlayButton,
+  PauseButton,
+  StopButton,
   loadWaveformData,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
@@ -36,25 +38,6 @@ const Controls = styled.div`
   flex-wrap: wrap;
 `;
 
-const Button = styled.button`
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--ifm-color-emphasis-300, #ccc);
-  border-radius: 0.25rem;
-  background: var(--ifm-background-color, white);
-  color: var(--ifm-font-color-base, #333);
-  cursor: pointer;
-  font-size: 1rem;
-
-  &:hover:not(:disabled) {
-    background: var(--ifm-color-emphasis-200, #eee);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
 const CheckboxLabel = styled.label`
   display: flex;
   gap: 0.4rem;
@@ -76,19 +59,14 @@ function Transport({
   linkEndpoints,
   onLinkEndpointsChange,
 }: TransportProps) {
-  const { isPlaying } = useMediaElementAnimation();
-  const { continuousPlay } = useMediaElementState();
-  const { play, pause, stop, setContinuousPlay } = useMediaElementControls();
+  const { continuousPlay } = useAnnotations();
+  const { setContinuousPlay } = usePlaybackControls();
 
   return (
     <Controls>
-      <Button onClick={() => play()} disabled={isPlaying}>
-        Play
-      </Button>
-      <Button onClick={() => pause()} disabled={!isPlaying}>
-        Pause
-      </Button>
-      <Button onClick={() => stop()}>Stop</Button>
+      <PlayButton />
+      <PauseButton />
+      <StopButton />
       <CheckboxLabel>
         <input
           type="checkbox"

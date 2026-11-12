@@ -54,11 +54,8 @@ vi.mock('@waveform-playlist/playout', () => ({
   configureGlobalContext: h.configureGlobalContext,
 }));
 
-import {
-  WaveformPlaylistProvider,
-  usePlaybackRefs,
-  usePlaylistTimeline,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { useEngineRefs, usePlaylistTimeline } from '../contexts/playlistContexts';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -86,7 +83,7 @@ let isReady = false;
 let setAppTracks: (update: (tracks: ClipTrack[]) => ClipTrack[]) => void;
 
 const Probe: React.FC = () => {
-  engineRef = usePlaybackRefs().playoutRef;
+  engineRef = useEngineRefs().playoutRef;
   isReady = usePlaylistTimeline().isReady;
   return null;
 };

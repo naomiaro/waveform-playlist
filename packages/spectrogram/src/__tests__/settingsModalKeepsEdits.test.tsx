@@ -12,7 +12,7 @@ import {
   WaveformPlaylistProvider,
   Waveform,
   SpectrogramIntegrationProvider,
-  usePlaylistControls,
+  useEditorControls,
   usePlaylistZoom,
   type SpectrogramIntegration,
 } from '@waveform-playlist/browser';
@@ -115,7 +115,7 @@ const INTEGRATION: SpectrogramIntegration = {
 let zoomIn: () => void = () => {};
 let samplesPerPixel = 0;
 const Probe: React.FC = () => {
-  zoomIn = usePlaylistControls().zoomIn;
+  zoomIn = useEditorControls().zoomIn;
   samplesPerPixel = usePlaylistZoom().samplesPerPixel;
   return null;
 };

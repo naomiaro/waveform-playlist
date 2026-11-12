@@ -7,7 +7,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
-- **Focused context hooks** — one hook per group of fields that change together (`usePlaylistView`, `usePlaylistSettings`, `usePlaylistZoom`, `usePlaylistTimeline`, `usePlaylistMixer`, `usePlaylistAnnotations`, `useLoop`, `useSelection`, `useCurrentTime`, `useIsPlaying`, `usePlaybackRefs`, `usePlaylistControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
+- **Focused context hooks** — one hook per group of fields that change together (`useIsPlaying`, `useCurrentTime`, `useSelection`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistTimeline`, `usePlaylistMixer`, `useLoop`, `useEditorControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
 - **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
@@ -82,30 +82,47 @@ Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvi
 
 ## Context Hooks
 
-`WaveformPlaylistProvider` splits its context into one hook per group of fields that change together, so components only re-render for the data they actually read:
+Each provider splits its context into one hook per group of fields that change together, so components only re-render for the data they actually read. The two providers serve what they share through the same hooks, so a component written against the first table works under either; a hook reads the nearest provider.
+
+Under either provider:
 
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
+| `useIsPlaying` | `isPlaying` | play, pause, stop |
+| `useCurrentTime` | `currentTime` — where the cursor rests; does not advance during playback | a seek, a pause, a stop and a leftward selection drag |
+| `useSelection` | `selectionStart`, `selectionEnd` | every pointer move of a selection drag, so only components that show the selection should call it |
+| `useActiveAnnotation` | `activeAnnotationId` | every annotation boundary during playback, so only components that show the active annotation should call it |
+| `useAnnotations` | `annotations`, `continuousPlay` | an annotation edit, the continuous-play toggle |
+| `usePlaybackControls` | Actions — `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
+| `usePlaybackRefs` | `currentTimeRef` (the live position), `visualTimeRef` (the position to draw), `registerFrameCallback()` / `unregisterFrameCallback()` for 60fps-driven UI (playhead, progress bars) | never |
 | `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
 | `usePlaylistSettings` | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | `usePlaylistZoom` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
+
+`WaveformPlaylistProvider` only:
+
+| Hook | Exposes | Re-renders on |
+|------|---------|---------------|
+| `useEditorControls` | Actions — track mute/solo/volume/pan, track order, zoom, loop, undo/redo, annotation editing settings, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
+| `useEngineRefs` | `playoutRef` (the engine), `isDraggingRef`, `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
+| `useAnnotationEditing` | `annotationsEditable`, `linkEndpoints` | either setting being toggled |
 | `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
 | `usePlaylistMixer` | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
 | `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
-| `usePlaylistAnnotations` | `annotations`, `annotationsEditable`, `linkEndpoints`, `continuousPlay` | an annotation edit, an annotation settings toggle |
 | `useLoop` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | `useSelectedTrackId` | `selectedTrackId` | another track being selected |
 | `useUndoRedo` | `canUndo`, `canRedo` | after an edit |
-| `useIsPlaying` | `isPlaying` | play, pause, stop |
-| `usePlaybackRefs` | Animation refs (`currentTimeRef` for the live position, `visualTimeRef`), `getPlaybackTime()`, `registerFrameCallback()` for 60fps-driven UI (playhead, progress bars), `playoutRef` (the engine), `isDraggingRef` | never |
-| `useSelection` | `selectionStart`, `selectionEnd` | every pointer move of a selection drag, so only components that show the selection should call it |
-| `useCurrentTime` | `currentTime` — where the cursor rests; does not advance during playback | a seek, a pause, a stop and a leftward selection drag |
-| `useActiveAnnotation` | `activeAnnotationId` | every annotation boundary during playback, so only components that show the active annotation should call it |
-| `usePlaylistControls` | Actions — `play`, `pause`, `stop`, `seekTo`, track mute/solo/volume/pan, zoom, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
 
-`usePlaylistTimeline` and `usePlaylistMixer` change during an interaction; call them in the smallest component that needs them. `usePlaybackRefs` never re-renders the component that calls it: read a ref's `.current` in a handler, an effect or a frame callback.
+`MediaElementPlaylistProvider` only:
 
-`MediaElementPlaylistProvider` has `useMediaElementAnimation`, `useMediaElementState`, `useMediaElementControls`, `useMediaElementData`.
+| Hook | Exposes | Re-renders on |
+|------|---------|---------------|
+| `usePlaybackRate` | `playbackRate`, `setPlaybackRate` | the speed changing |
+| `useMediaElementTrack` | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` (the player) | the track or the zoom level changing, the player becoming ready |
+
+`usePlaylistTimeline` and `usePlaylistMixer` change during an interaction; call them in the smallest component that needs them. `usePlaybackRefs` and `useEngineRefs` never re-render the component that calls them: read a ref's `.current` in a handler, an effect or a frame callback.
+
+The transport buttons (`PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`), `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs` and `AutomaticScrollCheckbox` work under either provider. `PlaybackRateSelect` works under `MediaElementPlaylistProvider` only.
 
 ## Examples & Documentation
 

@@ -2306,7 +2306,7 @@ The React packages are **not** being replaced — both surfaces coexist (see Pac
 | `@waveform-playlist/browser` (React)               | `@dawcore/components` (Web Components)                                        |
 | `@waveform-playlist/ui-components` (React)         | Merged into `@dawcore/components`                                             |
 | `WaveformPlaylistProvider` (React context)         | `<daw-editor>` element                                                        |
-| `usePlaylistControls()`                            | `element.play()`, `element.stop()`, etc.                                      |
+| `usePlaybackControls()`, `useEditorControls()`     | `element.play()`, `element.stop()`, etc.                                      |
 | `useIsPlaying()`                                   | `element.isPlaying`                                                           |
 | `useSelection()`                                   | `element.selection`                                                           |
 | `useCurrentTime()`                                 | `element.currentTime`                                                         |
@@ -2323,7 +2323,7 @@ The React packages are **not** being replaced — both surfaces coexist (see Pac
 | `useDynamicTracks()` hook (file/blob loading)      | `editor.loadFiles()` method + `file-drop` attribute                           |
 | `useUndoRedo()` hook (planned)                     | `engine.undo()` / `engine.redo()` + `<daw-undo-button>` / `<daw-redo-button>` |
 | `MediaElementPlaylistProvider` (React context)     | `<daw-player>` element                                                        |
-| `useMediaElementControls()`                        | `player.play()`, `player.pause()`, etc.                                       |
+| `usePlaybackControls()` under that provider        | `player.play()`, `player.pause()`, etc.                                       |
 
 React 19+ users consume `@dawcore/components` directly in JSX — no wrapper package needed. React 18 is not supported.
 

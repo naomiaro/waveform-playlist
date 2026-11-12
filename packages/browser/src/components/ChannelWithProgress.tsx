@@ -18,7 +18,7 @@ import {
   usePlaylistZoom,
   usePlaybackRefs,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 
 const ChannelWrapper = styled.div`
   position: relative;

@@ -1,5 +1,4 @@
 import React, {
-  createContext,
   useState,
   useEffect,
   useLayoutEffect,
@@ -14,7 +13,6 @@ import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData } from '@waveform-playlist/core';
-import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
@@ -24,14 +22,45 @@ import { followAnnotations } from './providerInternals/followAnnotations';
 import { useAnnotationState } from './providerInternals/useAnnotationState';
 import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
-import { useRequiredContext } from './providerInternals/useRequiredContext';
 import { useViewDefaults } from './providerInternals/useViewDefaults';
+import { useTimeFormat } from './hooks/useTimeFormat';
 import {
-  MediaElementInternalsContext,
-  MediaElementSelectionContext,
-  type MediaElementInternalsValue,
-  type MediaElementSelectionValue,
-} from './providerInternals/mediaElementInternalContexts';
+  BLOCKED,
+  playbackRefsValue,
+  ActiveAnnotationContext,
+  AnnotationEditingContext,
+  AnnotationsContext,
+  CurrentTimeContext,
+  EditorControlsContext,
+  EngineRefsContext,
+  IsPlayingContext,
+  LoopContext,
+  MediaElementTrackContext,
+  PlaybackControlsContext,
+  PlaybackRateContext,
+  PlaybackRefsContext,
+  PlaylistMixerContext,
+  PlaylistSettingsContext,
+  PlaylistTimelineContext,
+  PlaylistViewContext,
+  PlaylistZoomContext,
+  SelectedTrackIdContext,
+  SelectionContext,
+  TrackReorderPreviewContext,
+  UndoRedoContext,
+  type ActiveAnnotationContextValue,
+  type AnnotationsContextValue,
+  type CurrentTimeContextValue,
+  type IsPlayingContextValue,
+  type MediaElementTrackContextValue,
+  type PlaybackControlsContextValue,
+  type PlaybackRateContextValue,
+  type PlaybackRefsContextValue,
+  type PlaylistSettingsContextValue,
+  type PlaylistViewContextValue,
+  type PlaylistZoomContextValue,
+  type SelectionContextValue,
+} from './contexts/playlistContexts';
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -47,79 +76,6 @@ export interface MediaElementTrackConfig {
   fadeOut?: FadeConfig;
 }
 
-// Context values for animation (high-frequency updates)
-export interface MediaElementAnimationContextValue {
-  isPlaying: boolean;
-  currentTime: number;
-  currentTimeRef: React.RefObject<number>;
-}
-
-// Context values for playlist state
-export interface MediaElementStateContextValue {
-  continuousPlay: boolean;
-  annotations: AnnotationData[];
-  activeAnnotationId: string | null;
-  playbackRate: number;
-  isAutomaticScroll: boolean;
-}
-
-// Context values for controls
-export interface MediaElementControlsContextValue {
-  /**
-   * Starts playback at `startTime` (default: the cursor). With `playDuration`
-   * it stops by itself after that many seconds of audio. Called before the
-   * player exists, the play is queued and starts when the player arrives.
-   */
-  play: (startTime?: number, playDuration?: number) => Promise<void>;
-  pause: () => void;
-  stop: () => void;
-  seekTo: (time: number) => void;
-  setPlaybackRate: (rate: number) => void;
-  setContinuousPlay: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
-  /**
-   * Where an annotation edge drag shows its moves while it is in progress.
-   * The built-in annotation boxes publish to it; read it in a custom
-   * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
-   */
-  annotationPreview: AnnotationPreviewHandle;
-  setActiveAnnotationId: (id: string | null) => void;
-  setAutomaticScroll: (enabled: boolean) => void;
-  setScrollContainer: (element: HTMLDivElement | null) => void;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-}
-
-// Context values for playlist data
-export interface MediaElementDataContextValue {
-  /** The length of the track's audio, from its waveform data. Never 0 for a real track. */
-  duration: number;
-  /**
-   * True once the media element has loaded its metadata, false again while a
-   * replaced player loads. Use this, not `duration`, as "the player can be used".
-   */
-  isReady: boolean;
-  peaksDataArray: TrackClipPeaks[];
-  sampleRate: number;
-  waveHeight: number;
-  timeScaleHeight: number;
-  samplesPerPixel: number;
-  playoutRef: React.RefObject<MediaElementPlayout | null>;
-  controls: { show: boolean; width: number };
-  barWidth: number;
-  barGap: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
-  roundedBars: boolean;
-  progressBarWidth: number;
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
-}
-
-// Create contexts
-const MediaElementAnimationContext = createContext<MediaElementAnimationContextValue | null>(null);
-const MediaElementStateContext = createContext<MediaElementStateContextValue | null>(null);
-const MediaElementControlsContext = createContext<MediaElementControlsContextValue | null>(null);
-const MediaElementDataContext = createContext<MediaElementDataContextValue | null>(null);
-
 export interface MediaElementPlaylistProviderProps {
   /** Single track configuration with source URL and waveform data */
   track: MediaElementTrackConfig;
@@ -129,7 +85,8 @@ export interface MediaElementPlaylistProviderProps {
   waveHeight?: number;
   /** Show timescale */
   timescale?: boolean;
-  /** Initial playback rate (0.5 to 2.0) */
+  /** Playback rate (0.5 to 2.0). The user's `setPlaybackRate` overrides it; a
+   *  later change of this prop overrides that, until they choose again. */
   playbackRate?: number;
   /** Whether to preserve pitch when changing playback rate (default: true).
    *  Set to false when using an external pitch processor like SoundTouch. */
@@ -240,6 +197,35 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [currentTime, setCurrentTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
+  // The latest instruction wins: the `playbackRate` prop when it changes, or
+  // what the user chose with `setPlaybackRate` since. A changed prop becomes
+  // the state here, during render (the "derive state from a prop" pattern),
+  // so the speed select never shows a speed other than the one playing.
+  const [ratePropSeen, setRatePropSeen] = useState(initialPlaybackRate);
+  // `Object.is`: a NaN prop (a failed parse in the consumer) must compare
+  // equal to itself, or this would set state on every render.
+  if (!Object.is(ratePropSeen, initialPlaybackRate)) {
+    setRatePropSeen(initialPlaybackRate);
+    setPlaybackRateState(initialPlaybackRate);
+  }
+  // The same speed for a player that arrives later (see the init effect).
+  // Written by `setPlaybackRate`, and by the layout effect below for a prop
+  // VALUE it has not applied yet. Not on every run: the effect also runs
+  // again with the same prop (a StrictMode remount, a revealed `<Activity>`),
+  // and it runs after a child's layout effect of the same commit; none of
+  // those is a new instruction, and each would put the prop's speed back
+  // over one that was chosen since. A layout effect, for two reasons: a
+  // render React discards leaves nothing here that never committed, and it
+  // runs before any child's passive effect of the same commit, so a child
+  // that sets a speed in answer to a prop change (restoring a saved one) is
+  // the later instruction and wins.
+  const playbackRateRef = useRef(initialPlaybackRate);
+  const ratePropAppliedRef = useRef(initialPlaybackRate);
+  useLayoutEffect(() => {
+    if (Object.is(ratePropAppliedRef.current, initialPlaybackRate)) return;
+    ratePropAppliedRef.current = initialPlaybackRate;
+    playbackRateRef.current = initialPlaybackRate;
+  }, [initialPlaybackRate]);
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
@@ -266,20 +252,21 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     isAutomaticScrollRef,
     setAutomaticScroll,
   } = useScrollFollow(automaticScroll);
-  // The playhead and the progress overlay register here; the one loop below
-  // draws them. Not in a public context yet (see mediaElementInternalContexts).
+  // The playhead, the progress overlay and `AudioPosition` register here; the
+  // one loop below draws them.
   const { registerFrameCallback, unregisterFrameCallback, runFrameCallbacks } = useFrameCallbacks();
 
   // The time selection. Setting it moves the cursor to its start, and Play
   // plays it (see `setSelection` and `play` below), as under the WebAudio
   // provider (#688).
-  const [selection, setSelectionState] = useState<MediaElementSelectionValue>({
+  const [selection, setSelectionState] = useState<SelectionContextValue>({
     selectionStart: 0,
     selectionEnd: 0,
   });
   const selectionRef = useRef(selection);
 
   const [samplesPerPixel] = useState(initialSamplesPerPixel);
+  const { timeFormat, setTimeFormat } = useTimeFormat();
 
   // Refs
   const playoutRef = useRef<MediaElementPlayout | null>(null);
@@ -490,6 +477,16 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
+        // The speed the provider shows (`usePlaybackRate()`, the speed
+        // select) is the prop's, or the one chosen since the prop last
+        // changed. The bundled engine was created at the prop's speed, as
+        // given: it is told only a speed that differs (its setter clamps,
+        // its constructor does not, so repeating the prop could change it).
+        // A custom `createPlayout` is not given the speed: it is always told.
+        const speed = playbackRateRef.current;
+        if (createPlayout || !Object.is(speed, initialPlaybackRate)) {
+          playout.setPlaybackRate(speed);
+        }
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own
@@ -770,7 +767,14 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // a range set during playback is played start to end, and a collapsed one
   // (a cursor move) carries on open-ended from there.
   const setSelection = useCallback(
-    (start: number, end: number) => {
+    (requestedStart: number, requestedEnd: number) => {
+      // Ordered and inside the audio, whoever asks: the highlight, the cursor
+      // and what Play plays must be one range (typed times can be reversed
+      // or past the end; the multitrack engine orders its pair too).
+      const length = latestAudioRef.current.waveformData.duration;
+      const clamp = (time: number) => Math.max(0, Math.min(time, length));
+      const start = clamp(Math.min(requestedStart, requestedEnd));
+      const end = clamp(Math.max(requestedStart, requestedEnd));
       const previous = selectionRef.current;
       if (previous.selectionStart !== start || previous.selectionEnd !== end) {
         selectionRef.current = { selectionStart: start, selectionEnd: end };
@@ -819,141 +823,178 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   const setPlaybackRate = useCallback((rate: number) => {
     const clampedRate = Math.max(0.5, Math.min(2.0, rate));
+    playbackRateRef.current = clampedRate;
     setPlaybackRateState(clampedRate);
     if (playoutRef.current) {
       playoutRef.current.setPlaybackRate(clampedRate);
     }
   }, []);
 
-  // Context values
-  const animationValue: MediaElementAnimationContextValue = useMemo(
-    () => ({
-      isPlaying,
-      currentTime,
-      currentTimeRef,
-    }),
-    [isPlaying, currentTime]
+  // Context values. The shared ones are the same context objects the
+  // WebAudio provider renders (#688), each holding fields that change together.
+  const isPlayingValue: IsPlayingContextValue = useMemo(() => ({ isPlaying }), [isPlaying]);
+  const currentTimeValue: CurrentTimeContextValue = useMemo(() => ({ currentTime }), [currentTime]);
+  const activeAnnotationValue: ActiveAnnotationContextValue = useMemo(
+    () => ({ activeAnnotationId }),
+    [activeAnnotationId]
+  );
+  const annotationsValue: AnnotationsContextValue = useMemo(
+    () => ({ annotations, continuousPlay }),
+    [annotations, continuousPlay]
+  );
+  const settingsValue: PlaylistSettingsContextValue = useMemo(
+    () => ({ timeFormat, isAutomaticScroll }),
+    [timeFormat, isAutomaticScroll]
   );
 
-  const stateValue: MediaElementStateContextValue = useMemo(
-    () => ({
-      continuousPlay,
-      annotations,
-      activeAnnotationId,
-      playbackRate,
-      isAutomaticScroll,
-    }),
-    [continuousPlay, annotations, activeAnnotationId, playbackRate, isAutomaticScroll]
+  // Never changes. A media element reports the audible position, so the
+  // position to draw is the playback position itself.
+  const refsValue: PlaybackRefsContextValue = useMemo(
+    () =>
+      playbackRefsValue({
+        currentTimeRef,
+        visualTimeRef: currentTimeRef,
+        registerFrameCallback,
+        unregisterFrameCallback,
+      }),
+    [registerFrameCallback, unregisterFrameCallback]
   );
 
-  const controlsValue: MediaElementControlsContextValue = useMemo(
+  // Never changes.
+  const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
       play,
       pause,
       stop,
       seekTo,
-      setPlaybackRate,
-      setContinuousPlay,
-      setAnnotations,
-      annotationPreview,
-      setActiveAnnotationId,
-      setAutomaticScroll,
-      setScrollContainer,
-      scrollContainerRef,
-    }),
-    [
-      play,
-      pause,
-      stop,
-      seekTo,
-      setPlaybackRate,
-      setContinuousPlay,
-      setAnnotations,
-      annotationPreview,
-      setActiveAnnotationId,
-      setAutomaticScroll,
-      setScrollContainer,
-      scrollContainerRef,
-    ]
-  );
-
-  // Internal (not exported from the package): see mediaElementInternalContexts.
-  const internalsValue: MediaElementInternalsValue = useMemo(
-    () => ({
-      registerFrameCallback,
-      unregisterFrameCallback,
-      visualTimeRef: currentTimeRef,
       setSelection,
+      setTimeFormat,
+      setAutomaticScroll,
+      setScrollContainer,
+      scrollContainerRef,
+      setContinuousPlay,
+      setAnnotations,
+      annotationPreview,
+      setActiveAnnotationId,
     }),
-    [registerFrameCallback, unregisterFrameCallback, setSelection]
+    [
+      play,
+      pause,
+      stop,
+      seekTo,
+      setSelection,
+      setTimeFormat,
+      setAutomaticScroll,
+      setScrollContainer,
+      scrollContainerRef,
+      setContinuousPlay,
+      setAnnotations,
+      annotationPreview,
+      setActiveAnnotationId,
+    ]
   );
 
-  const dataValue: MediaElementDataContextValue = useMemo(
+  // A single track at a fixed zoom level: the three layout modes and both
+  // zoom directions are always off.
+  const viewValue: PlaylistViewContextValue = useMemo(
+    () => ({
+      sampleRate,
+      waveHeight,
+      timeScaleHeight,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+      progressBarWidth,
+      mono: false,
+      indefinitePlayback: false,
+      fillViewport: false,
+    }),
+    [
+      sampleRate,
+      waveHeight,
+      timeScaleHeight,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+      progressBarWidth,
+    ]
+  );
+  const zoomValue: PlaylistZoomContextValue = useMemo(
+    () => ({ samplesPerPixel, canZoomIn: false, canZoomOut: false }),
+    [samplesPerPixel]
+  );
+
+  const playbackRateValue: PlaybackRateContextValue = useMemo(
+    () => ({ playbackRate, setPlaybackRate }),
+    [playbackRate, setPlaybackRate]
+  );
+
+  const trackFadeIn = track.fadeIn;
+  const trackFadeOut = track.fadeOut;
+  const trackValue: MediaElementTrackContextValue = useMemo(
     () => ({
       duration,
       isReady,
       peaksDataArray,
-      sampleRate,
-      waveHeight,
-      timeScaleHeight,
-      samplesPerPixel,
+      fadeIn: trackFadeIn,
+      fadeOut: trackFadeOut,
       playoutRef,
-      controls,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
-      fadeIn: track.fadeIn,
-      fadeOut: track.fadeOut,
     }),
-    [
-      duration,
-      isReady,
-      peaksDataArray,
-      sampleRate,
-      waveHeight,
-      timeScaleHeight,
-      samplesPerPixel,
-      controls,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
-      track.fadeIn,
-      track.fadeOut,
-    ]
+    [duration, isReady, peaksDataArray, trackFadeIn, trackFadeOut]
   );
 
+  // The nine contexts only the WebAudio provider serves are blocked, so that
+  // inside this provider `useLoop()` (say) throws instead of reading a
+  // WebAudio provider further out. Outermost: what changes least.
   return (
     <ThemeProvider theme={mergedTheme}>
-      <MediaElementAnimationContext.Provider value={animationValue}>
-        <MediaElementStateContext.Provider value={stateValue}>
-          <MediaElementControlsContext.Provider value={controlsValue}>
-            <MediaElementDataContext.Provider value={dataValue}>
-              <MediaElementInternalsContext.Provider value={internalsValue}>
-                <MediaElementSelectionContext.Provider value={selection}>
-                  {children}
-                </MediaElementSelectionContext.Provider>
-              </MediaElementInternalsContext.Provider>
-            </MediaElementDataContext.Provider>
-          </MediaElementControlsContext.Provider>
-        </MediaElementStateContext.Provider>
-      </MediaElementAnimationContext.Provider>
+      <EditorControlsContext.Provider value={BLOCKED}>
+        <EngineRefsContext.Provider value={BLOCKED}>
+          <AnnotationEditingContext.Provider value={BLOCKED}>
+            <LoopContext.Provider value={BLOCKED}>
+              <SelectedTrackIdContext.Provider value={BLOCKED}>
+                <UndoRedoContext.Provider value={BLOCKED}>
+                  <PlaylistTimelineContext.Provider value={BLOCKED}>
+                    <PlaylistMixerContext.Provider value={BLOCKED}>
+                      <TrackReorderPreviewContext.Provider value={BLOCKED}>
+                        <PlaybackRefsContext.Provider value={refsValue}>
+                          <PlaybackControlsContext.Provider value={controlsValue}>
+                            <PlaylistViewContext.Provider value={viewValue}>
+                              <PlaylistZoomContext.Provider value={zoomValue}>
+                                <PlaylistSettingsContext.Provider value={settingsValue}>
+                                  <MediaElementTrackContext.Provider value={trackValue}>
+                                    <PlaybackRateContext.Provider value={playbackRateValue}>
+                                      <AnnotationsContext.Provider value={annotationsValue}>
+                                        <IsPlayingContext.Provider value={isPlayingValue}>
+                                          <ActiveAnnotationContext.Provider
+                                            value={activeAnnotationValue}
+                                          >
+                                            <CurrentTimeContext.Provider value={currentTimeValue}>
+                                              <SelectionContext.Provider value={selection}>
+                                                {children}
+                                              </SelectionContext.Provider>
+                                            </CurrentTimeContext.Provider>
+                                          </ActiveAnnotationContext.Provider>
+                                        </IsPlayingContext.Provider>
+                                      </AnnotationsContext.Provider>
+                                    </PlaybackRateContext.Provider>
+                                  </MediaElementTrackContext.Provider>
+                                </PlaylistSettingsContext.Provider>
+                              </PlaylistZoomContext.Provider>
+                            </PlaylistViewContext.Provider>
+                          </PlaybackControlsContext.Provider>
+                        </PlaybackRefsContext.Provider>
+                      </TrackReorderPreviewContext.Provider>
+                    </PlaylistMixerContext.Provider>
+                  </PlaylistTimelineContext.Provider>
+                </UndoRedoContext.Provider>
+              </SelectedTrackIdContext.Provider>
+            </LoopContext.Provider>
+          </AnnotationEditingContext.Provider>
+        </EngineRefsContext.Provider>
+      </EditorControlsContext.Provider>
     </ThemeProvider>
   );
 };
-
-// Hooks
-const PROVIDER = 'MediaElementPlaylistProvider';
-
-export const useMediaElementAnimation = () =>
-  useRequiredContext(MediaElementAnimationContext, 'useMediaElementAnimation', PROVIDER);
-
-export const useMediaElementState = () =>
-  useRequiredContext(MediaElementStateContext, 'useMediaElementState', PROVIDER);
-
-export const useMediaElementControls = () =>
-  useRequiredContext(MediaElementControlsContext, 'useMediaElementControls', PROVIDER);
-
-export const useMediaElementData = () =>
-  useRequiredContext(MediaElementDataContext, 'useMediaElementData', PROVIDER);

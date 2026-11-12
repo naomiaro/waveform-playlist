@@ -25,7 +25,8 @@ import {
   AudioPosition,
   ClipInteractionProvider,
   useCurrentTime,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
   useSelection,
   KeyboardShortcuts,
   usePlaylistView,
@@ -175,7 +176,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const { sampleRate, controls } = usePlaylistView();
   const { isAutomaticScroll } = usePlaylistSettings();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { scrollContainerRef, setSelectedTrackId: setProviderSelectedTrackId, play, stop, pause, seekTo, setRecordingActive } = usePlaylistControls();
+  const { scrollContainerRef, play, stop, pause, seekTo } = usePlaybackControls();
+  const { setSelectedTrackId: setProviderSelectedTrackId, setRecordingActive } = useEditorControls();
   const { isLoopEnabled } = useLoop();
   const { selectedTrackId: providerSelectedTrackId } = useSelectedTrackId();
   const { selectionStart, selectionEnd } = useSelection();

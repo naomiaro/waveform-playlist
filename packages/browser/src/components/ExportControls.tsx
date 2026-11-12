@@ -1,6 +1,6 @@
 import React from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
-import { usePlaylistTimeline, usePlaylistMixer } from '../WaveformPlaylistContext';
+import { usePlaylistTimeline, usePlaylistMixer } from '../contexts/playlistContexts';
 import {
   useExportWav,
   type OfflineEffectsFunction,

@@ -1,6 +1,11 @@
 import React from 'react';
 import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
-import { usePlaylistControls, usePlaylistAnnotations } from '../WaveformPlaylistContext';
+import {
+  usePlaybackControls,
+  useEditorControls,
+  useAnnotations,
+  useAnnotationEditing,
+} from '../contexts/playlistContexts';
 
 /**
  * Continuous play checkbox that uses the playlist context.
@@ -8,8 +13,8 @@ import { usePlaylistControls, usePlaylistAnnotations } from '../WaveformPlaylist
  */
 export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { ContinuousPlayCheckbox: Base } = useAnnotationIntegration();
-  const { continuousPlay } = usePlaylistAnnotations();
-  const { setContinuousPlay } = usePlaylistControls();
+  const { continuousPlay } = useAnnotations();
+  const { setContinuousPlay } = usePlaybackControls();
 
   return <Base checked={continuousPlay} onChange={setContinuousPlay} className={className} />;
 };
@@ -20,8 +25,8 @@ export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ class
  */
 export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { LinkEndpointsCheckbox: Base } = useAnnotationIntegration();
-  const { linkEndpoints } = usePlaylistAnnotations();
-  const { setLinkEndpoints } = usePlaylistControls();
+  const { linkEndpoints } = useAnnotationEditing();
+  const { setLinkEndpoints } = useEditorControls();
 
   return <Base checked={linkEndpoints} onChange={setLinkEndpoints} className={className} />;
 };
@@ -32,8 +37,8 @@ export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ classN
  */
 export const EditableCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { EditableCheckbox: Base } = useAnnotationIntegration();
-  const { annotationsEditable } = usePlaylistAnnotations();
-  const { setAnnotationsEditable } = usePlaylistControls();
+  const { annotationsEditable } = useAnnotationEditing();
+  const { setAnnotationsEditable } = useEditorControls();
 
   return (
     <Base checked={annotationsEditable} onChange={setAnnotationsEditable} className={className} />
@@ -49,7 +54,7 @@ export const DownloadAnnotationsButton: React.FC<{ filename?: string; className?
   className,
 }) => {
   const { DownloadAnnotationsButton: Base } = useAnnotationIntegration();
-  const { annotations } = usePlaylistAnnotations();
+  const { annotations } = useAnnotations();
 
   return <Base annotations={annotations} filename={filename} className={className} />;
 };

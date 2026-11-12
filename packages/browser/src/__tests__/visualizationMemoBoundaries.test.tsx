@@ -62,16 +62,17 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
   useSelection,
   useActiveAnnotation,
   usePlaylistMixer,
   usePlaylistTimeline,
   usePlaylistZoom,
   useSelectedTrackId,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -150,7 +151,8 @@ function createFakeAdapter(): PlayoutAdapter {
 }
 
 let probe: {
-  controls: ReturnType<typeof usePlaylistControls>;
+  controls: ReturnType<typeof usePlaybackControls>;
+  editor: ReturnType<typeof useEditorControls>;
   data: ReturnType<typeof usePlaylistTimeline> &
     ReturnType<typeof usePlaylistZoom> &
     ReturnType<typeof usePlaylistMixer>;
@@ -161,7 +163,8 @@ let probe: {
 
 const ProbeChild: React.FC = () => {
   probe = {
-    controls: usePlaylistControls(),
+    controls: usePlaybackControls(),
+    editor: useEditorControls(),
     data: { ...usePlaylistTimeline(), ...usePlaylistZoom(), ...usePlaylistMixer() },
     state: useSelectedTrackId(),
     selection: useSelection(),
@@ -242,8 +245,8 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
     await mount(threeTracks().tracks);
 
     await act(async () => {
-      probe.controls.setTrackVolume(1, 0.5);
-      probe.controls.setMasterVolume(0.5);
+      probe.editor.setTrackVolume(1, 0.5);
+      probe.editor.setMasterVolume(0.5);
     });
 
     expect(probe.data.trackStates[1].volume).toBe(0.5);
@@ -256,8 +259,8 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
     await mount(threeTracks().tracks);
 
     await act(async () => {
-      probe.controls.setLoopRegion(0.2, 0.8);
-      probe.controls.setLoopEnabled(true);
+      probe.editor.setLoopRegion(0.2, 0.8);
+      probe.editor.setLoopEnabled(true);
     });
 
     expect(counts.shell).toBe(0);
@@ -410,12 +413,12 @@ describe('visualization memo boundaries (#693)', () => {
   it('selecting another track re-renders the two tracks involved and no other', async () => {
     await mount(threeTracks().tracks);
     await act(async () => {
-      probe.controls.setSelectedTrackId('t1');
+      probe.editor.setSelectedTrackId('t1');
     });
     resetCounts();
 
     await act(async () => {
-      probe.controls.setSelectedTrackId('t2');
+      probe.editor.setSelectedTrackId('t2');
     });
 
     expect(Object.keys(counts.track).sort()).toEqual(['t1', 't2']);
@@ -448,7 +451,7 @@ describe('visualization memo boundaries (#693)', () => {
     await mount(threeTracks().tracks);
 
     await act(async () => {
-      probe.controls.setTrackVolume(1, 0.5);
+      probe.editor.setTrackVolume(1, 0.5);
     });
 
     expect(probe.data.trackStates[1].volume).toBe(0.5);
@@ -466,12 +469,12 @@ describe('visualization memo boundaries (#693)', () => {
         .filter((t) => t.startsWith('scaleX'));
 
     await act(async () => {
-      probe.controls.setCurrentTime(0.5);
+      probe.editor.setCurrentTime(0.5);
     });
     expect(transforms().sort()).toEqual(['scaleX(0)', 'scaleX(0.5)', 'scaleX(0.5)', 'scaleX(0.5)']);
 
     await act(async () => {
-      probe.controls.setCurrentTime(2.25);
+      probe.editor.setCurrentTime(2.25);
     });
     expect(transforms().sort()).toEqual(['scaleX(0.25)', 'scaleX(1)', 'scaleX(1)', 'scaleX(1)']);
   });
@@ -482,7 +485,7 @@ describe('visualization memo boundaries (#693)', () => {
     const px = (seconds: number) => (seconds * SAMPLE_RATE) / probe.data.samplesPerPixel;
 
     await act(async () => {
-      probe.controls.setCurrentTime(0.5);
+      probe.editor.setCurrentTime(0.5);
     });
     expect(playhead()?.style.transform).toBe(`translate3d(${px(0.5)}px, 0, 0)`);
 

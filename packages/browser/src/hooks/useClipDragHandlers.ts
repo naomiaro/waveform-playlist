@@ -4,7 +4,7 @@ import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
 import { sortedClipsOf } from '../utils/sortedClips';
-import { usePlaylistView } from '../WaveformPlaylistContext';
+import { usePlaylistView } from '../contexts/playlistContexts';
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
@@ -13,7 +13,7 @@ interface UseClipDragHandlersOptions {
   engineRef: React.RefObject<PlaylistEngine | null>;
   /** Ref toggled during boundary trim drags. When true, the provider's loadAudio
    *  skips engine rebuilds so engine keeps original clip positions. On drag end,
-   *  engine.trimClip() commits the final delta. Obtain from usePlaybackRefs(). */
+   *  engine.trimClip() commits the final delta. Obtain from useEngineRefs(). */
   isDraggingRef: React.MutableRefObject<boolean>;
   /** Optional function that snaps a sample position to the nearest grid position.
    *  Used for boundary trim snapping (move snapping is handled by the SnapToGridModifier). */

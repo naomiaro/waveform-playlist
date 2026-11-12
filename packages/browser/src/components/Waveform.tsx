@@ -5,7 +5,7 @@ import type {
   AnnotationActionOptions,
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
-import { usePlaylistAnnotations } from '../WaveformPlaylistContext';
+import { useAnnotations } from '../contexts/playlistContexts';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
 import type { VisualizationRecordingState } from './visualizationLayout';
@@ -17,7 +17,7 @@ import { PlaylistAnnotationList, type PlaylistAnnotationListProps } from './Play
  * (#768), as MediaElementWaveform does (#744).
  */
 const AnnotationListWhenPresent: React.FC<PlaylistAnnotationListProps> = (props) => {
-  const { annotations } = usePlaylistAnnotations();
+  const { annotations } = useAnnotations();
   if (annotations.length === 0) return null;
   return <PlaylistAnnotationList {...props} />;
 };

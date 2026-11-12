@@ -31,7 +31,9 @@ import '@radix-ui/themes/styles.css';
 import {
   WaveformPlaylistProvider,
   Waveform,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
+  useEngineRefs,
   useCurrentTime,
   useSelection,
   KeyboardShortcuts,
@@ -75,7 +77,8 @@ interface AnimatedTimeDisplayProps {
 const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ duration, format }) => {
   const timeRef = useRef<HTMLSpanElement>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const { currentTimeRef, playbackStartTimeRef, audioStartPositionRef } = usePlaybackRefs();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { playbackStartTimeRef, audioStartPositionRef } = useEngineRefs();
   const { isPlaying } = useIsPlaying();
   // Where the cursor rests. It changes on a seek, a pause and a stop (not
   // during playback), which is when the stopped display below must update.
@@ -205,7 +208,7 @@ const GrungyTimestamp = styled.div<{ $left: number }>`
 // Custom Track Controls Component - compact horizontal layout
 const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) => {
   const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackSolo, setTrackVolume } = usePlaylistControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume } = useEditorControls();
   const trackState = trackStates[trackIndex];
 
   if (!trackState) return null;
@@ -260,7 +263,7 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
 // Custom Selection Time Inputs using Radix UI
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = useSelection();
-  const { setSelection } = usePlaylistControls();
+  const { setSelection } = usePlaybackControls();
   const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
@@ -301,7 +304,8 @@ interface FlexibleApiContentProps {
 
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
-  const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
+  const { play, pause, stop, seekTo, setTimeFormat, setAutomaticScroll } = usePlaybackControls();
+  const { setMasterVolume, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = useEditorControls();
   const { currentTimeRef } = usePlaybackRefs();
   const { timeFormat, isAutomaticScroll } = usePlaylistSettings();
   const { duration } = usePlaylistTimeline();
@@ -593,7 +597,7 @@ export function FlexibleApiExample() {
               <code>PlayButton</code> or <code>AudioPosition</code>, this example shows:
             </Text>
             <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
-              <li><Text size="2" color="gray"><code>usePlaylistControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions</Text></li>
+              <li><Text size="2" color="gray"><code>usePlaybackControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions; <code>useEditorControls()</code> - Get the mixer, zoom and loop setters</Text></li>
               <li><Text size="2" color="gray"><code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get <code>duration</code>, <code>tracks</code>, <code>trackStates</code>, <code>masterVolume</code></Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistSettings()</code>, <code>usePlaylistView()</code> and <code>useLoop()</code> - Get <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>, and the loop region</Text></li>

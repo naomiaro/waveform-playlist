@@ -49,7 +49,8 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider, usePlaylistTimeline } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { recordingDisplayEnd } from '../hooks/useRecordingLayout';
 import {

@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import {
   MasterVolumeControl as BaseMasterVolumeControl,
   TimeFormatSelect as BaseTimeFormatSelect,
+  PlaybackRateSelect as BasePlaybackRateSelect,
   AutomaticScrollCheckbox as BaseAutomaticScrollCheckbox,
   SelectionTimeInputs as BaseSelectionTimeInputs,
   formatTime,
@@ -10,19 +11,21 @@ import styled from 'styled-components';
 import {
   useCurrentTime,
   useSelection,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
+  usePlaybackRate,
   usePlaylistSettings,
   usePlaylistMixer,
   usePlaybackRefs,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 
 /**
  * Master volume control that uses the playlist context
  */
 export const MasterVolumeControl: React.FC<{ className?: string }> = ({ className }) => {
   const { masterVolume } = usePlaylistMixer();
-  const { setMasterVolume } = usePlaylistControls();
+  const { setMasterVolume } = useEditorControls();
 
   return (
     <BaseMasterVolumeControl
@@ -38,7 +41,7 @@ export const MasterVolumeControl: React.FC<{ className?: string }> = ({ classNam
  */
 export const TimeFormatSelect: React.FC<{ className?: string }> = ({ className }) => {
   const { timeFormat } = usePlaylistSettings();
-  const { setTimeFormat } = usePlaylistControls();
+  const { setTimeFormat } = usePlaybackControls();
 
   return <BaseTimeFormatSelect value={timeFormat} onChange={setTimeFormat} className={className} />;
 };
@@ -92,11 +95,30 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
 };
 
 /**
+ * Playback speed dropdown. MediaElementPlaylistProvider only (#688).
+ * `rates` lists the speeds to offer (default 0.5× to 2×).
+ */
+export const PlaybackRateSelect: React.FC<{ rates?: readonly number[]; className?: string }> = ({
+  rates,
+  className,
+}) => {
+  const { playbackRate, setPlaybackRate } = usePlaybackRate();
+  return (
+    <BasePlaybackRateSelect
+      value={playbackRate}
+      onChange={setPlaybackRate}
+      rates={rates}
+      className={className}
+    />
+  );
+};
+
+/**
  * Selection time inputs that use the playlist context
  */
 export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ className }) => {
   const { selectionStart, selectionEnd } = useSelection();
-  const { setSelection } = usePlaylistControls();
+  const { setSelection } = usePlaybackControls();
 
   return (
     <BaseSelectionTimeInputs
@@ -114,7 +136,7 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
  */
 export const AutomaticScrollCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { isAutomaticScroll } = usePlaylistSettings();
-  const { setAutomaticScroll } = usePlaylistControls();
+  const { setAutomaticScroll } = usePlaybackControls();
 
   return (
     <BaseAutomaticScrollCheckbox
