@@ -162,6 +162,16 @@ function TrackSelector() {
 }
 ```
 
+In a playlist rendered by `<Waveform>`, pressing on a track's row or on its default track controls selects that track. The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
+
+```css
+[data-track-row][data-selected='true'] {
+  outline: 1px solid #63c75f;
+}
+```
+
+The background of the selected track comes from the theme: `selectedTrackBackground` for the row and `selectedTrackControlsBackground` for its controls (see [Theming](./theming.md)).
+
 ## Adding and Removing Tracks
 
 Track management (adding, removing, reordering) is handled by updating the `tracks` prop passed to `WaveformPlaylistProvider`. The provider does not have built-in `addTrack` / `removeTrack` / `moveTrack` methods — you manage tracks in your own state:

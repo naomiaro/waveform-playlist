@@ -250,6 +250,7 @@ interface WaveformPlaylistTheme {
   selectedWaveOutlineColor: string;
   selectedWaveFillColor: string;
   selectedTrackControlsBackground: string;
+  selectedTrackBackground: string; // Tint of the selected track's row
 
   // Timescale colors
   timeColor: string;

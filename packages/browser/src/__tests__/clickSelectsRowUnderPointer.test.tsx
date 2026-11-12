@@ -182,10 +182,13 @@ describe('a press on the tracks selects the row under the pointer', () => {
   it('below the last row: the selected track does not change', async () => {
     await mount([makeTrack('one'), makeTrack('two')]);
 
-    await pressAt(WAVE_HEIGHT * 1.5);
-    await waitFor(() => expect(selectedTrackId).toBe('two'));
+    // Select the FIRST track, so that "unchanged" cannot be mistaken for
+    // "the last row took the press".
+    await pressAt(WAVE_HEIGHT * 0.5);
+    await waitFor(() => expect(selectedTrackId).toBe('one'));
+    // pressAt flushes the press inside act(): a wrong selection would be in by now.
     await pressAt(WAVE_HEIGHT * 5);
-    expect(selectedTrackId).toBe('two');
-    expect(selectedRowIds()).toEqual(['two']);
+    expect(selectedTrackId).toBe('one');
+    expect(selectedRowIds()).toEqual(['one']);
   });
 });

@@ -43,16 +43,19 @@ test.describe('Selecting a track by pressing on its row', () => {
   });
 
   test("rows below a 'both' track select their own track (#762)", async ({ page }) => {
-    const first = rows(page).nth(0);
-    const canvasesBefore = await first.locator('canvas').count();
+    const menuButton = page.getByRole('button', { name: 'Track menu' }).first();
+    const both = page.getByRole('radio', { name: 'Both' });
 
-    await page.getByRole('button', { name: 'Track menu' }).first().click();
-    await page.getByRole('radio', { name: 'Both' }).click();
+    // Choosing a mode closes the menu.
+    await menuButton.click();
+    await both.click();
+    await expect(both).toHaveCount(0);
 
-    // The first track now draws a spectrogram as well as its waveform.
-    await expect(async () => {
-      expect(await first.locator('canvas').count()).toBeGreaterThan(canvasesBefore);
-    }).toPass({ timeout: 10000 });
+    // Open it again to see that the first track is in 'both' mode, then close it.
+    await menuButton.click();
+    await expect(both).toBeChecked();
+    await page.keyboard.press('Escape');
+    await expect(both).toHaveCount(0);
 
     for (const index of [1, 2, 3, 0]) {
       await pressRow(page, rows(page).nth(index));
