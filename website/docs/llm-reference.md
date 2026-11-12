@@ -304,7 +304,6 @@ interface PlaylistControlsContextValue {
 
   // Time format
   setTimeFormat: (format: TimeFormat) => void;
-  formatTime: (seconds: number) => string;
 
   // Zoom
   zoomIn: () => void;
@@ -358,7 +357,6 @@ interface PlaylistDataContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
-  minimumPlaylistHeight: number;
   controls: { show: boolean; width: number };
   playoutRef: RefObject<PlaylistEngine | null>;  // PlaylistEngine from @waveform-playlist/engine
   samplesPerPixel: number;

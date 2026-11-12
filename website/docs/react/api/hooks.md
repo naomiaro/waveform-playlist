@@ -92,7 +92,6 @@ function usePlaylistData(): {
   samplesPerPixel: number;
   waveHeight: number;
   timeScaleHeight: number;
-  minimumPlaylistHeight: number;
   mono: boolean;
   masterVolume: number;
   canZoomIn: boolean;
@@ -534,7 +533,6 @@ interface PlaylistControlsContextValue {
 
   // Time format
   setTimeFormat: (format: TimeFormat) => void;
-  formatTime: (seconds: number) => string;
 
   // Zoom
   zoomIn: () => void;

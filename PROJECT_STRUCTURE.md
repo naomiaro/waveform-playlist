@@ -878,7 +878,6 @@ export interface PlaylistControlsContextValue {
   setSelectedTrackId: (trackId: string | null) => void;
   // Time format
   setTimeFormat: (format: TimeFormat) => void;
-  formatTime: (seconds: number) => string;
   // Zoom
   zoomIn: () => void;
   zoomOut: () => void;
@@ -913,7 +912,6 @@ export interface PlaylistDataContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
-  minimumPlaylistHeight: number;
   controls: { show: boolean; width: number };
   playoutRef: React.RefObject<PlaylistEngine | null>;
   samplesPerPixel: number;

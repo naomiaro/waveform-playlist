@@ -150,7 +150,30 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
+// Calls actions only, as a transport button or a custom control does (#767).
+let controlsProbe: { renders: number };
+const ControlsProbeChild: React.FC = () => {
+  usePlaylistControls();
+  controlsProbe = { renders: (controlsProbe?.renders ?? 0) + 1 };
+  return null;
+};
+
 const TRACKS = [makeTrack('track-1'), makeTrack('track-2')];
+
+// One set of elements for every render of the wrapper, as when a parent passes
+// `children` through: a probe then renders only when a context it reads
+// changes, not because the wrapper rendered.
+const CHILDREN = (
+  <>
+    <ProbeChild />
+    <StateProbeChild />
+    <SelectionProbeChild />
+    <AnimationProbeChild />
+    <CurrentTimeProbeChild />
+    <ActiveAnnotationProbeChild />
+    <ControlsProbeChild />
+  </>
+);
 
 // `inlineProps` passes fresh `controls` and `theme` object literals on every
 // render of the wrapper, which is how most consumers write them.
@@ -170,12 +193,7 @@ async function mount({ inlineProps = false } = {}) {
         ? { controls: { show: true, width: 200 }, theme: { playheadColor: 'red' } }
         : {})}
     >
-      <ProbeChild />
-      <StateProbeChild />
-      <SelectionProbeChild />
-      <AnimationProbeChild />
-      <CurrentTimeProbeChild />
-      <ActiveAnnotationProbeChild />
+      {CHILDREN}
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
@@ -516,6 +534,30 @@ describe('the controls value does not follow the timeline length or the time for
     await waitFor(() => expect(probe.data.duration).toBe(2));
 
     expect(probe.controls).toBe(before);
+  });
+
+  it('a component that only calls actions does not render when the duration changes', async () => {
+    const { setTracks } = await mount();
+    const rendersBefore = controlsProbe.renders;
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(controlsProbe.renders).toBe(rendersBefore);
+  });
+
+  it('a component that only calls actions does not render when the time format changes', async () => {
+    await mount();
+    const rendersBefore = controlsProbe.renders;
+
+    await act(async () => {
+      probe.controls.setTimeFormat('seconds');
+    });
+    expect(probe.data.timeFormat).toBe('seconds');
+
+    expect(controlsProbe.renders).toBe(rendersBefore);
   });
 
   it('controls value survives a time-format change', async () => {
