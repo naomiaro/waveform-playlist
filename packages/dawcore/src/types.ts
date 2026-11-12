@@ -20,24 +20,43 @@ export interface TrackDescriptor {
   soloed: boolean;
   /** What the track holds: audio clips or MIDI clips, never both (#756). */
   kind: TrackKind;
-  /** How the track is drawn. Always `'piano-roll'` for a MIDI track and never
-   *  for an audio track: see `trackDescriptorRenderMode`. */
+  /** How an audio track is drawn. A MIDI track is drawn as a piano roll from
+   *  its `kind`; its `renderMode` is always `'waveform'` and means nothing. */
   renderMode: TrackRenderMode;
   spectrogramConfig?: SpectrogramConfig | null;
   clips: ClipDescriptor[];
 }
 
 /**
- * The render mode a track descriptor carries, given its kind: a MIDI track is
- * a piano roll, and an audio track asked for a piano roll is a waveform (the
- * kind, not `render-mode`, is what makes a track MIDI).
+ * A render mode from untyped input (an attribute string, a config object from
+ * JavaScript). A missing value is `'waveform'`. Anything that is not a render
+ * mode is `'waveform'` with a warning; the former `'piano-roll'` gets a hint.
+ */
+export function normalizeRenderMode(value: unknown): TrackRenderMode {
+  if (value === null || value === undefined) return 'waveform';
+  if (value === 'waveform' || value === 'spectrogram' || value === 'both') return value;
+  console.warn(
+    '[dawcore] render-mode="' +
+      String(value) +
+      '" is not a render mode (waveform or spectrogram); using waveform.' +
+      (value === 'piano-roll'
+        ? ' A piano roll is how a MIDI track is drawn: set kind="midi" on the track.'
+        : '')
+  );
+  return 'waveform';
+}
+
+/**
+ * The render mode a track descriptor carries, given its kind. Render modes are
+ * for audio tracks; a MIDI track always carries `'waveform'`, so that a
+ * `render-mode="spectrogram"` left on it does not start the spectrogram
+ * pipeline for a track with no audio.
  */
 export function trackDescriptorRenderMode(
   kind: TrackKind,
   requested: TrackRenderMode
 ): TrackRenderMode {
-  if (kind === 'midi') return 'piano-roll';
-  return requested === 'piano-roll' ? 'waveform' : requested;
+  return kind === 'midi' ? 'waveform' : requested;
 }
 
 /** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
@@ -117,7 +136,7 @@ export interface TrackConfig {
    * is reported through `daw-clip-error`. Creation-only: ignored by `updateTrack`.
    */
   kind?: TrackKind;
-  /** How an audio track is drawn. A MIDI track is always a piano roll. */
+  /** How an audio track is drawn. Ignored for a MIDI track (a piano roll). */
   renderMode?: TrackRenderMode;
   spectrogramConfig?: SpectrogramConfig | null;
   clips?: ClipConfig[];

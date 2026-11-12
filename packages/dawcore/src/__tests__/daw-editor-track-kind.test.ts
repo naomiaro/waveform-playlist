@@ -121,15 +121,15 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     await editor.updateComplete;
 
     expect(adapter.setTracks.mock.lastCall![0][0].kind).toBe('midi');
-    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(editor.shadowRoot.querySelector('daw-piano-roll')).not.toBeNull();
   });
 
-  it('an empty MIDI track is a piano-roll track before it has any clip', async () => {
+  it('an empty MIDI track is a MIDI track before it has any clip', async () => {
     const { editor, adapter } = makeEditor();
     await editor.addTrack({ name: 'Keys', kind: 'midi' });
 
-    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(adapter.setTracks.mock.lastCall![0][0]).toMatchObject({ kind: 'midi', clips: [] });
   });
 
@@ -151,6 +151,25 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     expect(clipsSentToAdapter(adapter)).toEqual([]);
     // Not drawn as a piano roll either: the kind decides.
     expect(editor.tracks[0]).toMatchObject({ kind: 'audio', renderMode: 'waveform' });
+  });
+
+  it('a MIDI track is drawn as a piano roll whatever render-mode says, and starts no spectrogram', async () => {
+    const { editor } = makeEditor();
+    const track = document.createElement('daw-track') as any;
+    track.setAttribute('kind', 'midi');
+    track.setAttribute('render-mode', 'spectrogram');
+    const clip = document.createElement('daw-clip') as any;
+    clip.midiNotes = NOTES;
+    track.appendChild(clip);
+    editor.appendChild(track);
+
+    expect(await settled(editor, track.trackId)).toBe('ready');
+    await editor.updateComplete;
+
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
+    expect(editor.shadowRoot.querySelector('daw-piano-roll')).not.toBeNull();
+    expect(editor.shadowRoot.querySelector('daw-spectrogram')).toBeNull();
+    expect(editor.shadowRoot.querySelector('daw-waveform')).toBeNull();
   });
 
   it('an audio clip on a MIDI track is refused without being fetched; the MIDI clip loads', async () => {
@@ -196,7 +215,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     track.kind = 'audio';
     await track.updateComplete;
 
-    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     const kindWarnings = () =>
       vi
         .mocked(console.warn)
@@ -283,6 +302,21 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     expect(errors[0].error.message).toMatch(/Cannot record onto MIDI track "Keys"/);
   });
 
+  it('updateTrack on a track without an element checks the render mode too', () => {
+    const { editor } = makeEditor();
+    editor._reconcileDescriptorsWithEngineTracks([
+      { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
+    ]);
+
+    editor.updateTrack('a', { renderMode: 'piano-roll' });
+
+    expect(editor.tracks[0].renderMode).toBe('waveform');
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
+
+    editor.updateTrack('a', { renderMode: 'spectrogram' });
+    expect(editor.tracks[0].renderMode).toBe('spectrogram');
+  });
+
   it('an undo-restored MIDI track gets a MIDI descriptor', () => {
     const { editor } = makeEditor();
     editor._reconcileDescriptorsWithEngineTracks([
@@ -291,7 +325,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     ]);
 
     const byName = Object.fromEntries(editor.tracks.map((t: any) => [t.name, t]));
-    expect(byName.Keys).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(byName.Keys).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(byName.Gtr).toMatchObject({ kind: 'audio', renderMode: 'waveform' });
   });
 });

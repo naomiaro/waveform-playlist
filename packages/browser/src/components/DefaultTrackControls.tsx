@@ -12,7 +12,7 @@ import {
   TrackMenu,
   ReorderRail,
 } from '@waveform-playlist/ui-components';
-import type { RenderMode } from '@waveform-playlist/core';
+import type { RenderMode, TrackKind } from '@waveform-playlist/core';
 import type { TrackState } from '../WaveformPlaylistContext';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 
@@ -20,6 +20,8 @@ export interface DefaultTrackControlsProps {
   trackIndex: number;
   trackId: string;
   trackState: TrackState;
+  /** Audio (default) or MIDI. A MIDI track gets no render-mode menu. */
+  kind?: TrackKind;
   effectiveRenderMode: RenderMode;
   selectTrack: (trackIndex: number) => void;
   onRemoveTrack?: (trackIndex: number) => void;
@@ -54,6 +56,7 @@ function DefaultTrackControlsImpl({
   trackIndex,
   trackId,
   trackState,
+  kind,
   effectiveRenderMode,
   selectTrack,
   onRemoveTrack,
@@ -96,7 +99,9 @@ function DefaultTrackControlsImpl({
         >
           {trackState.name || `Track ${trackIndex + 1}`}
         </span>
-        {spectrogram?.renderMenuItems && (
+        {/* Render modes and spectrogram settings are for audio tracks: a MIDI
+            track is always a piano roll, so the menu would offer nothing. */}
+        {spectrogram?.renderMenuItems && kind !== 'midi' && (
           <span style={{ position: 'absolute', right: 0, top: 0 }}>
             <TrackMenu
               items={(onClose) =>

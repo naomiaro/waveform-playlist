@@ -29,6 +29,8 @@ test.describe('Multi-Clip Example', () => {
       expect(total).toBeGreaterThan(0);
       expect(await page.locator('[data-track-row][data-track-kind="audio"]').count()).toBe(total);
       expect(await page.locator('[data-track-row]:not([data-track-kind="audio"])').count()).toBe(0);
+      // Audio clips are never drawn as piano rolls.
+      expect(await page.locator('[data-piano-roll]').count()).toBe(0);
     }).toPass({ timeout: 10000 });
   });
 

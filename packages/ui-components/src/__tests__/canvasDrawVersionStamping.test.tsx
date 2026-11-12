@@ -143,20 +143,61 @@ describe('PianoRollChannel', () => {
   });
 });
 
-describe('SmartChannel in piano-roll mode without notes', () => {
-  it('does not redraw on re-render (the empty note list keeps its identity)', () => {
+describe('SmartChannel draws a piano roll for a clip with notes', () => {
+  const base = { index: 0, data: new Int8Array(0), bits: 8 as const, length: 500 };
+  // One array for all renders: a new array is a new drawing.
+  const noNotes: MidiNoteData[] = [];
+
+  it('does not redraw on re-render while the note list keeps its identity', () => {
     visibleChunks = [0];
-    const props = {
-      index: 0,
-      data: new Int8Array(0),
-      bits: 8 as const,
-      length: 500,
-      renderMode: 'piano-roll' as const,
-    };
-    const { rerender } = render(<SmartChannel {...props} />);
+    const props = { ...base, midiNotes: noNotes };
+    const { container, rerender } = render(<SmartChannel {...props} />);
     rerender(<SmartChannel {...props} />);
     rerender(<SmartChannel {...props} />);
+    expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
     expect(clears()).toEqual({ 0: 1 });
+  });
+
+  it('whatever the render mode, and an empty note list is still a MIDI clip', () => {
+    visibleChunks = [0];
+    for (const renderMode of ['waveform', 'spectrogram', 'both'] as const) {
+      const { container, unmount } = render(
+        <SmartChannel {...base} renderMode={renderMode} midiNotes={noNotes} />
+      );
+      expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it('also when the spectrogram props are present: notes win over a spectrogram mode', () => {
+    visibleChunks = [0];
+    const register = vi.fn();
+    for (const renderMode of ['spectrogram', 'both'] as const) {
+      const { container, unmount } = render(
+        <SmartChannel
+          {...base}
+          renderMode={renderMode}
+          midiNotes={noNotes}
+          spectrogramClipId="clip-1"
+          spectrogramOnCanvasRegister={register}
+          spectrogramOnCanvasUnregister={vi.fn()}
+        />
+      );
+      expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
+      unmount();
+    }
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  it('a clip without notes is not a piano roll, and null is not notes', () => {
+    visibleChunks = [0];
+    const { container, unmount } = render(<SmartChannel {...base} />);
+    expect(container.querySelector('[data-piano-roll]')).toBeNull();
+    unmount();
+    // Plain-JS data: core's clipKind reads a null midiNotes as an audio clip.
+    const nullNotes = null as unknown as MidiNoteData[];
+    const second = render(<SmartChannel {...base} midiNotes={nullNotes} />);
+    expect(second.container.querySelector('[data-piano-roll]')).toBeNull();
   });
 });
 

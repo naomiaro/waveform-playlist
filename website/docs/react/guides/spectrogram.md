@@ -59,7 +59,6 @@ Each track has a `renderMode` field:
 | `'waveform'` (default) | Time-domain waveform |
 | `'spectrogram'` | FFT spectrogram only |
 | `'both'` | Waveform on top, spectrogram below |
-| `'piano-roll'` | MIDI notes. Not set by hand: a MIDI track (`kind: 'midi'`) is always drawn this way, and an audio track never is |
 
 ### Optional UI
 

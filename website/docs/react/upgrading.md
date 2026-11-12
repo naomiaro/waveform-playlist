@@ -985,9 +985,49 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 
 **What else changes:**
 
-- **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty. An audio track is never drawn as one: `renderMode: 'piano-roll'` on an audio track is ignored (waveform).
+- **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty, and an audio track never is. `'piano-roll'` is no longer a render mode: see [the section below](#piano-roll-is-removed-from-rendermode).
 - **Recording.** A take cannot be recorded onto a MIDI track, and a take now stays on the track it was started on. See [the next section](#useintegratedrecording-a-take-stays-on-its-track-pass-recordingtrackid-to-the-preview): it needs a code change in every app that shows the live preview.
 - **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id. The `trackInput` getter of `ToneTrack`, which existed to join the two, is removed: a track's effects function already receives that node as its first argument.
+
+## `'piano-roll'` is removed from `RenderMode`
+
+**Packages:** `@waveform-playlist/core`, `@waveform-playlist/ui-components`, `@waveform-playlist/browser`.
+
+`RenderMode` is now `'waveform' | 'spectrogram' | 'both'`. A piano roll is not a mode you choose: it is how a MIDI track is drawn. Render modes apply to audio tracks only, and a `renderMode` or spectrogram override on a MIDI track does nothing. With the spectrogram integration mounted, the default track panel of a MIDI track no longer shows the track menu (the render-mode choices and the spectrogram settings).
+
+**Find:** the string `'piano-roll'` in TypeScript or JSX: `renderMode: 'piano-roll'` on a track, `renderMode="piano-roll"` on `<SmartChannel>`, comparisons such as `mode === 'piano-roll'`, and `switch` statements over `RenderMode`. TypeScript reports each one.
+
+**Replace with:**
+
+```tsx
+// Before: a track drawn as a piano roll
+const keys = createTrack({ name: 'Keys', clips: [midiClip], renderMode: 'piano-roll' });
+
+// After: a MIDI track
+const keys = createTrack({ name: 'Keys', kind: 'midi', clips: [midiClip] });
+```
+
+```tsx
+// Before: asking a track how it is drawn
+const isPianoRoll = track.renderMode === 'piano-roll';
+
+// After
+const isPianoRoll = track.kind === 'midi';
+```
+
+If you render `<SmartChannel>` from `@waveform-playlist/ui-components` yourself, it now draws a piano roll whenever it is given `midiNotes` (an empty array included; `null` and `undefined` mean an audio clip) and ignores `renderMode` and the spectrogram props for that clip:
+
+```tsx
+// Before
+<SmartChannel renderMode="piano-roll" midiNotes={clip.midiNotes} {...rest} />
+
+// After
+<SmartChannel midiNotes={clip.midiNotes} {...rest} />
+```
+
+Pass `midiNotes` only for a MIDI clip, and pass the same array while the notes are unchanged: before, a missing `midiNotes` in piano-roll mode was drawn as an empty piano roll; now a missing `midiNotes` means an audio clip.
+
+In a page rendered by `<Waveform>`, the channel element of each MIDI clip has the attribute `data-piano-roll`, and each track row has `data-track-kind="audio"` or `"midi"`, for styling and tests.
 
 ## `useIntegratedRecording`: a take stays on its track; pass `recordingTrackId` to the preview
 
@@ -1179,7 +1219,7 @@ Do not confuse core's `createEffectInstance(type, audioContext, params)` with th
 
 **Packages:** `@dawcore/components`.
 
-This entry is for code that uses `<daw-editor>`. A `<daw-track>` now has a `kind` attribute, `audio` (the default) or `midi`, and holds clips of that kind only. `render-mode="piano-roll"` no longer makes a track a MIDI track: it is ignored on an audio track, and a MIDI track is always drawn as a piano roll.
+This entry is for code that uses `<daw-editor>`. A `<daw-track>` now has a `kind` attribute, `audio` (the default) or `midi`, and holds clips of that kind only. `render-mode="piano-roll"` no longer exists: a MIDI track is always drawn as a piano roll, and `render-mode` (`waveform` or `spectrogram`) is for audio tracks. The old value, on the attribute or in `addTrack` / `updateTrack`, logs a console warning that names `kind="midi"` and is treated as `waveform`.
 
 `editor.loadMidi()` and `editor.addTrack({ midi: { notes } })` set the kind for you and need no change.
 

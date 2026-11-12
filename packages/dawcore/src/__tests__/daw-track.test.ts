@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 
 beforeAll(async () => {
   await import('../elements/daw-clip');
@@ -72,8 +72,27 @@ describe('DawTrackElement', () => {
 
   it('reflects render-mode attribute', () => {
     const el = document.createElement('daw-track') as any;
+    el.setAttribute('render-mode', 'spectrogram');
+    expect(el.renderMode).toBe('spectrogram');
+  });
+
+  it('removing the render-mode attribute goes back to waveform without a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-track') as any;
+    el.setAttribute('render-mode', 'spectrogram');
+    el.removeAttribute('render-mode');
+    expect(el.renderMode).toBe('waveform');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('render-mode="piano-roll" is not a render mode any more: waveform, with a hint about kind', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-track') as any;
     el.setAttribute('render-mode', 'piano-roll');
-    expect(el.renderMode).toBe('piano-roll');
+    expect(el.renderMode).toBe('waveform');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
+    warn.mockRestore();
   });
 
   it('dispatches daw-track-update when renderMode changes after first render', async () => {
@@ -86,7 +105,7 @@ describe('DawTrackElement', () => {
       detail = e.detail;
     });
 
-    el.renderMode = 'piano-roll';
+    el.renderMode = 'spectrogram';
     await el.updateComplete;
 
     expect(detail).toEqual({ trackId: el.trackId });

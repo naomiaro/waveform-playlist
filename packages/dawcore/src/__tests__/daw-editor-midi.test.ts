@@ -157,7 +157,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('addTrack({ midi }) creates a piano-roll track with one MIDI clip', async () => {
+  it('addTrack({ midi }) creates a MIDI track with one MIDI clip', async () => {
     const editor = document.createElement('daw-editor') as any;
     const adapter = makeMockAdapter();
     editor.adapter = adapter;
@@ -171,7 +171,7 @@ describe('<daw-editor> MIDI loading', () => {
 
     expect(track.getAttribute('kind')).toBe('midi');
     expect(track.getAttribute('render-mode')).toBeNull();
-    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(adapter.setTracks.mock.lastCall![0][0].kind).toBe('midi');
     expect(track.name).toBe('Lead');
     const clipEls = track.querySelectorAll('daw-clip');
@@ -313,7 +313,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('updateTrack({ renderMode: "piano-roll" }) sets render-mode attribute on DOM track', async () => {
+  it('updateTrack({ renderMode }) sets render-mode attribute on DOM track', async () => {
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);
@@ -321,9 +321,9 @@ describe('<daw-editor> MIDI loading', () => {
     const track = await editor.addTrack({ name: 'Test' });
     expect(track.getAttribute('render-mode')).toBeNull();
 
-    editor.updateTrack(track.trackId, { renderMode: 'piano-roll' });
+    editor.updateTrack(track.trackId, { renderMode: 'spectrogram' });
     await track.updateComplete;
-    expect(track.getAttribute('render-mode')).toBe('piano-roll');
+    expect(track.getAttribute('render-mode')).toBe('spectrogram');
     document.body.removeChild(editor);
   });
 
@@ -347,7 +347,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('does not emit "no AudioBuffer" warning for piano-roll tracks during statechange', async () => {
+  it('does not emit "no AudioBuffer" warning for MIDI tracks during statechange', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const editor = document.createElement('daw-editor') as any;

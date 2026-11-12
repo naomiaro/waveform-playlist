@@ -37,6 +37,15 @@ test.describe('MIDI Example', () => {
     await expect(page.locator('[data-track-row][data-track-kind="audio"]')).toHaveCount(0);
   });
 
+  test('every MIDI clip is drawn as a piano roll', async ({ page }) => {
+    await expect(async () => {
+      const rowsWithPianoRoll = await page
+        .locator('[data-track-row]')
+        .evaluateAll((rows) => rows.filter((row) => row.querySelector('[data-piano-roll]')).length);
+      expect(rowsWithPianoRoll).toBe(TRACK_COUNT);
+    }).toPass({ timeout: 5000 });
+  });
+
   test('loads the .mid file once and then stays settled', async ({ page, baseURL }) => {
     const midiRequests: string[] = [];
     const errors: string[] = [];

@@ -97,7 +97,7 @@ Declares a track. Must be a direct child of `<daw-editor>`.
 | `muted`       | boolean | `false`      | Whether track is muted                                                                                                            |
 | `soloed`      | boolean | `false`      | Whether track is soloed                                                                                                           |
 | `kind`        | string  | `'audio'`    | `'audio'` or `'midi'`. What the track holds: every `<daw-clip>` must be of this kind (a clip with `src` is audio, a clip without is MIDI). A clip of the other kind is not added and is reported with `daw-clip-error`. A MIDI track mounts `<daw-piano-roll>` for each clip. Set it before the track is added; a later change is ignored with a warning. |
-| `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track (always a piano roll); `'piano-roll'` on an audio track is ignored. |
+| `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track, which is always a piano roll. Any other value (the former `'piano-roll'` included) warns and is treated as `'waveform'`. |
 
 When `src` is set without child `<daw-clip>` elements, a single clip spanning the full audio is created automatically.
 
