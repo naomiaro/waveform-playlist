@@ -12,6 +12,8 @@ const rows = (page: Page) => page.locator('[data-track-row]');
 /** Press inside a row: on its waveform, clear of the clip header at the top. */
 async function pressRow(page: Page, row: Locator) {
   await expect(row).toBeVisible();
+  // The lower rows are below the fold, and a raw mouse click does not scroll.
+  await row.scrollIntoViewIfNeeded();
   let box: { x: number; y: number; width: number; height: number } | null = null;
   await expect(async () => {
     box = await row.boundingBox();
@@ -45,7 +47,7 @@ test.describe('Selecting a track by pressing on its row', () => {
     const canvasesBefore = await first.locator('canvas').count();
 
     await page.getByRole('button', { name: 'Track menu' }).first().click();
-    await page.getByRole('radio', { name: 'Both' }).check();
+    await page.getByRole('radio', { name: 'Both' }).click();
 
     // The first track now draws a spectrogram as well as its waveform.
     await expect(async () => {
