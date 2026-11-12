@@ -97,40 +97,45 @@ No React and no build step — drop `<daw-editor>` into any HTML page and assign
 
 ## Architecture
 
-Both providers use React Context with split contexts for performance (16 in WaveformPlaylistProvider, 4 in MediaElementPlaylistProvider). In WaveformPlaylistProvider each hook returns one group of fields that change together, and a component re-renders only for the hooks it calls.
+Both providers use React Context with small contexts for performance (21 in all: 10 that both providers serve, 9 that only WaveformPlaylistProvider serves, 2 that only MediaElementPlaylistProvider serves). Each hook returns one group of fields that change together, and a component re-renders only for the hooks it calls. A hook reads the NEAREST playlist provider.
 
-**WaveformPlaylistProvider** (multi-track, Web Audio API):
-1. **usePlaylistView()** — what the provider was configured with: sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars, progressBarWidth, mono, indefinitePlayback, fillViewport; changes on a prop change (and once when the real sample rate is known), not on a settings click
-2. **usePlaylistSettings()** — timeFormat, isAutomaticScroll; changes when the user changes either (apart from the view value, which every clip overlay and the visualization read)
-3. **usePlaylistZoom()** — samplesPerPixel, canZoomIn, canZoomOut; changes on a zoom
+**Under either provider** (a component written against these works with both):
+1. **useIsPlaying()** — isPlaying; changes on play, pause, stop
+2. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
+3. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
+4. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
+5. **useAnnotations()** — annotations, continuousPlay (NOT activeAnnotationId, NOT annotationsEditable / linkEndpoints)
+6. **usePlaybackControls()** — never changes: play(start?, duration?) / pause / stop / seekTo (stop returns the cursor to where playback started; seekTo clamps to the audio and restarts a running play), setSelection, setTimeFormat, setAutomaticScroll, setScrollContainer, scrollContainerRef, setContinuousPlay, setAnnotations, setActiveAnnotationId, annotationPreview (a source: the annotations as an edge drag in progress would leave them)
+7. **usePlaybackRefs()** — never re-renders: currentTimeRef (live position), visualTimeRef (the position to draw), registerFrameCallback / unregisterFrameCallback. Read `.current` in handlers, effects and frame callbacks; to re-render when a value changes, also call the hook that carries it
+8. **usePlaylistView()** — what the provider was configured with: sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars, progressBarWidth, mono, indefinitePlayback, fillViewport (the last three always false under MediaElementPlaylistProvider); changes on a prop change (and once when the real sample rate is known), not on a settings click
+9. **usePlaylistSettings()** — timeFormat, isAutomaticScroll; changes when the user changes either (apart from the view value, which every clip overlay and the visualization read)
+10. **usePlaylistZoom()** — samplesPerPixel, canZoomIn, canZoomOut (both always false under MediaElementPlaylistProvider); changes on a zoom
+
+**WaveformPlaylistProvider only** (multi-track, Web Audio API; these throw when the nearest provider is MediaElementPlaylistProvider):
+1. **useEditorControls()** — never changes: setCurrentTime, track mute/solo/volume/pan, reorderTrack, setSelectedTrackId, zoomIn / zoomOut, setMasterVolume, setLinkEndpoints, setAnnotationsEditable, loop setters, undo / redo, setRecordingActive
+2. **useEngineRefs()** — never re-renders: playoutRef (PlaylistEngine), isDraggingRef, playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime, getLookAhead, getOutputLatency
+3. **useAnnotationEditing()** — annotationsEditable, linkEndpoints
 4. **usePlaylistTimeline()** — tracks, peaksDataArray, duration, isReady, onTracksChange; changes on every clip operation, every pointer move of a trim and a zoom (peaksDataArray is computed per zoom level), and when loading finishes or peaks arrive (call it in the smallest component that needs it)
 5. **usePlaylistMixer()** — trackStates, masterVolume; changes on every mute, solo, volume or pan change (each step of a slider drag) and when tracks are added, removed or reordered (same advice)
 6. **useTrackReorderPreview()** — trackDragPreview, trackReorderEpoch; changes on every drag-over of a track reorder
-7. **usePlaylistAnnotations()** — annotations, annotationsEditable, linkEndpoints, continuousPlay (NOT activeAnnotationId)
-8. **useLoop()** — isLoopEnabled, loopStart, loopEnd
-9. **useSelectedTrackId()** — selectedTrackId
-10. **useUndoRedo()** — canUndo, canRedo; changes after an edit
-11. **useIsPlaying()** — isPlaying; changes on play, pause, stop
-12. **usePlaybackRefs()** — never re-renders: currentTimeRef (live position), visualTimeRef, playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime, getLookAhead, getOutputLatency, registerFrameCallback / unregisterFrameCallback, playoutRef (PlaylistEngine), isDraggingRef. Read `.current` in handlers, effects and frame callbacks; to re-render when a value changes, also call the hook that carries it
-13. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
-14. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
-15. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
-16. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters, annotationPreview (a source: the annotations as an edge drag in progress would leave them)
+7. **useLoop()** — isLoopEnabled, loopStart, loopEnd
+8. **useSelectedTrackId()** — selectedTrackId
+9. **useUndoRedo()** — canUndo, canRedo; changes after an edit
 
-Each hook's value type is exported (`PlaylistViewContextValue`, `PlaylistSettingsContextValue`, …), as are `ClipPeaks`, `TrackClipPeaks` and `TrackDragPreview`.
+**MediaElementPlaylistProvider only** (single-track, HTMLAudioElement; these throw when the nearest provider is WaveformPlaylistProvider):
+1. **usePlaybackRate()** — playbackRate (0.5 to 2), setPlaybackRate
+2. **useMediaElementTrack()** — duration (from the waveform data, known at first render), isReady (media metadata loaded; do not gate Play on it), peaksDataArray, fadeIn, fadeOut, playoutRef (MediaElementPlayout)
 
-The combined data / state / animation hooks of earlier majors are removed; the upgrade guide (https://naomiaro.github.io/waveform-playlist/docs/react/upgrading) has a field-to-hook table.
+Each hook's value type is exported (`PlaybackControlsContextValue`, `PlaylistViewContextValue`, …), as are `ClipPeaks`, `TrackClipPeaks`, `TrackDragPreview` and `FrameData`.
 
-**MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
-1. **useMediaElementAnimation()** — isPlaying, currentTime
-2. **useMediaElementState()** — continuousPlay, annotations, playbackRate
-3. **useMediaElementControls()** — play(start?, duration?) / pause / stop / seekTo with the same rules as the multitrack provider (stop returns the cursor to where playback started; seekTo restarts a running play; a play before the player exists is queued), setPlaybackRate, annotationPreview
-4. **useMediaElementData()** — duration (from the waveform data, known at first render), isReady (media metadata loaded; do not gate Play on it), peaksDataArray, sampleRate, display config
+Library controls that work under either provider: PlayButton, PauseButton, StopButton (disabled unless playing), RewindButton, FastForwardButton, SkipBackwardButton, SkipForwardButton, ClearAllButton, AudioPosition, TimeFormatSelect, SelectionTimeInputs, AutomaticScrollCheckbox, and inside AnnotationProvider ContinuousPlayCheckbox and DownloadAnnotationsButton. MediaElementPlaylistProvider only: PlaybackRateSelect. WaveformPlaylistProvider only: LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, MasterVolumeControl, LinkEndpointsCheckbox, EditableCheckbox, KeyboardShortcuts, ExportWavButton.
+
+Removed in the next major: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()`, `useMediaElementData()`, the eight engine fields of `usePlaybackRefs()`, and before them the combined data / state / animation hooks. The upgrade guide (https://naomiaro.github.io/waveform-playlist/docs/react/upgrading) has a field-to-hook table for each.
 
 ## Key Hooks
 
 *From `@waveform-playlist/browser` (core, engine-free):*
-- `useAnnotationDragHandlers(opts)` — Drag handlers for annotation box edges. Pass `preview: annotationPreview` (from `usePlaylistControls()` / `useMediaElementControls()`) and each move is published to the preview while `onAnnotationsChange` is called once, on release; without it, once per move. Escape restores every annotation the drag moved. `useAnnotationsWithPreview(annotations, annotationPreview)` returns what to draw in a custom annotation renderer.
+- `useAnnotationDragHandlers(opts)` — Drag handlers for annotation box edges. Pass `preview: annotationPreview` (from `usePlaybackControls()`, under either provider) and each move is published to the preview while `onAnnotationsChange` is called once, on release; without it, once per move. Escape restores every annotation the drag moved. `useAnnotationsWithPreview(annotations, annotationPreview)` returns what to draw in a custom annotation renderer.
 - `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
@@ -179,7 +184,7 @@ The combined data / state / animation hooks of earlier majors are removed; the u
 
 ### Recording Hooks (from `@waveform-playlist/recording`)
 
-- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: a take is added to the track that was selected when `startRecording()` was called (returned as `recordingTrackId`, `null` when idle; the target cannot be switched mid-take, and a MIDI track is refused); mic access, VU meter (`meter`, a `MeterSource`), live take progress (`progress`, a `RecordingProgressSource` to pass as `<Waveform recordingState={{ isRecording: true, trackId, startSample, progress, bits: 16 }} />`), start/stop/pause recording, adds the take at the record-start playhead position with punch-in replace semantics (overlapped clip content is trimmed/removed/split); recording latency compensation is configurable via `latencyOffset` (seconds) on both the React `IntegratedRecordingOptions` and the dawcore `RecordingOptions` passed to `editor.startRecording()`. `startRecording()` resolves `true` when capture actually started. For overdub, call `usePlaylistControls().setRecordingActive(true, trackId)` before `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it); both reset automatically when the recording ends. `<daw-editor>` does both automatically during recording (no API call needed)
+- `useIntegratedRecording(tracks, setTracks, selectedTrackId, options)` — Combined recording + track management: a take is added to the track that was selected when `startRecording()` was called (returned as `recordingTrackId`, `null` when idle; the target cannot be switched mid-take, and a MIDI track is refused); mic access, VU meter (`meter`, a `MeterSource`), live take progress (`progress`, a `RecordingProgressSource` to pass as `<Waveform recordingState={{ isRecording: true, trackId, startSample, progress, bits: 16 }} />`), start/stop/pause recording, adds the take at the record-start playhead position with punch-in replace semantics (overlapped clip content is trimmed/removed/split); recording latency compensation is configurable via `latencyOffset` (seconds) on both the React `IntegratedRecordingOptions` and the dawcore `RecordingOptions` passed to `editor.startRecording()`. `startRecording()` resolves `true` when capture actually started. For overdub, call `useEditorControls().setRecordingActive(true, trackId)` before `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it); both reset automatically when the recording ends. `<daw-editor>` does both automatically during recording (no API call needed)
 - `useRecording(stream, options)` — Low-level recording via AudioWorklet; `startRecording()` resolves `true`/`false` for capture start success. Elapsed time and live peaks come through `progress`, a `RecordingProgressSource` (`subscribe` / `getSnapshot` over `{ duration, peaks }`), not state
 - `useRecordingProgress(progress, { updateRate? })` — A recording's `{ duration, peaks }` as React state, at most `updateRate` times a second (default 10); for an elapsed-time label
 - `enumerateMicrophones()` / `watchMicrophoneDevices(listener)` — framework-agnostic, permission-free mic listing from `@waveform-playlist/core` (`hasLabels` false pre-permission: browsers redact labels)

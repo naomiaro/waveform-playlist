@@ -206,80 +206,64 @@ Called when the player could not be created (a missing optional peer, a throwing
 
 ## Context Hooks
 
-### useMediaElementAnimation
+`MediaElementPlaylistProvider` publishes what it shares with `WaveformPlaylistProvider` through the same hooks, so a component written against them works under either provider. The interfaces are in the [hooks reference](/docs/react/api/hooks#core-context-hooks).
 
-High-frequency animation state for smooth playhead updates.
+| Hook | Returns under this provider |
+|------|-----------|
+| `useIsPlaying()` | `isPlaying` |
+| `useCurrentTime()` | `currentTime`: where the cursor rests. It does not advance during playback |
+| `useSelection()` | `selectionStart`, `selectionEnd` |
+| `useActiveAnnotation()` | `activeAnnotationId` |
+| `useAnnotations()` | `annotations`, `continuousPlay` |
+| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef` (the same ref as `currentTimeRef` here: a media element reports the audible position), `registerFrameCallback`, `unregisterFrameCallback` |
+| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`; `mono`, `indefinitePlayback` and `fillViewport` are always `false` |
+| `usePlaylistSettings()` | `timeFormat` (default `'hh:mm:ss.uuu'`), `isAutomaticScroll` |
+| `usePlaylistZoom()` | `samplesPerPixel`; `canZoomIn` and `canZoomOut` are always `false` |
+
+Two hooks exist under this provider only:
+
+### usePlaybackRate
+
+The playback speed and its setter.
 
 ```typescript
-interface MediaElementAnimationContextValue {
-  isPlaying: boolean;
-  currentTime: number;
-  currentTimeRef: React.RefObject<number>;
-}
-```
-
-### useMediaElementState
-
-Playlist state values.
-
-```typescript
-interface MediaElementStateContextValue {
-  continuousPlay: boolean;
-  annotations: AnnotationData[];
-  activeAnnotationId: string | null;
+interface PlaybackRateContextValue {
+  /** 0.5 to 2. */
   playbackRate: number;
-  isAutomaticScroll: boolean;
-}
-```
-
-### useMediaElementControls
-
-Playback and annotation controls.
-
-```typescript
-interface MediaElementControlsContextValue {
-  // Starts at startTime (default: the cursor). With playDuration it stops by
-  // itself. Before the player exists the play is queued.
-  play: (startTime?: number, playDuration?: number) => Promise<void>;
-  pause: () => void;
-  // Returns the cursor to where playback started.
-  stop: () => void;
-  // During playback this restarts playback at `time`.
-  seekTo: (time: number) => void;
+  /** Clamped to 0.5–2. Stable identity. */
   setPlaybackRate: (rate: number) => void;
-  setContinuousPlay: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
-  annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
-  setActiveAnnotationId: (id: string | null) => void;
-  setAutomaticScroll: (enabled: boolean) => void;
-  setScrollContainer: (element: HTMLDivElement | null) => void;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 ```
 
-### useMediaElementData
+### useMediaElementTrack
 
-Playlist data for rendering.
+The one track of the player.
 
 ```typescript
-interface MediaElementDataContextValue {
-  duration: number; // the track's length, from its waveform data; known from the first render
-  isReady: boolean; // the media element has loaded its metadata
+interface MediaElementTrackContextValue {
+  /** The length of the track's audio, from its waveform data. Never 0 for a real track. */
+  duration: number;
+  /**
+   * True once the media element has loaded its metadata, false again while a
+   * replaced player loads. Use this, not `duration`, as "the player can be used".
+   */
+  isReady: boolean;
   peaksDataArray: TrackClipPeaks[];
-  sampleRate: number;
-  waveHeight: number;
-  timeScaleHeight: number;
-  samplesPerPixel: number;
-  playoutRef: React.RefObject<MediaElementPlayout | null>;
-  controls: { show: boolean; width: number };
-  barWidth: number;
-  barGap: number;
-  roundedBars: boolean;
-  progressBarWidth: number;
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;
+  /** The player. `current` is null until it has been created. */
+  playoutRef: React.RefObject<MediaElementPlayout | null>;
 }
 ```
+
+### Hooks that throw under this provider
+
+`useEditorControls()`, `useEngineRefs()`, `useAnnotationEditing()`, `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()` and `useUndoRedo()` need `WaveformPlaylistProvider`. Under this provider they throw, also when it is nested inside a `WaveformPlaylistProvider`: every hook reads the nearest playlist provider. The message reads, for example, "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
+
+### Controls
+
+The library's `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox` and (inside `<AnnotationProvider>`) `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` work under this provider. `PlaybackRateSelect` works under this provider only. `KeyboardShortcuts`, the loop and zoom buttons, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `ExportWavButton` do not: there are no keyboard shortcuts, no loop and no zoom here. See [Components](/docs/react/api/components#which-provider-each-control-needs).
 
 `playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/react/guides/media-element-playout#tonejs-effects)).
 

@@ -298,8 +298,8 @@ function SaveLoadState() {
   const { trackStates } = usePlaylistMixer();
   // The ref, not useCurrentTime(): the position is only read when Save is pressed
   const { currentTimeRef } = usePlaybackRefs();
-  const { seekTo, setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } =
-    usePlaylistControls();
+  const { seekTo } = usePlaybackControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = useEditorControls();
 
   const saveState = () => {
     const state = {
@@ -350,7 +350,7 @@ declare global {
 }
 
 function ExternalTransport() {
-  const { play, pause, stop, seekTo } = usePlaylistControls();
+  const { play, pause, stop, seekTo } = usePlaybackControls();
   // currentTimeRef follows playback; reading it needs no re-render
   const { currentTimeRef } = usePlaybackRefs();
   const { isPlaying } = useIsPlaying();

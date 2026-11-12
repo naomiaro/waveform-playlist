@@ -90,9 +90,10 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **API Source of Truth:**
 
-- Context types (hooks, state, controls): `packages/browser/src/WaveformPlaylistContext.tsx`
-- Context hooks, one per group of fields that change together (#768; the table is in `packages/browser/CLAUDE.md`, "Contexts Are Grouped by Change Rate"): `usePlaylistControls`, `usePlaybackRefs`, `useIsPlaying`, `useCurrentTime`, `useSelection`, `useActiveAnnotation`, `usePlaylistView`, `usePlaylistZoom`, `usePlaylistTimeline`, `usePlaylistMixer`, `useTrackReorderPreview`, `usePlaylistAnnotations`, `useLoop`, `useSelectedTrackId`, `useUndoRedo`
-- MediaElement context types: `packages/browser/src/MediaElementPlaylistContext.tsx`
+- `WaveformPlaylistProvider`, `TrackState`, `ClipPeaks`, `TrackClipPeaks`: `packages/browser/src/WaveformPlaylistContext.tsx`
+- Context value types and hooks of both providers: `packages/browser/src/contexts/playlistContexts.ts`
+- Context hooks, one per group of fields that change together (#768, #688; the table is in `packages/browser/CLAUDE.md`, "Contexts Are Grouped by Change Rate"). Under either provider: `useIsPlaying`, `useCurrentTime`, `useSelection`, `useActiveAnnotation`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistSettings`, `usePlaylistZoom`. `WaveformPlaylistProvider` only: `useEditorControls`, `useEngineRefs`, `useAnnotationEditing`, `usePlaylistTimeline`, `usePlaylistMixer`, `useTrackReorderPreview`, `useLoop`, `useSelectedTrackId`, `useUndoRedo`. `MediaElementPlaylistProvider` only: `usePlaybackRate`, `useMediaElementTrack`
+- `MediaElementPlaylistProvider`, `MediaElementTrackConfig`: `packages/browser/src/MediaElementPlaylistContext.tsx`
 - AudioTrackConfig interface: `packages/browser/src/hooks/useAudioTracks.ts`
 - Effects hooks return types: `packages/browser/src/hooks/useDynamicEffects.ts`, `useTrackDynamicEffects.ts`
 - Peak types (`Peaks`, `Bits`, `PeakData`): `packages/core/src/types/index.ts` (re-exported by `webaudio-peaks` for backwards compat)

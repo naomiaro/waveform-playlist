@@ -19,6 +19,18 @@ import {
 } from '@waveform-playlist/browser';
 ```
 
+## Which Provider Each Control Needs
+
+The controls on this page read the nearest playlist provider.
+
+| Works under | Components |
+| --- | --- |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` |
+| `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
+| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton` |
+
+A control under a provider that does not serve it throws when it renders, also when a provider of the right kind is further out. The message names the hook and both providers, for example: "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
+
 ## Waveform
 
 The main visualization component that renders tracks and handles interactions.
@@ -157,7 +169,7 @@ const GlowingPlayhead = ({ position, color = '#ff0000' }) => (
 
 ### PlayButton
 
-Starts playback from the current cursor position.
+Starts playback from the current cursor position, or plays the highlighted selection.
 
 ```tsx
 <PlayButton />
@@ -165,7 +177,9 @@ Starts playback from the current cursor position.
 
 **Behavior:**
 - Disabled during playback
-- Starts from selection start if selection exists
+- With a selection highlighted (and, under `WaveformPlaylistProvider`, looping off) it plays the selection and stops at its end. If the cursor is inside the selection, it resumes from the cursor
+- Otherwise it plays from the cursor
+- Works the same way under `MediaElementPlaylistProvider`, which has no loop
 
 ### PauseButton
 
@@ -180,34 +194,42 @@ Pauses playback, maintaining cursor position.
 
 ### StopButton
 
-Stops playback and resets cursor to start.
+Stops playback and returns the cursor to where playback started.
 
 ```tsx
 <StopButton />
 ```
 
 **Behavior:**
-- Always enabled
+- Disabled when not playing, under both providers. After Pause it is disabled and the cursor stays at the pause point
 
 ### RewindButton
 
-Jumps backward by a fixed amount.
+Moves the cursor to the start: `seekTo(0)`. During playback, playback restarts there.
 
 ```tsx
 <RewindButton />
 ```
 
-**Default:** 5 seconds
-
 ### FastForwardButton
 
-Jumps forward by a fixed amount.
+Moves the cursor to the end of the audio: `seekTo(Infinity)`, which the provider clamps.
 
 ```tsx
 <FastForwardButton />
 ```
 
-**Default:** 5 seconds
+### SkipBackwardButton and SkipForwardButton
+
+Move the cursor back or forward by `skipAmount` seconds from the current playback position, clamped to the audio. During playback, playback restarts at the new position.
+
+```tsx
+<SkipBackwardButton />
+<SkipForwardButton skipAmount={10} />
+```
+
+**Props:**
+- `skipAmount` (optional): seconds to skip. Default 5
 
 ### SetLoopRegionButton
 
@@ -300,14 +322,33 @@ Volume slider for a specific track.
 
 ### AudioPosition
 
-Shows current time and duration.
+Shows the current playback position. It follows playback through the provider's animation loop, and shows the resting cursor position while stopped.
 
 ```tsx
 <AudioPosition />
-// Output: "0:00.000 / 3:45.123"
 ```
 
-The format respects the current time format setting.
+The format is the provider's current time format (`TimeFormatSelect`, or `setTimeFormat` from `usePlaybackControls()`); the default is `hh:mm:ss.uuu`. Works under either provider.
+
+---
+
+## Playback Speed
+
+### PlaybackRateSelect
+
+`MediaElementPlaylistProvider` only. A dropdown (a native `<select>` with the accessible name "Playback speed") that shows and sets the provider's playback rate.
+
+```tsx
+<PlaybackRateSelect />
+<PlaybackRateSelect rates={[0.75, 1, 1.5]} />
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `rates` | `readonly number[]` | `[0.5, 0.75, 1, 1.25, 1.5, 2]` | The speeds to offer, in the order to list them |
+| `className` | `string` | - | Class for the wrapper element |
+
+A current speed that is not among `rates` (set from code with `setPlaybackRate`) is listed as an extra option. The base component of the same name in `@waveform-playlist/ui-components` takes `value`, `onChange`, `rates`, `disabled` and `className`, for use without the provider.
 
 ---
 
@@ -395,7 +436,7 @@ Registers a custom track-controls row as a vertical drag source for reordering. 
 | `disabled` | `boolean` | `false` | Disable the drag source |
 | `children` | `(props: SortableTrackControlsRenderProps) => ReactNode` | - | Render prop receiving `ref` (sortable item wrapper), `handleRef` (drag grip), and `isDragSource` |
 
-Requires `ClipInteractionProvider` (or another ambient `@dnd-kit/react` `DragDropProvider`) — drags are committed by calling `usePlaylistControls().reorderTrack(trackId, toIndex)` from the shared `onDragEnd` handler.
+Requires `ClipInteractionProvider` (or another ambient `@dnd-kit/react` `DragDropProvider`) — drags are committed by calling `useEditorControls().reorderTrack(trackId, toIndex)` from the shared `onDragEnd` handler.
 
 ---
 

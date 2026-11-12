@@ -29,13 +29,13 @@ The controls panel displays:
 
 ## Programmatic Track Controls
 
-Use `usePlaylistControls()` and `usePlaylistMixer()` for custom track control UI:
+Use `useEditorControls()` and `usePlaylistMixer()` for custom track control UI:
 
 ```tsx
-import { usePlaylistControls, usePlaylistMixer } from '@waveform-playlist/browser';
+import { useEditorControls, usePlaylistMixer } from '@waveform-playlist/browser';
 
 function CustomTrackControls({ trackIndex }: { trackIndex: number }) {
-  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = usePlaylistControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = useEditorControls();
   const { trackStates } = usePlaylistMixer();
   const state = trackStates[trackIndex];
 
@@ -77,7 +77,7 @@ function CustomTrackControls({ trackIndex }: { trackIndex: number }) {
 Muting a track silences it completely:
 
 ```tsx
-const { setTrackMute } = usePlaylistControls();
+const { setTrackMute } = useEditorControls();
 const { trackStates } = usePlaylistMixer();
 
 // Toggle mute
@@ -95,7 +95,7 @@ setTrackMute(trackIndex, false);
 Soloing a track mutes all other non-soloed tracks:
 
 ```tsx
-const { setTrackSolo } = usePlaylistControls();
+const { setTrackSolo } = useEditorControls();
 const { trackStates } = usePlaylistMixer();
 
 // Toggle solo
@@ -109,7 +109,7 @@ When multiple tracks are soloed, only those tracks are audible.
 Volume ranges from 0 (silent) to 1 (full volume):
 
 ```tsx
-const { setTrackVolume } = usePlaylistControls();
+const { setTrackVolume } = useEditorControls();
 
 // Set to 50% volume
 setTrackVolume(trackIndex, 0.5);
@@ -120,7 +120,7 @@ setTrackVolume(trackIndex, 0.5);
 Pan ranges from -1 (full left) to 1 (full right):
 
 ```tsx
-const { setTrackPan } = usePlaylistControls();
+const { setTrackPan } = useEditorControls();
 
 // Pan fully left
 setTrackPan(trackIndex, -1);
@@ -139,14 +139,14 @@ Select tracks for operations like deletion or effects:
 ```tsx
 import {
   useSelectedTrackId,
-  usePlaylistControls,
+  useEditorControls,
   usePlaylistTimeline,
 } from '@waveform-playlist/browser';
 
 function TrackSelector() {
   const { tracks } = usePlaylistTimeline();
   const { selectedTrackId } = useSelectedTrackId();
-  const { setSelectedTrackId } = usePlaylistControls();
+  const { setSelectedTrackId } = useEditorControls();
 
   return (
     <ul>
@@ -265,14 +265,14 @@ const { tracks, loading } = useAudioTracks([
 import {
   WaveformPlaylistProvider,
   Waveform,
-  usePlaylistControls,
+  useEditorControls,
   usePlaylistMixer,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function TrackControlRow({ trackIndex }: { trackIndex: number }) {
   const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = usePlaylistControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } = useEditorControls();
   const state = trackStates[trackIndex];
 
   if (!state) return null;
