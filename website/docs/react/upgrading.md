@@ -622,7 +622,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
    }, [currentTime]);
    ```
 
-   The same applies to render props. `renderPlayhead` is now called when playback starts or stops, on a seek, a selection change, a view change or a zoom, and no longer on every mixer, track or peaks change. A custom playhead that positioned itself from refs on each call must not rely on those extra calls.
+   The same applies to render props. `renderPlayhead` is no longer called on a mixer, loop, undo, annotation, time-format or automatic-scroll change. It is still called when playback starts or stops, on a seek, a selection change, a view change, a zoom, a track selection and every timeline change (a clip operation, a pointer move of a trim, peaks arriving). A custom playhead that positioned itself from refs on each call must not rely on the calls that are gone.
 
    `playoutRef.current` is `null` until the engine is first built and during a rebuild. Read it in an event handler, or in an effect that depends on `isReady` from `usePlaylistTimeline()`.
 
@@ -632,7 +632,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 4. **A custom `renderTrackControls` that mounts `SortableTrackControls` itself** reads `trackReorderEpoch` (folded into the panel's `key`) and `trackDragPreview` from `useTrackReorderPreview()`, not from `usePlaylistData()`.
 
-5. **A small timing difference, nothing to migrate.** A `play()` called while the engine is being rebuilt (the tracks just changed) is queued. The playhead, the clip progress overlays and `AudioPosition` now move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier.
+5. **A small timing difference, nothing to migrate.** A `play()` called while the engine is being rebuilt (the tracks just changed) is queued. The playhead, the clip progress overlays and `AudioPosition` now move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier. If the queued play never starts (the rebuild fails), they now stay where they were until the next seek or stop.
 
 ### `PlaylistInfoContext` has no `duration`; `SmartScale` takes `durationMs`
 
@@ -658,13 +658,13 @@ The context value no longer has a `duration` field. Every channel and track read
 </PlaylistInfoContext.Provider>
 ```
 
-In TypeScript both are compile errors (an unknown `duration` property, a missing `durationMs` prop). In plain JavaScript a `<SmartScale>` without `durationMs` renders the timescale with no ticks and no labels, and reports no error, so check every `<SmartScale` by hand. A component of your own that read `duration` from the context takes it as a prop instead.
+In TypeScript both are compile errors (an unknown `duration` property, a missing `durationMs` prop). In plain JavaScript a `<SmartScale>` without `durationMs` renders the timescale with no ticks and no labels and throws nothing, so check every `<SmartScale` by hand. A component of your own that read `duration` from the context takes it as a prop instead.
 
 ### `SpectrogramProvider` needs the new `@waveform-playlist/browser`
 
 **Package:** `@waveform-playlist/spectrogram`.
 
-`SpectrogramProvider` reads the new hooks, so the new major of `@waveform-playlist/spectrogram` requires the new major of `@waveform-playlist/browser`. Its own API is unchanged. Upgrade the two together.
+`SpectrogramProvider` reads the new hooks, so the new major of `@waveform-playlist/spectrogram` requires the new major of `@waveform-playlist/browser`. Its own API is unchanged. The pairing fails in both directions: an older `@waveform-playlist/spectrogram` calls `usePlaylistData()`, which the new `@waveform-playlist/browser` does not have. Upgrade the two together.
 
 ## Dragging an annotation edge: one `onAnnotationsChange` per drag in the MediaElement player, and Escape restores everything
 
