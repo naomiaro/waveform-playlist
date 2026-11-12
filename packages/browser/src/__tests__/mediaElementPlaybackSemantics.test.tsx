@@ -586,7 +586,10 @@ describe('duration and peaks come from the track; readiness is its own flag', ()
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect(String(onError.mock.calls[0][0].message)).toContain('test.mp3');
+    // The code and the browser's text, and NOT the URL (it may carry a token).
+    expect(String(onError.mock.calls[0][0].message)).toBe(
+      'Media failed to load (code 4: not supported)'
+    );
     expect(probe.data.isReady).toBe(false);
   });
 });
@@ -628,6 +631,10 @@ describe('Play before the player exists is queued', () => {
       await probe.controls.play(3);
     });
     await act(async () => probe.controls[action]());
+    // The cancelled play had moved the cursor to its start: the state shows
+    // it, and agrees with the ref the next Play starts from.
+    expect(probe.animation.currentTimeRef.current).toBe(3);
+    expect(probe.animation.currentTime).toBe(3);
     await deliver();
     expect(playout().play).not.toHaveBeenCalled();
     expect(probe.animation.isPlaying).toBe(false);
@@ -951,6 +958,9 @@ describe('players that are gone', () => {
     });
     await act(async () => fail(new Error('no engine')));
     await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    // The play that will never start had moved the cursor: ref and state agree.
+    expect(probe.animation.currentTimeRef.current).toBe(3);
+    expect(probe.animation.currentTime).toBe(3);
 
     // The same audio in a new player (only the name differs): the cursor is
     // kept, and the play that failed must not come back to life.
@@ -972,5 +982,163 @@ describe('players that are gone', () => {
     await act(async () => first.complete?.());
     expect(second.pause).not.toHaveBeenCalled();
     expect(second.seekTo).not.toHaveBeenCalled();
+  });
+});
+
+describe('review round 1 (#782)', () => {
+  // Children's effects run before the provider's: the play arrives before the
+  // provider has started creating its player.
+  const PlayOnMount: React.FC<{ source: string }> = ({ source }) => {
+    const { play } = useMediaElementControls();
+    React.useEffect(() => {
+      void play(2);
+    }, [play, source]);
+    return null;
+  };
+
+  it("a play() from a child's mount effect is queued and starts when the player arrives", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playout = createFakePlayout();
+    const createPlayout = (() => playout) as unknown as () => MediaElementPlayout;
+    render(
+      <MediaElementPlaylistProvider track={TRACK} createPlayout={createPlayout}>
+        <ProbeChild />
+        <PlayOnMount source={TRACK.source} />
+      </MediaElementPlaylistProvider>
+    );
+    await act(async () => {});
+    expect(playout.play).toHaveBeenCalledExactlyOnceWith(undefined, 2);
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+
+  it("after a failed init, a play() from a child's effect on the next track is queued too", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const second = createFakePlayout();
+    let calls = 0;
+    const createPlayout = (() => {
+      calls++;
+      if (calls === 1) throw new Error('no engine');
+      return second;
+    }) as unknown as () => MediaElementPlayout;
+    const onError = vi.fn();
+    const tree = (track: typeof TRACK, playOnMount: boolean) => (
+      <MediaElementPlaylistProvider track={track} createPlayout={createPlayout} onError={onError}>
+        <ProbeChild />
+        {playOnMount ? <PlayOnMount source={track.source} /> : null}
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(tree(TRACK, false));
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+
+    view.rerender(tree(OTHER_TRACK, true));
+    await act(async () => {});
+    expect(second.play).toHaveBeenCalledExactlyOnceWith(undefined, 2);
+  });
+
+  it('a range that ends at the end of the audio rests at its end: the ended event after it changes nothing', async () => {
+    const { playout } = await mount({
+      annotationList: { annotations: TO_THE_END, isContinuousPlay: true },
+    });
+    await act(async () => {
+      await probe.controls.play(6, 2);
+    });
+    playout().time = 7;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n4');
+
+    // The media element reports its last position, then that it has ended.
+    await act(async () => {
+      playout().time = SECONDS;
+      playout().emit('timeupdate', SECONDS);
+    });
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(SECONDS);
+    await act(async () => playout().complete?.());
+
+    expect(probe.animation.currentTime).toBe(SECONDS);
+    expect(probe.animation.currentTimeRef.current).toBe(SECONDS);
+    expect(probe.state.activeAnnotationId).toBe('n4');
+  });
+
+  it('Stop pressed while stopped does not go back to the start of a range that played out', async () => {
+    const { playout } = await mount();
+    await act(async () => {
+      await probe.controls.play(2, 3);
+    });
+    playout().time = 5;
+    await runFrame();
+    expect(probe.animation.currentTime).toBe(5);
+
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(5);
+    expect(playout().getCurrentTime()).toBe(5);
+  });
+
+  it('Stop after a pause still returns to the play start (a pause is not a rest)', async () => {
+    const { playout } = await mount();
+    await act(async () => {
+      await probe.controls.play(2, 3);
+    });
+    playout().time = 4;
+    await runFrame();
+    await act(async () => probe.controls.pause());
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(2);
+  });
+
+  it('the same audio in a new player during playback: a Stop afterwards leaves the cursor where the listener was', async () => {
+    const { playout, changeTrack } = await mount();
+    await playing(playout(), 1, 4);
+    await changeTrack({ ...TRACK, name: 'Renamed' });
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(4);
+
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(4);
+  });
+
+  it('a media error during playback ends playback where it was and reports it', async () => {
+    const onError = vi.fn();
+    const { playout } = await mount({ onError });
+    await playing(playout(), 1, 3);
+
+    await act(async () => playout().emit('error', { code: 2, message: 'network' }));
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(3);
+    expect(frames.size).toBe(0);
+  });
+
+  it('a media error while stopped does not touch the cursor or the player', async () => {
+    const { playout } = await mount();
+    await act(async () => probe.controls.seekTo(3));
+    playout().pause.mockClear();
+    await act(async () => playout().emit('error', null));
+    expect(playout().pause).not.toHaveBeenCalled();
+    expect(probe.animation.currentTime).toBe(3);
+  });
+
+  it('a play the browser refuses does not leave isPlaying true', async () => {
+    const { playout, deliver } = await mount({ holdPlayer: true });
+    await act(async () => {
+      await probe.controls.play(3);
+    });
+    await deliver();
+    expect(probe.animation.isPlaying).toBe(true);
+
+    await act(async () => playout().emit('playrejected', new Error('NotAllowedError')));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(3);
+    expect(frames.size).toBe(0);
+  });
+
+  it('a refusal reported by a player that was replaced is ignored', async () => {
+    const { playout, changeTrack } = await mount();
+    const first = playout();
+    await changeTrack(OTHER_TRACK);
+    await playing(playout(), 1, 2);
+    await act(async () => first.emit('playrejected', new Error('late')));
+    await act(async () => first.emit('error', null));
+    expect(probe.animation.isPlaying).toBe(true);
   });
 });

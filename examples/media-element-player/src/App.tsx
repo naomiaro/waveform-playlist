@@ -64,8 +64,11 @@ export function App() {
   const [preservesPitch, setPreservesPitch] = useState(true);
   // Stable: the provider creates its player again when `onError` (or `onReady`,
   // `createPlayout`) gets a new identity, which stops playback.
+  // Shown above the player, which stays mounted: the provider reports both a
+  // player that could not be created and media that failed to load.
+  const [playerError, setPlayerError] = useState<string | null>(null);
   const handlePlayoutError = useCallback(
-    (err: Error) => setError('Playout init failed: ' + err.message),
+    (err: Error) => setPlayerError('Player error: ' + err.message),
     []
   );
 
@@ -97,6 +100,7 @@ export function App() {
       </Header>
 
       {error && <Banner role="alert">{error}</Banner>}
+      {playerError && <Banner role="alert">{playerError}</Banner>}
 
       {!error && !track && <Status>Loading waveform…</Status>}
 
@@ -109,7 +113,8 @@ export function App() {
           barWidth={2}
           barGap={0}
           timescale
-          // New in v14: surface playout-init failures (e.g. a missing peer) to the UI.
+          // Surface a player that could not be created (e.g. a missing peer) and
+          // media that failed to load.
           onError={handlePlayoutError}
         >
           <Controls preservesPitch={preservesPitch} onPreservesPitchChange={setPreservesPitch} />

@@ -302,9 +302,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // one is being replaced). Started by the init effect when the player
   // arrives; cleared by Stop, Pause, new audio and a failed init.
   const pendingPlayRef = useRef<{ position: number } | null>(null);
-  // True from the start of an init unless it failed: only then is there a
-  // player, or one on its way, for a play to start on or wait for.
-  const playoutInFlightRef = useRef(false);
+  // False only after an init failed: otherwise there is a player, or one on
+  // its way, for a play to start on or wait for. It starts true: a child's
+  // mount effect runs before this provider's init effect, and a `play()`
+  // there must be queued like any other. The init's cleanup sets it true
+  // again for the same reason (cleanups run before any effect of the commit).
+  const playoutInFlightRef = useRef(true);
 
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
@@ -380,6 +383,10 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       playbackEndTimeRef.current = null;
       currentTimeRef.current = cursor;
       setCurrentTime(cursor);
+      // Where playback came to rest is where the next one starts from: a Stop
+      // pressed while stopped must not move the cursor (to the start of a
+      // range that has played out, say). A pause is not a rest.
+      playStartPositionRef.current = cursor;
     },
     [stopAnimationFrameLoop, setIsPlaying]
   );
@@ -421,6 +428,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           setIsReady(true);
           onReady?.();
         });
+        // The URL is left out of the message on purpose: it may carry a
+        // token, and consumers show `error.message` in their UI.
         playout.on('error', (mediaError) => {
           if (cancelled) return;
           const detail = mediaError
@@ -429,9 +438,17 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
               (mediaError.message ? ': ' + mediaError.message : '') +
               ')'
             : '';
-          const error = new Error('Media failed to load: ' + source + detail);
+          const error = new Error('Media failed to load' + detail);
           console.warn('[waveform-playlist] ' + error.message);
+          // Nothing is audible any more: do not go on showing "playing".
+          if (isPlayingRef.current) restAt(currentTimeRef.current);
           onError?.(error);
+        });
+        // The browser refused to start playback (no user gesture, most often
+        // for a play that was queued and started here, outside the click).
+        playout.on('playrejected', () => {
+          if (cancelled) return;
+          if (isPlayingRef.current) restAt(currentTimeRef.current);
         });
 
         playout.addTrack({
@@ -459,7 +476,10 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         // at its own end instead: the loop below does the same when it sees
         // the end first, and which of the two does is a race.
         playout.setOnPlaybackComplete(() => {
-          if (cancelled) return;
+          // The element's `ended` also arrives after the loop or `timeupdate`
+          // has already ended a range that reaches the end of the audio;
+          // that rest stands.
+          if (cancelled || !isPlayingRef.current) return;
           const boundedEnd = playbackEndTimeRef.current;
           if (boundedEnd !== null && !isSelectionPlayRef.current) {
             restAt(Math.min(boundedEnd, waveformData.duration));
@@ -493,6 +513,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           // Nothing will arrive for a queued play to wait for.
           playoutInFlightRef.current = false;
           pendingPlayRef.current = null;
+          // A play that was queued moved the cursor ref to its start; show it.
+          setCurrentTime(currentTimeRef.current);
         }
         console.warn('[waveform-playlist] MediaElement playout init failed: ' + String(err));
         onError?.(err instanceof Error ? err : new Error(String(err)));
@@ -509,6 +531,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setIsPlaying(false);
       // Whatever replaces this player has its own metadata to load.
       setIsReady(false);
+      // A player is on its way again, also after an init that failed.
+      playoutInFlightRef.current = true;
       const latest = latestAudioRef.current;
       if (latest.source !== source || latest.waveformData !== waveformData) {
         // New audio: the old position and the old active annotation mean
@@ -529,7 +553,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       } else {
         // The same audio (or an unmount): keep the listener's place, and
         // bring the state up to it. During playback only the ref advances.
+        // That place is also where a Stop leaves the cursor from now on.
         setCurrentTime(currentTimeRef.current);
+        playStartPositionRef.current = currentTimeRef.current;
       }
       if (createdPlayout) {
         createdPlayout.dispose();
@@ -686,7 +712,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const pause = useCallback(() => {
     // Cancels a play queued for a player that has not arrived.
     pendingPlayRef.current = null;
-    if (!playoutRef.current) return;
+    if (!playoutRef.current) {
+      // The play it cancelled moved the cursor ref to its start; show it.
+      setCurrentTime(currentTimeRef.current);
+      return;
+    }
 
     playoutRef.current.pause();
     setIsPlaying(false);

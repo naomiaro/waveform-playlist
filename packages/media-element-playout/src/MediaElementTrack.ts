@@ -65,6 +65,13 @@ export interface MediaElementTrackEvents {
   ended: () => void;
   /** Fired on each native timeupdate; carries the current time in seconds. */
   timeupdate: (time: number) => void;
+  /**
+   * Fired when a play() could not start: the browser refused it (autoplay
+   * policy: no user gesture), the source is not playable, or the
+   * AudioContext could not be resumed. Not fired for a play that was merely
+   * interrupted by a pause() or a newer play() (an `AbortError`).
+   */
+  playrejected: (err: unknown) => void;
 }
 
 /**
@@ -292,7 +299,12 @@ export class MediaElementTrack {
       this._scheduleFades(offset);
       this.audioElement.currentTime = offset;
       this.audioElement.play().catch((err) => {
+        // A pause() or a newer play() before this one started rejects it with
+        // an AbortError. That is not a failure, and reporting it would end
+        // the play that replaced it.
+        if (err instanceof Error && err.name === 'AbortError') return;
         console.warn('[waveform-playlist] MediaElementTrack: play() failed: ' + String(err));
+        this._emit('playrejected', err);
       });
     };
 
@@ -307,6 +319,7 @@ export class MediaElementTrack {
           console.warn(
             '[waveform-playlist] MediaElementTrack: AudioContext.resume() failed: ' + String(err)
           );
+          this._emit('playrejected', err);
         });
     } else {
       startPlayback();

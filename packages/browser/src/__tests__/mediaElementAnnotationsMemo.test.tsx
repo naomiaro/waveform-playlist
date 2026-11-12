@@ -249,6 +249,30 @@ describe('MediaElement annotation boxes (#744)', () => {
     expect(playout.play.mock.lastCall).toEqual([undefined, 2]);
   });
 
+  it('a click on a box whose play throws is reported, not left as an unhandled rejection', async () => {
+    const { playout } = await mount(<MediaElementWaveform />);
+    playout.play.mockImplementation(() => {
+      throw new Error('player broke');
+    });
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+
+    await act(async () => {
+      fireEvent.click(document.querySelector('[data-box="n3"]')!);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    process.off('unhandledRejection', unhandled);
+
+    expect(unhandled).not.toHaveBeenCalled();
+    expect(
+      vi
+        .mocked(console.warn)
+        .mock.calls.some((call) =>
+          String(call[0]).includes('Failed to start playback for annotation n3')
+        )
+    ).toBe(true);
+  });
+
   it('boundary drags are converted with the rate of the track', async () => {
     await mount(<MediaElementWaveform editable linkEndpoints />);
 

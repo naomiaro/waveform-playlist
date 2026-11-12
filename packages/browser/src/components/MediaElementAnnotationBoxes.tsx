@@ -56,15 +56,14 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
   const handleAnnotationClick = useCallback(
     (annotation: AnnotationData) => {
       setActiveAnnotationId(annotation.id);
-      try {
-        play(annotation.start);
-      } catch (err) {
-        console.error(
-          'waveform-playlist: Failed to start playback for annotation',
-          annotation.id,
-          err
+      play(annotation.start).catch((err) => {
+        console.warn(
+          '[waveform-playlist] Failed to start playback for annotation ' +
+            annotation.id +
+            ': ' +
+            String(err)
         );
-      }
+      });
     },
     [setActiveAnnotationId, play]
   );

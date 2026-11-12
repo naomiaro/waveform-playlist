@@ -275,9 +275,7 @@ describe('setSource() / in-place source swap', () => {
     playout.addTrack({ source: 'a.mp3' });
     playout.addTrack({ source: 'b.mp3' }); // replace via addTrack → warns
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Only one track is supported')
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Only one track is supported'));
     warnSpy.mockRestore();
   });
 
@@ -312,5 +310,48 @@ describe('setSource() / in-place source swap', () => {
 
     playout.setSource({ source: 'b.mp3' });
     expect(playout.isPlaying).toBe(false);
+  });
+});
+
+describe('a play() the browser does not start', () => {
+  const flush = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  it("emits 'playrejected' and is no longer playing when the element refuses", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const refused = Object.assign(new Error('no user gesture'), { name: 'NotAllowedError' });
+    created[0].play.mockImplementation(() => Promise.reject(refused));
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    expect(playout.isPlaying).toBe(true);
+    await flush();
+
+    expect(onRejected).toHaveBeenCalledExactlyOnceWith(refused);
+    expect(playout.isPlaying).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('says nothing when the play was only interrupted (AbortError)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const aborted = Object.assign(new Error('interrupted by pause'), { name: 'AbortError' });
+    created[0].play.mockImplementation(() => Promise.reject(aborted));
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    await flush();
+
+    expect(onRejected).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(playout.isPlaying).toBe(true);
+    vi.restoreAllMocks();
   });
 });
