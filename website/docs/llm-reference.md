@@ -1632,7 +1632,7 @@ import { ClipInteractionProvider } from '@waveform-playlist/browser';
 
 interface ClipInteractionProviderProps {
   snap?: boolean;                      // Default: false — enable snap-to-grid (auto-detects beats vs timescale from context)
-  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input AND wider (24px) clip trim handles on every clip below
+  touchOptimized?: boolean;            // 250ms delay activation for touch input AND wider (24px) clip trim handles on every clip below. Left out: inherited from a ClipInteractionOptions/ClipInteractionProvider above (false at the top)
   children: React.ReactNode;
 }
 ```

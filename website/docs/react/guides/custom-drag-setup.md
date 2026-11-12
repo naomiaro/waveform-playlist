@@ -326,7 +326,9 @@ Clips read two options from context: whether they can be dragged and trimmed, an
 | `enabled` | `boolean` | inherited, `false` at the top | Clips below can be dragged and trimmed. Without it they show no trim handles and their headers do not drag |
 | `touchOptimized` | `boolean` | inherited, `false` at the top | Clips below get 24px trim handles |
 
-A prop you leave out keeps the value from the nearest `ClipInteractionOptions` or `ClipInteractionProvider` above, so it can also be nested to change one option for part of the tree:
+A prop you leave out keeps the value from the nearest `ClipInteractionOptions` or `ClipInteractionProvider` above, so it can also be nested to change one option for part of the tree. `ClipInteractionProvider` follows the same rule for its own `touchOptimized`: left out, it takes the value from above for its sensors and for the handles.
+
+The [Custom Drag Setup example](pathname:///waveform-playlist/examples/custom-drag-setup) runs this setup, with a checkbox for each option.
 
 ```tsx
 <ClipInteractionProvider touchOptimized>
