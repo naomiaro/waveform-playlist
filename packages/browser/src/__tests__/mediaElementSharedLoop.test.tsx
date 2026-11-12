@@ -189,10 +189,10 @@ async function mount(options: MountOptions = {}) {
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
   const Wrapper = options.strict ? React.StrictMode : React.Fragment;
-  const tree = (showPlaylist: boolean, playlists = 1) => (
+  const tree = (showPlaylist: boolean, playlists = 1, track = TRACK) => (
     <Wrapper>
       <MediaElementPlaylistProvider
-        track={TRACK}
+        track={track}
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={createPlayout}
         automaticScroll={options.automaticScroll}
@@ -215,6 +215,8 @@ async function mount(options: MountOptions = {}) {
   return {
     playout,
     show: (showPlaylist: boolean, playlists = 1) => view.rerender(tree(showPlaylist, playlists)),
+    /** The same audio under another source URL: the player is created again. */
+    changeSource: (source: string) => view.rerender(tree(true, 1, { ...TRACK, source })),
   };
 }
 
@@ -424,6 +426,26 @@ describe('MediaElement playback runs one animation loop', () => {
     await act(async () => probe.controls.pause());
     expect(registered.size).toBe(0);
     expect(frames.size).toBe(0);
+  });
+
+  it('a new source during playback stops playback: nothing stays registered, and a seek moves the playhead', async () => {
+    const { playout, changeSource } = await mount();
+    await act(async () => probe.controls.play());
+    playout.time = 2;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+
+    // The provider disposes the player and creates another for the new source.
+    await act(async () => changeSource('other.mp3'));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(registered.size).toBe(0);
+    expect(frames.size).toBe(0);
+
+    // Not playing, so the resting position is drawn: a seek moves the playhead.
+    await act(async () => probe.controls.seekTo(3));
+    expect(playhead().style.transform).toBe(`translate3d(${3 * PX_PER_SECOND}px, 0, 0)`);
+    expect(progressOverlay().style.transform).toBe('scaleX(0.375)');
   });
 
   it('a playlist that unmounts during playback leaves nothing registered', async () => {

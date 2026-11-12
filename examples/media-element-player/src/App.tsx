@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
@@ -62,6 +62,12 @@ export function App() {
   const [track, setTrack] = useState<MediaElementTrackConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preservesPitch, setPreservesPitch] = useState(true);
+  // Stable: the provider creates its player again when `onError` (or `onReady`,
+  // `createPlayout`) gets a new identity, which stops playback.
+  const handlePlayoutError = useCallback(
+    (err: Error) => setError('Playout init failed: ' + err.message),
+    []
+  );
 
   // Load the pre-computed waveform peaks once, then build the single-track config.
   useEffect(() => {
@@ -104,7 +110,7 @@ export function App() {
           barGap={0}
           timescale
           // New in v14: surface playout-init failures (e.g. a missing peer) to the UI.
-          onError={(err) => setError('Playout init failed: ' + err.message)}
+          onError={handlePlayoutError}
         >
           <Controls preservesPitch={preservesPitch} onPreservesPitchChange={setPreservesPitch} />
           <MediaElementWaveform />

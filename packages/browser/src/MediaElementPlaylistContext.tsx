@@ -335,6 +335,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     return () => {
       cancelled = true;
       stopAnimationFrameLoop();
+      // The player that was playing is about to be disposed: playback has
+      // stopped, whatever replaces it. Left true, the UI showed "playing"
+      // with no audio and no loop, and the playhead and progress overlay
+      // (drawn at rest only while not playing) stopped following seeks.
+      setIsPlaying(false);
       if (createdPlayout) {
         createdPlayout.dispose();
       }
