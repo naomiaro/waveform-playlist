@@ -11,6 +11,7 @@ import {
   SlidersHorizontalIcon,
   MicrophoneIcon,
   RowsIcon,
+  HandGrabbingIcon,
   TextAaIcon,
   LightningIcon,
   InfinityIcon,
@@ -102,6 +103,13 @@ const examples = [
     path: 'multi-clip',
     category: 'advanced',
     icon: <RowsIcon weight="light" aria-hidden="true" />,
+  },
+  {
+    title: 'Custom Drag Setup',
+    description: 'Your own drag provider. Same clip editing.',
+    path: 'custom-drag-setup',
+    category: 'advanced',
+    icon: <HandGrabbingIcon weight="light" aria-hidden="true" />,
   },
   {
     title: 'Beats & Bars',

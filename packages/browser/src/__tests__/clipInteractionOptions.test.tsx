@@ -33,6 +33,19 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
+// The options `ClipInteractionProvider` hands to `useDragSensors`, latest last.
+const sensorOptions = vi.hoisted(() => [] as unknown[]);
+vi.mock('../hooks/useDragSensors', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useDragSensors')>();
+  return {
+    ...actual,
+    useDragSensors: (options: Parameters<typeof actual.useDragSensors>[0]) => {
+      sensorOptions.push(options);
+      return actual.useDragSensors(options);
+    },
+  };
+});
+
 import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
 import { Waveform } from '../components/Waveform';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
@@ -126,6 +139,7 @@ async function mount(tree: (probe: React.ReactNode) => React.ReactNode) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   seen.props = {};
+  sensorOptions.length = 0;
   seen.renders = {};
   isReady = false;
   enabledSeen = null;
@@ -305,6 +319,46 @@ describe('clip interaction options have one source, the context (#690)', () => {
 
     expect(seen.props['clip-a']).toEqual({ touchOptimized: false, disableHeaderDrag: true });
     expect(handleWidths(container)).toEqual([]);
+  });
+
+  it('a ClipInteractionProvider without the flag inherits touchOptimized from above, for handles and sensors', async () => {
+    const { container } = await mount((probe) => (
+      <ClipInteractionOptions touchOptimized>
+        <ClipInteractionProvider>
+          {probe}
+          <Waveform showClipHeaders />
+        </ClipInteractionProvider>
+      </ClipInteractionOptions>
+    ));
+
+    expect(seen.props['clip-a']).toEqual({ touchOptimized: true, disableHeaderDrag: false });
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH_TOUCH]));
+    expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: true });
+  });
+
+  it('a ClipInteractionProvider with touchOptimized={false} overrides what is above', async () => {
+    const { container } = await mount((probe) => (
+      <ClipInteractionOptions touchOptimized>
+        <ClipInteractionProvider touchOptimized={false}>
+          {probe}
+          <Waveform showClipHeaders />
+        </ClipInteractionProvider>
+      </ClipInteractionOptions>
+    ));
+
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH]));
+    expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: false });
+  });
+
+  it('the provider passes its own flag to the sensors', async () => {
+    await mount((probe) => (
+      <ClipInteractionProvider touchOptimized>
+        {probe}
+        <Waveform showClipHeaders />
+      </ClipInteractionProvider>
+    ));
+
+    expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: true });
   });
 
   it('PlaylistVisualization used directly reads the same context', async () => {
