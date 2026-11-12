@@ -242,6 +242,81 @@ const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
 
+## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
+
+**Package:** `@waveform-playlist/browser`.
+
+Whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, now has one source: a context that each clip reads. `<Waveform>` and `<PlaylistVisualization>` no longer take `interactiveClips` or `touchOptimized`. Before, `ClipInteractionProvider` turned `interactiveClips` on but not the wide handles, so touch support needed the same flag in two places.
+
+**If you use `ClipInteractionProvider`:**
+
+**Find:** `interactiveClips` or `touchOptimized` on a `<Waveform>` or `<PlaylistVisualization>` inside a `ClipInteractionProvider`.
+
+**Replace with:** nothing on the waveform. Where the provider already had `touchOptimized`, that one flag now does both jobs:
+
+```tsx
+// Before
+<ClipInteractionProvider touchOptimized>
+  <Waveform showClipHeaders interactiveClips touchOptimized />
+</ClipInteractionProvider>
+
+// After
+<ClipInteractionProvider touchOptimized>
+  <Waveform showClipHeaders />
+</ClipInteractionProvider>
+```
+
+**If you use your own `DragDropProvider`:**
+
+**Find:** `interactiveClips` or `touchOptimized` on a `<Waveform>` or `<PlaylistVisualization>` that is not inside a `ClipInteractionProvider`.
+
+**Replace with:** `ClipInteractionOptions` around it.
+
+```tsx
+// Before
+<DragDropProvider sensors={sensors} /* … */>
+  <Waveform showClipHeaders interactiveClips touchOptimized />
+</DragDropProvider>
+
+// After
+import { ClipInteractionOptions } from '@waveform-playlist/browser';
+
+<DragDropProvider sensors={sensors} /* … */>
+  <ClipInteractionOptions enabled touchOptimized>
+    <Waveform showClipHeaders />
+  </ClipInteractionOptions>
+</DragDropProvider>
+```
+
+Use `enabled` alone where you had `interactiveClips` alone.
+
+**If `touchOptimized` was on the `<Waveform>` but not on the provider**, you had wide handles with the normal mouse-tuned sensors. Moving the flag to the provider would also add the 250ms touch-hold delay. To keep exactly what you had, set only the handle width:
+
+```tsx
+// Before
+<ClipInteractionProvider>
+  <Waveform showClipHeaders touchOptimized />
+</ClipInteractionProvider>
+
+// After
+<ClipInteractionProvider>
+  <ClipInteractionOptions touchOptimized>
+    <Waveform showClipHeaders />
+  </ClipInteractionOptions>
+</ClipInteractionProvider>
+```
+
+**In plain JavaScript nothing reports a leftover prop.** `<Waveform interactiveClips>` and `<Waveform touchOptimized>` are ignored without a warning (TypeScript reports them). With your own `DragDropProvider` the visible result is clips that no longer drag and have no trim handles, so search for both names before you run the app.
+
+**Behaviour that changes without a code change:**
+
+- `<ClipInteractionProvider touchOptimized>` now also widens the trim handles, from 8px to 24px. If you set the flag on the provider only and want to keep the narrow handles, nest `<ClipInteractionOptions touchOptimized={false}>` inside the provider.
+- `<PlaylistVisualization>` used directly inside a `ClipInteractionProvider` now has interactive clips. Before, only `<Waveform>` picked that up from the provider. To keep them static, nest `<ClipInteractionOptions enabled={false}>`.
+- `<Waveform interactiveClips={false}>` inside a `ClipInteractionProvider` never switched interaction off (the provider's value won). `<ClipInteractionOptions enabled={false}>` does.
+- A `ClipInteractionProvider` without `touchOptimized` now inherits it from a `ClipInteractionProvider` or `ClipInteractionOptions` above it. If you nest a plain provider inside `<ClipInteractionProvider touchOptimized>`, the inner one used to have mouse-tuned sensors and 8px handles; it now has the 250ms touch-hold sensors and 24px handles. Set `touchOptimized={false}` on the inner provider to keep what you had.
+- A `ClipInteractionProvider` always makes the clips below it interactive, also inside `<ClipInteractionOptions enabled={false}>`. Put `<ClipInteractionOptions enabled={false}>` inside the provider to switch interaction off.
+- `useClipInteractionEnabled()` used to mean "inside a `ClipInteractionProvider`". It now means "clips here can be dragged and trimmed": also true inside `<ClipInteractionOptions enabled>` with no provider, and false under `<ClipInteractionOptions enabled={false}>` inside one. Do not use it to detect the provider.
+
 ## `selectionStart` and `selectionEnd` move from `usePlaylistState()` to `useSelection()`
 
 **Package:** `@waveform-playlist/browser`.

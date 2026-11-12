@@ -139,7 +139,7 @@ export function App() {
             <PauseButton />
             <StopButton />
           </Controls>
-          <Waveform interactiveClips showClipHeaders />
+          <Waveform showClipHeaders />
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </>

@@ -17,7 +17,7 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
 <WaveformPlaylistProvider tracks={tracks} timescale>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
-    <Waveform showClipHeaders interactiveClips />
+    <Waveform showClipHeaders />
   </BeatsAndBarsProvider>
 </WaveformPlaylistProvider>
 ```
@@ -49,7 +49,7 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 </WaveformPlaylistProvider>
 ```
 
-`ClipInteractionProvider` handles all the drag sensors, collision detection, snap modifiers, and drag handlers internally. The `interactiveClips` prop on `Waveform` is auto-enabled when inside a `ClipInteractionProvider`.
+`ClipInteractionProvider` handles all the drag sensors, collision detection, snap modifiers, and drag handlers internally. Clips inside a `ClipInteractionProvider` can be dragged and trimmed; `Waveform` needs no prop for it.
 
 When `snap` is enabled, the provider reads from `BeatsAndBarsProvider` context:
 - If `scaleMode="beats"` and `snapTo` is `"beat"` or `"bar"` → clips snap to the beat/bar grid
@@ -58,7 +58,7 @@ When `snap` is enabled, the provider reads from `BeatsAndBarsProvider` context:
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `snap` | `boolean` | `false` | Enable snap-to-grid (auto-detects beats vs timescale from context) |
-| `touchOptimized` | `boolean` | `false` | 250ms delay activation for touch input |
+| `touchOptimized` | `boolean` | inherited, `false` at the top | 250ms delay activation for touch input, and wider (24px) clip trim handles |
 
 :::info Advanced: Manual DragDropProvider Setup
 

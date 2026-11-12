@@ -103,6 +103,7 @@ function App() {
 | [WAM! Kick It Up a Notch](https://naomiaro.github.io/waveform-playlist/examples/wam-effects) | Host WAM 2.0 plugins with community library, native GUIs, and mixed Tone+WAM chains |
 | [Recording](https://naomiaro.github.io/waveform-playlist/examples/recording) | Live recording with VU meter and waveform preview |
 | [Multi-Clip](https://naomiaro.github.io/waveform-playlist/examples/multi-clip) | Drag-and-drop clip editing with trim handles |
+| [Custom Drag Setup](https://naomiaro.github.io/waveform-playlist/examples/custom-drag-setup) | The same clip editing with your own `DragDropProvider` and `ClipInteractionOptions` |
 | [Annotations](https://naomiaro.github.io/waveform-playlist/examples/annotations) | Time-synced text with keyboard navigation |
 | [Waveform Data](https://naomiaro.github.io/waveform-playlist/examples/waveform-data) | Pre-computed peaks for fast loading |
 | [MIDI](https://naomiaro.github.io/waveform-playlist/examples/midi) | MIDI file playback with piano roll and SoundFont samples |

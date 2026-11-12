@@ -16,7 +16,7 @@ import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
-import { ClipInteractionContextProvider } from '../contexts/ClipInteractionContext';
+import { ClipInteractionOptions, useClipInteraction } from '../contexts/ClipInteractionContext';
 
 // Stable noop to avoid creating a new function reference on every render
 const NOOP_TRACKS_CHANGE = () => {};
@@ -27,15 +27,23 @@ export interface ClipInteractionProviderProps {
    *  (if present with scaleMode="beats" and snapTo!="off"), otherwise
    *  falls back to timescale-based snapping. Default: false. */
   snap?: boolean;
+  /** Touch-friendly interaction: drag sensors that wait 250ms on touch (so a
+   *  swipe still scrolls) and wider clip trim handles. Left out: inherited from
+   *  a `ClipInteractionOptions` or `ClipInteractionProvider` above (false at
+   *  the top). */
   touchOptimized?: boolean;
   children: React.ReactNode;
 }
 
 export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = ({
   snap = false,
-  touchOptimized = false,
+  touchOptimized: touchOptimizedProp,
   children,
 }) => {
+  // One value for the sensors and for the handles (which `ClipInteractionOptions`
+  // below resolves the same way): the prop, else what is set above.
+  const inherited = useClipInteraction();
+  const touchOptimized = touchOptimizedProp ?? inherited.touchOptimized;
   const { tracks, samplesPerPixel, sampleRate, playoutRef, isDraggingRef, onTracksChange } =
     usePlaylistData();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
@@ -212,7 +220,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, getTracks, samplesPerPixel, sampleRate]);
 
   return (
-    <ClipInteractionContextProvider value={true}>
+    <ClipInteractionOptions enabled touchOptimized={touchOptimized}>
       <DragDropProvider
         sensors={sensors}
         onDragStart={onDragStart}
@@ -223,6 +231,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       >
         {children}
       </DragDropProvider>
-    </ClipInteractionContextProvider>
+    </ClipInteractionOptions>
   );
 };

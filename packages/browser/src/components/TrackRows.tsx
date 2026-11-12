@@ -23,6 +23,7 @@ import {
 } from '../WaveformPlaylistContext';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
+import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import {
   TrackRowPositioner,
@@ -39,9 +40,7 @@ interface ClipDisplayOptions {
   sampleRate: number;
   showClipHeaders: boolean;
   gainScaledWaveforms: boolean;
-  interactiveClips: boolean;
   showFades: boolean;
-  touchOptimized: boolean;
   selectTrack: (trackIndex: number) => void;
   registerSpectrogramCanvas: SpectrogramIntegration['registerSpectrogramCanvas'] | undefined;
   unregisterSpectrogramCanvas: SpectrogramIntegration['unregisterSpectrogramCanvas'] | undefined;
@@ -76,13 +75,14 @@ const ClipView = React.memo(function ClipView({
   sampleRate,
   showClipHeaders,
   gainScaledWaveforms,
-  interactiveClips,
   showFades,
-  touchOptimized,
   selectTrack,
   registerSpectrogramCanvas,
   unregisterSpectrogramCanvas,
 }: ClipViewProps) {
+  // The one source of both options (#690): set by `ClipInteractionProvider`
+  // or `ClipInteractionOptions` above, never passed down as props.
+  const { enabled: interactiveClips, touchOptimized } = useClipInteraction();
   const peaksData = clip.peaks;
   const width = peaksData.length;
 
