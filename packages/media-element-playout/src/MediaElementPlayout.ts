@@ -88,6 +88,11 @@ export class MediaElementPlayout {
       }
     });
 
+    // A play the browser refused is not playing.
+    this.track.on('playrejected', () => {
+      this._isPlaying = false;
+    });
+
     // Re-attach any consumer listeners to the newly created track (covers the
     // first track and the addTrack-replace path).
     this._attachListenersToTrack();
@@ -269,7 +274,7 @@ export class MediaElementPlayout {
 
   /**
    * Subscribe to a lifecycle event (loadedmetadata / play / pause / error /
-   * ended / timeupdate) without reaching into track.element. Listeners are
+   * ended / timeupdate / playrejected) without reaching into track.element. Listeners are
    * retained and re-attached automatically when the source is swapped.
    */
   on<K extends keyof MediaElementTrackEvents>(

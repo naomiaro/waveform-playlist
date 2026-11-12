@@ -101,12 +101,15 @@ interface MediaElementPlaylistProviderProps {
     isContinuousPlay?: boolean;
   };
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
-  onReady?: () => void;
+  onReady?: () => void;                  // the media element has loaded its metadata; once per player. Pass a stable function
+  onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); the provider adds no URL to the message. Pass a stable function
   barWidth?: number;                     // Default: 1
   barGap?: number;                       // Default: 0
   roundedBars?: boolean;                 // Default: false — pill caps, radius barWidth/2
   progressBarWidth?: number;             // Default: barWidth + barGap
-  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout */
+  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.
+   *  It must implement on() and emit 'loadedmetadata' (without it isReady never turns true).
+   *  The provider also listens for 'timeupdate', 'error' and 'playrejected'. */
   createPlayout?: () => MediaElementPlayout;
 }
 ```
@@ -141,10 +144,14 @@ interface MediaElementStateContextValue {
 
 ```typescript
 interface MediaElementControlsContextValue {
-  play: (startTime?: number) => void;
+  // Same rules as WaveformPlaylistProvider's controls.
+  // play: from startTime (default: the cursor); with playDuration it stops by itself and the
+  // cursor rests at the range's end, or at the selection's START when the range is the
+  // highlighted selection (start inside it, end at its end). Queued if the player does not exist yet.
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
-  stop: () => void;
-  seekTo: (time: number) => void;
+  stop: () => void;                      // cursor returns to where playback started (not to 0); while already stopped it does not move
+  seekTo: (time: number) => void;        // while playing: restarts playback at `time`
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
@@ -160,7 +167,8 @@ interface MediaElementControlsContextValue {
 
 ```typescript
 interface MediaElementDataContextValue {
-  duration: number;
+  duration: number;                      // track.waveformData.duration, from the first render (never "0 until loaded")
+  isReady: boolean;                      // media element has loaded its metadata; false again while a replaced player loads. Do NOT gate Play on it: play() before ready is queued or started, and some browsers load metadata only on play
   peaksDataArray: TrackClipPeaks[];
   sampleRate: number;
   waveHeight: number;

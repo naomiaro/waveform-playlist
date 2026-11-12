@@ -196,7 +196,13 @@ Width in pixels of progress bars.
 
 **Type:** `() => void`
 
-Called when the audio track is ready for playback.
+Called when the media element has loaded its metadata: it knows its length and can be played and seeked. Called each time a player's media has loaded: once per player (the player is created again when the track or one of the player options changes), and again if your code calls `playoutRef.current.setSource()`. Not called for a source that cannot be loaded; see `onError`. Some browsers load metadata only when playback is asked for, so do not make Play wait for it. Pass a stable function: a new identity creates the player again.
+
+#### `onError`
+
+**Type:** `(error: Error) => void`
+
+Called when the player could not be created (a missing optional peer, a throwing `createPlayout`, an error from the engine's `addTrack`) and when the media element reports an error (a source that cannot be loaded or decoded, or a network failure during playback, which also ends playback). The provider does not put the source URL in the message. The provider also logs a warning. Pass a stable function.
 
 ## Context Hooks
 
@@ -232,9 +238,13 @@ Playback and annotation controls.
 
 ```typescript
 interface MediaElementControlsContextValue {
-  play: (startTime?: number) => void;
+  // Starts at startTime (default: the cursor). With playDuration it stops by
+  // itself. Before the player exists the play is queued.
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
+  // Returns the cursor to where playback started.
   stop: () => void;
+  // During playback this restarts playback at `time`.
   seekTo: (time: number) => void;
   setPlaybackRate: (rate: number) => void;
   setContinuousPlay: (enabled: boolean) => void;
@@ -253,7 +263,8 @@ Playlist data for rendering.
 
 ```typescript
 interface MediaElementDataContextValue {
-  duration: number;
+  duration: number; // the track's length, from its waveform data; known from the first render
+  isReady: boolean; // the media element has loaded its metadata
   peaksDataArray: TrackClipPeaks[];
   sampleRate: number;
   waveHeight: number;
@@ -307,6 +318,7 @@ interface MediaElementPlaylistProviderProps {
 
   // Callbacks
   onReady?: () => void;
+  onError?: (error: Error) => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
 
   // Waveform rendering
@@ -316,7 +328,8 @@ interface MediaElementPlaylistProviderProps {
   progressBarWidth?: number;
 
   // Custom engine
-  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout */
+  /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.
+   *  It must implement on() and emit 'loadedmetadata'. */
   createPlayout?: () => MediaElementPlayout;
 }
 ```

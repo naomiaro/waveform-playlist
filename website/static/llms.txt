@@ -124,8 +124,8 @@ The combined data / state / animation hooks of earlier majors are removed; the u
 **MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
 1. **useMediaElementAnimation()** — isPlaying, currentTime
 2. **useMediaElementState()** — continuousPlay, annotations, playbackRate
-3. **useMediaElementControls()** — play/pause/stop/seekTo, setPlaybackRate, annotationPreview
-4. **useMediaElementData()** — duration, peaksDataArray, sampleRate, display config
+3. **useMediaElementControls()** — play(start?, duration?) / pause / stop / seekTo with the same rules as the multitrack provider (stop returns the cursor to where playback started; seekTo restarts a running play; a play before the player exists is queued), setPlaybackRate, annotationPreview
+4. **useMediaElementData()** — duration (from the waveform data, known at first render), isReady (media metadata loaded; do not gate Play on it), peaksDataArray, sampleRate, display config
 
 ## Key Hooks
 

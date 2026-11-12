@@ -738,13 +738,96 @@ No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the 
 4. **Automatic scroll positions are whole pixels**, as under `WaveformPlaylistProvider`.
 5. **When the provider replaces its player during playback, `isPlaying` becomes `false`.** The player is replaced when the track's `source`, `waveformData`, `name`, `fadeIn` or `fadeOut` changes, when the `audioContext`, `playbackRate` or `preservesPitch` prop changes, and when `onReady`, `onError` or `createPlayout` gets a new identity. The audio always stopped at that moment; `isPlaying` used to stay `true`, so a Play button stayed disabled and nothing played. Playback does not resume by itself.
 6. **New audio starts at 0.** When the track's `source` or `waveformData` changes, playing or not, the cursor goes to 0 and the active annotation is cleared; before, both were kept, so the old position was applied to the new audio. When the player is replaced for the same audio (any other reason in item 5), both are kept, `currentTime` is brought up to the position playback had reached, and the next `play()` continues from there. `waveformData` is compared by identity, so pass the same object while the audio is the same. The selection is kept either way. To start new audio somewhere else (a saved position per file), call `seekTo` or `setActiveAnnotationId` from a `useEffect` keyed on the source in a component under the provider, or from `onReady`: both run after the reset. A `useLayoutEffect` runs before it and is overwritten.
-7. **`seekTo` clamps to the length of the current track (`track.waveformData.duration`), not to the `duration` value.** `duration` is 0 until the first player is ready and stays at the previous file's length while the next one loads, so a `seekTo` made before the player was ready went to 0, and a position restored for a longer file was cut off at the old file's length. Both now go where they were asked to: the position is shown at once, the player is moved to it when it is ready, and `play()` starts there. Until the player is ready, `currentTime` can therefore be larger than `duration`. `duration` itself is unchanged: it still goes from 0 to the length when the player is ready.
+7. **`seekTo` clamps to the length of the current track (`track.waveformData.duration`), not to the `duration` value.** `duration` is 0 until the first player is ready and stays at the previous file's length while the next one loads, so a `seekTo` made before the player was ready went to 0, and a position restored for a longer file was cut off at the old file's length. Both now go where they were asked to: the position is shown at once, the player is moved to it when it is ready, and `play()` starts there. (At the time of that change `duration` still went from 0 to the length when the player was ready; it is the track's length from the first render since the next entry.)
 
-What a click, a drag and Play do is unchanged. While stopped, a click seeks and a drag highlights a range without moving the cursor. During playback, a click or a drag restarts playback, on release, from where the press landed; a range dragged meanwhile is dropped on release. Playback does not use the selection.
+What a click, a drag and Play do was not changed by this step; the next entry changes it (the cursor follows the start of a dragged range, a press during playback moves playback at once, and a range can be played).
 
 **Find:** `onReady`, `onError` or `createPlayout` passed to `MediaElementPlaylistProvider` as inline functions (`onReady={() => …}`), or a `track` built with inline `fadeIn` / `fadeOut` objects (`fadeIn: { duration: 1 }`), by a component that re-renders during playback: each render replaces the player, and playback now visibly stops. Also a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
 
 **Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so playback stops, the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play, automatic scroll and the active annotation go back to their initial values. The selection is not yet readable or settable from outside the built-in components.
+
+## MediaElement player: Stop, the ends of playback, seeking and the selection follow the multitrack player's rules
+
+**Package:** `@waveform-playlist/browser`.
+
+`MediaElementPlaylistProvider` now plays, stops, seeks and selects the way `WaveformPlaylistProvider` does, so that one set of controls can mean the same thing under both. The hooks keep their names in this step. One signature changes (`play`), one field is added (`isReady`), and the meaning of `duration`, `onReady` and `onError` changes.
+
+| What | Before | Now |
+| --- | --- | --- |
+| `stop()` | cursor to 0 | cursor back to where playback started |
+| The audio plays to its end | cursor to 0 | cursor back to where playback started; the active annotation is cleared |
+| An annotation plays to its end with continuous play off | the provider wrote no position: the playhead showed what the media element reported after rewinding (0 was observed) while `currentTime` kept its old value | cursor back to where playback started (the annotation's start when it was clicked), and `currentTime` agrees |
+| `play` | `(startTime?) => void` | `(startTime?, playDuration?) => Promise<void>`; with `playDuration` it stops by itself and leaves the cursor at the end of the range (two exceptions below). The promise resolves as soon as the play has been handed to the player or queued, not when sound starts |
+| `play()` before the player exists | did nothing | queued: starts when the player arrives, also when it was called from a mount effect. `stop()`, `pause()`, new audio and a player that fails to arrive cancel it; a replacement of the player for the same audio keeps it. `isPlaying` stays `false` until the player has arrived and been started. The cursor ref (`currentTimeRef`) is at the queued start position from the moment of the call; the `currentTime` state follows when the play is cancelled or a seek is made (not when it starts: during playback only the ref advances), and the cursor stays there if the play is cancelled |
+| `seekTo(t)` during playback | moved the media element | restarts playback at `t`, so the track's fades are scheduled again; a range that was playing becomes an open-ended play |
+| A drag on the waveform while stopped | highlighted a range, the cursor stayed | highlights a range and moves the cursor to its start |
+| A press on the waveform during playback | playback moved on release | playback moves on the press; a drag made meanwhile selects nothing |
+| `duration` from `useMediaElementData()` | 0 until the player was created | the length from `track.waveformData`, from the first render |
+| The waveform | "Loading waveform…" until the peaks effect ran | drawn on the first render |
+| `onReady` | called when the player object was created | called when the media element has loaded its metadata (it knows its length and can be played and seeked) |
+| A source that cannot be loaded or decoded | nothing | `onError` is called with an `Error` ("Media failed to load (code …)"; the provider does not add the URL to the message, because it may carry a token. The text after the code is the browser's own), and the player never becomes ready |
+| A media error during playback (the network drops) | `isPlaying` stayed `true` with no sound | playback ends where it was (`isPlaying` `false`, cursor kept) and `onError` is called |
+| The browser refuses to start playback (no user gesture, typically for a play from a mount effect or a queued play) | `isPlaying` stayed `true` with no sound | `isPlaying` goes back to `false`, cursor kept. Needs `@waveform-playlist/media-element-playout` from the same release (its new `playrejected` event). Not yet in one case with the `audioContext` prop: while that context is suspended the engine waits for it to resume, a browser may leave that pending when there was no user gesture, and `isPlaying` then stays `true` as before (#783) |
+| `stop()` while already stopped | cursor to 0 | the cursor does not move, unless playback is paused (then it returns to where playback started; a pause followed by a replacement of the player for the same audio counts as stopped) |
+| `createPlayout` | any object with the playout's methods | must also implement `on()` and emit `loadedmetadata`; without `on()` the provider calls `onError` |
+
+**Where playback started** is the `startTime` of the last `play()`, or the cursor when it was called without one; for selection playback it is the start of the selection. A `seekTo` or a press on the waveform replaces it with the new position, during playback as well as while stopped. Wherever playback comes to rest by itself (the end of a range, of an annotation or of the audio, an error) is the new starting point too, so a `stop()` while stopped does not move the cursor. A `stop()` while a play is queued cancels it and leaves the cursor at that play's starting point (the start of the selection for a queued selection playback). To go back to the beginning, call `seekTo(0)`.
+
+**Ranges.** A range rests at its own end, with two exceptions. (1) When an annotation is active and continuous play is off, playback stops at that annotation's end if it comes first, and the cursor returns to where playback started. The annotation keyboard controls (`useAnnotationKeyboardControls` with `onPlay: play`) now play a real range for this reason: their duration argument used to be ignored. (2) Selection playback: a `play(start, duration)` that starts inside the highlighted range and ends at its end stops there and returns the cursor to the START of the selection, also when it was resumed part-way after a pause, and continuous play has no effect on it. The selection cannot be read from outside the built-in components yet, and no built-in control passes a duration, so in this step selection playback is reached only by code that knows the range it highlighted; the shared Play button of the next step uses it. `play()` without a duration is open-ended from the cursor, selection or not.
+
+**In a hidden tab** animation frames stop while the audio goes on. A range and an annotation are still ended there, from the media element's `timeupdate` event. Browsers fire it about four times a second of real time, so the stop can be late by that much (more audio at a higher playback rate). This path is covered by unit tests that fire the event with no animation frame; it has not been checked in a really hidden tab.
+
+**`isReady` is not a condition for Play.** Some browsers do not load metadata before the first play (iOS on a cellular connection or in low-data mode may ignore `preload`; not verified here). There `isReady` and `onReady` come only after playback has been asked for. Do not disable a Play button on `isReady`: `play()` works before the player is ready. Other things to know: `onReady` is called again if your code calls `playoutRef.current.setSource()`; an effect keyed on `isReady` runs again each time the player is replaced; and an exception thrown inside `onReady` is caught and logged by the engine's event emitter (it used to reach `onError`).
+
+**Find:**
+
+- `stop()` from `useMediaElementControls()` used as "rewind": code that reads `currentTime` or `currentTimeRef` after a stop and expects 0.
+- An effect that lists `duration` (from `useMediaElementData()`) as a dependency in order to run again "when the player is ready", or a guard such as `duration === 0` / `duration > 0` used as "is it loaded".
+- `onReady` used as "the player object exists" (for example to read `playoutRef.current` early). It is now later, and it is not called at all for a source that fails to load.
+- A custom `createPlayout`.
+- Code that awaits or ignores the return value of `play()`: it is a promise now, and a `try { play() } catch` no longer catches anything (use `.catch`).
+- A Play button disabled on "not loaded yet".
+- An `onError` handler that assumes the player could not be created (a message such as "init failed", or unmounting the player): it is now also called for media that fails to load, possibly in the middle of playback.
+
+**Replace with:**
+
+```tsx
+// Before: Stop also rewound
+<button onClick={() => stop()}>Stop</button>
+
+// After: Stop returns to where playback started; rewinding is its own action
+<button onClick={() => stop()}>Stop</button>
+<button onClick={() => seekTo(0)}>Rewind</button>
+```
+
+```tsx
+// Before: `duration` went from 0 to the length when the player was created
+const { playoutRef, duration } = useMediaElementData();
+useEffect(() => {
+  const outputNode = playoutRef.current?.outputNode;
+  if (!outputNode) return;
+  // …wire it up
+}, [playoutRef, duration]);
+
+// After: `isReady` is the signal
+const { playoutRef, isReady } = useMediaElementData();
+useEffect(() => {
+  const outputNode = playoutRef.current?.outputNode;
+  if (!outputNode) return;
+  // …wire it up
+}, [playoutRef, isReady]);
+```
+
+```tsx
+// Before: nothing told you that the file was missing
+<MediaElementPlaylistProvider track={track}>
+
+// After: pass a stable onError to show it
+const handleError = useCallback((error: Error) => setProblem(error.message), []);
+<MediaElementPlaylistProvider track={track} onError={handleError}>
+```
+
+A custom playout created from the package's own `MediaElementPlayout` class needs no change. One written from scratch needs `on(event, listener)`. The provider subscribes to four events: `loadedmetadata` must be emitted (without it the player is never ready); `timeupdate` (the position, used as the hidden-tab fallback), `error` and `playrejected` are optional to emit. `getTrack()` is no longer called.
 
 ## Keyboard shortcuts yield to the focused control
 

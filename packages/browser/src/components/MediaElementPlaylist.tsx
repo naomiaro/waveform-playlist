@@ -128,7 +128,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   const { isPlaying } = useMediaElementAnimation();
   // No annotation state here: it changes at every annotation boundary during
   // playback, and only MediaElementAnnotationBoxes needs it (#744).
-  const { play, seekTo, setScrollContainer } = useMediaElementControls();
+  const { setScrollContainer } = useMediaElementControls();
   const {
     duration,
     peaksDataArray,
@@ -137,7 +137,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     timeScaleHeight,
     samplesPerPixel,
     controls,
-    playoutRef,
     barWidth,
     barGap,
     roundedBars,
@@ -199,10 +198,14 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   };
 
   const handleDragMove = (e: MouseEvent) => {
+    // During playback the press was a seek; a range is not drawn over it.
+    if (isPlaying) return;
     const moveTime = dragTimeAt(e.clientX);
     if (moveTime === null) return;
-    // From where the press landed to the pointer.
-    setSelection(mouseDownTimeRef.current, moveTime);
+    // From where the press landed to the pointer, in order: the cursor
+    // follows the start of the selection.
+    const anchor = mouseDownTimeRef.current;
+    setSelection(Math.min(anchor, moveTime), Math.max(anchor, moveTime));
   };
 
   const handleDragEnd = (e: MouseEvent | null) => {
@@ -212,17 +215,11 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     // selection as the last move left it.
     if (e === null) return;
 
-    // During playback, use the time captured at mouseDown — auto-scroll shifts the
-    // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
-    // would produce a wrong (shifted) position.
-    if (isPlaying && playoutRef.current) {
-      const clickTime = Math.max(0, mouseDownTimeRef.current);
-      seekTo(clickTime);
-      setSelection(clickTime, clickTime);
-      playoutRef.current.stop();
-      play(clickTime);
-      return;
-    }
+    // During playback the press was the seek (`setSelection` restarts a
+    // running play at a collapsed selection) and moves were ignored: there is
+    // nothing left to do, and the release position must not be used anyway
+    // (auto-scroll shifts the overlay between the press and the release).
+    if (isPlaying) return;
 
     const endTime = dragTimeAt(e.clientX);
     if (endTime === null) return;
@@ -233,7 +230,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
     // If it's just a click (not a drag), seek to that position
     if (Math.abs(end - start) < 0.1) {
-      seekTo(start);
       setSelection(start, start);
     } else {
       // It was a drag - finalize the selection

@@ -137,6 +137,8 @@ playout.on('loadedmetadata', () => console.log('duration:', playout.duration));
 playout.on('play', () => updateTransportUI('playing'));
 playout.on('pause', () => updateTransportUI('paused'));
 playout.on('error', (err) => surfaceError(err));
+// The browser did not start a play() (no user gesture, unplayable source)
+playout.on('playrejected', (err) => updateTransportUI('paused'));
 playout.off('play', handler); // unsubscribe
 ```
 

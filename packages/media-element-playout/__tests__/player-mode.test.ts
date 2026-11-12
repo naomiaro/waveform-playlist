@@ -275,9 +275,7 @@ describe('setSource() / in-place source swap', () => {
     playout.addTrack({ source: 'a.mp3' });
     playout.addTrack({ source: 'b.mp3' }); // replace via addTrack → warns
 
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Only one track is supported')
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Only one track is supported'));
     warnSpy.mockRestore();
   });
 
@@ -312,5 +310,203 @@ describe('setSource() / in-place source swap', () => {
 
     playout.setSource({ source: 'b.mp3' });
     expect(playout.isPlaying).toBe(false);
+  });
+});
+
+describe('a play() the browser does not start', () => {
+  const flush = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  it("emits 'playrejected' and is no longer playing when the element refuses", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    const refused = Object.assign(new Error('no user gesture'), { name: 'NotAllowedError' });
+    created[0].play.mockImplementation(() => Promise.reject(refused));
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    expect(playout.isPlaying).toBe(true);
+    await flush();
+
+    expect(onRejected).toHaveBeenCalledExactlyOnceWith(refused);
+    expect(playout.isPlaying).toBe(false);
+    vi.restoreAllMocks();
+  });
+
+  it('says nothing when the play was only interrupted (AbortError)', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3' });
+    // Not an `Error` on purpose: an element from another frame rejects with
+    // that frame's DOMException, which fails `instanceof Error` here. Only
+    // the name can be relied on.
+    const aborted = { name: 'AbortError', message: 'interrupted by pause' };
+    created[0].play.mockImplementation(() => Promise.reject(aborted));
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    await flush();
+
+    expect(onRejected).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    expect(playout.isPlaying).toBe(true);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('a start that waits for a suspended AudioContext', () => {
+  // The smallest AudioContext the track needs: nodes that connect, and a
+  // resume() the test settles by hand. EVERY pending resume() is settled, as
+  // a real context does: two play() calls leave two starts waiting.
+  function createSuspendedContext() {
+    const node = () => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      gain: {
+        value: 1,
+        setValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+        cancelScheduledValues: vi.fn(),
+        setValueCurveAtTime: vi.fn(),
+      },
+    });
+    let pending: Array<{ resolve: () => void; reject: (reason: unknown) => void }> = [];
+    const context = {
+      state: 'suspended',
+      currentTime: 0,
+      destination: {},
+      createMediaElementSource: vi.fn(node),
+      createGain: vi.fn(node),
+      resume: vi.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            pending.push({ resolve, reject });
+          })
+      ),
+    };
+    return {
+      context: context as unknown as AudioContext,
+      resumed: async () => {
+        context.state = 'running';
+        const settling = pending;
+        pending = [];
+        settling.forEach((entry) => entry.resolve());
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+      refused: async (reason: unknown) => {
+        const settling = pending;
+        pending = [];
+        settling.forEach((entry) => entry.reject(reason));
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+    };
+  }
+
+  it('starts the element once the context has resumed', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    expect(created[0].play).not.toHaveBeenCalled();
+    await resumed();
+    expect(created[0].play).toHaveBeenCalledTimes(1);
+    expect(created[0].currentTime).toBe(2);
+  });
+
+  it.each(['pause', 'stop'] as const)(
+    'does not start after a %s() that came while it waited',
+    async (action) => {
+      const { context, resumed } = createSuspendedContext();
+      const playout = new MediaElementPlayout();
+      playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+      playout.play(undefined, 2);
+      playout[action]();
+      await resumed();
+
+      expect(created[0].play).not.toHaveBeenCalled();
+    }
+  );
+
+  it('a newer play() replaces the one that was waiting', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    playout.play(undefined, 5);
+    await resumed();
+
+    expect(created[0].play).toHaveBeenCalledTimes(1);
+    expect(created[0].currentTime).toBe(5);
+  });
+
+  it('does not start after the source was swapped while it waited', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    playout.setSource({ source: 'b.mp3' });
+    expect(created[0].load).toHaveBeenCalledTimes(1);
+    await resumed();
+
+    expect(created[0].play).not.toHaveBeenCalled();
+  });
+
+  it('does not start after the playout was disposed while it waited', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    playout.dispose();
+    await resumed();
+
+    expect(created[0].play).not.toHaveBeenCalled();
+  });
+
+  it("two plays waiting when resume() rejects: 'playrejected' once, for the newer", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { context, refused } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    playout.play(undefined, 5);
+    await refused(new Error('not allowed'));
+
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
+  it("emits 'playrejected' when resume() rejects, unless the play was cancelled first", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const first = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: first.context });
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    await first.refused(new Error('not allowed'));
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(playout.isPlaying).toBe(false);
+
+    playout.play(undefined, 2);
+    playout.pause();
+    await first.refused(new Error('not allowed'));
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
   });
 });

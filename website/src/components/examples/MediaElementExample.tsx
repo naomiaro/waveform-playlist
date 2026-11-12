@@ -218,7 +218,9 @@ function StartAtQueryTime() {
  * Bridge pattern: native GainNode → Tone.Gain.input (native→native) → Tone effect chain
  */
 function EffectWiring() {
-  const { playoutRef, duration } = useMediaElementData();
+  // `isReady` turns true when the player exists and its media has loaded;
+  // it is what makes this effect run again once `playoutRef` is set.
+  const { playoutRef, isReady } = useMediaElementData();
   const audioContext = getGlobalAudioContext();
 
   // Wire the effect chain after the AudioContext is running (user gesture).
@@ -289,7 +291,7 @@ function EffectWiring() {
       crusher?.dispose();
       bridge?.dispose();
     };
-  }, [playoutRef, audioContext, duration]);
+  }, [playoutRef, audioContext, isReady]);
 
   return null;
 }

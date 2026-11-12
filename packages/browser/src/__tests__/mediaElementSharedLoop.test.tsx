@@ -118,6 +118,11 @@ function createFakePlayout() {
     addTrack: vi.fn(),
     getTrack: () => undefined,
     setOnPlaybackComplete() {},
+    // Reports its metadata as soon as it is asked: "ready" right after creation.
+    on(event: string, listener: () => void) {
+      if (event === 'loadedmetadata') queueMicrotask(listener);
+    },
+    off() {},
     play: vi.fn((_when?: number, offset?: number) => {
       fake.time = offset ?? 0;
     }),
@@ -254,7 +259,7 @@ async function mount(options: MountOptions = {}) {
     </Wrapper>
   );
   const view = render(tree(true));
-  await waitFor(() => expect(probe.data.duration).toBe(SECONDS));
+  await waitFor(() => expect(probe.data.isReady).toBe(true));
   await waitFor(() => expect(document.querySelector('[data-playhead]')).not.toBeNull());
   await act(async () => {});
   return {
@@ -337,14 +342,18 @@ describe('MediaElement selection lives in the provider', () => {
     expect(selections()[0].style.width).toBe('140px');
   });
 
-  it('a click collapses the selection and seeks; a drag does not seek', async () => {
+  it('a drag puts the cursor at its start and seeks once; a click collapses the selection and seeks', async () => {
     const { playout } = await mount();
     const overlay = clickOverlay();
     await press(overlay, 100);
+    expect(playout.seekTo).toHaveBeenCalledExactlyOnceWith(seconds(100));
+    // A rightward drag keeps its start: the media element is not seeked per move.
+    await moveTo(150);
     await moveTo(200);
     await release(200);
-    expect(playout.seekTo).not.toHaveBeenCalled();
-    expect(probe.animation.currentTime).toBe(0);
+    expect(playout.seekTo).toHaveBeenCalledTimes(1);
+    expect(probe.animation.currentTime).toBe(seconds(100));
+    playout.seekTo.mockClear();
 
     await press(overlay, 150);
     await release(150);
@@ -417,19 +426,25 @@ describe('MediaElement selection lives in the provider', () => {
     await release(200);
   });
 
-  it('playing ignores the selection, and a press during playback restarts there', async () => {
+  it('controls.play() alone plays on from the cursor, and a press during playback restarts there', async () => {
     const { playout } = await mount();
     const overlay = clickOverlay();
     await press(overlay, 100);
     await moveTo(200);
     await release(200);
 
+    // The drag left the cursor at the selection's start. Without a duration
+    // this is an open-ended play: playing the selection is the caller's
+    // choice (`play(start, end - start)`), as under the WebAudio provider.
     await act(async () => probe.controls.play());
-    expect(playout.play).toHaveBeenLastCalledWith(undefined, 0);
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(100));
+    playout.time = seconds(250);
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
 
     await press(overlay, 250);
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(250));
     await release(300);
-    expect(playout.stop).toHaveBeenCalledTimes(1);
     expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(250));
     expect(selections()).toHaveLength(0);
     await act(async () => probe.controls.stop());
@@ -709,7 +724,11 @@ describe('MediaElement annotation playback goes through the shared loop step', (
 
     playout.time = 2;
     await runFrame();
-    expect(playout.stop).toHaveBeenCalledTimes(1);
+    // Paused and moved back to where playback started, not rewound to 0 by
+    // the engine's stop() (#688).
+    expect(playout.pause).toHaveBeenCalledTimes(1);
+    expect(playout.stop).not.toHaveBeenCalled();
+    expect(playout.seekTo).toHaveBeenLastCalledWith(0);
     expect(probe.animation.isPlaying).toBe(false);
     expect(probe.state.activeAnnotationId).toBe('n1');
     // The loop ended with the playback: no further frame is requested.
@@ -805,6 +824,7 @@ describe('MediaElement public hook values are unchanged by #769', () => {
         'barGap',
         'barWidth',
         'controls',
+        'isReady',
         'duration',
         'fadeIn',
         'fadeOut',

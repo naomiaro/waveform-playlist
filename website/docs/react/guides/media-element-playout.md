@@ -123,7 +123,7 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 
 // Inside a child component of MediaElementPlaylistProvider:
 function EffectWiring() {
-  const { playoutRef, duration } = useMediaElementData();
+  const { playoutRef, isReady } = useMediaElementData();
   const audioContext = getGlobalAudioContext();
 
   useEffect(() => {
@@ -175,7 +175,7 @@ function EffectWiring() {
       crusher?.dispose();
       bridge?.dispose();
     };
-  }, [playoutRef, audioContext, duration]);
+  }, [playoutRef, audioContext, isReady]);
 
   return null;
 }
@@ -185,16 +185,28 @@ function EffectWiring() {
 
 The key insight: `Tone.Gain.input` is a native `GainNode`, so `outputNode.connect(bridge.input)` is a standard Web Audio native-to-native connection. From the bridge onward, Tone.js manages the effect chain. Tone.js must be dynamically imported (`await import('tone')`) after the `AudioContext` is running to avoid AudioWorklet errors on suspended contexts. See the [Media Element example](/examples/media-element) for a working demo.
 
+## Playback Rules
+
+The controls follow the same rules as `WaveformPlaylistProvider`'s:
+
+- `stop()`, the audio reaching its end, and an annotation reaching its end with continuous play off all return the cursor to where playback started. `seekTo(0)` rewinds.
+- `play(start, duration)` plays a range and stops; the cursor rests at the end of the range. If an annotation is active and continuous play is off, playback stops at that annotation's end when it comes first.
+- `play()` called before the player exists is queued and starts when the player arrives. Do not wait for `isReady` before enabling Play.
+- If the media fails during playback, or the browser refuses to start playback (no user gesture), `isPlaying` goes back to `false`. One case is not detected yet: with the `audioContext` prop, while that context is still suspended and the browser leaves its resume pending ([#783](https://github.com/naomiaro/waveform-playlist/issues/783)).
+- `seekTo(time)` during playback restarts playback at `time`. A `stop()` while already stopped does not move the cursor.
+- A drag on the waveform highlights a range and moves the cursor to its start. During playback a press moves playback there and a drag selects nothing.
+- `duration` is the length from the track's waveform data and is known from the first render. `isReady` (and the `onReady` prop) tell you that the media element has loaded; `onError` tells you that it could not.
+
 ## Context Hooks
 
 `MediaElementPlaylistProvider` uses 4 split contexts, matching the pattern of `WaveformPlaylistProvider`:
 
 | Hook | Frequency | Key returns |
 |------|-----------|-------------|
-| `useMediaElementAnimation()` | On play/pause/stop/seek | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
+| `useMediaElementAnimation()` | On play/pause/stop/seek, and on each move of a leftward selection drag | `isPlaying`, `currentTime`, `currentTimeRef` (ref updates at 60fps) |
 | `useMediaElementState()` | Medium | `playbackRate`, `annotations`, `activeAnnotationId`, `continuousPlay`, `isAutomaticScroll` |
 | `useMediaElementControls()` | Stable | `play`, `pause`, `stop`, `seekTo`, `setPlaybackRate`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `setContinuousPlay`, `setAutomaticScroll` |
-| `useMediaElementData()` | Stable | `duration`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `fadeIn`, `fadeOut`, `playoutRef` |
+| `useMediaElementData()` | Stable | `duration`, `isReady`, `peaksDataArray`, `sampleRate`, `samplesPerPixel`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `fadeIn`, `fadeOut`, `playoutRef` |
 
 ## Live Example
 

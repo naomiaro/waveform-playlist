@@ -40,6 +40,11 @@ function createFakePlayout() {
     addTrack: vi.fn(),
     getTrack: () => undefined,
     setOnPlaybackComplete() {},
+    // Reports its metadata as soon as it is asked: "ready" right after creation.
+    on(event: string, listener: () => void) {
+      if (event === 'loadedmetadata') queueMicrotask(listener);
+    },
+    off() {},
     play: vi.fn(),
     pause() {},
     stop() {},
@@ -54,6 +59,7 @@ type Controls = ReturnType<typeof useMediaElementControls>;
 
 let probe: {
   controls: Controls;
+  isReady: boolean;
   duration: number;
   currentTime: number;
   isAutomaticScroll: boolean;
@@ -65,6 +71,7 @@ const ProbeChild: React.FC = () => {
   const controls = useMediaElementControls();
   probe = {
     controls,
+    isReady: useMediaElementData().isReady,
     duration: useMediaElementData().duration,
     currentTime: useMediaElementAnimation().currentTime,
     isAutomaticScroll: useMediaElementState().isAutomaticScroll,
@@ -83,10 +90,12 @@ async function mount() {
       <ProbeChild />
     </MediaElementPlaylistProvider>
   );
-  // The first render is before the playout has loaded.
-  expect(probe.duration).toBe(0);
+  // The first render is before the player is ready. The duration is known
+  // from the waveform data all along (#688).
+  expect(probe.isReady).toBe(false);
+  expect(probe.duration).toBe(SECONDS);
   const first = probe.controls;
-  await waitFor(() => expect(probe.duration).toBe(SECONDS));
+  await waitFor(() => expect(probe.isReady).toBe(true));
   await act(async () => {});
   return { playout, first };
 }
@@ -99,14 +108,14 @@ afterEach(async () => {
 });
 
 describe('MediaElement controls value (#767)', () => {
-  it('is the same object before and after the duration loads', async () => {
+  it('is the same object before and after the player is ready', async () => {
     const { first } = await mount();
 
     expect(probe.controls).toBe(first);
     expect(controlsSeen).toHaveLength(1);
   });
 
-  it('a seekTo captured before the duration loaded clamps to the loaded duration', async () => {
+  it("a seekTo captured before the player was ready clamps to the track's length", async () => {
     const { playout, first } = await mount();
 
     await act(async () => {
