@@ -102,8 +102,9 @@ interface PlayheadProps {
   /**
    * The time to draw the playhead at, in seconds. The provider keeps it current
    * on every frame of playback, and on a seek, a stop and the end of playback
-   * (after a pause under MediaElementPlaylistProvider it holds the last frame's
-   * time, within a frame of the paused position). Under
+   * (after a pause under MediaElementPlaylistProvider it is not rewritten: it
+   * holds the last time the loop or the element's `timeupdate` reported,
+   * normally within a frame of the paused position). Under
    * WaveformPlaylistProvider it is the audible time while playing (raw minus
    * output latency and look-ahead); under MediaElementPlaylistProvider it is
    * the same ref as currentTimeRef.

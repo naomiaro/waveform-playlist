@@ -10,7 +10,8 @@ One playhead, one progress overlay, one selection highlight and one custom-playh
 - `MediaElementPlaylistProvider`: the resting playhead (default or custom) is hidden while a range is highlighted, as it always was under `WaveformPlaylistProvider`; it is shown during playback and when the selection is collapsed.
 - `MediaElementPlaylistProvider`: the progress overlay is as wide as the clip (before: as wide as the peak data, one pixel wider on the example pages).
 - `WaveformPlaylistProvider`: two visualizations under one provider each animate their default playhead (before: they shared one frame-callback id and only one moved).
-- `WaveformPlaylistProvider`: the background of a selected channel falls back to the unselected colour when the theme's selected colour is explicitly `undefined` or empty (the canvas colours do not). The default playhead no longer registers its frame callback under the id `'playhead'`, so a consumer callback with that id is no longer replaced by it. `PlayheadWithMarker` rendered directly needs `visualTimeRef`.
+- `WaveformPlaylistProvider`: the background of a selected channel falls back to the unselected colour when the theme's selected colour is explicitly `undefined` or empty (the canvas colours do not). The default playhead no longer registers its frame callback under the id `'playhead'`, so a consumer callback with that id is no longer replaced by it.
+- `PlayheadWithMarker` rendered directly (not through `renderPlayhead`) needs `visualTimeRef`.
 - The `usePlaybackRefs()` value is a plain object again: the eight fields that moved to `useEngineRefs()` in part 2 read `undefined` there (they threw in the unreleased part 2).
 
 See "One playhead and one progress overlay for both providers" in the upgrade guide.

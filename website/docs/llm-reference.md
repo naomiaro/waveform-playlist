@@ -1828,7 +1828,7 @@ interface PlayheadProps {
   currentTimeRef: React.RefObject<number>; // raw position, seconds
   // Time to draw at, seconds; kept current per frame of playback and on a
   // seek, a stop and the end of playback. MediaElement: the same ref as
-  // currentTimeRef (after a pause: the last frame's time).
+  // currentTimeRef (after a pause: the last reported time).
   visualTimeRef: React.RefObject<number>;
   samplesPerPixel: number; // x = (time * sampleRate) / samplesPerPixel
   sampleRate: number;
