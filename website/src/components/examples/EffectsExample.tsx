@@ -151,6 +151,7 @@ const StyledDropZone = styled(FileDropZone)`
   margin-top: 1rem;
 `;
 
+
 const ControlsWrapper = styled.div`
   position: relative;
 `;
@@ -161,10 +162,7 @@ interface FrequencyVisualizerProps {
   isDarkMode?: boolean;
 }
 
-const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({
-  analyserRef,
-  isDarkMode = true,
-}) => {
+const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, isDarkMode = true }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasAnalyser, setHasAnalyser] = useState(false);
   const gradientRef = useRef<CanvasGradient | null>(null);
@@ -202,20 +200,20 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({
     const barGradient = canvasCtx.createLinearGradient(0, scaledHeight, 0, 0);
     if (isDarkMode) {
       // Industrial Berlin palette - green to amber to red
-      barGradient.addColorStop(0, '#2d4a2d'); // Dark green at bottom (quiet)
-      barGradient.addColorStop(0.3, '#63C75F'); // Ampelmännchen green
-      barGradient.addColorStop(0.5, '#8fa563'); // Olive transition
-      barGradient.addColorStop(0.7, '#c49a6c'); // Warm amber
+      barGradient.addColorStop(0, '#2d4a2d');    // Dark green at bottom (quiet)
+      barGradient.addColorStop(0.3, '#63C75F');  // Ampelmännchen green
+      barGradient.addColorStop(0.5, '#8fa563');  // Olive transition
+      barGradient.addColorStop(0.7, '#c49a6c');  // Warm amber
       barGradient.addColorStop(0.85, '#d08070'); // Muted red
-      barGradient.addColorStop(1, '#a85050'); // Deep red at top (loud/clipping)
+      barGradient.addColorStop(1, '#a85050');    // Deep red at top (loud/clipping)
     } else {
       // Light mode - similar palette, slightly muted
-      barGradient.addColorStop(0, '#4a6b4a'); // Muted green at bottom
-      barGradient.addColorStop(0.3, '#5ab354'); // Green
-      barGradient.addColorStop(0.5, '#7a9a5a'); // Olive
-      barGradient.addColorStop(0.7, '#b08860'); // Amber
+      barGradient.addColorStop(0, '#4a6b4a');    // Muted green at bottom
+      barGradient.addColorStop(0.3, '#5ab354');  // Green
+      barGradient.addColorStop(0.5, '#7a9a5a');  // Olive
+      barGradient.addColorStop(0.7, '#b08860');  // Amber
       barGradient.addColorStop(0.85, '#c07060'); // Coral
-      barGradient.addColorStop(1, '#a05050'); // Deep red at top
+      barGradient.addColorStop(1, '#a05050');    // Deep red at top
     }
     gradientRef.current = barGradient;
 
@@ -312,12 +310,7 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({
       }
 
       // Add floor reflection effect - industrial look
-      const reflectionGradient = canvasCtx.createLinearGradient(
-        0,
-        scaledHeight - 8,
-        0,
-        scaledHeight
-      );
+      const reflectionGradient = canvasCtx.createLinearGradient(0, scaledHeight - 8, 0, scaledHeight);
       reflectionGradient.addColorStop(0, 'transparent');
       reflectionGradient.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
       canvasCtx.fillStyle = reflectionGradient;
@@ -505,14 +498,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
       setIsExportingZip(false);
       setZipProgress(0);
     }
-  }, [
-    contextTracks,
-    trackStates,
-    exportWav,
-    applyEffectsToExport,
-    offlineEffectsFunction,
-    createOfflineTrackEffects,
-  ]);
+  }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
   // Render custom track controls using the track effects manager
   // Stable, so the track control panels are not re-rendered by this
@@ -529,17 +515,14 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   );
 
   // Handle dropped/selected audio files
-  const handleFiles = useCallback(
-    async (files: File[]) => {
-      const audioFiles = files.filter((file) => file.type.startsWith('audio/'));
-      if (audioFiles.length === 0) return;
+  const handleFiles = useCallback(async (files: File[]) => {
+    const audioFiles = files.filter(file => file.type.startsWith('audio/'));
+    if (audioFiles.length === 0) return;
 
-      const audioContext = getGlobalAudioContext();
-      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-      if (newTracks.length > 0) onAddTracks(newTracks);
-    },
-    [onAddTracks]
-  );
+    const audioContext = getGlobalAudioContext();
+    const newTracks = await decodeAudioFiles(audioContext, audioFiles);
+    if (newTracks.length > 0) onAddTracks(newTracks);
+  }, [onAddTracks]);
 
   return (
     <>
@@ -553,11 +536,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
-          {isLoading && (
-            <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>
-              Loading: {loadedCount}/{totalCount}
-            </span>
-          )}
+          {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
         </ControlsRow>
         <VisualizerWrapper>
           <FrequencyVisualizer analyserRef={analyserRef} isDarkMode={isDarkMode} />
@@ -627,11 +606,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           ) : (
             <ExportWavButton
               label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
-              filename={
-                exportMode === 'master'
-                  ? 'mix'
-                  : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`
-              }
+              filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
               mode={exportMode}
               trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
               applyEffects={applyEffectsToExport}
@@ -668,48 +643,34 @@ export function EffectsExample() {
 
   // Create dynamic effects manager for master effects
   const effectsManager = useDynamicEffects(256);
-  const {
-    analyserRef,
-    masterEffects,
-    addEffect: addMasterEffect,
-    createOfflineEffectsFunction,
-  } = effectsManager;
+  const { analyserRef, masterEffects, addEffect: addMasterEffect, createOfflineEffectsFunction } = effectsManager;
 
   // Create track effects manager
   const trackEffectsManager = useTrackDynamicEffects();
   const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction } = trackEffectsManager;
 
   // Track configurations - Albert Kader "Ubiquitous" minimal techno
-  const audioConfigs = React.useMemo(
-    () => [
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-        name: 'Kick',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-        name: 'Bass',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
-        name: 'HiHat',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-        name: 'Synth',
-      },
-    ],
-    []
-  );
+  const audioConfigs = React.useMemo(() => [
+    {
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+      name: 'Kick',
+    },
+    {
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+      name: 'Bass',
+    },
+    {
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
+      name: 'HiHat',
+    },
+    {
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+      name: 'Synth',
+    },
+  ], []);
 
   // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const {
-    tracks: loadedTracks,
-    loading,
-    error,
-    loadedCount,
-    totalCount,
-  } = useAudioTracks(audioConfigs, { immediate: true });
+  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
 
   // Update local state as tracks finish loading
   useEffect(() => {
@@ -751,27 +712,26 @@ export function EffectsExample() {
   }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
 
   // Handle delete track
-  const handleDeleteTrack = useCallback(
-    (trackIndex: number) => {
-      const trackToDelete = tracks[trackIndex];
-      if (trackToDelete) {
-        // Clear effects for this track
-        clearTrackEffects(trackToDelete.id);
-      }
-      setTracks((prevTracks) => prevTracks.filter((_, index) => index !== trackIndex));
-    },
-    [tracks, clearTrackEffects]
-  );
+  const handleDeleteTrack = useCallback((trackIndex: number) => {
+    const trackToDelete = tracks[trackIndex];
+    if (trackToDelete) {
+      // Clear effects for this track
+      clearTrackEffects(trackToDelete.id);
+    }
+    setTracks(prevTracks => prevTracks.filter((_, index) => index !== trackIndex));
+  }, [tracks, clearTrackEffects]);
 
   // Handle add tracks
   const handleAddTracks = useCallback((newTracks: ClipTrack[]) => {
-    setTracks((prevTracks) => [...prevTracks, ...newTracks]);
+    setTracks(prevTracks => [...prevTracks, ...newTracks]);
   }, []);
 
   if (loadError) {
     return (
       <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {loadError}</div>
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {loadError}
+        </div>
       </Container>
     );
   }

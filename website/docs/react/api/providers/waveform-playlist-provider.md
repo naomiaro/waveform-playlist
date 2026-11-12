@@ -407,7 +407,9 @@ interface PlaylistControlsContextValue {
 }
 ```
 
-### View settings (usePlaylistView)
+### View (usePlaylistView)
+
+What the provider was configured with. Changes on a prop change, not on a settings click.
 
 ```typescript
 interface PlaylistViewContextValue {
@@ -420,12 +422,21 @@ interface PlaylistViewContextValue {
   roundedBars: boolean;
   progressBarWidth: number;
   mono: boolean;
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
   /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
   indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
+}
+```
+
+### Settings (usePlaylistSettings)
+
+The two settings a user toggles. Changes when the user changes either.
+
+```typescript
+interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 ```
 
@@ -441,7 +452,7 @@ interface PlaylistZoomContextValue {
 
 ### Timeline (usePlaylistTimeline)
 
-Changes on every clip operation and on every pointer move of a trim.
+Changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level); also when loading finishes (`isReady`) and when peaks arrive.
 
 ```typescript
 interface PlaylistTimelineContextValue {
@@ -455,7 +466,7 @@ interface PlaylistTimelineContextValue {
 
 ### Mixer (usePlaylistMixer)
 
-Changes on every step of a volume or pan slider.
+Changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered.
 
 ```typescript
 interface PlaylistMixerContextValue {

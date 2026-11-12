@@ -185,9 +185,7 @@ export function CustomDragSetupExample() {
   }, []);
 
   if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
-    );
+    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>;
   }
 
   return (

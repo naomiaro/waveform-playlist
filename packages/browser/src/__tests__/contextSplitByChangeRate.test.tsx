@@ -15,6 +15,7 @@ import {
   WaveformPlaylistProvider,
   usePlaylistControls,
   usePlaylistView,
+  usePlaylistSettings,
   usePlaylistZoom,
   usePlaylistTimeline,
   usePlaylistMixer,
@@ -93,6 +94,7 @@ function createFakeAdapter(): PlayoutAdapter {
 // it rendered.
 const HOOKS = {
   view: usePlaylistView,
+  settings: usePlaylistSettings,
   zoom: usePlaylistZoom,
   timeline: usePlaylistTimeline,
   mixer: usePlaylistMixer,
@@ -204,12 +206,11 @@ describe('each hook returns its own group of fields (#768)', () => {
         'roundedBars',
         'progressBarWidth',
         'mono',
-        'timeFormat',
-        'isAutomaticScroll',
         'indefinitePlayback',
         'fillViewport',
       ].sort()
     );
+    expect(keys('settings')).toEqual(['isAutomaticScroll', 'timeFormat']);
     expect(keys('zoom')).toEqual(['canZoomIn', 'canZoomOut', 'samplesPerPixel']);
     expect(keys('timeline')).toEqual(
       ['duration', 'isReady', 'onTracksChange', 'peaksDataArray', 'tracks'].sort()
@@ -273,17 +274,19 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     expect(values.mixer.masterVolume).toBe(0.5);
   });
 
-  it('a time-format change: the view', async () => {
+  // The two settings a user toggles are apart from the view value: every clip
+  // overlay and the visualization shell read that one for `sampleRate`.
+  it('a time-format change: the settings', async () => {
     await mount();
-    expect(await rendered(() => values.controls.setTimeFormat('seconds'))).toEqual(['view']);
-    expect(values.view.timeFormat).toBe('seconds');
+    expect(await rendered(() => values.controls.setTimeFormat('seconds'))).toEqual(['settings']);
+    expect(values.settings.timeFormat).toBe('seconds');
   });
 
-  it('an automatic-scroll toggle: the view', async () => {
+  it('an automatic-scroll toggle: the settings', async () => {
     await mount();
-    const next = !values.view.isAutomaticScroll;
-    expect(await rendered(() => values.controls.setAutomaticScroll(next))).toEqual(['view']);
-    expect(values.view.isAutomaticScroll).toBe(next);
+    const next = !values.settings.isAutomaticScroll;
+    expect(await rendered(() => values.controls.setAutomaticScroll(next))).toEqual(['settings']);
+    expect(values.settings.isAutomaticScroll).toBe(next);
   });
 
   it('a zoom: the zoom value, and the timeline (peaks are per zoom level)', async () => {
@@ -323,6 +326,24 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     expect(values.annotations.annotations[0].lines).toEqual(['changed']);
   });
 
+  it('an edit and its undo: the undo state (and nothing that is not about tracks)', async () => {
+    await mount();
+    expect(values.undo).toEqual({ canUndo: false, canRedo: false });
+    const quiet: HookName[] = ['view', 'settings', 'zoom', 'loop', 'selectedTrack', 'annotations'];
+
+    const afterEdit = await rendered(() => {
+      values.refs.playoutRef.current!.moveClip('track-1', 'track-1-clip', SAMPLE_RATE / 10);
+    });
+    expect(afterEdit).toContain('undo');
+    expect(values.undo).toEqual({ canUndo: true, canRedo: false });
+    for (const name of quiet) expect(afterEdit).not.toContain(name);
+
+    const afterUndo = await rendered(() => values.controls.undo());
+    expect(afterUndo).toContain('undo');
+    expect(values.undo).toEqual({ canUndo: false, canRedo: true });
+    for (const name of quiet) expect(afterUndo).not.toContain(name);
+  });
+
   it('a track-reorder preview: the reorder preview', async () => {
     await mount();
     expect(
@@ -359,8 +380,11 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     const names = await rendered(() => setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]));
     await waitFor(() => expect(values.timeline.duration).toBe(2));
     expect(names).toContain('timeline');
+    // The mixer follows too: the new track gets its mixer state.
+    expect(names).toContain('mixer');
     for (const quiet of [
       'view',
+      'settings',
       'zoom',
       'loop',
       'selectedTrack',
@@ -421,6 +445,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
 
   it.each([
     'usePlaylistView',
+    'usePlaylistSettings',
     'usePlaylistZoom',
     'usePlaylistTimeline',
     'usePlaylistMixer',
@@ -433,6 +458,11 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'usePlaybackRefs',
   ])('%s is exported from the package entry', (name) => {
     expect(typeof (publicApi as Record<string, unknown>)[name]).toBe('function');
+  });
+
+  it('the optional readers stay internal to the package', () => {
+    expect('usePlaylistViewOptional' in publicApi).toBe(false);
+    expect('usePlaylistZoomOptional' in publicApi).toBe(false);
   });
 
   it.each(HOOK_NAMES)('the %s hook throws outside the provider, naming itself', (name) => {

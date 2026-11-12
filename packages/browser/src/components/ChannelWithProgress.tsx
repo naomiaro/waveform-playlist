@@ -118,8 +118,8 @@ function playedRatio(
 
 /**
  * The played-portion overlay of one channel. It is the only part of a channel
- * that follows the cursor, so it alone subscribes to the animation and data
- * contexts (#693): a seek, or a selection whose start moves, re-renders these
+ * that follows the cursor, so it alone subscribes to the provider's contexts
+ * (#693): a seek, or a selection whose start moves, re-renders these
  * small overlays and not the channels (and their canvases' React trees) around
  * them.
  */

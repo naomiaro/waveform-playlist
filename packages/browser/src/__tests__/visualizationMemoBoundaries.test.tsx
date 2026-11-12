@@ -21,6 +21,8 @@ const counts = vi.hoisted(() => ({
   track: {} as Record<string, number>,
   controls: 0,
   scale: 0,
+  // The timeline length the timescale was last given, in milliseconds.
+  scaleDurationMs: -1,
   shell: 0,
 }));
 
@@ -54,6 +56,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     },
     SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
       counts.scale++;
+      counts.scaleDurationMs = props.durationMs;
       return createElement(actual.SmartScale, props);
     },
   };
@@ -263,7 +266,7 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
     expect(counts.controls).toBe(0);
   });
 
-  it('a time-format change and an automatic-scroll toggle re-render no clip and no channel', async () => {
+  it('a time-format change and an automatic-scroll toggle re-render no clip, channel, track, panel or shell', async () => {
     await mount(threeTracks().tracks);
 
     await act(async () => {
@@ -273,6 +276,9 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
 
     expect(totalOf(counts.clip)).toBe(0);
     expect(counts.channel).toBe(0);
+    expect(counts.shell).toBe(0);
+    expect(totalOf(counts.track)).toBe(0);
+    expect(counts.controls).toBe(0);
   });
 
   // The timeline length is not in `PlaylistInfoContext` any more: every
@@ -299,8 +305,10 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
     expect(counts.clip.d).toBeUndefined();
     // One channel per clip in this fixture: only the trimmed clip's renders.
     expect(counts.channel).toBe(counts.clip.b);
-    // The timescale is what draws the new length.
+    // The timescale is what draws the new length, and gets it in milliseconds.
     expect(counts.scale).toBeGreaterThanOrEqual(1);
+    expect(counts.scaleDurationMs).toBe(probe.data.duration * 1000);
+    expect(counts.scaleDurationMs).toBe(2500);
   });
 });
 

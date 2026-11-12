@@ -7,7 +7,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
-- **Focused context hooks** — one hook per group of fields that change together (`usePlaylistView`, `usePlaylistZoom`, `usePlaylistTimeline`, `usePlaylistMixer`, `usePlaylistAnnotations`, `useLoop`, `useSelection`, `useCurrentTime`, `useIsPlaying`, `usePlaybackRefs`, `usePlaylistControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
+- **Focused context hooks** — one hook per group of fields that change together (`usePlaylistView`, `usePlaylistSettings`, `usePlaylistZoom`, `usePlaylistTimeline`, `usePlaylistMixer`, `usePlaylistAnnotations`, `useLoop`, `useSelection`, `useCurrentTime`, `useIsPlaying`, `usePlaybackRefs`, `usePlaylistControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
 - **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
@@ -86,10 +86,11 @@ Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvi
 
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
-| `usePlaylistView` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `timeFormat`, `isAutomaticScroll`, `indefinitePlayback`, `fillViewport` | a provider prop change, a settings click |
+| `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
+| `usePlaylistSettings` | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | `usePlaylistZoom` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
-| `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim |
-| `usePlaylistMixer` | `trackStates`, `masterVolume` | every step of a volume or pan slider |
+| `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
+| `usePlaylistMixer` | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
 | `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
 | `usePlaylistAnnotations` | `annotations`, `annotationsEditable`, `linkEndpoints`, `continuousPlay` | an annotation edit, an annotation settings toggle |
 | `useLoop` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |

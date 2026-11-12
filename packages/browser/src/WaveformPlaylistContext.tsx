@@ -294,9 +294,9 @@ export interface PlaylistControlsContextValue {
 }
 
 /**
- * View settings (#768): what the provider was configured with, plus the two
- * settings a user toggles (time format, automatic scroll). Changes on a prop
- * change or a settings click, never during an interaction.
+ * View configuration (#768): what the provider was configured with. Changes
+ * on a prop change (and once when the real sample rate is known), never
+ * during an interaction.
  */
 export interface PlaylistViewContextValue {
   sampleRate: number;
@@ -311,14 +311,22 @@ export interface PlaylistViewContextValue {
   progressBarWidth: number;
   /** Whether tracks are rendered in mono mode */
   mono: boolean;
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
   /** Whether playback continues past the end of loaded audio instead of
    *  auto-stopping (implies the fillViewport layout) */
   indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container even when the
    *  audio is shorter (layout only — no effect on playback) */
   fillViewport: boolean;
+}
+
+/**
+ * The two settings a user toggles (#768). Apart from the view value because
+ * every clip overlay and the visualization shell read that one: a toggle here
+ * renders only the components that show the setting.
+ */
+export interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 
 /** The zoom level (#768). Changes on a zoom. */
@@ -329,8 +337,9 @@ export interface PlaylistZoomContextValue {
 }
 
 /**
- * What is on the timeline (#768). Changes on every clip operation and on every
- * pointer move of a trim, so call `usePlaylistTimeline()` only in a component
+ * What is on the timeline (#768). Changes on every clip operation, on every
+ * pointer move of a trim and on a zoom (the peaks are computed per zoom
+ * level), so call `usePlaylistTimeline()` only in a component
  * that draws tracks or needs the timeline length during render.
  */
 export interface PlaylistTimelineContextValue {
@@ -342,7 +351,7 @@ export interface PlaylistTimelineContextValue {
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
-/** Mixer state (#768). Changes on every step of a volume or pan slider. */
+/** Mixer state (#768). Changes on every mute, solo, volume or pan change. */
 export interface PlaylistMixerContextValue {
   trackStates: TrackState[];
   masterVolume: number;
@@ -378,6 +387,7 @@ const CurrentTimeContext = createContext<CurrentTimeContextValue | null>(null);
 const ActiveAnnotationContext = createContext<ActiveAnnotationContextValue | null>(null);
 const PlaylistControlsContext = createContext<PlaylistControlsContextValue | null>(null);
 const PlaylistViewContext = createContext<PlaylistViewContextValue | null>(null);
+const PlaylistSettingsContext = createContext<PlaylistSettingsContextValue | null>(null);
 const PlaylistZoomContext = createContext<PlaylistZoomContextValue | null>(null);
 const PlaylistTimelineContext = createContext<PlaylistTimelineContextValue | null>(null);
 const PlaylistMixerContext = createContext<PlaylistMixerContextValue | null>(null);
@@ -1411,7 +1421,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   // Read the engine's scheduler lookahead (Tone adapter ~0.1s, native 0).
-  // Exposed through PlaybackAnimationContextValue so consumers (e.g., recording
+  // Exposed through PlaybackRefsContextValue so consumers (e.g., recording
   // live preview) compute audible-latency from the same source as the playhead.
   const getLookAhead = useCallback((): number => {
     return engineRef.current?.lookAhead ?? 0;
@@ -2269,8 +2279,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       mono,
-      timeFormat,
-      isAutomaticScroll,
       indefinitePlayback,
       fillViewport,
     }),
@@ -2284,11 +2292,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       roundedBars,
       progressBarWidth,
       mono,
-      timeFormat,
-      isAutomaticScroll,
       indefinitePlayback,
       fillViewport,
     ]
+  );
+
+  const settingsValue: PlaylistSettingsContextValue = useMemo(
+    () => ({ timeFormat, isAutomaticScroll }),
+    [timeFormat, isAutomaticScroll]
   );
 
   const zoomValue: PlaylistZoomContextValue = useMemo(
@@ -2296,13 +2307,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [samplesPerPixel, zoom.canZoomIn, zoom.canZoomOut]
   );
 
-  // Changes on every pointer move of a trim.
+  // Changes on every pointer move of a trim, and on a zoom (the peaks are
+  // computed per zoom level).
   const timelineValue: PlaylistTimelineContextValue = useMemo(
     () => ({ tracks, peaksDataArray, duration, isReady, onTracksChange }),
     [tracks, peaksDataArray, duration, isReady, onTracksChange]
   );
 
-  // Changes on every step of a volume or pan slider.
+  // Changes on every mute, solo, volume or pan change.
   const mixerValue: PlaylistMixerContextValue = useMemo(
     () => ({ trackStates, masterVolume }),
     [trackStates, masterVolume]
@@ -2324,31 +2336,33 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       <PlaybackRefsContext.Provider value={refsValue}>
         <PlaylistControlsContext.Provider value={controlsValue}>
           <PlaylistViewContext.Provider value={viewValue}>
-            <PlaylistZoomContext.Provider value={zoomValue}>
-              <UndoRedoContext.Provider value={undoRedoValue}>
-                <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
-                  <LoopContext.Provider value={loopValue}>
-                    <PlaylistAnnotationsContext.Provider value={annotationsValue}>
-                      <IsPlayingContext.Provider value={isPlayingValue}>
-                        <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
-                          <CurrentTimeContext.Provider value={currentTimeValue}>
-                            <SelectionContext.Provider value={selectionValue}>
-                              <TrackReorderPreviewContext.Provider value={reorderPreviewValue}>
-                                <PlaylistMixerContext.Provider value={mixerValue}>
-                                  <PlaylistTimelineContext.Provider value={timelineValue}>
-                                    {children}
-                                  </PlaylistTimelineContext.Provider>
-                                </PlaylistMixerContext.Provider>
-                              </TrackReorderPreviewContext.Provider>
-                            </SelectionContext.Provider>
-                          </CurrentTimeContext.Provider>
-                        </ActiveAnnotationContext.Provider>
-                      </IsPlayingContext.Provider>
-                    </PlaylistAnnotationsContext.Provider>
-                  </LoopContext.Provider>
-                </SelectedTrackIdContext.Provider>
-              </UndoRedoContext.Provider>
-            </PlaylistZoomContext.Provider>
+            <PlaylistSettingsContext.Provider value={settingsValue}>
+              <PlaylistZoomContext.Provider value={zoomValue}>
+                <UndoRedoContext.Provider value={undoRedoValue}>
+                  <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
+                    <LoopContext.Provider value={loopValue}>
+                      <PlaylistAnnotationsContext.Provider value={annotationsValue}>
+                        <IsPlayingContext.Provider value={isPlayingValue}>
+                          <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
+                            <CurrentTimeContext.Provider value={currentTimeValue}>
+                              <SelectionContext.Provider value={selectionValue}>
+                                <TrackReorderPreviewContext.Provider value={reorderPreviewValue}>
+                                  <PlaylistMixerContext.Provider value={mixerValue}>
+                                    <PlaylistTimelineContext.Provider value={timelineValue}>
+                                      {children}
+                                    </PlaylistTimelineContext.Provider>
+                                  </PlaylistMixerContext.Provider>
+                                </TrackReorderPreviewContext.Provider>
+                              </SelectionContext.Provider>
+                            </CurrentTimeContext.Provider>
+                          </ActiveAnnotationContext.Provider>
+                        </IsPlayingContext.Provider>
+                      </PlaylistAnnotationsContext.Provider>
+                    </LoopContext.Provider>
+                  </SelectedTrackIdContext.Provider>
+                </UndoRedoContext.Provider>
+              </PlaylistZoomContext.Provider>
+            </PlaylistSettingsContext.Provider>
           </PlaylistViewContext.Provider>
         </PlaylistControlsContext.Provider>
       </PlaybackRefsContext.Provider>
@@ -2422,26 +2436,30 @@ export const usePlaylistControls = () =>
   useRequired(PlaylistControlsContext, 'usePlaylistControls');
 
 /**
- * View settings: `sampleRate`, `waveHeight`, `controls`, bar style, `mono`,
- * `timeFormat`, `isAutomaticScroll`, `indefinitePlayback`, `fillViewport`.
- * Re-renders on a prop change or a settings click.
+ * View configuration: `sampleRate`, `waveHeight`, `timeScaleHeight`,
+ * `controls`, bar style, `mono`, `indefinitePlayback`, `fillViewport`.
+ * Re-renders on a prop change.
  */
 export const usePlaylistView = () => useRequired(PlaylistViewContext, 'usePlaylistView');
+
+/** `{ timeFormat, isAutomaticScroll }`. Re-renders when the user changes either. */
+export const usePlaylistSettings = () =>
+  useRequired(PlaylistSettingsContext, 'usePlaylistSettings');
 
 /** `{ samplesPerPixel, canZoomIn, canZoomOut }`. Re-renders on a zoom. */
 export const usePlaylistZoom = () => useRequired(PlaylistZoomContext, 'usePlaylistZoom');
 
 /**
  * `{ tracks, peaksDataArray, duration, isReady, onTracksChange }`. A component
- * that calls this re-renders on every clip operation and on every pointer move
- * of a trim.
+ * that calls this re-renders on every clip operation, on every pointer move of
+ * a trim and on a zoom.
  */
 export const usePlaylistTimeline = () =>
   useRequired(PlaylistTimelineContext, 'usePlaylistTimeline');
 
 /**
  * `{ trackStates, masterVolume }`. A component that calls this re-renders on
- * every step of a volume or pan slider.
+ * every mute, solo, volume or pan change (each step of a slider drag).
  */
 export const usePlaylistMixer = () => useRequired(PlaylistMixerContext, 'usePlaylistMixer');
 

@@ -13,6 +13,7 @@ React hooks for accessing playlist state and controls.
 import {
   // Core context hooks
   usePlaylistView,
+  usePlaylistSettings,
   usePlaylistZoom,
   usePlaylistTimeline,
   usePlaylistMixer,
@@ -85,10 +86,11 @@ These hooks access the playlist context provided by `WaveformPlaylistProvider`. 
 
 | Hook                                                 | Returns                                                                 | The component re-renders on                        |
 | ---------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------- |
-| [`usePlaylistView()`](#useplaylistview)              | sample rate, sizes, bar style, `mono`, `timeFormat`, scroll and layout settings | a provider prop change, a settings click           |
+| [`usePlaylistView()`](#useplaylistview) | sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
+| [`usePlaylistSettings()`](#useplaylistsettings) | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | [`usePlaylistZoom()`](#useplaylistzoom)              | `samplesPerPixel`, `canZoomIn`, `canZoomOut`                            | a zoom                                             |
-| [`usePlaylistTimeline()`](#useplaylisttimeline)      | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange`     | every clip operation, every pointer move of a trim |
-| [`usePlaylistMixer()`](#useplaylistmixer)            | `trackStates`, `masterVolume`                                           | every step of a volume or pan slider               |
+| [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom, loading finishing, peaks arriving |
+| [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change; tracks added, removed or reordered |
 | [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview`, `trackReorderEpoch`                                | every drag-over of a track reorder                 |
 | [`usePlaylistAnnotations()`](#useplaylistannotations) | `annotations`, `annotationsEditable`, `linkEndpoints`, `continuousPlay` | an annotation edit, an annotation settings toggle  |
 | [`useLoop()`](#useloop)                              | `isLoopEnabled`, `loopStart`, `loopEnd`                                 | a loop change                                      |
@@ -101,13 +103,13 @@ These hooks access the playlist context provided by `WaveformPlaylistProvider`. 
 | [`useActiveAnnotation()`](#useactiveannotation)      | `activeAnnotationId`                                                    | every annotation boundary during playback          |
 | [`usePlaylistControls()`](#useplaylistcontrols)      | actions                                                                 | never                                              |
 
-All of them throw when called outside `WaveformPlaylistProvider`. The value types (`PlaylistViewContextValue` and the others named below) are exported from `@waveform-playlist/browser`.
+All of them throw when called outside `WaveformPlaylistProvider`. The value types (`PlaylistViewContextValue` and the others named below) are exported from `@waveform-playlist/browser`, as are `ClipPeaks`, `TrackClipPeaks` and `TrackDragPreview`, so every field can be named.
 
 Upgrading from a version with the combined data, state and animation hooks? The [upgrade guide](../upgrading.md#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields) lists where each field went.
 
 ### usePlaylistView
 
-View settings: what the provider was configured with, plus the two settings a user toggles (time format, automatic scroll). The value changes on a provider prop change or a settings click, never during an interaction.
+What the provider was configured with. The value changes on a provider prop change (and once when the real sample rate is known), not on a settings click, and never during an interaction.
 
 ```typescript
 function usePlaylistView(): PlaylistViewContextValue;
@@ -125,12 +127,23 @@ interface PlaylistViewContextValue {
   progressBarWidth: number;
   /** Whether tracks are rendered in mono mode */
   mono: boolean;
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
   /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
   indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
+}
+```
+
+### usePlaylistSettings
+
+The two settings a user toggles: the time format and automatic scroll. The value changes when the user changes either. They are apart from `usePlaylistView()` because every clip's progress overlay and the visualization read the view value, so a toggle there would re-render all of them. Set them with `setTimeFormat(format)` and `setAutomaticScroll(enabled)` from `usePlaylistControls()`.
+
+```typescript
+function usePlaylistSettings(): PlaylistSettingsContextValue;
+
+interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 ```
 
@@ -150,7 +163,7 @@ interface PlaylistZoomContextValue {
 
 ### usePlaylistTimeline
 
-What is on the timeline. The value changes on every clip operation and on every pointer move of a trim, so call this hook only in a component that draws tracks or needs the timeline length during render.
+What is on the timeline. The value changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive, so call this hook only in a component that draws tracks or needs the timeline length during render.
 
 ```typescript
 function usePlaylistTimeline(): PlaylistTimelineContextValue;
@@ -167,7 +180,7 @@ interface PlaylistTimelineContextValue {
 
 ### usePlaylistMixer
 
-Mixer state. The value changes on every step of a volume or pan slider, so call this hook in the component that shows the mixer values, not in the component that renders the page.
+Mixer state. The value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered, so call this hook in the component that shows the mixer values, not in the component that renders the page.
 
 ```typescript
 function usePlaylistMixer(): PlaylistMixerContextValue;

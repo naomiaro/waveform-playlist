@@ -181,7 +181,7 @@ interface MediaElementDataContextValue {
 
 ## WaveformPlaylist Context Hooks
 
-One hook per group of fields that change together; a component re-renders only for the hooks it calls. All require `WaveformPlaylistProvider`. They replace the three combined data / state / animation hooks of earlier majors — field-to-hook table in the [upgrade guide](./react/upgrading.md).
+One hook per group of fields that change together; a component re-renders only for the hooks it calls. All require `WaveformPlaylistProvider`. The value types below are exported from `@waveform-playlist/browser`, with `ClipPeaks`, `TrackClipPeaks`, `TrackDragPreview`, `TrackState` and `FrameData`. They replace the three combined data / state / animation hooks of earlier majors — field-to-hook table in the [upgrade guide](./react/upgrading.md).
 
 ### useIsPlaying()
 
@@ -384,9 +384,9 @@ interface PlaylistControlsContextValue {
 ### usePlaylistView()
 
 ```typescript
-// View settings: what the provider was configured with, plus the two settings a
-// user toggles (time format, automatic scroll). Re-renders on a prop change or a
-// settings click, never during an interaction.
+// What the provider was configured with. Re-renders on a prop change (and once
+// when the real sample rate is known), not on a settings click, never during an
+// interaction.
 interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
@@ -397,12 +397,22 @@ interface PlaylistViewContextValue {
   roundedBars: boolean;
   progressBarWidth: number;
   mono: boolean;
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
   /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
   indefinitePlayback: boolean;
   /** Whether the timeline visually fills the scroll container (layout only) */
   fillViewport: boolean;
+}
+```
+
+### usePlaylistSettings()
+
+```typescript
+// The two settings a user toggles. Re-renders when the user changes either.
+// Apart from the view value because every clip's progress overlay and the
+// visualization read that one.
+interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 ```
 
@@ -420,7 +430,9 @@ interface PlaylistZoomContextValue {
 ### usePlaylistTimeline()
 
 ```typescript
-// Re-renders on every clip operation and on every pointer move of a trim: call it
+// Re-renders on every clip operation, on every pointer move of a trim and on a
+// zoom (peaksDataArray is computed per zoom level); also when loading finishes
+// (isReady) and when peaks arrive. Call it
 // only in a component that draws tracks or needs the timeline length during render.
 interface PlaylistTimelineContextValue {
   tracks: ClipTrack[];
@@ -434,7 +446,8 @@ interface PlaylistTimelineContextValue {
 ### usePlaylistMixer()
 
 ```typescript
-// Re-renders on every step of a volume or pan slider.
+// Re-renders on every mute, solo, volume or pan change (each step of a slider
+// drag), and when tracks are added, removed or reordered.
 interface PlaylistMixerContextValue {
   trackStates: TrackState[];
   masterVolume: number;

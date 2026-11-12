@@ -741,13 +741,15 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     │   └─→ activeAnnotationId
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
-    ├─→ PlaylistViewContext (prop changes, settings clicks)
-    │   └─→ sampleRate, waveHeight, bar style, mono, timeFormat, etc.
+    ├─→ PlaylistViewContext (prop changes)
+    │   └─→ sampleRate, waveHeight, bar style, mono, indefinitePlayback, fillViewport
+    ├─→ PlaylistSettingsContext (the user changing a setting)
+    │   └─→ timeFormat, isAutomaticScroll
     ├─→ PlaylistZoomContext (a zoom)
     │   └─→ samplesPerPixel, canZoomIn, canZoomOut
-    ├─→ PlaylistTimelineContext (every clip operation, every pointer move of a trim)
+    ├─→ PlaylistTimelineContext (every clip operation, every pointer move of a trim, a zoom)
     │   └─→ tracks, peaksDataArray, duration, isReady, onTracksChange
-    ├─→ PlaylistMixerContext (every step of a volume or pan slider)
+    ├─→ PlaylistMixerContext (every mute, solo, volume or pan change; tracks added, removed or reordered)
     │   └─→ trackStates, masterVolume
     └─→ TrackReorderPreviewContext (every drag-over of a track reorder)
         └─→ trackDragPreview, trackReorderEpoch
@@ -784,7 +786,7 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-The provider uses **15 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies:
+The provider uses **16 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies:
 
 1. **IsPlayingContext** (`useIsPlaying()`) - Changes on play, pause and stop
 
@@ -816,24 +818,43 @@ The provider uses **15 separate contexts**, one per group of fields that change 
     - Doesn't cause re-renders when accessed
     - All control functions
 
-11. **PlaylistViewContext** (`usePlaylistView()`) - View settings
-    - Sample rate, sizes, bar style, `mono`, time format, scroll and layout settings
-    - Changes on a prop change or a settings click
+11. **PlaylistViewContext** (`usePlaylistView()`) - What the provider was configured with
+    - Sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport`
+    - Changes on a prop change, not on a settings click
 
-12. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom
+12. **PlaylistSettingsContext** (`usePlaylistSettings()`) - The two settings a user toggles
+    - `timeFormat`, `isAutomaticScroll`
+    - Apart from the view value because every clip's progress overlay and the visualization read that one
 
-13. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks, peaks, duration, `isReady`
-    - Changes on every clip operation and on every pointer move of a trim
+13. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom
 
-14. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states and master volume
-    - Changes on every step of a volume or pan slider
+14. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks, peaks, duration, `isReady`
+    - Changes on every clip operation, on every pointer move of a trim and on a zoom (peaks are computed per zoom level)
+    - Also when loading finishes and when peaks arrive
 
-15. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
+15. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states and master volume
+    - Changes on every mute, solo, volume or pan change (each step of a slider drag)
+    - Also when tracks are added, removed or reordered
+
+16. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
     - Changes on every drag-over of a track reorder
+
+**Key Files:**
+
+- `packages/browser/src/WaveformPlaylistContext.tsx` - Context provider (flexible API)
+- `packages/browser/src/SpectrogramIntegrationContext.tsx` - Optional spectrogram integration
+- `packages/browser/src/hooks/` - Reusable business logic
+- `packages/browser/src/components/` - React components
+- `packages/engine/src/PlaylistEngine.ts` - Stateful timeline engine
+- `packages/engine/src/operations/` - Pure clip/timeline/viewport operations
+- `packages/ui-components/src/components/Playlist.tsx` - UI container
+- `packages/playout/src/TonePlayout.ts` - Audio playback
+
+## State Management
 
 ### Context Splitting for Performance (2025-01-21)
 
-The `WaveformPlaylistProvider` uses **15 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
+The `WaveformPlaylistProvider` uses **16 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
 
 **Architecture:**
 
@@ -942,7 +963,7 @@ export interface PlaylistControlsContextValue {
   redo: () => void;
 }
 
-// 4. View settings - change on a prop change or a settings click
+// 4. View - what the provider was configured with; changes on a prop change
 export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
@@ -953,10 +974,14 @@ export interface PlaylistViewContextValue {
   roundedBars: boolean;
   progressBarWidth: number;
   mono: boolean;
-  timeFormat: TimeFormat;
-  isAutomaticScroll: boolean;
   indefinitePlayback: boolean;       // Whether playback continues past end of audio
   fillViewport: boolean;
+}
+
+// 4a. The two settings a user toggles
+export interface PlaylistSettingsContextValue {
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
 }
 
 // 4b. Zoom - changes on a zoom
@@ -966,7 +991,7 @@ export interface PlaylistZoomContextValue {
   canZoomOut: boolean;
 }
 
-// 4c. Timeline - changes on every clip operation and every pointer move of a trim
+// 4c. Timeline - changes on every clip operation, every pointer move of a trim and a zoom
 export interface PlaylistTimelineContextValue {
   tracks: ClipTrack[];
   peaksDataArray: TrackClipPeaks[];
@@ -975,7 +1000,7 @@ export interface PlaylistTimelineContextValue {
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
-// 4d. Mixer - changes on every step of a volume or pan slider
+// 4d. Mixer - changes on every mute, solo, volume or pan change, and when tracks are added, removed or reordered
 export interface PlaylistMixerContextValue {
   trackStates: TrackState[];
   masterVolume: number;

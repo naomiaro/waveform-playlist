@@ -17,6 +17,7 @@ import {
   WaveformPlaylistProvider,
   usePlaylistControls,
   usePlaylistView,
+  usePlaylistSettings,
   usePlaylistTimeline,
   usePlaylistMixer,
   usePlaybackRefs,
@@ -103,6 +104,7 @@ type Selection = ReturnType<typeof useSelection>;
 let probe: {
   controls: Controls;
   view: View;
+  settings: ReturnType<typeof usePlaylistSettings>;
   timeline: Timeline;
   mixer: Mixer;
   theme: unknown;
@@ -161,6 +163,7 @@ const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaylistControls(),
     view: usePlaylistView(),
+    settings: usePlaylistSettings(),
     timeline: usePlaylistTimeline(),
     mixer: usePlaylistMixer(),
     theme: useTheme(),
@@ -592,7 +595,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       probe.controls.setTimeFormat('seconds');
     });
-    expect(probe.view.timeFormat).toBe('seconds');
+    expect(probe.settings.timeFormat).toBe('seconds');
 
     expect(controlsProbe.renders).toBe(rendersBefore);
   });
@@ -605,7 +608,7 @@ describe('the controls value does not follow the timeline length or the time for
       probe.controls.setTimeFormat('seconds');
     });
 
-    expect(probe.view.timeFormat).toBe('seconds');
+    expect(probe.settings.timeFormat).toBe('seconds');
     expect(probe.controls).toBe(before);
   });
 

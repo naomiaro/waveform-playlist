@@ -11,7 +11,7 @@ import {
   useCurrentTime,
   useSelection,
   usePlaylistControls,
-  usePlaylistView,
+  usePlaylistSettings,
   usePlaylistMixer,
   usePlaybackRefs,
   useIsPlaying,
@@ -37,7 +37,7 @@ export const MasterVolumeControl: React.FC<{ className?: string }> = ({ classNam
  * Time format selector that uses the playlist context
  */
 export const TimeFormatSelect: React.FC<{ className?: string }> = ({ className }) => {
-  const { timeFormat } = usePlaylistView();
+  const { timeFormat } = usePlaylistSettings();
   const { setTimeFormat } = usePlaylistControls();
 
   return <BaseTimeFormatSelect value={timeFormat} onChange={setTimeFormat} className={className} />;
@@ -62,7 +62,7 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
   const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only: what is shown comes from the ref.
   useCurrentTime();
-  const { timeFormat: format } = usePlaylistView();
+  const { timeFormat: format } = usePlaylistSettings();
 
   // Register per-frame callback during playback — uses raw time for display
   useEffect(() => {
@@ -113,7 +113,7 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
  * Uses split contexts to avoid re-rendering during animation
  */
 export const AutomaticScrollCheckbox: React.FC<{ className?: string }> = ({ className }) => {
-  const { isAutomaticScroll } = usePlaylistView();
+  const { isAutomaticScroll } = usePlaylistSettings();
   const { setAutomaticScroll } = usePlaylistControls();
 
   return (

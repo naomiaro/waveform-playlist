@@ -12,18 +12,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { getContext } from 'tone';
 import styled from 'styled-components';
-import {
-  Theme,
-  Button,
-  Flex,
-  Card,
-  Text,
-  Separator,
-  Slider,
-  Select,
-  Switch,
-  TextField,
-} from '@radix-ui/themes';
+import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
 import {
   PlayIcon,
   PauseIcon,
@@ -36,7 +25,7 @@ import {
   CaretDoubleLeftIcon,
   CaretDoubleRightIcon,
   LightbulbIcon,
-  ArrowsClockwiseIcon,
+  ArrowsClockwiseIcon
 } from '@phosphor-icons/react';
 import '@radix-ui/themes/styles.css';
 import {
@@ -49,7 +38,7 @@ import {
   ClipInteractionProvider,
   type TimeFormat,
   type ClipTrack,
-  usePlaylistView,
+  usePlaylistSettings,
   usePlaylistTimeline,
   usePlaylistMixer,
   usePlaybackRefs,
@@ -57,12 +46,7 @@ import {
   useIsPlaying,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import {
-  CLIP_HEADER_HEIGHT,
-  PlayheadWithMarker,
-  formatTime,
-  parseTime,
-} from '@waveform-playlist/ui-components';
+import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Container = styled.div`
@@ -140,10 +124,7 @@ const AnimatedTimeDisplayComponent: React.FC<AnimatedTimeDisplayProps> = ({ dura
 
   return (
     <TimeDisplay>
-      <span ref={timeRef} data-testid="time-display">
-        {formatTime(currentTime, format)}
-      </span>{' '}
-      / {formattedDuration}
+      <span ref={timeRef} data-testid="time-display">{formatTime(currentTime, format)}</span> / {formattedDuration}
     </TimeDisplay>
   );
 };
@@ -202,7 +183,7 @@ const VolumeSliderContainer = styled.div`
 // Grungy timestamp style for Berlin underground aesthetic
 const GrungyTimestamp = styled.div<{ $left: number }>`
   position: absolute;
-  left: ${(props) => props.$left + 4}px;
+  left: ${props => props.$left + 4}px;
   font-size: 0.7rem;
   font-family: 'Courier New', monospace;
   font-weight: 700;
@@ -237,32 +218,26 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
       <TrackButtonsRow>
         <Button
           size="1"
-          variant={trackState.muted ? 'solid' : 'outline'}
-          color={trackState.muted ? 'red' : 'gray'}
+          variant={trackState.muted ? "solid" : "outline"}
+          color={trackState.muted ? "red" : "gray"}
           onClick={() => setTrackMute(trackIndex, !trackState.muted)}
           style={{
             padding: '0 0.4rem',
             minWidth: 0,
-            ...(!trackState.muted && {
-              color: 'rgba(255,255,255,0.9)',
-              borderColor: 'rgba(255,255,255,0.4)',
-            }),
+            ...(!trackState.muted && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
           }}
         >
           M
         </Button>
         <Button
           size="1"
-          variant={trackState.soloed ? 'solid' : 'outline'}
-          color={trackState.soloed ? 'amber' : 'gray'}
+          variant={trackState.soloed ? "solid" : "outline"}
+          color={trackState.soloed ? "amber" : "gray"}
           onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
           style={{
             padding: '0 0.4rem',
             minWidth: 0,
-            ...(!trackState.soloed && {
-              color: 'rgba(255,255,255,0.9)',
-              borderColor: 'rgba(255,255,255,0.4)',
-            }),
+            ...(!trackState.soloed && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
           }}
         >
           S
@@ -286,7 +261,7 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = useSelection();
   const { setSelection } = usePlaylistControls();
-  const { timeFormat } = usePlaylistView();
+  const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
   const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,9 +283,7 @@ const CustomSelectionInputs: React.FC = () => {
         size="2"
         style={{ width: '140px' }}
       />
-      <Text size="2" color="gray">
-        to
-      </Text>
+      <Text size="2" color="gray">to</Text>
       <TextField.Root
         value={formatTime(selectionEnd, format)}
         onChange={handleEndChange}
@@ -328,24 +301,11 @@ interface FlexibleApiContentProps {
 
 // Main Example Content Component - Using individual hooks with Radix UI
 const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
-  const {
-    play,
-    pause,
-    stop,
-    seekTo,
-    setMasterVolume,
-    setTimeFormat,
-    setAutomaticScroll,
-    setLoopEnabled,
-    setLoopRegion,
-    zoomIn,
-    zoomOut,
-  } = usePlaylistControls();
+  const { play, pause, stop, seekTo, setMasterVolume, setTimeFormat, setAutomaticScroll, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = usePlaylistControls();
   const { currentTimeRef } = usePlaybackRefs();
-  const { timeFormat } = usePlaylistView();
+  const { timeFormat, isAutomaticScroll } = usePlaylistSettings();
   const { duration } = usePlaylistTimeline();
   const { masterVolume } = usePlaylistMixer();
-  const { isAutomaticScroll } = usePlaylistView();
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { selectionStart, selectionEnd } = useSelection();
   const format = timeFormat as TimeFormat;
@@ -411,12 +371,12 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
                 }
                 setLoopEnabled(!isLoopEnabled);
               }}
-              variant={isLoopEnabled ? 'solid' : 'soft'}
-              color={isLoopEnabled ? 'green' : 'gray'}
+              variant={isLoopEnabled ? "solid" : "soft"}
+              color={isLoopEnabled ? "green" : "gray"}
               size="2"
               title={isLoopEnabled ? 'Disable loop' : 'Enable loop'}
             >
-              <ArrowsClockwiseIcon size={16} weight={isLoopEnabled ? 'fill' : 'light'} />
+              <ArrowsClockwiseIcon size={16} weight={isLoopEnabled ? "fill" : "light"} />
               {isLoopEnabled ? 'Loop On' : 'Loop Off'}
             </Button>
           </Flex>
@@ -427,9 +387,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
       <Card>
         <Flex gap="3" align="center" wrap="wrap">
           <Flex gap="2" align="center">
-            <Text size="2" color="gray">
-              Zoom:
-            </Text>
+            <Text size="2" color="gray">Zoom:</Text>
             <Button onClick={zoomIn} size="2" variant="soft">
               <MagnifyingGlassPlusIcon size={16} weight="light" />
               In
@@ -443,19 +401,18 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
           <Separator orientation="vertical" />
 
           <Flex gap="2" align="center">
-            <Text size="2" color="gray">
-              Auto-scroll:
-            </Text>
-            <Switch checked={isAutomaticScroll} onCheckedChange={setAutomaticScroll} />
+            <Text size="2" color="gray">Auto-scroll:</Text>
+            <Switch
+              checked={isAutomaticScroll}
+              onCheckedChange={setAutomaticScroll}
+            />
           </Flex>
 
           <Separator orientation="vertical" />
 
           <Flex gap="2" align="center" style={{ minWidth: '200px' }}>
             <SpeakerHighIcon size={16} weight="light" />
-            <Text size="2" color="gray">
-              Volume:
-            </Text>
+            <Text size="2" color="gray">Volume:</Text>
             <Slider
               value={[masterVolume * 100]}
               onValueChange={([v]) => setMasterVolume(v / 100)}
@@ -472,7 +429,9 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
       <ClipInteractionProvider>
         <KeyboardShortcuts playback clipSplitting undo />
         <Waveform
-          renderTrackControls={(trackIndex) => <CustomTrackControls trackIndex={trackIndex} />}
+          renderTrackControls={(trackIndex) => (
+            <CustomTrackControls trackIndex={trackIndex} />
+          )}
           renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
           renderTick={(label, pixelPosition) => {
             return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
@@ -489,9 +448,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
           <Separator orientation="vertical" />
 
           <Flex gap="2" align="center">
-            <Text size="2" color="gray">
-              Time Format:
-            </Text>
+            <Text size="2" color="gray">Time Format:</Text>
             <Select.Root value={timeFormat} onValueChange={(v) => setTimeFormat(v as TimeFormat)}>
               <Select.Trigger />
               <Select.Content>
@@ -507,9 +464,7 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
           <Separator orientation="vertical" />
 
           <Flex gap="2" align="center">
-            <Text size="2" color="gray">
-              Selection Range:
-            </Text>
+            <Text size="2" color="gray">Selection Range:</Text>
             <CustomSelectionInputs />
           </Flex>
         </Flex>
@@ -554,49 +509,22 @@ export function FlexibleApiExample() {
   };
 
   // Albert Kader "Ubiquitous" - all 11 tracks
-  const audioConfigs = React.useMemo(
-    () => [
-      { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
-        name: 'HiHat 1',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus',
-        name: 'HiHat 2',
-      },
-      { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
-      { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
-      { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus',
-        name: 'Shakers',
-      },
-      { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
-        name: 'Synth 1',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus',
-        name: 'Synth 2 Mod',
-      },
-      {
-        src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-        name: 'Synth 2',
-      },
-    ],
-    []
-  );
+  const audioConfigs = React.useMemo(() => [
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
+    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
+  ], []);
 
   // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const {
-    tracks: loadedTracks,
-    loading,
-    error,
-    loadedCount,
-    totalCount,
-  } = useAudioTracks(audioConfigs, { immediate: true });
+  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
   const [tracks, setTracks] = useState<ClipTrack[]>([]);
 
   // Update tracks state as they finish loading
@@ -608,12 +536,7 @@ export function FlexibleApiExample() {
 
   if (error) {
     return (
-      <Theme
-        appearance={isDark ? 'dark' : 'light'}
-        accentColor="blue"
-        grayColor="slate"
-        radius="medium"
-      >
+      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
         <Container>
           <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)' }}>
             <Text size="3" color="red">
@@ -628,18 +551,11 @@ export function FlexibleApiExample() {
   // Show loading progress while tracks are being loaded
   if (tracks.length === 0 && loading) {
     return (
-      <Theme
-        appearance={isDark ? 'dark' : 'light'}
-        accentColor="blue"
-        grayColor="slate"
-        radius="medium"
-      >
+      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
         <Container>
           <Card>
             <Flex justify="center" align="center" style={{ padding: '3rem' }}>
-              <Text size="3">
-                Loading tracks: {loadedCount}/{totalCount}...
-              </Text>
+              <Text size="3">Loading tracks: {loadedCount}/{totalCount}...</Text>
             </Flex>
           </Card>
         </Container>
@@ -648,12 +564,7 @@ export function FlexibleApiExample() {
   }
 
   return (
-    <Theme
-      appearance={isDark ? 'dark' : 'light'}
-      accentColor="blue"
-      grayColor="slate"
-      radius="medium"
-    >
+    <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
       <Container>
         <WaveformPlaylistProvider
           tracks={tracks}
@@ -675,123 +586,48 @@ export function FlexibleApiExample() {
 
         <Card style={{ marginTop: '2rem', background: 'var(--gray-2)' }}>
           <Flex direction="column" gap="2">
-            <Text size="3" weight="bold">
-              <LightbulbIcon
-                size={18}
-                weight="light"
-                style={{ marginRight: '4px', verticalAlign: 'text-bottom' }}
-              />{' '}
-              About This Example
-            </Text>
+            <Text size="3" weight="bold"><LightbulbIcon size={18} weight="light" style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} /> About This Example</Text>
             <Text size="2" color="gray">
-              This example demonstrates the <strong>flexible hooks API</strong> - using individual
-              hooks to build completely custom controls with Radix UI components. Instead of using
-              pre-built components like
+              This example demonstrates the <strong>flexible hooks API</strong> - using individual hooks to build
+              completely custom controls with Radix UI components. Instead of using pre-built components like
               <code>PlayButton</code> or <code>AudioPosition</code>, this example shows:
             </Text>
             <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
-              <li>
-                <Text size="2" color="gray">
-                  <code>usePlaylistControls()</code> - Get <code>play</code>, <code>pause</code>,{' '}
-                  <code>stop</code> functions
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get{' '}
-                  <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get{' '}
-                  <code>duration</code>, <code>tracks</code>, <code>trackStates</code>,{' '}
-                  <code>masterVolume</code>
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>usePlaylistView()</code> and <code>useLoop()</code> - Get{' '}
-                  <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>,
-                  and the loop region
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>useSelection()</code> - Get <code>selectionStart</code> and{' '}
-                  <code>selectionEnd</code>
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>useTimeFormat()</code> - Get <code>formatTime</code> and{' '}
-                  <code>parseTime</code> for time display/input
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  <code>renderPlayhead</code> - Custom playhead with triangle marker (see{' '}
-                  <code>PlayheadWithMarker</code>)
-                </Text>
-              </li>
-              <li>
-                <Text size="2" color="gray">
-                  Radix UI components (<code>Button</code>, <code>Slider</code>, <code>Switch</code>
-                  , <code>Select</code>)
-                </Text>
-              </li>
+              <li><Text size="2" color="gray"><code>usePlaylistControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions</Text></li>
+              <li><Text size="2" color="gray"><code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position</Text></li>
+              <li><Text size="2" color="gray"><code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get <code>duration</code>, <code>tracks</code>, <code>trackStates</code>, <code>masterVolume</code></Text></li>
+              <li><Text size="2" color="gray"><code>usePlaylistSettings()</code>, <code>usePlaylistView()</code> and <code>useLoop()</code> - Get <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>, and the loop region</Text></li>
+              <li><Text size="2" color="gray"><code>useSelection()</code> - Get <code>selectionStart</code> and <code>selectionEnd</code></Text></li>
+              <li><Text size="2" color="gray"><code>useTimeFormat()</code> - Get <code>formatTime</code> and <code>parseTime</code> for time display/input</Text></li>
+              <li><Text size="2" color="gray"><code>renderPlayhead</code> - Custom playhead with triangle marker (see <code>PlayheadWithMarker</code>)</Text></li>
+              <li><Text size="2" color="gray">Radix UI components (<code>Button</code>, <code>Slider</code>, <code>Switch</code>, <code>Select</code>)</Text></li>
             </ul>
             <Text size="2" color="gray">
-              This gives you maximum flexibility - use any UI library (Radix, Material-UI, Chakra,
-              etc.) and build exactly the interface you want!
+              This gives you maximum flexibility - use any UI library (Radix, Material-UI, Chakra, etc.) and build exactly the interface you want!
             </Text>
           </Flex>
         </Card>
 
         <Card style={{ marginTop: '1rem', background: 'var(--gray-2)' }}>
           <Flex direction="column" gap="2">
-            <Text size="3" weight="bold">
-              ⌨️ Keyboard Shortcuts
-            </Text>
+            <Text size="3" weight="bold">⌨️ Keyboard Shortcuts</Text>
             <Flex gap="4" wrap="wrap">
               <Flex direction="column" gap="1">
-                <Text size="2" weight="bold" color="gray">
-                  Playback
-                </Text>
-                <Text size="2" color="gray">
-                  <code>Space</code> — Play / Pause
-                </Text>
-                <Text size="2" color="gray">
-                  <code>Escape</code> — Stop
-                </Text>
-                <Text size="2" color="gray">
-                  <code>0</code> — Rewind to start
-                </Text>
-                <Text size="2" color="gray">
-                  <strong>Loop</strong> — Toggle loop for selection
-                </Text>
+                <Text size="2" weight="bold" color="gray">Playback</Text>
+                <Text size="2" color="gray"><code>Space</code> — Play / Pause</Text>
+                <Text size="2" color="gray"><code>Escape</code> — Stop</Text>
+                <Text size="2" color="gray"><code>0</code> — Rewind to start</Text>
+                <Text size="2" color="gray"><strong>Loop</strong> — Toggle loop for selection</Text>
               </Flex>
               <Flex direction="column" gap="1">
-                <Text size="2" weight="bold" color="gray">
-                  Editing
-                </Text>
-                <Text size="2" color="gray">
-                  <code>S</code> — Split clip at playhead
-                </Text>
+                <Text size="2" weight="bold" color="gray">Editing</Text>
+                <Text size="2" color="gray"><code>S</code> — Split clip at playhead</Text>
               </Flex>
               <Flex direction="column" gap="1">
-                <Text size="2" weight="bold" color="gray">
-                  Clip Interactions
-                </Text>
-                <Text size="2" color="gray">
-                  <strong>Drag clip header</strong> — Move clip along timeline
-                </Text>
-                <Text size="2" color="gray">
-                  <strong>Drag clip edges</strong> — Trim clip boundaries
-                </Text>
-                <Text size="2" color="gray">
-                  <strong>Click waveform</strong> — Position playhead
-                </Text>
+                <Text size="2" weight="bold" color="gray">Clip Interactions</Text>
+                <Text size="2" color="gray"><strong>Drag clip header</strong> — Move clip along timeline</Text>
+                <Text size="2" color="gray"><strong>Drag clip edges</strong> — Trim clip boundaries</Text>
+                <Text size="2" color="gray"><strong>Click waveform</strong> — Position playhead</Text>
               </Flex>
             </Flex>
           </Flex>
