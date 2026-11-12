@@ -115,7 +115,7 @@ describe('MediaElement controls value (#767)', () => {
     expect(controlsSeen).toHaveLength(1);
   });
 
-  it('a seekTo captured before the player was ready clamps to the track's length', async () => {
+  it("a seekTo captured before the player was ready clamps to the track's length", async () => {
     const { playout, first } = await mount();
 
     await act(async () => {

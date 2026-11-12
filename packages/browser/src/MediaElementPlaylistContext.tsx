@@ -301,8 +301,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // one is being replaced). Started by the init effect when the player
   // arrives; cleared by Stop, Pause, new audio and a failed init.
   const pendingPlayRef = useRef<{ position: number; endTime?: number } | null>(null);
-  // True from the start of an init until its player arrives or it fails:
-  // only then is there something a queued play can wait for.
+  // True from the start of an init unless it failed: only then is there a
+  // player, or one on its way, for a play to start on or wait for.
   const playoutInFlightRef = useRef(false);
 
   // Get sample rate from waveform data
@@ -386,6 +386,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // The init effect starts a queued play when its player arrives, long after
   // the render that created the effect: it reads the loop starter from here.
   const startAnimationLoopRef = useRef<() => void>(() => {});
+  // Likewise the step that ends playback, for the engine's `timeupdate`.
+  const endPlaybackIfDueRef = useRef<(time: number) => boolean>(() => false);
 
   // Initialize playout and load track
   useEffect(() => {
@@ -440,13 +442,16 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           fadeOut: track.fadeOut,
         });
 
-        // Set up time update callback
-        const mediaTrack = playout.getTrack(playout['track']?.id ?? '');
-        if (mediaTrack) {
-          mediaTrack.setOnTimeUpdateCallback((time) => {
-            currentTimeRef.current = time;
-          });
-        }
+        // The media element reports its position about four times a second,
+        // also while the tab is hidden and animation frames are not running.
+        // It keeps the cursor current, and it is the fallback that ends a
+        // range or an annotation in a hidden tab (up to a quarter of a second
+        // late); in a visible tab the animation loop sees the end first.
+        playout.on('timeupdate', (time) => {
+          if (cancelled) return;
+          currentTimeRef.current = time;
+          if (isPlayingRef.current) endPlaybackIfDueRef.current(time);
+        });
 
         // The audio played to its end. The cursor returns to where playback
         // started, as on Stop. A bounded play that is not the selection rests
@@ -464,7 +469,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
-        playoutInFlightRef.current = false;
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own
@@ -479,7 +483,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         if (queued) {
           pendingPlayRef.current = null;
           currentTimeRef.current = queued.position;
-          playbackEndTimeRef.current = queued.endTime ?? null;
           playout.play(undefined, queued.position);
           setIsPlaying(true);
           startAnimationLoopRef.current();
@@ -505,7 +508,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setIsPlaying(false);
       // Whatever replaces this player has its own metadata to load.
       setIsReady(false);
-      playbackEndTimeRef.current = null;
       const latest = latestAudioRef.current;
       if (latest.source !== source || latest.waveformData !== waveformData) {
         // New audio: the old position and the old active annotation mean
@@ -551,21 +553,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     createPlayout,
   ]);
 
-  // Animation loop
-  const startAnimationLoop = useCallback(() => {
-    const updateTime = () => {
-      const time = playoutRef.current?.getCurrentTime() ?? 0;
-      currentTimeRef.current = time;
-
-      // The media element reports the audible position: one time for logic
-      // and for drawing.
-      runFrameCallbacks({
-        time,
-        visualTime: time,
-        sampleRate,
-        samplesPerPixel: samplesPerPixelRef.current,
-      });
-
+  // The step that follows the annotations and ends playback when it is due.
+  // Returns true when it ended playback. Run by the animation loop on every
+  // frame and by the engine's `timeupdate` (see the init effect), so it must
+  // give the same result when it runs twice for one position.
+  const endPlaybackIfDue = useCallback(
+    (time: number): boolean => {
       const activeAnnotationEnded = followAnnotations({
         annotations: annotationsRef.current,
         lookup: annotationLookup,
@@ -582,7 +575,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         // Continuous play off: stop at the end of the active annotation and
         // return the cursor to where playback started.
         restAt(playStartPositionRef.current);
-        return;
+        return true;
       }
 
       // A bounded play (`play(start, duration)`, the selection) has reached
@@ -591,8 +584,36 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       const endTime = playbackEndTimeRef.current;
       if (endTime !== null && time >= endTime) {
         restAt(isSelectionPlayRef.current ? playStartPositionRef.current : endTime);
-        return;
+        return true;
       }
+      return false;
+    },
+    [
+      annotationsRef,
+      annotationLookup,
+      activeAnnotationIdRef,
+      continuousPlayRef,
+      setActiveAnnotationId,
+      restAt,
+    ]
+  );
+
+  // Animation loop
+  const startAnimationLoop = useCallback(() => {
+    const updateTime = () => {
+      const time = playoutRef.current?.getCurrentTime() ?? 0;
+      currentTimeRef.current = time;
+
+      // The media element reports the audible position: one time for logic
+      // and for drawing.
+      runFrameCallbacks({
+        time,
+        visualTime: time,
+        sampleRate,
+        samplesPerPixel: samplesPerPixelRef.current,
+      });
+
+      if (endPlaybackIfDue(time)) return;
 
       if (isAutomaticScrollRef.current && scrollContainerRef.current) {
         centrePlayhead(scrollContainerRef.current, time, sampleRate, samplesPerPixelRef.current);
@@ -603,21 +624,17 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
     startAnimationFrameLoop(updateTime);
   }, [
-    setActiveAnnotationId,
     sampleRate,
     startAnimationFrameLoop,
-    annotationLookup,
-    annotationsRef,
-    activeAnnotationIdRef,
-    continuousPlayRef,
     isAutomaticScrollRef,
     scrollContainerRef,
     runFrameCallbacks,
-    restAt,
+    endPlaybackIfDue,
   ]);
   useLayoutEffect(() => {
     startAnimationLoopRef.current = startAnimationLoop;
-  }, [startAnimationLoop]);
+    endPlaybackIfDueRef.current = endPlaybackIfDue;
+  }, [startAnimationLoop, endPlaybackIfDue]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
@@ -752,9 +769,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       if (!isPlayingRef.current) {
         // Nothing is playing: an earlier play no longer says anything about
         // this position.
-        isSelectionPlayRef.current = false;
         playStartPositionRef.current = start;
-        playbackEndTimeRef.current = null;
         // Only when the start moved: a rightward drag keeps its start, and
         // must not seek the media element on every pointer move.
         if (playout && cursorMoved) playout.seekTo(start);

@@ -215,16 +215,11 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     // selection as the last move left it.
     if (e === null) return;
 
-    // During playback, use the time captured at mouseDown — auto-scroll shifts the
-    // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
-    // would produce a wrong (shifted) position.
-    // The press already moved playback there (`setSelection` restarts a
-    // running play); this only makes sure nothing is left selected.
-    if (isPlaying) {
-      const clickTime = Math.max(0, mouseDownTimeRef.current);
-      setSelection(clickTime, clickTime);
-      return;
-    }
+    // During playback the press was the seek (`setSelection` restarts a
+    // running play at a collapsed selection) and moves were ignored: there is
+    // nothing left to do, and the release position must not be used anyway
+    // (auto-scroll shifts the overlay between the press and the release).
+    if (isPlaying) return;
 
     const endTime = dragTimeAt(e.clientX);
     if (endTime === null) return;

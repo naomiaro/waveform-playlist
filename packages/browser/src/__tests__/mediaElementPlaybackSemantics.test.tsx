@@ -468,6 +468,16 @@ describe('the drag in MediaElementPlaylist', () => {
     expect(probe.animation.currentTime).toBe(2);
   });
 
+  it('a drag shorter than a tenth of a second is a click: nothing stays selected', async () => {
+    await mount({ playlist: true });
+    await press(100);
+    await moveTo(102);
+    expect(probe.selection).toEqual({ selectionStart: 2, selectionEnd: 2.04 });
+    await release(102);
+    expect(probe.selection).toEqual({ selectionStart: 2, selectionEnd: 2 });
+    expect(probe.animation.currentTime).toBe(2);
+  });
+
   it('while playing: the press moves playback there, moves are ignored, the release selects nothing', async () => {
     const { playout } = await mount({ playlist: true });
     await playing(playout(), 0, 1);
@@ -669,5 +679,248 @@ describe('a custom playout must report its events', () => {
     );
     await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
     expect(probe.data.isReady).toBe(false);
+  });
+});
+
+// Annotations that cover the audio to its end.
+const TO_THE_END = [...ANNOTATIONS, { id: 'n4', start: 6, end: 8, lines: ['four'] }];
+
+describe('ends of playback, the cases a mutation run found untested', () => {
+  it('the audio ending clears the active annotation', async () => {
+    const { playout } = await mount({
+      annotationList: { annotations: TO_THE_END, isContinuousPlay: true },
+    });
+    await playing(playout(), 5, 7.9);
+    expect(probe.state.activeAnnotationId).toBe('n4');
+
+    await act(async () => playout().complete?.());
+    expect(probe.state.activeAnnotationId).toBeNull();
+    expect(probe.animation.currentTime).toBe(5);
+  });
+
+  it('a range that runs past the end of the audio rests at the end of the audio', async () => {
+    const { playout } = await mount();
+    await act(async () => {
+      await probe.controls.play(6, 5);
+    });
+    playout().time = 7.9;
+    await runFrame();
+
+    await act(async () => playout().complete?.());
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(SECONDS);
+  });
+
+  it('Stop clears the active annotation', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+      await probe.controls.play(0);
+    });
+    playout().time = 1;
+    await runFrame();
+    await act(async () => probe.controls.stop());
+    expect(probe.state.activeAnnotationId).toBeNull();
+  });
+
+  it('new audio: Stop no longer returns to a position in the old audio', async () => {
+    const { playout, changeTrack, loadMetadata } = await mount();
+    await playing(playout(), 3, 4);
+    await changeTrack(OTHER_TRACK);
+    await loadMetadata();
+    expect(probe.animation.currentTime).toBe(0);
+
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(0);
+  });
+
+  it('the selection ending on an annotation boundary keeps the highlight on the annotation that played', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => probe.internals.setSelection(1, 2));
+    await act(async () => {
+      await probe.controls.play(1, 1);
+    });
+    playout().time = 1.5;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n1');
+
+    // 2 is the end of n1 and the start of n2.
+    playout().time = 2;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.state.activeAnnotationId).toBe('n1');
+  });
+});
+
+describe('what counts as playing the selection', () => {
+  // The selection is 2 to 5. Only a play that starts inside it and ends at
+  // its end returns the cursor to its start; any other range rests at its end.
+  it.each([
+    { name: 'starts before the selection', start: 1, duration: 4, restsAt: 5 },
+    { name: 'starts at the end of the selection', start: 5, duration: 0, restsAt: 5 },
+    { name: 'ends inside the selection', start: 3, duration: 1, restsAt: 4 },
+    { name: 'starts inside and ends at its end', start: 3, duration: 2, restsAt: 2 },
+  ])('a play that $name rests at $restsAt', async ({ start, duration, restsAt }) => {
+    const { playout } = await mount();
+    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => {
+      await probe.controls.play(start, duration);
+    });
+    playout().time = start + duration;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(restsAt);
+  });
+
+  it('a seek during selection playback ends it: annotation ends stop playback again', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => probe.internals.setSelection(1, 5));
+    await act(async () => {
+      await probe.controls.play(1, 4);
+    });
+    await act(async () => probe.controls.seekTo(2.5));
+    playout().time = 2.6;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n2');
+
+    playout().time = 4;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(2.5);
+  });
+});
+
+describe('setSelection, the remaining cases', () => {
+  it('while stopped it is the new resting place: Stop does not go back to an old play start', async () => {
+    const { playout } = await mount();
+    await playing(playout(), 1, 2);
+    await act(async () => probe.controls.stop());
+    await act(async () => probe.internals.setSelection(4, 4));
+
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(4);
+  });
+
+  it('during an annotation play it replaces that play: the old annotation does not stop it', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+      await probe.controls.play(0);
+    });
+    playout().time = 1;
+    await runFrame();
+
+    await act(async () => probe.internals.setSelection(5, 5));
+    expect(probe.state.activeAnnotationId).toBeNull();
+    playout().time = 5.1;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+});
+
+describe('a queued play follows what happens before the player arrives', () => {
+  it('a seek re-points it and drops its end', async () => {
+    const { playout, deliver } = await mount({ holdPlayer: true });
+    await act(async () => {
+      await probe.controls.play(1, 2);
+    });
+    await act(async () => probe.controls.seekTo(4));
+    await deliver();
+    expect(playout().play).toHaveBeenCalledExactlyOnceWith(undefined, 4);
+    playout().time = 7;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+
+  it('a selection re-points it and gives it the selection end', async () => {
+    const { playout, deliver } = await mount({ holdPlayer: true });
+    await act(async () => {
+      await probe.controls.play(1);
+    });
+    await act(async () => probe.internals.setSelection(3, 4));
+    await deliver();
+    expect(playout().play).toHaveBeenCalledExactlyOnceWith(undefined, 3);
+    playout().time = 4;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(3);
+  });
+
+  it('once started it is no longer queued: a seek restarts the running play', async () => {
+    const { playout, deliver } = await mount({ holdPlayer: true });
+    await act(async () => {
+      await probe.controls.play(1);
+    });
+    await deliver();
+    await act(async () => probe.controls.seekTo(5));
+    expect(playout().play).toHaveBeenLastCalledWith(undefined, 5);
+  });
+});
+
+describe('a hidden tab: no animation frames, the media element still reports its time', () => {
+  it('a range ends from the timeupdate event alone', async () => {
+    const { playout } = await mount();
+    await act(async () => {
+      await probe.controls.play(2, 3);
+    });
+    await act(async () => playout().emit('timeupdate', 4.9));
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(probe.animation.currentTimeRef.current).toBe(4.9);
+
+    await act(async () => playout().emit('timeupdate', 5.2));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(5);
+    expect(playout().getCurrentTime()).toBe(5);
+    expect(frames.size).toBe(0);
+  });
+
+  it('the selection ends from the timeupdate event and returns to its start', async () => {
+    const { playout } = await mount();
+    await act(async () => probe.internals.setSelection(2, 5));
+    await act(async () => {
+      await probe.controls.play(2, 3);
+    });
+    await act(async () => playout().emit('timeupdate', 5.1));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(2);
+  });
+
+  it('an annotation ends from the timeupdate event, continuous play off', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n2');
+      await probe.controls.play(2);
+    });
+    await act(async () => playout().emit('timeupdate', 4.1));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(2);
+  });
+
+  it('with continuous play on the highlight follows from the timeupdate event', async () => {
+    const { playout } = await mount({
+      annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
+    });
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    await act(async () => playout().emit('timeupdate', 2.5));
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+
+  it('while not playing it only keeps the cursor ref current', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => playout().emit('timeupdate', 2.5));
+    expect(probe.animation.currentTimeRef.current).toBe(2.5);
+    expect(probe.state.activeAnnotationId).toBeNull();
+    expect(playout().pause).not.toHaveBeenCalled();
+  });
+
+  it('a report from a player that was replaced is ignored', async () => {
+    const { playout, changeTrack } = await mount();
+    const first = playout();
+    await changeTrack(OTHER_TRACK);
+    await act(async () => first.emit('timeupdate', 6));
+    expect(probe.animation.currentTimeRef.current).toBe(0);
   });
 });
