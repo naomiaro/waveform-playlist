@@ -208,16 +208,22 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     setRatePropSeen(initialPlaybackRate);
     setPlaybackRateState(initialPlaybackRate);
   }
-  // The same speed for a player that arrives later: the init effect tells
-  // every new player (a custom `createPlayout` is not given the speed any
-  // other way). Written by `setPlaybackRate`, and by the layout effect below
-  // for a changed prop. A layout effect, for two reasons: a render React
-  // discards leaves nothing here that never committed, and it runs before
-  // any child's passive effect of the same commit, so a child that sets a
-  // speed in answer to the change (restoring a saved one) is the later
-  // instruction and wins.
+  // The same speed for a player that arrives later (see the init effect).
+  // Written by `setPlaybackRate`, and by the layout effect below for a prop
+  // VALUE it has not applied yet. Not on every run: the effect also runs
+  // again with the same prop (a StrictMode remount, a revealed `<Activity>`),
+  // and it runs after a child's layout effect of the same commit; none of
+  // those is a new instruction, and each would put the prop's speed back
+  // over one that was chosen since. A layout effect, for two reasons: a
+  // render React discards leaves nothing here that never committed, and it
+  // runs before any child's passive effect of the same commit, so a child
+  // that sets a speed in answer to a prop change (restoring a saved one) is
+  // the later instruction and wins.
   const playbackRateRef = useRef(initialPlaybackRate);
+  const ratePropAppliedRef = useRef(initialPlaybackRate);
   useLayoutEffect(() => {
+    if (Object.is(ratePropAppliedRef.current, initialPlaybackRate)) return;
+    ratePropAppliedRef.current = initialPlaybackRate;
     playbackRateRef.current = initialPlaybackRate;
   }, [initialPlaybackRate]);
   // Annotations are derived from the prop (single source of truth in the
@@ -471,12 +477,16 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
-        // Every new player is told the current speed: the prop's, or the one
-        // the user chose since the prop last changed. It is what
-        // `usePlaybackRate()` (the speed select) shows. For the bundled
-        // engine, created at the prop's speed, this matters only after a
-        // choice of the user; a custom `createPlayout` learns the speed here.
-        playout.setPlaybackRate(playbackRateRef.current);
+        // The speed the provider shows (`usePlaybackRate()`, the speed
+        // select) is the prop's, or the one chosen since the prop last
+        // changed. The bundled engine was created at the prop's speed, as
+        // given: it is told only a speed that differs (its setter clamps,
+        // its constructor does not, so repeating the prop could change it).
+        // A custom `createPlayout` is not given the speed: it is always told.
+        const speed = playbackRateRef.current;
+        if (createPlayout || !Object.is(speed, initialPlaybackRate)) {
+          playout.setPlaybackRate(speed);
+        }
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own

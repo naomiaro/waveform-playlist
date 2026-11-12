@@ -91,7 +91,7 @@ interface MediaElementPlaylistProviderProps {
   samplesPerPixel?: number;              // Default: 1024
   waveHeight?: number;                   // Default: 100
   timescale?: boolean;                   // Default: false
-  playbackRate?: number;                 // Default: 1 (range: 0.5–2.0)
+  playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false
   theme?: Partial<WaveformPlaylistTheme>;
@@ -1836,6 +1836,7 @@ interface PlaybackRateSelectProps {
 // StopButton is disabled unless playing. RewindButton / FastForwardButton /
 // SkipBackwardButton / SkipForwardButton call seekTo only: seekTo(0), seekTo(Infinity),
 // seekTo(currentTimeRef.current ± skipAmount) (skipAmount default 5).
+// FastForwardButton is disabled under a WaveformPlaylistProvider with indefinitePlayback.
 ```
 
 All button/control components connect to context automatically. No props required for basic usage. All accept `className` and `style`.

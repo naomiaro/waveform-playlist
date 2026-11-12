@@ -121,7 +121,7 @@ When provided, audio routes through a Web Audio graph enabling fades and effects
 **Type:** `number`
 **Default:** `1`
 
-The playback rate, passed to the player as given (`setPlaybackRate` clamps to 0.5–2; the prop is not clamped). The user can change it with `setPlaybackRate` from `usePlaybackRate()` (the `PlaybackRateSelect` control); a later change of this prop replaces their choice, for the audio and for the value `usePlaybackRate()` returns, until they choose again. Every new player, including one from a custom `createPlayout`, is told the current speed with `setPlaybackRate`. Changing the prop recreates the player.
+The playback rate. The bundled engine is created at this speed as given; the provider does not clamp the prop (its `setPlaybackRate` clamps to 0.5–2). The user can change the speed with `setPlaybackRate` from `usePlaybackRate()` (the `PlaybackRateSelect` control); a later change of this prop replaces their choice, for the audio and for the value `usePlaybackRate()` returns, until they choose again. A player that replaces another plays at the current speed. A player from a custom `createPlayout` is not created with the speed: the provider calls its `setPlaybackRate` with the current speed when it arrives. Changing the prop recreates the player.
 
 #### `preservesPitch`
 

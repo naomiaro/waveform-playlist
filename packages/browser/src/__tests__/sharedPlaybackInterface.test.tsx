@@ -1318,6 +1318,121 @@ describe('review fixes', () => {
     expect(fakes[1].rate).toBe(2);
   });
 
+  // Third review: the prop's speed is remembered once per prop VALUE. An
+  // effect that merely runs again (a child's earlier layout effect, a
+  // StrictMode remount, a revealed <Activity>) is not a new instruction.
+  describe('the remembered speed survives effect re-runs with an unchanged prop', () => {
+    const makeFactory = () => {
+      const fakes: FakePlayout[] = [];
+      const createPlayout = () => {
+        const fake = createFakePlayout();
+        fakes.push(fake);
+        return fake as unknown as MediaElementPlayout;
+      };
+      return { fakes, createPlayout };
+    };
+
+    it("a child's mount layout effect that sets the speed", async () => {
+      const { fakes, createPlayout } = makeFactory();
+      const readers = makeReaders({ rate: usePlaybackRate });
+      const SetOnMount: React.FC = () => {
+        const { setPlaybackRate } = usePlaybackRate();
+        React.useLayoutEffect(() => {
+          setPlaybackRate(2);
+        }, [setPlaybackRate]);
+        return null;
+      };
+      render(
+        <MediaElementPlaylistProvider track={TRACK} createPlayout={createPlayout}>
+          <SetOnMount />
+          {readers.children}
+        </MediaElementPlaylistProvider>
+      );
+      await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+      expect(readers.values.rate.playbackRate).toBe(2);
+      expect(fakes[0].rate).toBe(2);
+    });
+
+    it("StrictMode, with a child's mount effect guarded to run once", async () => {
+      const { fakes, createPlayout } = makeFactory();
+      const readers = makeReaders({ rate: usePlaybackRate });
+      const SetOnce: React.FC = () => {
+        const { setPlaybackRate } = usePlaybackRate();
+        const done = React.useRef(false);
+        React.useEffect(() => {
+          if (done.current) return;
+          done.current = true;
+          setPlaybackRate(2);
+        }, [setPlaybackRate]);
+        return null;
+      };
+      render(
+        <React.StrictMode>
+          <MediaElementPlaylistProvider track={TRACK} createPlayout={createPlayout}>
+            <SetOnce />
+            {readers.children}
+          </MediaElementPlaylistProvider>
+        </React.StrictMode>
+      );
+      await waitFor(() =>
+        expect(fakes.some((fake) => fake.addTrack.mock.calls.length > 0)).toBe(true)
+      );
+      const live = fakes.filter((fake) => fake.dispose.mock.calls.length === 0);
+      expect(live).toHaveLength(1);
+      expect(readers.values.rate.playbackRate).toBe(2);
+      expect(live[0].rate).toBe(2);
+    });
+
+    it('an <Activity> hidden and shown again after the user chose a speed', async () => {
+      const { fakes, createPlayout } = makeFactory();
+      const readers = makeReaders({ rate: usePlaybackRate });
+      const ui = (mode: 'visible' | 'hidden') => (
+        <React.Activity mode={mode}>
+          <MediaElementPlaylistProvider track={TRACK} createPlayout={createPlayout}>
+            {readers.children}
+          </MediaElementPlaylistProvider>
+        </React.Activity>
+      );
+      const view = render(ui('visible'));
+      await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+      act(() => readers.values.rate.setPlaybackRate(1.5));
+      view.rerender(ui('hidden'));
+      await waitFor(() => expect(fakes[0].dispose).toHaveBeenCalled());
+      view.rerender(ui('visible'));
+      await waitFor(() => expect(fakes[1]?.addTrack).toHaveBeenCalled());
+      expect(readers.values.rate.playbackRate).toBe(1.5);
+      expect(fakes[1].rate).toBe(1.5);
+    });
+
+    it('the same after the prop itself has changed once: only a NEW prop value counts', async () => {
+      const { fakes, createPlayout } = makeFactory();
+      const readers = makeReaders({ rate: usePlaybackRate });
+      const ui = (mode: 'visible' | 'hidden', playbackRate: number) => (
+        <React.Activity mode={mode}>
+          <MediaElementPlaylistProvider
+            track={TRACK}
+            playbackRate={playbackRate}
+            createPlayout={createPlayout}
+          >
+            {readers.children}
+          </MediaElementPlaylistProvider>
+        </React.Activity>
+      );
+      const view = render(ui('visible', 1));
+      await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+      view.rerender(ui('visible', 2));
+      await waitFor(() => expect(fakes[1]?.addTrack).toHaveBeenCalled());
+      expect(fakes[1].rate).toBe(2);
+      act(() => readers.values.rate.setPlaybackRate(0.75));
+      view.rerender(ui('hidden', 2));
+      await waitFor(() => expect(fakes[1].dispose).toHaveBeenCalled());
+      view.rerender(ui('visible', 2));
+      await waitFor(() => expect(fakes[2]?.addTrack).toHaveBeenCalled());
+      expect(readers.values.rate.playbackRate).toBe(0.75);
+      expect(fakes[2].rate).toBe(0.75);
+    });
+  });
+
   it('a replaced player is created at the speed the user chose, not at the prop', async () => {
     const fakes: FakePlayout[] = [];
     // The provider passes the rate to the factory's options only for the
