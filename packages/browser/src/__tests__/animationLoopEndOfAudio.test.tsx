@@ -25,7 +25,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistControls, usePlaylistTimeline, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useEditorControls,
+  usePlaylistTimeline,
+  useIsPlaying,
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -117,7 +122,8 @@ let probe: Probe;
 
 const ProbeChild: React.FC = () => {
   const { isPlaying } = useIsPlaying();
-  const { play, setRecordingActive } = usePlaylistControls();
+  const { play } = usePlaybackControls();
+  const { setRecordingActive } = useEditorControls();
   const { isReady } = usePlaylistTimeline();
   probe = {
     isPlaying,

@@ -9,8 +9,8 @@ import { render, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const animation = { isPlaying: false };
-// What the provider gives its own components: the resting position and the
-// frame-callback registry its one animation loop drives (#769).
+// What usePlaybackRefs() gives: the position to draw and the frame-callback
+// registry the provider's one animation loop drives (#769, #688).
 const internals = vi.hoisted(() => {
   const callbacks = new Map<string, (data: { visualTime: number }) => void>();
   return {
@@ -25,13 +25,14 @@ const internals = vi.hoisted(() => {
   };
 });
 
-vi.mock('../MediaElementPlaylistContext', () => ({
-  useMediaElementAnimation: () => animation,
-  useMediaElementData: () => ({ samplesPerPixel: 100, sampleRate: 1000 }),
-}));
-
-vi.mock('../providerInternals/mediaElementInternalContexts', () => ({
-  useMediaElementInternals: () => internals,
+// The inner progress child reads these; the channel itself reads none of them.
+vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../contexts/playlistContexts')>()),
+  useIsPlaying: () => animation,
+  useCurrentTime: () => ({ currentTime: 0 }),
+  usePlaylistView: () => ({ sampleRate: 1000 }),
+  usePlaylistZoom: () => ({ samplesPerPixel: 100 }),
+  usePlaybackRefs: () => internals,
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => ({

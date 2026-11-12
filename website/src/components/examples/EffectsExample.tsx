@@ -20,7 +20,7 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
-  usePlaylistControls,
+  useEditorControls,
   KeyboardShortcuts,
   usePlaylistTimeline,
   usePlaylistMixer,
@@ -351,7 +351,7 @@ const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
 }) => {
   const { tracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackSolo, setTrackVolume } = usePlaylistControls();
+  const { setTrackMute, setTrackSolo, setTrackVolume } = useEditorControls();
 
   const trackState = trackStates[trackIndex] || {
     name: `Track ${trackIndex + 1}`,

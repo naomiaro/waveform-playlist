@@ -30,9 +30,9 @@ so edits to the library are picked up without a rebuild. Audio + pre-computed
 
 - `loadWaveformData(peaksSrc)` → a `MediaElementTrackConfig` (`{ source, waveformData, name }`).
 - `MediaElementPlaylistProvider` + `MediaElementWaveform` for rendering.
-- The four context hooks: `useMediaElementAnimation`, `useMediaElementState`,
-  `useMediaElementControls`, `useMediaElementData`.
-- Pitch-preserving rate control + a preserve-pitch toggle.
+- The library transport on the shared hooks: `PlayButton`, `PauseButton`, `StopButton`,
+  `AudioPosition`, and `PlaybackRateSelect` for the speed.
+- A preserve-pitch toggle (pitch-preserving rate control is the default).
 - The v14 `onError` prop surfacing init failures (e.g. a missing peer) in the UI.
 
 ## Using it in your own app

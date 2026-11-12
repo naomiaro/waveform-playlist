@@ -8,7 +8,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistControls, usePlaylistTimeline, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useEditorControls,
+  usePlaylistTimeline,
+  useIsPlaying,
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import { PlayButton } from '../components/PlaybackControls';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
@@ -114,7 +119,8 @@ let probe: Probe;
 
 const ProbeChild: React.FC = () => {
   const { isPlaying } = useIsPlaying();
-  const { setSelection, setCurrentTime, setLoopEnabled, stop, pause } = usePlaylistControls();
+  const { setSelection, stop, pause } = usePlaybackControls();
+  const { setCurrentTime, setLoopEnabled } = useEditorControls();
   const { isReady } = usePlaylistTimeline();
   probe = { isReady, isPlaying, setSelection, setCurrentTime, setLoopEnabled, stop, pause };
   return null;

@@ -11,7 +11,15 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistControls, usePlaylistTimeline, usePlaybackRefs, useIsPlaying, useCurrentTime, useActiveAnnotation, type FrameData } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  usePlaylistTimeline,
+  usePlaybackRefs,
+  useIsPlaying,
+  useCurrentTime,
+  useActiveAnnotation,
+  type FrameData,
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -95,7 +103,7 @@ let probe: {
   isReady: boolean;
   currentTime: number;
   activeAnnotationId: string | null;
-  controls: ReturnType<typeof usePlaylistControls>;
+  controls: ReturnType<typeof usePlaybackControls>;
   refs: ReturnType<typeof usePlaybackRefs>;
 };
 
@@ -105,7 +113,7 @@ const ProbeChild: React.FC = () => {
     isReady: usePlaylistTimeline().isReady,
     currentTime: useCurrentTime().currentTime,
     activeAnnotationId: useActiveAnnotation().activeAnnotationId,
-    controls: usePlaylistControls(),
+    controls: usePlaybackControls(),
     refs: usePlaybackRefs(),
   };
   return null;

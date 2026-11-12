@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaylistControls,
+  useEditorControls,
   useTimeFormat,
   useKeyboardShortcuts,
   getShortcutLabel,
@@ -23,12 +23,12 @@ import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
 // Zoom controls via context hooks demo
 const ZoomControlsDemo: React.FC = () => {
   const { samplesPerPixel, canZoomIn, canZoomOut } = usePlaylistZoom();
-  const { zoomIn, zoomOut } = usePlaylistControls();
+  const { zoomIn, zoomOut } = useEditorControls();
 
   return (
     <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>
-        usePlaylistZoom + usePlaylistControls (zoom)
+        usePlaylistZoom + useEditorControls (zoom)
       </h3>
       <div style={{ marginBottom: '1rem' }}>
         <strong>Current:</strong> {samplesPerPixel} samples/pixel
@@ -93,10 +93,10 @@ const TimeFormatDemo: React.FC = () => {
 
 // useMasterVolume via context demo
 // Note: useMasterVolume is an internal hook used by WaveformPlaylistProvider.
-// Components should access masterVolume via usePlaylistMixer/usePlaylistControls.
+// Components should access masterVolume via usePlaylistMixer/useEditorControls.
 const MasterVolumeDemo: React.FC = () => {
   const { masterVolume } = usePlaylistMixer();
-  const { setMasterVolume } = usePlaylistControls();
+  const { setMasterVolume } = useEditorControls();
   const [muted, setMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(masterVolume);
 
@@ -114,7 +114,7 @@ const MasterVolumeDemo: React.FC = () => {
   return (
     <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>
-        usePlaylistMixer + usePlaylistControls (masterVolume)
+        usePlaylistMixer + useEditorControls (masterVolume)
       </h3>
       <div style={{ marginBottom: '1rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem' }}>
@@ -247,7 +247,7 @@ These stories demonstrate how to test and visualize custom React hooks.
 ## Available Hooks
 
 ### Demoed in Storybook
-- \`usePlaylistZoom\` / \`usePlaylistMixer\` + \`usePlaylistControls\` - Zoom controls and master volume (via context)
+- \`usePlaylistZoom\` / \`usePlaylistMixer\` + \`useEditorControls\` - Zoom controls and master volume (via context)
 - \`useTimeFormat\` - Format and parse time values
 - \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
 
@@ -282,7 +282,7 @@ export const ZoomControls: StoryObj = {
     docs: {
       description: {
         story:
-          'Zoom controls accessed via `usePlaylistZoom` (state) and `usePlaylistControls` (actions). Engine owns zoom state.',
+          'Zoom controls accessed via `usePlaylistZoom` (state) and `useEditorControls` (actions). Engine owns zoom state.',
       },
     },
   },
@@ -313,7 +313,7 @@ export const MasterVolume: StoryObj = {
     docs: {
       description: {
         story:
-          'Master volume accessed via `usePlaylistMixer` (state) and `usePlaylistControls` (actions). Engine owns volume state.',
+          'Master volume accessed via `usePlaylistMixer` (state) and `useEditorControls` (actions). Engine owns volume state.',
       },
     },
   },

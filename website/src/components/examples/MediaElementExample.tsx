@@ -1,14 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type * as ToneNs from 'tone';
 import {
   MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementState,
-  useMediaElementControls,
-  useMediaElementData,
+  usePlaybackControls,
+  useMediaElementTrack,
   loadWaveformData,
   MediaElementWaveform,
+  PlayButton,
+  PauseButton,
+  StopButton,
+  PlaybackRateSelect,
+  AudioPosition,
 } from '@waveform-playlist/browser';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
@@ -96,7 +99,7 @@ const Label = styled.span`
   margin-right: 0.5rem;
 `;
 
-const TimeDisplay = styled.span`
+const TimeDisplay = styled(AudioPosition)`
   font-family: 'Courier New', monospace;
   font-size: 1rem;
   padding: 0.25rem 0.5rem;
@@ -106,87 +109,24 @@ const TimeDisplay = styled.span`
   text-align: center;
 `;
 
-
-// Playback rate presets
-const SPEED_PRESETS = [
-  { label: '0.5x', value: 0.5 },
-  { label: '0.75x', value: 0.75 },
-  { label: '1x', value: 1 },
-  { label: '1.25x', value: 1.25 },
-  { label: '1.5x', value: 1.5 },
-  { label: '2x', value: 2 },
-];
-
-// Format time as m:ss
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds) || isNaN(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Controls component that uses the context hooks.
-// currentTimeRef is updated at 60fps by the provider's animation loop,
-// but currentTime (React state) only updates on pause/stop/seek/playback-end.
-// We use a local rAF loop to update a DOM ref directly for smooth time display.
+// Transport from the library's controls: they read the nearest provider, so
+// each of the three players on this page gets its own set.
 function PlaybackControls() {
-  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
-  const { playbackRate } = useMediaElementState();
-  const { play, pause, stop, setPlaybackRate } = useMediaElementControls();
-  const { duration } = useMediaElementData();
-
-  const timeDisplayRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    let rafId: number;
-    const update = () => {
-      if (timeDisplayRef.current) {
-        const time = currentTimeRef.current ?? 0;
-        timeDisplayRef.current.textContent = `${formatTime(time)} / ${formatTime(duration)}`;
-      }
-      if (isPlaying) {
-        rafId = requestAnimationFrame(update);
-      }
-    };
-    if (isPlaying) {
-      rafId = requestAnimationFrame(update);
-    } else {
-      update();
-    }
-    return () => cancelAnimationFrame(rafId);
-  }, [isPlaying, currentTimeRef, duration]);
-
   return (
     <Controls>
       <ControlGroup>
-        <Button onClick={() => play()} disabled={isPlaying}>
-          ▶ Play
-        </Button>
-        <Button onClick={() => pause()} disabled={!isPlaying}>
-          ⏸ Pause
-        </Button>
-        <Button onClick={() => stop()}>
-          ⏹ Stop
-        </Button>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
       </ControlGroup>
 
       <ControlGroup>
-        <TimeDisplay ref={timeDisplayRef}>
-          {formatTime(currentTimeRef.current ?? 0)} / {formatTime(duration)}
-        </TimeDisplay>
+        <TimeDisplay />
       </ControlGroup>
 
       <ControlGroup>
         <Label>Speed:</Label>
-        {SPEED_PRESETS.map(preset => (
-          <SpeedButton
-            key={preset.value}
-            $active={playbackRate === preset.value}
-            onClick={() => setPlaybackRate(preset.value)}
-          >
-            {preset.label}
-          </SpeedButton>
-        ))}
+        <PlaybackRateSelect />
       </ControlGroup>
     </Controls>
   );
@@ -198,7 +138,7 @@ function PlaybackControls() {
  * the position and moves the player to it when it arrives.
  */
 function StartAtQueryTime() {
-  const { seekTo } = useMediaElementControls();
+  const { seekTo } = usePlaybackControls();
 
   useEffect(() => {
     const start = Number(new URLSearchParams(window.location.search).get('t'));
@@ -220,7 +160,7 @@ function StartAtQueryTime() {
 function EffectWiring() {
   // `isReady` turns true when the player exists and its media has loaded;
   // it is what makes this effect run again once `playoutRef` is set.
-  const { playoutRef, isReady } = useMediaElementData();
+  const { playoutRef, isReady } = useMediaElementTrack();
   const audioContext = getGlobalAudioContext();
 
   // Wire the effect chain after the AudioContext is running (user gesture).

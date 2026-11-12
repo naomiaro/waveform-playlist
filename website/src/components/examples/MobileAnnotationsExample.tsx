@@ -27,14 +27,15 @@ import {
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
   Waveform,
-  usePlaylistControls,
+  usePlaybackControls,
   useActiveAnnotation,
   useAnnotationDragHandlers,
   useDragSensors,
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
-  usePlaylistAnnotations,
+  useAnnotations,
+  useAnnotationEditing,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -260,7 +261,7 @@ const AnnotationInfo = styled.div`
 // Reading it in this small component keeps the rest of the page from
 // re-rendering each time.
 const ActiveAnnotationInfo: React.FC = () => {
-  const { annotations } = usePlaylistAnnotations();
+  const { annotations } = useAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   const activeAnnotation = annotations.find(a => a.id === activeAnnotationId);
 
@@ -285,8 +286,9 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
   const { sampleRate, controls } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
-  const { annotations, linkEndpoints, continuousPlay } = usePlaylistAnnotations();
-  const { setAnnotations, setActiveAnnotationId, play, annotationPreview } = usePlaylistControls();
+  const { annotations, continuousPlay } = useAnnotations();
+  const { linkEndpoints } = useAnnotationEditing();
+  const { setAnnotations, setActiveAnnotationId, play, annotationPreview } = usePlaybackControls();
 
   // Use touch-optimized sensors with 250ms delay
   const sensors = useDragSensors({ touchOptimized: true });

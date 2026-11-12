@@ -9,7 +9,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistControls, usePlaylistTimeline } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useEditorControls,
+  usePlaylistTimeline,
+} from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
@@ -94,12 +98,17 @@ const FakeAnnotationText: React.FC<AnnotationTextIntegrationProps> = (props) => 
 const INTEGRATION = { AnnotationText: FakeAnnotationText } as unknown as AnnotationIntegration;
 
 let probe: {
-  controls: ReturnType<typeof usePlaylistControls>;
+  controls: ReturnType<typeof usePlaybackControls>;
+  editor: ReturnType<typeof useEditorControls>;
   data: ReturnType<typeof usePlaylistTimeline>;
 };
 
 const ProbeChild: React.FC = () => {
-  probe = { controls: usePlaylistControls(), data: usePlaylistTimeline() };
+  probe = {
+    controls: usePlaybackControls(),
+    editor: useEditorControls(),
+    data: usePlaylistTimeline(),
+  };
   return null;
 };
 
@@ -161,7 +170,7 @@ describe('PlaylistAnnotationList (#740)', () => {
     const before = last().annotationListConfig;
 
     await act(async () => {
-      probe.controls.setLinkEndpoints(true);
+      probe.editor.setLinkEndpoints(true);
     });
     expect(last().annotationListConfig).toEqual({ linkEndpoints: true, continuousPlay: false });
     expect(last().annotationListConfig).not.toBe(before);

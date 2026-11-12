@@ -16,7 +16,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistControls, usePlaylistTimeline, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  usePlaylistTimeline,
+  useIsPlaying,
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -99,15 +103,16 @@ interface Probe {
   play: (startTime?: number, playDuration?: number) => Promise<void>;
   stop: () => void;
   pause: () => void;
+  seekTo: (time: number) => void;
 }
 
 let probe: Probe;
 
 const ProbeChild: React.FC = () => {
   const { isPlaying } = useIsPlaying();
-  const { play, stop, pause } = usePlaylistControls();
+  const { play, stop, pause, seekTo } = usePlaybackControls();
   const { isReady } = usePlaylistTimeline();
-  probe = { isPlaying, isReady, play, stop, pause };
+  probe = { isPlaying, isReady, play, stop, pause, seekTo };
   return null;
 };
 
@@ -326,6 +331,44 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     expect(adapters[0].playCalls.filter((c) => c.afterDispose)).toEqual([]);
     expect(adapters[1].playCalls).toHaveLength(1);
     expect(probe.isPlaying).toBe(true);
+  });
+
+  // #688: the transport buttons are `seekTo` only. Until then Rewind and the
+  // skips called `play(t)` themselves, which re-pointed the waiting resume;
+  // `seekTo` needed a live engine and left the resume at the old position.
+  it('seekTo while playback waits for the rebuilt engine re-points the resume', async () => {
+    const view = await mountReady();
+    await act(async () => {
+      await probe.play(1);
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    const finishBuild = startGatedRebuild(view);
+    await act(async () => {
+      await settle();
+      probe.seekTo(3);
+      await settle();
+      finishBuild();
+      await settle();
+    });
+
+    expect(adapters[0].playCalls.filter((c) => c.afterDispose)).toEqual([]);
+    expect(adapters[1].playCalls).toHaveLength(1);
+    expect(adapters[1].playCalls[0].startTime).toBe(3);
+    expect(probe.isPlaying).toBe(true);
+  });
+
+  it('seekTo while stopped during a rebuild starts nothing', async () => {
+    const view = await mountReady();
+    const finishBuild = startGatedRebuild(view);
+    await act(async () => {
+      await settle();
+      probe.seekTo(3);
+      finishBuild();
+      await settle();
+    });
+    expect(adapters[1].playCalls).toEqual([]);
+    expect(probe.isPlaying).toBe(false);
   });
 
   it('a play that starts between the tracks commit and the rebuild effect is carried over', async () => {

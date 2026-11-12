@@ -15,8 +15,9 @@ import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
   MediaElementWaveform,
-  useMediaElementControls,
-  useMediaElementAnimation,
+  PlayButton,
+  PauseButton,
+  StopButton,
   loadWaveformData,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -60,48 +61,20 @@ const WaveformWrapper = styled.div`
   overflow: hidden;
 `;
 
-const ControlButton = styled.button`
-  padding: 0.375rem 0.75rem;
-  border: 1px solid var(--ifm-color-emphasis-300, #dee2e6);
-  border-radius: 0.25rem;
-  background: var(--ifm-background-color, #fff);
-  color: var(--ifm-font-color-base, #1c1e21);
-  cursor: pointer;
-  font-size: 0.875rem;
-
-  &:hover:not(:disabled) {
-    background: var(--ifm-color-emphasis-100, #f0f0f0);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
 const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus';
 const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat';
 const FADE_DURATION = 1.5;
 const SAMPLES_PER_PIXEL = 1024;
 
 /**
- * Playback controls that read state from the MediaElement provider context.
+ * The library's transport buttons: they read the nearest MediaElement provider.
  */
 function PlaybackControls() {
-  const { play, pause, stop } = useMediaElementControls();
-  const { isPlaying } = useMediaElementAnimation();
-
   return (
     <Controls>
-      <ControlButton onClick={() => play()} disabled={isPlaying}>
-        Play
-      </ControlButton>
-      <ControlButton onClick={() => pause()} disabled={!isPlaying}>
-        Pause
-      </ControlButton>
-      <ControlButton onClick={() => stop()} disabled={!isPlaying}>
-        Stop
-      </ControlButton>
+      <PlayButton />
+      <PauseButton />
+      <StopButton />
     </Controls>
   );
 }

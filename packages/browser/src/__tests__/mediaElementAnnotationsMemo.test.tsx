@@ -45,7 +45,12 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 });
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
-import { useMediaElementControls, useMediaElementData, useMediaElementState } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useMediaElementTrack,
+  useAnnotations,
+  useActiveAnnotation,
+} from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
@@ -129,16 +134,16 @@ const INTEGRATION = {
 } as unknown as AnnotationIntegration;
 
 let probe: {
-  controls: ReturnType<typeof useMediaElementControls>;
-  data: ReturnType<typeof useMediaElementData>;
-  state: ReturnType<typeof useMediaElementState>;
+  controls: ReturnType<typeof usePlaybackControls>;
+  data: ReturnType<typeof useMediaElementTrack>;
+  state: ReturnType<typeof useAnnotations> & ReturnType<typeof useActiveAnnotation>;
 };
 
 const ProbeChild: React.FC = () => {
   probe = {
-    controls: useMediaElementControls(),
-    data: useMediaElementData(),
-    state: useMediaElementState(),
+    controls: usePlaybackControls(),
+    data: useMediaElementTrack(),
+    state: { ...useAnnotations(), ...useActiveAnnotation() },
   };
   return null;
 };
