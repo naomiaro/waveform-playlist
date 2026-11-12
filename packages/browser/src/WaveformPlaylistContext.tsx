@@ -3,7 +3,6 @@ import React, {
   useContext,
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -496,13 +495,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const duration = useMemo(() => timelineDuration(tracks), [tracks]);
   // The animation loop and `seekTo` read the timeline end from here, so that
   // neither changes identity when it moves: `seekTo` and `play` are in the
-  // controls value, which must not follow `duration` (#767). Written in a
-  // layout effect, so it is current before any frame or event handler that
-  // follows the commit.
+  // controls value, which must not follow `duration` (#767). Written during
+  // render, like `isPlayingRef` and `tracksRef`, so that a child that calls
+  // `seekTo` from a layout effect of the same commit already gets the new end.
   const durationRef = useRef(duration);
-  useLayoutEffect(() => {
-    durationRef.current = duration;
-  }, [duration]);
+  durationRef.current = duration;
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlayState] = useState(
@@ -1526,9 +1523,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const stopAnimationLoop = stopAnimationFrameLoop;
 
   // Two jobs, during playback only:
-  //  - restart the animation loop if its closure changes, so the running loop
-  //    always has current values (its dependencies are stable today; the
-  //    timeline end is read from `durationRef`);
+  //  - restart the animation loop when playback starts and if its closure
+  //    changes, so the running loop always has current values (its
+  //    dependencies are stable today; the timeline end is read from
+  //    `durationRef`, so a duration change does not restart it);
   //  - when continuous play is switched ON, reschedule the audio without an end,
   //    so it runs past the annotation it was bounded to.
   // The reschedule is tied to that false -> true transition, not to the current

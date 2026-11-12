@@ -158,6 +158,18 @@ const ControlsProbeChild: React.FC = () => {
   return null;
 };
 
+// When set, the child below seeks there from a layout effect of the commit in
+// which `duration` changes: before the provider's own effects have run.
+let seekFromLayoutEffect: { target: number } | null = null;
+const LayoutSeekChild: React.FC = () => {
+  const { seekTo } = usePlaylistControls();
+  const { duration } = usePlaylistData();
+  React.useLayoutEffect(() => {
+    if (seekFromLayoutEffect && duration === 2) seekTo(seekFromLayoutEffect.target);
+  }, [duration, seekTo]);
+  return null;
+};
+
 const TRACKS = [makeTrack('track-1'), makeTrack('track-2')];
 
 // One set of elements for every render of the wrapper, as when a parent passes
@@ -172,6 +184,7 @@ const CHILDREN = (
     <CurrentTimeProbeChild />
     <ActiveAnnotationProbeChild />
     <ControlsProbeChild />
+    <LayoutSeekChild />
   </>
 );
 
@@ -181,6 +194,7 @@ async function mount({ inlineProps = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   adapterTime = 0;
+  seekFromLayoutEffect = null;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   let tracks = TRACKS;
@@ -609,6 +623,47 @@ describe('the controls value does not follow the timeline length or the time for
       seekTo(1.5);
     });
     expect(currentTimeProbe.currentTime).toBe(1);
+  });
+
+  it('a seekTo called from a layout effect of the commit that brings the new duration clamps to it', async () => {
+    const { setTracks } = await mount();
+    seekFromLayoutEffect = { target: 1.5 };
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(currentTimeProbe.currentTime).toBe(1.5);
+  });
+
+  it('playback keeps running to the new end when a longer track is appended (no rebuild, no loop restart)', async () => {
+    const { adapter, setTracks } = await mount();
+    const addTrack = vi.spyOn(adapter, 'addTrack');
+    const setTracksOnAdapter = vi.spyOn(adapter, 'setTracks');
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+    const playCalls = (adapter.play as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    // The same two track objects plus one: an incremental add.
+    await act(async () => {
+      setTracks([...TRACKS, makeTrack('track-3', 2)]);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    expect(addTrack).toHaveBeenCalledTimes(1);
+    expect(setTracksOnAdapter).not.toHaveBeenCalled();
+    expect((adapter.play as ReturnType<typeof vi.fn>).mock.calls.length).toBe(playCalls);
+
+    adapterTime = 1.5;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    adapterTime = 2.1;
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 
   it('playback that is running when the timeline grows stops at the new end, not the old one', async () => {

@@ -209,7 +209,7 @@ Two related values on `usePlaylistData()` keep their names and types but are now
 
 Nothing in the library read either field.
 
-`usePlaylistControls().formatTime` formatted a time in the playlist's current time format. It was a new function after every `setTimeFormat`, which made the whole controls value change, so every component that calls `usePlaylistControls()` rendered again. The value returned by `usePlaylistControls()` no longer changes with the time format, or with `duration`.
+`usePlaylistControls().formatTime` formatted a time in the playlist's current time format. It was a new function after every `setTimeFormat`, which made the whole controls value change, so every component that calls `usePlaylistControls()` rendered again. The value returned by `usePlaylistControls()` no longer changes with the time format, or with `duration`. The value returned by `useMediaElementControls()` no longer changes when the track's duration arrives.
 
 **Find:** `formatTime` read from `usePlaylistControls()`.
 
@@ -241,8 +241,6 @@ const { minimumPlaylistHeight } = usePlaylistData();
 const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
-
-`useMediaElementControls()` likewise keeps its identity when the track's duration arrives.
 
 ## `selectionStart` and `selectionEnd` move from `usePlaylistState()` to `useSelection()`
 

@@ -121,7 +121,9 @@ describe('MediaElement controls value (#767)', () => {
     expect(playout.seekTo).toHaveBeenLastCalledWith(SECONDS);
   });
 
-  it('setAutomaticScroll keeps its identity and still applies', async () => {
+  // The setter was never unstable by itself (it was an arrow inside the memo);
+  // this pins that it still works after being pulled out.
+  it('setAutomaticScroll from the first controls value still applies', async () => {
     const { first } = await mount();
     const { setAutomaticScroll } = first;
 

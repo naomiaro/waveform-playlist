@@ -3,7 +3,6 @@ import React, {
   useContext,
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -213,11 +212,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   // `seekTo` clamps against this, so it keeps its identity when the duration
-  // arrives and the controls value does not change with it (#767).
+  // arrives and the controls value does not change with it (#767). Written
+  // during render, so a child's layout effect of the same commit reads the
+  // new value.
   const durationRef = useRef(duration);
-  useLayoutEffect(() => {
-    durationRef.current = duration;
-  }, [duration]);
+  durationRef.current = duration;
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
   // Annotations are derived from prop (single source of truth in parent)
