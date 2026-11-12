@@ -258,10 +258,132 @@ test.describe('Media Element Example', () => {
       // It went on from 8 s; it did not start again from 0.
       expect(await shownSeconds()).toBeGreaterThanOrEqual(8);
 
+      // Stop returns the cursor to where playback started (#688): 8 s, not 0.
       await stop.click();
       await expect(async () => {
-        expect(await playheadX()).toBe(0);
+        expect(Math.abs((await playheadX()) - restingX)).toBeLessThanOrEqual(1);
+        expect(await shownSeconds()).toBe(8);
       }).toPass({ timeout: 5000 });
+    });
+
+    // #688: the MediaElement provider follows the WebAudio provider's rules.
+    test('Stop returns the cursor to where playback started; a seek while stopped stays put', async ({
+      page,
+    }) => {
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      const playhead = player.locator('[data-playhead]');
+      const play = page.getByRole('button', { name: /Play/ }).first();
+      const stop = page.getByRole('button', { name: /Stop/ }).first();
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await player.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const y = box!.y + box!.height / 2;
+
+      // A click while stopped moves the cursor there.
+      await page.mouse.click(box!.x + 120, y);
+      await expect(async () => {
+        expect(Math.abs((await playheadX()) - 120)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 5000 });
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(140);
+      }).toPass({ timeout: 10000 });
+
+      await stop.click();
+      await expect(async () => {
+        expect(Math.abs((await playheadX()) - 120)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 5000 });
+      // It rests there: the media element does not report another position.
+      await page.waitForTimeout(600);
+      expect(Math.abs((await playheadX()) - 120)).toBeLessThanOrEqual(1);
+
+      // Play again starts from the same place.
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(140);
+      }).toPass({ timeout: 10000 });
+      expect(await playheadX()).toBeLessThan(400);
+      await stop.click();
+    });
+
+    test('a press during playback moves playback there at once, and a drag selects nothing', async ({
+      page,
+    }) => {
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      const playhead = player.locator('[data-playhead]');
+      const play = page.getByRole('button', { name: /Play/ }).first();
+      const pause = page.getByRole('button', { name: /Pause/ }).first();
+      const stop = page.getByRole('button', { name: /Stop/ }).first();
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await player.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const y = box!.y + box!.height / 2;
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(5);
+      }).toPass({ timeout: 10000 });
+
+      // Press far ahead and hold: playback is already there before the release.
+      await page.mouse.move(box!.x + 300, y);
+      await page.mouse.down();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThanOrEqual(300);
+      }).toPass({ timeout: 5000 });
+      await page.mouse.move(box!.x + 200, y, { steps: 5 });
+      await expect(page.locator('[data-selection]')).toHaveCount(0);
+      await page.mouse.up();
+
+      await expect(page.locator('[data-selection]')).toHaveCount(0);
+      await expect(pause).toBeEnabled();
+      expect(await playheadX()).toBeGreaterThanOrEqual(300);
+
+      // Stop returns to where this play began: the press.
+      await stop.click();
+      await expect(async () => {
+        expect(Math.abs((await playheadX()) - 300)).toBeLessThanOrEqual(1);
+      }).toPass({ timeout: 5000 });
+    });
+
+    test('the total time is shown before the player has loaded', async ({ page, baseURL }) => {
+      // Hold the audio back: the length comes from the waveform data.
+      await page.route('**/*.opus', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        await route.continue();
+      });
+      const audioRequested = page.waitForRequest('**/*.opus');
+      await page.goto(`${baseURL}/examples/media-element`);
+      // The route above is holding this request: the player cannot be ready.
+      await audioRequested;
+      const timeDisplay = page.getByText(/^\d+:\d\d \/ \d+:\d\d$/).first();
+      await expect(timeDisplay).toBeVisible({ timeout: 30000 });
+      await expect(timeDisplay).not.toHaveText(/\/ 0:00$/, { timeout: 2000 });
+      await expect(
+        page.locator('[data-scroll-container]').first().locator('canvas').first()
+      ).toBeVisible();
+    });
+
+    test('a source that cannot be loaded is reported', async ({ page, baseURL }) => {
+      const warnings: string[] = [];
+      page.on('console', (msg) => {
+        if (msg.type() === 'warning') warnings.push(msg.text());
+      });
+      await page.route('**/*.opus', (route) => route.abort());
+      await page.goto(`${baseURL}/examples/media-element`);
+      await expect(async () => {
+        expect(warnings.some((text) => text.includes('Media failed to load'))).toBe(true);
+      }).toPass({ timeout: 30000 });
     });
 
     test('speed controls are visible', async ({ page }) => {

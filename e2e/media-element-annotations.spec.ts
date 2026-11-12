@@ -41,11 +41,28 @@ test.describe('Media Element Annotations Example', () => {
     const pause = page.getByRole('button', { name: 'Pause', exact: true });
 
     // Annotation 4 is 2.68 seconds long.
-    await page.locator('[data-scroll-container]').getByText('4', { exact: true }).click();
+    const box4 = page.locator('[data-scroll-container]').getByText('4', { exact: true });
+    await box4.click();
     await expect(pause).toBeEnabled({ timeout: 10000 });
 
     await expect(play).toBeEnabled({ timeout: 10000 });
     await expect(pause).toBeDisabled();
+
+    // The cursor returns to the start of the annotation (#688), not to 0.
+    const container = page.locator('[data-scroll-container]').first();
+    const playhead = container.locator('[data-playhead]');
+    await expect(async () => {
+      // The box is the label's nearest absolutely positioned ancestor.
+      const boxLeft = await box4.evaluate((label) => {
+        let node: HTMLElement | null = label as HTMLElement;
+        while (node && getComputedStyle(node).position !== 'absolute') node = node.parentElement;
+        return node ? node.getBoundingClientRect().left : -1;
+      });
+      const playheadRect = await playhead.boundingBox();
+      expect(playheadRect).toBeTruthy();
+      expect(boxLeft).toBeGreaterThan(0);
+      expect(Math.abs(playheadRect!.x - boxLeft)).toBeLessThanOrEqual(2);
+    }).toPass({ timeout: 5000 });
   });
 
   test('with continuous play on, a clicked box keeps playing past its end', async ({ page }) => {
