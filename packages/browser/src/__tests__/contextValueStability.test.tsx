@@ -34,11 +34,11 @@ if (typeof globalThis.requestAnimationFrame === 'undefined') {
 
 const SAMPLE_RATE = 48000;
 
-function makeTrack(id: string): ClipTrack {
+function makeTrack(id: string, seconds = 1): ClipTrack {
   const clip = {
     id: id + '-clip',
     startSample: 0,
-    durationSamples: SAMPLE_RATE,
+    durationSamples: seconds * SAMPLE_RATE,
     offsetSamples: 0,
     sampleRate: SAMPLE_RATE,
   } as AudioClip;
@@ -71,7 +71,7 @@ function createFakeAdapter(): PlayoutAdapter {
     pause() {},
     stop() {},
     seek() {},
-    getCurrentTime: () => 0,
+    getCurrentTime: () => adapterTime,
     isPlaying: () => false,
     setMasterVolume() {},
     setTrackVolume() {},
@@ -82,6 +82,9 @@ function createFakeAdapter(): PlayoutAdapter {
     dispose() {},
   } as unknown as PlayoutAdapter;
 }
+
+// What the fake adapter reports as the playback position.
+let adapterTime = 0;
 
 type Controls = ReturnType<typeof usePlaylistControls>;
 type Data = ReturnType<typeof usePlaylistData>;
@@ -154,11 +157,13 @@ const TRACKS = [makeTrack('track-1'), makeTrack('track-2')];
 async function mount({ inlineProps = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
+  adapterTime = 0;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
+  let tracks = TRACKS;
   const Wrapper: React.FC = () => (
     <WaveformPlaylistProvider
-      tracks={TRACKS}
+      tracks={tracks}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       {...(inlineProps
@@ -175,7 +180,15 @@ async function mount({ inlineProps = false } = {}) {
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(probe.data.isReady).toBe(true));
-  return { adapter, rerender: () => utils.rerender(<Wrapper />) };
+  return {
+    adapter,
+    rerender: () => utils.rerender(<Wrapper />),
+    // Replaces the `tracks` prop, as a parent does after an edit.
+    setTracks: (next: ClipTrack[]) => {
+      tracks = next;
+      utils.rerender(<Wrapper />);
+    },
+  };
 }
 
 afterEach(async () => {
@@ -484,5 +497,100 @@ describe('the active annotation lives in its own context (#740)', () => {
     expect(() => render(<ActiveAnnotationProbeChild />)).toThrow(
       'useActiveAnnotation must be used within WaveformPlaylistProvider'
     );
+  });
+});
+
+// 2 seconds instead of 1: the timeline end moves, as it does on every pointer
+// move while the last clip's right edge is trimmed.
+const LONGER_TRACKS = [makeTrack('track-1', 2), makeTrack('track-2')];
+
+describe('the controls value does not follow the timeline length or the time format (#767)', () => {
+  it('controls value survives a change of duration', async () => {
+    const { setTracks } = await mount();
+    const before = probe.controls;
+    expect(probe.data.duration).toBe(1);
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(probe.controls).toBe(before);
+  });
+
+  it('controls value survives a time-format change', async () => {
+    await mount();
+    const before = probe.controls;
+
+    await act(async () => {
+      probe.controls.setTimeFormat('seconds');
+    });
+
+    expect(probe.data.timeFormat).toBe('seconds');
+    expect(probe.controls).toBe(before);
+  });
+
+  it('a seekTo captured before the timeline grew clamps to the new end', async () => {
+    const { setTracks } = await mount();
+    const { seekTo } = probe.controls;
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    await act(async () => {
+      seekTo(1.5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(1.5);
+
+    await act(async () => {
+      seekTo(5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(2);
+  });
+
+  it('a seekTo captured before the timeline shrank clamps to the new end', async () => {
+    const { setTracks } = await mount();
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    const { seekTo } = probe.controls;
+
+    await act(async () => {
+      setTracks(TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(1));
+
+    await act(async () => {
+      seekTo(1.5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(1);
+  });
+
+  it('playback that is running when the timeline grows stops at the new end, not the old one', async () => {
+    const { setTracks } = await mount();
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.isPlaying).toBe(true));
+
+    // Past the old end (1 s), before the new one (2 s): several frames pass
+    // and playback is still running.
+    adapterTime = 1.5;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    adapterTime = 2.1;
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 });
