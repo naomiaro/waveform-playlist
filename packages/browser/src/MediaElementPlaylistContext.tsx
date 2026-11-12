@@ -297,10 +297,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const playStartPositionRef = useRef(0);
   const playbackEndTimeRef = useRef<number | null>(null);
   const isSelectionPlayRef = useRef(false);
+  // Where a queued play ends is `playbackEndTimeRef`, as for a running one.
   // A play asked for while there is no player (the first one is loading, or
   // one is being replaced). Started by the init effect when the player
   // arrives; cleared by Stop, Pause, new audio and a failed init.
-  const pendingPlayRef = useRef<{ position: number; endTime?: number } | null>(null);
+  const pendingPlayRef = useRef<{ position: number } | null>(null);
   // True from the start of an init unless it failed: only then is there a
   // player, or one on its way, for a play to start on or wait for.
   const playoutInFlightRef = useRef(false);
@@ -667,7 +668,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       if (!playout) {
         // The player is loading or being replaced: the init effect starts
         // this when it arrives. `isPlaying` stays false until audio starts.
-        pendingPlayRef.current = { position: actualStartTime, endTime };
+        pendingPlayRef.current = { position: actualStartTime };
         return;
       }
       pendingPlayRef.current = null;
@@ -716,7 +717,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     const queued = pendingPlayRef.current;
     if (queued) {
       queued.position = clampedTime;
-      queued.endTime = undefined;
       return;
     }
 
@@ -760,7 +760,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       const queued = pendingPlayRef.current;
       if (queued) {
         queued.position = start;
-        queued.endTime = endTime;
         replaceBoundedPlay();
         return;
       }

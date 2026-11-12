@@ -924,3 +924,53 @@ describe('a hidden tab: no animation frames, the media element still reports its
     expect(probe.animation.currentTimeRef.current).toBe(0);
   });
 });
+
+describe('players that are gone', () => {
+  it('a play queued for a player that failed to arrive does not start on a later one', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onError = vi.fn();
+    let fail: (reason: Error) => void = () => {};
+    const later = createFakePlayout();
+    let calls = 0;
+    const createPlayout = (() => {
+      calls++;
+      if (calls > 1) return later;
+      return new Promise((_resolve, reject) => {
+        fail = reject;
+      });
+    }) as unknown as () => MediaElementPlayout;
+    const tree = (track: typeof TRACK) => (
+      <MediaElementPlaylistProvider track={track} createPlayout={createPlayout} onError={onError}>
+        <ProbeChild />
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(tree(TRACK));
+    await act(async () => {});
+    await act(async () => {
+      await probe.controls.play(3);
+    });
+    await act(async () => fail(new Error('no engine')));
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+
+    // The same audio in a new player (only the name differs): the cursor is
+    // kept, and the play that failed must not come back to life.
+    view.rerender(tree({ ...TRACK, name: 'Renamed' }));
+    await act(async () => {});
+    expect(probe.data.playoutRef.current).toBe(later);
+    expect(later.play).not.toHaveBeenCalled();
+    expect(probe.animation.isPlaying).toBe(false);
+  });
+
+  it('the end-of-audio report of a replaced player does not touch the new one', async () => {
+    const { playout, changeTrack } = await mount();
+    const first = playout();
+    await playing(first, 3, 4);
+    await changeTrack(OTHER_TRACK);
+    const second = playout();
+    expect(second).not.toBe(first);
+
+    await act(async () => first.complete?.());
+    expect(second.pause).not.toHaveBeenCalled();
+    expect(second.seekTo).not.toHaveBeenCalled();
+  });
+});
