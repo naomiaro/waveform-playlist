@@ -3,7 +3,16 @@ import type { KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { usePlaybackShortcuts } from '../hooks/usePlaybackShortcuts';
 import { useClipSplitting } from '../hooks/useClipSplitting';
 import { useAnnotationKeyboardControls } from '../hooks/useAnnotationKeyboardControls';
-import { useActiveAnnotation, usePlaylistZoom, usePlaylistTimeline, useEngineRefs, useAnnotations, useAnnotationEditing, usePlaybackControls, useEditorControls } from '../contexts/playlistContexts';
+import {
+  useActiveAnnotation,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  useEngineRefs,
+  useAnnotations,
+  useAnnotationEditing,
+  usePlaybackControls,
+  useEditorControls,
+} from '../contexts/playlistContexts';
 
 export interface KeyboardShortcutsProps {
   /** Enable default playback shortcuts (Space, Escape, 0). Defaults to false. */
@@ -44,8 +53,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   const { annotations: annotationList, continuousPlay } = useAnnotations();
   const { linkEndpoints } = useAnnotationEditing();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } =
-    usePlaybackControls();
+  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } = usePlaybackControls();
   const { undo, redo } = useEditorControls();
 
   const { splitClipAtPlayhead } = useClipSplitting({

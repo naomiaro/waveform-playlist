@@ -19,7 +19,16 @@ import {
   type RenderPlayheadFunction,
   CLIP_HEADER_HEIGHT,
 } from '@waveform-playlist/ui-components';
-import { usePlaylistView, usePlaylistZoom, usePlaylistTimeline, useTrackReorderPreview, useSelectedTrackId, useIsPlaying, usePlaybackControls, useEditorControls } from '../contexts/playlistContexts';
+import {
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  useTrackReorderPreview,
+  useSelectedTrackId,
+  useIsPlaying,
+  usePlaybackControls,
+  useEditorControls,
+} from '../contexts/playlistContexts';
 import {
   applyTrackOrderPreview,
   computeTrackLayout,

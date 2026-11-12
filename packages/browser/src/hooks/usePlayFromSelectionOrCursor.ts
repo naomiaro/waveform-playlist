@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { usePlaybackControls, useSelection, usePlaybackRefs, useLoopOptional } from '../contexts/playlistContexts';
+import {
+  usePlaybackControls,
+  useSelection,
+  usePlaybackRefs,
+  useLoopOptional,
+} from '../contexts/playlistContexts';
 
 /**
  * The one way playback is started by the built-in controls, so the Play button

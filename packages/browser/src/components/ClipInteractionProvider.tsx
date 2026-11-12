@@ -11,7 +11,13 @@ import {
 } from '@waveform-playlist/core';
 import { useBeatsAndBars, getScaleInfo } from '@waveform-playlist/ui-components';
 
-import { usePlaylistView, usePlaylistZoom, usePlaylistTimeline, useEngineRefs, useEditorControls } from '../contexts/playlistContexts';
+import {
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  useEngineRefs,
+  useEditorControls,
+} from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';

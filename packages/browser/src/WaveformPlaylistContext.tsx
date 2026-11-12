@@ -1,11 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-  type ReactNode,
-} from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { ThemeProvider } from 'styled-components';
 import type {
   EffectsFunction,
@@ -20,13 +13,12 @@ import {
   type AnnotationAction,
   type MidiNoteData,
 } from '@waveform-playlist/core';
-import { type TimeFormat, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
+import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
 import { assertTrackKind } from '@waveform-playlist/core';
-import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import {
   useTimeFormat,
   useZoomControls,

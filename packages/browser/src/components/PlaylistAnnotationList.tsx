@@ -1,6 +1,11 @@
 import React from 'react';
 import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
-import { useActiveAnnotation, usePlaybackControls, useAnnotations, useAnnotationEditing } from '../contexts/playlistContexts';
+import {
+  useActiveAnnotation,
+  usePlaybackControls,
+  useAnnotations,
+  useAnnotationEditing,
+} from '../contexts/playlistContexts';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationListView, type AnnotationListCommonProps } from './AnnotationListView';
 

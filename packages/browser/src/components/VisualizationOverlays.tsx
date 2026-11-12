@@ -12,7 +12,21 @@ import {
   type RenderPlayheadFunction,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
-import { useActiveAnnotation, useCurrentTime, useSelection, usePlaylistView, usePlaylistZoom, usePlaybackRefs, useLoop, useIsPlaying, usePlaybackControls, useEditorControls, useEngineRefs, useAnnotations, useAnnotationEditing } from '../contexts/playlistContexts';
+import {
+  useActiveAnnotation,
+  useCurrentTime,
+  useSelection,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaybackRefs,
+  useLoop,
+  useIsPlaying,
+  usePlaybackControls,
+  useEditorControls,
+  useEngineRefs,
+  useAnnotations,
+  useAnnotationEditing,
+} from '../contexts/playlistContexts';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';

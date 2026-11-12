@@ -8,7 +8,17 @@ import {
   formatTime,
 } from '@waveform-playlist/ui-components';
 import styled from 'styled-components';
-import { useCurrentTime, useSelection, usePlaybackControls, useEditorControls, usePlaybackRate, usePlaylistSettings, usePlaylistMixer, usePlaybackRefs, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  useCurrentTime,
+  useSelection,
+  usePlaybackControls,
+  useEditorControls,
+  usePlaybackRate,
+  usePlaylistSettings,
+  usePlaylistMixer,
+  usePlaybackRefs,
+  useIsPlaying,
+} from '../contexts/playlistContexts';
 
 /**
  * Master volume control that uses the playlist context

@@ -12,7 +12,13 @@ import {
   type WaveformPlaylistTheme,
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
-import { useCurrentTime, usePlaylistView, usePlaylistZoom, usePlaybackRefs, useIsPlaying } from '../contexts/playlistContexts';
+import {
+  useCurrentTime,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaybackRefs,
+  useIsPlaying,
+} from '../contexts/playlistContexts';
 
 const ChannelWrapper = styled.div`
   position: relative;
