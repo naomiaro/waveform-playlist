@@ -36,6 +36,7 @@ import {
   useTrackReorderPreview,
   usePlaybackRate,
   useMediaElementTrack,
+  useLoopOptional,
 } from '../contexts/playlistContexts';
 import {
   PlayButton,
@@ -47,6 +48,7 @@ import {
   SkipForwardButton,
   LoopButton,
 } from '../components/PlaybackControls';
+import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
 import {
   AudioPosition,
   AutomaticScrollCheckbox,
@@ -762,18 +764,20 @@ describe('the library controls under MediaElementPlaylistProvider', () => {
         {readers.children}
       </>
     );
-    act(() => readers.values.controls.setSelection(2, 4));
+    // Not an annotation's range (those are 0-2 and 2-4): only the selection
+    // can end this play at 3.5.
+    act(() => readers.values.controls.setSelection(2.5, 3.5));
     await act(async () => {
       fireEvent.click(button('Play'));
     });
-    expect(fake.play).toHaveBeenLastCalledWith(undefined, 2);
+    expect(fake.play).toHaveBeenLastCalledWith(undefined, 2.5);
     fake.time = 3;
     await runFrame();
     expect(readers.values.isPlaying.isPlaying).toBe(true);
-    fake.time = 4.01;
+    fake.time = 3.51;
     await runFrame();
     expect(readers.values.isPlaying.isPlaying).toBe(false);
-    expect(readers.values.currentTime.currentTime).toBe(2);
+    expect(readers.values.currentTime.currentTime).toBe(2.5);
   });
 
   it('Rewind, Fast Forward and the skips seek, stopped and playing', async () => {
@@ -865,6 +869,22 @@ describe('the library controls under MediaElementPlaylistProvider', () => {
     expect([...select.options].map((o) => o.value)).toContain('0.9');
   });
 
+  it('PlaybackRateSelect offers the given rates', async () => {
+    await mountMediaElement(<PlaybackRateSelect rates={[1, 1.5]} />);
+    const select = screen.getByLabelText('Playback speed') as HTMLSelectElement;
+    expect([...select.options].map((o) => o.value)).toEqual(['1', '1.5']);
+  });
+
+  it('there is no loop to read: the internal optional reader gives null, not the blocked marker', async () => {
+    let loop: unknown = 'unset';
+    const Reader: React.FC = () => {
+      loop = useLoopOptional();
+      return null;
+    };
+    await mountMediaElement(<Reader />);
+    expect(loop).toBeNull();
+  });
+
   it('the automatic-scroll checkbox and the selection inputs read and write the provider', async () => {
     const readers = makeReaders({
       controls: usePlaybackControls,
@@ -916,6 +936,30 @@ class ErrorCatcher extends React.Component<
 }
 
 describe('the library transport under WaveformPlaylistProvider', () => {
+  it('the 0 shortcut moves the cursor to the start', async () => {
+    useTimerFrames();
+    const readers = makeReaders({
+      controls: usePlaybackControls,
+      currentTime: useCurrentTime,
+      timeline: usePlaylistTimeline,
+    });
+    render(
+      webAudio(
+        <>
+          <KeyboardShortcuts playback />
+          {readers.children}
+        </>
+      )
+    );
+    await waitFor(() => expect(readers.values.timeline.isReady).toBe(true));
+    act(() => readers.values.controls.seekTo(2));
+    expect(readers.values.currentTime.currentTime).toBe(2);
+    act(() => {
+      fireEvent.keyDown(document.body, { key: '0' });
+    });
+    expect(readers.values.currentTime.currentTime).toBe(0);
+  });
+
   it('Rewind and the skips still restart playback at the new position', async () => {
     useTimerFrames();
     const adapter = createFakeAdapter();
