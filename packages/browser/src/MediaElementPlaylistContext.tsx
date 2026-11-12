@@ -196,9 +196,21 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [currentTime, setCurrentTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
-  // The speed the user chose, for a player that arrives later (see the init
-  // effect). Written by `setPlaybackRate` only.
+  // The latest instruction wins: the `playbackRate` prop when it changes, or
+  // what the user chose with `setPlaybackRate` since. A changed prop becomes
+  // the state here, during render (the "derive state from a prop" pattern),
+  // so the speed select never shows a speed other than the one playing.
+  const [ratePropSeen, setRatePropSeen] = useState(initialPlaybackRate);
+  if (ratePropSeen !== initialPlaybackRate) {
+    setRatePropSeen(initialPlaybackRate);
+    setPlaybackRateState(initialPlaybackRate);
+  }
+  // The same speed for a player that arrives later (see the init effect).
+  // Written by `setPlaybackRate`, and by the init effect when it runs for a
+  // changed prop: in an effect, not during render, so that a render React
+  // discards leaves no speed here that never committed.
   const playbackRateRef = useRef(initialPlaybackRate);
+  const ratePropAppliedRef = useRef(initialPlaybackRate);
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
@@ -365,6 +377,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     const source = track.source;
     const waveformData = track.waveformData;
     playoutInFlightRef.current = true;
+    // A changed `playbackRate` prop replaces whatever the user chose before
+    // it; this run's player is created at that speed.
+    if (ratePropAppliedRef.current !== initialPlaybackRate) {
+      ratePropAppliedRef.current = initialPlaybackRate;
+      playbackRateRef.current = initialPlaybackRate;
+    }
 
     (async () => {
       try {
@@ -451,9 +469,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
         playoutRef.current = playout;
         // The player was created at the `playbackRate` prop's speed. If the
-        // user has chosen another one since, this player replaces the one
-        // they chose it on: it plays at their speed, which is also what
-        // `usePlaybackRate()` (the speed select) goes on showing.
+        // user has chosen another one since the prop last changed, this
+        // player replaces the one they chose it on: it plays at their speed,
+        // which is also what `usePlaybackRate()` (the speed select) shows.
         if (playbackRateRef.current !== initialPlaybackRate) {
           playout.setPlaybackRate(playbackRateRef.current);
         }

@@ -73,6 +73,7 @@ const waveform = WaveformData.create({
   data: Array.from({ length: LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -10 : 10)),
 });
 const TRACK = { source: 'test.mp3', waveformData: waveform, name: 'Test' };
+const RENAMED_TRACK = { ...TRACK, name: 'Renamed' };
 
 const ANNOTATIONS: AnnotationData[] = [
   { id: 'a1', start: 0, end: 2, lines: ['one'] },
@@ -1163,6 +1164,43 @@ describe('review fixes', () => {
         selectionEnd: SECONDS,
       });
     });
+  });
+
+  // "The latest instruction wins" (maintainer, 2026-11-12): a changed prop is
+  // an instruction too, for the audio and for what the select shows.
+  it('a changed playbackRate prop becomes the speed, over an earlier choice of the user', async () => {
+    const fakes: FakePlayout[] = [];
+    const createPlayout = () => {
+      const fake = createFakePlayout();
+      fakes.push(fake);
+      return fake as unknown as MediaElementPlayout;
+    };
+    const readers = makeReaders({ rate: usePlaybackRate });
+    const ui = (playbackRate: number, name = 'Test') => (
+      <MediaElementPlaylistProvider
+        track={name === 'Test' ? TRACK : RENAMED_TRACK}
+        playbackRate={playbackRate}
+        createPlayout={createPlayout}
+      >
+        {readers.children}
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(1));
+    await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+    act(() => readers.values.rate.setPlaybackRate(1.5));
+
+    view.rerender(ui(2));
+    await waitFor(() => expect(fakes[1]?.addTrack).toHaveBeenCalled());
+    expect(readers.values.rate.playbackRate).toBe(2);
+    // The new player was made for the prop's speed: it is not put back to 1.5.
+    expect(fakes[1].setPlaybackRate).not.toHaveBeenCalled();
+
+    // The user chooses again: that wins, also on the next player.
+    act(() => readers.values.rate.setPlaybackRate(0.75));
+    view.rerender(ui(2, 'Renamed'));
+    await waitFor(() => expect(fakes[2]?.addTrack).toHaveBeenCalled());
+    expect(readers.values.rate.playbackRate).toBe(0.75);
+    expect(fakes[2].rate).toBe(0.75);
   });
 
   it('a replaced player is created at the speed the user chose, not at the prop', async () => {

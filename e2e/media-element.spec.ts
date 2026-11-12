@@ -405,6 +405,30 @@ test.describe('Media Element Example', () => {
       await page.getByRole('button', { name: 'Stop' }).first().click();
     });
 
+    // Review of #688 part 2: a replaced player (here: the Preserve Pitch
+    // toggle recreates it) runs at the speed the user chose, which is what
+    // the dropdown goes on showing. Before, it ran at the provider's prop.
+    test('the chosen speed survives a replaced player', async ({ page }) => {
+      const speed = page.getByRole('combobox', { name: 'Playback speed' }).first();
+      const position = page.getByLabel('Audio position').first();
+      const seconds = async () => {
+        const [hours, minutes, rest] = ((await position.textContent()) ?? '').split(':');
+        return Number(hours) * 3600 + Number(minutes) * 60 + Number(rest);
+      };
+      await speed.selectOption('2');
+      await page.getByRole('button', { name: 'Off', exact: true }).first().click();
+      await expect(speed).toHaveValue('2');
+
+      await page.getByRole('button', { name: 'Play' }).first().click();
+      await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
+      const before = await seconds();
+      await page.waitForTimeout(1000);
+      const advanced = (await seconds()) - before;
+      expect(advanced).toBeGreaterThan(1.6);
+      expect(advanced).toBeLessThan(2.6);
+      await page.getByRole('button', { name: 'Stop' }).first().click();
+    });
+
     test('Stop is disabled unless playing; after Pause the cursor stays where it paused', async ({
       page,
     }) => {
