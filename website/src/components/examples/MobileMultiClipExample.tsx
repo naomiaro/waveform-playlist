@@ -293,8 +293,8 @@ export function MobileMultiClipExample() {
             </ControlGroup>
           </Controls>
 
-          {/* The provider's touchOptimized also widens the clip trim handles */}
-          <Waveform showClipHeaders />
+          {/* touchOptimized enables larger touch targets for clip boundaries */}
+          <Waveform showClipHeaders touchOptimized />
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

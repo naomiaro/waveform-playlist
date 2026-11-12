@@ -48,8 +48,7 @@ export default function MobileMultiClipExamplePage(): React.ReactElement {
 
           <h3>Implementation</h3>
           <p>
-            One prop on <code>ClipInteractionProvider</code> enables both the touch delay and the wider
-            trim handles. With your own <code>DragDropProvider</code>, set the two parts yourself:
+            Enable mobile optimization with two props:
           </p>
           <pre style={{
             background: 'var(--ifm-code-background)',
@@ -57,13 +56,7 @@ export default function MobileMultiClipExamplePage(): React.ReactElement {
             borderRadius: '4px',
             overflow: 'auto',
           }}>
-{`// With ClipInteractionProvider: one prop
-<ClipInteractionProvider touchOptimized>
-  <Waveform showClipHeaders />
-</ClipInteractionProvider>
-
-// With your own DragDropProvider:
-// 1. Configure drag sensors with touch delay
+{`// 1. Configure drag sensors with touch delay
 const sensors = useDragSensors({ touchOptimized: true });
 
 // 2. Enable larger touch targets on Waveform
