@@ -96,7 +96,8 @@ Declares a track. Must be a direct child of `<daw-editor>`.
 | `pan`         | number  | `0`          | Stereo pan (-1.0 left, 0 center, 1.0 right)                                                                                       |
 | `muted`       | boolean | `false`      | Whether track is muted                                                                                                            |
 | `soloed`      | boolean | `false`      | Whether track is soloed                                                                                                           |
-| `render-mode` | string  | `'waveform'` | `'waveform'` or `'piano-roll'`. Piano-roll mode mounts `<daw-piano-roll>` for each clip in the track instead of `<daw-waveform>`. |
+| `kind`        | string  | `'audio'`    | `'audio'` or `'midi'`. What the track holds: every `<daw-clip>` must be of this kind (a clip with `src` is audio, a clip without is MIDI). A clip of the other kind is not added and is reported with `daw-clip-error`. A MIDI track mounts `<daw-piano-roll>` for each clip. Set it before the track is added; a later change is ignored with a warning. |
+| `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track (always a piano roll); `'piano-roll'` on an audio track is ignored. |
 
 When `src` is set without child `<daw-clip>` elements, a single clip spanning the full audio is created automatically.
 
@@ -242,7 +243,7 @@ Uses chunked rendering (1000px chunks) with virtual scrolling for performance. O
 
 ### `<daw-piano-roll>`
 
-Renders MIDI notes on canvas — alternative to `<daw-waveform>` for clips on tracks with `render-mode="piano-roll"`. Auto-mounted by `<daw-editor>`; rarely instantiated directly.
+Renders MIDI notes on canvas — alternative to `<daw-waveform>` for clips on MIDI tracks (`<daw-track kind="midi">`). Auto-mounted by `<daw-editor>`; rarely instantiated directly.
 
 Same chunked rendering pattern as `<daw-waveform>` (1000px chunks, virtual scrolling). Auto-fits the pitch range to the actual notes (± 1 note for breathing room), maps velocity to opacity (0.3 → 1.0), and respects `--daw-piano-roll-note-color` / `--daw-piano-roll-selected-note-color` / `--daw-piano-roll-background` CSS custom properties.
 
@@ -344,7 +345,7 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
   │     └── <daw-clip>          ← Data element, light DOM
   ├── <daw-track-controls>      ← Visual, Shadow DOM (auto-generated)
   ├── <daw-waveform>            ← Visual, Shadow DOM (auto-generated; render-mode="waveform")
-  ├── <daw-piano-roll>          ← Visual, Shadow DOM (auto-generated; render-mode="piano-roll")
+  ├── <daw-piano-roll>          ← Visual, Shadow DOM (auto-generated; kind="midi")
   ├── <daw-playhead>            ← Visual, Shadow DOM (auto-generated)
   ├── <daw-ruler>               ← Visual, Shadow DOM (auto-generated)
   └── <daw-selection>           ← Visual, Shadow DOM (auto-generated)

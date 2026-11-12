@@ -102,7 +102,7 @@ export async function loadMidiImpl(
     parsed.tracks.map((t) =>
       host.addTrack({
         name: t.name,
-        renderMode: 'piano-roll',
+        kind: 'midi',
         clips: [
           {
             midiNotes: t.notes,

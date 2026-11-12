@@ -31,7 +31,7 @@ import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { createValueSource } from '@waveform-playlist/core';
+import { assertTrackKind, createValueSource } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import {
   useTimeFormat,
@@ -846,6 +846,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // snapshot as the guard, not from prevTracksRef.current.
         const engine = engineRef.current;
         const { added: addedTracks, filled: filledTracks } = incrementalChange;
+        // The engine rejects a track whose clips do not match its kind (#756).
+        // Check the whole batch before applying any of it, so a bad track
+        // late in the batch does not leave the earlier ones half applied.
+        [...filledTracks, ...addedTracks].forEach(assertTrackKind);
 
         // Merge current UI state into a track before handing it to the engine
         const currentTrackStates = trackStatesRef.current;

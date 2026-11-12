@@ -152,6 +152,7 @@ export function useMidiTracks(
 
       return createTrack({
         name: trackName,
+        kind: 'midi',
         clips: [clip],
         muted: config.muted ?? false,
         soloed: config.soloed ?? false,

@@ -19,6 +19,14 @@ test.describe('Multi-Clip Example', () => {
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
   });
 
+  test('every track is an audio track (#756)', async ({ page }) => {
+    const rows = page.locator('[data-track-row]');
+    await expect(rows.first()).toBeVisible();
+    const total = await rows.count();
+    expect(total).toBeGreaterThan(0);
+    await expect(page.locator('[data-track-row][data-track-kind="audio"]')).toHaveCount(total);
+  });
+
   test.describe('Playhead Positioning', () => {
     test('clicking on waveform area moves playhead', async ({ page }) => {
       // Get the first clip container - this ensures we click on actual waveform content

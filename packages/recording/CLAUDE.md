@@ -123,6 +123,10 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 
 **Overdub flow (in RecordingExample):** `startRecordingWithPlayback()` is re-entrancy-guarded (a double Record press races the async startup — `isRecording` state commits only after several awaits — and would clobber the punch-in position). It calls `setRecordingActive(true, selectedTrackId)` eagerly (suppresses the end-of-audio auto-stop + arm-mutes the recorded track BEFORE playback starts), then `await startRecording()` — **resolves a boolean**; on `false` or a stop-during-startup cancel, release the session and skip playback — then `play(currentTime)`. Stop button stops recording AND pauses playback explicitly (there is NO playback-stop→recording-stop auto-trigger effect — a stale mention of one here previously seeded issue #589's phantom mechanism). Record button is start-only (not a toggle).
 
+## A Take Belongs to the Track It Was Started On (#756)
+
+`useIntegratedRecording` captures the selected track id in `startRecording()` (`recordingTrackIdRef`, also returned as the `recordingTrackId` state for the live preview) and `stopRecording()` adds the take to THAT track, whatever is selected by then. The target cannot be switched mid-take: the maintainer's rule (2026-11-11), the same as dawcore, whose session is keyed by the track id. `startRecording()` refuses a MIDI track (returns `false`, sets `error`): a track holds one kind of clip and a take is audio. Before #756 the take went to the track selected at stop, so a MIDI track selected mid-take received an audio clip, which the engine now rejects.
+
 ## Multi-Instance Worklet Registration Gap
 
 **Known issue:** `workletLoadedRef` in `useRecording` and `useMicrophoneLevel` is per-component-instance (`useRef`). Multiple instances would each try `addModule()` → `registerProcessor()` throws on the already-registered name. Fix when multi-mic is needed: promote to module-level variable or `Map<AudioContext, boolean>`.

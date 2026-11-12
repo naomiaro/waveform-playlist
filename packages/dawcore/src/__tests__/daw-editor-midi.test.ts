@@ -57,7 +57,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const track = document.createElement('daw-track') as any;
-    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('kind', 'midi');
     track.setAttribute('name', 'Lead');
 
     const clip = document.createElement('daw-clip') as any;
@@ -83,7 +83,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const track = document.createElement('daw-track') as any;
-    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('kind', 'midi');
     const clip = document.createElement('daw-clip') as any;
     const notes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
     clip.midiNotes = notes;
@@ -110,7 +110,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const track = document.createElement('daw-track') as any;
-    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('kind', 'midi');
     const clip = document.createElement('daw-clip') as any;
     clip.midiNotes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
     track.appendChild(clip);
@@ -135,7 +135,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const track = document.createElement('daw-track') as any;
-    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('kind', 'midi');
     // Clip with neither midiNotes nor duration — pure placeholder
     const clip = document.createElement('daw-clip') as any;
     track.appendChild(clip);
@@ -169,7 +169,10 @@ describe('<daw-editor> MIDI loading', () => {
       midi: { notes, channel: 0, program: 24 },
     });
 
-    expect(track.getAttribute('render-mode')).toBe('piano-roll');
+    expect(track.getAttribute('kind')).toBe('midi');
+    expect(track.getAttribute('render-mode')).toBeNull();
+    expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
+    expect(adapter.setTracks.mock.lastCall![0][0].kind).toBe('midi');
     expect(track.name).toBe('Lead');
     const clipEls = track.querySelectorAll('daw-clip');
     expect(clipEls.length).toBe(1);
@@ -186,7 +189,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const track = document.createElement('daw-track') as any;
-    track.setAttribute('render-mode', 'piano-roll');
+    track.setAttribute('kind', 'midi');
     const clip = document.createElement('daw-clip') as any;
     clip.duration = 4; // placeholder span — notes not yet set
     track.appendChild(clip);
@@ -220,7 +223,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('purges audio caches when a clip transitions from audio to MIDI', async () => {
+  it('refuses notes on a clip of an audio track: the clip and its caches stay as they were (#756)', async () => {
     const editor = document.createElement('daw-editor') as any;
     const adapter = makeMockAdapter();
     editor.adapter = adapter;
@@ -246,6 +249,7 @@ describe('<daw-editor> MIDI loading', () => {
     // Populate _engineTracks with an audio clip so _applyClipUpdate can find it
     editor._engineTracks = new Map(editor._engineTracks).set(trackId, {
       id: trackId,
+      kind: 'audio',
       name: 'Test',
       volume: 1,
       pan: 0,
@@ -272,9 +276,13 @@ describe('<daw-editor> MIDI loading', () => {
       pan: 0,
       muted: false,
       soloed: false,
+      kind: 'audio',
       renderMode: 'waveform',
       clips: [],
     });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errors: any[] = [];
+    editor.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
 
     // Simulate a DawClipElement with midiNotes set (audio→MIDI transition)
     const fakeClipEl = {
@@ -290,10 +298,17 @@ describe('<daw-editor> MIDI loading', () => {
 
     editor._applyClipUpdate(trackId, clipId, fakeClipEl);
 
-    // Audio caches should be purged after an audio→MIDI transition
-    expect(editor._clipBuffers.has(clipId)).toBe(false);
-    expect(editor._clipOffsets.has(clipId)).toBe(false);
-    expect(editor._peaksData.has(clipId)).toBe(false);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ trackId, clipId });
+    expect(String(errors[0].error.message)).toMatch(/MIDI clip.*audio track "Test".*kind="midi"/);
+    // Nothing changed: still the audio clip, with its caches.
+    const clipAfter = editor._engineTracks.get(trackId).clips[0];
+    expect(clipAfter.audioBuffer).toBe(fakeBuffer);
+    expect(clipAfter.midiNotes).toBeUndefined();
+    expect(editor._clipBuffers.has(clipId)).toBe(true);
+    expect(editor._clipOffsets.has(clipId)).toBe(true);
+    expect(editor._peaksData.has(clipId)).toBe(true);
+    expect(adapter.updateTrack).not.toHaveBeenCalled();
 
     document.body.removeChild(editor);
   });
@@ -394,7 +409,7 @@ describe('<daw-editor> MIDI loading', () => {
       editor.adapter = makeMockAdapter();
       document.body.appendChild(editor);
       const trackEl = document.createElement('daw-track') as any;
-      trackEl.setAttribute('render-mode', 'piano-roll');
+      trackEl.setAttribute('kind', 'midi');
       const clipEl = document.createElement('daw-clip') as any;
       clipEl.duration = 4; // placeholder span
       trackEl.appendChild(clipEl);
@@ -429,6 +444,7 @@ describe('splitAtPlayhead MIDI guard', () => {
   ) {
     return {
       id: 't1',
+      kind: 'midi' as const,
       name: 'MIDI Track',
       volume: 1,
       pan: 0,

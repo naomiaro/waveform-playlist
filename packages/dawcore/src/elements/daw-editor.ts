@@ -20,12 +20,13 @@ import type {
   TrackConfig,
   ClipConfig,
 } from '../types';
-import { isDomClip } from '../types';
+import { isDomClip, trackDescriptorRenderMode } from '../types';
 import {
   createClip,
   createClipFromSeconds,
   createTrack,
   clipPixelWidth,
+  trackKind,
 } from '@waveform-playlist/core';
 import { PeakPipeline } from '../workers/peakPipeline';
 import type { DawTrackElement } from './daw-track';
@@ -65,6 +66,7 @@ import type {
   DawTrackReorderGrabDetail,
   DawClipIdDetail,
   DawClipErrorDetail,
+  DawRecordingErrorDetail,
   DawErrorDetail,
   DawTimeFormatChangeDetail,
   LoadFilesResult,
@@ -1418,7 +1420,31 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const trackEl = (e.target as HTMLElement).closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
     const oldDescriptor = this._tracks.get(trackId);
-    const descriptor = this._readTrackDescriptor(trackEl);
+    let descriptor = this._readTrackDescriptor(trackEl);
+    if (oldDescriptor && oldDescriptor.kind !== descriptor.kind) {
+      // The clips already loaded are of the old kind (#756).
+      console.warn(
+        '[dawcore] <daw-track> "' +
+          descriptor.name +
+          '": kind cannot change after the track has loaded (still "' +
+          oldDescriptor.kind +
+          '"). Remove the track and add one of the other kind.'
+      );
+      descriptor = {
+        ...descriptor,
+        kind: oldDescriptor.kind,
+        renderMode: trackDescriptorRenderMode(oldDescriptor.kind, trackEl.renderMode),
+      };
+      // Put the element back, so it says what the editor holds and the next
+      // unrelated update (a volume change) does not warn again. The update
+      // this assignment dispatches finds the kinds equal. In a microtask: we
+      // are inside the element's own updated(), where Lit's dev build warns
+      // about a property change.
+      const keptKind = oldDescriptor.kind;
+      queueMicrotask(() => {
+        trackEl.kind = keptKind;
+      });
+    }
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     if (this._engine) {
       if (oldDescriptor?.volume !== descriptor.volume)
@@ -1495,9 +1521,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         pan: track.pan ?? 0,
         muted: track.muted ?? false,
         soloed: track.soloed ?? false,
-        renderMode: track.clips.some((c) => c.midiNotes && c.midiNotes.length > 0)
-          ? 'piano-roll'
-          : 'waveform',
+        kind: trackKind(track),
+        renderMode: trackDescriptorRenderMode(trackKind(track), 'waveform'),
         clips: [],
       });
     }
@@ -1746,6 +1771,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // block can roll back partial state on any error past the cache writes.
     let insertedClipId: string | null = null;
     try {
+      const trackDesc = this._tracks.get(trackId);
+      const kindError = trackDesc
+        ? this._clipKindError(trackDesc.name, trackDesc.kind, false, clipDesc.name || clipDesc.src)
+        : null;
+      if (kindError) throw kindError;
       // Concurrent fetches: peaks (if provided) + audio decode.
       const waveformDataPromise = clipDesc.peaksSrc
         ? this._resolvePeaks(clipDesc.peaksSrc)
@@ -2036,8 +2066,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // — including placeholders. For audio clips it is undefined.
     // Use loose != null consistently: treats both null and undefined as "not MIDI"
     // for both clipEl.midiNotes (DawClipElement defaults to null) and oldClip.midiNotes.
-    const isMidiNow = clipEl.midiNotes != null;
+    // A clip with a src is an audio clip even if notes are set on it, as at
+    // load (_isMidiDescriptor: "treating as audio, notes will be ignored").
+    const isMidiNow = clipEl.midiNotes != null && !clipEl.src;
     const wasMidi = oldClip.midiNotes != null;
+    if (isMidiNow && trackKind(t) !== 'midi') {
+      // Notes assigned to a clip of an audio track: the clip would become a
+      // MIDI clip on an audio track (#756). Leave the engine clip as it is.
+      const kindError = this._clipKindError(t.name, 'audio', true, clipEl.name || clipId);
+      console.warn('[dawcore] _applyClipUpdate: ' + kindError?.message);
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId, error: kindError },
+        })
+      );
+      return;
+    }
     if (isMidiNow || wasMidi) {
       const notes = this._validMidiNotes(clipEl.midiNotes ?? []);
       const noteSpanSeconds = notes.length
@@ -2188,9 +2234,36 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       pan: trackEl.pan,
       muted: trackEl.muted,
       soloed: trackEl.soloed,
-      renderMode: trackEl.renderMode,
+      kind: trackEl.kind,
+      renderMode: trackDescriptorRenderMode(trackEl.kind, trackEl.renderMode),
       clips,
     };
+  }
+  /**
+   * The error for a clip whose kind is not its track's (#756), or null. A clip
+   * with no `src` is a MIDI clip (see _isMidiDescriptor).
+   */
+  private _clipKindError(
+    trackName: string,
+    kind: TrackDescriptor['kind'],
+    clipIsMidi: boolean,
+    clipLabel: string
+  ): Error | null {
+    if (clipIsMidi === (kind === 'midi')) return null;
+    return new Error(
+      clipIsMidi
+        ? 'clip "' +
+          clipLabel +
+          '" is a MIDI clip (no src) on audio track "' +
+          trackName +
+          '". A track holds one kind of clip: set kind="midi" on the <daw-track>' +
+          " (or kind: 'midi' in addTrack) for a track of MIDI clips."
+        : 'clip "' +
+          clipLabel +
+          '" is an audio clip on MIDI track "' +
+          trackName +
+          '". A track holds one kind of clip: put the clip on an audio track.'
+    );
   }
   // --- Audio Loading ---
   private async _loadTrack(trackId: string, descriptor: TrackDescriptor) {
@@ -2204,8 +2277,38 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const sppAtLoadStart = this._samplesPerPixel;
     try {
       const clips = [];
+      // MIDI clips refused because the track is an audio track: they have no
+      // src, so the "all clips failed" count below would not see them.
+      let refusedMidiClips = 0;
       for (const clipDesc of descriptor.clips) {
-        if (this._isMidiDescriptor(clipDesc)) {
+        const clipIsMidi = this._isMidiDescriptor(clipDesc);
+        const kindError = this._clipKindError(
+          descriptor.name,
+          descriptor.kind,
+          clipIsMidi,
+          clipDesc.name || clipDesc.src || (isDomClip(clipDesc) ? clipDesc.clipId : '')
+        );
+        if (kindError) {
+          // Not added: a wrong-kind clip must never reach the engine, which
+          // throws on a track that holds both kinds.
+          console.warn('[dawcore] _loadTrack: ' + kindError.message);
+          if (this.isConnected) {
+            this.dispatchEvent(
+              new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+                bubbles: true,
+                composed: true,
+                detail: {
+                  trackId,
+                  clipId: isDomClip(clipDesc) ? clipDesc.clipId : '',
+                  error: kindError,
+                },
+              })
+            );
+          }
+          if (clipIsMidi) refusedMidiClips++;
+          continue;
+        }
+        if (clipIsMidi) {
           // MIDI clip path: no fetch, no peaks, register the clip directly.
           // Always registers (even with no notes / no duration) so late note
           // arrivals via daw-clip-update — handled in _applyClipUpdate
@@ -2270,6 +2373,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
             if (this._tracks.has(trackId)) {
               const previewTrack = createTrack({
                 name: descriptor.name,
+                kind: descriptor.kind,
                 clips: [clip],
                 volume: descriptor.volume,
                 pan: descriptor.pan,
@@ -2375,6 +2479,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
       const track = createTrack({
         name: descriptor.name,
+        kind: descriptor.kind,
         clips,
         volume: descriptor.volume,
         pan: descriptor.pan,
@@ -2384,7 +2489,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       // If clips were requested but ALL failed to load, surface as a track-level
       // error so addTrack({clips: [...]}) rejects appropriately. Per-clip
       // daw-clip-error events have already fired for each individual failure.
-      const requestedClips = descriptor.clips.filter((c) => c.src).length;
+      const requestedClips = descriptor.clips.filter((c) => c.src).length + refusedMidiClips;
       if (requestedClips > 0 && clips.length === 0) {
         throw new Error(
           'all ' + requestedClips + ' clip(s) failed to load — see prior daw-clip-error events'
@@ -2742,9 +2847,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (config.muted) trackEl.setAttribute('muted', '');
     if (config.soloed) trackEl.setAttribute('soloed', '');
 
-    // render-mode: explicit > inferred from midi shorthand > default 'waveform'
-    const renderMode = config.renderMode ?? (config.midi ? 'piano-roll' : undefined);
-    if (renderMode !== undefined) trackEl.setAttribute('render-mode', renderMode);
+    // kind: explicit > 'midi' from the midi shorthand > default 'audio'. A
+    // MIDI track is drawn as a piano roll whatever render-mode says.
+    const kind = config.kind ?? (config.midi ? 'midi' : undefined);
+    if (kind !== undefined) trackEl.setAttribute('kind', kind);
+    if (config.renderMode !== undefined) trackEl.setAttribute('render-mode', config.renderMode);
 
     const clipConfigs: ClipConfig[] = [...(config.clips ?? [])];
     if (config.midi) {
@@ -2862,7 +2969,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       ...(partial.pan !== undefined && { pan: partial.pan }),
       ...(partial.muted !== undefined && { muted: partial.muted }),
       ...(partial.soloed !== undefined && { soloed: partial.soloed }),
-      ...(normalizedRenderMode !== undefined && { renderMode: normalizedRenderMode }),
+      ...(normalizedRenderMode !== undefined && {
+        renderMode: trackDescriptorRenderMode(oldDesc.kind, normalizedRenderMode),
+      }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
     if (this._engine) {
@@ -3330,6 +3439,25 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const s = stream ?? this.recordingStream;
     if (!s) {
       console.warn('[dawcore] startRecording: no stream provided and recordingStream is null');
+      return;
+    }
+    // A take is audio: it cannot land on a MIDI track (#756).
+    const targetId = options?.trackId ?? this._selectedTrackId;
+    const target = targetId ? this._tracks.get(targetId) : undefined;
+    if (targetId && target?.kind === 'midi') {
+      const error = new Error(
+        'Cannot record onto MIDI track "' +
+          target.name +
+          '": a recording is audio. Select or create an audio track first.'
+      );
+      console.warn('[dawcore] startRecording: ' + error.message);
+      this.dispatchEvent(
+        new CustomEvent<DawRecordingErrorDetail>('daw-recording-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId: targetId, error },
+        })
+      );
       return;
     }
     await this._recordingController.startRecording(s, options);

@@ -462,16 +462,18 @@ For the live waveform preview to match the finalized clip, pass the **same** val
 ```tsx
 const LATENCY = 0.023; // your measured latency, in seconds
 
-const { isRecording, progress, ... } =
+const { isRecording, progress, recordingTrackId, ... } =
   useIntegratedRecording(tracks, setTracks, selectedTrackId, {
     currentTime,
     latencyOffset: LATENCY,
   });
 
 <Waveform
-  recordingState={isRecording ? {
+  recordingState={isRecording && recordingTrackId ? {
     isRecording,
-    trackId: selectedTrackId,
+    // The track the take was started on (from useIntegratedRecording): the
+    // take is added there even if another track is selected meanwhile.
+    trackId: recordingTrackId,
     // startSample is derived by the consumer: the timeline position captured
     // when recording started — see the full recording example.
     startSample,

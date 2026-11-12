@@ -127,7 +127,7 @@ const ClipView = React.memo(function ClipView({
           gain={gainScaledWaveforms ? (clip.gain ?? 1) : 1}
           clipStartSample={clip.startSample}
           clipDurationSamples={clip.durationSamples}
-          renderMode={clip.midiNotes ? 'piano-roll' : renderMode}
+          renderMode={renderMode}
           midiNotes={clip.midiNotes}
           clipSampleRate={clip.sampleRate}
           clipOffsetSeconds={
@@ -291,6 +291,8 @@ const TrackRow = React.memo(function TrackRow({
       $animate={animate}
       data-track-row=""
       data-track-id={trackId}
+      // The render mode follows the kind (trackRenderMode): piano roll = MIDI.
+      data-track-kind={renderMode === 'piano-roll' ? 'midi' : 'audio'}
       data-track-drag-source={isDragSource ? 'true' : undefined}
     >
       <TrackComponent

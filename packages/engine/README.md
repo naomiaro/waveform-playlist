@@ -34,6 +34,7 @@ await engine.init();
 
 const track: ClipTrack = {
   id: 'track-1',
+  kind: 'audio', // or 'midi': a track holds one kind of clip, and setTracks throws otherwise
   name: 'Guitar',
   clips: [
     createClipFromSeconds({

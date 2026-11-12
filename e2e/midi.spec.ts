@@ -32,6 +32,11 @@ test.describe('MIDI Example', () => {
     await expect(page.getByText(/Loading MIDI tracks/)).toHaveCount(0);
   });
 
+  test('every track is a MIDI track (#756)', async ({ page }) => {
+    await expect(page.locator('[data-track-row][data-track-kind="midi"]')).toHaveCount(TRACK_COUNT);
+    await expect(page.locator('[data-track-row][data-track-kind="audio"]')).toHaveCount(0);
+  });
+
   test('loads the .mid file once and then stays settled', async ({ page, baseURL }) => {
     const midiRequests: string[] = [];
     const errors: string[] = [];

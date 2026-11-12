@@ -176,6 +176,188 @@ describe('useIntegratedRecording', () => {
     }
   });
 
+  it('refuses to record onto a MIDI track (#756)', async () => {
+    getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+    const setTracks = vi.fn();
+    const midiTrack: ClipTrack = { ...makeTrack('track-1'), kind: 'midi', name: 'Keys' };
+    const { result } = renderHook(() => useIntegratedRecording([midiTrack], setTracks, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    let started: boolean | undefined;
+    await act(async () => {
+      started = await result.current.startRecording();
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.recordingTrackId).toBeNull();
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.error?.message).toMatch(/"Keys" is a MIDI track/);
+    expect(setTracks).not.toHaveBeenCalled();
+  });
+
+  it.each(['midi', 'audio'] as const)(
+    'the take lands on the track it was started on when a %s track is selected mid-take (#756)',
+    async (otherKind) => {
+      getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+      const setTracks = vi.fn();
+      const tracks: ClipTrack[] = [
+        { ...makeTrack('track-1'), kind: 'audio' },
+        { ...makeTrack('track-2'), kind: otherKind },
+      ];
+      const { result, rerender } = renderHook(
+        ({ selected }: { selected: string }) => useIntegratedRecording(tracks, setTracks, selected),
+        { initialProps: { selected: 'track-1' } }
+      );
+      await act(async () => {
+        await result.current.requestMicAccess();
+      });
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(true);
+      expect(result.current.recordingTrackId).toBe('track-1');
+
+      rerender({ selected: 'track-2' });
+      expect(result.current.recordingTrackId).toBe('track-1');
+      act(() => {
+        recNode.port.onmessage!({
+          data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+        } as MessageEvent);
+      });
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+
+      expect(result.current.recordingTrackId).toBeNull();
+      const finalTracks = setTracks.mock.calls[0][0] as ClipTrack[];
+      expect(finalTracks.find((t) => t.id === 'track-1')!.clips).toHaveLength(1);
+      expect(finalTracks.find((t) => t.id === 'track-2')!.clips).toHaveLength(0);
+    }
+  );
+
+  it('a second startRecording() during a take changes nothing: the take stays on its track (#756)', async () => {
+    getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+    const setTracks = vi.fn();
+    const tracks: ClipTrack[] = [
+      { ...makeTrack('track-1'), kind: 'audio' },
+      { ...makeTrack('track-2'), kind: 'audio' },
+    ];
+    const { result, rerender } = renderHook(
+      ({ selected }: { selected: string }) => useIntegratedRecording(tracks, setTracks, selected),
+      { initialProps: { selected: 'track-1' } }
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    rerender({ selected: 'track-2' });
+
+    let second: boolean | undefined;
+    await act(async () => {
+      second = await result.current.startRecording();
+    });
+
+    expect(second).toBe(false);
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.recordingTrackId).toBe('track-1');
+
+    act(() => {
+      recNode.port.onmessage!({
+        data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    const finalTracks = setTracks.mock.calls[0][0] as ClipTrack[];
+    expect(finalTracks.find((t) => t.id === 'track-1')!.clips).toHaveLength(1);
+    expect(finalTracks.find((t) => t.id === 'track-2')!.clips).toHaveLength(0);
+  });
+
+  it('a second startRecording() while the first is still starting changes nothing (#756)', async () => {
+    getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+    const setTracks = vi.fn();
+    const tracks: ClipTrack[] = [
+      { ...makeTrack('track-1'), kind: 'audio' },
+      { ...makeTrack('track-2'), kind: 'audio' },
+    ];
+    const { result, rerender } = renderHook(
+      ({ selected }: { selected: string }) => useIntegratedRecording(tracks, setTracks, selected),
+      { initialProps: { selected: 'track-1' } }
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    let first: boolean | undefined;
+    let second: boolean | undefined;
+    await act(async () => {
+      // Not awaited: the first start is parked in its async startup.
+      const firstStart = result.current.startRecording();
+      rerender({ selected: 'track-2' });
+      second = await result.current.startRecording();
+      first = await firstStart;
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.recordingTrackId).toBe('track-1');
+
+    act(() => {
+      recNode.port.onmessage!({
+        data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+      } as MessageEvent);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+    const finalTracks = setTracks.mock.calls[0][0] as ClipTrack[];
+    expect(finalTracks.find((t) => t.id === 'track-1')!.clips).toHaveLength(1);
+    expect(finalTracks.find((t) => t.id === 'track-2')!.clips).toHaveLength(0);
+
+    // The take is over: a new one can start, on the track selected now.
+    let third: boolean | undefined;
+    await act(async () => {
+      third = await result.current.startRecording();
+    });
+    expect(third).toBe(true);
+    expect(result.current.recordingTrackId).toBe('track-2');
+  });
+
+  it('recordingTrackId is null again when a take ends on its own (microphone unplugged)', async () => {
+    const stream = createMockStream('mic');
+    getUserMediaMock.mockResolvedValue(stream);
+    const { result } = renderHook(() =>
+      useIntegratedRecording([{ ...makeTrack('track-1'), kind: 'audio' }], vi.fn(), 'track-1')
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.recordingTrackId).toBe('track-1');
+
+    // The browser ends the microphone track: useRecording stops by itself.
+    const audioTrack = stream.getAudioTracks()[0] as unknown as {
+      addEventListener: ReturnType<typeof vi.fn>;
+    };
+    const onEnded = audioTrack.addEventListener.mock.calls.find(([type]) => type === 'ended')![1];
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => {
+      onEnded();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.recordingTrackId).toBeNull();
+  });
+
   it('rejects changeDevice while recording (stream untouched, error surfaced)', async () => {
     const setTracks = vi.fn();
     const { result } = await setupRecording([makeTrack('track-1')], setTracks);

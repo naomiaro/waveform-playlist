@@ -1,7 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
-import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
+import type { RenderMode, SpectrogramConfig, TrackKind } from '@waveform-playlist/core';
 import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 
 /** Structural view of the editor's public per-track effects API (keyed by
@@ -40,6 +40,32 @@ export class DawTrackElement extends LitElement {
   @property({ type: Number }) pan = 0;
   @property({ type: Boolean }) muted = false;
   @property({ type: Boolean }) soloed = false;
+
+  /**
+   * What the track holds: `'audio'` (default) or `'midi'`. Every `<daw-clip>`
+   * child must be of this kind (#756). Set it before the track connects:
+   * the editor reads it when it loads the track.
+   */
+  @property({ reflect: true, noAccessor: true })
+  get kind(): TrackKind {
+    return this._kind;
+  }
+  set kind(value: TrackKind) {
+    if (value !== 'audio' && value !== 'midi') {
+      console.warn(
+        '[dawcore] <daw-track kind="' +
+          String(value) +
+          "\"> is not a track kind ('audio' or 'midi'); keeping \"" +
+          this._kind +
+          '"'
+      );
+      return;
+    }
+    const old = this._kind;
+    this._kind = value;
+    this.requestUpdate('kind', old);
+  }
+  private _kind: TrackKind = 'audio';
 
   // Custom getter/setter so we can warn-and-fallback on 'both' (dawcore
   // doesn't yet support rendering waveform + spectrogram simultaneously).
@@ -183,6 +209,7 @@ export class DawTrackElement extends LitElement {
       'soloed',
       'src',
       'name',
+      'kind',
       'renderMode',
       'spectrogramConfig',
     ];

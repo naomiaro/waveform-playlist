@@ -283,7 +283,7 @@ single-track player using only `@waveform-playlist/browser` + `@waveform-playlis
 - [`analyser.html`](examples/dawcore-tone/analyser.html) — Spectrum analyser connected to master output
 - [`spectrogram.html`](examples/dawcore-tone/spectrogram.html) — Per-track FFT spectrograms with the Tone.js adapter
 - [`faust-precompiled.html`](examples/dawcore-tone/faust-precompiled.html) — The same precompiled Faust effect on the Tone.js adapter (native AudioContext mode)
-- [`midi.html`](examples/dawcore-tone/midi.html) — Programmatic MIDI clips with piano-roll render mode and Tone.js PolySynth
+- [`midi.html`](examples/dawcore-tone/midi.html) — Programmatic MIDI track (piano roll) played through Tone.js PolySynth
 - [`midi-load.html`](examples/dawcore-tone/midi-load.html) — Load `.mid` files (URL or file picker) via `editor.loadMidi()` and play them through Tone.js PolySynth
 - [`soundfont.html`](examples/dawcore-tone/soundfont.html) — MIDI through SoundFont samples: `SoundFontCache.fromUrl()` + `createToneAdapter({ soundFontCache })`, with PolySynth fallback when the `.sf2` fails to load
 - [`annotations.html`](examples/dawcore-tone/annotations.html) — `<daw-annotation-track>` lyric/section markers with dual-view sync between the timeline lane and `<daw-annotation-list>`, drag-to-resize boundaries, and keyboard navigation/playback with the Tone.js adapter

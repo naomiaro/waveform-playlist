@@ -220,6 +220,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     requestMicAccess,
     changeDevice,
     error,
+    recordingTrackId,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
     currentTime,
     channelCount: 2,
@@ -524,7 +525,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
       // Stop recording if we're removing the track being recorded to
       // Must await so the recorded clip is saved before the track is removed
-      if (isRecording && trackToRemove.id === selectedTrackId) {
+      // (the track the take was started on, which need not be the selected one).
+      if (isRecording && trackToRemove.id === recordingTrackId) {
         await stopRecording();
         stop();
       }
@@ -545,7 +547,17 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         seekTo(0);
       }
     },
-    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording, stop, seekTo]
+    [
+      tracks,
+      setTracks,
+      selectedTrackId,
+      setSelectedTrackId,
+      isRecording,
+      recordingTrackId,
+      stopRecording,
+      stop,
+      seekTo,
+    ]
   );
 
   return (
@@ -671,10 +683,12 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           showClipHeaders
           onRemoveTrack={handleRemoveTrack}
           recordingState={
-            isRecording && selectedTrackId
+            isRecording && recordingTrackId
               ? {
                   isRecording: true,
-                  trackId: selectedTrackId,
+                  // The track the take was started on: selecting another
+                  // track mid-take does not move it.
+                  trackId: recordingTrackId,
                   startSample: recordingStartSample,
                   // A source, not values: only the preview clip follows the
                   // take frame by frame; this component does not re-render.

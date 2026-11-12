@@ -147,12 +147,12 @@ describe('<daw-editor>.loadMidi', () => {
     expect(tracks.map((t) => t.getAttribute('name'))).toEqual(['Track 1', 'Track 2']);
   });
 
-  it('sets render-mode="piano-roll" on every created track', async () => {
+  it('makes every created track a MIDI track (kind="midi")', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 3 }));
     await editor.loadMidi('/midi/x.mid');
     const tracks = Array.from(editor.querySelectorAll('daw-track'));
     tracks.forEach((t) => {
-      expect(t.getAttribute('render-mode')).toBe('piano-roll');
+      expect(t.getAttribute('kind')).toBe('midi');
     });
   });
 
