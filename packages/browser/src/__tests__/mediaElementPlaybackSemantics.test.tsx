@@ -982,6 +982,12 @@ describe('players that are gone', () => {
     await act(async () => first.complete?.());
     expect(second.pause).not.toHaveBeenCalled();
     expect(second.seekTo).not.toHaveBeenCalled();
+
+    // Nor while the new player is playing: its play is not ended by it.
+    await playing(second, 1, 2);
+    await act(async () => first.complete?.());
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(second.pause).not.toHaveBeenCalled();
   });
 });
 
