@@ -308,12 +308,14 @@ describe('clip interaction options have one source, the context (#690)', () => {
     expect(enabledSeen).toBe(false);
   });
 
-  it('the removed Waveform props are type errors and do nothing at runtime', async () => {
+  it('the removed props are type errors and do nothing at runtime', async () => {
     const { container } = await mount((probe) => (
       <>
         {probe}
-        {/* @ts-expect-error interactiveClips and touchOptimized were removed in #690 */}
-        <Waveform showClipHeaders interactiveClips touchOptimized />
+        {/* @ts-expect-error interactiveClips was removed in #690 */}
+        <Waveform showClipHeaders interactiveClips />
+        {/* @ts-expect-error touchOptimized was removed in #690 */}
+        <PlaylistVisualization showClipHeaders touchOptimized />
       </>
     ));
 
@@ -348,6 +350,46 @@ describe('clip interaction options have one source, the context (#690)', () => {
 
     expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH]));
     expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: false });
+  });
+
+  it('a plain ClipInteractionProvider inside a touch-optimized one inherits it', async () => {
+    const { container } = await mount((probe) => (
+      <ClipInteractionProvider touchOptimized>
+        <ClipInteractionProvider>
+          {probe}
+          <Waveform showClipHeaders />
+        </ClipInteractionProvider>
+      </ClipInteractionProvider>
+    ));
+
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH_TOUCH]));
+    // The inner provider's sensors are the last ones configured.
+    expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: true });
+  });
+
+  it('a ClipInteractionProvider with nothing above and no flag uses the normal sensors', async () => {
+    await mount((probe) => (
+      <ClipInteractionProvider>
+        {probe}
+        <Waveform showClipHeaders />
+      </ClipInteractionProvider>
+    ));
+
+    expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: false });
+  });
+
+  it('a ClipInteractionProvider makes clips interactive even under enabled={false}', async () => {
+    await mount((probe) => (
+      <ClipInteractionOptions enabled={false}>
+        <ClipInteractionProvider>
+          {probe}
+          <Waveform showClipHeaders />
+        </ClipInteractionProvider>
+      </ClipInteractionOptions>
+    ));
+
+    expect(seen.props['clip-a'].disableHeaderDrag).toBe(false);
+    expect(enabledSeen).toBe(true);
   });
 
   it('the provider passes its own flag to the sensors', async () => {

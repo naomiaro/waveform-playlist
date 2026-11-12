@@ -67,8 +67,10 @@ test.describe('Custom Drag Setup Example', () => {
   test.beforeEach(async ({ page, baseURL }) => {
     await page.goto(`${baseURL}/examples/custom-drag-setup`);
     await page.waitForSelector('h1:has-text("Custom Drag Setup")', { timeout: 30000 });
+    // The clips first: the page mounts with no tracks, and an empty playlist is
+    // "ready" too. Then ready, which now means the engine has these tracks.
+    await expect(page.locator('[data-clip-container]')).toHaveCount(5, { timeout: 30000 });
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
-    await expect(page.locator('[data-clip-container]')).toHaveCount(5);
     // Two trim handles per clip once the clips are interactive.
     await expect(page.locator(HANDLE)).toHaveCount(10);
   });
@@ -213,12 +215,20 @@ test.describe('Custom Drag Setup Example', () => {
     await expect(page.locator(HANDLE)).toHaveCount(0);
   });
 
-  test('playback still starts after an edit', async ({ page }) => {
+  test('after a clip is moved, playback starts and time advances', async ({ page }) => {
+    const before = await geometry(clip(page, 1));
     await dragHeader(page, 1, -60);
+    await expect(async () => {
+      const after = await geometry(clip(page, 1));
+      expect(Math.abs(after.left - (before.left - 60))).toBeLessThanOrEqual(2);
+    }).toPass({ timeout: 5000 });
+
     await page.getByRole('button', { name: 'Play', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled({
-      timeout: 10000,
-    });
+    // The position display is the only text of this shape in the controls.
+    const time = page.getByText(/^\d\d:\d\d:\d\d\.\d{3}$/).first();
+    await expect(async () => {
+      expect(await time.textContent()).not.toBe('00:00:00.000');
+    }).toPass({ timeout: 10000 });
     await page.getByRole('button', { name: 'Stop', exact: true }).click();
   });
 });

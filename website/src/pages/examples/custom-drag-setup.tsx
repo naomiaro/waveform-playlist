@@ -72,6 +72,8 @@ const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ /* … */ }
 </DragDropProvider>`}
           </pre>
           <p>
+            This is shortened: the page also selects the track of a clip when its drag starts, and gives
+            the collision modifier a function for <code>tracks</code> so it is not rebuilt while trimming.
             The full walkthrough, with snap-to-grid and annotation dragging, is in the{' '}
             <Link to="/docs/react/guides/custom-drag-setup">Custom Drag Setup guide</Link>.
           </p>

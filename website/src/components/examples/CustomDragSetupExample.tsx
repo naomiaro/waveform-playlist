@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
@@ -134,9 +134,17 @@ function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: Cli
     handleDragStart(event);
   };
 
+  // The collision modifier takes a function for `tracks`, so the modifiers
+  // array is not rebuilt on every pointer move of a trim (tracks change then).
+  const tracksRef = useRef(tracks);
+  tracksRef.current = tracks;
+  const getTracks = useCallback(() => tracksRef.current, []);
   const modifiers = useMemo(
-    () => [RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })],
-    [tracks, samplesPerPixel]
+    () => [
+      RestrictToHorizontalAxis,
+      ClipCollisionModifier.configure({ tracks: getTracks, samplesPerPixel }),
+    ],
+    [getTracks, samplesPerPixel]
   );
 
   return (
