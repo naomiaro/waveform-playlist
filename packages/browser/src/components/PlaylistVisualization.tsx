@@ -25,7 +25,11 @@ import {
   usePlaylistControls,
   usePlaylistData,
 } from '../WaveformPlaylistContext';
-import { applyTrackOrderPreview, computeTrackLayout } from '../utils/trackOrderPreview';
+import {
+  applyTrackOrderPreview,
+  computeTrackLayout,
+  trackIdAtOffset,
+} from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
 import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { useRecordingLayout } from '../hooks/useRecordingLayout';
@@ -294,6 +298,41 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     [setSelectedTrackId]
   );
 
+  // Shared vertical layout for BOTH columns (waveform rows + control slots).
+  // Heights use the existing slot formula; order applies the live drag
+  // preview so both columns slide together. Hoisted from the per-slot
+  // computation so the two columns can never disagree.
+  const trackHeightById = useMemo(() => {
+    const m = new Map<string, number>();
+    peaksDataArray.forEach((trackClipPeaks, trackIndex) => {
+      const track = tracks[trackIndex];
+      if (!track) return;
+      const maxChannels = getTrackChannelCount(
+        trackClipPeaks,
+        track.id === recordingTrackId ? recordingChannelCount : 0
+      );
+      m.set(track.id, waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0));
+    });
+    return m;
+  }, [
+    peaksDataArray,
+    tracks,
+    recordingTrackId,
+    recordingChannelCount,
+    waveHeight,
+    showClipHeaders,
+  ]);
+
+  const displayOrderIds = useMemo(
+    () => applyTrackOrderPreview(tracks, trackDragPreview).map((t) => t.id),
+    [tracks, trackDragPreview]
+  );
+
+  const trackLayout = useMemo(
+    () => computeTrackLayout(displayOrderIds, trackHeightById),
+    [displayOrderIds, trackHeightById]
+  );
+
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     // Primary button only: a right-click opens the context menu and its
     // release may never be delivered.
@@ -302,32 +341,15 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     const x = e.clientX - rect.left;
     const clickTime = (x * samplesPerPixel) / sampleRate;
 
-    const y = e.clientY - rect.top;
-    const trackY = y;
-
-    let cumulativeHeight = 0;
-    let clickedTrackIndex = -1;
-
-    for (let i = 0; i < peaksDataArray.length; i++) {
-      const trackClipPeaks = peaksDataArray[i];
-      const trackId = tracks[i]?.id;
-      const rawCh = getTrackChannelCount(
-        trackClipPeaks,
-        trackId === recordingTrackId ? recordingChannelCount : 0
-      );
-      const trackMode = (trackId && renderModeById.get(trackId)) || 'waveform';
-      const effectiveCh = trackMode === 'both' ? rawCh * 2 : rawCh;
-      const trackHeight = effectiveCh * waveHeight + (showClipHeaders ? 22 : 0);
-
-      if (trackY >= cumulativeHeight && trackY < cumulativeHeight + trackHeight) {
-        clickedTrackIndex = i;
-        break;
-      }
-      cumulativeHeight += trackHeight;
-    }
-
-    if (clickedTrackIndex !== -1) {
-      selectTrack(clickedTrackIndex);
+    // The row under the pointer, from the layout the rows are positioned with.
+    const clickedTrackId = trackIdAtOffset(
+      displayOrderIds,
+      trackLayout,
+      trackHeightById,
+      e.clientY - rect.top
+    );
+    if (clickedTrackId !== null) {
+      setSelectedTrackId(clickedTrackId);
     }
 
     mouseDownTimeRef.current = clickTime;
@@ -393,41 +415,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   };
 
   useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
-
-  // Shared vertical layout for BOTH columns (waveform rows + control slots).
-  // Heights use the existing slot formula; order applies the live drag
-  // preview so both columns slide together. Hoisted from the per-slot
-  // computation so the two columns can never disagree.
-  const trackHeightById = useMemo(() => {
-    const m = new Map<string, number>();
-    peaksDataArray.forEach((trackClipPeaks, trackIndex) => {
-      const track = tracks[trackIndex];
-      if (!track) return;
-      const maxChannels = getTrackChannelCount(
-        trackClipPeaks,
-        track.id === recordingTrackId ? recordingChannelCount : 0
-      );
-      m.set(track.id, waveHeight * maxChannels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0));
-    });
-    return m;
-  }, [
-    peaksDataArray,
-    tracks,
-    recordingTrackId,
-    recordingChannelCount,
-    waveHeight,
-    showClipHeaders,
-  ]);
-
-  const displayOrderIds = useMemo(
-    () => applyTrackOrderPreview(tracks, trackDragPreview).map((t) => t.id),
-    [tracks, trackDragPreview]
-  );
-
-  const trackLayout = useMemo(
-    () => computeTrackLayout(displayOrderIds, trackHeightById),
-    [displayOrderIds, trackHeightById]
-  );
 
   const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
 
