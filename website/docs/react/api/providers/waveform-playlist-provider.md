@@ -347,7 +347,6 @@ interface PlaylistControlsContextValue {
   setSelection: (start: number, end: number) => void;
   setSelectedTrackId: (trackId: string | null) => void;
   setTimeFormat: (format: TimeFormat) => void;
-  formatTime: (seconds: number) => string;
   zoomIn: () => void;
   zoomOut: () => void;
   setMasterVolume: (volume: number) => void;
@@ -388,7 +387,6 @@ interface PlaylistDataContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
-  minimumPlaylistHeight: number;
   controls: { show: boolean; width: number };
   samplesPerPixel: number;
   timeFormat: TimeFormat;

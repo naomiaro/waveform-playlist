@@ -203,6 +203,45 @@ Two related values on `usePlaylistData()` keep their names and types but are now
 - `<Waveform>` no longer renders the text "Loading waveform..." before the first peaks; clips render at once and their waveforms fill in.
 - `<Waveform className="…">` now sets the class on the playlist's outermost element (the one with `data-playlist-state`). Before, the class was only on the "Loading waveform..." placeholder and disappeared once the playlist rendered, so check that a class you pass there has the styles you want on the whole playlist.
 
+## `formatTime` is removed from `usePlaylistControls()`, and `minimumPlaylistHeight` from `usePlaylistData()`
+
+**Package:** `@waveform-playlist/browser`.
+
+Nothing in the library read either field.
+
+`usePlaylistControls().formatTime` formatted a time in the playlist's current time format. It was a new function after every `setTimeFormat`, which made the whole controls value change, so every component that calls `usePlaylistControls()` rendered again. The value returned by `usePlaylistControls()` no longer changes with the time format, or with `duration`. The value returned by `useMediaElementControls()` no longer changes when the track's duration arrives.
+
+**Find:** `formatTime` read from `usePlaylistControls()`.
+
+**Replace with:** `formatTime` from `@waveform-playlist/ui-components` and the `timeFormat` from `usePlaylistData()`:
+
+```tsx
+// Before
+const { formatTime } = usePlaylistControls();
+const label = formatTime(seconds);
+
+// After
+import { formatTime } from '@waveform-playlist/ui-components';
+
+const { timeFormat } = usePlaylistData();
+const label = formatTime(seconds, timeFormat);
+```
+
+`useTimeFormat()` is unchanged: it is a separate hook with its own state, and it still returns `formatTime`.
+
+**Find:** `minimumPlaylistHeight` read from `usePlaylistData()`.
+
+**Replace with:** the same sum, from values that are still there:
+
+```tsx
+// Before
+const { minimumPlaylistHeight } = usePlaylistData();
+
+// After
+const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
+const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
+```
+
 ## `selectionStart` and `selectionEnd` move from `usePlaylistState()` to `useSelection()`
 
 **Package:** `@waveform-playlist/browser`.

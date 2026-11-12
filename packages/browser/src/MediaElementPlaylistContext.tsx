@@ -211,6 +211,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  // `seekTo` clamps against this, so it keeps its identity when the duration
+  // arrives and the controls value does not change with it (#767). Written
+  // during render, so a child's layout effect of the same commit reads the
+  // new value.
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
   // Annotations are derived from prop (single source of truth in parent)
@@ -477,18 +483,15 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     setActiveAnnotationId(null);
   }, [stopAnimationLoop, setActiveAnnotationId]);
 
-  const seekTo = useCallback(
-    (time: number) => {
-      const clampedTime = Math.max(0, Math.min(time, duration));
-      currentTimeRef.current = clampedTime;
-      setCurrentTime(clampedTime);
+  const seekTo = useCallback((time: number) => {
+    const clampedTime = Math.max(0, Math.min(time, durationRef.current));
+    currentTimeRef.current = clampedTime;
+    setCurrentTime(clampedTime);
 
-      if (playoutRef.current) {
-        playoutRef.current.seekTo(clampedTime);
-      }
-    },
-    [duration]
-  );
+    if (playoutRef.current) {
+      playoutRef.current.seekTo(clampedTime);
+    }
+  }, []);
 
   const setPlaybackRate = useCallback((rate: number) => {
     const clampedRate = Math.max(0.5, Math.min(2.0, rate));
@@ -547,6 +550,10 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     []
   );
 
+  const setAutomaticScroll = useCallback((enabled: boolean) => {
+    setIsAutomaticScroll(enabled);
+  }, []);
+
   const controlsValue: MediaElementControlsContextValue = useMemo(
     () => ({
       play,
@@ -558,9 +565,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
-      setAutomaticScroll: (enabled: boolean) => {
-        setIsAutomaticScroll(enabled);
-      },
+      setAutomaticScroll,
       setScrollContainer,
       scrollContainerRef,
     }),
@@ -574,6 +579,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      setAutomaticScroll,
       setScrollContainer,
     ]
   );

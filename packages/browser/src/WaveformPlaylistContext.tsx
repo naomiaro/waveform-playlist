@@ -218,7 +218,6 @@ export interface PlaylistControlsContextValue {
 
   // Time format
   setTimeFormat: (format: TimeFormat) => void;
-  formatTime: (seconds: number) => string;
 
   // Zoom
   zoomIn: () => void;
@@ -276,7 +275,6 @@ export interface PlaylistDataContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
-  minimumPlaylistHeight: number;
   controls: { show: boolean; width: number };
   playoutRef: React.RefObject<PlaylistEngine | null>;
   samplesPerPixel: number;
@@ -495,6 +493,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Timeline length in seconds: the end of the last clip. Derived during
   // render so it never lags `tracks` (#692).
   const duration = useMemo(() => timelineDuration(tracks), [tracks]);
+  // The animation loop and `seekTo` read the timeline end from here, so that
+  // neither changes identity when it moves: `seekTo` and `play` are in the
+  // controls value, which must not follow `duration` (#767). Written during
+  // render, like `isPlayingRef` and `tracksRef`, so that a child that calls
+  // `seekTo` from a layout effect of the same commit already gets the new end.
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
   const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
   const [continuousPlay, setContinuousPlayState] = useState(
@@ -627,7 +632,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const sampleRateRef = useRef<number>(initialSampleRate);
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
-  const { timeFormat, setTimeFormat, formatTime } = useTimeFormat();
+  const { timeFormat, setTimeFormat } = useTimeFormat();
   const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
   const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
   const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
@@ -1446,7 +1451,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       }
 
       // Handle automatic scroll — uses shared visualTime for alignment with playhead
-      if (isAutomaticScrollRef.current && scrollContainerRef.current && duration > 0) {
+      if (isAutomaticScrollRef.current && scrollContainerRef.current && durationRef.current > 0) {
         const container = scrollContainerRef.current;
         const pixelPosition = (visualTime * sr) / spp;
         const containerWidth = container.clientWidth;
@@ -1489,7 +1494,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       //   end of existing material (#589/#590).
       // Explicit ends (selection playback, annotation boundaries) are
       // handled above regardless.
-      if (time >= duration && !indefinitePlaybackRef.current && !recordingActiveRef.current) {
+      if (
+        time >= durationRef.current &&
+        !indefinitePlaybackRef.current &&
+        !recordingActiveRef.current
+      ) {
         // Stop playback - inline to avoid circular dependency
         if (engineRef.current) {
           engineRef.current.stop();
@@ -1504,7 +1513,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     };
     startAnimationFrameLoop(updateTime);
   }, [
-    duration,
     setActiveAnnotationId,
     startAnimationFrameLoop,
     getPlaybackTime,
@@ -1515,8 +1523,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const stopAnimationLoop = stopAnimationFrameLoop;
 
   // Two jobs, during playback only:
-  //  - restart the animation loop whenever its closure changes (e.g. `duration`),
-  //    so the running loop always has current values;
+  //  - restart the animation loop when playback starts and if its closure
+  //    changes, so the running loop always has current values (its
+  //    dependencies are stable today; the timeline end is read from
+  //    `durationRef`, so a duration change does not restart it);
   //  - when continuous play is switched ON, reschedule the audio without an end,
   //    so it runs past the annotation it was bounded to.
   // The reschedule is tied to that false -> true transition, not to the current
@@ -1796,7 +1806,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const seekTo = useCallback(
     (time: number) => {
       // Clamp time to valid range
-      const clampedTime = Math.max(0, Math.min(time, duration));
+      const clampedTime = Math.max(0, Math.min(time, durationRef.current));
 
       // Update the current time state
       setCurrentTimeRefs(clampedTime);
@@ -1808,7 +1818,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         play(clampedTime);
       }
     },
-    [duration, play, setCurrentTimeRefs]
+    [play, setCurrentTimeRefs]
   );
 
   // Track controls
@@ -2000,7 +2010,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   const sampleRate = sampleRateRef.current;
   const timeScaleHeight = timescale ? 30 : 0;
-  const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 
   // Split context values for performance optimization
   // Animation context only re-renders consumers when playback starts or
@@ -2121,7 +2130,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
       // Time format
       setTimeFormat,
-      formatTime,
 
       // Zoom
       zoomIn: zoom.zoomIn,
@@ -2172,7 +2180,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setSelection,
       setSelectedTrackIdControl,
       setTimeFormat,
-      formatTime,
       zoom.zoomIn,
       zoom.zoomOut,
       setMasterVolume,
@@ -2204,7 +2211,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       sampleRate,
       waveHeight,
       timeScaleHeight,
-      minimumPlaylistHeight,
       controls,
       playoutRef: engineRef,
       samplesPerPixel,
@@ -2231,7 +2237,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       sampleRate,
       waveHeight,
       timeScaleHeight,
-      minimumPlaylistHeight,
       controls,
       engineRef,
       samplesPerPixel,

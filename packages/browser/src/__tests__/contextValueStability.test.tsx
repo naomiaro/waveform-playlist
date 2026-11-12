@@ -34,11 +34,11 @@ if (typeof globalThis.requestAnimationFrame === 'undefined') {
 
 const SAMPLE_RATE = 48000;
 
-function makeTrack(id: string): ClipTrack {
+function makeTrack(id: string, seconds = 1): ClipTrack {
   const clip = {
     id: id + '-clip',
     startSample: 0,
-    durationSamples: SAMPLE_RATE,
+    durationSamples: seconds * SAMPLE_RATE,
     offsetSamples: 0,
     sampleRate: SAMPLE_RATE,
   } as AudioClip;
@@ -71,7 +71,7 @@ function createFakeAdapter(): PlayoutAdapter {
     pause() {},
     stop() {},
     seek() {},
-    getCurrentTime: () => 0,
+    getCurrentTime: () => adapterTime,
     isPlaying: () => false,
     setMasterVolume() {},
     setTrackVolume() {},
@@ -82,6 +82,9 @@ function createFakeAdapter(): PlayoutAdapter {
     dispose() {},
   } as unknown as PlayoutAdapter;
 }
+
+// What the fake adapter reports as the playback position.
+let adapterTime = 0;
 
 type Controls = ReturnType<typeof usePlaylistControls>;
 type Data = ReturnType<typeof usePlaylistData>;
@@ -147,35 +150,77 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
+// Calls actions only, as a transport button or a custom control does (#767).
+let controlsProbe: { renders: number };
+const ControlsProbeChild: React.FC = () => {
+  usePlaylistControls();
+  controlsProbe = { renders: (controlsProbe?.renders ?? 0) + 1 };
+  return null;
+};
+
+// When set, the child below seeks there from a layout effect of the commit in
+// which `duration` changes: before the provider's own effects have run.
+let seekFromLayoutEffect: { target: number } | null = null;
+const LayoutSeekChild: React.FC = () => {
+  const { seekTo } = usePlaylistControls();
+  const { duration } = usePlaylistData();
+  React.useLayoutEffect(() => {
+    if (seekFromLayoutEffect && duration === 2) seekTo(seekFromLayoutEffect.target);
+  }, [duration, seekTo]);
+  return null;
+};
+
 const TRACKS = [makeTrack('track-1'), makeTrack('track-2')];
+
+// One set of elements for every render of the wrapper, as when a parent passes
+// `children` through: a probe then renders only when a context it reads
+// changes, not because the wrapper rendered.
+const CHILDREN = (
+  <>
+    <ProbeChild />
+    <StateProbeChild />
+    <SelectionProbeChild />
+    <AnimationProbeChild />
+    <CurrentTimeProbeChild />
+    <ActiveAnnotationProbeChild />
+    <ControlsProbeChild />
+    <LayoutSeekChild />
+  </>
+);
 
 // `inlineProps` passes fresh `controls` and `theme` object literals on every
 // render of the wrapper, which is how most consumers write them.
 async function mount({ inlineProps = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
+  adapterTime = 0;
+  seekFromLayoutEffect = null;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
+  let tracks = TRACKS;
   const Wrapper: React.FC = () => (
     <WaveformPlaylistProvider
-      tracks={TRACKS}
+      tracks={tracks}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       {...(inlineProps
         ? { controls: { show: true, width: 200 }, theme: { playheadColor: 'red' } }
         : {})}
     >
-      <ProbeChild />
-      <StateProbeChild />
-      <SelectionProbeChild />
-      <AnimationProbeChild />
-      <CurrentTimeProbeChild />
-      <ActiveAnnotationProbeChild />
+      {CHILDREN}
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(probe.data.isReady).toBe(true));
-  return { adapter, rerender: () => utils.rerender(<Wrapper />) };
+  return {
+    adapter,
+    rerender: () => utils.rerender(<Wrapper />),
+    // Replaces the `tracks` prop, as a parent does after an edit.
+    setTracks: (next: ClipTrack[]) => {
+      tracks = next;
+      utils.rerender(<Wrapper />);
+    },
+  };
 }
 
 afterEach(async () => {
@@ -484,5 +529,165 @@ describe('the active annotation lives in its own context (#740)', () => {
     expect(() => render(<ActiveAnnotationProbeChild />)).toThrow(
       'useActiveAnnotation must be used within WaveformPlaylistProvider'
     );
+  });
+});
+
+// 2 seconds instead of 1: the timeline end moves, as it does on every pointer
+// move while the last clip's right edge is trimmed.
+const LONGER_TRACKS = [makeTrack('track-1', 2), makeTrack('track-2')];
+
+describe('the controls value does not follow the timeline length or the time format (#767)', () => {
+  it('controls value survives a change of duration', async () => {
+    const { setTracks } = await mount();
+    const before = probe.controls;
+    expect(probe.data.duration).toBe(1);
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(probe.controls).toBe(before);
+  });
+
+  it('a component that only calls actions does not render when the duration changes', async () => {
+    const { setTracks } = await mount();
+    const rendersBefore = controlsProbe.renders;
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(controlsProbe.renders).toBe(rendersBefore);
+  });
+
+  it('a component that only calls actions does not render when the time format changes', async () => {
+    await mount();
+    const rendersBefore = controlsProbe.renders;
+
+    await act(async () => {
+      probe.controls.setTimeFormat('seconds');
+    });
+    expect(probe.data.timeFormat).toBe('seconds');
+
+    expect(controlsProbe.renders).toBe(rendersBefore);
+  });
+
+  it('controls value survives a time-format change', async () => {
+    await mount();
+    const before = probe.controls;
+
+    await act(async () => {
+      probe.controls.setTimeFormat('seconds');
+    });
+
+    expect(probe.data.timeFormat).toBe('seconds');
+    expect(probe.controls).toBe(before);
+  });
+
+  it('a seekTo captured before the timeline grew clamps to the new end', async () => {
+    const { setTracks } = await mount();
+    const { seekTo } = probe.controls;
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    await act(async () => {
+      seekTo(1.5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(1.5);
+
+    await act(async () => {
+      seekTo(5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(2);
+  });
+
+  it('a seekTo captured before the timeline shrank clamps to the new end', async () => {
+    const { setTracks } = await mount();
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    const { seekTo } = probe.controls;
+
+    await act(async () => {
+      setTracks(TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(1));
+
+    await act(async () => {
+      seekTo(1.5);
+    });
+    expect(currentTimeProbe.currentTime).toBe(1);
+  });
+
+  it('a seekTo called from a layout effect of the commit that brings the new duration clamps to it', async () => {
+    const { setTracks } = await mount();
+    seekFromLayoutEffect = { target: 1.5 };
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+
+    expect(currentTimeProbe.currentTime).toBe(1.5);
+  });
+
+  it('playback keeps running to the new end when a longer track is appended (no rebuild, no loop restart)', async () => {
+    const { adapter, setTracks } = await mount();
+    const addTrack = vi.spyOn(adapter, 'addTrack');
+    const setTracksOnAdapter = vi.spyOn(adapter, 'setTracks');
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+    const playCalls = (adapter.play as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    // The same two track objects plus one: an incremental add.
+    await act(async () => {
+      setTracks([...TRACKS, makeTrack('track-3', 2)]);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    expect(addTrack).toHaveBeenCalledTimes(1);
+    expect(setTracksOnAdapter).not.toHaveBeenCalled();
+    expect((adapter.play as ReturnType<typeof vi.fn>).mock.calls.length).toBe(playCalls);
+
+    adapterTime = 1.5;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    adapterTime = 2.1;
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
+  });
+
+  it('playback that is running when the timeline grows stops at the new end, not the old one', async () => {
+    const { setTracks } = await mount();
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    await act(async () => {
+      setTracks(LONGER_TRACKS);
+    });
+    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.isPlaying).toBe(true));
+
+    // Past the old end (1 s), before the new one (2 s): several frames pass
+    // and playback is still running.
+    adapterTime = 1.5;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(probe.isPlaying).toBe(true);
+
+    adapterTime = 2.1;
+    await waitFor(() => expect(probe.isPlaying).toBe(false));
   });
 });
