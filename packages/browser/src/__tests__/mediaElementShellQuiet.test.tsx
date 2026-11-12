@@ -177,13 +177,17 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     expect(counts).toEqual({ clip: 0, channel: 0, track: 0 });
   });
 
-  it('a leftward selection drag (the start moves on each move) does the same', async () => {
-    const { playhead, overlay, reset } = await mount();
+  it('a leftward selection drag (the start moves on each move) moves the overlay and renders none of them', async () => {
+    const { view, playhead, reset } = await mount();
+    // wrapper > [background, overlay, channel container]; the playhead is
+    // hidden at rest while a range is highlighted (#688, part 3), so the
+    // overlay is found on its own.
+    const overlay = () => view.container.querySelector('[style*="scaleX"]') as HTMLElement;
     act(() => controls.setSelection(4, 6));
     reset();
     for (const start of [3.5, 3, 2.5]) {
       act(() => controls.setSelection(start, 6));
-      expect(playhead().style.transform).toBe(playheadAt(start));
+      expect(playhead()).toBeNull();
       expect(overlay().style.transform).toBe(overlayAt(start));
     }
     expect(counts).toEqual({ clip: 0, channel: 0, track: 0 });

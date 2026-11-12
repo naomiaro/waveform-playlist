@@ -3,12 +3,17 @@
  * annotation state. They are small siblings of the track rows (#693): these
  * re-render on every pointer move of a selection drag and on every
  * active-annotation change during playback, and the rows do not.
+ *
+ * `SelectionOverlay` and `PlayheadOverlay` read shared hooks only and are
+ * rendered by both views (`PlaylistVisualization` and `MediaElementPlaylist`,
+ * #688). The annotation boxes and the loop region are multitrack only.
  */
 import React, { useCallback } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
   useTheme,
+  type PlayheadProps,
   type RenderPlayheadFunction,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
@@ -23,7 +28,6 @@ import {
   useIsPlaying,
   usePlaybackControls,
   useEditorControls,
-  useEngineRefs,
   useAnnotations,
   useAnnotationEditing,
 } from '../contexts/playlistContexts';
@@ -32,8 +36,12 @@ import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
 
-/** The highlighted selection range. Renders nothing for a collapsed selection. */
-export const SelectionOverlay: React.FC = () => {
+/**
+ * The highlighted selection range. Renders nothing for a collapsed selection.
+ * Memoized (it takes no props): a render of the view around it (play, pause,
+ * a press) is not its concern, only the selection, the zoom and the theme are.
+ */
+export const SelectionOverlay: React.FC = React.memo(function SelectionOverlay() {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { selectionStart, selectionEnd } = useSelection();
   const { sampleRate } = usePlaylistView();
@@ -48,12 +56,49 @@ export const SelectionOverlay: React.FC = () => {
       color={theme.selectionColor}
     />
   );
+});
+
+/**
+ * What `renderPlayhead` was given until #688 part 3 and is not given any more,
+ * with what to do instead.
+ */
+const REMOVED_PLAYHEAD_PROPS: Readonly<Record<string, string>> = {
+  playbackStartTimeRef: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
+  audioStartPositionRef: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
+  getAudioContextTime: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
+  getPlaybackTime:
+    'read it from useEngineRefs() (WaveformPlaylistProvider only), or place the playhead from visualTimeRef',
+  controlsOffset: 'it was always 0: delete it',
 };
+
+/**
+ * INTERNAL: the props object handed to `renderPlayhead`. Five props were
+ * removed from `PlayheadProps`; a leftover playhead in plain JavaScript that
+ * still reads one would get `undefined` and draw at `NaN` pixels with no
+ * error. Each removed name is a getter that throws instead. The getters are
+ * not enumerable: the object still lists and spreads as its seven props, so
+ * `<PlayheadWithMarker {...props} />` is unaffected.
+ *
+ * MIGRATION-GUARD: remove in the major after this one (#788).
+ */
+export function playheadProps(props: PlayheadProps): PlayheadProps {
+  const value = { ...props };
+  for (const [name, instead] of Object.entries(REMOVED_PLAYHEAD_PROPS)) {
+    Object.defineProperty(value, name, {
+      enumerable: false,
+      get() {
+        throw new Error(`${name} is no longer passed to renderPlayhead: ${instead}`);
+      },
+    });
+  }
+  return value;
+}
 
 /**
  * Wrapper that isolates the custom playhead's hooks from its parent.
  * Calling renderPlayhead() directly would merge its hooks into the parent,
  * causing "Rendered more hooks" errors if renderPlayhead is conditionally provided.
+ * It reads shared hooks only, so it serves both providers.
  */
 const CustomPlayhead: React.FC<{
   renderPlayhead: RenderPlayheadFunction;
@@ -62,31 +107,26 @@ const CustomPlayhead: React.FC<{
   sampleRate: number;
 }> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
   const { currentTimeRef, visualTimeRef } = usePlaybackRefs();
-  const { playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime } =
-    useEngineRefs();
   const { isPlaying } = useIsPlaying();
   // Subscribed for the re-render only, so a seek while stopped moves a custom
   // playhead: the position below comes from the refs.
   useCurrentTime();
 
   // Use visualTimeRef so the initial position matches the audible output
-  // (the playhead's rAF loop also reads visualTimeRef for in-sync animation).
+  // (the default playhead and the progress fill are drawn from it too).
   const visualTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
 
-  return renderPlayhead({
-    position: (visualTime * sampleRate) / samplesPerPixel,
-    color,
-    isPlaying,
-    currentTimeRef,
-    visualTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    samplesPerPixel,
-    sampleRate,
-    controlsOffset: 0,
-    getAudioContextTime,
-    getPlaybackTime,
-  }) as React.ReactElement;
+  return renderPlayhead(
+    playheadProps({
+      position: (visualTime * sampleRate) / samplesPerPixel,
+      color,
+      isPlaying,
+      currentTimeRef,
+      visualTimeRef,
+      samplesPerPixel,
+      sampleRate,
+    })
+  ) as React.ReactElement;
 };
 
 export interface PlayheadOverlayProps {
@@ -94,7 +134,10 @@ export interface PlayheadOverlayProps {
   renderPlayhead?: RenderPlayheadFunction;
 }
 
-/** The playhead: shown while playing, and at rest when no range is selected. */
+/**
+ * The playhead: shown while playing, and at rest when no range is selected.
+ * The same under either provider.
+ */
 export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isPlaying } = useIsPlaying();

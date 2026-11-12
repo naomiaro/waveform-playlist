@@ -459,6 +459,8 @@ const MOVED_TO_ENGINE_REFS: readonly (keyof EngineRefsContextValue)[] = [
  * would read `undefined` and fail somewhere else, later. Each moved name is a
  * getter that throws instead. The getters are not enumerable: the value still
  * lists, spreads and compares as its four fields.
+ *
+ * MIGRATION-GUARD: remove in the major after this one (#788).
  */
 export function playbackRefsValue(fields: PlaybackRefsContextValue): PlaybackRefsContextValue {
   const value = { ...fields };
