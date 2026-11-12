@@ -6,13 +6,12 @@ import { DevicePixelRatioProvider } from '../contexts/DevicePixelRatio';
 import { BeatsAndBarsProvider } from '../contexts/BeatsAndBars';
 
 // Different zoom levels to demonstrate SmartScale behavior
-const createPlaylistInfo = (samplesPerPixel: number, duration: number) => ({
+const createPlaylistInfo = (samplesPerPixel: number) => ({
   sampleRate: 48000,
   samplesPerPixel,
   zoomLevels: [500, 1000, 1500, 2000, 2500, 5000, 10000],
   waveHeight: 80,
   timeScaleHeight: 20,
-  duration,
   controls: {
     show: false,
     width: 150,
@@ -34,10 +33,11 @@ type Story = StoryObj<typeof SmartScale>;
 // --- Temporal mode stories ---
 
 export const TemporalZoomedIn: Story = {
+  args: { durationMs: 30000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(500, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(500)}>
           <div style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
               Temporal · Samples per pixel: 500 (zoomed in)
@@ -51,10 +51,11 @@ export const TemporalZoomedIn: Story = {
 };
 
 export const TemporalMediumZoom: Story = {
+  args: { durationMs: 60000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1500, 60000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1500)}>
           <div style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
               Temporal · Samples per pixel: 1500 (medium zoom)
@@ -68,10 +69,11 @@ export const TemporalMediumZoom: Story = {
 };
 
 export const TemporalZoomedOut: Story = {
+  args: { durationMs: 180000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(5000, 180000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(5000)}>
           <div style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
               Temporal · Samples per pixel: 5000 (zoomed out)
@@ -85,10 +87,11 @@ export const TemporalZoomedOut: Story = {
 };
 
 export const TemporalVeryZoomedOut: Story = {
+  args: { durationMs: 300000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(12000, 300000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(12000)}>
           <div style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
               Temporal · Samples per pixel: 12000 (very zoomed out)
@@ -103,6 +106,7 @@ export const TemporalVeryZoomedOut: Story = {
 
 export const TemporalCustomLabels: Story = {
   args: {
+    durationMs: 60000,
     renderTick: (label: string, pixelPosition: number) => (
       <div
         style={{
@@ -120,7 +124,7 @@ export const TemporalCustomLabels: Story = {
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 60000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <div style={{ padding: '1rem' }}>
             <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
               Temporal · Custom labels (seconds only, blue)
@@ -136,10 +140,11 @@ export const TemporalCustomLabels: Story = {
 // --- Beats & bars mode stories ---
 
 export const BeatsAndBars120BPM: Story = {
+  args: { durationMs: 30000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
@@ -155,10 +160,11 @@ export const BeatsAndBars120BPM: Story = {
 };
 
 export const BeatsAndBars119BPM: Story = {
+  args: { durationMs: 30000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <BeatsAndBarsProvider bpm={119} timeSignature={[4, 4]} snapTo="beat">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
@@ -174,10 +180,11 @@ export const BeatsAndBars119BPM: Story = {
 };
 
 export const BeatsAndBarsWaltzTime: Story = {
+  args: { durationMs: 30000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <BeatsAndBarsProvider bpm={140} timeSignature={[3, 4]} snapTo="beat">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
@@ -193,10 +200,11 @@ export const BeatsAndBarsWaltzTime: Story = {
 };
 
 export const BeatsAndBars78Time: Story = {
+  args: { durationMs: 30000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <BeatsAndBarsProvider bpm={160} timeSignature={[7, 8]} snapTo="beat">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
@@ -212,10 +220,11 @@ export const BeatsAndBars78Time: Story = {
 };
 
 export const BeatsAndBarsZoomedOut: Story = {
+  args: { durationMs: 120000 },
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(3000, 120000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(3000)}>
           <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="bar">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>
@@ -232,6 +241,7 @@ export const BeatsAndBarsZoomedOut: Story = {
 
 export const BeatsAndBarsCustomLabels: Story = {
   args: {
+    durationMs: 30000,
     renderTick: (label: string, pixelPosition: number) => (
       <div
         style={{
@@ -250,7 +260,7 @@ export const BeatsAndBarsCustomLabels: Story = {
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000, 30000)}>
+        <PlaylistInfoContext.Provider value={createPlaylistInfo(1000)}>
           <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
             <div style={{ padding: '1rem' }}>
               <p style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>

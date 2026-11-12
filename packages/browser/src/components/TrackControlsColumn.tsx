@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { trackKind } from '@waveform-playlist/core';
 import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
-import { usePlaylistControls, type TrackState } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistMixer } from '../WaveformPlaylistContext';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
 import { SortableTrackControls } from './SortableTrackControls';
@@ -14,7 +14,6 @@ const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
 export interface TrackControlsColumnProps {
   tracks: ClipTrack[];
-  trackStates: TrackState[];
   /** Render mode per track id, as resolved by the visualization. */
   renderModeById: ReadonlyMap<string, RenderMode>;
   trackLayout: TrackLayout;
@@ -36,11 +35,11 @@ export interface TrackControlsColumnProps {
  *
  * Memoized (#693): it takes no selection, cursor or annotation state, so a
  * selection drag or an active-annotation change during playback does not
- * re-render the panels.
+ * re-render the panels. It reads the mixer state itself (#768), so a volume
+ * or pan step renders this column and not the visualization shell above it.
  */
 function TrackControlsColumnImpl({
   tracks,
-  trackStates,
   renderModeById,
   trackLayout,
   trackHeightById,
@@ -55,6 +54,7 @@ function TrackControlsColumnImpl({
   setSettingsModalTrackId,
 }: TrackControlsColumnProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
+  const { trackStates } = usePlaylistMixer();
   const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan, reorderTrack } =
     usePlaylistControls();
 

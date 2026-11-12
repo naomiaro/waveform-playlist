@@ -2,11 +2,7 @@ import React, { useCallback } from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
-import {
-  usePlaybackAnimation,
-  usePlaylistData,
-  usePlaylistState,
-} from '../WaveformPlaylistContext';
+import { usePlaylistView, usePlaybackRefs, useSelectedTrackId } from '../WaveformPlaylistContext';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
@@ -47,9 +43,9 @@ export interface UseClipSplittingResult {
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
   const { tracks, engineRef } = options;
-  const { sampleRate } = usePlaylistData();
-  const { currentTimeRef } = usePlaybackAnimation();
-  const { selectedTrackId } = usePlaylistState();
+  const { sampleRate } = usePlaylistView();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { selectedTrackId } = useSelectedTrackId();
 
   /**
    * Split a specific clip at a given time

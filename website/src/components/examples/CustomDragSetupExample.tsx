@@ -16,7 +16,8 @@ import {
   useClipDragHandlers,
   useDragSensors,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistZoom,
+  usePlaybackRefs,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -106,7 +107,8 @@ interface ClipDragSetupProps {
  * collision modifier.
  */
 function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: ClipDragSetupProps) {
-  const { samplesPerPixel, playoutRef, isDraggingRef } = usePlaylistData();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { playoutRef, isDraggingRef } = usePlaybackRefs();
   const { setSelectedTrackId } = usePlaylistControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
@@ -183,7 +185,9 @@ export function CustomDragSetupExample() {
   }, []);
 
   if (error) {
-    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>;
+    return (
+      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
+    );
   }
 
   return (

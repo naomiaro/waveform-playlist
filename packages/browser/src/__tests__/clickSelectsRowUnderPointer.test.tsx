@@ -9,7 +9,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider, usePlaylistState } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider, useSelectedTrackId } from '../WaveformPlaylistContext';
 import { Waveform } from '../components/Waveform';
 import type { ClipTrack, AudioClip, RenderMode } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -76,7 +76,7 @@ function createFakeAdapter(): PlayoutAdapter {
 
 let selectedTrackId: string | null = null;
 const Probe: React.FC = () => {
-  selectedTrackId = usePlaylistState().selectedTrackId;
+  selectedTrackId = useSelectedTrackId().selectedTrackId;
   return null;
 };
 

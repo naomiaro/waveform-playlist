@@ -1,6 +1,6 @@
 import React from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
-import { usePlaylistData } from '../WaveformPlaylistContext';
+import { usePlaylistTimeline, usePlaylistMixer } from '../WaveformPlaylistContext';
 import {
   useExportWav,
   type OfflineEffectsFunction,
@@ -51,7 +51,8 @@ export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
   onExportComplete,
   onExportError,
 }) => {
-  const { tracks, trackStates } = usePlaylistData();
+  const { tracks } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { exportWav, isExporting, progress } = useExportWav();
 
   const handleExport = async () => {

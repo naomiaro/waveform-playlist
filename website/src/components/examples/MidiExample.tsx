@@ -17,8 +17,8 @@ import {
   ClearAllButton,
   AudioPosition,
   KeyboardShortcuts,
-  usePlaylistState,
   usePlaylistControls,
+  usePlaylistView,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -159,13 +159,12 @@ const LoadingOverlay = styled.div`
   gap: 0.5rem;
 `;
 
-
 const StyledDropZone = styled(FileDropZone)`
   margin-top: 1rem;
 `;
 
 function AutoScrollToggle() {
-  const { isAutomaticScroll } = usePlaylistState();
+  const { isAutomaticScroll } = usePlaylistView();
   const { setAutomaticScroll } = usePlaylistControls();
 
   return (
@@ -264,9 +263,7 @@ export function MidiExample() {
   const [userAudioTracks, setUserAudioTracks] = React.useState<ClipTrack[]>([]);
   const objectUrlsRef = React.useRef<string[]>([]);
 
-  const soundFontUrl = useSoundFont
-    ? '/waveform-playlist/media/soundfont/A320U.sf2'
-    : undefined;
+  const soundFontUrl = useSoundFont ? '/waveform-playlist/media/soundfont/A320U.sf2' : undefined;
   const {
     cache: soundFontCache,
     loading: soundFontLoading,
@@ -283,7 +280,13 @@ export function MidiExample() {
     return configs;
   }, [baseHidden, userMidiConfigs]);
 
-  const { tracks: allTracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs, {
+  const {
+    tracks: allTracks,
+    loading,
+    error,
+    loadedCount,
+    totalCount,
+  } = useMidiTracks(midiConfigs, {
     sampleRate: getGlobalAudioContext().sampleRate,
   });
 
@@ -353,11 +356,14 @@ export function MidiExample() {
 
   // Mirror engine mutations back to userAudioTracks state.
   // MIDI tracks (in allTracks) are managed by useMidiTracks; only audio tracks are updated.
-  const handleTracksChange = React.useCallback((updatedTracks: ClipTrack[]) => {
-    const midiTrackIds = new Set(allTracks.map((t) => t.id));
-    const updatedAudioTracks = updatedTracks.filter((t) => !midiTrackIds.has(t.id));
-    setUserAudioTracks(updatedAudioTracks);
-  }, [allTracks]);
+  const handleTracksChange = React.useCallback(
+    (updatedTracks: ClipTrack[]) => {
+      const midiTrackIds = new Set(allTracks.map((t) => t.id));
+      const updatedAudioTracks = updatedTracks.filter((t) => !midiTrackIds.has(t.id));
+      setUserAudioTracks(updatedAudioTracks);
+    },
+    [allTracks]
+  );
 
   if (error) {
     return (

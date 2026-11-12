@@ -4,7 +4,7 @@
 //
 // useAnnotationKeyboardControls is a general-purpose annotation keyboard hook and
 // must work WITHOUT a WaveformPlaylistProvider (e.g. inside MediaElementPlaylistProvider).
-// A v11 refactor made it call usePlaylistData() unconditionally to read
+// A v11 refactor made it call usePlaylistData() (since replaced, #768) unconditionally to read
 // samplesPerPixel/sampleRate, which THROWS outside WaveformPlaylistProvider — crashing
 // every MediaElement consumer that uses keyboard annotation controls.
 //

@@ -5,11 +5,22 @@ import type {
   AnnotationActionOptions,
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
-import { usePlaylistState } from '../WaveformPlaylistContext';
+import { usePlaylistAnnotations } from '../WaveformPlaylistContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
 import type { VisualizationRecordingState } from './visualizationLayout';
-import { PlaylistAnnotationList } from './PlaylistAnnotationList';
+import { PlaylistAnnotationList, type PlaylistAnnotationListProps } from './PlaylistAnnotationList';
+
+/**
+ * The text list, only when there are annotations. It reads the annotations so
+ * that Waveform does not: Waveform then renders only when its own props change
+ * (#768), as MediaElementWaveform does (#744).
+ */
+const AnnotationListWhenPresent: React.FC<PlaylistAnnotationListProps> = (props) => {
+  const { annotations } = usePlaylistAnnotations();
+  if (annotations.length === 0) return null;
+  return <PlaylistAnnotationList {...props} />;
+};
 
 export interface WaveformProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
@@ -78,8 +89,6 @@ export const Waveform: React.FC<WaveformProps> = ({
   trackReordering = false,
   recordingState,
 }) => {
-  const { annotations } = usePlaylistState();
-
   return (
     <>
       <PlaylistVisualization
@@ -96,16 +105,14 @@ export const Waveform: React.FC<WaveformProps> = ({
         trackReordering={trackReordering}
         recordingState={recordingState}
       />
-      {annotations.length > 0 && (
-        <PlaylistAnnotationList
-          height={annotationTextHeight}
-          renderAnnotationItem={renderAnnotationItem}
-          controls={annotationControls}
-          annotationListConfig={annotationListConfig}
-          scrollActivePosition={scrollActivePosition}
-          scrollActiveContainer={scrollActiveContainer}
-        />
-      )}
+      <AnnotationListWhenPresent
+        height={annotationTextHeight}
+        renderAnnotationItem={renderAnnotationItem}
+        controls={annotationControls}
+        annotationListConfig={annotationListConfig}
+        scrollActivePosition={scrollActivePosition}
+        scrollActiveContainer={scrollActiveContainer}
+      />
     </>
   );
 };

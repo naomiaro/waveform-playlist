@@ -16,9 +16,12 @@ import { useTheme } from 'styled-components';
 import {
   WaveformPlaylistProvider,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaybackAnimation,
-  usePlaylistState,
+  usePlaylistView,
+  usePlaylistTimeline,
+  usePlaylistMixer,
+  usePlaybackRefs,
+  useIsPlaying,
+  useLoop,
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
@@ -87,18 +90,30 @@ function createFakeAdapter(): PlayoutAdapter {
 let adapterTime = 0;
 
 type Controls = ReturnType<typeof usePlaylistControls>;
-type Data = ReturnType<typeof usePlaylistData>;
+type View = ReturnType<typeof usePlaylistView>;
+type Timeline = ReturnType<typeof usePlaylistTimeline>;
+type Mixer = ReturnType<typeof usePlaylistMixer>;
 
-type State = ReturnType<typeof usePlaylistState>;
+// The loop value stands for "state that is not the selection, the cursor or
+// the active annotation": each of those got its own context so that a reader
+// of anything else is left alone (#733, #740).
+type State = ReturnType<typeof useLoop>;
 type Selection = ReturnType<typeof useSelection>;
 
-let probe: { controls: Controls; data: Data; theme: unknown; isPlaying: boolean };
+let probe: {
+  controls: Controls;
+  view: View;
+  timeline: Timeline;
+  mixer: Mixer;
+  theme: unknown;
+  isPlaying: boolean;
+};
 let stateProbe: { state: State; renders: number };
 let selectionProbe: { selection: Selection; renders: number };
 
-// Reads only the state context, as most consumers do (#733).
+// Reads only the loop context (#733, #768).
 const StateProbeChild: React.FC = () => {
-  stateProbe = { state: usePlaylistState(), renders: (stateProbe?.renders ?? 0) + 1 };
+  stateProbe = { state: useLoop(), renders: (stateProbe?.renders ?? 0) + 1 };
   return null;
 };
 
@@ -110,15 +125,17 @@ const SelectionProbeChild: React.FC = () => {
   return null;
 };
 
-type Animation = ReturnType<typeof usePlaybackAnimation>;
-let animationProbe: { animation: Animation; renders: number };
+type Animation = ReturnType<typeof useIsPlaying>;
+type Refs = ReturnType<typeof usePlaybackRefs>;
+let animationProbe: { animation: Animation; refs: Refs; renders: number };
 let currentTimeProbe: { currentTime: number; renders: number };
 let activeAnnotationProbe: { activeAnnotationId: string | null; renders: number };
 
-// Reads only the animation context, as a transport button does (#740).
+// Reads isPlaying and the refs, as a transport button does (#740, #768).
 const AnimationProbeChild: React.FC = () => {
   animationProbe = {
-    animation: usePlaybackAnimation(),
+    animation: useIsPlaying(),
+    refs: usePlaybackRefs(),
     renders: (animationProbe?.renders ?? 0) + 1,
   };
   return null;
@@ -143,9 +160,11 @@ const ActiveAnnotationProbeChild: React.FC = () => {
 const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaylistControls(),
-    data: usePlaylistData(),
+    view: usePlaylistView(),
+    timeline: usePlaylistTimeline(),
+    mixer: usePlaylistMixer(),
     theme: useTheme(),
-    isPlaying: usePlaybackAnimation().isPlaying,
+    isPlaying: useIsPlaying().isPlaying,
   };
   return null;
 };
@@ -163,7 +182,7 @@ const ControlsProbeChild: React.FC = () => {
 let seekFromLayoutEffect: { target: number } | null = null;
 const LayoutSeekChild: React.FC = () => {
   const { seekTo } = usePlaylistControls();
-  const { duration } = usePlaylistData();
+  const { duration } = usePlaylistTimeline();
   React.useLayoutEffect(() => {
     if (seekFromLayoutEffect && duration === 2) seekTo(seekFromLayoutEffect.target);
   }, [duration, seekTo]);
@@ -211,7 +230,7 @@ async function mount({ inlineProps = false } = {}) {
     </WaveformPlaylistProvider>
   );
   const utils = render(<Wrapper />);
-  await waitFor(() => expect(probe.data.isReady).toBe(true));
+  await waitFor(() => expect(probe.timeline.isReady).toBe(true));
   return {
     adapter,
     rerender: () => utils.rerender(<Wrapper />),
@@ -239,7 +258,7 @@ describe('provider context values keep their identity (#691)', () => {
       probe.controls.setTrackVolume(0, 0.4);
     });
 
-    expect(probe.data.trackStates[0].volume).toBe(0.4);
+    expect(probe.mixer.trackStates[0].volume).toBe(0.4);
     expect(probe.controls).toBe(before);
   });
 
@@ -254,30 +273,34 @@ describe('provider context values keep their identity (#691)', () => {
     expect(probe.controls).toBe(before);
   });
 
-  it('data value and theme survive a parent re-render with unchanged props', async () => {
+  it('view and timeline values and theme survive a parent re-render with unchanged props', async () => {
     const { rerender } = await mount();
-    const dataBefore = probe.data;
+    const dataBefore = probe.view;
+    const timelineBefore = probe.timeline;
     const themeBefore = probe.theme;
 
     await act(async () => {
       rerender();
     });
 
-    expect(probe.data).toBe(dataBefore);
+    expect(probe.view).toBe(dataBefore);
+    expect(probe.timeline).toBe(timelineBefore);
     expect(probe.theme).toBe(themeBefore);
   });
 
-  it('data value and theme survive a parent re-render that passes equal inline objects', async () => {
+  it('view and timeline values and theme survive a parent re-render that passes equal inline objects', async () => {
     const { rerender } = await mount({ inlineProps: true });
-    const dataBefore = probe.data;
+    const dataBefore = probe.view;
+    const timelineBefore = probe.timeline;
     const themeBefore = probe.theme;
-    expect(probe.data.controls).toEqual({ show: true, width: 200 });
+    expect(probe.view.controls).toEqual({ show: true, width: 200 });
 
     await act(async () => {
       rerender();
     });
 
-    expect(probe.data).toBe(dataBefore);
+    expect(probe.view).toBe(dataBefore);
+    expect(probe.timeline).toBe(timelineBefore);
     expect(probe.theme).toBe(themeBefore);
   });
 
@@ -334,8 +357,8 @@ describe('provider context values keep their identity (#691)', () => {
       probe.controls.setTrackSolo(1, true);
     });
 
-    expect(probe.data.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
-    expect(probe.data.trackStates[1]).toMatchObject({ pan: -0.5, soloed: true });
+    expect(probe.mixer.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
+    expect(probe.mixer.trackStates[1]).toMatchObject({ pan: -0.5, soloed: true });
   });
 });
 
@@ -396,7 +419,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
 
     expect(currentTimeProbe.currentTime).toBe(0.5);
     expect(currentTimeProbe.renders).toBeGreaterThan(currentTimeRendersBefore);
-    expect(animationProbe.animation.currentTimeRef.current).toBe(0.5);
+    expect(animationProbe.refs.currentTimeRef.current).toBe(0.5);
     expect(animationProbe.animation).toBe(animationBefore);
     expect(animationProbe.renders).toBe(animationRendersBefore);
     expect(animationProbe.animation).not.toHaveProperty('currentTime');
@@ -448,7 +471,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
       probe.controls.pause();
     });
     expect(animationProbe.animation.isPlaying).toBe(false);
-    expect(animationProbe.animation.currentTimeRef.current).toBe(0.6);
+    expect(animationProbe.refs.currentTimeRef.current).toBe(0.6);
     expect(currentTimeProbe.currentTime).toBe(0.6);
   });
 
@@ -474,7 +497,7 @@ describe('the resting cursor position lives in its own context (#740)', () => {
     });
 
     expect(animationProbe.animation.isPlaying).toBe(false);
-    expect(animationProbe.animation.currentTimeRef.current).toBe(0.6);
+    expect(animationProbe.refs.currentTimeRef.current).toBe(0.6);
     expect(currentTimeProbe.currentTime).toBe(0.6);
   });
 
@@ -540,12 +563,12 @@ describe('the controls value does not follow the timeline length or the time for
   it('controls value survives a change of duration', async () => {
     const { setTracks } = await mount();
     const before = probe.controls;
-    expect(probe.data.duration).toBe(1);
+    expect(probe.timeline.duration).toBe(1);
 
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
     expect(probe.controls).toBe(before);
   });
@@ -557,7 +580,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
     expect(controlsProbe.renders).toBe(rendersBefore);
   });
@@ -569,7 +592,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       probe.controls.setTimeFormat('seconds');
     });
-    expect(probe.data.timeFormat).toBe('seconds');
+    expect(probe.view.timeFormat).toBe('seconds');
 
     expect(controlsProbe.renders).toBe(rendersBefore);
   });
@@ -582,7 +605,7 @@ describe('the controls value does not follow the timeline length or the time for
       probe.controls.setTimeFormat('seconds');
     });
 
-    expect(probe.data.timeFormat).toBe('seconds');
+    expect(probe.view.timeFormat).toBe('seconds');
     expect(probe.controls).toBe(before);
   });
 
@@ -593,7 +616,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
     await act(async () => {
       seekTo(1.5);
@@ -611,13 +634,13 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
     const { seekTo } = probe.controls;
 
     await act(async () => {
       setTracks(TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(1));
+    await waitFor(() => expect(probe.timeline.duration).toBe(1));
 
     await act(async () => {
       seekTo(1.5);
@@ -632,7 +655,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
     expect(currentTimeProbe.currentTime).toBe(1.5);
   });
@@ -651,7 +674,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks([...TRACKS, makeTrack('track-3', 2)]);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
     expect(addTrack).toHaveBeenCalledTimes(1);
     expect(setTracksOnAdapter).not.toHaveBeenCalled();
     expect((adapter.play as ReturnType<typeof vi.fn>).mock.calls.length).toBe(playCalls);
@@ -676,7 +699,7 @@ describe('the controls value does not follow the timeline length or the time for
     await act(async () => {
       setTracks(LONGER_TRACKS);
     });
-    await waitFor(() => expect(probe.data.duration).toBe(2));
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
     await waitFor(() => expect(probe.isPlaying).toBe(true));
 
     // Past the old end (1 s), before the new one (2 s): several frames pass

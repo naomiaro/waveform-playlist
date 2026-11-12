@@ -23,7 +23,8 @@ import React from 'react';
 import {
   WaveformPlaylistProvider,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistTimeline,
+  usePlaylistMixer,
 } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -99,7 +100,8 @@ let probe: {
 };
 
 const ProbeChild: React.FC = () => {
-  const { tracks, trackStates, isReady } = usePlaylistData();
+  const { tracks, isReady } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { reorderTrack } = usePlaylistControls();
   probe = { tracks, trackStates, isReady, reorderTrack };
   return null;

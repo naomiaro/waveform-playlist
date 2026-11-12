@@ -2,8 +2,8 @@ import React from 'react';
 import type { AnnotationAction, AnnotationActionOptions } from '@waveform-playlist/core';
 import {
   useActiveAnnotation,
-  usePlaylistState,
   usePlaylistControls,
+  usePlaylistAnnotations,
 } from '../WaveformPlaylistContext';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationListView, type AnnotationListCommonProps } from './AnnotationListView';
@@ -30,7 +30,8 @@ export interface PlaylistAnnotationListProps extends AnnotationListCommonProps {
  * Throws if used without `<AnnotationProvider>` wrapping the component tree.
  */
 export const PlaylistAnnotationList: React.FC<PlaylistAnnotationListProps> = (props) => {
-  const { annotations, annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
+  const { annotations, annotationsEditable, linkEndpoints, continuousPlay } =
+    usePlaylistAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setAnnotations, annotationPreview } = usePlaylistControls();
   // While an edge is dragged with the preview, the times in the list follow it.

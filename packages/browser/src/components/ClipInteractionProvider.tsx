@@ -11,7 +11,13 @@ import {
 } from '@waveform-playlist/core';
 import { useBeatsAndBars, getScaleInfo } from '@waveform-playlist/ui-components';
 
-import { usePlaylistData, usePlaylistControls } from '../WaveformPlaylistContext';
+import {
+  usePlaylistControls,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  usePlaybackRefs,
+} from '../WaveformPlaylistContext';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
@@ -44,8 +50,10 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   // below resolves the same way): the prop, else what is set above.
   const inherited = useClipInteraction();
   const touchOptimized = touchOptimizedProp ?? inherited.touchOptimized;
-  const { tracks, samplesPerPixel, sampleRate, playoutRef, isDraggingRef, onTracksChange } =
-    usePlaylistData();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { tracks, onTracksChange } = usePlaylistTimeline();
+  const { playoutRef, isDraggingRef } = usePlaybackRefs();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
     usePlaylistControls();
   const beatsAndBars = useBeatsAndBars();

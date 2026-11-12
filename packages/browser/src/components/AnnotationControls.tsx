@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
-import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistAnnotations } from '../WaveformPlaylistContext';
 
 /**
  * Continuous play checkbox that uses the playlist context.
@@ -8,7 +8,7 @@ import { usePlaylistState, usePlaylistControls } from '../WaveformPlaylistContex
  */
 export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { ContinuousPlayCheckbox: Base } = useAnnotationIntegration();
-  const { continuousPlay } = usePlaylistState();
+  const { continuousPlay } = usePlaylistAnnotations();
   const { setContinuousPlay } = usePlaylistControls();
 
   return <Base checked={continuousPlay} onChange={setContinuousPlay} className={className} />;
@@ -20,7 +20,7 @@ export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ class
  */
 export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { LinkEndpointsCheckbox: Base } = useAnnotationIntegration();
-  const { linkEndpoints } = usePlaylistState();
+  const { linkEndpoints } = usePlaylistAnnotations();
   const { setLinkEndpoints } = usePlaylistControls();
 
   return <Base checked={linkEndpoints} onChange={setLinkEndpoints} className={className} />;
@@ -32,7 +32,7 @@ export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ classN
  */
 export const EditableCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { EditableCheckbox: Base } = useAnnotationIntegration();
-  const { annotationsEditable } = usePlaylistState();
+  const { annotationsEditable } = usePlaylistAnnotations();
   const { setAnnotationsEditable } = usePlaylistControls();
 
   return (
@@ -49,7 +49,7 @@ export const DownloadAnnotationsButton: React.FC<{ filename?: string; className?
   className,
 }) => {
   const { DownloadAnnotationsButton: Base } = useAnnotationIntegration();
-  const { annotations } = usePlaylistState();
+  const { annotations } = usePlaylistAnnotations();
 
   return <Base annotations={annotations} filename={filename} className={className} />;
 };

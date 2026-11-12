@@ -49,7 +49,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider, usePlaylistTimeline } from '../WaveformPlaylistContext';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { recordingDisplayEnd } from '../hooks/useRecordingLayout';
 import {
@@ -134,7 +134,7 @@ function createFakeAdapter(): PlayoutAdapter {
 
 let isReady = false;
 const ProbeChild: React.FC = () => {
-  isReady = usePlaylistData().isReady;
+  isReady = usePlaylistTimeline().isReady;
   return null;
 };
 

@@ -30,19 +30,20 @@ import {
   EditableCheckbox,
   AudioPosition,
   Waveform,
-  usePlaylistData,
-  usePlaylistState,
   usePlaylistControls,
-  usePlaybackAnimation,
   useAnnotationDragHandlers,
   useDragSensors,
   KeyboardShortcuts,
   ClearAllButton,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  usePlaybackRefs,
+  usePlaylistAnnotations,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { sonnetNotes as defaultNotes } from './sonnetAnnotations';
-
 
 // Annotation actions for the UI
 const annotationActions = [
@@ -50,7 +51,7 @@ const annotationActions = [
     text: '−',
     title: 'Reduce annotation end by 0.010s',
     action: (annotation: any, i: number, annotations: any[], opts: any) => {
-      const delta = 0.010;
+      const delta = 0.01;
       annotation.end -= delta;
 
       if (opts.linkEndpoints) {
@@ -65,13 +66,13 @@ const annotationActions = [
       if (annotation.begin !== undefined) {
         annotation.begin = annotation.end.toString();
       }
-    }
+    },
   },
   {
     text: '+',
     title: 'Increase annotation end by 0.010s',
     action: (annotation: any, i: number, annotations: any[], opts: any) => {
-      const delta = 0.010;
+      const delta = 0.01;
       annotation.end += delta;
 
       if (opts.linkEndpoints) {
@@ -86,7 +87,7 @@ const annotationActions = [
       if (annotation.begin !== undefined) {
         annotation.begin = annotation.end.toString();
       }
-    }
+    },
   },
   {
     text: '✂',
@@ -107,15 +108,15 @@ const annotationActions = [
       if (annotation.begin !== undefined) {
         annotation.begin = annotation.end.toString();
       }
-    }
+    },
   },
   {
     text: '🗑',
     title: 'Delete annotation',
     action: (annotation: any, i: number, annotations: any[]) => {
       annotations.splice(i, 1);
-    }
-  }
+    },
+  },
 ];
 
 const Container = styled.div`
@@ -192,7 +193,6 @@ const ActionButton = styled.button`
   }
 `;
 
-
 const SuccessButton = styled(ActionButton)`
   /* Same as ActionButton - no special styling */
 `;
@@ -216,12 +216,14 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   defaultAnnotationDuration = 3.0,
   minAnnotationDuration = 0.5,
 }) => {
-  const { samplesPerPixel, sampleRate, duration, controls } = usePlaylistData();
-  const { annotations, linkEndpoints } = usePlaylistState();
+  const { sampleRate, controls } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { duration } = usePlaylistTimeline();
+  const { annotations, linkEndpoints } = usePlaylistAnnotations();
   const { setAnnotations, play, annotationPreview } = usePlaylistControls();
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
-  const { currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
@@ -240,54 +242,57 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   });
 
   // Find the next available gap for an annotation starting from a given time
-  const findNextAvailableGap = useCallback((startFrom: number): { start: number; maxEnd: number } | null => {
-    if (duration <= 0) return null;
+  const findNextAvailableGap = useCallback(
+    (startFrom: number): { start: number; maxEnd: number } | null => {
+      if (duration <= 0) return null;
 
-    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
+      const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
 
-    // Check if we're inside an existing annotation
-    const containingAnnotation = sortedAnnotations.find(
-      (a) => startFrom >= a.start && startFrom < a.end
-    );
+      // Check if we're inside an existing annotation
+      const containingAnnotation = sortedAnnotations.find(
+        (a) => startFrom >= a.start && startFrom < a.end
+      );
 
-    let gapStart: number;
-    let searchFromIndex: number;
+      let gapStart: number;
+      let searchFromIndex: number;
 
-    if (containingAnnotation) {
-      // Start searching after this annotation ends
-      gapStart = containingAnnotation.end;
-      searchFromIndex = sortedAnnotations.indexOf(containingAnnotation) + 1;
-    } else {
-      // We're in a gap, start from current position
-      gapStart = startFrom;
-      searchFromIndex = sortedAnnotations.findIndex((a) => a.start > startFrom);
-      if (searchFromIndex === -1) searchFromIndex = sortedAnnotations.length;
-    }
-
-    // Find the next annotation after our gap start (if any)
-    const nextAnnotation = sortedAnnotations[searchFromIndex];
-    const gapEnd = nextAnnotation ? nextAnnotation.start : duration;
-
-    // Check if there's enough space
-    if (gapEnd - gapStart >= minAnnotationDuration) {
-      return { start: gapStart, maxEnd: gapEnd };
-    }
-
-    // No space here, look for the next gap
-    // Iterate through remaining annotations looking for gaps between them
-    for (let i = searchFromIndex; i < sortedAnnotations.length; i++) {
-      const current = sortedAnnotations[i];
-      const next = sortedAnnotations[i + 1];
-      const potentialGapStart = current.end;
-      const potentialGapEnd = next ? next.start : duration;
-
-      if (potentialGapEnd - potentialGapStart >= minAnnotationDuration) {
-        return { start: potentialGapStart, maxEnd: potentialGapEnd };
+      if (containingAnnotation) {
+        // Start searching after this annotation ends
+        gapStart = containingAnnotation.end;
+        searchFromIndex = sortedAnnotations.indexOf(containingAnnotation) + 1;
+      } else {
+        // We're in a gap, start from current position
+        gapStart = startFrom;
+        searchFromIndex = sortedAnnotations.findIndex((a) => a.start > startFrom);
+        if (searchFromIndex === -1) searchFromIndex = sortedAnnotations.length;
       }
-    }
 
-    return null; // No available gap found
-  }, [annotations, duration, minAnnotationDuration]);
+      // Find the next annotation after our gap start (if any)
+      const nextAnnotation = sortedAnnotations[searchFromIndex];
+      const gapEnd = nextAnnotation ? nextAnnotation.start : duration;
+
+      // Check if there's enough space
+      if (gapEnd - gapStart >= minAnnotationDuration) {
+        return { start: gapStart, maxEnd: gapEnd };
+      }
+
+      // No space here, look for the next gap
+      // Iterate through remaining annotations looking for gaps between them
+      for (let i = searchFromIndex; i < sortedAnnotations.length; i++) {
+        const current = sortedAnnotations[i];
+        const next = sortedAnnotations[i + 1];
+        const potentialGapStart = current.end;
+        const potentialGapEnd = next ? next.start : duration;
+
+        if (potentialGapEnd - potentialGapStart >= minAnnotationDuration) {
+          return { start: potentialGapStart, maxEnd: potentialGapEnd };
+        }
+      }
+
+      return null; // No available gap found
+    },
+    [annotations, duration, minAnnotationDuration]
+  );
 
   // Add annotation at current playhead position or next available gap
   const addAnnotationAtPlayhead = useCallback(() => {
@@ -329,7 +334,14 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           ];
 
     setAnnotations(newAnnotations);
-  }, [currentTimeRef, annotations, duration, setAnnotations, defaultAnnotationDuration, findNextAvailableGap]);
+  }, [
+    currentTimeRef,
+    annotations,
+    duration,
+    setAnnotations,
+    defaultAnnotationDuration,
+    findNextAvailableGap,
+  ]);
 
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {
@@ -356,7 +368,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
       setIsLoadingAudio(true);
       const audioContext = Tone.getContext().rawContext as AudioContext;
       const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-      if (newTracks.length > 0) onTracksChange(prevTracks => [...prevTracks, ...newTracks]);
+      if (newTracks.length > 0) onTracksChange((prevTracks) => [...prevTracks, ...newTracks]);
       setIsLoadingAudio(false);
     },
     [onTracksChange]
@@ -407,7 +419,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           fileFilter={(f) => f.type.startsWith('audio/')}
           label="Drop audio files here or click to browse"
           dragLabel="Drop audio files here"
-          loadingContent={isLoadingAudio ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined}
+          loadingContent={
+            isLoadingAudio ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined
+          }
         />
 
         <TopBar>
@@ -429,16 +443,11 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           <Separator />
 
           <ControlGroup>
-            <SuccessButton
-              onClick={addAnnotationAtPlayhead}
-              title="Add annotation at playhead (A)"
-            >
+            <SuccessButton onClick={addAnnotationAtPlayhead} title="Add annotation at playhead (A)">
               + Add Annotation
             </SuccessButton>
             <DownloadAnnotationsButton />
-            <ActionButton onClick={() => jsonInputRef.current?.click()}>
-              Upload JSON
-            </ActionButton>
+            <ActionButton onClick={() => jsonInputRef.current?.click()}>Upload JSON</ActionButton>
             <ClearAllButton onClearAll={onClearAll} />
             <HiddenFileInput
               ref={jsonInputRef}
@@ -464,10 +473,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           </ControlGroup>
         </TopBar>
 
-        <Waveform
-          annotationControls={annotationActions}
-          annotationTextHeight={300}
-        />
+        <Waveform annotationControls={annotationActions} annotationTextHeight={300} />
 
         <TimeControlsBar>
           <ControlGroup>
@@ -561,11 +567,7 @@ export function AnnotationsExample() {
   }
 
   if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error}
-      </div>
-    );
+    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error}</div>;
   }
 
   return (

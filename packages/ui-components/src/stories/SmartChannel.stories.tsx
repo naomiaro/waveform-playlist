@@ -27,7 +27,6 @@ const playlistInfo = {
   zoomLevels: [1000, 1500, 2000, 2500],
   waveHeight: 80,
   timeScaleHeight: 15,
-  duration: 30000,
   controls: {
     show: false,
     width: 150,

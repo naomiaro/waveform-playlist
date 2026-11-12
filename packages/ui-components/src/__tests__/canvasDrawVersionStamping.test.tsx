@@ -315,21 +315,23 @@ describe('TimeScale', () => {
 });
 
 describe('SmartScale', () => {
-  // Default PlaylistInfo: 30 s at 48 px per second = 1440 px = two chunks.
+  // 30 s at the default PlaylistInfo's 48 px per second = 1440 px = two chunks.
   it('does not redraw the ticks when renderTick is a new function', () => {
     visibleChunks = [0, 1];
-    const { rerender } = render(<SmartScale renderTick={(label) => <i>{'one ' + label}</i>} />);
+    const { rerender } = render(
+      <SmartScale durationMs={30000} renderTick={(label) => <i>{'one ' + label}</i>} />
+    );
     expect(clears()).toEqual({ 0: 1, 1: 1 });
     expect(screen.getByText('one 0:00')).toBeDefined();
 
-    rerender(<SmartScale renderTick={(label) => <i>{'two ' + label}</i>} />);
+    rerender(<SmartScale durationMs={30000} renderTick={(label) => <i>{'two ' + label}</i>} />);
     expect(screen.getByText('two 0:00')).toBeDefined();
     expect(clears()).toEqual({ 0: 1, 1: 1 });
   });
 
   it('renders default labels and the same ticks without renderTick', () => {
     visibleChunks = [0, 1];
-    render(<SmartScale />);
+    render(<SmartScale durationMs={30000} />);
     expect(screen.getByText('0:00')).toBeDefined();
     expect(log.get(0)!.fillRects.length).toBeGreaterThan(0);
     expect(log.get(1)!.fillRects.length).toBeGreaterThan(0);
@@ -339,7 +341,7 @@ describe('SmartScale', () => {
     visibleChunks = [0, 1];
     const scale = (renderTick?: (label: string) => React.ReactNode) => (
       <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="off">
-        <SmartScale renderTick={renderTick} />
+        <SmartScale durationMs={30000} renderTick={renderTick} />
       </BeatsAndBarsProvider>
     );
     const { rerender } = render(scale());

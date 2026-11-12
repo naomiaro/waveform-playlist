@@ -4,16 +4,41 @@ export type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/p
 // Export new flexible/headless API
 export {
   WaveformPlaylistProvider,
-  usePlaybackAnimation,
-  usePlaylistState,
-  useSelection,
-  useCurrentTime,
-  useActiveAnnotation,
   usePlaylistControls,
-  usePlaylistData,
-  usePlaylistDataOptional,
+  usePlaybackRefs,
+  useIsPlaying,
+  useCurrentTime,
+  useSelection,
+  useActiveAnnotation,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  usePlaylistMixer,
+  useTrackReorderPreview,
+  usePlaylistAnnotations,
+  useLoop,
+  useSelectedTrackId,
+  useUndoRedo,
 } from './WaveformPlaylistContext';
-export type { TrackState, FrameData } from './WaveformPlaylistContext';
+export type {
+  TrackState,
+  FrameData,
+  PlaylistControlsContextValue,
+  PlaybackRefsContextValue,
+  IsPlayingContextValue,
+  CurrentTimeContextValue,
+  SelectionContextValue,
+  ActiveAnnotationContextValue,
+  PlaylistViewContextValue,
+  PlaylistZoomContextValue,
+  PlaylistTimelineContextValue,
+  PlaylistMixerContextValue,
+  TrackReorderPreviewContextValue,
+  PlaylistAnnotationsContextValue,
+  LoopContextValue,
+  SelectedTrackIdContextValue,
+  UndoRedoContextValue,
+} from './WaveformPlaylistContext';
 
 // Export MediaElement-based provider (single-track with playback rate control)
 export {

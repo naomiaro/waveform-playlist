@@ -2,11 +2,12 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import {
   WaveformPlaylistProvider,
-  usePlaylistData,
   usePlaylistControls,
   useTimeFormat,
   useKeyboardShortcuts,
   getShortcutLabel,
+  usePlaylistZoom,
+  usePlaylistMixer,
 } from '@waveform-playlist/browser';
 import type { KeyboardShortcut } from '@waveform-playlist/browser';
 import { BaseButton, BaseSlider, BaseSelect } from '../styled';
@@ -21,7 +22,7 @@ import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
 
 // Zoom controls via context hooks demo
 const ZoomControlsDemo: React.FC = () => {
-  const { samplesPerPixel, canZoomIn, canZoomOut } = usePlaylistData();
+  const { samplesPerPixel, canZoomIn, canZoomOut } = usePlaylistZoom();
   const { zoomIn, zoomOut } = usePlaylistControls();
 
   return (
@@ -94,7 +95,7 @@ const TimeFormatDemo: React.FC = () => {
 // Note: useMasterVolume is an internal hook used by WaveformPlaylistProvider.
 // Components should access masterVolume via usePlaylistData/usePlaylistControls.
 const MasterVolumeDemo: React.FC = () => {
-  const { masterVolume } = usePlaylistData();
+  const { masterVolume } = usePlaylistMixer();
   const { setMasterVolume } = usePlaylistControls();
   const [muted, setMuted] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(masterVolume);

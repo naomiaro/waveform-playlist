@@ -10,8 +10,9 @@ import React from 'react';
 import {
   WaveformPlaylistProvider,
   usePlaylistControls,
-  usePlaylistData,
   useActiveAnnotation,
+  usePlaylistTimeline,
+  usePlaylistZoom,
 } from '../WaveformPlaylistContext';
 import {
   AnnotationIntegrationContext,
@@ -107,14 +108,14 @@ const INTEGRATION = {
 
 let probe: {
   controls: ReturnType<typeof usePlaylistControls>;
-  data: ReturnType<typeof usePlaylistData>;
+  data: ReturnType<typeof usePlaylistTimeline> & ReturnType<typeof usePlaylistZoom>;
   activeAnnotationId: string | null;
 };
 
 const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaylistControls(),
-    data: usePlaylistData(),
+    data: { ...usePlaylistTimeline(), ...usePlaylistZoom() },
     activeAnnotationId: useActiveAnnotation().activeAnnotationId,
   };
   return null;

@@ -1,16 +1,17 @@
 import React, { useCallback } from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
 import {
-  usePlaybackAnimation,
-  usePlaylistState,
   useSelection,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistTimeline,
+  usePlaybackRefs,
+  useLoop,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import { usePlayFromSelectionOrCursor } from '../hooks/usePlayFromSelectionOrCursor';
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   // Shared with the Space shortcut: the selection if one is highlighted, else the cursor.
   const handleClick = usePlayFromSelectionOrCursor();
 
@@ -22,7 +23,7 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
 };
 
 export const PauseButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { pause } = usePlaylistControls();
 
   return (
@@ -33,7 +34,7 @@ export const PauseButton: React.FC<{ className?: string }> = ({ className }) => 
 };
 
 export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { stop } = usePlaylistControls();
 
   return (
@@ -44,7 +45,7 @@ export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
 };
 
 export const RewindButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { play, setCurrentTime } = usePlaylistControls();
 
   const handleClick = () => {
@@ -63,9 +64,9 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
 };
 
 export const FastForwardButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { play, setCurrentTime } = usePlaylistControls();
-  const { duration } = usePlaylistData();
+  const { duration } = usePlaylistTimeline();
 
   const handleClick = () => {
     setCurrentTime(duration);
@@ -86,7 +87,8 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   skipAmount = 5,
   className,
 }) => {
-  const { currentTimeRef, isPlaying } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   const { play, setCurrentTime } = usePlaylistControls();
 
   const handleClick = () => {
@@ -109,9 +111,10 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   skipAmount = 5,
   className,
 }) => {
-  const { currentTimeRef, isPlaying } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
   const { play, setCurrentTime } = usePlaylistControls();
-  const { duration } = usePlaylistData();
+  const { duration } = usePlaylistTimeline();
 
   const handleClick = () => {
     const newTime = Math.min(duration, (currentTimeRef.current ?? 0) + skipAmount);
@@ -130,9 +133,9 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
 };
 
 export const LoopButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isLoopEnabled, loopStart, loopEnd } = usePlaylistState();
+  const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { setLoopEnabled, setLoopRegion } = usePlaylistControls();
-  const { duration } = usePlaylistData();
+  const { duration } = usePlaylistTimeline();
 
   const hasValidLoopRegion = loopStart !== loopEnd && loopEnd > loopStart;
 
@@ -159,7 +162,7 @@ export const LoopButton: React.FC<{ className?: string }> = ({ className }) => {
 
 export const SetLoopRegionButton: React.FC<{ className?: string }> = ({ className }) => {
   const { selectionStart, selectionEnd } = useSelection();
-  const { loopStart, loopEnd } = usePlaylistState();
+  const { loopStart, loopEnd } = useLoop();
   const { setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
 
   const hasValidSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;

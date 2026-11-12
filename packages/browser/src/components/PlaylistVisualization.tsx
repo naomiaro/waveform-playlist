@@ -20,10 +20,13 @@ import {
   CLIP_HEADER_HEIGHT,
 } from '@waveform-playlist/ui-components';
 import {
-  usePlaybackAnimation,
-  usePlaylistState,
   usePlaylistControls,
-  usePlaylistData,
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  useTrackReorderPreview,
+  useSelectedTrackId,
+  useIsPlaying,
 } from '../WaveformPlaylistContext';
 import {
   applyTrackOrderPreview,
@@ -117,8 +120,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying } = usePlaybackAnimation();
-  const { selectedTrackId, indefinitePlayback, fillViewport } = usePlaylistState();
+  const { isPlaying } = useIsPlaying();
+  const { selectedTrackId } = useSelectedTrackId();
   const {
     setSelection,
     play,
@@ -128,11 +131,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     setRecordingActive,
   } = usePlaylistControls();
   const {
-    peaksDataArray,
-    trackStates,
-    tracks,
-    duration,
-    samplesPerPixel,
     sampleRate,
     waveHeight,
     timeScaleHeight,
@@ -140,11 +138,13 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     barWidth,
     barGap,
     roundedBars,
-    isReady,
-    trackReorderEpoch,
     mono,
-    trackDragPreview,
-  } = usePlaylistData();
+    indefinitePlayback,
+    fillViewport,
+  } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { peaksDataArray, tracks, duration, isReady } = usePlaylistTimeline();
+  const { trackReorderEpoch, trackDragPreview } = useTrackReorderPreview();
 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
   const spectrogram = useContext(SpectrogramIntegrationContext);
@@ -418,7 +418,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
             <TrackControlsColumn
               key="control-slots-layout"
               tracks={tracks}
-              trackStates={trackStates}
               renderModeById={renderModeById}
               trackLayout={trackLayout}
               trackHeightById={trackHeightById}
@@ -437,7 +436,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     [
       controls.show,
       tracks,
-      trackStates,
       renderModeById,
       trackLayout,
       trackHeightById,
@@ -461,7 +459,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
       zoomLevels: [samplesPerPixel],
       waveHeight,
       timeScaleHeight,
-      duration: displayDuration * 1000,
       controls,
       barWidth,
       barGap,
@@ -472,7 +469,6 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
       sampleRate,
       waveHeight,
       timeScaleHeight,
-      displayDuration,
       controls,
       barWidth,
       barGap,
@@ -484,11 +480,11 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     () =>
       timeScaleHeight > 0 ? (
         <>
-          <SmartScale renderTick={renderTick} />
+          <SmartScale durationMs={displayDuration * 1000} renderTick={renderTick} />
           <LoopRegionOverlay maxPosition={tracksFullWidth} />
         </>
       ) : undefined,
-    [timeScaleHeight, renderTick, tracksFullWidth]
+    [timeScaleHeight, displayDuration, renderTick, tracksFullWidth]
   );
 
   return (

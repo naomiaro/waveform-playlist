@@ -11,7 +11,6 @@ type PlaylistInfo = {
   zoomLevels: Array<number>;
   waveHeight: number;
   timeScaleHeight: number;
-  duration: number;
   controls: Controls;
   /** Width in pixels of waveform bars. Default: 1 */
   barWidth: number;
@@ -33,7 +32,6 @@ export const PlaylistInfoContext = createContext<PlaylistInfo>({
     show: false,
     width: 150,
   },
-  duration: 30000,
   barWidth: 1,
   barGap: 0,
   roundedBars: false,
