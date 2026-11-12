@@ -193,6 +193,24 @@ function PlaybackControls() {
 }
 
 /**
+ * Deep link: `/examples/media-element?t=8` starts the first player at 8
+ * seconds. The effect runs before the player has loaded; the provider stores
+ * the position and moves the player to it when it arrives.
+ */
+function StartAtQueryTime() {
+  const { seekTo } = useMediaElementControls();
+
+  useEffect(() => {
+    const start = Number(new URLSearchParams(window.location.search).get('t'));
+    if (Number.isFinite(start) && start > 0) {
+      seekTo(start);
+    }
+  }, [seekTo]);
+
+  return null;
+}
+
+/**
  * Child component that wires the MediaElement output into a Tone.js effect chain.
  * Must be rendered inside MediaElementPlaylistProvider to access playoutRef.
  *
@@ -353,6 +371,7 @@ export function MediaElementExample() {
             barWidth={2}
             barGap={0}
           >
+            <StartAtQueryTime />
             <PlaybackControls />
             <Controls style={{ marginTop: '-0.5rem' }}>
               <ControlGroup>

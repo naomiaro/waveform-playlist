@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
   Playlist,
   Track as TrackComponent,
@@ -18,6 +18,10 @@ import {
   useMediaElementControls,
   useMediaElementData,
 } from '../MediaElementPlaylistContext';
+import {
+  useMediaElementInternals,
+  useMediaElementSelection,
+} from '../providerInternals/mediaElementInternalContexts';
 import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
 import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
 import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
@@ -53,6 +57,30 @@ const CustomMediaElementPlayhead: React.FC<{
     controlsOffset: 0,
   }) as React.ReactElement;
 };
+
+/**
+ * The highlighted selection range. The only part of the playlist that follows
+ * the selection, so a drag renders this and not the waveform (#769). Memoized:
+ * a render of the playlist around it (play, pause, a seek) is not its concern.
+ */
+const MediaElementSelectionOverlay = React.memo(function MediaElementSelectionOverlay({
+  color,
+}: {
+  color: string;
+}) {
+  const { selectionStart, selectionEnd } = useMediaElementSelection();
+  const { sampleRate, samplesPerPixel } = useMediaElementData();
+
+  if (selectionStart === selectionEnd) return null;
+
+  return (
+    <Selection
+      startPosition={(Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
+      endPosition={(Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
+      color={color}
+    />
+  );
+});
 
 export interface MediaElementPlaylistProps {
   /** Custom function to generate the label shown on annotation boxes */
@@ -117,8 +145,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     fadeOut,
   } = useMediaElementData();
 
-  const [selectionStart, setSelectionStart] = useState(0);
-  const [selectionEnd, setSelectionEnd] = useState(0);
+  // The selection is the provider's (#769); this component only writes it,
+  // and MediaElementSelectionOverlay reads it.
+  const { setSelection } = useMediaElementInternals();
   const [isSelecting, setIsSelecting] = useState(false);
 
   // Local ref for scroll container - also register with context for auto-scroll
@@ -154,10 +183,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
       mouseDownTimeRef.current = clickTime;
       dragElementRef.current = e.currentTarget;
       setIsSelecting(true);
-      setSelectionStart(clickTime);
-      setSelectionEnd(clickTime);
+      setSelection(clickTime, clickTime);
     },
-    [samplesPerPixel, sampleRate]
+    [samplesPerPixel, sampleRate, setSelection]
   );
 
   // The drag is followed on the window, not on the overlay: the pointer may
@@ -173,7 +201,8 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   const handleDragMove = (e: MouseEvent) => {
     const moveTime = dragTimeAt(e.clientX);
     if (moveTime === null) return;
-    setSelectionEnd(moveTime);
+    // From where the press landed to the pointer.
+    setSelection(mouseDownTimeRef.current, moveTime);
   };
 
   const handleDragEnd = (e: MouseEvent | null) => {
@@ -189,8 +218,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     if (isPlaying && playoutRef.current) {
       const clickTime = Math.max(0, mouseDownTimeRef.current);
       seekTo(clickTime);
-      setSelectionStart(clickTime);
-      setSelectionEnd(clickTime);
+      setSelection(clickTime, clickTime);
       playoutRef.current.stop();
       play(clickTime);
       return;
@@ -206,16 +234,40 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
     // If it's just a click (not a drag), seek to that position
     if (Math.abs(end - start) < 0.1) {
       seekTo(start);
-      setSelectionStart(start);
-      setSelectionEnd(start);
+      setSelection(start, start);
     } else {
       // It was a drag - finalize the selection
-      setSelectionStart(start);
-      setSelectionEnd(end);
+      setSelection(start, end);
     }
   };
 
   useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
+
+  // Every Track, channel and the timescale read this context: a new object per render
+  // of this component would re-render them all.
+  const playlistInfo = useMemo(
+    () => ({
+      samplesPerPixel,
+      sampleRate,
+      zoomLevels: [samplesPerPixel],
+      waveHeight,
+      timeScaleHeight,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+    }),
+    [
+      samplesPerPixel,
+      sampleRate,
+      waveHeight,
+      timeScaleHeight,
+      controls,
+      barWidth,
+      barGap,
+      roundedBars,
+    ]
+  );
 
   // Show loading if peaks not ready
   if (peaksDataArray.length === 0) {
@@ -224,19 +276,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   return (
     <DevicePixelRatioProvider>
-      <PlaylistInfoContext.Provider
-        value={{
-          samplesPerPixel,
-          sampleRate,
-          zoomLevels: [samplesPerPixel],
-          waveHeight,
-          timeScaleHeight,
-          controls,
-          barWidth,
-          barGap,
-          roundedBars,
-        }}
-      >
+      <PlaylistInfoContext.Provider value={playlistInfo}>
         <Playlist
           theme={theme}
           backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
@@ -329,17 +369,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
               linkEndpoints={linkEndpointsProp}
               onAnnotationUpdate={onAnnotationUpdate}
             />
-            {selectionStart !== selectionEnd && (
-              <Selection
-                startPosition={
-                  (Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel
-                }
-                endPosition={
-                  (Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel
-                }
-                color={theme.selectionColor}
-              />
-            )}
+            <MediaElementSelectionOverlay color={theme.selectionColor} />
             {renderPlayhead ? (
               <CustomMediaElementPlayhead
                 renderPlayhead={renderPlayhead}

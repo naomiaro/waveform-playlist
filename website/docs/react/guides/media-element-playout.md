@@ -91,18 +91,22 @@ Pass an `AudioContext` to enable Web Audio routing. This routes audio through a 
 Configure fade in/out on the track config. Requires `audioContext`:
 
 ```tsx
-<MediaElementPlaylistProvider
-  track={{
+// Memoized: the provider creates its player again (and stops playback) when a
+// fade object gets a new identity, so the track must not be rebuilt per render.
+const track = useMemo(
+  () => ({
     source: '/audio/track.mp3',
     waveformData,
     name: 'My Track',
-    fadeIn: { duration: 1.5, type: 'logarithmic' },
-    fadeOut: { duration: 1.5, type: 'sCurve' },
-  }}
-  audioContext={audioContext}
->
+    fadeIn: { duration: 1.5, type: 'logarithmic' as const },
+    fadeOut: { duration: 1.5, type: 'sCurve' as const },
+  }),
+  [waveformData]
+);
+
+<MediaElementPlaylistProvider track={track} audioContext={audioContext}>
   <MediaElementWaveform showFades />
-</MediaElementPlaylistProvider>
+</MediaElementPlaylistProvider>;
 ```
 
 Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.

@@ -22,16 +22,12 @@ import {
   type AnnotationAction,
   type MidiNoteData,
 } from '@waveform-playlist/core';
-import {
-  type TimeFormat,
-  type WaveformPlaylistTheme,
-  defaultTheme,
-} from '@waveform-playlist/ui-components';
+import { type TimeFormat, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { assertTrackKind, createValueSource } from '@waveform-playlist/core';
+import { assertTrackKind } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import {
   useTimeFormat,
@@ -44,8 +40,12 @@ import {
   useAnimationFrameLoop,
   useWaveformDataCache,
 } from './hooks';
-import { useShallowStable } from './hooks/useShallowStable';
-import { createAnnotationLookup } from './utils/annotationLookup';
+import { followAnnotations } from './providerInternals/followAnnotations';
+import { useAnnotationState } from './providerInternals/useAnnotationState';
+import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
+import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
+import { useRequiredContext } from './providerInternals/useRequiredContext';
+import { useViewDefaults } from './providerInternals/useViewDefaults';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
 import { incrementalTrackChange } from './utils/incrementalTrackChange';
@@ -82,16 +82,7 @@ export interface TrackState {
 // Split contexts for performance optimization
 // Animation context contains playback state and timing refs — no per-frame state updates
 
-/** Per-frame data passed to registered animation callbacks. */
-export interface FrameData {
-  /** Raw engine time (for state/logic — NOT for visual positioning). */
-  readonly time: number;
-  /** Visually-aligned time for DOM positioning: engine.getAudibleTime() while
-   *  playing (matches speaker output), raw time when resting. */
-  readonly visualTime: number;
-  readonly sampleRate: number;
-  readonly samplesPerPixel: number;
-}
+export type { FrameData };
 
 /**
  * Whether playback is running. Its own context (#768): it is the only value of
@@ -372,10 +363,6 @@ export interface TrackReorderPreviewContextValue {
 }
 
 // The contexts. Each holds fields that change together (#733, #740, #768).
-// Shared default so an omitted `controls` prop keeps one identity across
-// renders — a fresh object here would invalidate the view context every render.
-const DEFAULT_CONTROLS = { show: false, width: 0 };
-
 const IsPlayingContext = createContext<IsPlayingContextValue | null>(null);
 const PlaybackRefsContext = createContext<PlaybackRefsContextValue | null>(null);
 const PlaylistAnnotationsContext = createContext<PlaylistAnnotationsContextValue | null>(null);
@@ -494,7 +481,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   zoomLevels,
   automaticScroll = false,
   theme: userThemeProp,
-  controls: controlsProp = DEFAULT_CONTROLS,
+  controls: controlsProp,
   annotationList,
   effects,
   trackEffects,
@@ -515,14 +502,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   createAdapter,
   children,
 }) => {
-  // Inline object literals from the parent get a new identity per render;
-  // keep the previous one while the contents are unchanged so the memoized
-  // context values and the merged theme below are not invalidated.
-  const controls = useShallowStable(controlsProp);
-  const userTheme = useShallowStable(userThemeProp);
-
-  // Default progressBarWidth to barWidth + barGap (fills gaps)
-  const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
+  const { controls, mergedTheme, progressBarWidth, timeScaleHeight } = useViewDefaults({
+    controls: controlsProp,
+    theme: userThemeProp,
+    barWidth,
+    barGap,
+    progressBarWidth: progressBarWidthProp,
+    timescale,
+  });
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
   // create a new reference every render, which would trigger engine rebuild via
@@ -533,33 +520,37 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [zoomLevels?.join(',')]
   );
 
-  // Annotations are derived from prop (single source of truth in parent)
-  // In v6, annotations must be pre-parsed (numeric start/end). Use parseAeneas() from @waveform-playlist/annotations before passing.
-  const annotations = useMemo(() => {
-    if (!annotationList?.annotations) return [];
-    if (process.env.NODE_ENV !== 'production' && annotationList.annotations.length > 0) {
-      const first = annotationList.annotations[0] as unknown as Record<string, unknown>;
-      if (typeof first.start !== 'number' || typeof first.end !== 'number') {
-        console.error(
-          '[waveform-playlist] Annotations must have numeric start/end values. ' +
-            'In v6, use parseAeneas() from @waveform-playlist/annotations before passing annotations. ' +
-            'Received start type: ' +
-            typeof first.start
-        );
-        return [];
-      }
-    }
-    return annotationList.annotations;
-  }, [annotationList?.annotations]);
-
-  // Ref for animation loop (avoids restarting loop on annotation change)
-  const annotationsRef = useRef<AnnotationData[]>(annotations);
-  annotationsRef.current = annotations;
-  // Per-frame lookups for the animation loop (cached; see annotationLookup.ts)
-  const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
+  // Annotations are derived from the prop (single source of truth in the
+  // parent). Shared with the MediaElement provider (#769).
+  const {
+    annotations,
+    annotationsRef,
+    annotationLookup,
+    setAnnotations,
+    annotationPreview,
+    activeAnnotationId,
+    activeAnnotationIdRef,
+    setActiveAnnotationId,
+    continuousPlay,
+    continuousPlayRef,
+    setContinuousPlay,
+  } = useAnnotationState({
+    annotationList,
+    onAnnotationsChange,
+    providerName: 'WaveformPlaylistProvider',
+  });
+  const {
+    scrollContainerRef,
+    setScrollContainer,
+    isAutomaticScroll,
+    isAutomaticScrollRef,
+    setAutomaticScroll,
+  } = useScrollFollow(automaticScroll);
+  // Components register per-frame DOM updates here instead of running their
+  // own rAF loops; the single loop below drives them all.
+  const { registerFrameCallback, unregisterFrameCallback, runFrameCallbacks } = useFrameCallbacks();
 
   // State
-  const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   // Timeline length in seconds: the end of the last clip. Derived during
@@ -573,10 +564,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const durationRef = useRef(duration);
   durationRef.current = duration;
   const [trackStates, setTrackStates] = useState<TrackState[]>([]);
-  const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
-  const [continuousPlay, setContinuousPlayState] = useState(
-    annotationList?.isContinuousPlay ?? false
-  );
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
   const [isReady, setIsReady] = useState(false);
@@ -665,13 +652,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // position/isPlaying=false. Stop paths that don't restart afterward don't
   // need suppression — see the mirror's own comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const isAutomaticScrollRef = useRef<boolean>(false);
-  // Animation frame callback registry — components register per-frame DOM update
-  // callbacks instead of running their own rAF loops. Single loop drives all.
-  const frameCallbacksRef = useRef<Map<string, (data: FrameData) => void>>(new Map());
-  const continuousPlayRef = useRef<boolean>(annotationList?.isContinuousPlay ?? false);
-  const activeAnnotationIdRef = useRef<string | null>(null);
   // Engine clip operations guard: tracks reference from the last engine statechange.
   // When engine methods (moveClip, trimClip, splitClip) mutate tracks, the statechange
   // handler stores state.tracks here and calls onTracksChange with the same reference.
@@ -780,19 +760,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // eslint-disable-next-line react-hooks/exhaustive-deps -- generatedWaveformVersion invalidates the ref-backed lookup
   }, [tracks, samplesPerPixel, mono, getGeneratedWaveformData, generatedWaveformVersion]);
 
-  // Custom setter for continuousPlay that updates BOTH state and ref synchronously
-  // This ensures the ref is updated immediately, before the animation loop can read it
-  const setContinuousPlay = useCallback((value: boolean) => {
-    continuousPlayRef.current = value; // Update ref synchronously
-    setContinuousPlayState(value); // Update state (triggers re-render)
-  }, []);
-
-  // Custom setter for activeAnnotationId that updates BOTH state and ref synchronously
-  const setActiveAnnotationId = useCallback((value: string | null) => {
-    activeAnnotationIdRef.current = value; // Update ref synchronously
-    setActiveAnnotationIdState(value); // Update state (triggers re-render)
-  }, []);
-
   // Cross-hook concern: reads selection refs to set loop region
   const setLoopRegionFromSelection = useCallback(() => {
     const start = selectionStartRef.current ?? 0;
@@ -803,10 +770,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [setLoopRegion, selectionStartRef, selectionEndRef]);
 
   // Keep refs in sync with state
-  useEffect(() => {
-    isAutomaticScrollRef.current = isAutomaticScroll;
-  }, [isAutomaticScroll]);
-
   useEffect(() => {
     trackStatesRef.current = trackStates;
   }, [trackStates]);
@@ -857,7 +820,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     container.scrollLeft = newScrollLeft;
     samplesPerPixelRef.current = newSamplesPerPixel;
-  }, [samplesPerPixel, duration]);
+  }, [samplesPerPixel, duration, scrollContainerRef]);
 
   // Track pending playback resume after tracks change
   // A play that must start once the engine being built is ready: playback
@@ -1432,14 +1395,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     return audioCtx && 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
   }, []);
 
-  const registerFrameCallback = useCallback((id: string, cb: (data: FrameData) => void) => {
-    frameCallbacksRef.current.set(id, cb);
-  }, []);
-
-  const unregisterFrameCallback = useCallback((id: string) => {
-    frameCallbacksRef.current.delete(id);
-  }, []);
-
   // Animation loop
   const startAnimationLoop = useCallback(() => {
     const updateTime = () => {
@@ -1466,72 +1421,38 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         sampleRate: sr,
         samplesPerPixel: spp,
       };
-      for (const cb of frameCallbacksRef.current.values()) {
-        cb(frameData);
-      }
+      runFrameCallbacks(frameData);
 
-      // Handle annotation playback based on continuous play mode
-      const currentAnnotations = annotationsRef.current;
-      if (currentAnnotations.length > 0) {
-        const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
-
-        // Playing the selection takes continuous play out of the picture:
-        // playback is not cut at annotation boundaries, whichever way the
-        // toggle is set. The active annotation still follows the playhead.
-        if (continuousPlayRef.current || isSelectionPlayRef.current) {
-          // On the frame that reaches a bounded play's end, leave the highlight
-          // alone: the end check below stops there, and it must not move on to
-          // the next annotation first. (Only this branch: with continuous play
-          // off, the branch below is what stops an annotation at its end and
-          // returns the cursor to where playback started.)
-          const reachedBoundedEnd =
-            playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current;
-          // Continuous play ON: update active annotation, let audio play to the end
-          if (reachedBoundedEnd) {
-            // nothing: playback stops below
-          } else if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
-            setActiveAnnotationId(currentAnnotation.id);
-          } else if (!currentAnnotation && activeAnnotationIdRef.current !== null) {
-            // Clear the active annotation when we're past it, but don't stop playback
-            // Let playback continue until the audio actually ends (handled by duration check)
-            setActiveAnnotationId(null);
-          }
-        } else {
-          // Continuous play OFF: stop at end of current annotation
-          if (activeAnnotationIdRef.current) {
-            const activeAnnotation = annotationLookup.byId(
-              currentAnnotations,
-              activeAnnotationIdRef.current
-            );
-            if (activeAnnotation && time >= activeAnnotation.end) {
-              // Stop playback at end of current annotation
-              if (engineRef.current) {
-                engineRef.current.stop();
-              }
-              setIsPlaying(false);
-              setCurrentTimeRefs(playStartPositionRef.current);
-              setCurrentTime(playStartPositionRef.current);
-              return;
-            }
-          } else {
-            // If no active annotation ID is set, use the current annotation
-            if (currentAnnotation) {
-              setActiveAnnotationId(currentAnnotation.id);
-            }
-          }
+      // Annotations. Playing the selection takes continuous play out of the
+      // picture: playback is not cut at annotation boundaries, whichever way
+      // the toggle is set, and the active annotation still follows the
+      // playhead. On the frame that reaches a bounded play's end the
+      // highlight is held: the end check below stops there, and it must not
+      // move on to the next annotation first.
+      const activeAnnotationEnded = followAnnotations({
+        annotations: annotationsRef.current,
+        lookup: annotationLookup,
+        time,
+        activeId: activeAnnotationIdRef.current,
+        followOnly: continuousPlayRef.current || isSelectionPlayRef.current,
+        holdHighlight: playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current,
+        setActiveAnnotationId,
+      });
+      if (activeAnnotationEnded) {
+        // Continuous play off: stop at the end of the active annotation and
+        // return the cursor to where playback started.
+        if (engineRef.current) {
+          engineRef.current.stop();
         }
+        setIsPlaying(false);
+        setCurrentTimeRefs(playStartPositionRef.current);
+        setCurrentTime(playStartPositionRef.current);
+        return;
       }
 
-      // Handle automatic scroll — uses shared visualTime for alignment with playhead
+      // Automatic scroll: the shared visual time, so it lines up with the playhead.
       if (isAutomaticScrollRef.current && scrollContainerRef.current && durationRef.current > 0) {
-        const container = scrollContainerRef.current;
-        const pixelPosition = (visualTime * sr) / spp;
-        const containerWidth = container.clientWidth;
-
-        // Continuously scroll to keep playhead centered.
-        // Math.round prevents sub-pixel jitter from browser integer rounding.
-        const targetScrollLeft = Math.round(Math.max(0, pixelPosition - containerWidth / 2));
-        container.scrollLeft = targetScrollLeft;
+        centrePlayhead(scrollContainerRef.current, visualTime, sr, spp);
       }
 
       // Check if we've reached the playback end time (for selection playback)
@@ -1590,6 +1511,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     getPlaybackTime,
     setCurrentTimeRefs,
     annotationLookup,
+    // Refs and a stable function from the shared provider hooks: they never
+    // change, and are listed because the linter cannot see that.
+    annotationsRef,
+    activeAnnotationIdRef,
+    continuousPlayRef,
+    isAutomaticScrollRef,
+    scrollContainerRef,
+    runFrameCallbacks,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -1671,6 +1600,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     animationFrameRef,
     getAudioContextTime,
     annotationLookup,
+    annotationsRef,
+    activeAnnotationIdRef,
   ]);
 
   // Resume playback after tracks change (e.g., after splitting a clip during playback)
@@ -2046,42 +1977,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         engineRef.current.play(start, endTime);
       }
     },
-    [setSelectionEngine, setCurrentTimeRefs, setActiveAnnotationId, isLoopEnabledRef]
-  );
-
-  // Memoize setScrollContainer callback
-  const setScrollContainer = useCallback((element: HTMLDivElement | null) => {
-    scrollContainerRef.current = element;
-  }, []);
-
-  // Created once: the annotations as an edge drag in progress would leave them.
-  const [annotationPreview] = useState<AnnotationPreviewHandle>(() =>
-    createValueSource<AnnotationData[] | null>(null)
-  );
-
-  // Stable callback ref for onAnnotationsChange to avoid re-creating controls context
-  const onAnnotationsChangeRef = useRef(onAnnotationsChange);
-  onAnnotationsChangeRef.current = onAnnotationsChange;
-
-  const setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>> = useCallback(
-    (action) => {
-      const updated = typeof action === 'function' ? action(annotationsRef.current) : action;
-      if (!onAnnotationsChangeRef.current) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            'waveform-playlist: setAnnotations was called but no onAnnotationsChange callback is provided. ' +
-              'Annotation edits will not persist. Pass onAnnotationsChange to WaveformPlaylistProvider to handle annotation updates.'
-          );
-        }
-        return;
-      }
-      onAnnotationsChangeRef.current(updated);
-    },
-    []
+    [
+      setSelectionEngine,
+      setCurrentTimeRefs,
+      setActiveAnnotationId,
+      isLoopEnabledRef,
+      activeAnnotationIdRef,
+    ]
   );
 
   const sampleRate = sampleRateRef.current;
-  const timeScaleHeight = timescale ? 30 : 0;
 
   // Context values, grouped by how often their fields change (#768). A
   // subscription is to a whole value, so a field belongs with the fields that
@@ -2168,10 +2073,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [setCurrentTimeRefs]
   );
 
-  const setAutomaticScrollControl = useCallback((enabled: boolean) => {
-    setIsAutomaticScroll(enabled);
-  }, []);
-
   const controlsValue: PlaylistControlsContextValue = useMemo(
     () => ({
       // Playback controls
@@ -2205,7 +2106,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setMasterVolume,
 
       // Automatic scroll
-      setAutomaticScroll: setAutomaticScrollControl,
+      setAutomaticScroll,
       setScrollContainer,
       scrollContainerRef,
 
@@ -2249,7 +2150,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       zoom.zoomIn,
       zoom.zoomOut,
       setMasterVolume,
-      setAutomaticScrollControl,
+      setAutomaticScroll,
       setScrollContainer,
       scrollContainerRef,
       setContinuousPlay,
@@ -2326,9 +2227,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [trackDragPreview, trackReorderEpoch]
   );
 
-  // Merge user theme with default theme
-  const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
-
   // Outermost: the values that change least. The order has no effect on
   // behaviour (every value is committed together); it is for reading.
   return (
@@ -2373,13 +2271,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 // One hook per context. A component re-renders only when the value of a
 // context it reads changes, so read the smallest group that has the field.
 
-function useRequired<T>(context: React.Context<T | null>, hookName: string): T {
-  const value = useContext(context);
-  if (!value) {
-    throw new Error(`${hookName} must be used within WaveformPlaylistProvider`);
-  }
-  return value;
-}
+const useRequired = <T,>(context: React.Context<T | null>, hookName: string): T =>
+  useRequiredContext(context, hookName, 'WaveformPlaylistProvider');
 
 /** `{ isPlaying }`. Re-renders on play, pause and stop. */
 export const useIsPlaying = () => useRequired(IsPlayingContext, 'useIsPlaying');
