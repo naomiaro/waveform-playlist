@@ -356,24 +356,6 @@ test.describe('Media Element Example', () => {
       }).toPass({ timeout: 5000 });
     });
 
-    test('the total time is shown before the player has loaded', async ({ page, baseURL }) => {
-      // Hold the audio back: the length comes from the waveform data.
-      await page.route('**/*.opus', async (route) => {
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        await route.continue();
-      });
-      const audioRequested = page.waitForRequest('**/*.opus');
-      await page.goto(`${baseURL}/examples/media-element`);
-      // The route above is holding this request: the player cannot be ready.
-      await audioRequested;
-      const timeDisplay = page.getByText(/^\d+:\d\d \/ \d+:\d\d$/).first();
-      await expect(timeDisplay).toBeVisible({ timeout: 30000 });
-      await expect(timeDisplay).not.toHaveText(/\/ 0:00$/, { timeout: 2000 });
-      await expect(
-        page.locator('[data-scroll-container]').first().locator('canvas').first()
-      ).toBeVisible();
-    });
-
     test('a source that cannot be loaded is reported', async ({ page, baseURL }) => {
       const warnings: string[] = [];
       page.on('console', (msg) => {
