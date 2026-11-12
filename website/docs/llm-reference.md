@@ -1582,9 +1582,7 @@ interface WaveformProps {
   className?: string;
   showClipHeaders?: boolean;      // Default: false
   gainScaledWaveforms?: boolean;  // Default: false. Draw each clip's waveform scaled by clip.gain (clamped)
-  interactiveClips?: boolean;     // Default: false
   showFades?: boolean;
-  touchOptimized?: boolean;
   onRemoveTrack?: (trackIndex: number) => void;
   /** Enable vertical track reordering: a drag grip + move up/down buttons on
    *  each default track control panel. Drag requires ClipInteractionProvider;
@@ -1634,12 +1632,26 @@ import { ClipInteractionProvider } from '@waveform-playlist/browser';
 
 interface ClipInteractionProviderProps {
   snap?: boolean;                      // Default: false — enable snap-to-grid (auto-detects beats vs timescale from context)
-  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input
+  touchOptimized?: boolean;            // Default: false — 250ms delay activation for touch input AND wider (24px) clip trim handles on every clip below
   children: React.ReactNode;
 }
 ```
 
-Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. When present, `interactiveClips` is auto-enabled on descendant `Waveform` components via `ClipInteractionContext`. When `snap` is enabled, reads `BeatsAndBarsProvider` context: if `scaleMode="beats"` and `snapTo!="off"`, clips snap to beats/bars; otherwise falls back to timescale-based snapping.
+Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. Every clip below it (under `Waveform` or `PlaylistVisualization`) can be dragged and trimmed: the provider renders `ClipInteractionOptions` (next), which is the only source of that; `Waveform` has no `interactiveClips` or `touchOptimized` prop. When `snap` is enabled, reads `BeatsAndBarsProvider` context: if `scaleMode="beats"` and `snapTo!="off"`, clips snap to beats/bars; otherwise falls back to timescale-based snapping.
+
+#### `ClipInteractionOptions`
+
+```typescript
+import { ClipInteractionOptions } from '@waveform-playlist/browser';
+
+interface ClipInteractionOptionsProps {
+  enabled?: boolean;         // Clips below can be dragged and trimmed. Left out: inherited (false at the top)
+  touchOptimized?: boolean;  // Clips below get 24px trim handles instead of 8px. Left out: inherited (false at the top)
+  children: React.ReactNode;
+}
+```
+
+The one source of the two clip interaction options; each clip reads them from this context. Use it with your own `DragDropProvider` (`<ClipInteractionOptions enabled><Waveform showClipHeaders /></ClipInteractionOptions>`; without `enabled`, clips show no trim handles and their headers do not drag), or nested inside a `ClipInteractionProvider` to change one option for part of the tree (`<ClipInteractionOptions touchOptimized={false}>` keeps 8px handles under a touch-optimized provider). It configures no sensors: pair `touchOptimized` with `useDragSensors({ touchOptimized: true })`.
 
 #### `useClipInteractionEnabled()`
 
@@ -1649,7 +1661,7 @@ import { useClipInteractionEnabled } from '@waveform-playlist/browser';
 function useClipInteractionEnabled(): boolean;
 ```
 
-Returns `true` when the component is inside a `ClipInteractionProvider`. Used internally by `Waveform` to auto-enable `interactiveClips`.
+Returns `true` when clips at this point of the tree can be dragged and trimmed: inside a `ClipInteractionProvider`, or inside `<ClipInteractionOptions enabled>`, and not under a nearer `<ClipInteractionOptions enabled={false}>`.
 
 ### KeyboardShortcuts
 

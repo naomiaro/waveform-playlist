@@ -16,7 +16,7 @@ import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
-import { ClipInteractionContextProvider } from '../contexts/ClipInteractionContext';
+import { ClipInteractionOptions } from '../contexts/ClipInteractionContext';
 
 // Stable noop to avoid creating a new function reference on every render
 const NOOP_TRACKS_CHANGE = () => {};
@@ -27,6 +27,8 @@ export interface ClipInteractionProviderProps {
    *  (if present with scaleMode="beats" and snapTo!="off"), otherwise
    *  falls back to timescale-based snapping. Default: false. */
   snap?: boolean;
+  /** Touch-friendly interaction: drag sensors that wait 250ms on touch (so a
+   *  swipe still scrolls) and wider clip trim handles. Default: false. */
   touchOptimized?: boolean;
   children: React.ReactNode;
 }
@@ -212,7 +214,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, getTracks, samplesPerPixel, sampleRate]);
 
   return (
-    <ClipInteractionContextProvider value={true}>
+    <ClipInteractionOptions enabled touchOptimized={touchOptimized}>
       <DragDropProvider
         sensors={sensors}
         onDragStart={onDragStart}
@@ -223,6 +225,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       >
         {children}
       </DragDropProvider>
-    </ClipInteractionContextProvider>
+    </ClipInteractionOptions>
   );
 };

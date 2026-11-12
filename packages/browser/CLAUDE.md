@@ -366,6 +366,17 @@ A boundary trim calls `onTracksChange` on every pointer move, so anything keyed 
 
 `useKeyboardShortcuts` likewise keeps the latest `shortcuts` in a ref and subscribes to `keydown` once per `enabled` value; callers build the array inline. Guarded by `stableDragHandlers.test.tsx`, which mocks `@dnd-kit/react`'s `DragDropProvider` to capture the props it is given.
 
+## Clip Interaction Options Have One Source (#690)
+
+Whether clips can be dragged and trimmed (`enabled`) and whether their trim handles are widened for touch (`touchOptimized`) come from ONE place: `ClipInteractionContext` (`contexts/ClipInteractionContext.tsx`), read by `ClipView` and by nothing else in the library. `ClipInteractionOptions` (exported) is the only component that provides it; `ClipInteractionProvider` renders `<ClipInteractionOptions enabled touchOptimized={…}>` around its `DragDropProvider`. `<Waveform>` and `<PlaylistVisualization>` take neither as a prop, and neither is threaded through `TrackRows` / `TrackRow`.
+
+- A prop left out of `ClipInteractionOptions` is inherited from the one above (`??`, not `||`), so it nests: `<ClipInteractionOptions touchOptimized={false}>` inside a touch-optimized provider keeps 8px handles and stays interactive, and `enabled={false}` switches interaction off for part of the tree.
+- The value is memoized on its two booleans. `ClipInteractionProvider` renders on every pointer move of a trim (it follows `tracks`); an unmemoized value would re-render every clip per move.
+- History, so it is not repeated: a first version (#773, reverted by #774) kept the two `<Waveform>` props and combined them with the context using `||`. Two sources meant no prop could switch off what the provider turned on, and `<PlaylistVisualization>` changed behaviour under the provider without anyone having decided it. The maintainer's rule for these components (2026-11-11): no doubled sources; a small context with a value that rarely changes, read where it is used, instead of props passed down through components that do not use them.
+- A view option that every clip needs and that never changes per frame belongs in a context like this one. `samplesPerPixel` and `sampleRate` are still props of `ClipView` on purpose: the data context that holds them changes on every trim move (#768 splits it).
+
+Tests: `clipInteractionOptions.test.tsx`; `e2e/mobile-multi-clip.spec.ts` checks the 24px handles on a page that sets only the provider flag.
+
 ## @dnd-kit/react v0.5.0 Event API Quirks
 
 - **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.

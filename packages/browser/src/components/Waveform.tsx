@@ -6,7 +6,6 @@ import type {
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
 import { usePlaylistState } from '../WaveformPlaylistContext';
-import { useClipInteractionEnabled } from '../contexts/ClipInteractionContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
 import type { VisualizationRecordingState } from './visualizationLayout';
@@ -43,14 +42,7 @@ export interface WaveformProps {
    *  height) so levelled clips look the way they sound. Default: false —
    *  waveforms show source level. Draw-time only; peaks are not regenerated. */
   gainScaledWaveforms?: boolean;
-  interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (auto-enabled by ClipInteractionProvider)
   showFades?: boolean; // Show fade in/out overlays on clips
-  /**
-   * Enable mobile-optimized touch interactions.
-   * When true, increases touch target sizes for clip boundaries.
-   * Use with useDragSensors({ touchOptimized: true }) for best results.
-   */
-  touchOptimized?: boolean;
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
   onRemoveTrack?: (trackIndex: number) => void;
   /** Enable vertical track reordering: a drag grip + move up/down buttons on
@@ -81,16 +73,12 @@ export const Waveform: React.FC<WaveformProps> = ({
   className,
   showClipHeaders = false,
   gainScaledWaveforms = false,
-  interactiveClips = false,
   showFades = false,
-  touchOptimized = false,
   onRemoveTrack,
   trackReordering = false,
   recordingState,
 }) => {
   const { annotations } = usePlaylistState();
-  const clipInteractionEnabled = useClipInteractionEnabled();
-  const effectiveInteractiveClips = interactiveClips || clipInteractionEnabled;
 
   return (
     <>
@@ -103,9 +91,7 @@ export const Waveform: React.FC<WaveformProps> = ({
         className={className}
         showClipHeaders={showClipHeaders}
         gainScaledWaveforms={gainScaledWaveforms}
-        interactiveClips={effectiveInteractiveClips}
         showFades={showFades}
-        touchOptimized={touchOptimized}
         onRemoveTrack={onRemoveTrack}
         trackReordering={trackReordering}
         recordingState={recordingState}

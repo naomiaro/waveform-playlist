@@ -126,7 +126,11 @@ export type {
 // Export ClipInteractionProvider for encapsulated drag/trim/snap/collision setup
 export { ClipInteractionProvider } from './components/ClipInteractionProvider';
 export type { ClipInteractionProviderProps } from './components/ClipInteractionProvider';
-export { useClipInteractionEnabled } from './contexts/ClipInteractionContext';
+export {
+  ClipInteractionOptions,
+  useClipInteractionEnabled,
+} from './contexts/ClipInteractionContext';
+export type { ClipInteractionOptionsProps } from './contexts/ClipInteractionContext';
 
 // Export modifiers and plugins for drag-and-drop
 export { ClipCollisionModifier } from './modifiers/ClipCollisionModifier';

@@ -70,14 +70,7 @@ export interface PlaylistVisualizationProps {
   showClipHeaders?: boolean;
   /** Draw each clip's waveform scaled by its gain. Default: false. */
   gainScaledWaveforms?: boolean;
-  interactiveClips?: boolean;
   showFades?: boolean;
-  /**
-   * Enable mobile-optimized touch interactions.
-   * When true, increases touch target sizes for clip boundaries.
-   * Use with useDragSensors({ touchOptimized: true }) for best results.
-   */
-  touchOptimized?: boolean;
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
   onRemoveTrack?: (trackIndex: number) => void;
   // Live recording state for real-time waveform preview
@@ -117,9 +110,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   className,
   showClipHeaders = false,
   gainScaledWaveforms = false,
-  interactiveClips = false,
   showFades = false,
-  touchOptimized = false,
   onRemoveTrack,
   recordingState,
   trackReordering = false,
@@ -540,9 +531,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
               sampleRate={sampleRate}
               showClipHeaders={showClipHeaders}
               gainScaledWaveforms={gainScaledWaveforms}
-              interactiveClips={interactiveClips}
               showFades={showFades}
-              touchOptimized={touchOptimized}
               selectTrack={selectTrack}
               registerSpectrogramCanvas={spectrogram?.registerSpectrogramCanvas}
               unregisterSpectrogramCanvas={spectrogram?.unregisterSpectrogramCanvas}

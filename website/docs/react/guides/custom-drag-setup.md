@@ -31,6 +31,7 @@ import {
   useDragSensors,
   ClipCollisionModifier,
   SnapToGridModifier,     // Only if using snap-to-grid
+  ClipInteractionOptions, // Tells the clips they can be dragged and trimmed
   Waveform,
 } from '@waveform-playlist/browser';
 ```
@@ -80,7 +81,9 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
         ClipCollisionModifier.configure({ tracks, samplesPerPixel }),
       ]}
     >
-      <Waveform showClipHeaders interactiveClips />
+      <ClipInteractionOptions enabled>
+        <Waveform showClipHeaders />
+      </ClipInteractionOptions>
     </DragDropProvider>
   );
 }
@@ -169,7 +172,9 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
       onDragEnd={onDragEnd}
       modifiers={modifiers}
     >
-      <Waveform showClipHeaders interactiveClips />
+      <ClipInteractionOptions enabled>
+        <Waveform showClipHeaders />
+      </ClipInteractionOptions>
     </DragDropProvider>
   );
 }
@@ -231,6 +236,8 @@ import {
   useClipDragHandlers,
   useAnnotationDragHandlers,
   useDragSensors,
+  ClipInteractionOptions,
+  Waveform,
 } from '@waveform-playlist/browser';
 
 function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnotationsChange }) {
@@ -282,7 +289,9 @@ function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnota
       onDragEnd={onDragEnd}
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
     >
-      <Waveform showClipHeaders interactiveClips />
+      <ClipInteractionOptions enabled>
+        <Waveform showClipHeaders />
+      </ClipInteractionOptions>
     </DragDropProvider>
   );
 }
@@ -297,6 +306,36 @@ const sensors = useDragSensors({ touchOptimized: true });
 ```
 
 This uses delay-based activation for touch events (distinguishes drag from scroll) while keeping distance-based activation for mouse/pen.
+
+The sensors do not change the size of the trim handles. Widen them with `touchOptimized` on `ClipInteractionOptions`:
+
+```tsx
+<ClipInteractionOptions enabled touchOptimized>
+  <Waveform showClipHeaders />
+</ClipInteractionOptions>
+```
+
+`<ClipInteractionProvider touchOptimized>` does both by itself.
+
+## `ClipInteractionOptions`
+
+Clips read two options from context: whether they can be dragged and trimmed, and whether their trim handles are widened for touch (24px instead of 8px). `Waveform` takes neither as a prop. `ClipInteractionProvider` sets both for you; with your own `DragDropProvider`, `ClipInteractionOptions` is how you set them:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `enabled` | `boolean` | inherited, `false` at the top | Clips below can be dragged and trimmed. Without it they show no trim handles and their headers do not drag |
+| `touchOptimized` | `boolean` | inherited, `false` at the top | Clips below get 24px trim handles |
+
+A prop you leave out keeps the value from the nearest `ClipInteractionOptions` or `ClipInteractionProvider` above, so it can also be nested to change one option for part of the tree:
+
+```tsx
+<ClipInteractionProvider touchOptimized>
+  {/* Touch-delay sensors, but the normal 8px handles */}
+  <ClipInteractionOptions touchOptimized={false}>
+    <Waveform showClipHeaders />
+  </ClipInteractionOptions>
+</ClipInteractionProvider>
+```
 
 ## Hook Reference
 

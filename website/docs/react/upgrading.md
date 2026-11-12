@@ -242,6 +242,60 @@ const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
 
+## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
+
+**Package:** `@waveform-playlist/browser`.
+
+Whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, now has one source: a context that each clip reads. `<Waveform>` and `<PlaylistVisualization>` no longer take `interactiveClips` or `touchOptimized`. Before, `ClipInteractionProvider` turned `interactiveClips` on but not the wide handles, so touch support needed the same flag in two places.
+
+**If you use `ClipInteractionProvider`:**
+
+**Find:** `interactiveClips` or `touchOptimized` on a `<Waveform>` or `<PlaylistVisualization>` inside a `ClipInteractionProvider`.
+
+**Replace with:** nothing on the waveform; `touchOptimized` goes on the provider only.
+
+```tsx
+// Before
+<ClipInteractionProvider touchOptimized>
+  <Waveform showClipHeaders interactiveClips touchOptimized />
+</ClipInteractionProvider>
+
+// After
+<ClipInteractionProvider touchOptimized>
+  <Waveform showClipHeaders />
+</ClipInteractionProvider>
+```
+
+**If you use your own `DragDropProvider`:**
+
+**Find:** `interactiveClips` or `touchOptimized` on a `<Waveform>` or `<PlaylistVisualization>` that is not inside a `ClipInteractionProvider`.
+
+**Replace with:** `ClipInteractionOptions` around it.
+
+```tsx
+// Before
+<DragDropProvider sensors={sensors} /* … */>
+  <Waveform showClipHeaders interactiveClips touchOptimized />
+</DragDropProvider>
+
+// After
+import { ClipInteractionOptions } from '@waveform-playlist/browser';
+
+<DragDropProvider sensors={sensors} /* … */>
+  <ClipInteractionOptions enabled touchOptimized>
+    <Waveform showClipHeaders />
+  </ClipInteractionOptions>
+</DragDropProvider>
+```
+
+Use `enabled` alone where you had `interactiveClips` alone.
+
+**Behaviour that changes without a code change:**
+
+- `<ClipInteractionProvider touchOptimized>` now also widens the trim handles, from 8px to 24px. If you set the flag on the provider only and want to keep the narrow handles, nest `<ClipInteractionOptions touchOptimized={false}>` inside the provider.
+- `<PlaylistVisualization>` used directly inside a `ClipInteractionProvider` now has interactive clips. Before, only `<Waveform>` picked that up from the provider. To keep them static, nest `<ClipInteractionOptions enabled={false}>`.
+- `<Waveform interactiveClips={false}>` inside a `ClipInteractionProvider` never switched interaction off (the provider's value won). `<ClipInteractionOptions enabled={false}>` does.
+
 ## `selectionStart` and `selectionEnd` move from `usePlaylistState()` to `useSelection()`
 
 **Package:** `@waveform-playlist/browser`.
