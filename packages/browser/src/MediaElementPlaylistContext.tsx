@@ -2,6 +2,7 @@ import React, {
   createContext,
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
   useMemo,
@@ -216,12 +217,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  // `seekTo` clamps against this, so it keeps its identity when the duration
-  // arrives and the controls value does not change with it (#767). Written
-  // during render, so a child's layout effect of the same commit reads the
-  // new value.
-  const durationRef = useRef(duration);
-  durationRef.current = duration;
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
   // Annotations are derived from the prop (single source of truth in the
@@ -279,11 +274,22 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
 
-  // The audio of the latest render, for the cleanup below to tell "new audio"
-  // from "the same audio in a new player" (a new name, fades, the pitch
-  // setting, a callback's identity). Written during render, like durationRef.
+  // The audio of the latest COMMITTED render, read by two things that must not
+  // wait for a render or an effect of their own:
+  //  - the cleanup below, to tell "new audio" from "the same audio in a new
+  //    player" (a new name, fades, the pitch setting, a callback's identity);
+  //  - `seekTo`, which clamps to the length of this audio. The `duration`
+  //    state cannot serve: it is 0 until the first player is ready and still
+  //    the previous file's length while the next one loads (and inside
+  //    `onReady`), so a saved position restored for a longer file was cut off
+  //    at the old length. Reading a ref also keeps `seekTo`'s identity (#767).
+  // Written in a layout effect, not during render: a render React discards
+  // (a transition, Suspense) must not leave audio here that never committed.
+  // Layout effects run before the passive cleanups of the same commit.
   const latestAudioRef = useRef({ source: track.source, waveformData: track.waveformData });
-  latestAudioRef.current = { source: track.source, waveformData: track.waveformData };
+  useLayoutEffect(() => {
+    latestAudioRef.current = { source: track.source, waveformData: track.waveformData };
+  }, [track.source, track.waveformData]);
 
   // Initialize playout and load track
   useEffect(() => {
@@ -503,7 +509,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   }, [stopAnimationLoop, setActiveAnnotationId]);
 
   const seekTo = useCallback((time: number) => {
-    const clampedTime = Math.max(0, Math.min(time, durationRef.current));
+    const trackDuration = latestAudioRef.current.waveformData.duration;
+    const clampedTime = Math.max(0, Math.min(time, trackDuration));
     currentTimeRef.current = clampedTime;
     setCurrentTime(clampedTime);
 

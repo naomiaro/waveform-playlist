@@ -90,6 +90,17 @@ const WAVEFORM_DATA = WaveformData.create({
 });
 
 const TRACK = { source: 'test.mp3', waveformData: WAVEFORM_DATA, name: 'Test' };
+// A file twice as long.
+const LONG_LENGTH = LENGTH * 2;
+const LONG_WAVEFORM_DATA = WaveformData.create({
+  version: 2,
+  channels: 1,
+  sample_rate: SAMPLE_RATE,
+  samples_per_pixel: SOURCE_SCALE,
+  bits: 8,
+  length: LONG_LENGTH,
+  data: Array.from({ length: LONG_LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -10 : 10)),
+});
 // Other peaks of the same length: new audio behind the same source URL.
 const OTHER_WAVEFORM_DATA = WaveformData.create({
   version: 2,
@@ -179,6 +190,8 @@ afterEach(async () => {
  */
 const SAVED: Record<string, { time: number; annotationId: string }> = {
   'other.mp3': { time: 5, annotationId: 'n2' },
+  // Past the end of the 8 second file, inside the 16 second one.
+  'long.mp3': { time: 12, annotationId: 'n2' },
 };
 const RestoreOnSource: React.FC<{ source: string }> = ({ source }) => {
   const { seekTo, setActiveAnnotationId } = useMediaElementControls();
@@ -210,6 +223,7 @@ interface MountOptions {
   annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
   strict?: boolean;
   restoreOnSource?: boolean;
+  onReady?: () => void;
   renderPlayhead?: React.ComponentProps<typeof MediaElementPlaylist>['renderPlayhead'];
 }
 
@@ -224,6 +238,7 @@ async function mount(options: MountOptions = {}) {
         track={track}
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={createPlayout}
+        onReady={options.onReady}
         automaticScroll={options.automaticScroll}
         annotationList={options.annotationList}
         timescale
@@ -551,6 +566,47 @@ describe('MediaElement playback runs one animation loop', () => {
     await act(async () => probe.controls.play());
     expect(playout.play).toHaveBeenLastCalledWith(undefined, 5);
     await act(async () => probe.controls.stop());
+  });
+
+  it("a restore into a longer file is not capped at the old file's length", async () => {
+    const { playout, changeTrack } = await mount({ restoreOnSource: true });
+    await act(async () => changeTrack({ source: 'long.mp3', waveformData: LONG_WAVEFORM_DATA }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(probe.animation.currentTime).toBe(12);
+    expect(probe.animation.currentTimeRef.current).toBe(12);
+    await waitFor(() => expect(probe.data.duration).toBe(2 * SECONDS));
+
+    await act(async () => probe.controls.play());
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, 12);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('a restore from onReady is not capped either, for the first file or a longer one', async () => {
+    const targets = [3, 12];
+    const onReady = vi.fn(() => probe.controls.seekTo(targets.shift() ?? 0));
+    const { playout, changeTrack } = await mount({ onReady });
+    // First file: the duration state is still 0 while onReady runs.
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(probe.animation.currentTime).toBe(3);
+
+    await act(async () => changeTrack({ source: 'long.mp3', waveformData: LONG_WAVEFORM_DATA }));
+    await waitFor(() => expect(onReady).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(probe.animation.currentTime).toBe(12);
+    expect(playout.seekTo).toHaveBeenLastCalledWith(12);
+  });
+
+  it('a seek is still clamped to the length of the current file', async () => {
+    const { playout, changeTrack } = await mount();
+    await act(async () => probe.controls.seekTo(99));
+    expect(probe.animation.currentTime).toBe(SECONDS);
+
+    await act(async () => changeTrack({ source: 'long.mp3', waveformData: LONG_WAVEFORM_DATA }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    await act(async () => probe.controls.seekTo(99));
+    expect(probe.animation.currentTime).toBe(2 * SECONDS);
+    await act(async () => probe.controls.seekTo(-1));
+    expect(probe.animation.currentTime).toBe(0);
   });
 
   it('the selection is kept across new audio', async () => {
