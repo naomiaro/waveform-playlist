@@ -226,6 +226,9 @@ test.describe('Recording example', () => {
 
     // Select the other track while the take runs (a click on its row, through
     // the overlay that covers the rows): the live preview stays where it is.
+    // The page exposes no "selected" attribute to assert on; that this click
+    // selects was checked by running the test against the hook from before
+    // #756, where the preview follows it to the other row and the test fails.
     let box: { x: number; y: number; width: number; height: number } | null = null;
     await expect(async () => {
       box = await other.boundingBox();

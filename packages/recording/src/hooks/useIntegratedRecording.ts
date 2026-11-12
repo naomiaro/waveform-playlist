@@ -169,6 +169,10 @@ export function useIntegratedRecording(
   // Reads selectedTrackId from ref to avoid stale closures when
   // auto-create track + start recording happen in the same render cycle
   const startRecording = useCallback(async (): Promise<boolean> => {
+    // A take is running: starting again must not re-capture its track or its
+    // start position (useRecording would refuse further down, after both had
+    // been overwritten).
+    if (isRecordingRef.current) return false;
     if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')

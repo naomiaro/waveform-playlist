@@ -469,7 +469,7 @@ const { isRecording, progress, recordingTrackId, ... } =
   });
 
 <Waveform
-  recordingState={isRecording ? {
+  recordingState={isRecording && recordingTrackId ? {
     isRecording,
     // The track the take was started on (from useIntegratedRecording): the
     // take is added there even if another track is selected meanwhile.

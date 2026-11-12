@@ -202,9 +202,9 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
         .mocked(console.warn)
         .mock.calls.filter(([message]) => String(message).includes('kind cannot change')).length;
     expect(kindWarnings()).toBe(1);
-    // The element is put back, so it says what the editor holds...
+    // The element is put back (in a microtask), so it says what the editor holds...
+    await vi.waitFor(() => expect(track.kind).toBe('midi'));
     await track.updateComplete;
-    expect(track.kind).toBe('midi');
     expect(track.getAttribute('kind')).toBe('midi');
 
     // ...and an unrelated later change does not warn again.

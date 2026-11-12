@@ -525,7 +525,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
       // Stop recording if we're removing the track being recorded to
       // Must await so the recorded clip is saved before the track is removed
-      if (isRecording && trackToRemove.id === selectedTrackId) {
+      // (the track the take was started on, which need not be the selected one).
+      if (isRecording && trackToRemove.id === recordingTrackId) {
         await stopRecording();
         stop();
       }
@@ -546,7 +547,17 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         seekTo(0);
       }
     },
-    [tracks, setTracks, selectedTrackId, setSelectedTrackId, isRecording, stopRecording, stop, seekTo]
+    [
+      tracks,
+      setTracks,
+      selectedTrackId,
+      setSelectedTrackId,
+      isRecording,
+      recordingTrackId,
+      stopRecording,
+      stop,
+      seekTo,
+    ]
   );
 
   return (

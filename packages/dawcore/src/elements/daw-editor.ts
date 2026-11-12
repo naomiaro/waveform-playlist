@@ -1437,8 +1437,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       };
       // Put the element back, so it says what the editor holds and the next
       // unrelated update (a volume change) does not warn again. The update
-      // this assignment dispatches finds the kinds equal.
-      trackEl.kind = oldDescriptor.kind;
+      // this assignment dispatches finds the kinds equal. In a microtask: we
+      // are inside the element's own updated(), where Lit's dev build warns
+      // about a property change.
+      const keptKind = oldDescriptor.kind;
+      queueMicrotask(() => {
+        trackEl.kind = keptKind;
+      });
     }
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     if (this._engine) {

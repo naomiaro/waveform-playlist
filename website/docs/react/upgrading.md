@@ -598,10 +598,10 @@ Applies to the `recordingState` prop of `<Waveform>` and `<PlaylistVisualization
 // After
 <Waveform
   recordingState={
-    isRecording
+    isRecording && recordingTrackId
       ? {
           isRecording: true,
-          trackId: selectedTrackId,
+          trackId: recordingTrackId, // from useIntegratedRecording: the track the take was started on
           startSample,
           progress,
           bits: 16,
