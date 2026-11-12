@@ -575,6 +575,12 @@ describe('MediaElement playback runs one animation loop', () => {
     expect(probe.animation.currentTime).toBe(12);
     expect(probe.animation.currentTimeRef.current).toBe(12);
     await waitFor(() => expect(probe.data.duration).toBe(2 * SECONDS));
+    // The position was stored while there was no player; the new player is
+    // moved to it when it arrives, not only when Play is pressed.
+    expect(playout.seekTo).toHaveBeenLastCalledWith(12);
+    // So a pause() while stopped, which reads the player's time, keeps it.
+    await act(async () => probe.controls.pause());
+    expect(probe.animation.currentTime).toBe(12);
 
     await act(async () => probe.controls.play());
     expect(playout.play).toHaveBeenLastCalledWith(undefined, 12);
@@ -594,6 +600,28 @@ describe('MediaElement playback runs one animation loop', () => {
     await act(async () => {});
     expect(probe.animation.currentTime).toBe(12);
     expect(playout.seekTo).toHaveBeenLastCalledWith(12);
+  });
+
+  it('a player that arrives with the cursor at 0 is not seeked', async () => {
+    const { playout, changeTrack } = await mount();
+    expect(playout.seekTo).not.toHaveBeenCalled();
+    await act(async () => probe.controls.seekTo(3));
+    playout.seekTo.mockClear();
+    // New audio: the cursor is reset to 0, and the new player starts there.
+    await act(async () => changeTrack({ source: 'other.mp3' }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    await act(async () => {});
+    expect(playout.seekTo).not.toHaveBeenCalled();
+  });
+
+  it('the same audio in a new player: the new player is moved to the kept position', async () => {
+    const { playout, changeTrack } = await mount();
+    await act(async () => probe.controls.seekTo(3));
+    playout.seekTo.mockClear();
+    await act(async () => changeTrack({ name: 'Renamed' }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(playout.seekTo).toHaveBeenCalledExactlyOnceWith(3));
+    expect(probe.animation.currentTime).toBe(3);
   });
 
   it('a seek is still clamped to the length of the current file', async () => {

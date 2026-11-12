@@ -215,6 +215,55 @@ test.describe('Media Element Example', () => {
       }).toPass({ timeout: 5000 });
     });
 
+    // #769: a position asked for before the player has loaded (`?t=8` on this
+    // page, from a child's effect) is stored, shown, and is where Play starts.
+    // The real media element must not report 0 over it while it loads.
+    test('a start position set before the player is ready is kept, and Play starts there', async ({
+      page,
+      baseURL,
+    }) => {
+      await page.goto(`${baseURL}/examples/media-element?t=8`);
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      const playhead = player.locator('[data-playhead]');
+      const timeDisplay = page.getByText(/^\d+:\d\d \/ \d+:\d\d$/).first();
+      const play = page.getByRole('button', { name: /Play/ }).first();
+      const stop = page.getByRole('button', { name: /Stop/ }).first();
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+      const shownSeconds = async () => {
+        const [minutes, seconds] = ((await timeDisplay.textContent()) ?? '')
+          .split(' / ')[0]
+          .split(':');
+        return Number(minutes) * 60 + Number(seconds);
+      };
+
+      // At rest, before any Play: the cursor and the time display are at 8 s (of 16).
+      await expect(timeDisplay).toHaveText(/^0:08 \//, { timeout: 10000 });
+      let restingX = 0;
+      await expect(async () => {
+        restingX = await playheadX();
+        expect(restingX).toBeGreaterThan(100);
+      }).toPass({ timeout: 5000 });
+
+      // Still there after the media element has had time to load and report.
+      await page.waitForTimeout(1500);
+      expect(await playheadX()).toBe(restingX);
+      expect(await shownSeconds()).toBe(8);
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(restingX + 5);
+      }).toPass({ timeout: 10000 });
+      // It went on from 8 s; it did not start again from 0.
+      expect(await shownSeconds()).toBeGreaterThanOrEqual(8);
+
+      await stop.click();
+      await expect(async () => {
+        expect(await playheadX()).toBe(0);
+      }).toPass({ timeout: 5000 });
+    });
+
     test('speed controls are visible', async ({ page }) => {
       await expect(page.getByRole('button', { name: '0.5x' }).first()).toBeVisible();
       await expect(page.getByRole('button', { name: '1x' }).first()).toBeVisible();

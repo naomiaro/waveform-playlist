@@ -339,6 +339,14 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
+        // The cursor may not be at 0: a position kept across a same-audio
+        // replacement, or one stored by `seekTo` while there was no player (a
+        // restore for this file). Move the new player there now, so its own
+        // time agrees with the cursor before Play is pressed (`pause()` reads
+        // it, and the media element reports it).
+        if (currentTimeRef.current > 0) {
+          playout.seekTo(currentTimeRef.current);
+        }
         setDuration(track.waveformData.duration);
         onReady?.();
       } catch (err) {
