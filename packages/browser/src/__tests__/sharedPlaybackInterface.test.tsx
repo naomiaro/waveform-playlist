@@ -345,7 +345,7 @@ async function mountMediaElement(children: React.ReactNode) {
 }
 
 /** The WebAudio provider's loading path needs frames that run by themselves. */
-const useTimerFrames = () => {
+const installTimerFrames = () => {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
     setTimeout(() => cb(performance.now()), 16) as unknown as number;
   globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
@@ -599,7 +599,7 @@ describe('what only one provider has throws under the other', () => {
 
 describe('the WebAudio provider splits its actions and refs', () => {
   it('usePlaybackControls and useEditorControls share no field, and neither is missing one', async () => {
-    useTimerFrames();
+    installTimerFrames();
     const readers = makeReaders({
       controls: usePlaybackControls,
       editor: useEditorControls,
@@ -654,7 +654,7 @@ describe('the WebAudio provider splits its actions and refs', () => {
   });
 
   it('continuous play renders the annotations reader and not the editing one, and the reverse', async () => {
-    useTimerFrames();
+    installTimerFrames();
     const readers = makeReaders({
       controls: usePlaybackControls,
       editor: useEditorControls,
@@ -944,7 +944,7 @@ class ErrorCatcher extends React.Component<
 
 describe('the library transport under WaveformPlaylistProvider', () => {
   it('the 0 shortcut moves the cursor to the start', async () => {
-    useTimerFrames();
+    installTimerFrames();
     const readers = makeReaders({
       controls: usePlaybackControls,
       currentTime: useCurrentTime,
@@ -968,7 +968,7 @@ describe('the library transport under WaveformPlaylistProvider', () => {
   });
 
   it('Rewind and the skips still restart playback at the new position', async () => {
-    useTimerFrames();
+    installTimerFrames();
     const adapter = createFakeAdapter();
     const readers = makeReaders({
       controls: usePlaybackControls,
@@ -1052,7 +1052,7 @@ describe('review fixes', () => {
   it.each(MOVED)(
     'reading %s from usePlaybackRefs() throws and names useEngineRefs, under either provider',
     async (field) => {
-      useTimerFrames();
+      installTimerFrames();
       for (const wrap of [mediaElement, (child: React.ReactNode) => webAudio(child)]) {
         const readers = makeReaders({ refs: usePlaybackRefs });
         render(wrap(readers.children));
@@ -1070,7 +1070,7 @@ describe('review fixes', () => {
 
   describe('seekTo past the end of the audio under WaveformPlaylistProvider (4 s of audio)', () => {
     async function mountWebAudio(props: { indefinitePlayback?: boolean } = {}) {
-      useTimerFrames();
+      installTimerFrames();
       const readers = makeReaders({
         controls: usePlaybackControls,
         editor: useEditorControls,
