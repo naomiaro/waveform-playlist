@@ -1987,7 +1987,7 @@ function useAnnotationControls(): {
 
 ### usePlaybackShortcuts
 
-Enable common playback keyboard shortcuts.
+Enable common playback keyboard shortcuts. `WaveformPlaylistProvider` only: the hook throws when the nearest playlist provider is `MediaElementPlaylistProvider`.
 
 #### Default Shortcuts
 

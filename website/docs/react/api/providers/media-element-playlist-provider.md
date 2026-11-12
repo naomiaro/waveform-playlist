@@ -121,7 +121,7 @@ When provided, audio routes through a Web Audio graph enabling fades and effects
 **Type:** `number`
 **Default:** `1`
 
-Initial playback rate. Range: 0.5 to 2.0.
+The playback rate. Range: 0.5 to 2.0. The user can change it with `setPlaybackRate` from `usePlaybackRate()` (the `PlaybackRateSelect` control); a later change of this prop replaces their choice, for the audio and for the value `usePlaybackRate()` returns, until they choose again. Changing the prop recreates the player.
 
 #### `preservesPitch`
 
@@ -263,7 +263,7 @@ interface MediaElementTrackContextValue {
 
 ### Controls
 
-The library's `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox` and (inside `<AnnotationProvider>`) `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` work under this provider. `PlaybackRateSelect` works under this provider only. `KeyboardShortcuts`, the loop and zoom buttons, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `ExportWavButton` do not: there are no keyboard shortcuts, no loop and no zoom here. See [Components](/docs/react/api/components#which-provider-each-control-needs).
+The library's `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox` and (inside `<AnnotationProvider>`) `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` work under this provider. `PlaybackRateSelect` works under this provider only. `KeyboardShortcuts`, the loop and zoom buttons, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `ExportWavButton` do not: there is no loop and no zoom here, and the library installs no keyboard shortcuts (`usePlaybackShortcuts()` throws here too; `useKeyboardShortcuts()` and `useAnnotationKeyboardControls()` can be called by your own component). See [Components](/docs/react/api/components#which-provider-each-control-needs).
 
 `playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/react/guides/media-element-playout#tonejs-effects)).
 

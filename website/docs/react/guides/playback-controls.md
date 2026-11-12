@@ -111,7 +111,8 @@ import { AudioPosition } from '@waveform-playlist/browser';
 function PositionDisplay() {
   return <AudioPosition />;
 }
-// Displays: "0:00.000 / 3:45.123"
+// Displays the position only, in the provider's time format
+// (default hh:mm:ss.uuu), for example "00:00:08.000"
 ```
 
 ### Programmatic Access

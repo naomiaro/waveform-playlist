@@ -85,7 +85,8 @@ export interface MediaElementPlaylistProviderProps {
   waveHeight?: number;
   /** Show timescale */
   timescale?: boolean;
-  /** Initial playback rate (0.5 to 2.0) */
+  /** Playback rate (0.5 to 2.0). The user's `setPlaybackRate` overrides it; a
+   *  later change of this prop overrides that, until they choose again. */
   playbackRate?: number;
   /** Whether to preserve pitch when changing playback rate (default: true).
    *  Set to false when using an external pitch processor like SoundTouch. */

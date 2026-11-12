@@ -1736,7 +1736,8 @@ interface KeyboardShortcut {
 }
 
 function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybackShortcutsReturn;
-// Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind)
+// WaveformPlaylistProvider only: throws when the nearest playlist provider is MediaElementPlaylistProvider.
+// Default shortcuts: Space (play/pause), Escape (stop), 0 (rewind: seekTo(0))
 // Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor.
 // With the cursor inside the selection (e.g. paused there) both resume from the cursor to the selection's end.
 // setSelection(start, end) during playback: a range restarts and plays start -> end; a collapsed selection continues open-ended.

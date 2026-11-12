@@ -220,7 +220,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 - `seekTo(time)` during playback restarts playback at `time`. A `stop()` while already stopped does not move the cursor.
 - `PlayButton` plays a highlighted selection as a range and stops at its end; with no selection it plays from the cursor. There is no loop under this provider.
 - `StopButton` is disabled unless playback is running. After Pause the cursor stays at the pause point; `stop()` called from code then still returns it to where playback started.
-- There are no keyboard shortcuts under this provider: `KeyboardShortcuts` needs `WaveformPlaylistProvider` and throws here.
+- The library installs no keyboard shortcuts under this provider: `KeyboardShortcuts` and `usePlaybackShortcuts()` need `WaveformPlaylistProvider` and throw here. `useKeyboardShortcuts()` (it reads no context) and `useAnnotationKeyboardControls()` can be called here by your own component.
 - A drag on the waveform highlights a range and moves the cursor to its start. During playback a press moves playback there and a drag selects nothing.
 - `duration` is the length from the track's waveform data and is known from the first render. `isReady` (and the `onReady` prop) tell you that the media element has loaded; `onError` tells you that it could not.
 
