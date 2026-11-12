@@ -149,6 +149,72 @@ test.describe('Media Element Example', () => {
       await stopButtons.first().click();
     });
 
+    // #769: the provider's one animation loop draws the playhead and the
+    // progress overlay; they run no loop of their own. The page's own time
+    // display is the second request per frame.
+    test('one provider loop moves the playhead and the progress overlay', async ({ page }) => {
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      const playhead = player.locator('[data-playhead]');
+      const play = page.getByRole('button', { name: /Play/ }).first();
+      const stop = page.getByRole('button', { name: /Stop/ }).first();
+      await expect(play).toBeEnabled();
+
+      // Count animation-frame requests and distinct frames from here on.
+      await page.evaluate(() => {
+        const counter = { calls: 0, frames: 0, last: -1 };
+        (window as unknown as { __raf: typeof counter }).__raf = counter;
+        const original = window.requestAnimationFrame.bind(window);
+        window.requestAnimationFrame = (cb) =>
+          original((t) => {
+            counter.calls++;
+            if (t !== counter.last) {
+              counter.frames++;
+              counter.last = t;
+            }
+            cb(t);
+          });
+      });
+
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+      const progressScale = () =>
+        player.evaluate((el) => {
+          const overlay = Array.from(el.querySelectorAll<HTMLElement>('div')).find((d) =>
+            d.style.transform.startsWith('scaleX')
+          );
+          return overlay ? Number(overlay.style.transform.slice(7, -1)) : -1;
+        });
+
+      expect(await playheadX()).toBe(0);
+      expect(await progressScale()).toBe(0);
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(5);
+        expect(await progressScale()).toBeGreaterThan(0);
+      }).toPass({ timeout: 10000 });
+
+      const first = await playheadX();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(first + 5);
+      }).toPass({ timeout: 10000 });
+
+      const raf = await page.evaluate(
+        () => (window as unknown as { __raf: { calls: number; frames: number } }).__raf
+      );
+      expect(raf.frames).toBeGreaterThan(10);
+      // Two per frame: the provider's loop and the example's time display.
+      // (Four before #769: the playhead and the overlay had their own.)
+      expect(raf.calls / raf.frames).toBeLessThan(2.5);
+
+      await stop.click();
+      await expect(async () => {
+        expect(await playheadX()).toBe(0);
+        expect(await progressScale()).toBe(0);
+      }).toPass({ timeout: 5000 });
+    });
+
     test('speed controls are visible', async ({ page }) => {
       await expect(page.getByRole('button', { name: '0.5x' }).first()).toBeVisible();
       await expect(page.getByRole('button', { name: '1x' }).first()).toBeVisible();
