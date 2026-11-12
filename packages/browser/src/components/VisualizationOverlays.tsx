@@ -38,7 +38,8 @@ import { AnnotationBoxes } from './AnnotationBoxes';
 /**
  * The highlighted selection range. Renders nothing for a collapsed selection.
  * Memoized (it takes no props): a render of the view around it (play, pause,
- * a press) is not its concern, only the selection, the zoom and the theme are.
+ * a press) is not its concern, only the selection, the zoom, the view settings
+ * and the theme are.
  */
 export const SelectionOverlay: React.FC = React.memo(function SelectionOverlay() {
   const theme = useTheme() as WaveformPlaylistTheme;

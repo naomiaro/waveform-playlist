@@ -758,7 +758,7 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 
 **Find:** `onReady`, `onError` or `createPlayout` passed to `MediaElementPlaylistProvider` as inline functions (`onReady={() => …}`), or a `track` built with inline `fadeIn` / `fadeOut` objects (`fadeIn: { duration: 1 }`), by a component that re-renders during playback: each render replaces the player, and playback now visibly stops. Also a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
 
-**Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so playback stops, the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play, automatic scroll and the active annotation go back to their initial values. The selection is not yet readable or settable from outside the built-in components.
+**Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `currentTimeRef` (since a later step `visualTimeRef`, the same ref under this provider) in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so playback stops, the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play, automatic scroll and the active annotation go back to their initial values. The selection is not yet readable or settable from outside the built-in components.
 
 **Note:** it is since a later entry: `useSelection()` reads it and `usePlaybackControls().setSelection` sets it. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
@@ -1228,11 +1228,11 @@ A component re-renders only for the hooks it calls. The four removed hooks carri
 2. **A `useMediaElementState()` reader** no longer re-renders when the active annotation changes, unless it calls `useActiveAnnotation()`.
 3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
 4. **Under `WaveformPlaylistProvider`, a `usePlaylistAnnotations()` reader moved to `useAnnotations()`** no longer re-renders on the Editable and Link-endpoints toggles, unless it calls `useAnnotationEditing()`.
-5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek, and during a leftward selection drag it is called on every move.
+5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek. (At this step it was also called on every move of a leftward selection drag; since the next section it is not called at all while a range is highlighted and playback is stopped or paused.)
 
 ## One playhead and one progress overlay for both providers; `PlayheadProps` has seven props
 
-The playhead, the played-portion overlay of a channel, the selection highlight and the wrapper that calls a custom `renderPlayhead` exist once and are rendered by both `<Waveform>` / `<PlaylistVisualization>` and `<MediaElementWaveform>` / `<MediaElementPlaylist>`. None of these parts was a public export; what changes for an app is the props a `renderPlayhead` function receives and three things on screen.
+The playhead, the played-portion overlay of a channel, the selection highlight and the wrapper that calls a custom `renderPlayhead` exist once and are rendered by both `<Waveform>` / `<PlaylistVisualization>` and `<MediaElementWaveform>` / `<MediaElementPlaylist>`. None of these parts was a public export; what changes for an app is the props a `renderPlayhead` function receives and the things listed under "On screen".
 
 ### `PlayheadProps`
 
@@ -1280,30 +1280,33 @@ function MyPlayhead({
 }
 
 // After
-function MyPlayhead({ visualTimeRef, samplesPerPixel, sampleRate }) {
-  // …in an animation frame while playing, and after each render while stopped:
+function MyPlayhead({ isPlaying, visualTimeRef, samplesPerPixel, sampleRate }) {
+  // …in an animation frame while isPlaying, and after each render while not:
   const x = ((visualTimeRef.current ?? 0) * sampleRate) / samplesPerPixel;
 }
 ```
 
 The props object is a plain object: reading a removed prop gives `undefined`, with no error.
 
-- **A playhead copied from the old `PlayheadWithMarker`** destructures all five removed props and uses them only as a fallback for a missing `visualTimeRef`. `visualTimeRef` is now always passed, so in plain JavaScript such a copy keeps drawing at the right place; delete the dead branches. TypeScript reports each removed name.
-- **A playhead that computes its position from `getPlaybackTime()` or from `getAudioContextTime()` and the two start refs** calls `undefined` ("getPlaybackTime is not a function") or draws at `NaN` pixels. Use `visualTimeRef`, which under `WaveformPlaylistProvider` is also what keeps the playhead in step with the progress fill (the raw engine time runs ahead of what is heard by the output latency).
-- A playhead that needs an engine value calls `useEngineRefs()` itself. The function passed as `renderPlayhead` may call hooks: it is called inside a component of its own.
+- **A playhead copied from the old `PlayheadWithMarker`** destructures all five removed props: it uses four of them only as a fallback for a missing `visualTimeRef`, and adds `controlsOffset`, which it defaults to `0`. `visualTimeRef` is now always passed, so in plain JavaScript such a copy keeps drawing at the right place; delete the dead branches. TypeScript reports each removed name.
+- **A playhead that computes its position from `getPlaybackTime()` or from `getAudioContextTime()` and the two start refs** calls `undefined` ("getPlaybackTime is not a function"), reads a ref that is not there ("Cannot read properties of undefined (reading 'current')"), or, where it adds a `controlsOffset` without a default or uses `?.current` in arithmetic, draws at `NaN` pixels. Use `visualTimeRef`, which under `WaveformPlaylistProvider` is also what keeps the playhead in step with the progress fill (the raw engine time runs ahead of what is heard, by the output latency and the engine's look-ahead).
+- A playhead that needs an engine value calls `useEngineRefs()` itself. The function passed as `renderPlayhead` is called inside a component of its own, so it may call hooks, as long as it calls the same hooks on every render; the simplest form is to return your own component, `(props) => <MyPlayhead {...props} />`. State held by a custom playhead is reset each time the playhead is hidden and shown again (see "On screen").
+- **`PlayheadWithMarker` or `Playhead` rendered by your own code** (not through `renderPlayhead`) must be given `visualTimeRef`. `PlayheadWithMarker` used to fall back to the other props when it was missing; now it fails with "Cannot read properties of undefined (reading 'current')". TypeScript reports the missing prop and each removed one.
 
-`PlayheadWithMarker` reads `visualTimeRef` only. `<Waveform renderPlayhead={PlayheadWithMarker} />` and `<MediaElementWaveform renderPlayhead={PlayheadWithMarker} />` need no change.
+`PlayheadWithMarker` places itself from `visualTimeRef`. `<Waveform renderPlayhead={PlayheadWithMarker} />` and `<MediaElementWaveform renderPlayhead={PlayheadWithMarker} />` need no change.
 
 ### On screen
 
-- **`MediaElementPlaylistProvider`: the resting playhead is hidden while a range is highlighted.** Before: the playhead line stayed visible on the left edge of the highlight. Now: with a range selected and playback stopped or paused there is no playhead (default or custom: `renderPlayhead` is not called); it is shown during playback, and again at rest once the selection is collapsed (a click). `WaveformPlaylistProvider` has always done this.
+- **`MediaElementPlaylistProvider`: the resting playhead is hidden while a range is highlighted.** Before: the playhead line stayed visible on the left edge of the highlight. Now: with a range selected and playback stopped or paused there is no playhead (default or custom: `renderPlayhead` is not called); it is shown during playback, and again at rest once the selection is collapsed (a click). `WaveformPlaylistProvider` already did this. A custom playhead is unmounted while hidden, so its own state and effects start again when it returns, and an element found through `[data-playhead]` (your CSS or tests) is absent in that state.
 - **`MediaElementPlaylistProvider`: the progress overlay is as wide as the clip.** Before: as wide as the waveform's peak data, which on the example pages was one pixel wider than the clip. Now: the clip's width, as under `WaveformPlaylistProvider`.
 - **`WaveformPlaylistProvider`: two visualizations under one provider each animate their playhead.** Before: the default playheads of two `<Waveform>` / `<PlaylistVisualization>` under the same provider registered under one id, so only one of them moved during playback. Now: each has its own.
+- **The library's playhead no longer uses the frame-callback id `'playhead'`.** Before: under `WaveformPlaylistProvider` a callback of your own registered as `registerFrameCallback('playhead', …)` and the default playhead replaced each other, because the registry keeps one callback per id. Now: the default playhead registers under a generated id, and yours is left alone. `AudioPosition` still uses `'audio-position'`.
+- **`WaveformPlaylistProvider`: the background of a selected track falls back to the unselected colour** when the theme's `selectedWaveFillColor` (or, in `'normal'` draw mode, `selectedWaveOutlineColor`) is explicitly `undefined` or empty. Before: no background colour. The bars drawn on the canvas do not fall back. Under `MediaElementPlaylistProvider` this was already so. A theme that leaves the key out gets the default theme's value and is not affected.
 
 ### What renders when
 
 - Under `MediaElementPlaylistProvider`, a custom `renderPlayhead` is not called at all while a range is highlighted at rest, and one small extra component (the playhead overlay) renders per pointer move of a rightward selection drag and whenever the waveform shell renders (play, pause, stop, a click).
-- Under `WaveformPlaylistProvider` the selection highlight no longer renders when the visualization around it does (play, pause, a track selection); it renders when the selection, the zoom or the theme changes.
+- Under `WaveformPlaylistProvider` the selection highlight no longer renders when the visualization around it does (play, pause, a track selection); it renders when the selection, the zoom, the theme or a view setting (`usePlaylistView()`) changes.
 
 ## Keyboard shortcuts yield to the focused control
 

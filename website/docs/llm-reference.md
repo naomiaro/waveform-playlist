@@ -1826,8 +1826,8 @@ interface PlayheadProps {
   color?: string; // theme.playheadColor
   isPlaying: boolean;
   currentTimeRef: React.RefObject<number>; // raw position, seconds
-  // Time to draw at, seconds; kept current per frame of playback and on
-  // seek/pause/stop. MediaElement: the same ref as currentTimeRef.
+  // Time to draw at, seconds; kept current per frame of playback and when
+  // playback comes to rest. MediaElement: the same ref as currentTimeRef.
   visualTimeRef: React.RefObject<number>;
   samplesPerPixel: number; // x = (time * sampleRate) / samplesPerPixel
   sampleRate: number;
@@ -1837,7 +1837,7 @@ type RenderPlayheadFunction = (props: PlayheadProps) => React.ReactNode;
 // <MediaElementWaveform renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
 ```
 
-Removed from `PlayheadProps`: `getPlaybackTime`, `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef` (call `useEngineRefs()` in the playhead, `WaveformPlaylistProvider` only) and `controlsOffset` (always 0). The props are a plain object: a removed name reads `undefined`. The playhead (default or custom) is not rendered while a range is highlighted and playback is stopped or paused, under either provider.
+Removed from `PlayheadProps`: `getPlaybackTime`, `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef` (call `useEngineRefs()` in the playhead, `WaveformPlaylistProvider` only) and `controlsOffset` (always 0). The props are a plain object: a removed name reads `undefined`. The playhead (default or custom) is not rendered while a range is highlighted and playback is stopped or paused, under either provider; a custom playhead is unmounted while hidden. `PlayheadWithMarker` rendered by your own code needs `visualTimeRef`.
 
 ```typescript
 // @waveform-playlist/browser: reads usePlaybackRate(). MediaElementPlaylistProvider only.

@@ -29,7 +29,7 @@ async function playbackSpeed(page: import('@playwright/test').Page): Promise<num
  * 2. Custom playhead (PlayheadWithMarker) + Timescale
  *
  * The custom playhead exercises the hook isolation pattern
- * (CustomMediaElementPlayhead wrapper) that prevents
+ * (the shared CustomPlayhead wrapper) that prevents
  * "Rendered more hooks" errors.
  */
 

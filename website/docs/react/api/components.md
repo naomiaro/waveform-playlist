@@ -101,7 +101,7 @@ interface PlayheadProps {
   currentTimeRef: React.RefObject<number>;
   /**
    * The time to draw the playhead at, in seconds. The provider keeps it current
-   * on every frame of playback and on seek, pause and stop. Under
+   * on every frame of playback and when playback comes to rest. Under
    * WaveformPlaylistProvider it is the audible time while playing (raw minus
    * output latency and look-ahead); under MediaElementPlaylistProvider it is
    * the same ref as currentTimeRef.
@@ -117,7 +117,7 @@ interface PlayheadProps {
 
 The playhead is not rendered (and `renderPlayhead` is not called) while a range is highlighted and playback is stopped or paused.
 
-Engine values are not props. A playhead for `WaveformPlaylistProvider` that needs one calls [`useEngineRefs()`](/docs/react/api/hooks#useenginerefs); the function passed as `renderPlayhead` may call hooks.
+Engine values are not props. A playhead for `WaveformPlaylistProvider` that needs one calls [`useEngineRefs()`](/docs/react/api/hooks#useenginerefs); the function passed as `renderPlayhead` may call hooks, the same ones on every render (or return your own component: `(props) => <MyPlayhead {...props} />`). A custom playhead is unmounted while it is hidden, so state it holds starts again.
 
 ### Built-in Playhead Components
 
