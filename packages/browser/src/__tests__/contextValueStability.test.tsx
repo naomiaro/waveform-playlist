@@ -13,20 +13,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { useTheme } from 'styled-components';
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  usePlaylistView,
-  usePlaylistSettings,
-  usePlaylistTimeline,
-  usePlaylistMixer,
-  usePlaybackRefs,
-  useIsPlaying,
-  useLoop,
-  useSelection,
-  useCurrentTime,
-  useActiveAnnotation,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistView, usePlaylistSettings, usePlaylistTimeline, usePlaylistMixer, usePlaybackRefs, useIsPlaying, useLoop, useSelection, useCurrentTime, useActiveAnnotation } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 

@@ -7,12 +7,8 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  usePlaylistTimeline,
-  useIsPlaying,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistTimeline, useIsPlaying } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import { PlayButton } from '../components/PlaybackControls';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';

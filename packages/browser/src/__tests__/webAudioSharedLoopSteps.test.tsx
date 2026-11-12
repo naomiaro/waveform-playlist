@@ -10,16 +10,8 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  usePlaylistTimeline,
-  usePlaybackRefs,
-  useIsPlaying,
-  useCurrentTime,
-  useActiveAnnotation,
-  type FrameData,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistTimeline, usePlaybackRefs, useIsPlaying, useCurrentTime, useActiveAnnotation, type FrameData } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 

@@ -9,17 +9,9 @@ import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
-import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
-import {
-  useMediaElementInternals,
-  useMediaElementSelection,
-} from '../providerInternals/mediaElementInternalContexts';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
+import { useMediaElementAnimation, useMediaElementControls, useMediaElementData, useMediaElementState } from '../contexts/playlistContexts';
+import { useMediaElementInternals, useMediaElementSelection } from '../contexts/playlistContexts';
 import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
 
 const SAMPLE_RATE = 44100;

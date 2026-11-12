@@ -2,13 +2,19 @@ import React, { useCallback } from 'react';
 import { BaseControlButton } from '@waveform-playlist/ui-components';
 import {
   useSelection,
-  usePlaylistControls,
+  usePlaybackControls,
+  useEditorControls,
   usePlaylistTimeline,
   usePlaybackRefs,
   useLoop,
   useIsPlaying,
-} from '../WaveformPlaylistContext';
+} from '../contexts/playlistContexts';
 import { usePlayFromSelectionOrCursor } from '../hooks/usePlayFromSelectionOrCursor';
+
+// Play, Pause, Stop, Rewind, Fast Forward and the two skips read only what
+// both providers have (#688), so they work under WaveformPlaylistProvider and
+// under MediaElementPlaylistProvider. The loop buttons below are
+// WaveformPlaylistProvider only.
 
 export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
   const { isPlaying } = useIsPlaying();
@@ -24,7 +30,7 @@ export const PlayButton: React.FC<{ className?: string }> = ({ className }) => {
 
 export const PauseButton: React.FC<{ className?: string }> = ({ className }) => {
   const { isPlaying } = useIsPlaying();
-  const { pause } = usePlaylistControls();
+  const { pause } = usePlaybackControls();
 
   return (
     <BaseControlButton onClick={pause} disabled={!isPlaying} className={className}>
@@ -35,7 +41,7 @@ export const PauseButton: React.FC<{ className?: string }> = ({ className }) => 
 
 export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
   const { isPlaying } = useIsPlaying();
-  const { stop } = usePlaylistControls();
+  const { stop } = usePlaybackControls();
 
   return (
     <BaseControlButton onClick={stop} disabled={!isPlaying} className={className}>
@@ -44,17 +50,12 @@ export const StopButton: React.FC<{ className?: string }> = ({ className }) => {
   );
 };
 
+// The four below move the cursor with `seekTo`, which clamps to the audio and
+// restarts playback at the new position when it is running.
+
 export const RewindButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = useIsPlaying();
-  const { play, setCurrentTime } = usePlaylistControls();
-
-  const handleClick = () => {
-    setCurrentTime(0);
-
-    if (isPlaying) {
-      play(0);
-    }
-  };
+  const { seekTo } = usePlaybackControls();
+  const handleClick = () => seekTo(0);
 
   return (
     <BaseControlButton onClick={handleClick} className={className}>
@@ -64,17 +65,9 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
 };
 
 export const FastForwardButton: React.FC<{ className?: string }> = ({ className }) => {
-  const { isPlaying } = useIsPlaying();
-  const { play, setCurrentTime } = usePlaylistControls();
-  const { duration } = usePlaylistTimeline();
-
-  const handleClick = () => {
-    setCurrentTime(duration);
-
-    if (isPlaying) {
-      play(duration);
-    }
-  };
+  const { seekTo } = usePlaybackControls();
+  // Clamped to the end of the audio by the provider.
+  const handleClick = () => seekTo(Infinity);
 
   return (
     <BaseControlButton onClick={handleClick} className={className}>
@@ -88,17 +81,8 @@ export const SkipBackwardButton: React.FC<{ skipAmount?: number; className?: str
   className,
 }) => {
   const { currentTimeRef } = usePlaybackRefs();
-  const { isPlaying } = useIsPlaying();
-  const { play, setCurrentTime } = usePlaylistControls();
-
-  const handleClick = () => {
-    const newTime = Math.max(0, (currentTimeRef.current ?? 0) - skipAmount);
-    setCurrentTime(newTime);
-
-    if (isPlaying) {
-      play(newTime);
-    }
-  };
+  const { seekTo } = usePlaybackControls();
+  const handleClick = () => seekTo((currentTimeRef.current ?? 0) - skipAmount);
 
   return (
     <BaseControlButton onClick={handleClick} className={className}>
@@ -112,18 +96,8 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
   className,
 }) => {
   const { currentTimeRef } = usePlaybackRefs();
-  const { isPlaying } = useIsPlaying();
-  const { play, setCurrentTime } = usePlaylistControls();
-  const { duration } = usePlaylistTimeline();
-
-  const handleClick = () => {
-    const newTime = Math.min(duration, (currentTimeRef.current ?? 0) + skipAmount);
-    setCurrentTime(newTime);
-
-    if (isPlaying) {
-      play(newTime);
-    }
-  };
+  const { seekTo } = usePlaybackControls();
+  const handleClick = () => seekTo((currentTimeRef.current ?? 0) + skipAmount);
 
   return (
     <BaseControlButton onClick={handleClick} className={className}>
@@ -134,7 +108,7 @@ export const SkipForwardButton: React.FC<{ skipAmount?: number; className?: stri
 
 export const LoopButton: React.FC<{ className?: string }> = ({ className }) => {
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
-  const { setLoopEnabled, setLoopRegion } = usePlaylistControls();
+  const { setLoopEnabled, setLoopRegion } = useEditorControls();
   const { duration } = usePlaylistTimeline();
 
   const hasValidLoopRegion = loopStart !== loopEnd && loopEnd > loopStart;
@@ -163,7 +137,7 @@ export const LoopButton: React.FC<{ className?: string }> = ({ className }) => {
 export const SetLoopRegionButton: React.FC<{ className?: string }> = ({ className }) => {
   const { selectionStart, selectionEnd } = useSelection();
   const { loopStart, loopEnd } = useLoop();
-  const { setLoopRegionFromSelection, clearLoopRegion } = usePlaylistControls();
+  const { setLoopRegionFromSelection, clearLoopRegion } = useEditorControls();
 
   const hasValidSelection = selectionStart !== selectionEnd && selectionEnd > selectionStart;
   const hasLoopRegion = loopStart !== loopEnd && loopEnd > loopStart;
@@ -205,7 +179,7 @@ export const ClearAllButton: React.FC<ClearAllButtonProps> = ({
   label = 'Clear All',
   className,
 }) => {
-  const { stop } = usePlaylistControls();
+  const { stop } = usePlaybackControls();
 
   const handleClick = useCallback(() => {
     stop();

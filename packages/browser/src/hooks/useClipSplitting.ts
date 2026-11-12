@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
-import { usePlaylistView, usePlaybackRefs, useSelectedTrackId } from '../WaveformPlaylistContext';
+import { usePlaylistView, usePlaybackRefs, useSelectedTrackId } from '../contexts/playlistContexts';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];

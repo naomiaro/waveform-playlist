@@ -62,16 +62,8 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  useSelection,
-  useActiveAnnotation,
-  usePlaylistMixer,
-  usePlaylistTimeline,
-  usePlaylistZoom,
-  useSelectedTrackId,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, useSelection, useActiveAnnotation, usePlaylistMixer, usePlaylistTimeline, usePlaylistZoom, useSelectedTrackId } from '../contexts/playlistContexts';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';

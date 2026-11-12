@@ -63,13 +63,8 @@ vi.mock('../providerInternals/useFrameCallbacks', async (importOriginal) => {
   };
 });
 
-import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
+import { useMediaElementAnimation, useMediaElementControls, useMediaElementData, useMediaElementState } from '../contexts/playlistContexts';
 import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
 
 const SAMPLE_RATE = 44100;

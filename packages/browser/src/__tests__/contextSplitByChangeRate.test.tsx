@@ -11,25 +11,8 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import * as contextModule from '../WaveformPlaylistContext';
 import * as publicApi from '../index';
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  usePlaylistView,
-  usePlaylistSettings,
-  usePlaylistZoom,
-  usePlaylistTimeline,
-  usePlaylistMixer,
-  useTrackReorderPreview,
-  usePlaylistAnnotations,
-  useLoop,
-  useSelectedTrackId,
-  useUndoRedo,
-  useIsPlaying,
-  usePlaybackRefs,
-  useSelection,
-  useCurrentTime,
-  useActiveAnnotation,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, usePlaylistView, usePlaylistSettings, usePlaylistZoom, usePlaylistTimeline, usePlaylistMixer, useTrackReorderPreview, usePlaylistAnnotations, useLoop, useSelectedTrackId, useUndoRedo, useIsPlaying, usePlaybackRefs, useSelection, useCurrentTime, useActiveAnnotation } from '../contexts/playlistContexts';
 import type { AnnotationData, ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 

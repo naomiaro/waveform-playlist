@@ -2,64 +2,64 @@
 export type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/playout';
 
 // Export new flexible/headless API
+export { WaveformPlaylistProvider } from './WaveformPlaylistContext';
+export type { TrackState, ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
+
+// Export MediaElement-based provider (single-track with playback rate control)
+export { MediaElementPlaylistProvider } from './MediaElementPlaylistContext';
+export type { MediaElementTrackConfig } from './MediaElementPlaylistContext';
+
+// The context hooks (#688). Under either provider:
 export {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  usePlaybackRefs,
   useIsPlaying,
   useCurrentTime,
   useSelection,
   useActiveAnnotation,
+  useAnnotations,
+  usePlaybackControls,
+  usePlaybackRefs,
   usePlaylistView,
   usePlaylistSettings,
   usePlaylistZoom,
+  // WaveformPlaylistProvider only:
+  useEditorControls,
+  useEngineRefs,
+  useAnnotationEditing,
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
-  usePlaylistAnnotations,
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
-} from './WaveformPlaylistContext';
+  // MediaElementPlaylistProvider only:
+  usePlaybackRate,
+  useMediaElementTrack,
+} from './contexts/playlistContexts';
 export type {
-  TrackState,
   FrameData,
-  ClipPeaks,
-  TrackClipPeaks,
-  TrackDragPreview,
-  PlaylistControlsContextValue,
-  PlaybackRefsContextValue,
   IsPlayingContextValue,
   CurrentTimeContextValue,
   SelectionContextValue,
   ActiveAnnotationContextValue,
+  AnnotationsContextValue,
+  PlaybackControlsContextValue,
+  PlaybackRefsContextValue,
   PlaylistViewContextValue,
   PlaylistSettingsContextValue,
   PlaylistZoomContextValue,
+  EditorControlsContextValue,
+  EngineRefsContextValue,
+  AnnotationEditingContextValue,
   PlaylistTimelineContextValue,
   PlaylistMixerContextValue,
   TrackReorderPreviewContextValue,
-  PlaylistAnnotationsContextValue,
   LoopContextValue,
   SelectedTrackIdContextValue,
   UndoRedoContextValue,
-} from './WaveformPlaylistContext';
-
-// Export MediaElement-based provider (single-track with playback rate control)
-export {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementState,
-  useMediaElementControls,
-  useMediaElementData,
-} from './MediaElementPlaylistContext';
-export type {
-  MediaElementTrackConfig,
-  MediaElementAnimationContextValue,
-  MediaElementStateContextValue,
-  MediaElementControlsContextValue,
-  MediaElementDataContextValue,
-} from './MediaElementPlaylistContext';
+  PlaybackRateContextValue,
+  MediaElementTrackContextValue,
+} from './contexts/playlistContexts';
+export type { TrackDragPreview } from './utils/trackOrderPreview';
 export type { AnnotationPreviewHandle } from './hooks';
 export {
   useClipDragHandlers,
@@ -98,6 +98,7 @@ export {
   ZoomOutButton,
   MasterVolumeControl,
   TimeFormatSelect,
+  PlaybackRateSelect,
   AudioPosition,
   SelectionTimeInputs,
   AutomaticScrollCheckbox,

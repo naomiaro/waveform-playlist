@@ -3,10 +3,13 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
-  useMediaElementState,
-  useMediaElementControls,
-  useMediaElementData,
-} from '../MediaElementPlaylistContext';
+  useAnnotations,
+  useActiveAnnotation,
+  usePlaybackControls,
+  usePlaylistView,
+  usePlaylistZoom,
+  useMediaElementTrack,
+} from '../contexts/playlistContexts';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
@@ -42,13 +45,15 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
   onAnnotationUpdate,
 }) => {
   const annotationIntegration = useContext(AnnotationIntegrationContext);
-  const { annotations, activeAnnotationId } = useMediaElementState();
-  const { play, setActiveAnnotationId, setAnnotations, annotationPreview } =
-    useMediaElementControls();
+  const { annotations } = useAnnotations();
+  const { activeAnnotationId } = useActiveAnnotation();
+  const { play, setActiveAnnotationId, setAnnotations, annotationPreview } = usePlaybackControls();
   // The drag publishes its moves to the preview and reports once, on
   // release; the boxes follow the preview meanwhile.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-  const { duration, sampleRate, samplesPerPixel } = useMediaElementData();
+  const { duration } = useMediaElementTrack();
+  const { sampleRate } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
 
   // A prop of every memoized box: its dependencies do not change when only
   // the active annotation does. Where playback ends (the annotation's end, or

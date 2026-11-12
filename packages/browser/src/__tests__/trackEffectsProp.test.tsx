@@ -54,11 +54,8 @@ vi.mock('@waveform-playlist/playout', () => ({
   configureGlobalContext: h.configureGlobalContext,
 }));
 
-import {
-  WaveformPlaylistProvider,
-  usePlaybackRefs,
-  usePlaylistTimeline,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaybackRefs, usePlaylistTimeline } from '../contexts/playlistContexts';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>

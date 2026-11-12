@@ -9,15 +9,8 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
-import {
-  WaveformPlaylistProvider,
-  useCurrentTime,
-  useActiveAnnotation,
-  usePlaylistControls,
-  usePlaylistTimeline,
-  usePlaylistAnnotations,
-  useIsPlaying,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { useCurrentTime, useActiveAnnotation, usePlaylistControls, usePlaylistTimeline, usePlaylistAnnotations, useIsPlaying } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 

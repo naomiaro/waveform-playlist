@@ -1,12 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import styled from 'styled-components';
-import {
-  useCurrentTime,
-  usePlaylistView,
-  usePlaylistZoom,
-  usePlaybackRefs,
-  useIsPlaying,
-} from '../WaveformPlaylistContext';
+import { useCurrentTime, usePlaylistView, usePlaylistZoom, usePlaybackRefs, useIsPlaying } from '../contexts/playlistContexts';
 
 const PlayheadLine = styled.div.attrs<{ $color: string; $width: number }>((props) => ({
   style: {

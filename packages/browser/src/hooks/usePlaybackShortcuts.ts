@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { usePlaylistControls, useIsPlaying } from '../WaveformPlaylistContext';
+import { usePlaybackControls, useIsPlaying } from '../contexts/playlistContexts';
 import { usePlayFromSelectionOrCursor } from './usePlayFromSelectionOrCursor';
 import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts';
 
@@ -63,7 +63,7 @@ export const usePlaybackShortcuts = (
   const { enabled = true, additionalShortcuts = [], shortcuts: overrideShortcuts } = options;
 
   const { isPlaying } = useIsPlaying();
-  const { setCurrentTime, play, pause, stop } = usePlaylistControls();
+  const { seekTo, pause, stop } = usePlaybackControls();
   // Space starts playback exactly as the Play button does.
   const playFromSelectionOrCursor = usePlayFromSelectionOrCursor();
 
@@ -92,12 +92,8 @@ export const usePlaybackShortcuts = (
    * If playing, stops and restarts playback from the beginning.
    */
   const rewindToStart = useCallback(() => {
-    setCurrentTime(0);
-
-    if (isPlaying) {
-      play(0);
-    }
-  }, [isPlaying, setCurrentTime, play]);
+    seekTo(0);
+  }, [seekTo]);
 
   // Default playback shortcuts
   const defaultShortcuts: KeyboardShortcut[] = [

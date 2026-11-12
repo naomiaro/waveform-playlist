@@ -3,14 +3,7 @@ import type { KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
 import { usePlaybackShortcuts } from '../hooks/usePlaybackShortcuts';
 import { useClipSplitting } from '../hooks/useClipSplitting';
 import { useAnnotationKeyboardControls } from '../hooks/useAnnotationKeyboardControls';
-import {
-  useActiveAnnotation,
-  usePlaylistControls,
-  usePlaylistZoom,
-  usePlaylistTimeline,
-  usePlaybackRefs,
-  usePlaylistAnnotations,
-} from '../WaveformPlaylistContext';
+import { useActiveAnnotation, usePlaylistZoom, usePlaylistTimeline, useEngineRefs, useAnnotations, useAnnotationEditing, usePlaybackControls, useEditorControls } from '../contexts/playlistContexts';
 
 export interface KeyboardShortcutsProps {
   /** Enable default playback shortcuts (Space, Escape, 0). Defaults to false. */
@@ -47,11 +40,13 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   // Clip splitting setup
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, duration } = usePlaylistTimeline();
-  const { playoutRef } = usePlaybackRefs();
-  const { annotations: annotationList, linkEndpoints, continuousPlay } = usePlaylistAnnotations();
+  const { playoutRef } = useEngineRefs();
+  const { annotations: annotationList, continuousPlay } = useAnnotations();
+  const { linkEndpoints } = useAnnotationEditing();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play, undo, redo } =
-    usePlaylistControls();
+  const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } =
+    usePlaybackControls();
+  const { undo, redo } = useEditorControls();
 
   const { splitClipAtPlayhead } = useClipSplitting({
     tracks,

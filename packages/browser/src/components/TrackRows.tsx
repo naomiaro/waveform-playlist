@@ -16,7 +16,8 @@ import {
   type TrackKind,
   type SpectrogramConfig,
 } from '@waveform-playlist/core';
-import { type ClipPeaks, type TrackClipPeaks, usePlaybackRefs } from '../WaveformPlaylistContext';
+import { type ClipPeaks, type TrackClipPeaks } from '../WaveformPlaylistContext';
+import { useEngineRefs } from '../contexts/playlistContexts';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
 import { useClipInteraction } from '../contexts/ClipInteractionContext';
@@ -177,7 +178,7 @@ const RecordingPreviewClip: React.FC<RecordingPreviewClipProps> = ({
   showClipHeaders,
   mono,
 }) => {
-  const { getLookAhead, getOutputLatency } = usePlaybackRefs();
+  const { getLookAhead, getOutputLatency } = useEngineRefs();
   // The one place that follows the take frame by frame (#695).
   // Called as methods (not destructured), so a source written as a class works.
   const source = recordingState.progress;

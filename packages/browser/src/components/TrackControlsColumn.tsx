@@ -2,7 +2,7 @@ import React, { type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { trackKind } from '@waveform-playlist/core';
 import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
-import { usePlaylistControls, usePlaylistMixer } from '../WaveformPlaylistContext';
+import { usePlaylistMixer, useEditorControls } from '../contexts/playlistContexts';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
 import { SortableTrackControls } from './SortableTrackControls';
@@ -56,7 +56,7 @@ function TrackControlsColumnImpl({
   const theme = useTheme() as WaveformPlaylistTheme;
   const { trackStates } = usePlaylistMixer();
   const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan, reorderTrack } =
-    usePlaylistControls();
+    useEditorControls();
 
   return (
     <TracksLayout $height={trackLayout.totalHeight}>

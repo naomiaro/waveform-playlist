@@ -10,13 +10,8 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
-import {
-  MediaElementPlaylistProvider,
-  useMediaElementAnimation,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
+import { useMediaElementAnimation, useMediaElementControls, useMediaElementData, useMediaElementState } from '../contexts/playlistContexts';
 
 const SAMPLE_RATE = 44100;
 const SOURCE_SCALE = 441;

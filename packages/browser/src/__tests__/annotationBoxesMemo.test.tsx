@@ -7,13 +7,8 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
-import {
-  WaveformPlaylistProvider,
-  usePlaylistControls,
-  useActiveAnnotation,
-  usePlaylistTimeline,
-  usePlaylistZoom,
-} from '../WaveformPlaylistContext';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { usePlaylistControls, useActiveAnnotation, usePlaylistTimeline, usePlaylistZoom } from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,

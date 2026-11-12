@@ -44,12 +44,8 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import {
-  MediaElementPlaylistProvider,
-  useMediaElementControls,
-  useMediaElementData,
-  useMediaElementState,
-} from '../MediaElementPlaylistContext';
+import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
+import { useMediaElementControls, useMediaElementData, useMediaElementState } from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,

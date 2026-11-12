@@ -45,7 +45,7 @@ interface UseAnnotationDragHandlersOptions {
  * const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
  *   annotations,
  *   onAnnotationsChange: setAnnotations,
- *   preview: annotationPreview, // from usePlaylistControls()
+ *   preview: annotationPreview, // from usePlaybackControls()
  *   samplesPerPixel,
  *   sampleRate,
  *   duration,

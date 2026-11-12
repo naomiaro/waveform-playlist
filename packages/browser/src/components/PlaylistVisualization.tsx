@@ -19,15 +19,7 @@ import {
   type RenderPlayheadFunction,
   CLIP_HEADER_HEIGHT,
 } from '@waveform-playlist/ui-components';
-import {
-  usePlaylistControls,
-  usePlaylistView,
-  usePlaylistZoom,
-  usePlaylistTimeline,
-  useTrackReorderPreview,
-  useSelectedTrackId,
-  useIsPlaying,
-} from '../WaveformPlaylistContext';
+import { usePlaylistView, usePlaylistZoom, usePlaylistTimeline, useTrackReorderPreview, useSelectedTrackId, useIsPlaying, usePlaybackControls, useEditorControls } from '../contexts/playlistContexts';
 import {
   applyTrackOrderPreview,
   computeTrackLayout,
@@ -122,14 +114,8 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
 
   const { isPlaying } = useIsPlaying();
   const { selectedTrackId } = useSelectedTrackId();
-  const {
-    setSelection,
-    play,
-    setScrollContainer,
-    setSelectedTrackId,
-    setCurrentTime,
-    setRecordingActive,
-  } = usePlaylistControls();
+  const { setSelection, play, setScrollContainer } = usePlaybackControls();
+  const { setSelectedTrackId, setCurrentTime, setRecordingActive } = useEditorControls();
   const {
     sampleRate,
     waveHeight,

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import type { RenderAnnotationItemProps } from '@waveform-playlist/core';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
-import { useMediaElementState } from '../MediaElementPlaylistContext';
+import { useAnnotations } from '../contexts/playlistContexts';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 import { MediaElementPlaylist } from './MediaElementPlaylist';
 import {
@@ -49,7 +49,7 @@ export interface MediaElementWaveformProps {
  * annotation boundary during playback (#744).
  */
 const AnnotationListWhenPresent: React.FC<MediaElementAnnotationListProps> = (props) => {
-  const { annotations } = useMediaElementState();
+  const { annotations } = useAnnotations();
   if (annotations.length === 0) return null;
   return <MediaElementAnnotationList {...props} />;
 };
