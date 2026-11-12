@@ -67,9 +67,12 @@ export interface MediaElementTrackEvents {
   timeupdate: (time: number) => void;
   /**
    * Fired when a play() could not start: the browser refused it (autoplay
-   * policy: no user gesture), the source is not playable, or the
-   * AudioContext could not be resumed. Not fired for a play that was merely
-   * interrupted by a pause() or a newer play() (an `AbortError`).
+   * policy: no user gesture), the source is not playable, or resuming the
+   * AudioContext (or the start that follows it) failed. Not fired for a play
+   * that was merely interrupted by a pause() or a newer play() (an
+   * `AbortError`), and not fired while a resume() stays pending: a browser
+   * may leave it pending, instead of rejecting it, when there was no user
+   * gesture.
    */
   playrejected: (err: unknown) => void;
 }
@@ -94,6 +97,11 @@ export class MediaElementTrack {
   private _id: string;
   private _name: string;
   private _playbackRate: number = 1;
+  // Counts play/pause/stop/load/dispose calls. A start that is waiting for
+  // the AudioContext to resume checks it and does nothing when another call
+  // came in meanwhile: a Stop pressed while it waited must not be followed
+  // by sound.
+  private _startGeneration = 0;
   private _volume: number;
   private onStopCallback?: () => void;
   private onTimeUpdateCallback?: (time: number) => void;
@@ -295,6 +303,7 @@ export class MediaElementTrack {
    * (fades depend on audioContext.currentTime being non-zero).
    */
   play(offset: number = 0): void {
+    const generation = ++this._startGeneration;
     const startPlayback = () => {
       this._scheduleFades(offset);
       this.audioElement.currentTime = offset;
@@ -302,7 +311,9 @@ export class MediaElementTrack {
         // A pause() or a newer play() before this one started rejects it with
         // an AbortError. That is not a failure, and reporting it would end
         // the play that replaced it.
-        if (err instanceof Error && err.name === 'AbortError') return;
+        // (The name alone: an element from another frame rejects with that
+        // frame's DOMException, which is not an `instanceof Error` here.)
+        if ((err as { name?: unknown } | null)?.name === 'AbortError') return;
         console.warn('[waveform-playlist] MediaElementTrack: play() failed: ' + String(err));
         this._emit('playrejected', err);
       });
@@ -314,8 +325,13 @@ export class MediaElementTrack {
     if (this._audioContext && this._audioContext.state === 'suspended') {
       this._audioContext
         .resume()
-        .then(startPlayback)
+        .then(() => {
+          // Paused, stopped, reloaded, disposed or played again while waiting.
+          if (generation !== this._startGeneration) return;
+          startPlayback();
+        })
         .catch((err) => {
+          if (generation !== this._startGeneration) return;
           console.warn(
             '[waveform-playlist] MediaElementTrack: AudioContext.resume() failed: ' + String(err)
           );
@@ -357,6 +373,7 @@ export class MediaElementTrack {
       );
       return;
     }
+    this._startGeneration++;
     this._cancelFades();
     this.audioElement.pause();
     this.audioElement.src = source;
@@ -375,6 +392,7 @@ export class MediaElementTrack {
    * Pause playback
    */
   pause(): void {
+    this._startGeneration++;
     this._cancelFades();
     this.audioElement.pause();
   }
@@ -383,6 +401,7 @@ export class MediaElementTrack {
    * Stop playback and reset to beginning
    */
   stop(): void {
+    this._startGeneration++;
     this._cancelFades();
     this.audioElement.pause();
     this.audioElement.currentTime = 0;
@@ -535,6 +554,7 @@ export class MediaElementTrack {
    * Clean up resources
    */
   dispose(): void {
+    this._startGeneration++;
     this.audioElement.removeEventListener('ended', this.handleEnded);
     this.audioElement.removeEventListener('timeupdate', this.handleTimeUpdate);
     this.audioElement.removeEventListener('loadedmetadata', this.handleLoadedMetadata);

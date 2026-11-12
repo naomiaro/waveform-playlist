@@ -192,7 +192,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 - `stop()`, the audio reaching its end, and an annotation reaching its end with continuous play off all return the cursor to where playback started. `seekTo(0)` rewinds.
 - `play(start, duration)` plays a range and stops; the cursor rests at the end of the range. If an annotation is active and continuous play is off, playback stops at that annotation's end when it comes first.
 - `play()` called before the player exists is queued and starts when the player arrives. Do not wait for `isReady` before enabling Play.
-- If the browser refuses to start playback (no user gesture) or the media fails during playback, `isPlaying` goes back to `false`.
+- If the media fails during playback, or the browser refuses to start playback (no user gesture), `isPlaying` goes back to `false`. With the `audioContext` prop a refused start is not detected yet ([#783](https://github.com/naomiaro/waveform-playlist/issues/783)).
 - `seekTo(time)` during playback restarts playback at `time`. A `stop()` while already stopped does not move the cursor.
 - A drag on the waveform highlights a range and moves the cursor to its start. During playback a press moves playback there and a drag selects nothing.
 - `duration` is the length from the track's waveform data and is known from the first render. `isReady` (and the `onReady` prop) tell you that the media element has loaded; `onError` tells you that it could not.

@@ -102,7 +102,7 @@ interface MediaElementPlaylistProviderProps {
   };
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   onReady?: () => void;                  // the media element has loaded its metadata; once per player. Pass a stable function
-  onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); no URL in the message. Pass a stable function
+  onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); the provider adds no URL to the message. Pass a stable function
   barWidth?: number;                     // Default: 1
   barGap?: number;                       // Default: 0
   roundedBars?: boolean;                 // Default: false — pill caps, radius barWidth/2

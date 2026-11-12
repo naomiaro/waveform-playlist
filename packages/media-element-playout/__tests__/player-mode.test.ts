@@ -341,7 +341,8 @@ describe('a play() the browser does not start', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const playout = new MediaElementPlayout();
     playout.addTrack({ source: 'a.mp3' });
-    const aborted = Object.assign(new Error('interrupted by pause'), { name: 'AbortError' });
+    // What a browser rejects with: a DOMException.
+    const aborted = new DOMException('interrupted by pause', 'AbortError');
     created[0].play.mockImplementation(() => Promise.reject(aborted));
     const onRejected = vi.fn();
     playout.on('playrejected', onRejected);
@@ -352,6 +353,112 @@ describe('a play() the browser does not start', () => {
     expect(onRejected).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
     expect(playout.isPlaying).toBe(true);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('a start that waits for a suspended AudioContext', () => {
+  // The smallest AudioContext the track needs: nodes that connect, and a
+  // resume() the test settles by hand.
+  function createSuspendedContext() {
+    const node = () => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+      gain: {
+        value: 1,
+        setValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+        cancelScheduledValues: vi.fn(),
+        setValueCurveAtTime: vi.fn(),
+      },
+    });
+    let settle: { resolve: () => void; reject: (reason: unknown) => void } | null = null;
+    const context = {
+      state: 'suspended',
+      currentTime: 0,
+      destination: {},
+      createMediaElementSource: vi.fn(node),
+      createGain: vi.fn(node),
+      resume: vi.fn(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            settle = { resolve, reject };
+          })
+      ),
+    };
+    return {
+      context: context as unknown as AudioContext,
+      resumed: async () => {
+        context.state = 'running';
+        settle?.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+      refused: async (reason: unknown) => {
+        settle?.reject(reason);
+        await Promise.resolve();
+        await Promise.resolve();
+      },
+    };
+  }
+
+  it('starts the element once the context has resumed', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    expect(created[0].play).not.toHaveBeenCalled();
+    await resumed();
+    expect(created[0].play).toHaveBeenCalledTimes(1);
+    expect(created[0].currentTime).toBe(2);
+  });
+
+  it.each(['pause', 'stop'] as const)(
+    'does not start after a %s() that came while it waited',
+    async (action) => {
+      const { context, resumed } = createSuspendedContext();
+      const playout = new MediaElementPlayout();
+      playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+      playout.play(undefined, 2);
+      playout[action]();
+      await resumed();
+
+      expect(created[0].play).not.toHaveBeenCalled();
+    }
+  );
+
+  it('a newer play() replaces the one that was waiting', async () => {
+    const { context, resumed } = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: context });
+
+    playout.play(undefined, 2);
+    playout.play(undefined, 5);
+    await resumed();
+
+    expect(created[0].play).toHaveBeenCalledTimes(1);
+    expect(created[0].currentTime).toBe(5);
+  });
+
+  it("emits 'playrejected' when resume() rejects, unless the play was cancelled first", async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const first = createSuspendedContext();
+    const playout = new MediaElementPlayout();
+    playout.addTrack({ source: 'a.mp3', audioContext: first.context });
+    const onRejected = vi.fn();
+    playout.on('playrejected', onRejected);
+
+    playout.play(undefined, 2);
+    await first.refused(new Error('not allowed'));
+    expect(onRejected).toHaveBeenCalledTimes(1);
+    expect(playout.isPlaying).toBe(false);
+
+    playout.play(undefined, 2);
+    playout.pause();
+    await first.refused(new Error('not allowed'));
+    expect(onRejected).toHaveBeenCalledTimes(1);
     vi.restoreAllMocks();
   });
 });

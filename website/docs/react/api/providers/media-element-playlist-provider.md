@@ -202,7 +202,7 @@ Called when the media element has loaded its metadata: it knows its length and c
 
 **Type:** `(error: Error) => void`
 
-Called when the player could not be created (a missing optional peer, a throwing `createPlayout`, an error from the engine's `addTrack`) and when the media element reports an error (a source that cannot be loaded or decoded, or a network failure during playback, which also ends playback). The message does not contain the source URL. The provider also logs a warning. Pass a stable function.
+Called when the player could not be created (a missing optional peer, a throwing `createPlayout`, an error from the engine's `addTrack`) and when the media element reports an error (a source that cannot be loaded or decoded, or a network failure during playback, which also ends playback). The provider does not put the source URL in the message. The provider also logs a warning. Pass a stable function.
 
 ## Context Hooks
 

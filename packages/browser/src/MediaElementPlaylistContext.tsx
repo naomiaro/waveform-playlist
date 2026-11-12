@@ -555,7 +555,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         // bring the state up to it. During playback only the ref advances.
         // That place is also where a Stop leaves the cursor from now on.
         setCurrentTime(currentTimeRef.current);
-        playStartPositionRef.current = currentTimeRef.current;
+        // Not while a play is queued: it has set its own play start (the
+        // selection's start for a resumed selection), and it is kept.
+        if (pendingPlayRef.current === null) {
+          playStartPositionRef.current = currentTimeRef.current;
+        }
       }
       if (createdPlayout) {
         createdPlayout.dispose();

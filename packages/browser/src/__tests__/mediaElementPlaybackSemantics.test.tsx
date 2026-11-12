@@ -1148,3 +1148,106 @@ describe('review round 1 (#782)', () => {
     expect(probe.animation.isPlaying).toBe(true);
   });
 });
+
+describe('review round 2 (#782)', () => {
+  it('under StrictMode a play() from a mount effect starts once, on the player that is kept', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const playouts: FakePlayout[] = [];
+    // A factory: each init gets its own player, as with the bundled engine.
+    const createPlayout = (() => {
+      const playout = createFakePlayout();
+      playouts.push(playout);
+      return playout;
+    }) as unknown as () => MediaElementPlayout;
+    const PlayOnMount: React.FC = () => {
+      const { play } = useMediaElementControls();
+      React.useEffect(() => {
+        void play(2);
+      }, [play]);
+      return null;
+    };
+    render(
+      <React.StrictMode>
+        <MediaElementPlaylistProvider track={TRACK} createPlayout={createPlayout}>
+          <ProbeChild />
+          <PlayOnMount />
+        </MediaElementPlaylistProvider>
+      </React.StrictMode>
+    );
+    await act(async () => {});
+
+    const started = playouts.filter((playout) => playout.play.mock.calls.length > 0);
+    expect(started).toHaveLength(1);
+    expect(started[0].play).toHaveBeenCalledExactlyOnceWith(undefined, 2);
+    expect(started[0].dispose).not.toHaveBeenCalled();
+    expect(probe.data.playoutRef.current).toBe(started[0]);
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+
+  it('a refusal reported while stopped or paused changes nothing', async () => {
+    const { playout } = await mount();
+    await act(async () => probe.controls.seekTo(3));
+    playout().pause.mockClear();
+    playout().seekTo.mockClear();
+    await act(async () => playout().emit('playrejected', new Error('late')));
+    expect(playout().pause).not.toHaveBeenCalled();
+    expect(playout().seekTo).not.toHaveBeenCalled();
+
+    await playing(playout(), 3, 4);
+    await act(async () => probe.controls.pause());
+    playout().seekTo.mockClear();
+    await act(async () => playout().emit('playrejected', new Error('late')));
+    expect(playout().seekTo).not.toHaveBeenCalled();
+    // Still paused, not rested: Stop returns to the play start.
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(3);
+  });
+
+  it('a media error with no details still has a message', async () => {
+    const onError = vi.fn();
+    const { playout } = await mount({ holdMetadata: true, onError });
+    await act(async () => playout().emit('error', null));
+    expect(String(onError.mock.calls[0][0].message)).toBe('Media failed to load');
+  });
+
+  it('a queued selection resume keeps the selection start across a same-audio replacement', async () => {
+    const { playout, deliver, changeTrack } = await mount({ holdPlayer: true });
+    await act(async () => probe.internals.setSelection(2, 5));
+    // Resume part-way: the cursor is at 3.5, the selection starts at 2.
+    await act(async () => {
+      await probe.controls.play(3.5, 1.5);
+    });
+    await changeTrack({ ...TRACK, name: 'Renamed' });
+    await deliver();
+    await deliver();
+    expect(playout().play).toHaveBeenCalledExactlyOnceWith(undefined, 3.5);
+
+    playout().time = 5;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(2);
+  });
+
+  it('Stop while a play is queued cancels it and leaves cursor and state at its start', async () => {
+    const { playout, deliver } = await mount({ holdPlayer: true });
+    await act(async () => {
+      await probe.controls.play(3);
+    });
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(3);
+    expect(probe.animation.currentTimeRef.current).toBe(3);
+    await deliver();
+    expect(playout().play).not.toHaveBeenCalled();
+    // The player that arrives is moved to the cursor.
+    expect(playout().getCurrentTime()).toBe(3);
+  });
+
+  it('a pause, then the same audio in a new player: Stop leaves the cursor at the paused position', async () => {
+    const { playout, changeTrack } = await mount();
+    await playing(playout(), 1, 4);
+    await act(async () => probe.controls.pause());
+    await changeTrack({ ...TRACK, name: 'Renamed' });
+    await act(async () => probe.controls.stop());
+    expect(probe.animation.currentTime).toBe(4);
+  });
+});
