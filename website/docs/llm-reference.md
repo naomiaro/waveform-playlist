@@ -1649,7 +1649,7 @@ import { useClipInteractionEnabled } from '@waveform-playlist/browser';
 function useClipInteractionEnabled(): boolean;
 ```
 
-Returns `true` when the component is inside a `ClipInteractionProvider`. Used internally by `Waveform` to auto-enable `interactiveClips`.
+Returns `true` when the component is inside a `ClipInteractionProvider`. The library does not need it: each clip reads the provider's context itself, which is what turns on `interactiveClips` (and, with `<ClipInteractionProvider touchOptimized>`, the wider trim handles) under the provider.
 
 ### KeyboardShortcuts
 

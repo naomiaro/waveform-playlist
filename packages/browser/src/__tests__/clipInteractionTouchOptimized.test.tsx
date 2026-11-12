@@ -34,6 +34,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 
 import { WaveformPlaylistProvider, usePlaylistData } from '../WaveformPlaylistContext';
 import { Waveform } from '../components/Waveform';
+import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import { useClipInteractionEnabled } from '../contexts/ClipInteractionContext';
 import { CLIP_BOUNDARY_WIDTH, CLIP_BOUNDARY_WIDTH_TOUCH } from '@waveform-playlist/ui-components';
@@ -186,7 +187,7 @@ describe('touchOptimized has one source for ClipInteractionProvider users (#690)
     expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH]));
   });
 
-  it('the Waveform props alone still work, with no ClipInteractionProvider', async () => {
+  it('the Waveform props alone still reach the clips, with no ClipInteractionProvider', async () => {
     await mount((probe) => (
       <>
         {probe}
@@ -207,6 +208,48 @@ describe('touchOptimized has one source for ClipInteractionProvider users (#690)
     ));
 
     expect(seen.props['clip-a']).toEqual({ touchOptimized: false, disableHeaderDrag: true });
+  });
+
+  it('PlaylistVisualization used directly under the provider gets both as well', async () => {
+    const { container } = await mount((probe) => (
+      <ClipInteractionProvider touchOptimized>
+        {probe}
+        <PlaylistVisualization showClipHeaders />
+      </ClipInteractionProvider>
+    ));
+
+    expect(seen.props['clip-a']).toEqual({ touchOptimized: true, disableHeaderDrag: false });
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH_TOUCH]));
+  });
+
+  it('a prop cannot switch off what the provider turned on', async () => {
+    await mount((probe) => (
+      <ClipInteractionProvider touchOptimized>
+        {probe}
+        <Waveform showClipHeaders touchOptimized={false} interactiveClips={false} />
+      </ClipInteractionProvider>
+    ));
+
+    expect(seen.props['clip-a']).toEqual({ touchOptimized: true, disableHeaderDrag: false });
+  });
+
+  it('turning the provider flag on later widens the handles of clips already on the page', async () => {
+    let touch = false;
+    const { container, rerender } = await mount((probe) => (
+      <ClipInteractionProvider touchOptimized={touch}>
+        {probe}
+        <Waveform showClipHeaders />
+      </ClipInteractionProvider>
+    ));
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH]));
+
+    touch = true;
+    await act(async () => {
+      rerender();
+    });
+
+    expect(seen.props['clip-a'].touchOptimized).toBe(true);
+    expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH_TOUCH]));
   });
 
   it('a re-render of the provider with the same flag does not re-render the clips', async () => {
