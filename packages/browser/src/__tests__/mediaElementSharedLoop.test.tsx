@@ -30,6 +30,39 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
+// The ids currently registered with the provider's frame-callback registry.
+const registered = vi.hoisted(() => new Set<string>());
+
+vi.mock('../providerInternals/useFrameCallbacks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../providerInternals/useFrameCallbacks')>();
+  const { useMemo } = await import('react');
+  return {
+    ...actual,
+    useFrameCallbacks: () => {
+      const real = actual.useFrameCallbacks();
+      return useMemo(
+        () => ({
+          ...real,
+          registerFrameCallback: (
+            id: string,
+            cb: Parameters<typeof real.registerFrameCallback>[1]
+          ) => {
+            registered.add(id);
+            real.registerFrameCallback(id, cb);
+          },
+          unregisterFrameCallback: (id: string) => {
+            registered.delete(id);
+            real.unregisterFrameCallback(id);
+          },
+        }),
+        // The object is new per render; its three functions are stable.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [real.registerFrameCallback, real.unregisterFrameCallback, real.runFrameCallbacks]
+      );
+    },
+  };
+});
+
 import {
   MediaElementPlaylistProvider,
   useMediaElementAnimation,
@@ -108,6 +141,7 @@ beforeEach(() => {
   nextFrameId = 1;
   counts.channel = 0;
   counts.scale = 0;
+  registered.clear();
   originalRAF = globalThis.requestAnimationFrame;
   originalCAF = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => {
@@ -138,8 +172,14 @@ async function runFrame(): Promise<number> {
   return pending.length;
 }
 
+const ANNOTATIONS = [
+  { id: 'n1', start: 0, end: 2, lines: ['one'] },
+  { id: 'n2', start: 2, end: 4, lines: ['two'] },
+];
+
 interface MountOptions {
   automaticScroll?: boolean;
+  annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
   renderPlayhead?: React.ComponentProps<typeof MediaElementPlaylist>['renderPlayhead'];
 }
 
@@ -153,6 +193,7 @@ async function mount(options: MountOptions = {}) {
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createPlayout={createPlayout}
       automaticScroll={options.automaticScroll}
+      annotationList={options.annotationList}
       timescale
     >
       <ProbeChild />
@@ -339,8 +380,23 @@ describe('MediaElement playback runs one animation loop', () => {
     expect(playhead().style.transform).toBe(`translate3d(${2 * PX_PER_SECOND}px, 0, 0)`);
     expect(progress.style.transform).toBe('scaleX(0.25)');
 
+    // Playhead and progress overlay, and nothing else.
+    expect(registered.size).toBe(2);
+
     await act(async () => probe.controls.pause());
     expect(frames.size).toBe(0);
+    expect(registered.size).toBe(0);
+  });
+
+  it('a playlist that unmounts during playback leaves nothing registered', async () => {
+    const { show } = await mount();
+    await act(async () => probe.controls.play());
+    expect(registered.size).toBe(2);
+    await act(async () => show(false));
+    expect(registered.size).toBe(0);
+    // The loop keeps running for whatever else is under the provider.
+    expect(await runFrame()).toBe(1);
+    await act(async () => probe.controls.stop());
   });
 
   it('shows the resting position after a seek while stopped, with no frame requested', async () => {
@@ -361,6 +417,61 @@ describe('MediaElement playback runs one animation loop', () => {
     playout.time = 4.013; // 200.65 px; minus 50.5 = 150.15
     await runFrame();
     expect(container.scrollLeft).toBe(150);
+    await act(async () => probe.controls.stop());
+  });
+});
+
+describe('MediaElement annotation playback goes through the shared loop step', () => {
+  it('continuous play off: playback stops at the end of the active annotation', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+      probe.controls.play(0);
+    });
+
+    playout.time = 1.9;
+    expect(await runFrame()).toBe(1);
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(playout.stop).not.toHaveBeenCalled();
+
+    playout.time = 2;
+    await runFrame();
+    expect(playout.stop).toHaveBeenCalledTimes(1);
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.state.activeAnnotationId).toBe('n1');
+    // The loop ended with the playback: no further frame is requested.
+    expect(frames.size).toBe(0);
+  });
+
+  it('continuous play on: the highlight follows and playback continues', async () => {
+    const { playout } = await mount({
+      annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
+    });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+      probe.controls.play(0);
+    });
+
+    playout.time = 2.5;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(playout.stop).not.toHaveBeenCalled();
+
+    playout.time = 5; // past every annotation
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBeNull();
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(frames.size).toBe(1);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('continuous play off, nothing active: the annotation under the playhead becomes active', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => probe.controls.play(0));
+    playout.time = 0.5;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n1');
+    expect(probe.animation.isPlaying).toBe(true);
     await act(async () => probe.controls.stop());
   });
 });
