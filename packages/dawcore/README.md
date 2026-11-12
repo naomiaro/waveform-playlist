@@ -163,10 +163,10 @@ await editor.addTrack({
 });
 ```
 
-This expands to a `<daw-track render-mode="piano-roll">` containing a `<daw-clip>` whose `midiNotes` JS property is set to the notes array. Equivalent declarative form:
+This expands to a MIDI track, `<daw-track kind="midi">`, containing a `<daw-clip>` whose `midiNotes` JS property is set to the notes array. A MIDI track holds MIDI clips only and is drawn as a piano roll; an audio track (the default, `kind="audio"`) holds audio clips only. A clip of the other kind is not added and is reported with `daw-clip-error`. Equivalent declarative form:
 
 ```html
-<daw-track render-mode="piano-roll" name="Lead">
+<daw-track kind="midi" name="Lead">
   <daw-clip midi-channel="0" midi-program="24"></daw-clip>
 </daw-track>
 <script>
@@ -508,7 +508,7 @@ Methods:
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `render-mode` (`'waveform' | 'piano-roll' | 'spectrogram'`, default `'waveform'`). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)).
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `kind` (`'audio' | 'midi'`, default `'audio'`: what the track holds; set it before the track is added), `render-mode` (`'waveform' | 'spectrogram'`, default `'waveform'`: how an audio track is drawn; a MIDI track is always a piano roll). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)).
 
 ### `<daw-clip>`
 
@@ -516,7 +516,7 @@ Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `off
 
 ### `<daw-piano-roll>`
 
-Visual element for MIDI note rendering. Mounted automatically when the parent track has `render-mode="piano-roll"` — you don't usually instantiate it directly. See [MIDI Tracks](#midi-tracks).
+Visual element for MIDI note rendering. Mounted automatically for the clips of a MIDI track (`<daw-track kind="midi">`) — you don't usually instantiate it directly. See [MIDI Tracks](#midi-tracks).
 
 ### `<daw-transport for="editor-id">`
 

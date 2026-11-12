@@ -1435,6 +1435,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         kind: oldDescriptor.kind,
         renderMode: trackDescriptorRenderMode(oldDescriptor.kind, trackEl.renderMode),
       };
+      // Put the element back, so it says what the editor holds and the next
+      // unrelated update (a volume change) does not warn again. The update
+      // this assignment dispatches finds the kinds equal.
+      trackEl.kind = oldDescriptor.kind;
     }
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     if (this._engine) {
@@ -2057,7 +2061,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // — including placeholders. For audio clips it is undefined.
     // Use loose != null consistently: treats both null and undefined as "not MIDI"
     // for both clipEl.midiNotes (DawClipElement defaults to null) and oldClip.midiNotes.
-    const isMidiNow = clipEl.midiNotes != null;
+    // A clip with a src is an audio clip even if notes are set on it, as at
+    // load (_isMidiDescriptor: "treating as audio, notes will be ignored").
+    const isMidiNow = clipEl.midiNotes != null && !clipEl.src;
     const wasMidi = oldClip.midiNotes != null;
     if (isMidiNow && trackKind(t) !== 'midi') {
       // Notes assigned to a clip of an audio track: the clip would become a

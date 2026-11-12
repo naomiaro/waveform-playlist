@@ -191,10 +191,51 @@ describe('useIntegratedRecording', () => {
     });
 
     expect(started).toBe(false);
+    expect(result.current.recordingTrackId).toBeNull();
     expect(result.current.isRecording).toBe(false);
     expect(result.current.error?.message).toMatch(/"Keys" is a MIDI track/);
     expect(setTracks).not.toHaveBeenCalled();
   });
+
+  it.each(['midi', 'audio'] as const)(
+    'the take lands on the track it was started on when a %s track is selected mid-take (#756)',
+    async (otherKind) => {
+      getUserMediaMock.mockResolvedValue(createMockStream('mic'));
+      const setTracks = vi.fn();
+      const tracks: ClipTrack[] = [
+        { ...makeTrack('track-1'), kind: 'audio' },
+        { ...makeTrack('track-2'), kind: otherKind },
+      ];
+      const { result, rerender } = renderHook(
+        ({ selected }: { selected: string }) => useIntegratedRecording(tracks, setTracks, selected),
+        { initialProps: { selected: 'track-1' } }
+      );
+      await act(async () => {
+        await result.current.requestMicAccess();
+      });
+      await act(async () => {
+        await result.current.startRecording();
+      });
+      expect(result.current.isRecording).toBe(true);
+      expect(result.current.recordingTrackId).toBe('track-1');
+
+      rerender({ selected: 'track-2' });
+      expect(result.current.recordingTrackId).toBe('track-1');
+      act(() => {
+        recNode.port.onmessage!({
+          data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+        } as MessageEvent);
+      });
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+
+      expect(result.current.recordingTrackId).toBeNull();
+      const finalTracks = setTracks.mock.calls[0][0] as ClipTrack[];
+      expect(finalTracks.find((t) => t.id === 'track-1')!.clips).toHaveLength(1);
+      expect(finalTracks.find((t) => t.id === 'track-2')!.clips).toHaveLength(0);
+    }
+  );
 
   it('rejects changeDevice while recording (stream untouched, error surfaced)', async () => {
     const setTracks = vi.fn();

@@ -478,7 +478,7 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split'. Audio 
 ```typescript
 track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
-track.kind: 'audio' | 'midi'     // Reflects kind attribute; fixed once the track has loaded
+track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track is registered is undone with a warning
 track.renderMode: string         // Reflects render-mode attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
@@ -1203,7 +1203,7 @@ Spectrogram is a **render mode on `<daw-track>`**, not a standalone element: an 
 <daw-track name="Piano" kind="midi"></daw-track>
 ```
 
-`waveform`, `spectrogram`, and `piano-roll` are shipped. `split` is tracked in #491 — today it warns and falls back to `spectrogram`.
+`waveform` and `spectrogram` are shipped, and so is the piano roll of MIDI tracks. `split` is tracked in #491 — today it warns and falls back to `spectrogram`.
 
 Switchable at runtime:
 

@@ -67,14 +67,15 @@ export function assertTrackKind(track: ClipTrack): void {
  * (default: the id + '-midi') and copies of the name, volume, pan, mute and solo.
  */
 export function splitTrackByKind(
-  track: ClipTrack,
+  // `kind` optional: data saved before tracks had a kind does not have one.
+  track: Omit<ClipTrack, 'kind'> & { kind?: TrackKind },
   midiTrackId: string = track.id + '-midi'
 ): ClipTrack[] {
   const audioClips = track.clips.filter((clip) => clipKind(clip) === 'audio');
   const midiClips = track.clips.filter((clip) => clipKind(clip) === 'midi');
 
   if (midiClips.length === 0) {
-    return [{ ...track, kind: track.clips.length === 0 ? trackKind(track) : 'audio' }];
+    return [{ ...track, kind: track.clips.length === 0 ? (track.kind ?? 'audio') : 'audio' }];
   }
   if (audioClips.length === 0) {
     return [{ ...track, kind: 'midi' }];

@@ -90,7 +90,8 @@ describe('splitTrackByKind', () => {
 
   it('sets the kind from the clips when every clip is MIDI', () => {
     const { kind: _kind, ...withoutKind } = createTrack({ name: 'm', clips: [midiClip()] });
-    const result = splitTrackByKind(withoutKind as ClipTrack);
+    // No cast: saved data without a kind is what the helper is for.
+    const result = splitTrackByKind(withoutKind);
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe('midi');
     expect(result[0].id).toBe(withoutKind.id);

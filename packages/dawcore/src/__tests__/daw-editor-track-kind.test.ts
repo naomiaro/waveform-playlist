@@ -41,6 +41,10 @@ function makeMockAdapter() {
     setTracks: vi.fn(),
     updateTrack: vi.fn(),
     setTempo: vi.fn(),
+    setTrackVolume: vi.fn(),
+    setTrackPan: vi.fn(),
+    setTrackMute: vi.fn(),
+    setTrackSolo: vi.fn(),
     play: vi.fn(),
     pause: vi.fn(),
     stop: vi.fn(),
@@ -193,9 +197,75 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     await track.updateComplete;
 
     expect(editor.tracks[0]).toMatchObject({ kind: 'midi', renderMode: 'piano-roll' });
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringContaining('kind cannot change after the track has loaded')
-    );
+    const kindWarnings = () =>
+      vi
+        .mocked(console.warn)
+        .mock.calls.filter(([message]) => String(message).includes('kind cannot change')).length;
+    expect(kindWarnings()).toBe(1);
+    // The element is put back, so it says what the editor holds...
+    await track.updateComplete;
+    expect(track.kind).toBe('midi');
+    expect(track.getAttribute('kind')).toBe('midi');
+
+    // ...and an unrelated later change does not warn again.
+    track.volume = 0.5;
+    await track.updateComplete;
+    expect(editor.tracks[0].volume).toBe(0.5);
+    expect(kindWarnings()).toBe(1);
+  });
+
+  it('a clip with both src and midiNotes on an audio track is an audio clip and can still be updated', () => {
+    const { editor, clipErrors } = makeEditor();
+    const buffer = { length: 48000, sampleRate: 48000, numberOfChannels: 1 } as AudioBuffer;
+    const audioClip = {
+      id: 'clip-1',
+      audioBuffer: buffer,
+      startSample: 0,
+      durationSamples: 48000,
+      offsetSamples: 0,
+      sourceDurationSamples: 48000,
+      sampleRate: 48000,
+      gain: 1,
+    };
+    editor._engineTracks = new Map().set('track-1', {
+      id: 'track-1',
+      kind: 'audio',
+      name: 'Gtr',
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      clips: [audioClip],
+    });
+    editor._tracks = new Map().set('track-1', {
+      name: 'Gtr',
+      src: '',
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      kind: 'audio',
+      renderMode: 'waveform',
+      clips: [],
+    });
+
+    editor._applyClipUpdate('track-1', 'clip-1', {
+      src: '/audio/gtr.mp3',
+      midiNotes: NOTES, // ignored at load ("treating as audio"), so ignored here too
+      midiChannel: null,
+      midiProgram: null,
+      start: 1,
+      duration: 1,
+      offset: 0,
+      gain: 1,
+      name: 'Gtr',
+    });
+
+    expect(clipErrors).toEqual([]);
+    const after = editor._engineTracks.get('track-1').clips[0];
+    expect(after.startSample).toBe(48000);
+    expect(after.audioBuffer).toBe(buffer);
+    expect(after.midiNotes).toBeUndefined();
   });
 
   it('startRecording onto a MIDI track dispatches daw-recording-error and starts nothing', async () => {

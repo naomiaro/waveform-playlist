@@ -1301,6 +1301,10 @@ interface IntegratedRecordingOptions {
 interface UseIntegratedRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
+  /** The track the current take will be added to: the one selected when
+   *  startRecording() was called. The target cannot be switched mid-take.
+   *  null when no take is running. Use it for recordingState.trackId. */
+  recordingTrackId: string | null;
   /** Live microphone levels. Stable identity; the hook does not re-render as
    *  they change. Array length = metered channel count. */
   meter: MeterSource;

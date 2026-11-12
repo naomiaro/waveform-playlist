@@ -934,8 +934,10 @@ What sets it:
 **In `WaveformPlaylistProvider` the error does not reach React, so an error boundary will not catch it.** The provider reports it instead:
 
 - the `onError` prop is called with the error;
-- `[waveform-playlist] Error loading audio: …` is logged as a console warning;
+- `[waveform-playlist] Error loading audio: …` is logged as a console warning (when the bad track was appended to a running playlist, `Incremental add failed, falling through to full rebuild: …` is logged first, and none of the tracks appended with it are added);
 - the playlist stays in its loading state (`isReady` false, `data-playlist-state="loading"`) and plays nothing, until `tracks` is valid again.
+
+With `deferEngineRebuild` set, the report comes when the deferral ends, because that is when the engine is next built.
 
 **Pass `onError` to the provider.** Without it, the only sign of a rejected track is the console warning and a playlist that never becomes ready.
 
@@ -974,6 +976,8 @@ import { splitTrackByKind } from '@waveform-playlist/core';
 const tracks = savedTracks.flatMap((track) => splitTrackByKind(track));
 ```
 
+The argument may lack `kind`, so saved data type-checks without a cast.
+
 - A track whose clips are all of one kind comes back as one track with that kind set. An empty track keeps the kind it has, or becomes an audio track.
 - A track holding both comes back as two. The audio track keeps the id; the MIDI track gets the id plus `-midi` (or the id you pass as the second argument) and the same name, volume, pan, mute and solo.
 
@@ -982,7 +986,7 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 **What else changes:**
 
 - **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty. An audio track is never drawn as one: `renderMode: 'piano-roll'` on an audio track is ignored (waveform).
-- **Recording.** `useIntegratedRecording`'s `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped.
+- **Recording.** `useIntegratedRecording`'s `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped. The take is now added to the track it was started on. Before, it was added to whichever track was selected when it stopped, so selecting another track mid-take moved it; the target can no longer be switched while a take is running (as in `<daw-editor>`). The hook returns that track's id as `recordingTrackId`: pass it, not the selected track id, as `recordingState.trackId`, so the live preview is drawn on the track the take will land on.
 - **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id.
 
 ## `addEffect` and `addEffectToTrack` return a promise
@@ -1148,11 +1152,19 @@ await editor.addTrack({ name: 'Piano', kind: 'midi', clips: [{ midiNotes }] });
 
 Put audio clips and MIDI clips on separate `<daw-track>` elements.
 
-**What happens to a clip of the wrong kind:** it is not added, and the editor dispatches `daw-clip-error` with `{ trackId, clipId, error }`. This covers a MIDI clip (no `src`) on an audio track, a `<daw-clip src>` on a MIDI track, `editor.addClip()` with a `src` onto a MIDI track (the promise rejects), and `midiNotes` assigned to a clip of an audio track. If every clip of a track is refused, `daw-track-error` follows and `addTrack()` rejects. Listen for `daw-clip-error`: an un-migrated `render-mode="piano-roll"` track shows up as that event and an empty track.
+**What happens to a clip of the wrong kind:** it is not added, and the editor dispatches `daw-clip-error` with `{ trackId, clipId, error }` (`clipId` is `''` for a clip with no `<daw-clip>` element, such as the `<daw-track src>` shorthand). This covers:
+
+- when a track loads: a MIDI clip (no `src`) on an audio track, and a `<daw-clip src>` on a MIDI track;
+- `editor.addClip()` with a `src` onto a MIDI track (the promise rejects, nothing is fetched);
+- `midiNotes` assigned to a source-less clip of an audio track.
+
+If every clip of a track is refused, `daw-track-error` follows and `addTrack()` rejects. Listen for `daw-clip-error`: an un-migrated `render-mode="piano-roll"` track shows up as that event and an empty track.
+
+Not covered: a source-less `<daw-clip>` appended to a track that has already loaded is ignored without an event, on a track of either kind. Adding a MIDI clip to a loaded track was not supported before this release either; put MIDI clips in the track when you create it.
 
 Also:
 
-- Set `kind` before the track is added to the editor. A change after the track has loaded is ignored with a console warning.
+- Set `kind` before the track is added to the editor. A later change is undone: the editor logs a console warning and sets the element's `kind` back.
 - `editor.startRecording()` onto a MIDI track records nothing and dispatches `daw-recording-error`.
-- `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one.
+- `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one. The exported `TrackDescriptor` and `TrackWithId` types therefore have a new required field: code that builds one of them by hand must add `kind`.
 

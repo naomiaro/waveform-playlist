@@ -66,6 +66,13 @@ export interface UseIntegratedRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
   /**
+   * The id of the track the current take will be added to: the track that was
+   * selected when `startRecording()` was called, whatever is selected since.
+   * `null` when no take is running. Use it, not the selected track, for the
+   * live preview (`recordingState.trackId`).
+   */
+  recordingTrackId: string | null;
+  /**
    * Live microphone levels (`useMicrophoneLevel`'s `meter`). The hook does not
    * re-render as they change: pass it to `<SegmentedVUMeter meter={meter} />`
    * or read it with `meter.subscribe()` / `useMeterLevels(meter)`.
@@ -113,6 +120,12 @@ export function useIntegratedRecording(
 
   // Capture timeline position when recording starts (not at stop time)
   const recordingStartTimeRef = useRef(0);
+  // The track the take was started on (an audio track: startRecording
+  // checks). The take lands there whatever is selected when it stops: the
+  // target cannot be switched mid-take, as in dawcore, where the session is
+  // keyed by the track id.
+  const recordingTrackIdRef = useRef<string | null>(null);
+  const [recordingTrackId, setRecordingTrackId] = useState<string | null>(null);
 
   // Keep selectedTrackId and currentTime in refs for use in callbacks.
   // Avoids stale closures and keeps the callbacks from being recreated when
@@ -189,9 +202,14 @@ export function useIntegratedRecording(
       // The position at stop time would be wrong: the caller may pass a new
       // `currentTime` (a seek, a pause) while the take is running.
       recordingStartTimeRef.current = currentTimeRef.current;
+      recordingTrackIdRef.current = selectedTrackIdRef.current;
+      setRecordingTrackId(selectedTrackIdRef.current);
 
-      return await startRec();
+      const started = await startRec();
+      if (!started) setRecordingTrackId(null);
+      return started;
     } catch (err) {
+      setRecordingTrackId(null);
       setHookError(err instanceof Error ? err : new Error(String(err)));
       return false;
     }
@@ -205,13 +223,16 @@ export function useIntegratedRecording(
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
       return;
+    } finally {
+      setRecordingTrackId(null);
     }
 
     // Add clip to track after recording completes. Read tracks through the
     // ref — the awaited stop handshake above can span >1s, and the closure's
     // tracks capture would silently revert concurrent edits.
-    const trackId = selectedTrackIdRef.current;
     const currentTracks = tracksRef.current;
+    // The track the take was started on, not the one selected now (#756).
+    const trackId = recordingTrackIdRef.current;
     if (buffer && trackId) {
       const selectedTrackIndex = currentTracks.findIndex((t) => t.id === trackId);
       if (selectedTrackIndex === -1) {
@@ -351,6 +372,7 @@ export function useIntegratedRecording(
     // Recording state
     isRecording,
     isPaused,
+    recordingTrackId,
     meter,
     progress,
     error: hookError || micError || meterError || recError,

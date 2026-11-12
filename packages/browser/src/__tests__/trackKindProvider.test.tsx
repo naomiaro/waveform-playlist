@@ -122,6 +122,22 @@ describe('a wrong-kind track in the provider (#756)', () => {
     }
   });
 
+  it('tracks appended to a running playlist: a bad one is reported and none of the batch is added first', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const first = track('a', 'audio', [clip('c1')]);
+    const { adapters, onError, rerender } = mount([first]);
+    await waitFor(() => expect(isReady).toBe(true));
+    const running = adapters[adapters.length - 1];
+
+    // Same first track object, two appended: the incremental path.
+    rerender([first, track('b', 'audio', [clip('c2')]), track('m', 'audio', [clip('c3', true)])]);
+
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect(onError.mock.calls[0][0].message).toMatch(/"m" is an audio track/);
+    expect(running.addTrack).not.toHaveBeenCalled();
+    expect(isReady).toBe(false);
+  });
+
   it('a later valid tracks prop recovers', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { onError, rerender } = mount([track('t1', 'audio', [clip('m', true)])]);
