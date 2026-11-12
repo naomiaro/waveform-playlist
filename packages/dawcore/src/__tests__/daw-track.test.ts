@@ -76,6 +76,16 @@ describe('DawTrackElement', () => {
     expect(el.renderMode).toBe('spectrogram');
   });
 
+  it('removing the render-mode attribute goes back to waveform without a warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-track') as any;
+    el.setAttribute('render-mode', 'spectrogram');
+    el.removeAttribute('render-mode');
+    expect(el.renderMode).toBe('waveform');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('render-mode="piano-roll" is not a render mode any more: waveform, with a hint about kind', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const el = document.createElement('daw-track') as any;

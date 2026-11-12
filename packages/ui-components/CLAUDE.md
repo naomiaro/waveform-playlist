@@ -151,7 +151,7 @@
 
 **Pattern:** Follows `Channel.tsx` exactly — chunked canvases via `useVisibleChunkIndices` + `useChunkedCanvasRefs` + `useClipViewportOrigin`. Same styled-components `.attrs()` pattern for frequently changing props.
 
-**Props:** `midiNotes`, `sampleRate`, `clipOffsetSeconds` flow through `SmartChannel`, which draws a piano roll when `midiNotes` is given (an empty array included: that is a MIDI clip without notes yet) and ignores `renderMode` for that clip. `'piano-roll'` is not a `RenderMode`; the clip's notes are the discriminator, the same rule as core's `clipKind`. A consumer must pass the same array while the notes are unchanged: `SmartChannel` no longer substitutes a shared empty array, because a missing `midiNotes` now means an audio clip. The wrapper carries `data-piano-roll`.
+**Props:** `midiNotes`, `sampleRate`, `clipOffsetSeconds` flow through `SmartChannel`, which draws a piano roll when `midiNotes` is not null (an empty array included: that is a MIDI clip without notes yet). That branch comes FIRST in `SmartChannel`, ahead of the spectrogram branches, so `renderMode` and the spectrogram props are ignored for such a clip; keep it first. `'piano-roll'` is not a `RenderMode`; the clip's notes are the discriminator, the same rule as core's `clipKind`. A consumer must pass the same array while the notes are unchanged: `SmartChannel` no longer substitutes a shared empty array, because a missing `midiNotes` now means an audio clip. The wrapper carries `data-piano-roll`.
 
 **Note rendering:** Velocity maps to opacity (0.3–1.0), pitch range auto-fits to actual data (not full 0-127), minimum 2px note width/height.
 

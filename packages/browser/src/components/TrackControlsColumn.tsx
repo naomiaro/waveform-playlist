@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
+import { trackKind } from '@waveform-playlist/core';
 import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
 import { usePlaylistControls, type TrackState } from '../WaveformPlaylistContext';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
@@ -70,6 +71,7 @@ function TrackControlsColumnImpl({
             volume: 1.0,
             pan: 0,
           },
+          kind: trackKind(track),
           effectiveRenderMode: renderModeById.get(track.id) ?? 'waveform',
           selectTrack,
           onRemoveTrack,

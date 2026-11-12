@@ -315,10 +315,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         trackClipPeaks,
         trackId === recordingTrackId ? recordingChannelCount : 0
       );
-      const trackMode =
-        spectrogram?.trackSpectrogramOverrides.get(trackId)?.renderMode ??
-        tracks[i]?.renderMode ??
-        'waveform';
+      const trackMode = (trackId && renderModeById.get(trackId)) || 'waveform';
       const effectiveCh = trackMode === 'both' ? rawCh * 2 : rawCh;
       const trackHeight = effectiveCh * waveHeight + (showClipHeaders ? 22 : 0);
 

@@ -169,10 +169,35 @@ describe('SmartChannel draws a piano roll for a clip with notes', () => {
     }
   });
 
-  it('a clip without notes is not a piano roll', () => {
+  it('also when the spectrogram props are present: notes win over a spectrogram mode', () => {
     visibleChunks = [0];
-    const { container } = render(<SmartChannel {...base} />);
+    const register = vi.fn();
+    for (const renderMode of ['spectrogram', 'both'] as const) {
+      const { container, unmount } = render(
+        <SmartChannel
+          {...base}
+          renderMode={renderMode}
+          midiNotes={noNotes}
+          spectrogramClipId="clip-1"
+          spectrogramOnCanvasRegister={register}
+          spectrogramOnCanvasUnregister={vi.fn()}
+        />
+      );
+      expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
+      unmount();
+    }
+    expect(register).not.toHaveBeenCalled();
+  });
+
+  it('a clip without notes is not a piano roll, and null is not notes', () => {
+    visibleChunks = [0];
+    const { container, unmount } = render(<SmartChannel {...base} />);
     expect(container.querySelector('[data-piano-roll]')).toBeNull();
+    unmount();
+    // Plain-JS data: core's clipKind reads a null midiNotes as an audio clip.
+    const nullNotes = null as unknown as MidiNoteData[];
+    const second = render(<SmartChannel {...base} midiNotes={nullNotes} />);
+    expect(second.container.querySelector('[data-piano-roll]')).toBeNull();
   });
 });
 

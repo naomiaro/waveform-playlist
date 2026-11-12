@@ -28,6 +28,25 @@ export interface TrackDescriptor {
 }
 
 /**
+ * A render mode from untyped input (an attribute string, a config object from
+ * JavaScript). A missing value is `'waveform'`. Anything that is not a render
+ * mode is `'waveform'` with a warning; the former `'piano-roll'` gets a hint.
+ */
+export function normalizeRenderMode(value: unknown): TrackRenderMode {
+  if (value === null || value === undefined) return 'waveform';
+  if (value === 'waveform' || value === 'spectrogram' || value === 'both') return value;
+  console.warn(
+    '[dawcore] render-mode="' +
+      String(value) +
+      '" is not a render mode (waveform or spectrogram); using waveform.' +
+      (value === 'piano-roll'
+        ? ' A piano roll is how a MIDI track is drawn: set kind="midi" on the track.'
+        : '')
+  );
+  return 'waveform';
+}
+
+/**
  * The render mode a track descriptor carries, given its kind. Render modes are
  * for audio tracks; a MIDI track always carries `'waveform'`, so that a
  * `render-mode="spectrogram"` left on it does not start the spectrogram

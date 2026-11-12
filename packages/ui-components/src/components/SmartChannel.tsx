@@ -73,6 +73,29 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   // Get draw mode from theme (defaults to 'inverted' for backwards compatibility)
   const drawMode = theme?.waveformDrawMode || 'inverted';
 
+  // A clip with notes is a MIDI clip (core's clipKind rule: not null, an empty
+  // array included). It is a piano roll whatever the render mode, so this
+  // comes before the spectrogram branches.
+  if (midiNotes != null) {
+    return (
+      <PianoRollChannel
+        index={props.index}
+        midiNotes={midiNotes}
+        length={props.length}
+        waveHeight={waveHeight}
+        devicePixelRatio={devicePixelRatio}
+        samplesPerPixel={samplesPerPixel}
+        sampleRate={sampleRateProp ?? contextSampleRate}
+        clipOffsetSeconds={clipOffsetSeconds ?? 0}
+        noteColor={theme?.pianoRollNoteColor}
+        selectedNoteColor={theme?.pianoRollSelectedNoteColor}
+        isSelected={isSelected}
+        transparentBackground={transparentBackground}
+        backgroundColor={theme?.pianoRollBackgroundColor}
+      />
+    );
+  }
+
   // Spectrogram requires registration callbacks and a clip ID.
   const hasSpectrogram =
     spectrogramClipId && spectrogramOnCanvasRegister && spectrogramOnCanvasUnregister;
@@ -132,26 +155,6 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
           />
         </div>
       </>
-    );
-  }
-
-  if (midiNotes !== undefined) {
-    return (
-      <PianoRollChannel
-        index={props.index}
-        midiNotes={midiNotes}
-        length={props.length}
-        waveHeight={waveHeight}
-        devicePixelRatio={devicePixelRatio}
-        samplesPerPixel={samplesPerPixel}
-        sampleRate={sampleRateProp ?? contextSampleRate}
-        clipOffsetSeconds={clipOffsetSeconds ?? 0}
-        noteColor={theme?.pianoRollNoteColor}
-        selectedNoteColor={theme?.pianoRollSelectedNoteColor}
-        isSelected={isSelected}
-        transparentBackground={transparentBackground}
-        backgroundColor={theme?.pianoRollBackgroundColor}
-      />
     );
   }
 

@@ -220,7 +220,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
 
   // A clip with notes is a MIDI clip and is drawn as a piano roll; the render
   // mode applies to audio clips only (black background for a spectrogram).
-  const isPianoRollMode = midiNotes !== undefined;
+  const isPianoRollMode = midiNotes != null;
   const isSpectrogramMode =
     !isPianoRollMode &&
     (smartChannelProps.renderMode === 'spectrogram' || smartChannelProps.renderMode === 'both');

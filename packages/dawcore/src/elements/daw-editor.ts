@@ -20,7 +20,7 @@ import type {
   TrackConfig,
   ClipConfig,
 } from '../types';
-import { isDomClip, trackDescriptorRenderMode } from '../types';
+import { isDomClip, normalizeRenderMode, trackDescriptorRenderMode } from '../types';
 import {
   createClip,
   createClipFromSeconds,
@@ -2952,7 +2952,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // No DOM element — apply directly to descriptor + engine.
     const oldDesc = this._tracks.get(trackId);
     if (!oldDesc) return;
-    let normalizedRenderMode = partial.renderMode;
+    let normalizedRenderMode =
+      partial.renderMode === undefined ? undefined : normalizeRenderMode(partial.renderMode);
     if (normalizedRenderMode === 'both') {
       console.warn(
         '[dawcore] render-mode="both" is not yet supported; falling back to \'spectrogram\''

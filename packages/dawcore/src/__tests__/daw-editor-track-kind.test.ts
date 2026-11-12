@@ -302,6 +302,21 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     expect(errors[0].error.message).toMatch(/Cannot record onto MIDI track "Keys"/);
   });
 
+  it('updateTrack on a track without an element checks the render mode too', () => {
+    const { editor } = makeEditor();
+    editor._reconcileDescriptorsWithEngineTracks([
+      { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
+    ]);
+
+    editor.updateTrack('a', { renderMode: 'piano-roll' });
+
+    expect(editor.tracks[0].renderMode).toBe('waveform');
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
+
+    editor.updateTrack('a', { renderMode: 'spectrogram' });
+    expect(editor.tracks[0].renderMode).toBe('spectrogram');
+  });
+
   it('an undo-restored MIDI track gets a MIDI descriptor', () => {
     const { editor } = makeEditor();
     editor._reconcileDescriptorsWithEngineTracks([
