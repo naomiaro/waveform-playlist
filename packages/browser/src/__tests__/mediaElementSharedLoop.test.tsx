@@ -180,6 +180,7 @@ const ANNOTATIONS = [
 interface MountOptions {
   automaticScroll?: boolean;
   annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
+  strict?: boolean;
   renderPlayhead?: React.ComponentProps<typeof MediaElementPlaylist>['renderPlayhead'];
 }
 
@@ -187,22 +188,25 @@ async function mount(options: MountOptions = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
+  const Wrapper = options.strict ? React.StrictMode : React.Fragment;
   const tree = (showPlaylist: boolean, playlists = 1) => (
-    <MediaElementPlaylistProvider
-      track={TRACK}
-      samplesPerPixel={SAMPLES_PER_PIXEL}
-      createPlayout={createPlayout}
-      automaticScroll={options.automaticScroll}
-      annotationList={options.annotationList}
-      timescale
-    >
-      <ProbeChild />
-      {showPlaylist
-        ? Array.from({ length: playlists }, (_, i) => (
-            <MediaElementPlaylist key={i} renderPlayhead={options.renderPlayhead} />
-          ))
-        : null}
-    </MediaElementPlaylistProvider>
+    <Wrapper>
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={createPlayout}
+        automaticScroll={options.automaticScroll}
+        annotationList={options.annotationList}
+        timescale
+      >
+        <ProbeChild />
+        {showPlaylist
+          ? Array.from({ length: playlists }, (_, i) => (
+              <MediaElementPlaylist key={i} renderPlayhead={options.renderPlayhead} />
+            ))
+          : null}
+      </MediaElementPlaylistProvider>
+    </Wrapper>
   );
   const view = render(tree(true));
   await waitFor(() => expect(probe.data.duration).toBe(SECONDS));
@@ -327,6 +331,30 @@ describe('MediaElement selection lives in the provider', () => {
     await release(150);
     expect(selections()).toHaveLength(2);
     expect(selections().map((s) => s.style.left)).toEqual(['50px', '50px']);
+
+    // A press on the other one (a click to seek) replaces the range in both.
+    const first = clickOverlay(0);
+    await press(first, 300);
+    await release(300);
+    expect(selections()).toHaveLength(0);
+  });
+
+  it('two playlists each register their playhead and progress, and both move', async () => {
+    const { playout, show } = await mount();
+    await act(async () => show(true, 2));
+    await waitFor(() => expect(document.querySelectorAll('[data-playhead]')).toHaveLength(2));
+    await act(async () => probe.controls.play());
+    expect(registered.size).toBe(4);
+
+    playout.time = 3;
+    expect(await runFrame()).toBe(1);
+    const playheads = Array.from(document.querySelectorAll<HTMLElement>('[data-playhead]'));
+    expect(playheads.map((el) => el.style.transform)).toEqual([
+      `translate3d(${3 * PX_PER_SECOND}px, 0, 0)`,
+      `translate3d(${3 * PX_PER_SECOND}px, 0, 0)`,
+    ]);
+    await act(async () => probe.controls.stop());
+    expect(registered.size).toBe(0);
   });
 
   it('a custom playhead function is not called per move of a drag', async () => {
@@ -386,6 +414,16 @@ describe('MediaElement playback runs one animation loop', () => {
     await act(async () => probe.controls.pause());
     expect(frames.size).toBe(0);
     expect(registered.size).toBe(0);
+  });
+
+  it('under StrictMode the callbacks end up registered once each, and are removed on pause', async () => {
+    await mount({ strict: true });
+    await act(async () => probe.controls.play());
+    expect(registered.size).toBe(2);
+    expect(await runFrame()).toBe(1);
+    await act(async () => probe.controls.pause());
+    expect(registered.size).toBe(0);
+    expect(frames.size).toBe(0);
   });
 
   it('a playlist that unmounts during playback leaves nothing registered', async () => {
@@ -477,6 +515,26 @@ describe('MediaElement annotation playback goes through the shared loop step', (
 });
 
 describe('MediaElement public hook values are unchanged by #769', () => {
+  it('the package entry does not export the internal hooks or contexts', async () => {
+    const entry = (await import('../index')) as Record<string, unknown>;
+    for (const name of [
+      'useMediaElementInternals',
+      'useMediaElementSelection',
+      'MediaElementInternalsContext',
+      'MediaElementSelectionContext',
+      'useFrameCallbacks',
+      'useAnnotationState',
+      'useScrollFollow',
+      'useViewDefaults',
+      'useRequiredContext',
+      'followAnnotations',
+      'centrePlayhead',
+    ]) {
+      expect(entry[name], name).toBeUndefined();
+    }
+    expect(entry.useMediaElementAnimation).toBeDefined();
+  });
+
   it('have exactly the documented fields', async () => {
     await mount();
     expect(Object.keys(probe.animation).sort()).toEqual(

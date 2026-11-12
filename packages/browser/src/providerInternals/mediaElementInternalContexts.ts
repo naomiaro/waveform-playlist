@@ -23,9 +23,10 @@ export interface MediaElementInternalsValue {
 }
 
 /**
- * The selection as the drag left it: `selectionStart` is where the press
- * landed and `selectionEnd` where the pointer is, so start can be the larger.
- * Changes on every pointer move of a selection drag.
+ * The selection. While a drag is in progress `selectionStart` is where the
+ * press landed and `selectionEnd` where the pointer is, so start can be the
+ * larger; a release stores them ordered. Changes on every pointer move of a
+ * selection drag.
  */
 export interface MediaElementSelectionValue {
   selectionStart: number;

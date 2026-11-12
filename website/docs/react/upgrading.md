@@ -354,7 +354,7 @@ const { isLoopEnabled } = usePlaylistState();
 
 **Note:** `usePlaylistState()` is removed later in this major. "Keep `usePlaylistState()` for the other fields" then means: read them from the hook that has them, for example `isLoopEnabled` from `useLoop()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
 
-`setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` has no selection state and is unchanged.
+`setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` exposes no selection and its hooks are unchanged.
 
 A component that calls `useSelection()` re-renders on every pointer move of a drag, so call it in the smallest component that shows the selection, not in a component that also renders a long list.
 
@@ -733,15 +733,15 @@ The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow t
 No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the time selection that `MediaElementPlaylist` used to keep in its own state, and its animation loop draws the playhead and the progress overlay, which used to run a `requestAnimationFrame` loop each. Four things behave differently:
 
 1. **The selection survives a remount of `MediaElementPlaylist`** (or `MediaElementWaveform`). Before, unmounting the component dropped the highlighted range. It is now kept for as long as the provider is mounted.
-2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own.
-3. **A custom `renderPlayhead` is not called on each pointer move of a selection drag.** The drag re-renders the highlighted range only. The function is still called when playback starts, pauses or stops and on a seek.
+2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own. A press on either one (a click to seek, or the start of a drag) therefore clears the range highlighted in both.
+3. **A custom `renderPlayhead` is not called on each pointer move of a selection drag.** A move re-renders the highlighted range only; the rest of `MediaElementPlaylist` (timescale, waveform, annotation boxes, your playhead) renders on the press and on the release, not in between. The function is still called whenever `MediaElementPlaylist` renders for another reason, among them: playback starting, pausing, stopping or ending, a seek, the press and the release of a click or drag, and the track's data arriving.
 4. **Automatic scroll positions are whole pixels**, as under `WaveformPlaylistProvider`.
 
-What a click, a drag and Play do is unchanged: a click seeks, a drag highlights a range without moving the cursor, and playback does not use the selection.
+What a click, a drag and Play do is unchanged. While stopped, a click seeks and a drag highlights a range without moving the cursor. During playback, a press restarts playback from where it landed and leaves no range. Playback does not use the selection.
 
 **Find:** a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
 
-**Replace with:** for the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`), which also resets playback. The selection is not yet readable or settable from outside the built-in components.
+**Replace with:** for the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play and the active annotation start over. The selection is not yet readable or settable from outside the built-in components.
 
 ## Keyboard shortcuts yield to the focused control
 
