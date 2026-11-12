@@ -6,6 +6,7 @@ import {
   useEditorControls,
   usePlaylistTimeline,
   usePlaybackRefs,
+  usePlaylistView,
   useLoop,
   useIsPlaying,
 } from '../contexts/playlistContexts';
@@ -66,11 +67,14 @@ export const RewindButton: React.FC<{ className?: string }> = ({ className }) =>
 
 export const FastForwardButton: React.FC<{ className?: string }> = ({ className }) => {
   const { seekTo } = usePlaybackControls();
-  // Clamped to the end of the audio by the provider.
+  // A provider with `indefinitePlayback` has no end to go to: its transport
+  // runs on past the audio (never set under the MediaElement provider).
+  const { indefinitePlayback } = usePlaylistView();
+  // An infinite time is the end of the audio.
   const handleClick = () => seekTo(Infinity);
 
   return (
-    <BaseControlButton onClick={handleClick} className={className}>
+    <BaseControlButton onClick={handleClick} disabled={indefinitePlayback} className={className}>
       Fast Forward
     </BaseControlButton>
   );

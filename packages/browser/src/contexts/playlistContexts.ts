@@ -468,7 +468,10 @@ export function playbackRefsValue(fields: PlaybackRefsContextValue): PlaybackRef
       get() {
         throw new Error(
           `${name} is no longer on usePlaybackRefs(): read it from useEngineRefs() ` +
-            `(${WEB_AUDIO} only)`
+            `(${WEB_AUDIO} only)` +
+            (name === 'playoutRef'
+              ? `; under ${MEDIA_ELEMENT} the player is useMediaElementTrack().playoutRef`
+              : '')
         );
       },
     });

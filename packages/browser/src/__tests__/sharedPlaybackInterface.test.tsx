@@ -1040,6 +1040,44 @@ describe('review fixes', () => {
     expect(message).toMatch(/^usePlaybackShortcuts needs WaveformPlaylistProvider/);
   });
 
+  it('usePlaybackShortcuts outside any provider, and in each nesting', () => {
+    expect(
+      thrownBy(
+        () => usePlaybackShortcuts(),
+        (child) => <>{child}</>
+      )
+    ).toBe('usePlaybackShortcuts must be used within WaveformPlaylistProvider');
+    cleanup();
+    // The nearest provider decides.
+    expect(
+      thrownBy(
+        () => usePlaybackShortcuts(),
+        (child) => webAudio(mediaElement(child))
+      )
+    ).toMatch(/^usePlaybackShortcuts needs WaveformPlaylistProvider/);
+    cleanup();
+    expect(
+      thrownBy(
+        () => usePlaybackShortcuts(),
+        (child) => mediaElement(webAudio(child))
+      )
+    ).toBeNull();
+  });
+
+  it('the Fast Forward button is enabled under MediaElementPlaylistProvider', async () => {
+    await mountMediaElement(<FastForwardButton />);
+    expect(
+      (screen.getByRole('button', { name: 'Fast Forward' }) as HTMLButtonElement).disabled
+    ).toBe(false);
+  });
+
+  it('the moved-field message for playoutRef also says where the MediaElement player is', async () => {
+    const readers = makeReaders({ refs: usePlaybackRefs });
+    render(mediaElement(readers.children));
+    const refs = readers.values.refs as unknown as Record<string, unknown>;
+    expect(() => refs.playoutRef).toThrow(/useMediaElementTrack\(\)\.playoutRef/);
+  });
+
   it('usePlaybackShortcuts still works under WaveformPlaylistProvider', () => {
     expect(
       thrownBy(
@@ -1060,6 +1098,8 @@ describe('review fixes', () => {
         expect(() => refs[field]).toThrow(
           `${field} is no longer on usePlaybackRefs(): read it from useEngineRefs()`
         );
+        // Reading is what throws: asking whether the name exists does not.
+        expect(field in refs).toBe(true);
         // Not a field of the value: spreading or listing it does not trip the guard.
         expect(Object.keys(refs).sort()).toEqual(SHARED_FIELDS.refs);
         expect(() => ({ ...refs })).not.toThrow();
@@ -1081,6 +1121,7 @@ describe('review fixes', () => {
         webAudio(
           <>
             <SkipBackwardButton skipAmount={5} />
+            <SkipForwardButton skipAmount={5} />
             <FastForwardButton />
             {readers.children}
           </>,
@@ -1094,9 +1135,17 @@ describe('review fixes', () => {
     const click = (name: string) =>
       act(() => fireEvent.click(screen.getByRole('button', { name })));
 
-    it('is clamped to the end by default', async () => {
+    it('is clamped to the end by default; Skip Forward stops there and Fast Forward goes there', async () => {
       const readers = await mountWebAudio();
       act(() => readers.values.controls.seekTo(30));
+      expect(readers.values.currentTime.currentTime).toBe(4);
+      act(() => readers.values.controls.seekTo(1));
+      click('Skip Forward');
+      expect(readers.values.currentTime.currentTime).toBe(4);
+      const fastForward = screen.getByRole('button', { name: 'Fast Forward' }) as HTMLButtonElement;
+      expect(fastForward.disabled).toBe(false);
+      act(() => readers.values.controls.seekTo(1));
+      click('Fast Forward');
       expect(readers.values.currentTime.currentTime).toBe(4);
     });
 
@@ -1106,8 +1155,16 @@ describe('review fixes', () => {
       expect(readers.values.currentTime.currentTime).toBe(30);
       click('Skip Backward');
       expect(readers.values.currentTime.currentTime).toBe(25);
-      // Fast Forward still means the end of the audio.
-      click('Fast Forward');
+      // There is no finite end: Skip Forward keeps going.
+      click('Skip Forward');
+      click('Skip Forward');
+      expect(readers.values.currentTime.currentTime).toBe(35);
+      // ...and Fast Forward has nowhere to go: the button is disabled.
+      expect(
+        (screen.getByRole('button', { name: 'Fast Forward' }) as HTMLButtonElement).disabled
+      ).toBe(true);
+      // From code, an infinite time still means the end of the audio.
+      act(() => readers.values.controls.seekTo(Infinity));
       expect(readers.values.currentTime.currentTime).toBe(4);
       // Never before the start.
       act(() => readers.values.controls.seekTo(-3));
@@ -1185,15 +1242,19 @@ describe('review fixes', () => {
         {readers.children}
       </MediaElementPlaylistProvider>
     );
-    const view = render(ui(1));
+    const view = render(ui(1.25));
     await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+    // Also the first player: the prop reaches a custom playout.
+    expect(fakes[0].rate).toBe(1.25);
     act(() => readers.values.rate.setPlaybackRate(1.5));
 
     view.rerender(ui(2));
     await waitFor(() => expect(fakes[1]?.addTrack).toHaveBeenCalled());
     expect(readers.values.rate.playbackRate).toBe(2);
-    // The new player was made for the prop's speed: it is not put back to 1.5.
-    expect(fakes[1].setPlaybackRate).not.toHaveBeenCalled();
+    // A custom factory is not given the speed: the provider tells each new
+    // player. The prop's speed, not the 1.5 chosen before the prop changed.
+    expect(fakes[1].rate).toBe(2);
+    expect(fakes[1].setPlaybackRate).not.toHaveBeenCalledWith(1.5);
 
     // The user chooses again: that wins, also on the next player.
     act(() => readers.values.rate.setPlaybackRate(0.75));
@@ -1201,6 +1262,60 @@ describe('review fixes', () => {
     await waitFor(() => expect(fakes[2]?.addTrack).toHaveBeenCalled());
     expect(readers.values.rate.playbackRate).toBe(0.75);
     expect(fakes[2].rate).toBe(0.75);
+  });
+
+  it('a playbackRate that is not a number does not loop the provider', async () => {
+    const readers = makeReaders({ rate: usePlaybackRate });
+    render(
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        playbackRate={NaN}
+        createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
+      >
+        {readers.children}
+      </MediaElementPlaylistProvider>
+    );
+    expect(readers.values.rate.playbackRate).toBeNaN();
+    expect(readers.renders.rate).toBeLessThan(5);
+  });
+
+  it("a child's effect that sets the speed in the commit of a prop change wins, for select and player", async () => {
+    const fakes: FakePlayout[] = [];
+    const createPlayout = () => {
+      const fake = createFakePlayout();
+      fakes.push(fake);
+      return fake as unknown as MediaElementPlayout;
+    };
+    const readers = makeReaders({ rate: usePlaybackRate });
+    // Sets 2 whenever the prop it is shown changes: a child restoring a saved speed.
+    const Restore: React.FC<{ prop: number }> = ({ prop }) => {
+      const { setPlaybackRate } = usePlaybackRate();
+      const first = React.useRef(true);
+      React.useEffect(() => {
+        if (first.current) {
+          first.current = false;
+          return;
+        }
+        setPlaybackRate(2);
+      }, [prop, setPlaybackRate]);
+      return null;
+    };
+    const ui = (playbackRate: number) => (
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        playbackRate={playbackRate}
+        createPlayout={createPlayout}
+      >
+        <Restore prop={playbackRate} />
+        {readers.children}
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(1));
+    await waitFor(() => expect(fakes[0]?.addTrack).toHaveBeenCalled());
+    view.rerender(ui(1.5));
+    await waitFor(() => expect(fakes[1]?.addTrack).toHaveBeenCalled());
+    expect(readers.values.rate.playbackRate).toBe(2);
+    expect(fakes[1].rate).toBe(2);
   });
 
   it('a replaced player is created at the speed the user chose, not at the prop', async () => {

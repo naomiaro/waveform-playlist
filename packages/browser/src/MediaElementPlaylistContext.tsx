@@ -202,16 +202,24 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // the state here, during render (the "derive state from a prop" pattern),
   // so the speed select never shows a speed other than the one playing.
   const [ratePropSeen, setRatePropSeen] = useState(initialPlaybackRate);
-  if (ratePropSeen !== initialPlaybackRate) {
+  // `Object.is`: a NaN prop (a failed parse in the consumer) must compare
+  // equal to itself, or this would set state on every render.
+  if (!Object.is(ratePropSeen, initialPlaybackRate)) {
     setRatePropSeen(initialPlaybackRate);
     setPlaybackRateState(initialPlaybackRate);
   }
-  // The same speed for a player that arrives later (see the init effect).
-  // Written by `setPlaybackRate`, and by the init effect when it runs for a
-  // changed prop: in an effect, not during render, so that a render React
-  // discards leaves no speed here that never committed.
+  // The same speed for a player that arrives later: the init effect tells
+  // every new player (a custom `createPlayout` is not given the speed any
+  // other way). Written by `setPlaybackRate`, and by the layout effect below
+  // for a changed prop. A layout effect, for two reasons: a render React
+  // discards leaves nothing here that never committed, and it runs before
+  // any child's passive effect of the same commit, so a child that sets a
+  // speed in answer to the change (restoring a saved one) is the later
+  // instruction and wins.
   const playbackRateRef = useRef(initialPlaybackRate);
-  const ratePropAppliedRef = useRef(initialPlaybackRate);
+  useLayoutEffect(() => {
+    playbackRateRef.current = initialPlaybackRate;
+  }, [initialPlaybackRate]);
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
@@ -378,12 +386,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     const source = track.source;
     const waveformData = track.waveformData;
     playoutInFlightRef.current = true;
-    // A changed `playbackRate` prop replaces whatever the user chose before
-    // it; this run's player is created at that speed.
-    if (ratePropAppliedRef.current !== initialPlaybackRate) {
-      ratePropAppliedRef.current = initialPlaybackRate;
-      playbackRateRef.current = initialPlaybackRate;
-    }
 
     (async () => {
       try {
@@ -469,13 +471,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         });
 
         playoutRef.current = playout;
-        // The player was created at the `playbackRate` prop's speed. If the
-        // user has chosen another one since the prop last changed, this
-        // player replaces the one they chose it on: it plays at their speed,
-        // which is also what `usePlaybackRate()` (the speed select) shows.
-        if (playbackRateRef.current !== initialPlaybackRate) {
-          playout.setPlaybackRate(playbackRateRef.current);
-        }
+        // Every new player is told the current speed: the prop's, or the one
+        // the user chose since the prop last changed. It is what
+        // `usePlaybackRate()` (the speed select) shows. For the bundled
+        // engine, created at the prop's speed, this matters only after a
+        // choice of the user; a custom `createPlayout` learns the speed here.
+        playout.setPlaybackRate(playbackRateRef.current);
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own
