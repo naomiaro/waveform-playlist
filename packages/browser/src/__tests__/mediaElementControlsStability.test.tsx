@@ -2,7 +2,8 @@
 //
 // #767: the MediaElement controls value must not change when the duration
 // arrives (0 until the playout has loaded the track), and a `seekTo` captured
-// before that must clamp to the loaded duration.
+// before that must clamp to the track's length (it reads the track's own
+// length through a ref, not the `duration` state: #769).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
