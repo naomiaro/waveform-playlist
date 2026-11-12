@@ -1071,13 +1071,6 @@ describe('review fixes', () => {
     ).toBe(false);
   });
 
-  it('the moved-field message for playoutRef also says where the MediaElement player is', async () => {
-    const readers = makeReaders({ refs: usePlaybackRefs });
-    render(mediaElement(readers.children));
-    const refs = readers.values.refs as unknown as Record<string, unknown>;
-    expect(() => refs.playoutRef).toThrow(/useMediaElementTrack\(\)\.playoutRef/);
-  });
-
   it('usePlaybackShortcuts still works under WaveformPlaylistProvider', () => {
     expect(
       thrownBy(
@@ -1087,26 +1080,21 @@ describe('review fixes', () => {
     ).toBeNull();
   });
 
-  it.each(MOVED)(
-    'reading %s from usePlaybackRefs() throws and names useEngineRefs, under either provider',
-    async (field) => {
-      installTimerFrames();
-      for (const wrap of [mediaElement, (child: React.ReactNode) => webAudio(child)]) {
-        const readers = makeReaders({ refs: usePlaybackRefs });
-        render(wrap(readers.children));
-        const refs = readers.values.refs as unknown as Record<string, unknown>;
-        expect(() => refs[field]).toThrow(
-          `${field} is no longer on usePlaybackRefs(): read it from useEngineRefs()`
-        );
-        // Reading is what throws: asking whether the name exists does not.
-        expect(field in refs).toBe(true);
-        // Not a field of the value: spreading or listing it does not trip the guard.
-        expect(Object.keys(refs).sort()).toEqual(SHARED_FIELDS.refs);
-        expect(() => ({ ...refs })).not.toThrow();
-        cleanup();
+  it('the eight fields that moved to useEngineRefs() are not on the usePlaybackRefs() value, under either provider', async () => {
+    installTimerFrames();
+    for (const wrap of [mediaElement, (child: React.ReactNode) => webAudio(child)]) {
+      const readers = makeReaders({ refs: usePlaybackRefs });
+      render(wrap(readers.children));
+      const refs = readers.values.refs as unknown as Record<string, unknown>;
+      expect(Object.keys(refs).sort()).toEqual(SHARED_FIELDS.refs);
+      for (const field of MOVED) {
+        // A plain object: a leftover read is `undefined`, not an error.
+        expect(field in refs, field).toBe(false);
+        expect(refs[field], field).toBeUndefined();
       }
+      cleanup();
     }
-  );
+  });
 
   describe('seekTo past the end of the audio under WaveformPlaylistProvider (4 s of audio)', () => {
     async function mountWebAudio(props: { indefinitePlayback?: boolean } = {}) {

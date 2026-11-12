@@ -70,7 +70,6 @@ export interface TrackState {
 
 import {
   BLOCKED,
-  playbackRefsValue,
   ActiveAnnotationContext,
   AnnotationEditingContext,
   AnnotationsContext,
@@ -1742,13 +1741,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Refs and stable functions: these two values never change. The first is
   // the part the MediaElement provider has too (#688).
   const refsValue: PlaybackRefsContextValue = useMemo(
-    () =>
-      playbackRefsValue({
-        currentTimeRef,
-        visualTimeRef,
-        registerFrameCallback,
-        unregisterFrameCallback,
-      }),
+    () => ({
+      currentTimeRef,
+      visualTimeRef,
+      registerFrameCallback,
+      unregisterFrameCallback,
+    }),
     [currentTimeRef, visualTimeRef, registerFrameCallback, unregisterFrameCallback]
   );
 

@@ -3,7 +3,6 @@ import {
   Playlist,
   Track as TrackComponent,
   Clip,
-  Selection,
   FadeOverlay,
   PlaylistInfoContext,
   DevicePixelRatioProvider,
@@ -15,78 +14,16 @@ import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type { Peaks } from '@waveform-playlist/core';
 import {
   useIsPlaying,
-  useCurrentTime,
-  useSelection,
   usePlaybackControls,
-  usePlaybackRefs,
   usePlaylistView,
   usePlaylistZoom,
   useMediaElementTrack,
 } from '../contexts/playlistContexts';
 import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
-import { AnimatedMediaElementPlayhead } from './AnimatedMediaElementPlayhead';
 import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
-import { ChannelWithMediaElementProgress } from './ChannelWithMediaElementProgress';
+import { ChannelWithProgress } from './ChannelWithProgress';
+import { SelectionOverlay, PlayheadOverlay } from './VisualizationOverlays';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
-
-/**
- * Wrapper that isolates the custom playhead's hooks from MediaElementPlaylist.
- * Calling renderPlayhead() directly inside MediaElementPlaylist's render would
- * merge its hooks into MediaElementPlaylist's hook count, causing "Rendered more
- * hooks" errors if renderPlayhead is conditionally provided.
- */
-// Stable refs for MediaElement playback (no AudioContext, so these are always 0)
-const ZERO_REF: React.RefObject<number> = { current: 0 };
-
-const CustomMediaElementPlayhead: React.FC<{
-  renderPlayhead: RenderPlayheadFunction;
-  color: string;
-  samplesPerPixel: number;
-  sampleRate: number;
-}> = ({ renderPlayhead, color, samplesPerPixel, sampleRate }) => {
-  const { isPlaying } = useIsPlaying();
-  const { currentTimeRef } = usePlaybackRefs();
-  // Subscribed for the re-render only, so a seek while stopped moves a custom
-  // playhead: the position below comes from the ref.
-  useCurrentTime();
-
-  return renderPlayhead({
-    position: ((currentTimeRef.current ?? 0) * sampleRate) / samplesPerPixel,
-    color,
-    isPlaying,
-    currentTimeRef,
-    playbackStartTimeRef: ZERO_REF,
-    audioStartPositionRef: ZERO_REF,
-    samplesPerPixel,
-    sampleRate,
-    controlsOffset: 0,
-  }) as React.ReactElement;
-};
-
-/**
- * The highlighted selection range. The only part of the playlist that follows
- * the selection, so a drag renders this and not the waveform (#769). Memoized:
- * a render of the playlist around it (play, pause, a seek) is not its concern.
- */
-const MediaElementSelectionOverlay = React.memo(function MediaElementSelectionOverlay({
-  color,
-}: {
-  color: string;
-}) {
-  const { selectionStart, selectionEnd } = useSelection();
-  const { sampleRate } = usePlaylistView();
-  const { samplesPerPixel } = usePlaylistZoom();
-
-  if (selectionStart === selectionEnd) return null;
-
-  return (
-    <Selection
-      startPosition={(Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
-      endPosition={(Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
-      color={color}
-    />
-  );
-});
 
 export interface MediaElementPlaylistProps {
   /** Custom function to generate the label shown on annotation boxes */
@@ -130,9 +67,9 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  // Not the resting cursor position (`useCurrentTime()`): the playhead and the
-  // progress overlay follow that themselves, so a seek or a leftward selection
-  // drag does not render the waveform (#688).
+  // Not the resting cursor position and not the selection: the playhead, the
+  // progress overlay and the selection overlay follow those themselves, so a
+  // seek or a selection drag does not render the waveform (#688).
   const { isPlaying } = useIsPlaying();
   // No annotation state here: it changes at every annotation boundary during
   // playback, and only MediaElementAnnotationBoxes needs it (#744).
@@ -143,7 +80,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   const { samplesPerPixel } = usePlaylistZoom();
 
   // The selection is the provider's (#769); this component only writes it,
-  // and MediaElementSelectionOverlay reads it.
+  // and the shared SelectionOverlay and PlayheadOverlay read it.
   const [isSelecting, setIsSelecting] = useState(false);
 
   // Local ref for scroll container - also register with context for auto-scroll
@@ -321,12 +258,13 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
                         trackId={`media-element-track-${trackIndex}`}
                       >
                         {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
-                          <ChannelWithMediaElementProgress
+                          <ChannelWithProgress
                             key={`${trackIndex}-${clipIndex}-${channelIndex}`}
                             index={channelIndex}
                             data={channelPeaks}
                             bits={peaksData.bits}
                             length={width}
+                            isSelected
                             clipStartSample={clip.startSample}
                             clipDurationSamples={clip.durationSamples}
                           />
@@ -362,17 +300,8 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
               linkEndpoints={linkEndpointsProp}
               onAnnotationUpdate={onAnnotationUpdate}
             />
-            <MediaElementSelectionOverlay color={theme.selectionColor} />
-            {renderPlayhead ? (
-              <CustomMediaElementPlayhead
-                renderPlayhead={renderPlayhead}
-                color={theme.playheadColor}
-                samplesPerPixel={samplesPerPixel}
-                sampleRate={sampleRate}
-              />
-            ) : (
-              <AnimatedMediaElementPlayhead color={theme.playheadColor} />
-            )}
+            <SelectionOverlay />
+            <PlayheadOverlay renderPlayhead={renderPlayhead} />
           </>
         </Playlist>
       </PlaylistInfoContext.Provider>

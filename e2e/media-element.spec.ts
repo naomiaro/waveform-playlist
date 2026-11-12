@@ -29,7 +29,7 @@ async function playbackSpeed(page: import('@playwright/test').Page): Promise<num
  * 2. Custom playhead (PlayheadWithMarker) + Timescale
  *
  * The custom playhead exercises the hook isolation pattern
- * (CustomMediaElementPlayhead wrapper) that prevents
+ * (the shared CustomPlayhead wrapper) that prevents
  * "Rendered more hooks" errors.
  */
 
@@ -486,26 +486,42 @@ test.describe('Media Element Example', () => {
       await page.mouse.move(box!.x + 160, y, { steps: 5 });
       await page.mouse.up();
 
+      // At rest with a range highlighted there is no playhead (#688, part 3:
+      // the same rule as the multitrack view). The cursor is at the start of
+      // the range all the same.
+      const selection = player.locator('[data-selection]');
+      await expect(selection).toHaveCount(1);
+      await expect(playhead).toHaveCount(0);
+      const selectionLeft = () => selection.evaluate((el) => (el as HTMLElement).offsetLeft);
       let startX = 0;
       await expect(async () => {
-        startX = await playheadX();
+        startX = await selectionLeft();
         expect(Math.abs(startX - 100)).toBeLessThanOrEqual(2);
       }).toPass({ timeout: 5000 });
       const startText = await position.textContent();
       expect(startText).not.toBe('00:00:00.000');
 
+      // During playback the playhead is shown and moves through the range.
       await play.click();
+      await expect(playhead).toHaveCount(1);
       await expect(async () => {
         expect(await playheadX()).toBeGreaterThan(startX + 5);
       }).toPass({ timeout: 10000 });
 
-      // It stops by itself at the end of the range: Play is enabled again and
-      // the cursor is back at the start of the selection, not at its end.
+      // It stops by itself at the end of the range: Play is enabled again, the
+      // playhead is hidden again, and the cursor is back at the start of the
+      // selection, not at its end.
       await expect(play).toBeEnabled({ timeout: 15000 });
-      await expect(async () => {
-        expect(Math.abs((await playheadX()) - startX)).toBeLessThanOrEqual(1);
-      }).toPass({ timeout: 5000 });
+      await expect(playhead).toHaveCount(0);
       await expect(position).toHaveText(startText ?? '');
+
+      // A click collapses the selection: the playhead is back, where the click was.
+      await page.mouse.click(box!.x + 240, y);
+      await expect(selection).toHaveCount(0);
+      await expect(playhead).toHaveCount(1);
+      await expect(async () => {
+        expect(Math.abs((await playheadX()) - 240)).toBeLessThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
     });
   });
 });

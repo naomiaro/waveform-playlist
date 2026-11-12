@@ -87,16 +87,40 @@ Replace the default playhead with a custom component using the `renderPlayhead` 
 
 ### PlayheadProps
 
-The render function receives these props:
+The render function receives these props, under either provider:
 
 ```typescript
 interface PlayheadProps {
-  /** Position in pixels from left edge */
+  /** Position in pixels from left edge (valid while not playing) */
   position: number;
   /** Playhead color from theme (default: #ff0000) */
   color?: string;
+  /** Whether audio is currently playing */
+  isPlaying: boolean;
+  /** Raw playback position in seconds */
+  currentTimeRef: React.RefObject<number>;
+  /**
+   * The time to draw the playhead at, in seconds. The provider keeps it current
+   * on every frame of playback, and on a seek, a stop and the end of playback
+   * (after a pause under MediaElementPlaylistProvider it is not rewritten: it
+   * holds the last time the loop or the element's `timeupdate` reported,
+   * normally within a frame of the paused position). Under
+   * WaveformPlaylistProvider it is the audible time while playing (raw minus
+   * output latency and look-ahead); under MediaElementPlaylistProvider it is
+   * the same ref as currentTimeRef.
+   */
+  visualTimeRef: React.RefObject<number>;
+  /** For converting time to pixels: (time * sampleRate) / samplesPerPixel */
+  samplesPerPixel: number;
+  sampleRate: number;
 }
 ```
+
+`position` is enough for a playhead that only needs to be right while stopped. To move during playback, read `visualTimeRef.current` in your own animation frame while `isPlaying` is true, as `PlayheadWithMarker` does.
+
+The playhead is not rendered (and `renderPlayhead` is not called) while a range is highlighted and playback is stopped or paused.
+
+Engine values are not props. A playhead for `WaveformPlaylistProvider` that needs one calls [`useEngineRefs()`](/docs/react/api/hooks#useenginerefs); the function passed as `renderPlayhead` may call hooks, the same ones on every render (or return your own component: `(props) => <MyPlayhead {...props} />`). A custom playhead is unmounted while it is hidden, so state it holds starts again.
 
 ### Built-in Playhead Components
 

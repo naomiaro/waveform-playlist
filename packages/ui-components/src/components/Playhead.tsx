@@ -24,6 +24,11 @@ const PlayheadLine = styled.div.attrs<PlayheadLineProps>((props) => ({
 
 /**
  * Props passed to the default playhead component or custom render function.
+ * The same seven under `WaveformPlaylistProvider` and
+ * `MediaElementPlaylistProvider`. Engine values (`getPlaybackTime`,
+ * `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef`) are
+ * not props: a playhead for `WaveformPlaylistProvider` that needs them calls
+ * `useEngineRefs()` from `@waveform-playlist/browser`.
  */
 export interface PlayheadProps {
   /** Position in pixels from left edge (only valid when not playing) */
@@ -32,35 +37,24 @@ export interface PlayheadProps {
   color?: string;
   /** Whether audio is currently playing */
   isPlaying: boolean;
-  /** Ref to current time in seconds - use for smooth animation during playback */
+  /**
+   * Ref to the raw playback position in seconds. Use `visualTimeRef` to place
+   * a playhead; this one is for logic that needs the scheduling position.
+   */
   currentTimeRef: React.RefObject<number>;
-  /** Audio context start time when playback began. Fallback when getPlaybackTime is not provided. */
-  playbackStartTimeRef: React.RefObject<number>;
-  /** Audio position when playback started. Fallback when getPlaybackTime is not provided. */
-  audioStartPositionRef: React.RefObject<number>;
+  /**
+   * Ref to the time a playhead should be drawn at, in seconds. Under
+   * `WaveformPlaylistProvider`, while playing, it is the audible time (raw
+   * minus output latency and look-ahead), and at rest the commanded position
+   * (seek, pause, stop). Under `MediaElementPlaylistProvider` it is the same
+   * ref as `currentTimeRef`. The provider keeps it current on every frame of
+   * playback, so a playhead that reads it stays in step with the progress fill.
+   */
+  visualTimeRef: React.RefObject<number>;
   /** Samples per pixel - for converting time to pixels */
   samplesPerPixel: number;
   /** Sample rate - for converting time to pixels */
   sampleRate: number;
-  /** Controls offset in pixels (deprecated, always 0 — controls are now outside scroll area) */
-  controlsOffset?: number;
-  /** Function to get current audio context time - required for smooth animation */
-  getAudioContextTime?: () => number;
-  /**
-   * Returns raw playback time from the engine (auto-wraps at loop boundaries).
-   * This is the scheduling position — for playhead display use `visualTimeRef`,
-   * which is latency-compensated while playing.
-   */
-  getPlaybackTime?: () => number;
-  /**
-   * Ref to the visually-aligned playback time: engine-compensated audible time
-   * (raw minus `outputLatency` and `engine.lookAhead`) while playing, the raw
-   * commanded position when resting (seek/pause/stop). Kept current by the
-   * provider's animation loop during playback and by pause/stop/seek paths
-   * when stopped. Use this for playhead positioning so it matches the
-   * progress fill in `ChannelWithProgress`.
-   */
-  visualTimeRef?: React.RefObject<number>;
 }
 
 /**
@@ -120,13 +114,8 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
   isPlaying,
   currentTimeRef,
   visualTimeRef,
-  playbackStartTimeRef,
-  audioStartPositionRef,
   samplesPerPixel,
   sampleRate,
-  controlsOffset = 0,
-  getAudioContextTime,
-  getPlaybackTime,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -134,27 +123,11 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
   useEffect(() => {
     const updatePosition = () => {
       if (containerRef.current) {
-        // Read visualTimeRef so the playhead matches what the listener actually
-        // hears (and stays in sync with the progress fill in ChannelWithProgress).
-        // The provider's animation loop updates visualTimeRef per frame during
-        // playback and the pause/seek/stop paths sync it when stopped.
-        // Fallbacks for legacy custom playheads that don't pass visualTimeRef:
-        let time: number;
-        if (visualTimeRef?.current !== undefined && visualTimeRef.current !== null) {
-          time = visualTimeRef.current;
-        } else if (isPlaying) {
-          if (getPlaybackTime) {
-            time = getPlaybackTime();
-          } else if (getAudioContextTime) {
-            const elapsed = getAudioContextTime() - (playbackStartTimeRef.current ?? 0);
-            time = (audioStartPositionRef.current ?? 0) + elapsed;
-          } else {
-            time = currentTimeRef.current ?? 0;
-          }
-        } else {
-          time = currentTimeRef.current ?? 0;
-        }
-        const pos = (time * sampleRate) / samplesPerPixel + controlsOffset;
+        // visualTimeRef is what the listener hears, and what the progress fill
+        // is drawn from: the provider updates it on every frame of playback and
+        // on pause, seek and stop.
+        const time = visualTimeRef.current ?? currentTimeRef.current ?? 0;
+        const pos = (time * sampleRate) / samplesPerPixel;
         containerRef.current.style.transform = `translate3d(${pos}px, 0, 0)`;
       }
 
@@ -175,24 +148,13 @@ export const PlayheadWithMarker: React.FC<PlayheadProps> = ({
         animationFrameRef.current = null;
       }
     };
-  }, [
-    isPlaying,
-    sampleRate,
-    samplesPerPixel,
-    controlsOffset,
-    currentTimeRef,
-    visualTimeRef,
-    playbackStartTimeRef,
-    audioStartPositionRef,
-    getAudioContextTime,
-    getPlaybackTime,
-  ]);
+  }, [isPlaying, sampleRate, samplesPerPixel, currentTimeRef, visualTimeRef]);
 
   // Update position when stopped (for seeks)
   useEffect(() => {
     if (!isPlaying && containerRef.current) {
-      const time = visualTimeRef?.current ?? currentTimeRef.current ?? 0;
-      const pos = (time * sampleRate) / samplesPerPixel + controlsOffset;
+      const time = visualTimeRef.current ?? currentTimeRef.current ?? 0;
+      const pos = (time * sampleRate) / samplesPerPixel;
       containerRef.current.style.transform = `translate3d(${pos}px, 0, 0)`;
     }
   });

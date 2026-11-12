@@ -90,11 +90,6 @@ export interface ChannelWithProgressProps extends SmartChannelProps {
   clipOffsetSeconds?: number;
 }
 
-/**
- * SmartChannel wrapper that adds an animated progress overlay.
- * The progress overlay shows the "played" portion of the waveform.
- * Updates via the shared animation frame registry — no own rAF loop.
- */
 interface ClipProgressProps {
   clipStartSample: number;
   clipDurationSamples: number;
@@ -121,7 +116,7 @@ function playedRatio(
  * that follows the cursor, so it alone subscribes to the provider's contexts
  * (#693): a seek, or a selection whose start moves, re-renders these
  * small overlays and not the channels (and their canvases' React trees) around
- * them.
+ * them. It reads shared hooks only, so it works under either provider (#688).
  */
 const ClipProgress: React.FC<ClipProgressProps> = ({
   clipStartSample,
@@ -192,6 +187,12 @@ const ClipProgress: React.FC<ClipProgressProps> = ({
   );
 };
 
+/**
+ * SmartChannel wrapper that adds an animated progress overlay showing the
+ * played portion of the waveform. Used under either provider: the multitrack
+ * rows and `MediaElementPlaylist` both render it. The channel itself reads no
+ * playback state; its `ClipProgress` child does.
+ */
 export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   clipStartSample,
   clipDurationSamples,
@@ -208,18 +209,14 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   // Get the draw mode from theme (defaults to 'inverted')
   const drawMode = theme?.waveformDrawMode || 'inverted';
 
-  let backgroundColor;
-  if (drawMode === 'inverted') {
-    backgroundColor =
-      smartChannelProps.isSelected && theme
-        ? theme.selectedWaveFillColor
-        : theme?.waveFillColor || 'white';
-  } else {
-    backgroundColor =
-      smartChannelProps.isSelected && theme
-        ? theme.selectedWaveOutlineColor
-        : theme?.waveOutlineColor || 'grey';
-  }
+  // A selected channel without a selected colour in the theme falls back to
+  // the unselected one. (MediaElementPlaylist always renders its one track
+  // selected.)
+  const selected = smartChannelProps.isSelected;
+  const backgroundColor =
+    drawMode === 'inverted'
+      ? (selected && theme?.selectedWaveFillColor) || theme?.waveFillColor || 'white'
+      : (selected && theme?.selectedWaveOutlineColor) || theme?.waveOutlineColor || 'grey';
 
   // A clip with notes is a MIDI clip and is drawn as a piano roll; the render
   // mode applies to audio clips only (black background for a spectrogram).

@@ -11,7 +11,7 @@ import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 
-const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0 }));
+const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0, selection: 0 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -29,6 +29,10 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     Track: (props: React.ComponentProps<typeof actual.Track>) => {
       counts.track++;
       return createElement(actual.Track, props);
+    },
+    Selection: (props: React.ComponentProps<typeof actual.Selection>) => {
+      counts.selection++;
+      return createElement(actual.Selection, props);
     },
   };
 });
@@ -156,6 +160,7 @@ async function mount(playlist: React.ReactElement = <MediaElementPlaylist />) {
     counts.clip = 0;
     counts.channel = 0;
     counts.track = 0;
+    counts.selection = 0;
   };
   reset();
   return { fake, view, playhead, overlay, reset };
@@ -174,19 +179,23 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     act(() => controls.seekTo(2));
     expect(playhead().style.transform).toBe(playheadAt(2));
     expect(overlay().style.transform).toBe(overlayAt(2));
-    expect(counts).toEqual({ clip: 0, channel: 0, track: 0 });
+    expect(counts).toMatchObject({ clip: 0, channel: 0, track: 0 });
   });
 
-  it('a leftward selection drag (the start moves on each move) does the same', async () => {
-    const { playhead, overlay, reset } = await mount();
+  it('a leftward selection drag (the start moves on each move) moves the overlay and renders none of them', async () => {
+    const { view, playhead, reset } = await mount();
+    // wrapper > [background, overlay, channel container]; the playhead is
+    // hidden at rest while a range is highlighted (#688, part 3), so the
+    // overlay is found on its own.
+    const overlay = () => view.container.querySelector('[style*="scaleX"]') as HTMLElement;
     act(() => controls.setSelection(4, 6));
     reset();
     for (const start of [3.5, 3, 2.5]) {
       act(() => controls.setSelection(start, 6));
-      expect(playhead().style.transform).toBe(playheadAt(start));
+      expect(playhead()).toBeNull();
       expect(overlay().style.transform).toBe(overlayAt(start));
     }
-    expect(counts).toEqual({ clip: 0, channel: 0, track: 0 });
+    expect(counts).toMatchObject({ clip: 0, channel: 0, track: 0 });
   });
 
   it('a pause and a stop leave both at the resting cursor', async () => {
@@ -222,5 +231,38 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     await mount(<MediaElementPlaylist renderPlayhead={renderPlayhead} />);
     act(() => controls.seekTo(2));
     expect(positions[positions.length - 1]).toBe(2 * PX_PER_SECOND);
+  });
+
+  it('the one track is drawn in the selected colours', async () => {
+    const { view } = await mount();
+    // wrapper > [background, overlay, channel container]
+    const background = view.container.querySelector('[style*="scaleX"]')!
+      .previousElementSibling as HTMLElement;
+    expect(background.style.background).toBe('rgb(0, 180, 216)'); // defaultTheme.selectedWaveFillColor
+  });
+
+  it('a collapsed selection renders no highlight at all', async () => {
+    const { reset } = await mount();
+    reset();
+    act(() => controls.setSelection(3, 3));
+    act(() => controls.seekTo(1));
+    expect(counts.selection).toBe(0);
+    act(() => controls.setSelection(3, 4));
+    expect(counts.selection).toBe(1);
+  });
+
+  it('play and pause render the shell and not the selection highlight', async () => {
+    const { reset } = await mount();
+    act(() => controls.setSelection(2, 4));
+    expect(counts.selection).toBeGreaterThan(0);
+    reset();
+    await act(async () => {
+      await controls.play(2, 2);
+    });
+    act(() => controls.pause());
+    // The shell rendered (its drag handlers read isPlaying)...
+    expect(counts.track).toBeGreaterThan(0);
+    // ...and the memoized highlight did not.
+    expect(counts.selection).toBe(0);
   });
 });

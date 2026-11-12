@@ -171,7 +171,7 @@
 
 **Props:** `Playlist` accepts `trackControlsSlots?: React.ReactNode[]` and `timescaleGapHeight?: number`. Track is channels-only (no controls rendering).
 
-**Implications:** No `controlsOffset` or `controlWidth` in click handlers, playhead positioning, selection, auto-scroll, or zoom calculations. `Playhead.controlsOffset` is deprecated (always 0).
+**Implications:** No `controlsOffset` or `controlWidth` in click handlers, playhead positioning, selection, auto-scroll, or zoom calculations. `PlayheadProps.controlsOffset` was removed in #688 part 3.
 
 ## Deferred Viewport Store Notifications (React 19 Compatibility)
 
@@ -245,9 +245,9 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 
 **Decision:** Transparent background, no padding/border-radius — consumers control container styling. `labelColor` prop (not theme) controls scale/channel label color for light/dark mode. Inactive segments use `rgba(128, 128, 128, 0.2)` to work on any background. Use transient `$props` for color, not CSS variables.
 
-## PlayheadProps Evolution
+## PlayheadProps
 
-Adding a new field to `PlayheadProps` is a soft-breaking change for custom playheads — they continue compiling but won't pick up the new behavior until updated. When the provider context exposes a new playback-time concept (e.g., `visualTimeRef`), thread it through `PlayheadProps` and update the bundled `PlayheadWithMarker` to use it. External consumers' custom playheads need to opt in. Document the failure mode (e.g., visual lag) so users notice.
+`PlayheadProps` holds what BOTH providers of the browser package can give (#688, part 3): `position`, `color`, `isPlaying`, `currentTimeRef`, `visualTimeRef` (required), `samplesPerPixel`, `sampleRate`. Do not add a prop that only one provider has: the MediaElement view once passed placeholder refs for the engine fields. Engine values are read with `useEngineRefs()` in the consumer's playhead. `PlayheadWithMarker` places itself from `visualTimeRef` (kept current by the provider per frame and on seek, stop and the end of playback; on pause too under the multitrack provider, while the MediaElement provider's `pause()` leaves the ref at the last time the loop or `timeupdate` reported; it has no fallback for a missing `visualTimeRef` any more, so hand-built props without it throw in its effect) and runs its own animation loop while playing; a new field means updating it and the upgrade guide, because custom playheads only pick it up when their authors do.
 
 ## Error Boundary
 

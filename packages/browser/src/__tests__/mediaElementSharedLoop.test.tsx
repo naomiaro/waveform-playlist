@@ -393,15 +393,18 @@ describe('MediaElement selection lives in the provider', () => {
     const { show } = await mount();
     await act(async () => show(true, 2));
     await waitFor(() => expect(document.querySelectorAll('[data-playhead]')).toHaveLength(2));
+    // Both overlays are found through their playheads now: a resting playhead
+    // is hidden while a range is highlighted (#688, part 3).
+    const first = clickOverlay(0);
     const overlay = clickOverlay(1);
     await press(overlay, 50);
     await moveTo(150);
     await release(150);
     expect(selections()).toHaveLength(2);
     expect(selections().map((s) => s.style.left)).toEqual(['50px', '50px']);
+    expect(document.querySelectorAll('[data-playhead]')).toHaveLength(0);
 
     // A press on the other one (a click to seek) replaces the range in both.
-    const first = clickOverlay(0);
     await press(first, 300);
     await release(300);
     expect(selections()).toHaveLength(0);

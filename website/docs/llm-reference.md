@@ -1812,8 +1812,33 @@ WaveformPlaylistProvider only (from @waveform-playlist/browser):
 WaveformPlaylistProvider only (from @waveform-playlist/browser/tone):
          ExportWavButton
 Playheads: Playhead, PlayheadWithMarker (from @waveform-playlist/ui-components)
+           both take PlayheadProps; see "Custom playhead" below
 Error Handling: PlaylistErrorBoundary (from @waveform-playlist/ui-components)
 ```
+
+### Custom playhead
+
+```typescript
+// from @waveform-playlist/ui-components. The same seven props under
+// WaveformPlaylistProvider and MediaElementPlaylistProvider.
+interface PlayheadProps {
+  position: number; // px from the left edge; valid while not playing
+  color?: string; // theme.playheadColor
+  isPlaying: boolean;
+  currentTimeRef: React.RefObject<number>; // raw position, seconds
+  // Time to draw at, seconds; kept current per frame of playback and on a
+  // seek, a stop and the end of playback. MediaElement: the same ref as
+  // currentTimeRef (after a pause: the last reported time).
+  visualTimeRef: React.RefObject<number>;
+  samplesPerPixel: number; // x = (time * sampleRate) / samplesPerPixel
+  sampleRate: number;
+}
+type RenderPlayheadFunction = (props: PlayheadProps) => React.ReactNode;
+// <Waveform renderPlayhead={PlayheadWithMarker} />
+// <MediaElementWaveform renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
+```
+
+Removed from `PlayheadProps`: `getPlaybackTime`, `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef` (call `useEngineRefs()` in the playhead, `WaveformPlaylistProvider` only) and `controlsOffset` (always 0). The props are a plain object: a removed name reads `undefined`. The playhead (default or custom) is not rendered while a range is highlighted and playback is stopped or paused, under either provider; a custom playhead is unmounted while hidden. `PlayheadWithMarker` rendered by your own code needs `visualTimeRef`.
 
 ```typescript
 // @waveform-playlist/browser: reads usePlaybackRate(). MediaElementPlaylistProvider only.

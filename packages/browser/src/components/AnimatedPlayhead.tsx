@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useId } from 'react';
 import styled from 'styled-components';
 import {
   useCurrentTime,
@@ -28,11 +28,15 @@ interface AnimatedPlayheadProps {
 }
 
 /**
- * Animated playhead that updates position via the shared animation frame registry.
- * No own rAF loop — the WaveformPlaylistContext animation loop drives all visual updates.
+ * The default playhead, under either provider. During playback the provider's
+ * animation loop moves it (a registered frame callback, no loop of its own);
+ * at rest it is placed after each render.
  */
 export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff0000' }) => {
   const playheadRef = useRef<HTMLDivElement>(null);
+  // Per instance: two visualizations under one provider each have a playhead,
+  // and the registry keeps one callback per id.
+  const frameCallbackId = useId();
 
   const { currentTimeRef, visualTimeRef, registerFrameCallback, unregisterFrameCallback } =
     usePlaybackRefs();
@@ -45,17 +49,19 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
 
   // Register per-frame callback during playback
   useEffect(() => {
-    const id = 'playhead';
     if (isPlaying) {
-      registerFrameCallback(id, ({ visualTime, sampleRate: sr, samplesPerPixel: spp }) => {
-        if (playheadRef.current) {
-          const px = (visualTime * sr) / spp;
-          playheadRef.current.style.transform = `translate3d(${px}px, 0, 0)`;
+      registerFrameCallback(
+        frameCallbackId,
+        ({ visualTime, sampleRate: sr, samplesPerPixel: spp }) => {
+          if (playheadRef.current) {
+            const px = (visualTime * sr) / spp;
+            playheadRef.current.style.transform = `translate3d(${px}px, 0, 0)`;
+          }
         }
-      });
+      );
     }
-    return () => unregisterFrameCallback(id);
-  }, [isPlaying, registerFrameCallback, unregisterFrameCallback]);
+    return () => unregisterFrameCallback(frameCallbackId);
+  }, [isPlaying, frameCallbackId, registerFrameCallback, unregisterFrameCallback]);
 
   // Update position when not playing (seeks, stops, etc.) — no rAF needed.
   // Reads visualTimeRef so the static playhead lines up with audible output
