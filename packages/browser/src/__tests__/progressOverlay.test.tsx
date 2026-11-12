@@ -14,6 +14,9 @@ const themeColors = vi.hoisted(() => ({
   waveProgressColor: 'rgb(1, 2, 3)',
   waveFillColor: 'rgb(10, 20, 30)',
   selectedWaveFillColor: undefined as string | undefined,
+  waveformDrawMode: undefined as 'inverted' | 'normal' | undefined,
+  waveOutlineColor: 'rgb(70, 80, 90)',
+  selectedWaveOutlineColor: undefined as string | undefined,
 }));
 // What usePlaybackRefs() gives: the position to draw and the frame-callback
 // registry the provider's one animation loop drives (#769, #688).
@@ -74,6 +77,8 @@ let originalRAF: typeof requestAnimationFrame;
 beforeEach(() => {
   animation.isPlaying = false;
   themeColors.selectedWaveFillColor = undefined;
+  themeColors.selectedWaveOutlineColor = undefined;
+  themeColors.waveformDrawMode = undefined;
   internals.visualTimeRef.current = 0;
   internals.callbacks.clear();
   requestedFrames = 0;
@@ -183,5 +188,18 @@ describe('ChannelWithProgress overlay', () => {
     themeColors.selectedWaveFillColor = undefined;
     rerender(<ChannelWithProgress {...props} isSelected length={100} />);
     expect(background().style.background).toBe('rgb(10, 20, 30)');
+  });
+
+  it('normal draw mode: the outline colours, with the same fallback', () => {
+    themeColors.waveformDrawMode = 'normal';
+    const { container, rerender } = render(<ChannelWithProgress {...props} isSelected />);
+    const background = () =>
+      (container.firstElementChild as HTMLElement).children[0] as HTMLElement;
+    expect(background().style.background).toBe('rgb(70, 80, 90)');
+    themeColors.selectedWaveOutlineColor = 'rgb(100, 110, 120)';
+    rerender(<ChannelWithProgress {...props} isSelected length={100} />);
+    expect(background().style.background).toBe('rgb(100, 110, 120)');
+    rerender(<ChannelWithProgress {...props} />);
+    expect(background().style.background).toBe('rgb(70, 80, 90)');
   });
 });

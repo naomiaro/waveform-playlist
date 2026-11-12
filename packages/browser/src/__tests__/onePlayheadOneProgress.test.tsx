@@ -5,7 +5,7 @@
 // copies are gone. What that changes for a consumer:
 //
 // - a `renderPlayhead` function receives the same seven props under either
-//   provider, and a prop that was removed throws when read;
+//   provider (a plain object: the five removed props are simply absent);
 // - under MediaElementPlaylistProvider the resting playhead is hidden while a
 //   range is highlighted, as it always was under WaveformPlaylistProvider;
 // - two visualizations under one WaveformPlaylistProvider each animate their
@@ -258,17 +258,13 @@ function capturePlayhead() {
   return { calls, renderPlayhead, last: () => calls[calls.length - 1] };
 }
 
-function expectRemovedPropsToThrow(props: PlayheadProps) {
+function expectRemovedPropsToBeAbsent(props: PlayheadProps) {
   const loose = props as unknown as Record<string, unknown>;
   for (const name of REMOVED_PROPS) {
-    expect(() => loose[name], name).toThrow(
-      new RegExp(`${name} is no longer passed to renderPlayhead`)
-    );
+    // A plain object: a leftover read is `undefined`, not an error.
+    expect(name in loose, name).toBe(false);
+    expect(loose[name], name).toBeUndefined();
   }
-  for (const name of REMOVED_PROPS.slice(0, 4)) {
-    expect(() => loose[name], name).toThrow(/useEngineRefs\(\)/);
-  }
-  expect(() => loose.controlsOffset).toThrow(/always 0/);
 }
 
 describe('a custom playhead gets the same props under both providers', () => {
@@ -279,7 +275,6 @@ describe('a custom playhead gets the same props under both providers', () => {
     expect(Object.keys(last()).sort()).toEqual(SHARED_PROPS);
     // No output latency to compensate for: one ref serves as both.
     expect(last().visualTimeRef).toBe(last().currentTimeRef);
-    expect({ ...last() }).toEqual(last());
 
     act(() => controls.seekTo(2));
     expect(last().position).toBe(2 * ME_PX_PER_SECOND);
@@ -301,18 +296,17 @@ describe('a custom playhead gets the same props under both providers', () => {
     expect(last().visualTimeRef.current).toBe(1.5);
   });
 
-  it('a prop that was removed throws when read, under either provider, and is not copied by a spread', async () => {
+  it('the five removed props are not passed, under either provider', async () => {
     const mediaElement = capturePlayhead();
     await mountMediaElement(<MediaElementPlaylist renderPlayhead={mediaElement.renderPlayhead} />);
-    expectRemovedPropsToThrow(mediaElement.last());
-    expect(Object.keys({ ...mediaElement.last() }).sort()).toEqual(SHARED_PROPS);
+    expectRemovedPropsToBeAbsent(mediaElement.last());
     await act(async () => {
       cleanup();
     });
 
     const webAudio = capturePlayhead();
     await mountWebAudio(<PlaylistVisualization renderPlayhead={webAudio.renderPlayhead} />);
-    expectRemovedPropsToThrow(webAudio.last());
+    expectRemovedPropsToBeAbsent(webAudio.last());
   });
 });
 

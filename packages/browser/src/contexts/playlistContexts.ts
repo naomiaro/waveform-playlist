@@ -440,47 +440,6 @@ function useSlot<T>(context: React.Context<Slot<T>>, hookName: string, needs: st
 
 const EITHER = `${WEB_AUDIO} or ${MEDIA_ELEMENT}`;
 
-/** What `usePlaybackRefs()` returned until #688 and `useEngineRefs()` returns now. */
-const MOVED_TO_ENGINE_REFS: readonly (keyof EngineRefsContextValue)[] = [
-  'playbackStartTimeRef',
-  'audioStartPositionRef',
-  'getPlaybackTime',
-  'getAudioContextTime',
-  'getLookAhead',
-  'getOutputLatency',
-  'playoutRef',
-  'isDraggingRef',
-];
-
-/**
- * INTERNAL: the value a provider puts in `PlaybackRefsContext`. `usePlaybackRefs()`
- * kept its name when eight of its fields moved to `useEngineRefs()`, so a
- * leftover `const { playoutRef } = usePlaybackRefs()` in plain JavaScript
- * would read `undefined` and fail somewhere else, later. Each moved name is a
- * getter that throws instead. The getters are not enumerable: the value still
- * lists, spreads and compares as its four fields.
- *
- * MIGRATION-GUARD: remove in the major after this one (#788).
- */
-export function playbackRefsValue(fields: PlaybackRefsContextValue): PlaybackRefsContextValue {
-  const value = { ...fields };
-  for (const name of MOVED_TO_ENGINE_REFS) {
-    Object.defineProperty(value, name, {
-      enumerable: false,
-      get() {
-        throw new Error(
-          `${name} is no longer on usePlaybackRefs(): read it from useEngineRefs() ` +
-            `(${WEB_AUDIO} only)` +
-            (name === 'playoutRef'
-              ? `; under ${MEDIA_ELEMENT} the player is useMediaElementTrack().playoutRef`
-              : '')
-        );
-      },
-    });
-  }
-  return value;
-}
-
 /** `{ isPlaying }`. Re-renders on play, pause and stop. */
 export const useIsPlaying = () => useSlot(IsPlayingContext, 'useIsPlaying', EITHER);
 

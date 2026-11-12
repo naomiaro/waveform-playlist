@@ -13,7 +13,6 @@ import {
   Selection,
   TimescaleLoopRegion,
   useTheme,
-  type PlayheadProps,
   type RenderPlayheadFunction,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
@@ -59,42 +58,6 @@ export const SelectionOverlay: React.FC = React.memo(function SelectionOverlay()
 });
 
 /**
- * What `renderPlayhead` was given until #688 part 3 and is not given any more,
- * with what to do instead.
- */
-const REMOVED_PLAYHEAD_PROPS: Readonly<Record<string, string>> = {
-  playbackStartTimeRef: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
-  audioStartPositionRef: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
-  getAudioContextTime: 'read it from useEngineRefs() (WaveformPlaylistProvider only)',
-  getPlaybackTime:
-    'read it from useEngineRefs() (WaveformPlaylistProvider only), or place the playhead from visualTimeRef',
-  controlsOffset: 'it was always 0: delete it',
-};
-
-/**
- * INTERNAL: the props object handed to `renderPlayhead`. Five props were
- * removed from `PlayheadProps`; a leftover playhead in plain JavaScript that
- * still reads one would get `undefined` and draw at `NaN` pixels with no
- * error. Each removed name is a getter that throws instead. The getters are
- * not enumerable: the object still lists and spreads as its seven props, so
- * `<PlayheadWithMarker {...props} />` is unaffected.
- *
- * MIGRATION-GUARD: remove in the major after this one (#788).
- */
-export function playheadProps(props: PlayheadProps): PlayheadProps {
-  const value = { ...props };
-  for (const [name, instead] of Object.entries(REMOVED_PLAYHEAD_PROPS)) {
-    Object.defineProperty(value, name, {
-      enumerable: false,
-      get() {
-        throw new Error(`${name} is no longer passed to renderPlayhead: ${instead}`);
-      },
-    });
-  }
-  return value;
-}
-
-/**
  * Wrapper that isolates the custom playhead's hooks from its parent.
  * Calling renderPlayhead() directly would merge its hooks into the parent,
  * causing "Rendered more hooks" errors if renderPlayhead is conditionally provided.
@@ -116,17 +79,15 @@ const CustomPlayhead: React.FC<{
   // (the default playhead and the progress fill are drawn from it too).
   const visualTime = visualTimeRef.current ?? currentTimeRef.current ?? 0;
 
-  return renderPlayhead(
-    playheadProps({
-      position: (visualTime * sampleRate) / samplesPerPixel,
-      color,
-      isPlaying,
-      currentTimeRef,
-      visualTimeRef,
-      samplesPerPixel,
-      sampleRate,
-    })
-  ) as React.ReactElement;
+  return renderPlayhead({
+    position: (visualTime * sampleRate) / samplesPerPixel,
+    color,
+    isPlaying,
+    currentTimeRef,
+    visualTimeRef,
+    samplesPerPixel,
+    sampleRate,
+  }) as React.ReactElement;
 };
 
 export interface PlayheadOverlayProps {

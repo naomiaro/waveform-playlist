@@ -26,7 +26,6 @@ import { useViewDefaults } from './providerInternals/useViewDefaults';
 import { useTimeFormat } from './hooks/useTimeFormat';
 import {
   BLOCKED,
-  playbackRefsValue,
   ActiveAnnotationContext,
   AnnotationEditingContext,
   AnnotationsContext,
@@ -852,13 +851,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Never changes. A media element reports the audible position, so the
   // position to draw is the playback position itself.
   const refsValue: PlaybackRefsContextValue = useMemo(
-    () =>
-      playbackRefsValue({
-        currentTimeRef,
-        visualTimeRef: currentTimeRef,
-        registerFrameCallback,
-        unregisterFrameCallback,
-      }),
+    () => ({
+      currentTimeRef,
+      visualTimeRef: currentTimeRef,
+      registerFrameCallback,
+      unregisterFrameCallback,
+    }),
     [registerFrameCallback, unregisterFrameCallback]
   );
 
