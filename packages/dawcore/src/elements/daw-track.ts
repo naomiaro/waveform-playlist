@@ -76,6 +76,19 @@ export class DawTrackElement extends LitElement {
   set renderMode(value: RenderMode) {
     const old = this._renderMode;
     let next = value;
+    if (next !== 'waveform' && next !== 'spectrogram' && next !== 'both') {
+      // From markup the value is any string. 'piano-roll' was a render mode
+      // until tracks got a kind (#756).
+      console.warn(
+        '[dawcore] <daw-track render-mode="' +
+          String(value) +
+          '"> is not a render mode (waveform or spectrogram); using waveform.' +
+          (String(value) === 'piano-roll'
+            ? ' A piano roll is how a MIDI track is drawn: set kind="midi" on the track.'
+            : '')
+      );
+      next = 'waveform';
+    }
     if (next === 'both') {
       console.warn(
         '[dawcore] <daw-track render-mode="both"> is not yet supported; falling back to \'spectrogram\''

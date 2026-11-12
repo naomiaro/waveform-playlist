@@ -193,7 +193,13 @@ export const PianoRollChannel: FunctionComponent<PianoRollChannelProps> = ({
   const bgColor = transparentBackground ? 'transparent' : backgroundColor;
 
   return (
-    <Wrapper $index={index} $cssWidth={length} $waveHeight={waveHeight} $backgroundColor={bgColor}>
+    <Wrapper
+      data-piano-roll=""
+      $index={index}
+      $cssWidth={length}
+      $waveHeight={waveHeight}
+      $backgroundColor={bgColor}
+    >
       {canvases}
     </Wrapper>
   );

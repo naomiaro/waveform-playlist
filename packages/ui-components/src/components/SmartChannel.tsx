@@ -15,7 +15,7 @@ export interface SmartChannelProps {
   /** If true, background is transparent (for use with external progress overlay) */
   transparentBackground?: boolean;
   /** Linear gain applied to the drawn waveform bars (see `ChannelProps.gain`).
-   *  Waveform rendering only — spectrogram and piano-roll ignore it. */
+   *  Waveform rendering only — spectrogram and piano roll ignore it. */
   gain?: number;
   /** Render mode: waveform, spectrogram, or both */
   renderMode?: RenderMode;
@@ -27,17 +27,17 @@ export interface SmartChannelProps {
   spectrogramOnCanvasRegister?: (reg: SpectrogramCanvasRegistration) => void;
   /** Counterpart for chunk unmount / unmount. */
   spectrogramOnCanvasUnregister?: (canvasId: string) => void;
-  /** MIDI note data for piano-roll rendering */
+  /**
+   * The notes of a MIDI clip. When given (an empty array included), the
+   * channel is drawn as a piano roll and `renderMode` is not used. Pass the
+   * same array while the notes are unchanged: a new array is redrawn.
+   */
   midiNotes?: MidiNoteData[];
   /** Sample rate for MIDI note time → pixel conversion */
   sampleRate?: number;
   /** Clip offset in seconds for MIDI note positioning */
   clipOffsetSeconds?: number;
 }
-
-// One empty list for every piano-roll channel without notes. An inline `[]`
-// would be a new array on each render and force a redraw.
-const EMPTY_MIDI_NOTES: MidiNoteData[] = [];
 
 export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   isSelected,
@@ -135,11 +135,11 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
     );
   }
 
-  if (renderMode === 'piano-roll') {
+  if (midiNotes !== undefined) {
     return (
       <PianoRollChannel
         index={props.index}
-        midiNotes={midiNotes ?? EMPTY_MIDI_NOTES}
+        midiNotes={midiNotes}
         length={props.length}
         waveHeight={waveHeight}
         devicePixelRatio={devicePixelRatio}

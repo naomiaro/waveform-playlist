@@ -9,9 +9,11 @@ import {
 } from '@waveform-playlist/ui-components';
 import {
   resolveRecordingOffsetSamples,
+  trackKind,
   type ClipTrack,
   type Peaks,
   type RenderMode,
+  type TrackKind,
   type SpectrogramConfig,
 } from '@waveform-playlist/core';
 import {
@@ -246,6 +248,8 @@ interface TrackRowProps extends ClipDisplayOptions {
   width: number;
   isSelected: boolean;
   isDragSource: boolean;
+  /** Audio or MIDI: a MIDI track is drawn as a piano roll. */
+  kind: TrackKind;
   renderMode: RenderMode;
   numChannels: number;
   waveHeight: number;
@@ -273,6 +277,7 @@ const TrackRow = React.memo(function TrackRow({
   width,
   isSelected,
   isDragSource,
+  kind,
   renderMode,
   numChannels,
   waveHeight,
@@ -291,14 +296,13 @@ const TrackRow = React.memo(function TrackRow({
       $animate={animate}
       data-track-row=""
       data-track-id={trackId}
-      // The render mode follows the kind (trackRenderMode): piano roll = MIDI.
-      data-track-kind={renderMode === 'piano-roll' ? 'midi' : 'audio'}
+      data-track-kind={kind}
       data-track-drag-source={isDragSource ? 'true' : undefined}
     >
       <TrackComponent
         numChannels={numChannels}
         backgroundColor={
-          renderMode === 'piano-roll'
+          kind === 'midi'
             ? theme.pianoRollBackgroundColor || '#1a1a2e'
             : waveformColorToCss(theme.waveOutlineColor)
         }
@@ -421,6 +425,7 @@ export const TrackRows = React.memo(function TrackRows({
             width={width}
             isSelected={track.id === selectedTrackId}
             isDragSource={track.id === dragSourceTrackId}
+            kind={trackKind(track)}
             renderMode={renderModeById.get(track.id) ?? 'waveform'}
             numChannels={getTrackChannelCount(trackClipPeaks, recordingChannels)}
             waveHeight={waveHeight}

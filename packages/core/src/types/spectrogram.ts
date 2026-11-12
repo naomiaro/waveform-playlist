@@ -91,8 +91,11 @@ export type SpectrogramDisplayConfig = Pick<
   | 'labelsBackground'
 >;
 
-/** Render mode for a track's visualization */
-export type RenderMode = 'waveform' | 'spectrogram' | 'both' | 'piano-roll';
+/**
+ * How an audio track is drawn. A MIDI track (`kind: 'midi'`) has no render
+ * mode: it is always drawn as a piano roll.
+ */
+export type RenderMode = 'waveform' | 'spectrogram' | 'both';
 
 /** Per-track overrides for spectrogram rendering (render mode, config, color map) */
 export interface TrackSpectrogramOverrides {

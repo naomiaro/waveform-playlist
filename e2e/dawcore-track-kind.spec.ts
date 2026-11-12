@@ -41,7 +41,7 @@ test.describe('dawcore track kinds', () => {
     expect(result).toEqual({
       attribute: 'midi',
       kind: 'midi',
-      renderMode: 'piano-roll',
+      renderMode: 'waveform',
       engineKind: 'midi',
     });
     await expect(page.locator('daw-piano-roll')).toHaveCount(1);

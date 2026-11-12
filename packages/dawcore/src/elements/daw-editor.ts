@@ -2682,12 +2682,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         // Transport setTracks rebuilds TrackNodes, severing effects hookups.
         this._effectsManager?.rewireTrackChains();
         // Regenerate peaks for new or trimmed clips.
-        // Piano-roll tracks have no AudioBuffer — skip them to avoid noisy
+        // MIDI tracks have no AudioBuffer — skip them to avoid noisy
         // "no AudioBuffer" warnings on every tracksVersion bump.
-        const audioTracks = engineState.tracks.filter((t) => {
-          const desc = this._tracks.get(t.id);
-          return desc?.renderMode !== 'piano-roll';
-        });
+        const audioTracks = engineState.tracks.filter((t) => trackKind(t) !== 'midi');
         syncPeaksForChangedClips(this, audioTracks);
       }
       // Tick-based annotations: BPM changes move their time-domain positions —
@@ -3961,7 +3958,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                             <span>${clip.name || t.descriptor?.name || ''}</span>
                           </div>`
                         : ''}
-                      ${t.descriptor?.renderMode === 'piano-roll'
+                      ${t.descriptor?.kind === 'midi'
                         ? html`<daw-piano-roll
                             style="position:absolute;left:0;top:${hdrH}px;"
                             .midiNotes=${clip.midiNotes ?? []}

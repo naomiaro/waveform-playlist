@@ -143,20 +143,36 @@ describe('PianoRollChannel', () => {
   });
 });
 
-describe('SmartChannel in piano-roll mode without notes', () => {
-  it('does not redraw on re-render (the empty note list keeps its identity)', () => {
+describe('SmartChannel draws a piano roll for a clip with notes', () => {
+  const base = { index: 0, data: new Int8Array(0), bits: 8 as const, length: 500 };
+  // One array for all renders: a new array is a new drawing.
+  const noNotes: MidiNoteData[] = [];
+
+  it('does not redraw on re-render while the note list keeps its identity', () => {
     visibleChunks = [0];
-    const props = {
-      index: 0,
-      data: new Int8Array(0),
-      bits: 8 as const,
-      length: 500,
-      renderMode: 'piano-roll' as const,
-    };
-    const { rerender } = render(<SmartChannel {...props} />);
+    const props = { ...base, midiNotes: noNotes };
+    const { container, rerender } = render(<SmartChannel {...props} />);
     rerender(<SmartChannel {...props} />);
     rerender(<SmartChannel {...props} />);
+    expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
     expect(clears()).toEqual({ 0: 1 });
+  });
+
+  it('whatever the render mode, and an empty note list is still a MIDI clip', () => {
+    visibleChunks = [0];
+    for (const renderMode of ['waveform', 'spectrogram', 'both'] as const) {
+      const { container, unmount } = render(
+        <SmartChannel {...base} renderMode={renderMode} midiNotes={noNotes} />
+      );
+      expect(container.querySelector('[data-piano-roll]')).not.toBeNull();
+      unmount();
+    }
+  });
+
+  it('a clip without notes is not a piano roll', () => {
+    visibleChunks = [0];
+    const { container } = render(<SmartChannel {...base} />);
+    expect(container.querySelector('[data-piano-roll]')).toBeNull();
   });
 });
 

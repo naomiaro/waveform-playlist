@@ -178,7 +178,7 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
         track,
         spectrogram.trackSpectrogramOverrides.get(track.id)?.renderMode
       );
-      if (mode === 'waveform' || mode === 'piano-roll') return;
+      if (mode === 'waveform') return;
       const overrides = spectrogram.trackSpectrogramOverrides.get(track.id);
       const cm =
         overrides?.colorMap ??
@@ -195,9 +195,9 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
     return helpers;
   }, [tracks, spectrogram]);
 
-  // Render mode per track, from its kind (see trackRenderMode): a MIDI track
-  // is a piano roll; an audio track takes a spectrogram override, else its own
-  // mode, else a waveform.
+  // Render mode per track (see trackRenderMode): an audio track takes a
+  // spectrogram override, else its own mode, else a waveform. A MIDI track is
+  // drawn as a piano roll from its kind and has no render mode.
   const renderModeById = useMemo(() => {
     const modes = new Map<string, RenderMode>();
     tracks.forEach((track) => {
