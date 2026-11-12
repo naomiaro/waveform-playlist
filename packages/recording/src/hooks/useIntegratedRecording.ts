@@ -126,6 +126,10 @@ export function useIntegratedRecording(
   // keyed by the track id.
   const recordingTrackIdRef = useRef<string | null>(null);
   const [recordingTrackId, setRecordingTrackId] = useState<string | null>(null);
+  // True from the moment startRecording() begins its async startup until it
+  // settles. isRecording only turns true a render after the startup succeeds,
+  // so without this a second call in that window would re-capture the track.
+  const isStartingRef = useRef(false);
 
   // Keep selectedTrackId and currentTime in refs for use in callbacks.
   // Avoids stale closures and keeps the callbacks from being recreated when
@@ -169,10 +173,10 @@ export function useIntegratedRecording(
   // Reads selectedTrackId from ref to avoid stale closures when
   // auto-create track + start recording happen in the same render cycle
   const startRecording = useCallback(async (): Promise<boolean> => {
-    // A take is running: starting again must not re-capture its track or its
-    // start position (useRecording would refuse further down, after both had
-    // been overwritten).
-    if (isRecordingRef.current) return false;
+    // A take is running or starting: starting again must not re-capture its
+    // track or its start position (useRecording would refuse further down,
+    // after both had been overwritten).
+    if (isRecordingRef.current || isStartingRef.current) return false;
     if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')
@@ -194,6 +198,7 @@ export function useIntegratedRecording(
       return false;
     }
 
+    isStartingRef.current = true;
     try {
       setHookError(null);
       // Resume audio context if needed
@@ -216,6 +221,8 @@ export function useIntegratedRecording(
       setRecordingTrackId(null);
       setHookError(err instanceof Error ? err : new Error(String(err)));
       return false;
+    } finally {
+      isStartingRef.current = false;
     }
   }, [isMonitoring, startRec]);
 
