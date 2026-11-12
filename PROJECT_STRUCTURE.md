@@ -346,10 +346,8 @@ const clip = createClipFromSeconds({
   │   ├── ZoomControls.tsx              # Zoom in/out buttons
   │   ├── ExportControls.tsx            # WAV export controls
   │   ├── AnnotationControls.tsx        # Annotation list + editing UI
-  │   ├── ChannelWithProgress.tsx       # Waveform channel with playback progress overlay
-  │   ├── ChannelWithMediaElementProgress.tsx  # MediaElement progress overlay
-  │   ├── AnimatedPlayhead.tsx          # Smooth 60fps playhead (Tone.js)
-  │   ├── AnimatedMediaElementPlayhead.tsx # Smooth 60fps playhead (MediaElement)
+  │   ├── ChannelWithProgress.tsx       # Waveform channel with playback progress overlay (both providers)
+  │   ├── AnimatedPlayhead.tsx          # Smooth 60fps playhead (both providers)
   │   ├── AnnotationListView.tsx        # The annotation list both providers render (shared)
   │   ├── AnnotationBoxes.tsx           # The row of annotation boxes both providers render (shared)
   │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider

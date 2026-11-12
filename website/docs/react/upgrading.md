@@ -855,7 +855,7 @@ A custom playout created from the package's own `MediaElementPlayout` class need
 
 Six hooks are removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()` and `useMediaElementData()`. A leftover call to a removed hook fails at import (the export is missing), not silently: under webpack or Rspack the import is `undefined` and the call throws at the first render; in native ES modules and the Vite dev server the module fails to link ("does not provide an export named …"). TypeScript reports the import.
 
-`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()`. A leftover read of one of them from the `usePlaybackRefs()` value throws at that read, under either provider, for example: "getLookAhead is no longer on usePlaybackRefs(): read it from useEngineRefs() (WaveformPlaylistProvider only)". In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` therefore throws at the destructuring, on the component's first render. A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. The eight names are not enumerable on the value, so it still lists and spreads as its four fields; a spread copy (`{ ...refs }`) does not carry the guard, and a moved name read from the copy is `undefined`. Only a read throws: `'playoutRef' in refs` is `true`, and `refs.playoutRef?.current` throws like any other read. The message for `playoutRef` (under either provider) goes on to name `useMediaElementTrack().playoutRef`, which is where the MediaElement provider's player is.
+`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()`. The value is a plain object with the four fields that remain, so a leftover read of one of the eight is `undefined`, with no error at the read. In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` gives `undefined` and the code fails where it next uses the name ("Cannot read properties of undefined (reading 'current')", or "getPlaybackTime is not a function"). A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. Search for the eight names next to `usePlaybackRefs` before running the app. Under `MediaElementPlaylistProvider` the player is `useMediaElementTrack().playoutRef`.
 
 | Removed | Replace with |
 | --- | --- |
@@ -1207,7 +1207,7 @@ Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`
 - **`MediaElementPlaylistProvider` has a time format.** Before: none. Now: `usePlaylistSettings().timeFormat` and `usePlaybackControls().setTimeFormat`, default `'hh:mm:ss.uuu'`, read by `AudioPosition` and `TimeFormatSelect`.
 - **`KeyboardShortcuts` and `usePlaybackShortcuts()` are `WaveformPlaylistProvider` only**, before and now: both throw under `MediaElementPlaylistProvider`, also when that provider is nested inside a `WaveformPlaylistProvider` (before, the hook then drove the outer playlist) (now with "usePlaybackShortcuts needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it"). `usePlaybackShortcuts()` listens on the window, and what keys do for the single-track player is not decided ([#723](https://github.com/naomiaro/waveform-playlist/issues/723), [#730](https://github.com/naomiaro/waveform-playlist/issues/730)). `useKeyboardShortcuts()` reads no context, and `useAnnotationKeyboardControls()` does not throw there, so your own component can call either under `MediaElementPlaylistProvider`.
 - **`useAnnotationKeyboardControls()` under `MediaElementPlaylistProvider` reads `samplesPerPixel` and `sampleRate` from the provider.** Before: under that provider the hook scrolled to the active annotation only when `scrollContainerRef`, `samplesPerPixel` and `sampleRate` were all passed as options. Now: with a `scrollContainerRef` and without the other two it reads them from the provider and scrolls the active annotation into view. An option that is passed still wins. Inside nested providers it reads the nearest one.
-- **Some hooks and components that read only shared hooks no longer throw under the other provider**: `useClipDragHandlers()` under `MediaElementPlaylistProvider`, and `MediaElementAnnotationList` and `AnimatedMediaElementPlayhead` under `WaveformPlaylistProvider`. That is a consequence of the shared hooks, not a supported use.
+- **Some hooks and components that read only shared hooks no longer throw under the other provider**: `useClipDragHandlers()` under `MediaElementPlaylistProvider`, and `MediaElementAnnotationList` under `WaveformPlaylistProvider`. That is a consequence of the shared hooks, not a supported use.
 
 ### What to check after the replacement of the MediaElement hooks
 
@@ -1229,6 +1229,81 @@ A component re-renders only for the hooks it calls. The four removed hooks carri
 3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
 4. **Under `WaveformPlaylistProvider`, a `usePlaylistAnnotations()` reader moved to `useAnnotations()`** no longer re-renders on the Editable and Link-endpoints toggles, unless it calls `useAnnotationEditing()`.
 5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek, and during a leftward selection drag it is called on every move.
+
+## One playhead and one progress overlay for both providers; `PlayheadProps` has seven props
+
+The playhead, the played-portion overlay of a channel, the selection highlight and the wrapper that calls a custom `renderPlayhead` exist once and are rendered by both `<Waveform>` / `<PlaylistVisualization>` and `<MediaElementWaveform>` / `<MediaElementPlaylist>`. None of these parts was a public export; what changes for an app is the props a `renderPlayhead` function receives and three things on screen.
+
+### `PlayheadProps`
+
+A `renderPlayhead` function (and `Playhead`, `PlayheadWithMarker` from `@waveform-playlist/ui-components`) receives the same seven props under either provider:
+
+| Prop | |
+| --- | --- |
+| `position` | pixels from the left edge, valid while not playing |
+| `color` | the theme's `playheadColor` |
+| `isPlaying` | |
+| `currentTimeRef` | the raw playback position, in seconds |
+| `visualTimeRef` | the time to draw the playhead at, in seconds. Always passed now (it was optional, and `MediaElementPlaylistProvider` did not pass it). Under `MediaElementPlaylistProvider` it is the same ref as `currentTimeRef` |
+| `samplesPerPixel` | |
+| `sampleRate` | |
+
+Five props are removed:
+
+| Removed prop | Replace with |
+| --- | --- |
+| `getPlaybackTime` | place the playhead from `visualTimeRef.current`; for the raw engine time, `useEngineRefs().getPlaybackTime` (`WaveformPlaylistProvider` only) |
+| `getAudioContextTime` | `useEngineRefs().getAudioContextTime` (`WaveformPlaylistProvider` only) |
+| `playbackStartTimeRef` | `useEngineRefs().playbackStartTimeRef` (`WaveformPlaylistProvider` only) |
+| `audioStartPositionRef` | `useEngineRefs().audioStartPositionRef` (`WaveformPlaylistProvider` only) |
+| `controlsOffset` | delete it: it was always `0` |
+
+Under `MediaElementPlaylistProvider` the two refs were placeholders that always held `0`, and the two functions were never passed.
+
+**Find:** in every function or component passed as `renderPlayhead`, the names `getPlaybackTime`, `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef` and `controlsOffset`.
+
+**Replace with:**
+
+```tsx
+// Before
+function MyPlayhead({
+  isPlaying,
+  currentTimeRef,
+  getPlaybackTime,
+  samplesPerPixel,
+  sampleRate,
+  controlsOffset = 0,
+}) {
+  // …in an animation frame while playing:
+  const time = isPlaying && getPlaybackTime ? getPlaybackTime() : (currentTimeRef.current ?? 0);
+  const x = (time * sampleRate) / samplesPerPixel + controlsOffset;
+}
+
+// After
+function MyPlayhead({ visualTimeRef, samplesPerPixel, sampleRate }) {
+  // …in an animation frame while playing, and after each render while stopped:
+  const x = ((visualTimeRef.current ?? 0) * sampleRate) / samplesPerPixel;
+}
+```
+
+The props object is a plain object: reading a removed prop gives `undefined`, with no error.
+
+- **A playhead copied from the old `PlayheadWithMarker`** destructures all five removed props and uses them only as a fallback for a missing `visualTimeRef`. `visualTimeRef` is now always passed, so in plain JavaScript such a copy keeps drawing at the right place; delete the dead branches. TypeScript reports each removed name.
+- **A playhead that computes its position from `getPlaybackTime()` or from `getAudioContextTime()` and the two start refs** calls `undefined` ("getPlaybackTime is not a function") or draws at `NaN` pixels. Use `visualTimeRef`, which under `WaveformPlaylistProvider` is also what keeps the playhead in step with the progress fill (the raw engine time runs ahead of what is heard by the output latency).
+- A playhead that needs an engine value calls `useEngineRefs()` itself. The function passed as `renderPlayhead` may call hooks: it is called inside a component of its own.
+
+`PlayheadWithMarker` reads `visualTimeRef` only. `<Waveform renderPlayhead={PlayheadWithMarker} />` and `<MediaElementWaveform renderPlayhead={PlayheadWithMarker} />` need no change.
+
+### On screen
+
+- **`MediaElementPlaylistProvider`: the resting playhead is hidden while a range is highlighted.** Before: the playhead line stayed visible on the left edge of the highlight. Now: with a range selected and playback stopped or paused there is no playhead (default or custom: `renderPlayhead` is not called); it is shown during playback, and again at rest once the selection is collapsed (a click). `WaveformPlaylistProvider` has always done this.
+- **`MediaElementPlaylistProvider`: the progress overlay is as wide as the clip.** Before: as wide as the waveform's peak data, which on the example pages was one pixel wider than the clip. Now: the clip's width, as under `WaveformPlaylistProvider`.
+- **`WaveformPlaylistProvider`: two visualizations under one provider each animate their playhead.** Before: the default playheads of two `<Waveform>` / `<PlaylistVisualization>` under the same provider registered under one id, so only one of them moved during playback. Now: each has its own.
+
+### What renders when
+
+- Under `MediaElementPlaylistProvider`, a custom `renderPlayhead` is not called at all while a range is highlighted at rest, and one small extra component (the playhead overlay) renders per pointer move of a rightward selection drag and whenever the waveform shell renders (play, pause, stop, a click).
+- Under `WaveformPlaylistProvider` the selection highlight no longer renders when the visualization around it does (play, pause, a track selection); it renders when the selection, the zoom or the theme changes.
 
 ## Keyboard shortcuts yield to the focused control
 
