@@ -101,7 +101,9 @@ interface PlayheadProps {
   currentTimeRef: React.RefObject<number>;
   /**
    * The time to draw the playhead at, in seconds. The provider keeps it current
-   * on every frame of playback and when playback comes to rest. Under
+   * on every frame of playback, and on a seek, a stop and the end of playback
+   * (after a pause under MediaElementPlaylistProvider it holds the last frame's
+   * time, within a frame of the paused position). Under
    * WaveformPlaylistProvider it is the audible time while playing (raw minus
    * output latency and look-ahead); under MediaElementPlaylistProvider it is
    * the same ref as currentTimeRef.
