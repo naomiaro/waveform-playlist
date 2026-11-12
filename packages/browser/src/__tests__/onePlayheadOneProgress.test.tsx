@@ -296,6 +296,31 @@ describe('a custom playhead gets the same props under both providers', () => {
     expect(last().visualTimeRef.current).toBe(1.5);
   });
 
+  it('isPlaying follows playback, under either provider', async () => {
+    const mediaElement = capturePlayhead();
+    await mountMediaElement(<MediaElementPlaylist renderPlayhead={mediaElement.renderPlayhead} />);
+    expect(mediaElement.last().isPlaying).toBe(false);
+    await act(async () => {
+      await controls.play();
+    });
+    expect(mediaElement.last().isPlaying).toBe(true);
+    act(() => controls.pause());
+    expect(mediaElement.last().isPlaying).toBe(false);
+    await act(async () => {
+      cleanup();
+    });
+
+    const webAudio = capturePlayhead();
+    await mountWebAudio(<PlaylistVisualization renderPlayhead={webAudio.renderPlayhead} />);
+    expect(webAudio.last().isPlaying).toBe(false);
+    await act(async () => {
+      await controls.play(0);
+    });
+    expect(webAudio.last().isPlaying).toBe(true);
+    act(() => controls.pause());
+    expect(webAudio.last().isPlaying).toBe(false);
+  });
+
   it('the five removed props are not passed, under either provider', async () => {
     const mediaElement = capturePlayhead();
     await mountMediaElement(<MediaElementPlaylist renderPlayhead={mediaElement.renderPlayhead} />);

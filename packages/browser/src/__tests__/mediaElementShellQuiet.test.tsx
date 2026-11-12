@@ -241,6 +241,16 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     expect(background.style.background).toBe('rgb(0, 180, 216)'); // defaultTheme.selectedWaveFillColor
   });
 
+  it('a collapsed selection renders no highlight at all', async () => {
+    const { reset } = await mount();
+    reset();
+    act(() => controls.setSelection(3, 3));
+    act(() => controls.seekTo(1));
+    expect(counts.selection).toBe(0);
+    act(() => controls.setSelection(3, 4));
+    expect(counts.selection).toBe(1);
+  });
+
   it('play and pause render the shell and not the selection highlight', async () => {
     const { reset } = await mount();
     act(() => controls.setSelection(2, 4));
