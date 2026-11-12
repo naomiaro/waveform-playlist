@@ -601,7 +601,7 @@ Applies to the `recordingState` prop of `<Waveform>` and `<PlaylistVisualization
     isRecording && recordingTrackId
       ? {
           isRecording: true,
-          trackId: recordingTrackId, // from useIntegratedRecording: the track the take was started on
+          trackId: recordingTrackId, // NOT the selected track id: see "a take stays on its track" below
           startSample,
           progress,
           bits: 16,
@@ -986,8 +986,65 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 **What else changes:**
 
 - **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty. An audio track is never drawn as one: `renderMode: 'piano-roll'` on an audio track is ignored (waveform).
-- **Recording.** `useIntegratedRecording`'s `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped. The take is now added to the track it was started on. Before, it was added to whichever track was selected when it stopped, so selecting another track mid-take moved it; the target can no longer be switched while a take is running (as in `<daw-editor>`). The hook returns that track's id as `recordingTrackId`: pass it, not the selected track id, as `recordingState.trackId`, so the live preview is drawn on the track the take will land on.
+- **Recording.** A take cannot be recorded onto a MIDI track, and a take now stays on the track it was started on. See [the next section](#useintegratedrecording-a-take-stays-on-its-track-pass-recordingtrackid-to-the-preview): it needs a code change in every app that shows the live preview.
 - **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id.
+
+## `useIntegratedRecording`: a take stays on its track; pass `recordingTrackId` to the preview
+
+**Packages:** `@waveform-playlist/recording`.
+
+:::warning Change `recordingState.trackId` in every recording UI
+
+`useIntegratedRecording` returns a new field, **`recordingTrackId`**. Pass it as `recordingState.trackId` on `<Waveform>` in place of the selected track id. If you keep passing the selected track id, the live preview is drawn on whichever track the user selects during a take, while the finished clip is added to the track the take was started on.
+
+:::
+
+What changed:
+
+- **The take belongs to the track it was started on.** The track that is selected when `startRecording()` is called receives the clip. Before, the clip went to whichever track was selected when the take _stopped_, so selecting another track mid-take moved it. The target can no longer be switched while a take is running, as in `<daw-editor>`.
+- **`recordingTrackId: string | null`** is that track's id: set when `startRecording()` is called, `null` when no take is running (also after a start that failed).
+- **A MIDI track is refused.** `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped.
+- **A second `startRecording()` while a take is running or starting returns `false`** and changes nothing.
+
+**Find:** `recordingState=` on `<Waveform>` (or `PlaylistVisualization`), and any other place that uses the selected track id to mean "the track being recorded": a guard that stops the take when that track is removed, a label that names it, a call to `setRecordingActive(true, trackId)` made after the take has started.
+
+**Replace with:**
+
+```tsx
+// Before
+const { isRecording, progress, startRecording, stopRecording } =
+  useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+
+<Waveform
+  recordingState={
+    isRecording && selectedTrackId
+      ? { isRecording: true, trackId: selectedTrackId, startSample, progress, bits: 16 }
+      : undefined
+  }
+/>
+
+// After
+const { isRecording, progress, recordingTrackId, startRecording, stopRecording } =
+  useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+
+<Waveform
+  recordingState={
+    isRecording && recordingTrackId
+      ? { isRecording: true, trackId: recordingTrackId, startSample, progress, bits: 16 }
+      : undefined
+  }
+/>
+```
+
+```tsx
+// Before: stop the take when its track is removed
+if (isRecording && removedTrack.id === selectedTrackId) await stopRecording();
+
+// After
+if (isRecording && removedTrack.id === recordingTrackId) await stopRecording();
+```
+
+The third argument of `useIntegratedRecording` is still the selected track id: it decides where the _next_ take starts.
 
 ## `addEffect` and `addEffectToTrack` return a promise
 
