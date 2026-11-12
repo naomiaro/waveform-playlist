@@ -6,7 +6,6 @@ import type {
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
 import { usePlaylistState } from '../WaveformPlaylistContext';
-import { useClipInteractionEnabled } from '../contexts/ClipInteractionContext';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
 import type { VisualizationRecordingState } from './visualizationLayout';
@@ -43,12 +42,15 @@ export interface WaveformProps {
    *  height) so levelled clips look the way they sound. Default: false —
    *  waveforms show source level. Draw-time only; peaks are not regenerated. */
   gainScaledWaveforms?: boolean;
-  interactiveClips?: boolean; // Enable dragging/trimming interactions on clips (auto-enabled by ClipInteractionProvider)
+  /** Enable dragging and trimming of clips. Not needed under
+   *  `ClipInteractionProvider`, which turns this on by itself. */
+  interactiveClips?: boolean;
   showFades?: boolean; // Show fade in/out overlays on clips
   /**
-   * Enable mobile-optimized touch interactions.
-   * When true, increases touch target sizes for clip boundaries.
-   * Use with useDragSensors({ touchOptimized: true }) for best results.
+   * Widen the clip trim handles for touch. Not needed under
+   * `<ClipInteractionProvider touchOptimized>`, which turns this on by itself;
+   * set it when you use your own DragDropProvider with
+   * `useDragSensors({ touchOptimized: true })`.
    */
   touchOptimized?: boolean;
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
@@ -89,8 +91,6 @@ export const Waveform: React.FC<WaveformProps> = ({
   recordingState,
 }) => {
   const { annotations } = usePlaylistState();
-  const clipInteractionEnabled = useClipInteractionEnabled();
-  const effectiveInteractiveClips = interactiveClips || clipInteractionEnabled;
 
   return (
     <>
@@ -103,7 +103,7 @@ export const Waveform: React.FC<WaveformProps> = ({
         className={className}
         showClipHeaders={showClipHeaders}
         gainScaledWaveforms={gainScaledWaveforms}
-        interactiveClips={effectiveInteractiveClips}
+        interactiveClips={interactiveClips}
         showFades={showFades}
         touchOptimized={touchOptimized}
         onRemoveTrack={onRemoveTrack}

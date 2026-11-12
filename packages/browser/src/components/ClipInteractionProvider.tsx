@@ -211,8 +211,12 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     return mods;
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, getTracks, samplesPerPixel, sampleRate]);
 
+  // Memoized: every clip reads it, and this component renders on each pointer
+  // move of a trim (it follows `tracks`).
+  const clipInteraction = useMemo(() => ({ enabled: true, touchOptimized }), [touchOptimized]);
+
   return (
-    <ClipInteractionContextProvider value={true}>
+    <ClipInteractionContextProvider value={clipInteraction}>
       <DragDropProvider
         sensors={sensors}
         onDragStart={onDragStart}

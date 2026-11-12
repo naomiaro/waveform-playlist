@@ -23,6 +23,7 @@ import {
 } from '../WaveformPlaylistContext';
 import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
+import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import {
   TrackRowPositioner,
@@ -76,13 +77,19 @@ const ClipView = React.memo(function ClipView({
   sampleRate,
   showClipHeaders,
   gainScaledWaveforms,
-  interactiveClips,
+  interactiveClips: interactiveClipsProp,
   showFades,
-  touchOptimized,
+  touchOptimized: touchOptimizedProp,
   selectTrack,
   registerSpectrogramCanvas,
   unregisterSpectrogramCanvas,
 }: ClipViewProps) {
+  // A `ClipInteractionProvider` above turns both on by itself (#690). The
+  // props are for a consumer with their own DragDropProvider, who has no
+  // provider of ours to say it.
+  const clipInteraction = useClipInteraction();
+  const interactiveClips = interactiveClipsProp || clipInteraction.enabled;
+  const touchOptimized = touchOptimizedProp || clipInteraction.touchOptimized;
   const peaksData = clip.peaks;
   const width = peaksData.length;
 

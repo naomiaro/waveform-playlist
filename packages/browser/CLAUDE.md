@@ -366,6 +366,10 @@ A boundary trim calls `onTracksChange` on every pointer move, so anything keyed 
 
 `useKeyboardShortcuts` likewise keeps the latest `shortcuts` in a ref and subscribes to `keydown` once per `enabled` value; callers build the array inline. Guarded by `stableDragHandlers.test.tsx`, which mocks `@dnd-kit/react`'s `DragDropProvider` to capture the props it is given.
 
+## ClipInteractionProvider Tells Clips What It Enabled (#690)
+
+`ClipInteractionProvider` publishes `{ enabled, touchOptimized }` (`contexts/ClipInteractionContext.tsx`, memoized: the provider renders on every pointer move of a trim). `ClipView` reads it and combines it with the props threaded from `<Waveform>`: `interactiveClips || enabled`, `touchOptimized || context.touchOptimized`. So the provider's `touchOptimized` configures the sensors AND widens the trim handles; before, the handles needed a second flag on `<Waveform>`. The two `<Waveform>` props stay for a consumer with their own `DragDropProvider`, who has no provider of ours to say it (maintainer's choice, 2026-11-11; whether they are removed, or a small provider is exported for custom setups, is decided in #685 when the options move onto the tracks part). `Waveform` no longer reads the context. `useClipInteractionEnabled()` still returns a boolean. Tests: `clipInteractionTouchOptimized.test.tsx`; `e2e/mobile-multi-clip.spec.ts` checks the 24 px handles on a page that sets only the provider flag.
+
 ## @dnd-kit/react v0.5.0 Event API Quirks
 
 - **`event.operation.position.delta`** is `undefined` in snapshots — `@derived` getters are non-enumerable and stripped by `snapshot()`. Compute manually: `position.current.x - position.initial.x`.

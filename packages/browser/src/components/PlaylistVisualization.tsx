@@ -70,12 +70,15 @@ export interface PlaylistVisualizationProps {
   showClipHeaders?: boolean;
   /** Draw each clip's waveform scaled by its gain. Default: false. */
   gainScaledWaveforms?: boolean;
+  /** Enable dragging and trimming of clips. Not needed under
+   *  `ClipInteractionProvider`, which turns this on by itself. */
   interactiveClips?: boolean;
   showFades?: boolean;
   /**
-   * Enable mobile-optimized touch interactions.
-   * When true, increases touch target sizes for clip boundaries.
-   * Use with useDragSensors({ touchOptimized: true }) for best results.
+   * Widen the clip trim handles for touch. Not needed under
+   * `<ClipInteractionProvider touchOptimized>`, which turns this on by itself;
+   * set it when you use your own DragDropProvider with
+   * `useDragSensors({ touchOptimized: true })`.
    */
   touchOptimized?: boolean;
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
