@@ -147,9 +147,11 @@ Provides @dnd-kit drag handlers for annotation boundary editing.
 ```typescript
 import { useAnnotationDragHandlers } from '@waveform-playlist/browser';
 
-const { annotations, linkEndpoints } = usePlaylistState();
+const { annotations, linkEndpoints } = usePlaylistAnnotations();
 const { setAnnotations, annotationPreview } = usePlaylistControls();
-const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
+const { sampleRate } = usePlaylistView();
+const { samplesPerPixel } = usePlaylistZoom();
+const { duration } = usePlaylistTimeline();
 
 const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
   annotations,                          // AnnotationData[]

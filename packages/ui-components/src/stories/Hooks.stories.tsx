@@ -28,7 +28,7 @@ const ZoomControlsDemo: React.FC = () => {
   return (
     <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>
-        usePlaylistData + usePlaylistControls (zoom)
+        usePlaylistZoom + usePlaylistControls (zoom)
       </h3>
       <div style={{ marginBottom: '1rem' }}>
         <strong>Current:</strong> {samplesPerPixel} samples/pixel
@@ -93,7 +93,7 @@ const TimeFormatDemo: React.FC = () => {
 
 // useMasterVolume via context demo
 // Note: useMasterVolume is an internal hook used by WaveformPlaylistProvider.
-// Components should access masterVolume via usePlaylistData/usePlaylistControls.
+// Components should access masterVolume via usePlaylistMixer/usePlaylistControls.
 const MasterVolumeDemo: React.FC = () => {
   const { masterVolume } = usePlaylistMixer();
   const { setMasterVolume } = usePlaylistControls();
@@ -114,7 +114,7 @@ const MasterVolumeDemo: React.FC = () => {
   return (
     <div style={{ padding: '1rem', border: '1px solid #ddd', borderRadius: '8px' }}>
       <h3 style={{ margin: '0 0 1rem 0', fontSize: '1rem' }}>
-        usePlaylistData + usePlaylistControls (masterVolume)
+        usePlaylistMixer + usePlaylistControls (masterVolume)
       </h3>
       <div style={{ marginBottom: '1rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem' }}>
@@ -247,7 +247,7 @@ These stories demonstrate how to test and visualize custom React hooks.
 ## Available Hooks
 
 ### Demoed in Storybook
-- \`usePlaylistData\` + \`usePlaylistControls\` - Zoom controls and master volume (via context)
+- \`usePlaylistZoom\` / \`usePlaylistMixer\` + \`usePlaylistControls\` - Zoom controls and master volume (via context)
 - \`useTimeFormat\` - Format and parse time values
 - \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
 
@@ -282,7 +282,7 @@ export const ZoomControls: StoryObj = {
     docs: {
       description: {
         story:
-          'Zoom controls accessed via `usePlaylistData` (state) and `usePlaylistControls` (actions). Engine owns zoom state.',
+          'Zoom controls accessed via `usePlaylistZoom` (state) and `usePlaylistControls` (actions). Engine owns zoom state.',
       },
     },
   },
@@ -313,7 +313,7 @@ export const MasterVolume: StoryObj = {
     docs: {
       description: {
         story:
-          'Master volume accessed via `usePlaylistData` (state) and `usePlaylistControls` (actions). Engine owns volume state.',
+          'Master volume accessed via `usePlaylistMixer` (state) and `usePlaylistControls` (actions). Engine owns volume state.',
       },
     },
   },

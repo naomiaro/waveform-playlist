@@ -295,9 +295,9 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 // zoomOut), so a saved zoom level could not be restored.
 function SaveLoadState() {
   // trackStates: { name, muted, soloed, volume, pan } per track
-  const { trackStates } = usePlaylistData();
+  const { trackStates } = usePlaylistMixer();
   // The ref, not useCurrentTime(): the position is only read when Save is pressed
-  const { currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
   const { seekTo, setTrackMute, setTrackSolo, setTrackVolume, setTrackPan } =
     usePlaylistControls();
 
@@ -352,7 +352,8 @@ declare global {
 function ExternalTransport() {
   const { play, pause, stop, seekTo } = usePlaylistControls();
   // currentTimeRef follows playback; reading it needs no re-render
-  const { isPlaying, currentTimeRef } = usePlaybackAnimation();
+  const { currentTimeRef } = usePlaybackRefs();
+  const { isPlaying } = useIsPlaying();
 
   // Expose controls globally
   useEffect(() => {

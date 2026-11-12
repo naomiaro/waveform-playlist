@@ -721,10 +721,18 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 User Interaction (React Events)
     ↓
 WaveformPlaylistProvider (Split Contexts for Performance)
-    ├─→ PlaybackAnimationContext (playback start/stop; refs and frame callbacks for 60fps)
-    │   └─→ isPlaying, currentTimeRef, registerFrameCallback()
-    ├─→ PlaylistStateContext (user interactions)
-    │   └─→ loop, selectedTrackId, annotations, etc.
+    ├─→ IsPlayingContext (play, pause, stop)
+    │   └─→ isPlaying
+    ├─→ PlaybackRefsContext (never changes; refs and frame callbacks for 60fps)
+    │   └─→ currentTimeRef, registerFrameCallback(), playoutRef, isDraggingRef, etc.
+    ├─→ PlaylistAnnotationsContext (annotation edits and settings)
+    │   └─→ annotations, annotationsEditable, linkEndpoints, continuousPlay
+    ├─→ LoopContext (loop changes)
+    │   └─→ isLoopEnabled, loopStart, loopEnd
+    ├─→ SelectedTrackIdContext (track selection)
+    │   └─→ selectedTrackId
+    ├─→ UndoRedoContext (after an edit)
+    │   └─→ canUndo, canRedo
     ├─→ SelectionContext (every pointer move of a selection drag)
     │   └─→ selectionStart, selectionEnd
     ├─→ CurrentTimeContext (seek, pause, stop, leftward selection drag)
@@ -733,8 +741,16 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     │   └─→ activeAnnotationId
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
-    └─→ PlaylistDataContext (static/infrequent updates)
-        └─→ duration, peaksDataArray, tracks, isDraggingRef, etc.
+    ├─→ PlaylistViewContext (prop changes, settings clicks)
+    │   └─→ sampleRate, waveHeight, bar style, mono, timeFormat, etc.
+    ├─→ PlaylistZoomContext (a zoom)
+    │   └─→ samplesPerPixel, canZoomIn, canZoomOut
+    ├─→ PlaylistTimelineContext (every clip operation, every pointer move of a trim)
+    │   └─→ tracks, peaksDataArray, duration, isReady, onTracksChange
+    ├─→ PlaylistMixerContext (every step of a volume or pan slider)
+    │   └─→ trackStates, masterVolume
+    └─→ TrackReorderPreviewContext (every drag-over of a track reorder)
+        └─→ trackDragPreview, trackReorderEpoch
     ↓
 ├─→ Primitive Components (subscribe to relevant contexts only)
 │   ├─→ PlayButton, PauseButton, StopButton
@@ -768,77 +784,100 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-The provider uses **7 separate contexts** to optimize performance by isolating different update frequencies:
+The provider uses **15 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies:
 
-1. **PlaybackAnimationContext** - High-frequency (60fps)
-   - Only animation subscribers (Playhead, automatic scroll)
-   - Prevents re-renders in UI controls
+1. **IsPlayingContext** (`useIsPlaying()`) - Changes on play, pause and stop
 
-2. **PlaylistStateContext** - User interactions
-   - State that changes on user actions
-   - UI components subscribe here
+2. **PlaybackRefsContext** (`usePlaybackRefs()`) - Refs and functions for 60fps reads
+   - The value never changes, so reading it never causes a re-render
+   - Timing refs, the frame-callback registry, `playoutRef`, `isDraggingRef`
 
-3. **SelectionContext** - The selected time range (`useSelection()`)
+3. **PlaylistAnnotationsContext** (`usePlaylistAnnotations()`) - Annotations and the annotation settings
+
+4. **LoopContext** (`useLoop()`) - Loop enabled flag and loop region
+
+5. **SelectedTrackIdContext** (`useSelectedTrackId()`) - The selected track
+
+6. **UndoRedoContext** (`useUndoRedo()`) - Whether undo and redo are available
+
+7. **SelectionContext** - The selected time range (`useSelection()`)
    - Changes on every pointer move of a selection drag
    - Only components that show or use the selection subscribe
 
-4. **CurrentTimeContext** - The resting cursor position (`useCurrentTime()`)
+8. **CurrentTimeContext** - The resting cursor position (`useCurrentTime()`)
    - Changes on a seek, a pause, a stop and a selection whose start moves; does not advance during playback
    - Only components that show the resting position subscribe (playhead, clip progress, position readout)
 
-5. **ActiveAnnotationContext** - The active annotation (`useActiveAnnotation()`)
+9. **ActiveAnnotationContext** - The active annotation (`useActiveAnnotation()`)
    - Changes at every annotation boundary during playback
    - Only the annotation list, the annotation boxes and the annotation shortcuts subscribe
 
-6. **PlaylistControlsContext** - Stable functions
-   - Doesn't cause re-renders when accessed
-   - All control functions
+10. **PlaylistControlsContext** (`usePlaylistControls()`) - Stable functions
+    - Doesn't cause re-renders when accessed
+    - All control functions
 
-7. **PlaylistDataContext** - Static/infrequent
-   - Audio buffers, duration, sample rate
-   - Changes rarely after initialization
+11. **PlaylistViewContext** (`usePlaylistView()`) - View settings
+    - Sample rate, sizes, bar style, `mono`, time format, scroll and layout settings
+    - Changes on a prop change or a settings click
 
-**Key Files:**
+12. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom
 
-- `packages/browser/src/WaveformPlaylistContext.tsx` - Context provider (flexible API)
-- `packages/browser/src/SpectrogramIntegrationContext.tsx` - Optional spectrogram integration
-- `packages/browser/src/hooks/` - Reusable business logic
-- `packages/browser/src/components/` - React components
-- `packages/engine/src/PlaylistEngine.ts` - Stateful timeline engine
-- `packages/engine/src/operations/` - Pure clip/timeline/viewport operations
-- `packages/ui-components/src/components/Playlist.tsx` - UI container
-- `packages/playout/src/TonePlayout.ts` - Audio playback
+13. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks, peaks, duration, `isReady`
+    - Changes on every clip operation and on every pointer move of a trim
 
-## State Management
+14. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states and master volume
+    - Changes on every step of a volume or pan slider
+
+15. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
+    - Changes on every drag-over of a track reorder
 
 ### Context Splitting for Performance (2025-01-21)
 
-The `WaveformPlaylistProvider` uses **7 separate contexts** to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
+The `WaveformPlaylistProvider` uses **15 separate contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
 
 **Architecture:**
 
 ```typescript
-// 1. Playback start/stop, plus refs and frame callbacks for 60fps reads
-export interface PlaybackAnimationContextValue {
+// 1. Whether playback is running - changes on play, pause and stop
+export interface IsPlayingContextValue {
   isPlaying: boolean;
+}
+
+// 1b. Refs and functions with a stable identity - the value never changes
+export interface PlaybackRefsContextValue {
   currentTimeRef: React.RefObject<number>;
+  visualTimeRef: React.RefObject<number>;
   playbackStartTimeRef: React.RefObject<number>;   // context.currentTime when playback started
   audioStartPositionRef: React.RefObject<number>;   // Audio position when playback started
   getPlaybackTime: () => number;                     // Current time from engine (auto-wraps at loops)
+  getAudioContextTime: () => number;
+  getLookAhead: () => number;
+  getOutputLatency: () => number;
+  registerFrameCallback: (id: string, cb: (data: FrameData) => void) => void;
+  unregisterFrameCallback: (id: string) => void;
+  playoutRef: React.RefObject<PlaylistEngine | null>;
+  isDraggingRef: React.MutableRefObject<boolean>;
 }
 
-// 2. User interaction state - UI components (includes engine-mirrored state)
-export interface PlaylistStateContextValue {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  annotationsEditable: boolean;
-  isAutomaticScroll: boolean;
-  isLoopEnabled: boolean;
+// 2. User interaction state, one context per group that changes together
+export interface PlaylistAnnotationsContextValue {
   annotations: AnnotationData[];
-  selectedTrackId: string | null;
+  annotationsEditable: boolean;
+  linkEndpoints: boolean;
+  continuousPlay: boolean;
+}
+
+export interface LoopContextValue {
+  isLoopEnabled: boolean;
   loopStart: number;
   loopEnd: number;
-  indefinitePlayback: boolean;       // Whether playback continues past end of audio
+}
+
+export interface SelectedTrackIdContextValue {
+  selectedTrackId: string | null;
+}
+
+export interface UndoRedoContextValue {
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -903,29 +942,49 @@ export interface PlaylistControlsContextValue {
   redo: () => void;
 }
 
-// 4. Static/infrequent data
-export interface PlaylistDataContextValue {
-  duration: number;
-  peaksDataArray: TrackClipPeaks[];
-  trackStates: TrackState[];
-  tracks: ClipTrack[];
+// 4. View settings - change on a prop change or a settings click
+export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
   timeScaleHeight: number;
   controls: { show: boolean; width: number };
-  playoutRef: React.RefObject<PlaylistEngine | null>;
-  samplesPerPixel: number;
-  timeFormat: TimeFormat;
-  masterVolume: number;
-  canZoomIn: boolean;
-  canZoomOut: boolean;
   barWidth: number;
   barGap: number;
+  roundedBars: boolean;
   progressBarWidth: number;
-  isReady: boolean;
   mono: boolean;
-  isDraggingRef: React.MutableRefObject<boolean>;
+  timeFormat: TimeFormat;
+  isAutomaticScroll: boolean;
+  indefinitePlayback: boolean;       // Whether playback continues past end of audio
+  fillViewport: boolean;
+}
+
+// 4b. Zoom - changes on a zoom
+export interface PlaylistZoomContextValue {
+  samplesPerPixel: number;
+  canZoomIn: boolean;
+  canZoomOut: boolean;
+}
+
+// 4c. Timeline - changes on every clip operation and every pointer move of a trim
+export interface PlaylistTimelineContextValue {
+  tracks: ClipTrack[];
+  peaksDataArray: TrackClipPeaks[];
+  duration: number;
+  isReady: boolean;
   onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
+}
+
+// 4d. Mixer - changes on every step of a volume or pan slider
+export interface PlaylistMixerContextValue {
+  trackStates: TrackState[];
+  masterVolume: number;
+}
+
+// 4e. Live track-reorder drag - changes on every drag-over
+export interface TrackReorderPreviewContextValue {
+  trackDragPreview: TrackDragPreview | null;
+  trackReorderEpoch: number;
 }
 ```
 
@@ -936,15 +995,17 @@ Components subscribe only to the contexts they need:
 ```typescript
 // Animation component: frame callbacks while playing, the resting position otherwise
 export const Playhead = () => {
-  const { isPlaying, registerFrameCallback, unregisterFrameCallback } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
+  const { registerFrameCallback, unregisterFrameCallback } = usePlaybackRefs(); // never re-renders
   useCurrentTime(); // re-render on seek/pause/stop so the resting position is redrawn
-  const { sampleRate, samplesPerPixel } = usePlaylistData(); // Static
+  const { sampleRate } = usePlaylistView(); // Static
+  const { samplesPerPixel } = usePlaylistZoom(); // Changes on a zoom
   // ... move the playhead element from the frame callback / an effect
 };
 
 // Control component subscribes to state and controls only
 export const ContinuousPlayCheckbox = () => {
-  const { continuousPlay } = usePlaylistState(); // User interactions
+  const { continuousPlay } = usePlaylistAnnotations(); // User interactions
   const { setContinuousPlay } = usePlaylistControls(); // Stable functions
   // NO re-renders during 60fps animation!
 };
@@ -1000,10 +1061,10 @@ See `packages/browser/src/hooks/` for hook implementations.
 
 ### Component State (React useState)
 
-State lives in `WaveformPlaylistContext` and is distributed across the 7 split contexts:
+State lives in `WaveformPlaylistContext` and is distributed across the split contexts:
 
 ```typescript
-// PlaybackAnimationContext
+// IsPlayingContext
 const [isPlaying, setIsPlaying] = useState(false);
 
 // CurrentTimeContext
@@ -1012,7 +1073,7 @@ const [currentTime, setCurrentTime] = useState(0);
 // ActiveAnnotationContext
 const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
-// PlaylistStateContext
+// PlaylistAnnotationsContext
 const [continuousPlay, setContinuousPlay] = useState(false);
 const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
 
@@ -1020,7 +1081,7 @@ const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
 const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
 
-// PlaylistDataContext — derived from `tracks` during render, not state
+// PlaylistTimelineContext — derived from `tracks` during render, not state
 const duration = useMemo(() => timelineDuration(tracks), [tracks]);
 const peaksDataArray = useMemo(/* derivePeaks(...) with a per-clip cache */);
 ```
@@ -1028,13 +1089,14 @@ const peaksDataArray = useMemo(/* derivePeaks(...) with a per-clip cache */);
 Access contexts using specialized hooks:
 
 ```typescript
-const { isPlaying, currentTimeRef } = usePlaybackAnimation();
-const { continuousPlay, annotations } = usePlaylistState();
+const { isPlaying } = useIsPlaying();
+const { currentTimeRef } = usePlaybackRefs();
+const { continuousPlay, annotations } = usePlaylistAnnotations();
 const { selectionStart, selectionEnd } = useSelection();
 const { currentTime } = useCurrentTime();
 const { activeAnnotationId } = useActiveAnnotation();
 const { play, pause, setContinuousPlay } = usePlaylistControls();
-const { duration, tracks } = usePlaylistData();
+const { duration, tracks } = usePlaylistTimeline();
 ```
 
 ### Refs for Performance
@@ -1311,7 +1373,7 @@ The playlist now provides a **flexible/headless API** using React Context and pr
 - `WaveformPlaylistProvider` wraps your app and provides state via context
 - Primitive components (PlayButton, ZoomInButton, etc.) work anywhere inside the provider
 - `Waveform` component accepts a render prop for custom track controls
-- Split context hooks (`usePlaylistData`, `usePlaylistControls`, etc.) provide direct access to state/methods
+- Split context hooks (`usePlaylistTimeline`, `usePlaylistControls`, etc.) provide direct access to state/methods
 
 ### Benefits
 
@@ -1333,13 +1395,13 @@ import {
   StopButton,
   Waveform,
   MasterVolumeControl,
-  usePlaylistData,
+  usePlaylistMixer,
   usePlaylistControls,
 } from '@waveform-playlist/browser';
 
 // Custom track controls
 const CustomTrackControls = ({ trackIndex }) => {
-  const { trackStates } = usePlaylistData();
+  const { trackStates } = usePlaylistMixer();
   const { setTrackMute } = usePlaylistControls();
   return (
     <button onClick={() => setTrackMute(trackIndex, !trackStates[trackIndex].muted)}>

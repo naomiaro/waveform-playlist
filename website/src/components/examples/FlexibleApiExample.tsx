@@ -698,20 +698,22 @@ export function FlexibleApiExample() {
               </li>
               <li>
                 <Text size="2" color="gray">
-                  <code>usePlaybackAnimation()</code> - Get <code>isPlaying</code> and{' '}
-                  <code>currentTimeRef</code> for the live position
+                  <code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get{' '}
+                  <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position
                 </Text>
               </li>
               <li>
                 <Text size="2" color="gray">
-                  <code>usePlaylistData()</code> - Get <code>duration</code>,{' '}
-                  <code>sampleRate</code>, etc.
+                  <code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get{' '}
+                  <code>duration</code>, <code>tracks</code>, <code>trackStates</code>,{' '}
+                  <code>masterVolume</code>
                 </Text>
               </li>
               <li>
                 <Text size="2" color="gray">
-                  <code>usePlaylistState()</code> - Get/set <code>timeFormat</code>,{' '}
-                  <code>masterVolume</code>, <code>isAutomaticScroll</code>, etc.
+                  <code>usePlaylistView()</code> and <code>useLoop()</code> - Get{' '}
+                  <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>,
+                  and the loop region
                 </Text>
               </li>
               <li>

@@ -97,16 +97,26 @@ No React and no build step — drop `<daw-editor>` into any HTML page and assign
 
 ## Architecture
 
-Both providers use React Context with split contexts for performance (7 in WaveformPlaylistProvider, 4 in MediaElementPlaylistProvider).
+Both providers use React Context with split contexts for performance (15 in WaveformPlaylistProvider, 4 in MediaElementPlaylistProvider). In WaveformPlaylistProvider each hook returns one group of fields that change together, and a component re-renders only for the hooks it calls.
 
 **WaveformPlaylistProvider** (multi-track, Web Audio API):
-1. **usePlaybackAnimation()** — isPlaying, timing refs (currentTimeRef for the live position), per-frame callback registry (NOT currentTime)
-2. **usePlaylistState()** — Medium-frequency: loop, annotations, selectedTrackId, settings (NOT the selection, NOT activeAnnotationId)
-3. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
-4. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
-5. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
-6. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters, annotationPreview (a source: the annotations as an edge drag in progress would leave them)
-7. **usePlaylistData()** — Stable: duration, tracks, trackStates, playoutRef (PlaylistEngine), isDraggingRef, display config, isReady
+1. **usePlaylistView()** — sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars, progressBarWidth, mono, timeFormat, isAutomaticScroll, indefinitePlayback, fillViewport; changes on a prop change or a settings click
+2. **usePlaylistZoom()** — samplesPerPixel, canZoomIn, canZoomOut; changes on a zoom
+3. **usePlaylistTimeline()** — tracks, peaksDataArray, duration, isReady, onTracksChange; changes on every clip operation and every pointer move of a trim (call it in the smallest component that needs it)
+4. **usePlaylistMixer()** — trackStates, masterVolume; changes on every step of a volume or pan slider (same advice)
+5. **useTrackReorderPreview()** — trackDragPreview, trackReorderEpoch; changes on every drag-over of a track reorder
+6. **usePlaylistAnnotations()** — annotations, annotationsEditable, linkEndpoints, continuousPlay (NOT activeAnnotationId)
+7. **useLoop()** — isLoopEnabled, loopStart, loopEnd
+8. **useSelectedTrackId()** — selectedTrackId
+9. **useUndoRedo()** — canUndo, canRedo; changes after an edit
+10. **useIsPlaying()** — isPlaying; changes on play, pause, stop
+11. **usePlaybackRefs()** — never re-renders: currentTimeRef (live position), visualTimeRef, playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime, getLookAhead, getOutputLatency, registerFrameCallback / unregisterFrameCallback, playoutRef (PlaylistEngine), isDraggingRef. Read `.current` in handlers, effects and frame callbacks; to re-render when a value changes, also call the hook that carries it
+12. **useSelection()** — selectionStart, selectionEnd; changes on every pointer move of a selection drag
+13. **useCurrentTime()** — currentTime: where the cursor rests; changes on seek, pause, stop and a leftward selection drag, does not advance during playback
+14. **useActiveAnnotation()** — activeAnnotationId; changes at every annotation boundary during playback
+15. **usePlaylistControls()** — Stable: play/pause/stop/seekTo, setSelection, track controls, zoom, settings setters, annotationPreview (a source: the annotations as an edge drag in progress would leave them)
+
+The combined data / state / animation hooks of earlier majors are removed; the upgrade guide (https://naomiaro.github.io/waveform-playlist/docs/react/upgrading) has a field-to-hook table.
 
 **MediaElementPlaylistProvider** (single-track, HTMLAudioElement):
 1. **useMediaElementAnimation()** — isPlaying, currentTime

@@ -516,11 +516,12 @@ function RecordingWithExport() {
 Or use the hook for more control:
 
 ```tsx
-import { usePlaylistData } from '@waveform-playlist/browser';
+import { usePlaylistTimeline, usePlaylistMixer } from '@waveform-playlist/browser';
 import { useExportWav } from '@waveform-playlist/browser/tone';
 
 function DownloadRecording() {
-  const { tracks, trackStates } = usePlaylistData();
+  const { tracks } = usePlaylistTimeline();
+  const { trackStates } = usePlaylistMixer();
   const { exportWav, isExporting, progress } = useExportWav();
 
   const handleDownload = async () => {

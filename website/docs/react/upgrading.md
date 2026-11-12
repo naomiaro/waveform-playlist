@@ -132,6 +132,8 @@ function Status() {
 }
 ```
 
+**Note:** `usePlaybackAnimation()` is removed later in this major. `isPlaying` is now on `useIsPlaying()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+
 If you used the context on its own, without a playlist provider, to hold your own state, replace it with a React context of your own; there is no drop-in export.
 
 ## `TimeInput` reports a change only after an edit
@@ -196,6 +198,8 @@ const audioBuffers = tracks.flatMap((track) =>
 );
 ```
 
+**Note:** `usePlaylistData()` is removed later in this major. `tracks` is now on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+
 Two related values on `usePlaylistData()` keep their names and types but are now derived from `tracks` during render instead of being set by an effect:
 
 - `duration` and `peaksDataArray` already match `tracks` in the render that receives new tracks. Code that waited a render for them (for example an effect that compared `peaksDataArray.length` with `tracks.length`) no longer needs to.
@@ -241,6 +245,8 @@ const { minimumPlaylistHeight } = usePlaylistData();
 const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
+
+**Note:** `usePlaylistData()` is removed later in this major. `timeFormat`, `waveHeight` and `timeScaleHeight` are now on `usePlaylistView()`, and `tracks` on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
 
 ## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
 
@@ -346,6 +352,8 @@ const { selectionStart, selectionEnd } = useSelection();
 const { isLoopEnabled } = usePlaylistState();
 ```
 
+**Note:** `usePlaylistState()` is removed later in this major. "Keep `usePlaylistState()` for the other fields" then means: read them from the hook that has them, for example `isLoopEnabled` from `useLoop()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+
 `setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` has no selection state and is unchanged.
 
 A component that calls `useSelection()` re-renders on every pointer move of a drag, so call it in the smallest component that shows the selection, not in a component that also renders a long list.
@@ -401,6 +409,8 @@ useEffect(() => {
 }, [isPlaying, currentTime]);
 ```
 
+**Note:** `usePlaybackAnimation()` is removed later in this major. `isPlaying` is now on `useIsPlaying()` and the refs (`currentTimeRef`, `visualTimeRef`) on `usePlaybackRefs()`, which never re-renders the component that calls it; the advice above about `useCurrentTime()` applies unchanged. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+
 A custom `renderPlayhead` function needs no change: it is called again with the new `position` after a seek. `setCurrentTime(t)` and `seekTo(t)` stay on `usePlaylistControls()`. `useCurrentTime()` must be called inside `WaveformPlaylistProvider`; `useMediaElementAnimation()` is unchanged and still returns `currentTime`.
 
 ## `activeAnnotationId` moves from `usePlaylistState()` to `useActiveAnnotation()`
@@ -426,9 +436,226 @@ const { annotations } = usePlaylistState();
 const { activeAnnotationId } = useActiveAnnotation();
 ```
 
+**Note:** `usePlaylistState()` is removed later in this major. `annotations` is now on `usePlaylistAnnotations()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+
 `setActiveAnnotationId(id)` stays on `usePlaylistControls()`. `useActiveAnnotation()` must be called inside `WaveformPlaylistProvider`; `useMediaElementState()` is unchanged and still returns `activeAnnotationId`.
 
 A component that calls `useActiveAnnotation()` re-renders at every annotation boundary during playback, so call it in a small component that shows the active annotation, not in the component that renders the whole page.
+
+## `usePlaylistData()`, `usePlaylistState()` and `usePlaybackAnimation()` are replaced by one hook per group of fields
+
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/ui-components`, `@waveform-playlist/spectrogram`.
+
+Four hooks are removed from `@waveform-playlist/browser`: `usePlaylistData()`, `usePlaylistState()`, `usePlaybackAnimation()` and `usePlaylistDataOptional()`. A context subscription is to the whole value, so a component that called `usePlaylistData()` for `sampleRate` also re-rendered on every step of a volume slider and on every pointer move of a trim, and one that called `usePlaybackAnimation()` for a ref re-rendered on play and stop. Each removed hook is replaced by hooks that return one group of fields that change together, so a component re-renders only for the group it reads.
+
+`usePlaylistControls()`, `useSelection()`, `useCurrentTime()` and `useActiveAnnotation()` are unchanged. The MediaElement hooks (`useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()`, `useMediaElementData()`) are unchanged.
+
+This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, `usePlaylistData()`, `usePlaylistState()` or `usePlaybackAnimation()`, use the hook from the tables below.
+
+### The new hooks
+
+All of them are exported from `@waveform-playlist/browser` and must be called inside `WaveformPlaylistProvider`; outside it they throw `<hook name> must be used within WaveformPlaylistProvider`.
+
+| Hook                       | Returns                                                                                                                                                                                                                                             | The component re-renders on                        |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `timeFormat`, `isAutomaticScroll`, `indefinitePlayback`, `fillViewport`                                                 | a provider prop change, a settings click           |
+| `usePlaylistZoom()`        | `samplesPerPixel`, `canZoomIn`, `canZoomOut`                                                                                                                                                                                                        | a zoom                                             |
+| `usePlaylistTimeline()`    | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange`                                                                                                                                                                                 | every clip operation, every pointer move of a trim |
+| `usePlaylistMixer()`       | `trackStates`, `masterVolume`                                                                                                                                                                                                                       | every step of a volume or pan slider               |
+| `useTrackReorderPreview()` | `trackDragPreview`, `trackReorderEpoch`                                                                                                                                                                                                             | every drag-over of a track reorder                 |
+| `usePlaylistAnnotations()` | `annotations`, `annotationsEditable`, `linkEndpoints`, `continuousPlay`                                                                                                                                                                             | an annotation edit, an annotation settings toggle  |
+| `useLoop()`                | `isLoopEnabled`, `loopStart`, `loopEnd`                                                                                                                                                                                                             | a loop change                                      |
+| `useSelectedTrackId()`     | `selectedTrackId`                                                                                                                                                                                                                                   | another track being selected                       |
+| `useUndoRedo()`            | `canUndo`, `canRedo`                                                                                                                                                                                                                                | after an edit                                      |
+| `useIsPlaying()`           | `isPlaying`                                                                                                                                                                                                                                         | play, pause, stop                                  |
+| `usePlaybackRefs()`        | `currentTimeRef`, `visualTimeRef`, `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `registerFrameCallback`, `unregisterFrameCallback`, `playoutRef`, `isDraggingRef` | never (the value keeps its identity)               |
+
+The value types are exported too: `PlaylistViewContextValue`, `PlaylistZoomContextValue`, `PlaylistTimelineContextValue`, `PlaylistMixerContextValue`, `TrackReorderPreviewContextValue`, `PlaylistAnnotationsContextValue`, `LoopContextValue`, `SelectedTrackIdContextValue`, `UndoRedoContextValue`, `IsPlayingContextValue`, `PlaybackRefsContextValue`, and, for the unchanged hooks, `PlaylistControlsContextValue`, `SelectionContextValue`, `CurrentTimeContextValue` and `ActiveAnnotationContextValue`.
+
+### Where each field went
+
+**Find:** `usePlaylistData`, `usePlaylistState`, `usePlaybackAnimation` and `usePlaylistDataOptional` (imports and calls).
+
+**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
+
+From `usePlaylistData()`:
+
+| Field               | Now from                   |
+| ------------------- | -------------------------- |
+| `sampleRate`        | `usePlaylistView()`        |
+| `waveHeight`        | `usePlaylistView()`        |
+| `timeScaleHeight`   | `usePlaylistView()`        |
+| `controls`          | `usePlaylistView()`        |
+| `barWidth`          | `usePlaylistView()`        |
+| `barGap`            | `usePlaylistView()`        |
+| `roundedBars`       | `usePlaylistView()`        |
+| `progressBarWidth`  | `usePlaylistView()`        |
+| `mono`              | `usePlaylistView()`        |
+| `timeFormat`        | `usePlaylistView()`        |
+| `samplesPerPixel`   | `usePlaylistZoom()`        |
+| `canZoomIn`         | `usePlaylistZoom()`        |
+| `canZoomOut`        | `usePlaylistZoom()`        |
+| `tracks`            | `usePlaylistTimeline()`    |
+| `peaksDataArray`    | `usePlaylistTimeline()`    |
+| `duration`          | `usePlaylistTimeline()`    |
+| `isReady`           | `usePlaylistTimeline()`    |
+| `onTracksChange`    | `usePlaylistTimeline()`    |
+| `trackStates`       | `usePlaylistMixer()`       |
+| `masterVolume`      | `usePlaylistMixer()`       |
+| `trackDragPreview`  | `useTrackReorderPreview()` |
+| `trackReorderEpoch` | `useTrackReorderPreview()` |
+| `playoutRef`        | `usePlaybackRefs()`        |
+| `isDraggingRef`     | `usePlaybackRefs()`        |
+
+From `usePlaylistState()`:
+
+| Field                 | Now from                   |
+| --------------------- | -------------------------- |
+| `annotations`         | `usePlaylistAnnotations()` |
+| `annotationsEditable` | `usePlaylistAnnotations()` |
+| `linkEndpoints`       | `usePlaylistAnnotations()` |
+| `continuousPlay`      | `usePlaylistAnnotations()` |
+| `isLoopEnabled`       | `useLoop()`                |
+| `loopStart`           | `useLoop()`                |
+| `loopEnd`             | `useLoop()`                |
+| `selectedTrackId`     | `useSelectedTrackId()`     |
+| `canUndo`             | `useUndoRedo()`            |
+| `canRedo`             | `useUndoRedo()`            |
+| `isAutomaticScroll`   | `usePlaylistView()`        |
+| `indefinitePlayback`  | `usePlaylistView()`        |
+| `fillViewport`        | `usePlaylistView()`        |
+
+From `usePlaybackAnimation()`:
+
+| Field                     | Now from            |
+| ------------------------- | ------------------- |
+| `isPlaying`               | `useIsPlaying()`    |
+| `currentTimeRef`          | `usePlaybackRefs()` |
+| `visualTimeRef`           | `usePlaybackRefs()` |
+| `playbackStartTimeRef`    | `usePlaybackRefs()` |
+| `audioStartPositionRef`   | `usePlaybackRefs()` |
+| `getPlaybackTime`         | `usePlaybackRefs()` |
+| `getAudioContextTime`     | `usePlaybackRefs()` |
+| `getLookAhead`            | `usePlaybackRefs()` |
+| `getOutputLatency`        | `usePlaybackRefs()` |
+| `registerFrameCallback`   | `usePlaybackRefs()` |
+| `unregisterFrameCallback` | `usePlaybackRefs()` |
+
+The fields that left these hooks in earlier entries stay where those entries put them: `selectionStart` and `selectionEnd` on `useSelection()`, `currentTime` on `useCurrentTime()`, `activeAnnotationId` on `useActiveAnnotation()`. The setters (`setSelectedTrackId`, `setLoopEnabled`, `setMasterVolume`, `zoomIn`, `undo` and the rest) stay on `usePlaylistControls()`.
+
+`usePlaylistDataOptional()` has no public replacement. It existed so that `useAnnotationKeyboardControls` could run under either provider. Under `WaveformPlaylistProvider` that hook still reads `samplesPerPixel` and `sampleRate` itself; under `MediaElementPlaylistProvider` pass them as options, as before. If your own component called `usePlaylistDataOptional()` to work with or without a provider, take the values it needs as props.
+
+```tsx
+// Before
+import {
+  usePlaylistData,
+  usePlaylistState,
+  usePlaybackAnimation,
+  usePlaylistControls,
+} from '@waveform-playlist/browser';
+
+function Toolbar() {
+  const { tracks, trackStates, sampleRate, samplesPerPixel, duration, masterVolume, playoutRef } =
+    usePlaylistData();
+  const { isLoopEnabled, selectedTrackId, canUndo, canRedo, annotations, isAutomaticScroll } =
+    usePlaylistState();
+  const { isPlaying, currentTimeRef, registerFrameCallback, unregisterFrameCallback } =
+    usePlaybackAnimation();
+  const { play, pause } = usePlaylistControls();
+  // ...
+}
+
+// After
+import {
+  usePlaylistView,
+  usePlaylistZoom,
+  usePlaylistTimeline,
+  usePlaylistMixer,
+  usePlaylistAnnotations,
+  useLoop,
+  useSelectedTrackId,
+  useUndoRedo,
+  useIsPlaying,
+  usePlaybackRefs,
+  usePlaylistControls,
+} from '@waveform-playlist/browser';
+
+function Toolbar() {
+  const { sampleRate, isAutomaticScroll } = usePlaylistView();
+  const { samplesPerPixel } = usePlaylistZoom();
+  const { tracks, duration } = usePlaylistTimeline();
+  const { trackStates, masterVolume } = usePlaylistMixer();
+  const { annotations } = usePlaylistAnnotations();
+  const { isLoopEnabled } = useLoop();
+  const { selectedTrackId } = useSelectedTrackId();
+  const { canUndo, canRedo } = useUndoRedo();
+  const { isPlaying } = useIsPlaying();
+  const { currentTimeRef, registerFrameCallback, unregisterFrameCallback, playoutRef } =
+    usePlaybackRefs();
+  const { play, pause } = usePlaylistControls();
+  // ...
+}
+```
+
+The "After" above is the mechanical translation, and it re-renders as often as the "Before" did. To get the benefit, move each group into the component that shows it: a loop button calls `useLoop()`, a master volume slider calls `usePlaylistMixer()`, and the toolbar that contains them calls neither.
+
+### What to check after the replacement
+
+1. **A component re-renders only for the group it reads.** Code that relied on being re-rendered by an unrelated change stops updating, with no type error. The two usual cases: an effect without a dependency array that reads a ref (`currentTimeRef.current`, `visualTimeRef.current`), and `playoutRef.current` read while rendering. `usePlaybackRefs()` never re-renders the component that calls it, so a component that calls only that hook renders once. Search for `.current` reads from these refs that are not inside an event handler, an effect with dependencies or a frame callback, and add a call to the hook that carries the value the code needs: `useCurrentTime()` for the resting cursor position, `useIsPlaying()` for play, pause and stop, `usePlaylistTimeline()` for `tracks`, `duration` and `isReady`.
+
+   ```tsx
+   // Before: usePlaybackAnimation() re-rendered this on play and stop
+   const { currentTimeRef } = usePlaybackAnimation();
+   useEffect(() => {
+     label.current.textContent = format(currentTimeRef.current ?? 0);
+   });
+
+   // After: subscribe to what the label shows
+   const { currentTime } = useCurrentTime();
+   useEffect(() => {
+     label.current.textContent = format(currentTime);
+   }, [currentTime]);
+   ```
+
+   `playoutRef.current` is `null` until the engine is first built and during a rebuild. Read it in an event handler, or in an effect that depends on `isReady` from `usePlaylistTimeline()`.
+
+2. **In plain JavaScript a removed hook is `undefined`.** The import gives `undefined` and the call throws at the first render (`usePlaylistData is not a function`). Nothing fails silently, and TypeScript reports the import.
+
+3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation and on every pointer move of a trim; the mixer value changes on every step of a volume or pan slider. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
+
+4. **A custom `renderTrackControls` that mounts `SortableTrackControls` itself** reads `trackReorderEpoch` (folded into the panel's `key`) and `trackDragPreview` from `useTrackReorderPreview()`, not from `usePlaylistData()`.
+
+### `PlaylistInfoContext` has no `duration`; `SmartScale` takes `durationMs`
+
+**Package:** `@waveform-playlist/ui-components`.
+
+This affects you only if you render `PlaylistInfoContext.Provider` or `<SmartScale>` yourself. `<Waveform>`, `<PlaylistVisualization>` and the MediaElement components do it for you and need no change.
+
+The context value no longer has a `duration` field. Every channel and track reads `PlaylistInfoContext`, and the timeline length changes on every pointer move of a trim at the end of the timeline. `<SmartScale>` now takes the length as a required prop, `durationMs`, in milliseconds (the unit the removed field had).
+
+**Find:** `duration` in a value passed to `PlaylistInfoContext.Provider`; `duration` read from `usePlaylistInfo()` or `useContext(PlaylistInfoContext)`; every `<SmartScale`.
+
+**Replace with:** remove the field from the context value and pass the length to `SmartScale`:
+
+```tsx
+// Before
+<PlaylistInfoContext.Provider value={{ ...info, duration: durationSeconds * 1000 }}>
+  <SmartScale />
+</PlaylistInfoContext.Provider>
+
+// After
+<PlaylistInfoContext.Provider value={info}>
+  <SmartScale durationMs={durationSeconds * 1000} />
+</PlaylistInfoContext.Provider>
+```
+
+In TypeScript both are compile errors (an unknown `duration` property, a missing `durationMs` prop). In plain JavaScript a `<SmartScale>` without `durationMs` gets `undefined` as its length, so check every `<SmartScale` by hand. A component of your own that read `duration` from the context takes it as a prop instead.
+
+### `SpectrogramProvider` needs the new `@waveform-playlist/browser`
+
+**Package:** `@waveform-playlist/spectrogram`.
+
+`SpectrogramProvider` reads the new hooks, so the new major of `@waveform-playlist/spectrogram` requires the new major of `@waveform-playlist/browser`. Its own API is unchanged. Upgrade the two together.
 
 ## Dragging an annotation edge: one `onAnnotationsChange` per drag in the MediaElement player, and Escape restores everything
 
@@ -474,7 +701,9 @@ const handlers = useAnnotationDragHandlers({
 
 // After
 const { setAnnotations, annotationPreview } = usePlaylistControls();
-const { samplesPerPixel, sampleRate, duration } = usePlaylistData();
+const { sampleRate } = usePlaylistView();
+const { samplesPerPixel } = usePlaylistZoom();
+const { duration } = usePlaylistTimeline();
 const handlers = useAnnotationDragHandlers({
   annotations,
   onAnnotationsChange: setAnnotations,
