@@ -53,3 +53,25 @@ export function computeTrackLayout(
   }
   return { topById, totalHeight: top };
 }
+
+/**
+ * The track whose row contains the vertical offset `y` (measured from the top
+ * of the first row), or null when `y` is above the first row or below the
+ * last. Reads the SAME layout the rows are positioned with, so a press always
+ * lands on the row that is drawn there (#762: the press handler once added up
+ * row heights of its own, and counted a 'both' track twice as tall).
+ */
+export function trackIdAtOffset(
+  orderedIds: readonly string[],
+  layout: TrackLayout,
+  heightById: ReadonlyMap<string, number>,
+  y: number
+): string | null {
+  for (const id of orderedIds) {
+    const top = layout.topById.get(id);
+    if (top === undefined) continue;
+    const height = heightById.get(id) ?? 0;
+    if (y >= top && y < top + height) return id;
+  }
+  return null;
+}

@@ -45,6 +45,7 @@ const lightTheme = {
   selectedWaveOutlineColor: '#0099ff',
   selectedWaveFillColor: '#FFD500',
   selectedTrackControlsBackground: '#d9e9ff',
+  selectedTrackBackground: '#e8f0fe',
   timeColor: '#000',
   timescaleBackgroundColor: '#fff',
   playheadColor: '#f00',
@@ -250,6 +251,7 @@ interface WaveformPlaylistTheme {
   selectedWaveOutlineColor: string;
   selectedWaveFillColor: string;
   selectedTrackControlsBackground: string;
+  selectedTrackBackground: string; // Background behind the selected track's clips
 
   // Timescale colors
   timeColor: string;

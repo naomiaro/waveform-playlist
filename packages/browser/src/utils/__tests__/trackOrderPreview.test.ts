@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   applyTrackOrderPreview,
   computeTrackLayout,
+  trackIdAtOffset,
   type TrackDragPreview,
 } from '../trackOrderPreview';
 
@@ -97,5 +98,53 @@ describe('computeTrackLayout', () => {
     const layout = computeTrackLayout([], new Map());
     expect(layout.topById.size).toBe(0);
     expect(layout.totalHeight).toBe(0);
+  });
+});
+
+describe('trackIdAtOffset', () => {
+  const heights = new Map([
+    ['a', 100],
+    ['b', 60],
+    ['c', 140],
+  ]);
+  const order = ['a', 'b', 'c'];
+  const layout = computeTrackLayout(order, heights);
+  const at = (y: number) => trackIdAtOffset(order, layout, heights, y);
+
+  it('finds the row an offset falls in', () => {
+    expect(at(0)).toBe('a');
+    expect(at(50)).toBe('a');
+    expect(at(130)).toBe('b');
+    expect(at(299)).toBe('c');
+  });
+
+  it('gives a boundary to the row that starts there', () => {
+    expect(at(99.5)).toBe('a');
+    expect(at(100)).toBe('b');
+    expect(at(160)).toBe('c');
+  });
+
+  it('is null above the first row and at or below the end of the last', () => {
+    expect(at(-1)).toBeNull();
+    expect(at(300)).toBeNull();
+    expect(at(1000)).toBeNull();
+  });
+
+  it('follows a previewed order', () => {
+    const previewed = ['b', 'c', 'a'];
+    const previewLayout = computeTrackLayout(previewed, heights);
+    expect(trackIdAtOffset(previewed, previewLayout, heights, 30)).toBe('b');
+    expect(trackIdAtOffset(previewed, previewLayout, heights, 100)).toBe('c');
+    expect(trackIdAtOffset(previewed, previewLayout, heights, 250)).toBe('a');
+  });
+
+  it('never returns a row with no height', () => {
+    const withGhost = ['a', 'ghost', 'b'];
+    const ghostLayout = computeTrackLayout(withGhost, heights);
+    expect(trackIdAtOffset(withGhost, ghostLayout, heights, 100)).toBe('b');
+  });
+
+  it('is null for an empty playlist', () => {
+    expect(trackIdAtOffset([], computeTrackLayout([], new Map()), new Map(), 10)).toBeNull();
   });
 });

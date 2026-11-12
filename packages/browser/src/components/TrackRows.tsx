@@ -297,6 +297,7 @@ const TrackRow = React.memo(function TrackRow({
       data-track-row=""
       data-track-id={trackId}
       data-track-kind={kind}
+      data-selected={isSelected ? 'true' : undefined}
       data-track-drag-source={isDragSource ? 'true' : undefined}
     >
       <TrackComponent

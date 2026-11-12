@@ -162,6 +162,23 @@ function TrackSelector() {
 }
 ```
 
+In a playlist rendered by `<Waveform>`, a press on the waveform area of a track's row selects that track, and so does a click on its default track controls (apart from the remove button, the track menu button and the reorder buttons). The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
+
+```css
+/* A border drawn over the selected row. The row's clips are painted above the
+   row's own outline and background, so the border goes on a pseudo-element. */
+[data-track-row][data-selected='true']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid #63c75f;
+  pointer-events: none; /* presses still reach the clips and the waveform */
+  z-index: 120; /* above the clip headers */
+}
+```
+
+The selected track's colours come from the theme: `selectedTrackBackground` is the background behind its clips and `selectedTrackControlsBackground` the background of its controls (see [Theming](./theming.md)).
+
 ## Adding and Removing Tracks
 
 Track management (adding, removing, reordering) is handled by updating the `tracks` prop passed to `WaveformPlaylistProvider`. The provider does not have built-in `addTrack` / `removeTrack` / `moveTrack` methods — you manage tracks in your own state:
