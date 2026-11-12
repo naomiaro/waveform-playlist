@@ -987,7 +987,7 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 
 - **Rendering.** A MIDI track is drawn as a piano roll, including while it is empty. An audio track is never drawn as one: `renderMode: 'piano-roll'` on an audio track is ignored (waveform).
 - **Recording.** A take cannot be recorded onto a MIDI track, and a take now stays on the track it was started on. See [the next section](#useintegratedrecording-a-take-stays-on-its-track-pass-recordingtrackid-to-the-preview): it needs a code change in every app that shows the live preview.
-- **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id.
+- **Tone.js adapter (`createToneAdapter`).** A track is one playout track under its own id. The second playout track that a mixed track used to get, under the id plus `:midi`, no longer exists; if you reached into `TonePlayout` with that id, use the track's id. The `trackInput` getter of `ToneTrack`, which existed to join the two, is removed: a track's effects function already receives that node as its first argument.
 
 ## `useIntegratedRecording`: a take stays on its track; pass `recordingTrackId` to the preview
 

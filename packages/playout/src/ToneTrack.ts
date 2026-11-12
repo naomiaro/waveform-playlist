@@ -597,15 +597,6 @@ export class ToneTrack {
     this.track.soloed = soloed;
   }
 
-  /**
-   * The pre-fader track input (clip sources arrive here, ahead of the
-   * effects). The MIDI half of a mixed audio+MIDI track sums its voices into
-   * it so both halves share one effects chain and one channel strip.
-   */
-  get trackInput(): Gain {
-    return this.inputGain;
-  }
-
   /** Native node behind the Volume stage — where an external chain returns. */
   private get _faderNativeInput(): AudioNode {
     // Volume.input is a Tone.js Gain<"decibels"> whose .input is the native
