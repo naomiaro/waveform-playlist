@@ -279,10 +279,28 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
 
+  // The audio the current player was created for. A player is also created
+  // again for the same audio (a new name, fades, pitch setting, callbacks).
+  const loadedAudioRef = useRef<{ source: string; waveformData: WaveformDataObject } | null>(null);
+
   // Initialize playout and load track
   useEffect(() => {
     let cancelled = false;
     let createdPlayout: MediaElementPlayout | null = null;
+
+    // New audio: the old position and the old active annotation mean nothing
+    // in it (the position can be past its end). The same audio in a new
+    // player keeps both, so the listener does not lose their place.
+    const previousAudio = loadedAudioRef.current;
+    loadedAudioRef.current = { source: track.source, waveformData: track.waveformData };
+    if (
+      previousAudio &&
+      (previousAudio.source !== track.source || previousAudio.waveformData !== track.waveformData)
+    ) {
+      currentTimeRef.current = 0;
+      setCurrentTime(0);
+      setActiveAnnotationId(null);
+    }
 
     (async () => {
       try {

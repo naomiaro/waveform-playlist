@@ -90,6 +90,16 @@ const WAVEFORM_DATA = WaveformData.create({
 });
 
 const TRACK = { source: 'test.mp3', waveformData: WAVEFORM_DATA, name: 'Test' };
+// Other peaks of the same length: new audio behind the same source URL.
+const OTHER_WAVEFORM_DATA = WaveformData.create({
+  version: 2,
+  channels: 1,
+  sample_rate: SAMPLE_RATE,
+  samples_per_pixel: SOURCE_SCALE,
+  bits: 8,
+  length: LENGTH,
+  data: Array.from({ length: LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -20 : 20)),
+});
 
 function createFakePlayout() {
   const fake = {
@@ -215,8 +225,9 @@ async function mount(options: MountOptions = {}) {
   return {
     playout,
     show: (showPlaylist: boolean, playlists = 1) => view.rerender(tree(showPlaylist, playlists)),
-    /** The same audio under another source URL: the player is created again. */
-    changeSource: (source: string) => view.rerender(tree(true, 1, { ...TRACK, source })),
+    /** Another track object: the provider creates its player again. */
+    changeTrack: (change: Partial<typeof TRACK>) =>
+      view.rerender(tree(true, 1, { ...TRACK, ...change })),
   };
 }
 
@@ -428,24 +439,71 @@ describe('MediaElement playback runs one animation loop', () => {
     expect(frames.size).toBe(0);
   });
 
-  it('a new source during playback stops playback: nothing stays registered, and a seek moves the playhead', async () => {
-    const { playout, changeSource } = await mount();
+  it('new audio during playback: playback stops, and the cursor and the active annotation are reset', async () => {
+    const { playout, changeTrack } = await mount({
+      annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
+    });
     await act(async () => probe.controls.play());
-    playout.time = 2;
+    playout.time = 2.5;
     await runFrame();
     expect(probe.animation.isPlaying).toBe(true);
+    expect(probe.state.activeAnnotationId).toBe('n2');
 
     // The provider disposes the player and creates another for the new source.
-    await act(async () => changeSource('other.mp3'));
+    await act(async () => changeTrack({ source: 'other.mp3' }));
     await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
     expect(probe.animation.isPlaying).toBe(false);
     expect(registered.size).toBe(0);
     expect(frames.size).toBe(0);
+    // The old position means nothing in the new audio.
+    expect(probe.animation.currentTime).toBe(0);
+    expect(probe.animation.currentTimeRef.current).toBe(0);
+    expect(probe.state.activeAnnotationId).toBeNull();
+    expect(playhead().style.transform).toBe('translate3d(0px, 0, 0)');
+    expect(progressOverlay().style.transform).toBe('scaleX(0)');
 
     // Not playing, so the resting position is drawn: a seek moves the playhead.
     await act(async () => probe.controls.seekTo(3));
     expect(playhead().style.transform).toBe(`translate3d(${3 * PX_PER_SECOND}px, 0, 0)`);
     expect(progressOverlay().style.transform).toBe('scaleX(0.375)');
+  });
+
+  it('new audio while paused also resets the cursor; the next play starts at 0', async () => {
+    const { playout, changeTrack } = await mount();
+    await act(async () => probe.controls.seekTo(3));
+    expect(probe.animation.currentTime).toBe(3);
+
+    await act(async () => changeTrack({ waveformData: OTHER_WAVEFORM_DATA }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(probe.animation.currentTime).toBe(0);
+    expect(probe.animation.currentTimeRef.current).toBe(0);
+    expect(playhead().style.transform).toBe('translate3d(0px, 0, 0)');
+
+    await act(async () => probe.controls.play());
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, 0);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('the same audio in a new player keeps the cursor and the active annotation', async () => {
+    const { playout, changeTrack } = await mount({
+      annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
+    });
+    await act(async () => probe.controls.play());
+    playout.time = 2.5;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n2');
+
+    // A new name: same source and peaks, but the player is created again.
+    await act(async () => changeTrack({ name: 'Renamed' }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTimeRef.current).toBe(2.5);
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(playhead().style.transform).toBe(`translate3d(${2.5 * PX_PER_SECOND}px, 0, 0)`);
+
+    await act(async () => probe.controls.play());
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, 2.5);
+    await act(async () => probe.controls.stop());
   });
 
   it('a playlist that unmounts during playback leaves nothing registered', async () => {
