@@ -243,7 +243,7 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
 
-  // Every Track, Clip and channel reads this context: a new object per render
+  // Every Track, channel and the timescale read this context: a new object per render
   // of this component would re-render them all.
   const playlistInfo = useMemo(
     () => ({
