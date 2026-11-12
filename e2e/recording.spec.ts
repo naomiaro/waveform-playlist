@@ -204,4 +204,46 @@ test.describe('Recording example', () => {
       expect(await litSegments(page, OUTPUT_METER)).toBeGreaterThan(0);
     }).toPass({ timeout: 10000 });
   });
+
+  test('a take lands on the track it was started on, even when another track is selected mid-take (#756)', async ({
+    page,
+    baseURL,
+  }) => {
+    await openRecordingPage(page, baseURL);
+    await page.getByRole('button', { name: '+ New Track' }).click();
+    await page.getByRole('button', { name: '+ New Track' }).click();
+    const rows = page.locator('[data-track-row]');
+    await expect(rows).toHaveCount(2);
+
+    // The track added last is the selected one: the take starts on it.
+    const started = rows.nth(1);
+    const other = rows.nth(0);
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(page.getByRole('button', { name: 'Recording', exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(started.locator('[data-clip-container]')).toHaveCount(1, { timeout: 10000 });
+
+    // Select the other track while the take runs (a click on its row, through
+    // the overlay that covers the rows): the live preview stays where it is.
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      box = await other.boundingBox();
+      expect(box).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    await page.mouse.click(box!.x + 60, box!.y + box!.height / 2);
+    await expect(other).toHaveAttribute('data-track-kind', 'audio');
+    await page.waitForTimeout(500);
+    await expect(started.locator('[data-clip-container]')).toHaveCount(1);
+    await expect(other.locator('[data-clip-container]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Stop' }).click();
+    await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible({
+      timeout: 30000,
+    });
+
+    // The take became a clip of the track it was started on.
+    await expect(started.locator('[data-clip-container]')).toHaveCount(1);
+    await expect(other.locator('[data-clip-container]')).toHaveCount(0);
+  });
 });
