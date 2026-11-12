@@ -1,6 +1,27 @@
 import { test, expect } from '@playwright/test';
 
 /**
+ * How fast the first player's position advances against the clock, over about
+ * a second. Both readings of each pair are taken inside the page, so runner
+ * delays between calls do not enter the ratio.
+ */
+async function playbackSpeed(page: import('@playwright/test').Page): Promise<number> {
+  return page.evaluate(async () => {
+    const element = document.querySelector('[aria-label="Audio position"]');
+    const read = () => {
+      const [hours, minutes, rest] = (element?.textContent ?? '').split(':');
+      return {
+        position: Number(hours) * 3600 + Number(minutes) * 60 + Number(rest),
+        clock: performance.now() / 1000,
+      };
+    };
+    const before = read();
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const after = read();
+    return (after.position - before.position) / (after.clock - before.clock);
+  });
+}
+/**
  * Media Element Playout tests
  *
  * The Media Element example renders two independent players:
@@ -378,30 +399,21 @@ test.describe('Media Element Example', () => {
       ).toEqual(['0.5', '0.75', '1', '1.25', '1.5', '2']);
 
       // The media element is not in the document, so the rate is read from
-      // what it does: the position advances about twice as fast as the clock.
+      // what it does: how fast the position advances against the clock.
       const position = page.getByLabel('Audio position').first();
-      const seconds = async () => {
-        const [hours, minutes, rest] = ((await position.textContent()) ?? '').split(':');
-        return Number(hours) * 3600 + Number(minutes) * 60 + Number(rest);
-      };
-      const advanceOverOneSecond = async () => {
-        const before = await seconds();
-        await page.waitForTimeout(1000);
-        return (await seconds()) - before;
-      };
-
       await page.getByRole('button', { name: 'Play' }).first().click();
       await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
-      const normal = await advanceOverOneSecond();
-      expect(normal).toBeGreaterThan(0.7);
-      expect(normal).toBeLessThan(1.4);
+      await page.waitForTimeout(200);
+      const normal = await playbackSpeed(page);
+      expect(normal).toBeGreaterThan(0.8);
+      expect(normal).toBeLessThan(1.2);
 
       await speed.selectOption('2');
       await expect(speed).toHaveValue('2');
       await page.waitForTimeout(200);
-      const doubled = await advanceOverOneSecond();
-      expect(doubled).toBeGreaterThan(1.6);
-      expect(doubled).toBeLessThan(2.6);
+      const doubled = await playbackSpeed(page);
+      expect(doubled).toBeGreaterThan(1.7);
+      expect(doubled).toBeLessThan(2.3);
       await page.getByRole('button', { name: 'Stop' }).first().click();
     });
 
@@ -411,21 +423,16 @@ test.describe('Media Element Example', () => {
     test('the chosen speed survives a replaced player', async ({ page }) => {
       const speed = page.getByRole('combobox', { name: 'Playback speed' }).first();
       const position = page.getByLabel('Audio position').first();
-      const seconds = async () => {
-        const [hours, minutes, rest] = ((await position.textContent()) ?? '').split(':');
-        return Number(hours) * 3600 + Number(minutes) * 60 + Number(rest);
-      };
       await speed.selectOption('2');
       await page.getByRole('button', { name: 'Off', exact: true }).first().click();
       await expect(speed).toHaveValue('2');
 
       await page.getByRole('button', { name: 'Play' }).first().click();
       await expect(position).not.toHaveText('00:00:00.000', { timeout: 10000 });
-      const before = await seconds();
-      await page.waitForTimeout(1000);
-      const advanced = (await seconds()) - before;
-      expect(advanced).toBeGreaterThan(1.6);
-      expect(advanced).toBeLessThan(2.6);
+      await page.waitForTimeout(200);
+      const replaced = await playbackSpeed(page);
+      expect(replaced).toBeGreaterThan(1.7);
+      expect(replaced).toBeLessThan(2.3);
       await page.getByRole('button', { name: 'Stop' }).first().click();
     });
 
