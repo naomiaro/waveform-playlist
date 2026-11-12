@@ -252,7 +252,11 @@ Whether clips can be dragged and trimmed, and whether their trim handles are wid
 
 **Find:** `interactiveClips` or `touchOptimized` on a `<Waveform>` or `<PlaylistVisualization>` inside a `ClipInteractionProvider`.
 
-**Replace with:** nothing on the waveform. Where the provider already had `touchOptimized`, that one flag now does both jobs:
+**Replace with:** it depends on where `touchOptimized` was. Check the provider before deleting anything:
+
+- `interactiveClips` on the waveform: delete it.
+- `touchOptimized` on the waveform AND on the provider: delete it from the waveform. The provider's flag now does both jobs (first example).
+- `touchOptimized` on the waveform but NOT on the provider: do not just delete it, or the trim handles shrink from 24px to 8px. Use the second example.
 
 ```tsx
 // Before
@@ -263,6 +267,24 @@ Whether clips can be dragged and trimmed, and whether their trim handles are wid
 // After
 <ClipInteractionProvider touchOptimized>
   <Waveform showClipHeaders />
+</ClipInteractionProvider>
+```
+
+**If `touchOptimized` was on the `<Waveform>` but not on the provider**, you had wide handles with the normal mouse-tuned sensors. Moving the flag to the provider would also add the 250ms touch-hold delay. To keep exactly what you had, set only the handle width:
+
+```tsx
+// Before
+<ClipInteractionProvider>
+  <Waveform showClipHeaders touchOptimized />
+</ClipInteractionProvider>
+
+// After
+import { ClipInteractionOptions } from '@waveform-playlist/browser';
+
+<ClipInteractionProvider>
+  <ClipInteractionOptions touchOptimized>
+    <Waveform showClipHeaders />
+  </ClipInteractionOptions>
 </ClipInteractionProvider>
 ```
 
@@ -289,22 +311,6 @@ import { ClipInteractionOptions } from '@waveform-playlist/browser';
 ```
 
 Use `enabled` alone where you had `interactiveClips` alone.
-
-**If `touchOptimized` was on the `<Waveform>` but not on the provider**, you had wide handles with the normal mouse-tuned sensors. Moving the flag to the provider would also add the 250ms touch-hold delay. To keep exactly what you had, set only the handle width:
-
-```tsx
-// Before
-<ClipInteractionProvider>
-  <Waveform showClipHeaders touchOptimized />
-</ClipInteractionProvider>
-
-// After
-<ClipInteractionProvider>
-  <ClipInteractionOptions touchOptimized>
-    <Waveform showClipHeaders />
-  </ClipInteractionOptions>
-</ClipInteractionProvider>
-```
 
 **In plain JavaScript nothing reports a leftover prop.** `<Waveform interactiveClips>` and `<Waveform touchOptimized>` are ignored without a warning (TypeScript reports them). With your own `DragDropProvider` the visible result is clips that no longer drag and have no trim handles, so search for both names before you run the app.
 
