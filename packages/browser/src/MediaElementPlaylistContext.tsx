@@ -1,6 +1,5 @@
 import React, {
   createContext,
-  useContext,
   useState,
   useEffect,
   useRef,
@@ -12,17 +11,26 @@ import { ThemeProvider } from 'styled-components';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout';
 import { type WaveformDataObject } from '@waveform-playlist/core';
-import { type WaveformPlaylistTheme, defaultTheme } from '@waveform-playlist/ui-components';
+import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { createValueSource } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from './hooks/useAnnotationDragHandlers';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
-import { useShallowStable } from './hooks/useShallowStable';
-import { createAnnotationLookup } from './utils/annotationLookup';
+import { followAnnotations } from './providerInternals/followAnnotations';
+import { useAnnotationState } from './providerInternals/useAnnotationState';
+import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
+import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
+import { useRequiredContext } from './providerInternals/useRequiredContext';
+import { useViewDefaults } from './providerInternals/useViewDefaults';
+import {
+  MediaElementInternalsContext,
+  MediaElementSelectionContext,
+  type MediaElementInternalsValue,
+  type MediaElementSelectionValue,
+} from './providerInternals/mediaElementInternalContexts';
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -95,10 +103,6 @@ export interface MediaElementDataContextValue {
 }
 
 // Create contexts
-// Shared default so an omitted `controls` prop keeps one identity across
-// renders — a fresh object here would invalidate the data context every render.
-const DEFAULT_CONTROLS = { show: false, width: 0 };
-
 const MediaElementAnimationContext = createContext<MediaElementAnimationContextValue | null>(null);
 const MediaElementStateContext = createContext<MediaElementStateContextValue | null>(null);
 const MediaElementControlsContext = createContext<MediaElementControlsContextValue | null>(null);
@@ -186,7 +190,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   preservesPitch = true,
   automaticScroll = false,
   theme: userThemeProp,
-  controls: controlsProp = DEFAULT_CONTROLS,
+  controls: controlsProp,
   annotationList,
   barWidth = 1,
   barGap = 0,
@@ -199,13 +203,14 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   createPlayout,
   children,
 }) => {
-  // Inline object literals from the parent get a new identity per render;
-  // keep the previous one while the contents are unchanged so the memoized
-  // context values and the merged theme below are not invalidated.
-  const controls = useShallowStable(controlsProp);
-  const userTheme = useShallowStable(userThemeProp);
-
-  const progressBarWidth = progressBarWidthProp ?? barWidth + barGap;
+  const { controls, mergedTheme, progressBarWidth, timeScaleHeight } = useViewDefaults({
+    controls: controlsProp,
+    theme: userThemeProp,
+    barWidth,
+    barGap,
+    progressBarWidth: progressBarWidthProp,
+    timescale,
+  });
 
   // State
   const [isPlaying, setIsPlaying] = useState(false);
@@ -219,72 +224,57 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   durationRef.current = duration;
   const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
-  // Annotations are derived from prop (single source of truth in parent)
-  // In v6, annotations must be pre-parsed (numeric start/end). Use parseAeneas() from @waveform-playlist/annotations before passing.
-  const annotations = useMemo(() => {
-    if (!annotationList?.annotations) return [];
-    if (process.env.NODE_ENV !== 'production' && annotationList.annotations.length > 0) {
-      const first = annotationList.annotations[0] as unknown as Record<string, unknown>;
-      if (typeof first.start !== 'number' || typeof first.end !== 'number') {
-        console.error(
-          '[waveform-playlist] Annotations must have numeric start/end values. ' +
-            'In v6, use parseAeneas() from @waveform-playlist/annotations before passing annotations. ' +
-            'Received start type: ' +
-            typeof first.start
-        );
-        return [];
-      }
-    }
-    return annotationList.annotations;
-  }, [annotationList?.annotations]);
+  // Annotations are derived from the prop (single source of truth in the
+  // parent). Shared with the WebAudio provider (#769).
+  const {
+    annotations,
+    annotationsRef,
+    annotationLookup,
+    setAnnotations,
+    annotationPreview,
+    activeAnnotationId,
+    activeAnnotationIdRef,
+    setActiveAnnotationId,
+    continuousPlay,
+    continuousPlayRef,
+    setContinuousPlay,
+  } = useAnnotationState({
+    annotationList,
+    onAnnotationsChange,
+    providerName: 'MediaElementPlaylistProvider',
+  });
+  const {
+    scrollContainerRef,
+    setScrollContainer,
+    isAutomaticScroll,
+    isAutomaticScrollRef,
+    setAutomaticScroll,
+  } = useScrollFollow(automaticScroll);
+  // The playhead and the progress overlay register here; the one loop below
+  // draws them. Not in a public context yet (see mediaElementInternalContexts).
+  const { registerFrameCallback, unregisterFrameCallback, runFrameCallbacks } = useFrameCallbacks();
 
-  // Ref for animation loop (avoids restarting loop on annotation change)
-  const annotationsRef = useRef<AnnotationData[]>(annotations);
-  annotationsRef.current = annotations;
-  // Per-frame lookups for the animation loop (cached; see annotationLookup.ts)
-  const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
+  // The time selection, as the drag in MediaElementPlaylist leaves it. Stored
+  // only: nothing seeks to it and playback does not use it.
+  const [selection, setSelectionState] = useState<MediaElementSelectionValue>({
+    selectionStart: 0,
+    selectionEnd: 0,
+  });
+  const setSelection = useCallback((start: number, end: number) => {
+    setSelectionState((previous) =>
+      previous.selectionStart === start && previous.selectionEnd === end
+        ? previous
+        : { selectionStart: start, selectionEnd: end }
+    );
+  }, []);
 
-  const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
-  const [continuousPlay, setContinuousPlayState] = useState(
-    annotationList?.isContinuousPlay ?? false
-  );
   const [samplesPerPixel] = useState(initialSamplesPerPixel);
-  const [isAutomaticScroll, setIsAutomaticScroll] = useState(automaticScroll);
 
   // Refs
   const playoutRef = useRef<MediaElementPlayout | null>(null);
   const currentTimeRef = useRef<number>(0);
-  const continuousPlayRef = useRef<boolean>(continuousPlay);
-  const activeAnnotationIdRef = useRef<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const isAutomaticScrollRef = useRef<boolean>(automaticScroll);
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
   const { startAnimationFrameLoop, stopAnimationFrameLoop } = useAnimationFrameLoop();
-
-  // Sync refs
-  useEffect(() => {
-    continuousPlayRef.current = continuousPlay;
-  }, [continuousPlay]);
-
-  useEffect(() => {
-    isAutomaticScrollRef.current = isAutomaticScroll;
-  }, [isAutomaticScroll]);
-
-  // Custom setter for activeAnnotationId
-  const setActiveAnnotationId = useCallback((value: string | null) => {
-    activeAnnotationIdRef.current = value;
-    setActiveAnnotationIdState(value);
-  }, []);
-
-  const setContinuousPlay = useCallback((value: boolean) => {
-    continuousPlayRef.current = value;
-    setContinuousPlayState(value);
-  }, []);
-
-  // Memoize setScrollContainer callback
-  const setScrollContainer = useCallback((element: HTMLDivElement | null) => {
-    scrollContainerRef.current = element;
-  }, []);
 
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
@@ -401,52 +391,51 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       const time = playoutRef.current?.getCurrentTime() ?? 0;
       currentTimeRef.current = time;
 
-      // Handle annotation playback
-      const currentAnnotations = annotationsRef.current;
-      if (currentAnnotations.length > 0) {
-        const currentAnnotation = annotationLookup.atTime(currentAnnotations, time);
+      // The media element reports the audible position: one time for logic
+      // and for drawing.
+      runFrameCallbacks({
+        time,
+        visualTime: time,
+        sampleRate,
+        samplesPerPixel: samplesPerPixelRef.current,
+      });
 
-        if (continuousPlayRef.current) {
-          if (currentAnnotation && currentAnnotation.id !== activeAnnotationIdRef.current) {
-            setActiveAnnotationId(currentAnnotation.id);
-          } else if (!currentAnnotation && activeAnnotationIdRef.current !== null) {
-            // Clear the active annotation when we're past it, but don't stop playback
-            // Let playback continue until the audio element fires its 'ended' event
-            setActiveAnnotationId(null);
-          }
-        } else {
-          if (activeAnnotationIdRef.current) {
-            const activeAnnotation = annotationLookup.byId(
-              currentAnnotations,
-              activeAnnotationIdRef.current
-            );
-            if (activeAnnotation && time >= activeAnnotation.end) {
-              playoutRef.current?.stop();
-              setIsPlaying(false);
-              return;
-            }
-          } else if (currentAnnotation) {
-            setActiveAnnotationId(currentAnnotation.id);
-          }
-        }
+      const activeAnnotationEnded = followAnnotations({
+        annotations: annotationsRef.current,
+        lookup: annotationLookup,
+        time,
+        activeId: activeAnnotationIdRef.current,
+        followOnly: continuousPlayRef.current,
+        holdHighlight: false,
+        setActiveAnnotationId,
+      });
+      if (activeAnnotationEnded) {
+        // Continuous play off: stop at the end of the active annotation.
+        playoutRef.current?.stop();
+        setIsPlaying(false);
+        return;
       }
 
-      // Handle automatic scroll - continuously center the playhead
       if (isAutomaticScrollRef.current && scrollContainerRef.current) {
-        const container = scrollContainerRef.current;
-        const pixelPosition = (time * sampleRate) / samplesPerPixelRef.current;
-        const containerWidth = container.clientWidth;
-
-        // Continuously scroll to keep playhead centered
-        const targetScrollLeft = Math.max(0, pixelPosition - containerWidth / 2);
-        container.scrollLeft = targetScrollLeft;
+        centrePlayhead(scrollContainerRef.current, time, sampleRate, samplesPerPixelRef.current);
       }
 
       startAnimationFrameLoop(updateTime);
     };
 
     startAnimationFrameLoop(updateTime);
-  }, [setActiveAnnotationId, sampleRate, startAnimationFrameLoop, annotationLookup]);
+  }, [
+    setActiveAnnotationId,
+    sampleRate,
+    startAnimationFrameLoop,
+    annotationLookup,
+    annotationsRef,
+    activeAnnotationIdRef,
+    continuousPlayRef,
+    isAutomaticScrollRef,
+    scrollContainerRef,
+    runFrameCallbacks,
+  ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
@@ -501,8 +490,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     }
   }, []);
 
-  const timeScaleHeight = timescale ? 30 : 0;
-
   // Context values
   const animationValue: MediaElementAnimationContextValue = useMemo(
     () => ({
@@ -523,36 +510,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     }),
     [continuousPlay, annotations, activeAnnotationId, playbackRate, isAutomaticScroll]
   );
-
-  // Created once: the annotations as an edge drag in progress would leave them.
-  const [annotationPreview] = useState<AnnotationPreviewHandle>(() =>
-    createValueSource<AnnotationData[] | null>(null)
-  );
-
-  // Stable callback ref for onAnnotationsChange to avoid re-creating controls context
-  const onAnnotationsChangeRef = useRef(onAnnotationsChange);
-  onAnnotationsChangeRef.current = onAnnotationsChange;
-
-  const setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>> = useCallback(
-    (action) => {
-      const updated = typeof action === 'function' ? action(annotationsRef.current) : action;
-      if (!onAnnotationsChangeRef.current) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            'waveform-playlist: setAnnotations was called but no onAnnotationsChange callback is provided. ' +
-              'Annotation edits will not persist. Pass onAnnotationsChange to MediaElementPlaylistProvider to handle annotation updates.'
-          );
-        }
-        return;
-      }
-      onAnnotationsChangeRef.current(updated);
-    },
-    []
-  );
-
-  const setAutomaticScroll = useCallback((enabled: boolean) => {
-    setIsAutomaticScroll(enabled);
-  }, []);
 
   const controlsValue: MediaElementControlsContextValue = useMemo(
     () => ({
@@ -581,7 +538,19 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setActiveAnnotationId,
       setAutomaticScroll,
       setScrollContainer,
+      scrollContainerRef,
     ]
+  );
+
+  // Internal (not exported from the package): see mediaElementInternalContexts.
+  const internalsValue: MediaElementInternalsValue = useMemo(
+    () => ({
+      registerFrameCallback,
+      unregisterFrameCallback,
+      visualTimeRef: currentTimeRef,
+      setSelection,
+    }),
+    [registerFrameCallback, unregisterFrameCallback, setSelection]
   );
 
   const dataValue: MediaElementDataContextValue = useMemo(
@@ -618,15 +587,17 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ]
   );
 
-  const mergedTheme = useMemo(() => ({ ...defaultTheme, ...userTheme }), [userTheme]);
-
   return (
     <ThemeProvider theme={mergedTheme}>
       <MediaElementAnimationContext.Provider value={animationValue}>
         <MediaElementStateContext.Provider value={stateValue}>
           <MediaElementControlsContext.Provider value={controlsValue}>
             <MediaElementDataContext.Provider value={dataValue}>
-              {children}
+              <MediaElementInternalsContext.Provider value={internalsValue}>
+                <MediaElementSelectionContext.Provider value={selection}>
+                  {children}
+                </MediaElementSelectionContext.Provider>
+              </MediaElementInternalsContext.Provider>
             </MediaElementDataContext.Provider>
           </MediaElementControlsContext.Provider>
         </MediaElementStateContext.Provider>
@@ -636,34 +607,16 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 };
 
 // Hooks
-export const useMediaElementAnimation = () => {
-  const context = useContext(MediaElementAnimationContext);
-  if (!context) {
-    throw new Error('useMediaElementAnimation must be used within MediaElementPlaylistProvider');
-  }
-  return context;
-};
+const PROVIDER = 'MediaElementPlaylistProvider';
 
-export const useMediaElementState = () => {
-  const context = useContext(MediaElementStateContext);
-  if (!context) {
-    throw new Error('useMediaElementState must be used within MediaElementPlaylistProvider');
-  }
-  return context;
-};
+export const useMediaElementAnimation = () =>
+  useRequiredContext(MediaElementAnimationContext, 'useMediaElementAnimation', PROVIDER);
 
-export const useMediaElementControls = () => {
-  const context = useContext(MediaElementControlsContext);
-  if (!context) {
-    throw new Error('useMediaElementControls must be used within MediaElementPlaylistProvider');
-  }
-  return context;
-};
+export const useMediaElementState = () =>
+  useRequiredContext(MediaElementStateContext, 'useMediaElementState', PROVIDER);
 
-export const useMediaElementData = () => {
-  const context = useContext(MediaElementDataContext);
-  if (!context) {
-    throw new Error('useMediaElementData must be used within MediaElementPlaylistProvider');
-  }
-  return context;
-};
+export const useMediaElementControls = () =>
+  useRequiredContext(MediaElementControlsContext, 'useMediaElementControls', PROVIDER);
+
+export const useMediaElementData = () =>
+  useRequiredContext(MediaElementDataContext, 'useMediaElementData', PROVIDER);

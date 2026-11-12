@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useId } from 'react';
 import styled from 'styled-components';
 import {
   SmartChannel,
@@ -9,6 +9,7 @@ import {
   waveformColorToCss,
 } from '@waveform-playlist/ui-components';
 import { useMediaElementAnimation, useMediaElementData } from '../MediaElementPlaylistContext';
+import { useMediaElementInternals } from '../providerInternals/mediaElementInternalContexts';
 
 const ChannelWrapper = styled.div`
   position: relative;
@@ -86,57 +87,52 @@ export const ChannelWithMediaElementProgress: React.FC<ChannelWithMediaElementPr
   ...smartChannelProps
 }) => {
   const progressRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
+  const frameCallbackId = useId();
   const theme = useTheme() as WaveformPlaylistTheme;
   const { waveHeight } = usePlaylistInfo();
 
-  const { isPlaying, currentTimeRef } = useMediaElementAnimation();
+  // `isPlaying` comes with `currentTime` in one value, so this also renders on
+  // a seek, a pause and a stop, which is what draws the resting progress.
+  const { isPlaying } = useMediaElementAnimation();
   const { samplesPerPixel, sampleRate } = useMediaElementData();
+  const { visualTimeRef, registerFrameCallback, unregisterFrameCallback } =
+    useMediaElementInternals();
 
   const progressColor = theme?.waveProgressColor || 'rgba(0, 0, 0, 0.1)';
 
   const channelWidth = smartChannelProps.length;
 
-  // Played fraction of the channel, 0..1. The overlay is as wide as the channel
-  // and scaled horizontally, so a frame changes only its transform.
-  const computeRatio = useCallback(() => {
-    const currentSample = (currentTimeRef.current ?? 0) * sampleRate;
-    if (channelWidth <= 0 || currentSample <= clipStartSample) return 0;
-    if (currentSample >= clipStartSample + clipDurationSamples) return 1;
-    const playedPixels = (currentSample - clipStartSample) / samplesPerPixel;
-    return Math.min(1, playedPixels / channelWidth);
-  }, [
-    currentTimeRef,
-    sampleRate,
-    samplesPerPixel,
-    clipStartSample,
-    clipDurationSamples,
-    channelWidth,
-  ]);
+  // Played fraction of the channel, 0..1, at a time in seconds. The overlay is
+  // as wide as the channel and scaled horizontally, so a frame changes only
+  // its transform.
+  const computeRatio = useCallback(
+    (time: number) => {
+      const currentSample = time * sampleRate;
+      if (channelWidth <= 0 || currentSample <= clipStartSample) return 0;
+      if (currentSample >= clipStartSample + clipDurationSamples) return 1;
+      const playedPixels = (currentSample - clipStartSample) / samplesPerPixel;
+      return Math.min(1, playedPixels / channelWidth);
+    },
+    [sampleRate, samplesPerPixel, clipStartSample, clipDurationSamples, channelWidth]
+  );
 
+  // While playing, the provider's animation loop draws the progress: a
+  // registered frame callback, no loop of its own.
   useEffect(() => {
-    if (!isPlaying) return;
-
-    const updateProgress = () => {
-      if (progressRef.current) {
-        progressRef.current.style.transform = `scaleX(${computeRatio()})`;
-      }
-      animationFrameRef.current = requestAnimationFrame(updateProgress);
-    };
-    animationFrameRef.current = requestAnimationFrame(updateProgress);
-
-    return () => {
-      if (animationFrameRef.current !== null) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
-  }, [isPlaying, computeRatio]);
+    if (isPlaying) {
+      registerFrameCallback(frameCallbackId, ({ visualTime }) => {
+        if (progressRef.current) {
+          progressRef.current.style.transform = `scaleX(${computeRatio(visualTime)})`;
+        }
+      });
+    }
+    return () => unregisterFrameCallback(frameCallbackId);
+  }, [isPlaying, frameCallbackId, computeRatio, registerFrameCallback, unregisterFrameCallback]);
 
   // When not playing, update after every render (seeks, stops, zoom changes).
   useEffect(() => {
     if (!isPlaying && progressRef.current) {
-      progressRef.current.style.transform = `scaleX(${computeRatio()})`;
+      progressRef.current.style.transform = `scaleX(${computeRatio(visualTimeRef.current ?? 0)})`;
     }
   });
 

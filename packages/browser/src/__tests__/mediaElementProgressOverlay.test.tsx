@@ -8,11 +8,30 @@ import React from 'react';
 import { render, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const animation = { isPlaying: false, currentTimeRef: { current: 0 } };
+const animation = { isPlaying: false };
+// What the provider gives its own components: the resting position and the
+// frame-callback registry its one animation loop drives (#769).
+const internals = vi.hoisted(() => {
+  const callbacks = new Map<string, (data: { visualTime: number }) => void>();
+  return {
+    callbacks,
+    visualTimeRef: { current: 0 },
+    registerFrameCallback: (id: string, cb: (data: { visualTime: number }) => void) => {
+      callbacks.set(id, cb);
+    },
+    unregisterFrameCallback: (id: string) => {
+      callbacks.delete(id);
+    },
+  };
+});
 
 vi.mock('../MediaElementPlaylistContext', () => ({
   useMediaElementAnimation: () => animation,
   useMediaElementData: () => ({ samplesPerPixel: 100, sampleRate: 1000 }),
+}));
+
+vi.mock('../providerInternals/mediaElementInternalContexts', () => ({
+  useMediaElementInternals: () => internals,
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => ({
@@ -38,35 +57,31 @@ function overlayOf(container: HTMLElement): HTMLElement {
   return (container.firstElementChild as HTMLElement).children[1] as HTMLElement;
 }
 
-let frames: FrameRequestCallback[];
+let requestedFrames: number;
 let originalRAF: typeof requestAnimationFrame;
-let originalCAF: typeof cancelAnimationFrame;
 
 beforeEach(() => {
-  frames = [];
   animation.isPlaying = false;
-  animation.currentTimeRef.current = 0;
+  internals.visualTimeRef.current = 0;
+  internals.callbacks.clear();
+  requestedFrames = 0;
   originalRAF = globalThis.requestAnimationFrame;
-  originalCAF = globalThis.cancelAnimationFrame;
-  globalThis.requestAnimationFrame = (cb: FrameRequestCallback) => frames.push(cb);
-  globalThis.cancelAnimationFrame = () => {};
+  globalThis.requestAnimationFrame = () => ++requestedFrames;
 });
 
 afterEach(() => {
   cleanup();
   globalThis.requestAnimationFrame = originalRAF;
-  globalThis.cancelAnimationFrame = originalCAF;
 });
 
-function runFrame() {
-  const pending = frames;
-  frames = [];
-  act(() => pending.forEach((cb) => cb(0)));
+/** One frame of the provider's loop at `time` seconds. */
+function runFrame(time: number) {
+  act(() => internals.callbacks.forEach((cb) => cb({ visualTime: time })));
 }
 
 describe('ChannelWithMediaElementProgress overlay', () => {
   it('is as wide as the channel and scaled to the played fraction when stopped', () => {
-    animation.currentTimeRef.current = 2.5; // a quarter of the clip
+    internals.visualTimeRef.current = 2.5; // a quarter of the clip
     const { container } = render(<ChannelWithMediaElementProgress {...props} />);
     const overlay = overlayOf(container);
     expect(overlay.style.width).toBe('100px');
@@ -78,25 +93,44 @@ describe('ChannelWithMediaElementProgress overlay', () => {
     const { container } = render(<ChannelWithMediaElementProgress {...props} />);
     const overlay = overlayOf(container);
 
-    animation.currentTimeRef.current = 5;
-    runFrame();
+    expect(internals.callbacks.size).toBe(1);
+    runFrame(5);
     expect(overlay.style.transform).toBe('scaleX(0.5)');
     expect(overlay.style.width).toBe('100px');
 
-    animation.currentTimeRef.current = 7.5;
-    runFrame();
+    runFrame(7.5);
     expect(overlay.style.transform).toBe('scaleX(0.75)');
     expect(overlay.style.width).toBe('100px');
+    // The provider's loop is the only one: the overlay requests no frames.
+    expect(requestedFrames).toBe(0);
+  });
+
+  it('registers with the loop only while playing, and unregisters on unmount', () => {
+    const { rerender, unmount } = render(<ChannelWithMediaElementProgress {...props} />);
+    expect(internals.callbacks.size).toBe(0);
+
+    animation.isPlaying = true;
+    rerender(<ChannelWithMediaElementProgress {...props} />);
+    expect(internals.callbacks.size).toBe(1);
+
+    animation.isPlaying = false;
+    rerender(<ChannelWithMediaElementProgress {...props} />);
+    expect(internals.callbacks.size).toBe(0);
+
+    animation.isPlaying = true;
+    rerender(<ChannelWithMediaElementProgress {...props} />);
+    unmount();
+    expect(internals.callbacks.size).toBe(0);
   });
 
   it('clamps before the clip and past its end', () => {
-    animation.currentTimeRef.current = 99;
+    internals.visualTimeRef.current = 99;
     const { container, rerender } = render(
       <ChannelWithMediaElementProgress {...props} clipStartSample={5000} />
     );
     expect(overlayOf(container).style.transform).toBe('scaleX(1)');
 
-    animation.currentTimeRef.current = 1; // before clipStartSample
+    internals.visualTimeRef.current = 1; // before clipStartSample
     rerender(<ChannelWithMediaElementProgress {...props} clipStartSample={5000} />);
     expect(overlayOf(container).style.transform).toBe('scaleX(0)');
   });
