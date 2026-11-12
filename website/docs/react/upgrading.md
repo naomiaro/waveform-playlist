@@ -726,6 +726,23 @@ const handlers = useAnnotationDragHandlers({
 
 The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow the preview by themselves. A custom annotation renderer needs `useAnnotationsWithPreview` to follow it.
 
+## MediaElement player: the provider owns the selection and runs the one animation loop
+
+**Package:** `@waveform-playlist/browser`.
+
+No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the time selection that `MediaElementPlaylist` used to keep in its own state, and its animation loop draws the playhead and the progress overlay, which used to run a `requestAnimationFrame` loop each. Four things behave differently:
+
+1. **The selection survives a remount of `MediaElementPlaylist`** (or `MediaElementWaveform`). Before, unmounting the component dropped the highlighted range. It is now kept for as long as the provider is mounted.
+2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own.
+3. **A custom `renderPlayhead` is not called on each pointer move of a selection drag.** The drag re-renders the highlighted range only. The function is still called when playback starts, pauses or stops and on a seek.
+4. **Automatic scroll positions are whole pixels**, as under `WaveformPlaylistProvider`.
+
+What a click, a drag and Play do is unchanged: a click seeks, a drag highlights a range without moving the cursor, and playback does not use the selection.
+
+**Find:** a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
+
+**Replace with:** for the playhead, position from `currentTimeRef` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`), which also resets playback. The selection is not yet readable or settable from outside the built-in components.
+
 ## Keyboard shortcuts yield to the focused control
 
 **Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useKeyboardShortcuts`, `usePlaybackShortcuts`, `<KeyboardShortcuts>`).

@@ -178,7 +178,7 @@ Rules when changing these files:
 - Call `useSelection()` only in a component that shows or uses the selection: `SelectionOverlay`, `PlayheadOverlay`, `SelectionTimeInputs`, `SetLoopRegionButton`, and `usePlayFromSelectionOrCursor` (so `PlayButton` and `KeyboardShortcuts` render per move; measured about 0.04 ms together, dev build).
 - The provider itself still renders per move (selection is its React state); its `children` are stable, so only context consumers follow.
 - `PlaylistVisualization`'s drag handlers take the anchor from `mouseDownTimeRef` (set at mouse-down), never from `selectionStart`. `selectionStart` is `min(anchor, pointer)`, so it stops being the anchor once the pointer passes left of it: until #733 a leftward drag selected only the last pointer movement.
-- `MediaElementPlaylistProvider` has no selection in any context; `MediaElementPlaylist` keeps it in local state with a fixed start, so it needed neither change.
+- `MediaElementPlaylistProvider` keeps its selection in an internal context since #769 (see "Provider Internals Exist Once"); it is stored as anchor and pointer, so the anchor question never arose there.
 - `setSelection` also sets `currentTime`, so a LEFTWARD drag changes the resting cursor position per move; that has its own context since #740 (next section).
 
 Measured per move of a rightward drag (dev build, `probes/select733.cjs`, which adds render time to the fiber-walk count): multi-clip 31 components to 9; annotations example (15 annotations) 369 to 17, React render at 4x CPU throttle 19.8 ms to 1.5 ms. Leftward: multi-clip 63 to 54, annotations 371 to 370. Guarded by `contextValueStability.test.tsx` (identities and render counts) and the drag-direction tests in `e2e/multi-clip.spec.ts`.
@@ -233,10 +233,34 @@ Rules:
 - `renderPlayhead` is called whenever the shell renders (`PlayheadOverlay` is a plain child of `PlaylistVisualization`, not memoized), so still on every timeline change, track selection and reorder drag-over; #768 only removed the mixer, loop, undo, annotation and settings triggers. A first draft of the upgrade guide claimed more and review caught it: read the parent's subscriptions before writing when a render prop is called.
 - `Waveform` reads no context. The "render the list only when there are annotations" test is in a child, `AnnotationListWhenPresent`, as in `MediaElementWaveform` (#744). Nothing counts `Waveform`'s own renders in a unit test.
 - `PlaylistInfoContext` (ui-components) has no `duration`: every `Track`, `SmartChannel` and `ChannelWithProgress` reads that context, and the length changes on each pointer move of a trim at the end of the timeline. `SmartScale` takes `durationMs` as a prop; the shell's memoized `timescale` element depends on `displayDuration`.
-- The MediaElement provider still has its four contexts (`currentTime` in the animation value, `activeAnnotationId` in the state value). Its split is part of #688 / #769, so that consumers migrate to the shared hook names once.
+- The MediaElement provider still has its four public contexts (`currentTime` in the animation value, `activeAnnotationId` in the state value). Their split comes with the shared hook names in #688, so that consumers migrate once; #769 added two internal contexts beside them and changed nothing public.
 - The provider nests the contexts with the least-changing outermost. The order has no effect on behaviour.
 
 Measuring: `probes/split768.cjs <port> <route> [throttle]` performs single actions (volume, pan, mute, master volume, loop, checkboxes, time format, reorder button, track selection, zoom, play/stop) and reports components rendered per action with the trigger roots; `probes/trim767.cjs` does the same for a trim. `probes/codemod768.cjs <files>` rewrites `const { … } = usePlaylistData()` style destructurings to the new hooks (it mangles an import list that has a comment inside it: check the diff).
+
+## Provider Internals Exist Once (#769)
+
+`src/providerInternals/` holds what `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` used to carry a copy each of. Nothing in it is exported from the package. Change the behaviour there, once:
+
+- `useAnnotationState` (the `annotations` memo with its dev-time numeric check, `annotationsRef`, the per-frame lookup, `setAnnotations`, `annotationPreview`, active id and continuous play with setters that write the ref before the state).
+- `useScrollFollow` (scroll container, the automatic-scroll state with a ref written by the setter) and `centrePlayhead()` (whole pixels).
+- `useFrameCallbacks` (the registry; `FrameData` lives here and is re-exported by the WebAudio context file).
+- `followAnnotations()`: the annotation step of the loop as a pure function. It moves the highlight and returns `true` when the active annotation has played to its end. What happens then is the provider's: the WebAudio provider stops the engine and returns the cursor to where playback started; the MediaElement provider stops the playout, and its cursor goes to 0. That difference is a decision for #688; do not unify it here.
+- `useViewDefaults` (`controls` and `theme` through `useShallowStable`, the merged theme, `progressBarWidth`, `timeScaleHeight`) and `useRequiredContext` (the throw behind every hook).
+
+`followAnnotations` takes `followOnly` and `holdHighlight` from the caller. WebAudio passes `continuousPlay || selection playback` and "this frame reaches a bounded play's end"; MediaElement passes `continuousPlay` and `false`. `holdHighlight` is read in the follow-only branch only (the #727 lesson: applied to the other branch it skips the stop at an annotation's end).
+
+**The MediaElement provider's frame registry and selection are internal contexts** (`mediaElementInternalContexts.ts`: `useMediaElementInternals()` for the registry, `visualTimeRef`, which is `currentTimeRef` itself there, and `setSelection`; `useMediaElementSelection()` for the two times). The maintainer chose this (2026-11-11) over adding them to the public `useMediaElement*` hooks: the public names come with the shared playback interface in #688, so a consumer learns them once. Until then do not export them, and do not make the MediaElement provider render the WebAudio provider's context objects (`useIsPlaying()` would start working under it without anyone having decided what `play` and `stop` mean there). `mediaElementSharedLoop.test.tsx` pins the four public values to their fields.
+
+- The selection is stored as the drag leaves it (`selectionStart` is the press, `selectionEnd` the pointer, so start can be the larger). `setSelection` only stores: no seek, and playback does not use it. `MediaElementSelectionOverlay` (memoized) is its only reader, so a drag move renders the provider and the overlay: 5 components on both example pages, 31 and 45 before (`probes/media769.cjs`).
+- Cost of moving it: a click to seek renders 3 components more than before (79 and 99 against 76 and 96), because the provider now renders on the press as well as on the release.
+- Seek, play, pause, stop and an annotation boundary still render the `MediaElementPlaylist` shell (it reads the animation value for `isPlaying`, and `currentTime` is in the same value). That needs the context split, which is #688.
+- Animation-frame requests per frame while playing: 4 to 2 on `/examples/media-element` (the provider's loop and the page's own time display), 3.4 to 1.4 on the annotations page. No timing difference is measurable; the point is that the playhead and the overlay can become one component each with their WebAudio twins.
+- A custom `renderPlayhead` still animates itself (`PlayheadWithMarker` runs its own loop on the refs in `PlayheadProps`); the registry is not part of that public type.
+- `duration` and peaks are still set from effects in the MediaElement provider. Deriving `duration` during render would remove its 0-to-value change, which consumers use as "the playout is ready" (see "Provider Child Effects and playoutRef Timing"); deriving peaks alone would draw them in a zero-width timeline until the playout resolves. Left to #688 with the maintainer's agreement.
+- The `PlaylistInfoContext` value in `MediaElementPlaylist` is memoized. Nothing below it is memoized today, so this shows in no count; it matters once something is.
+
+Tests: `providerInternals.test.tsx` (each piece alone), `mediaElementSharedLoop.test.tsx` (real provider and playlist with manual animation frames: one request per frame, the registered ids, the drag, the remount, annotation end), `webAudioSharedLoopSteps.test.tsx` (the WebAudio loop through the real provider with an output latency, so raw and visual time differ), and "one provider loop" in `e2e/media-element.spec.ts`. Known equivalent mutant: removing the cursor write at an annotation's end in the WebAudio loop changes nothing, because the engine's stop mirror writes the same position.
 
 ## One Annotation List and One Row of Boxes for Both Players (#744)
 
@@ -311,7 +335,7 @@ const selectTrack = useCallback((index: number) => {
 
 **FrameData:** The animation loop computes `FrameData { time, visualTime, sampleRate, samplesPerPixel }` once per frame and passes it to all registered callbacks. Callbacks must read `sampleRate`/`samplesPerPixel` from `FrameData`, not from closed-over render values — avoids stale closures during zoom changes.
 
-**Consumers:** `AnimatedPlayhead` (id: `'playhead'`), `ChannelWithProgress` (id: `useId()` — unique per instance), `AudioPosition` (id: `'audio-position'`). Auto-scroll uses `visualTime` directly in the loop body. MediaElement provider is excluded — has its own separate animation pattern.
+**Consumers:** `AnimatedPlayhead` (id: `'playhead'`), `ChannelWithProgress` (id: `useId()` — unique per instance), `AudioPosition` (id: `'audio-position'`). Auto-scroll uses `visualTime` directly in the loop body. The MediaElement provider has the same registry since #769, reached through an internal context (`useMediaElementInternals()`), with `visualTime` equal to `time`.
 
 **Per-frame annotation lookups** in both providers' loops go through `createAnnotationLookup()` (`src/utils/annotationLookup.ts`): `atTime` / `byId` return exactly what the `find` calls they replaced returned, cached against the annotations array's identity (so annotations must be replaced, not mutated). `atTime` only uses the cached hit and binary search when the list is sorted and non-overlapping; otherwise it falls back to the linear scan, because with overlaps "first match" depends on index order.
 
@@ -685,7 +709,7 @@ const setState = useCallback((v) => {
 
 ## MediaElement Progress Overlay
 
-`ChannelWithMediaElementProgress` matches `ChannelWithProgress`: the overlay is as wide as the channel and animated with `transform: scaleX(ratio)` (never `width`, which lays out every frame); geometry and colour go through `.attrs()` inline styles. It still runs its own rAF loop (the MediaElement provider has no frame-callback registry).
+`ChannelWithMediaElementProgress` matches `ChannelWithProgress`: the overlay is as wide as the channel and animated with `transform: scaleX(ratio)` (never `width`, which lays out every frame); geometry and colour go through `.attrs()` inline styles. Since #769 it registers a frame callback with the provider's loop (id from `useId()`), as `AnimatedMediaElementPlayhead` does; neither runs a loop of its own.
 
 ## MediaElement currentTime vs currentTimeRef
 

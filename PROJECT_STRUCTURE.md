@@ -296,6 +296,14 @@ const clip = createClipFromSeconds({
   ├── MediaElementPlaylistContext.tsx    # Context provider (HTMLAudioElement)
   ├── AnnotationIntegrationContext.tsx   # Optional annotation integration
   ├── SpectrogramIntegrationContext.tsx  # Optional spectrogram integration
+  ├── providerInternals/                # What both providers are built from (not exported)
+  │   ├── useAnnotationState.ts         # annotations, setAnnotations, preview, active id, continuous play
+  │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
+  │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
+  │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
+  │   ├── useViewDefaults.ts            # controls, merged theme, progressBarWidth, timeScaleHeight
+  │   ├── useRequiredContext.ts         # the throwing context read behind every hook
+  │   └── mediaElementInternalContexts.ts # MediaElement frame registry and selection (internal)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
   │   ├── useAnnotationDragHandlers.ts  # Annotation drag logic
