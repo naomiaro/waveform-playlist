@@ -1002,7 +1002,7 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 What changed:
 
 - **The take belongs to the track it was started on.** The track that is selected when `startRecording()` is called receives the clip. Before, the clip went to whichever track was selected when the take _stopped_, so selecting another track mid-take moved it. The target can no longer be switched while a take is running, as in `<daw-editor>`.
-- **`recordingTrackId: string | null`** is that track's id: set when `startRecording()` is called, `null` when no take is running (also after a start that failed).
+- **`recordingTrackId: string | null`** is that track's id while a take is running, and `null` whenever `isRecording` is false: before a take, after it stops (also when it stops by itself because the microphone was unplugged), and after a start that failed.
 - **A MIDI track is refused.** `startRecording()` returns `false` and sets `error` when the selected track is a MIDI track. Before, the take was added to the MIDI track and replaced the MIDI clips it overlapped.
 - **A second `startRecording()` while a take is running or starting returns `false`** and changes nothing.
 

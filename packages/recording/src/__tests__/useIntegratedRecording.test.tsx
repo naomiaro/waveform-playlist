@@ -329,6 +329,35 @@ describe('useIntegratedRecording', () => {
     expect(result.current.recordingTrackId).toBe('track-2');
   });
 
+  it('recordingTrackId is null again when a take ends on its own (microphone unplugged)', async () => {
+    const stream = createMockStream('mic');
+    getUserMediaMock.mockResolvedValue(stream);
+    const { result } = renderHook(() =>
+      useIntegratedRecording([{ ...makeTrack('track-1'), kind: 'audio' }], vi.fn(), 'track-1')
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(result.current.recordingTrackId).toBe('track-1');
+
+    // The browser ends the microphone track: useRecording stops by itself.
+    const audioTrack = stream.getAudioTracks()[0] as unknown as {
+      addEventListener: ReturnType<typeof vi.fn>;
+    };
+    const onEnded = audioTrack.addEventListener.mock.calls.find(([type]) => type === 'ended')![1];
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await act(async () => {
+      onEnded();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.recordingTrackId).toBeNull();
+  });
+
   it('rejects changeDevice while recording (stream untouched, error surfaced)', async () => {
     const setTracks = vi.fn();
     const { result } = await setupRecording([makeTrack('track-1')], setTracks);

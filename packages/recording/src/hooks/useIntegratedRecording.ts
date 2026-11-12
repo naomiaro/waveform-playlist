@@ -66,10 +66,10 @@ export interface UseIntegratedRecordingReturn {
   isRecording: boolean;
   isPaused: boolean;
   /**
-   * The id of the track the current take will be added to: the track that was
+   * The id of the track the running take will be added to: the track that was
    * selected when `startRecording()` was called, whatever is selected since.
-   * `null` when no take is running. Use it, not the selected track, for the
-   * live preview (`recordingState.trackId`).
+   * `null` whenever `isRecording` is false. Use it, not the selected track,
+   * for the live preview (`recordingState.trackId`).
    */
   recordingTrackId: string | null;
   /**
@@ -383,7 +383,9 @@ export function useIntegratedRecording(
     // Recording state
     isRecording,
     isPaused,
-    recordingTrackId,
+    // Only while a take is running: a take can also end without our
+    // stopRecording (the microphone is unplugged and useRecording stops itself).
+    recordingTrackId: isRecording ? recordingTrackId : null,
     meter,
     progress,
     error: hookError || micError || meterError || recError,
