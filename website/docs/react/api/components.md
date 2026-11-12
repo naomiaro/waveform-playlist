@@ -213,7 +213,7 @@ Moves the cursor to the start: `seekTo(0)`. During playback, playback restarts t
 
 ### FastForwardButton
 
-Moves the cursor to the end of the audio: `seekTo(Infinity)`, which the provider clamps.
+Moves the cursor to the end of the audio: `seekTo(Infinity)`, which the provider clamps. Disabled under a `WaveformPlaylistProvider` with `indefinitePlayback`, where the transport has no end.
 
 ```tsx
 <FastForwardButton />
@@ -221,7 +221,7 @@ Moves the cursor to the end of the audio: `seekTo(Infinity)`, which the provider
 
 ### SkipBackwardButton and SkipForwardButton
 
-Move the cursor back or forward by `skipAmount` seconds from the current playback position, clamped to the audio. During playback, playback restarts at the new position.
+Move the cursor back or forward by `skipAmount` seconds from the current playback position, clamped to the audio. Under a `WaveformPlaylistProvider` with `indefinitePlayback`, and during a recording session, the position is not clamped at the end of the audio: Skip Forward keeps going. During playback, playback restarts at the new position.
 
 ```tsx
 <SkipBackwardButton />

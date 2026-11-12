@@ -121,7 +121,7 @@ When provided, audio routes through a Web Audio graph enabling fades and effects
 **Type:** `number`
 **Default:** `1`
 
-The playback rate. Range: 0.5 to 2.0. The user can change it with `setPlaybackRate` from `usePlaybackRate()` (the `PlaybackRateSelect` control); a later change of this prop replaces their choice, for the audio and for the value `usePlaybackRate()` returns, until they choose again. Changing the prop recreates the player.
+The playback rate, passed to the player as given (`setPlaybackRate` clamps to 0.5–2; the prop is not clamped). The user can change it with `setPlaybackRate` from `usePlaybackRate()` (the `PlaybackRateSelect` control); a later change of this prop replaces their choice, for the audio and for the value `usePlaybackRate()` returns, until they choose again. Every new player, including one from a custom `createPlayout`, is told the current speed with `setPlaybackRate`. Changing the prop recreates the player.
 
 #### `preservesPitch`
 
