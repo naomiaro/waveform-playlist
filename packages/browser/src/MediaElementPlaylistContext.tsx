@@ -279,28 +279,19 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
 
-  // The audio the current player was created for. A player is also created
-  // again for the same audio (a new name, fades, pitch setting, callbacks).
-  const loadedAudioRef = useRef<{ source: string; waveformData: WaveformDataObject } | null>(null);
+  // The audio of the latest render, for the cleanup below to tell "new audio"
+  // from "the same audio in a new player" (a new name, fades, the pitch
+  // setting, a callback's identity). Written during render, like durationRef.
+  const latestAudioRef = useRef({ source: track.source, waveformData: track.waveformData });
+  latestAudioRef.current = { source: track.source, waveformData: track.waveformData };
 
   // Initialize playout and load track
   useEffect(() => {
     let cancelled = false;
     let createdPlayout: MediaElementPlayout | null = null;
-
-    // New audio: the old position and the old active annotation mean nothing
-    // in it (the position can be past its end). The same audio in a new
-    // player keeps both, so the listener does not lose their place.
-    const previousAudio = loadedAudioRef.current;
-    loadedAudioRef.current = { source: track.source, waveformData: track.waveformData };
-    if (
-      previousAudio &&
-      (previousAudio.source !== track.source || previousAudio.waveformData !== track.waveformData)
-    ) {
-      currentTimeRef.current = 0;
-      setCurrentTime(0);
-      setActiveAnnotationId(null);
-    }
+    // The audio this run's player is for.
+    const source = track.source;
+    const waveformData = track.waveformData;
 
     (async () => {
       try {
@@ -358,6 +349,22 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       // with no audio and no loop, and the playhead and progress overlay
       // (drawn at rest only while not playing) stopped following seeks.
       setIsPlaying(false);
+      const latest = latestAudioRef.current;
+      if (latest.source !== source || latest.waveformData !== waveformData) {
+        // New audio: the old position and the old active annotation mean
+        // nothing in it. Done here, in the cleanup, and not when the next
+        // player is set up: React runs every cleanup of a commit before any
+        // effect, so an effect of a child that restores a saved position for
+        // the new audio (`seekTo`, `setActiveAnnotationId`) runs after this
+        // and is kept.
+        currentTimeRef.current = 0;
+        setCurrentTime(0);
+        setActiveAnnotationId(null);
+      } else {
+        // The same audio (or an unmount): keep the listener's place, and
+        // bring the state up to it. During playback only the ref advances.
+        setCurrentTime(currentTimeRef.current);
+      }
       if (createdPlayout) {
         createdPlayout.dispose();
       }

@@ -173,6 +173,24 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+/**
+ * A consumer that puts the listener back where they were in each file: its
+ * own effect, keyed on the source, as an app with a list of files would have.
+ */
+const SAVED: Record<string, { time: number; annotationId: string }> = {
+  'other.mp3': { time: 5, annotationId: 'n2' },
+};
+const RestoreOnSource: React.FC<{ source: string }> = ({ source }) => {
+  const { seekTo, setActiveAnnotationId } = useMediaElementControls();
+  React.useEffect(() => {
+    const saved = SAVED[source];
+    if (!saved) return;
+    seekTo(saved.time);
+    setActiveAnnotationId(saved.annotationId);
+  }, [source, seekTo, setActiveAnnotationId]);
+  return null;
+};
+
 async function runFrame(): Promise<number> {
   const pending = [...frames.values()];
   frames.clear();
@@ -191,6 +209,7 @@ interface MountOptions {
   automaticScroll?: boolean;
   annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
   strict?: boolean;
+  restoreOnSource?: boolean;
   renderPlayhead?: React.ComponentProps<typeof MediaElementPlaylist>['renderPlayhead'];
 }
 
@@ -210,6 +229,7 @@ async function mount(options: MountOptions = {}) {
         timescale
       >
         <ProbeChild />
+        {options.restoreOnSource ? <RestoreOnSource source={track.source} /> : null}
         {showPlaylist
           ? Array.from({ length: playlists }, (_, i) => (
               <MediaElementPlaylist key={i} renderPlayhead={options.renderPlayhead} />
@@ -443,6 +463,8 @@ describe('MediaElement playback runs one animation loop', () => {
     const { playout, changeTrack } = await mount({
       annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
     });
+    await act(async () => probe.controls.seekTo(1));
+    expect(probe.animation.currentTime).toBe(1);
     await act(async () => probe.controls.play());
     playout.time = 2.5;
     await runFrame();
@@ -468,7 +490,7 @@ describe('MediaElement playback runs one animation loop', () => {
     expect(progressOverlay().style.transform).toBe('scaleX(0.375)');
   });
 
-  it('new audio while paused also resets the cursor; the next play starts at 0', async () => {
+  it('new audio while stopped after a seek also resets the cursor; the next play starts at 0', async () => {
     const { playout, changeTrack } = await mount();
     await act(async () => probe.controls.seekTo(3));
     expect(probe.animation.currentTime).toBe(3);
@@ -498,12 +520,61 @@ describe('MediaElement playback runs one animation loop', () => {
     await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
     expect(probe.animation.isPlaying).toBe(false);
     expect(probe.animation.currentTimeRef.current).toBe(2.5);
+    // The resting position as state, for a consumer that shows it.
+    expect(probe.animation.currentTime).toBe(2.5);
     expect(probe.state.activeAnnotationId).toBe('n2');
     expect(playhead().style.transform).toBe(`translate3d(${2.5 * PX_PER_SECOND}px, 0, 0)`);
 
     await act(async () => probe.controls.play());
     expect(playout.play).toHaveBeenLastCalledWith(undefined, 2.5);
     await act(async () => probe.controls.stop());
+  });
+
+  it("a child's own effect that restores a position for the new audio wins over the reset", async () => {
+    const { playout, changeTrack } = await mount({
+      annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
+      restoreOnSource: true,
+    });
+    await act(async () => probe.controls.play());
+    playout.time = 1;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n1');
+
+    await act(async () => changeTrack({ source: 'other.mp3' }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(probe.animation.currentTime).toBe(5);
+    expect(probe.animation.currentTimeRef.current).toBe(5);
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(playhead().style.transform).toBe(`translate3d(${5 * PX_PER_SECOND}px, 0, 0)`);
+
+    await act(async () => probe.controls.play());
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, 5);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('the selection is kept across new audio', async () => {
+    const { playout, changeTrack } = await mount();
+    const overlay = clickOverlay();
+    await press(overlay, 100);
+    await moveTo(200);
+    await release(200);
+    await act(async () => changeTrack({ source: 'other.mp3' }));
+    await waitFor(() => expect(playout.addTrack).toHaveBeenCalledTimes(2));
+    expect(selections()).toHaveLength(1);
+    expect(selections()[0].style.left).toBe('100px');
+  });
+
+  it('unmounting the provider during playback resets nothing and throws nothing', async () => {
+    await mount();
+    await act(async () => probe.controls.seekTo(2));
+    await act(async () => probe.controls.play());
+    const before = probe.animation.currentTimeRef.current;
+    await act(async () => {
+      cleanup();
+    });
+    expect(probe.animation.currentTimeRef.current).toBe(before);
+    expect(frames.size).toBe(0);
   });
 
   it('a playlist that unmounts during playback leaves nothing registered', async () => {
