@@ -60,9 +60,14 @@ const CustomMediaElementPlayhead: React.FC<{
 
 /**
  * The highlighted selection range. The only part of the playlist that follows
- * the selection, so a drag renders this and not the waveform (#769).
+ * the selection, so a drag renders this and not the waveform (#769). Memoized:
+ * a render of the playlist around it (play, pause, a seek) is not its concern.
  */
-const MediaElementSelectionOverlay: React.FC<{ color: string }> = ({ color }) => {
+const MediaElementSelectionOverlay = React.memo(function MediaElementSelectionOverlay({
+  color,
+}: {
+  color: string;
+}) {
   const { selectionStart, selectionEnd } = useMediaElementSelection();
   const { sampleRate, samplesPerPixel } = useMediaElementData();
 
@@ -75,7 +80,7 @@ const MediaElementSelectionOverlay: React.FC<{ color: string }> = ({ color }) =>
       color={color}
     />
   );
-};
+});
 
 export interface MediaElementPlaylistProps {
   /** Custom function to generate the label shown on annotation boxes */
