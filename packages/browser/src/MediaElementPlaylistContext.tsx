@@ -65,7 +65,12 @@ export interface MediaElementStateContextValue {
 
 // Context values for controls
 export interface MediaElementControlsContextValue {
-  play: (startTime?: number) => void;
+  /**
+   * Starts playback at `startTime` (default: the cursor). With `playDuration`
+   * it stops by itself after that many seconds of audio. Called before the
+   * player exists, the play is queued and starts when the player arrives.
+   */
+  play: (startTime?: number, playDuration?: number) => Promise<void>;
   pause: () => void;
   stop: () => void;
   seekTo: (time: number) => void;
@@ -86,7 +91,13 @@ export interface MediaElementControlsContextValue {
 
 // Context values for playlist data
 export interface MediaElementDataContextValue {
+  /** The length of the track's audio, from its waveform data. Never 0 for a real track. */
   duration: number;
+  /**
+   * True once the media element has loaded its metadata, false again while a
+   * replaced player loads. Use this, not `duration`, as "the player can be used".
+   */
+  isReady: boolean;
   peaksDataArray: TrackClipPeaks[];
   sampleRate: number;
   waveHeight: number;
@@ -154,14 +165,18 @@ export interface MediaElementPlaylistProviderProps {
    * createMediaElementSource() is called once per audio element.
    */
   audioContext?: AudioContext;
-  /** Callback when audio is ready */
+  /** Called when the media element has loaded its metadata (it knows its
+   *  length and can be played and seeked), once per player. */
   onReady?: () => void;
   /** Called when playout initialization fails (e.g. a missing optional peer,
-   *  a throwing `createPlayout`, or an `addTrack` error). The provider already
-   *  logs the error; use this to surface it in your UI. */
+   *  a throwing `createPlayout`, or an `addTrack` error) and when the media
+   *  element reports an error (a source that cannot be loaded or decoded).
+   *  The provider already logs the error; use this to surface it in your UI. */
   onError?: (err: Error) => void;
   /** Factory for a custom MediaElement playout. When omitted, the bundled engine
-   *  (@waveform-playlist/media-element-playout) is dynamically imported. */
+   *  (@waveform-playlist/media-element-playout) is dynamically imported. A
+   *  custom playout must implement `on()` and emit `loadedmetadata`: the
+   *  provider is not ready until it does. */
   createPlayout?: () => MediaElementPlayout;
   children: ReactNode;
 }
@@ -214,10 +229,16 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   });
 
   // State
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlayingState] = useState(false);
+  // Read by `seekTo` and `setSelection`, which must know at call time whether
+  // playback is running; written together with the state, never by a render.
+  const isPlayingRef = useRef(false);
+  const setIsPlaying = useCallback((playing: boolean) => {
+    isPlayingRef.current = playing;
+    setIsPlayingState(playing);
+  }, []);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [peaksDataArray, setPeaksDataArray] = useState<TrackClipPeaks[]>([]);
+  const [isReady, setIsReady] = useState(false);
   const [playbackRate, setPlaybackRateState] = useState(initialPlaybackRate);
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
@@ -249,19 +270,14 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // draws them. Not in a public context yet (see mediaElementInternalContexts).
   const { registerFrameCallback, unregisterFrameCallback, runFrameCallbacks } = useFrameCallbacks();
 
-  // The time selection, as the drag in MediaElementPlaylist leaves it. Stored
-  // only: nothing seeks to it and playback does not use it.
+  // The time selection. Setting it moves the cursor to its start, and Play
+  // plays it (see `setSelection` and `play` below), as under the WebAudio
+  // provider (#688).
   const [selection, setSelectionState] = useState<MediaElementSelectionValue>({
     selectionStart: 0,
     selectionEnd: 0,
   });
-  const setSelection = useCallback((start: number, end: number) => {
-    setSelectionState((previous) =>
-      previous.selectionStart === start && previous.selectionEnd === end
-        ? previous
-        : { selectionStart: start, selectionEnd: end }
-    );
-  }, []);
+  const selectionRef = useRef(selection);
 
   const [samplesPerPixel] = useState(initialSamplesPerPixel);
 
@@ -271,8 +287,64 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
   const { startAnimationFrameLoop, stopAnimationFrameLoop } = useAnimationFrameLoop();
 
+  // What the play that is running (or queued) is, in the WebAudio provider's
+  // terms (#688):
+  //  - where Stop, the end of the audio and the end of an annotation return
+  //    the cursor (for the selection: its start, even when resumed part-way);
+  //  - where a bounded play ends (null: it runs on);
+  //  - whether it is the highlighted selection that is playing. Then
+  //    continuous play is out of the picture: annotation ends do not stop it.
+  const playStartPositionRef = useRef(0);
+  const playbackEndTimeRef = useRef<number | null>(null);
+  const isSelectionPlayRef = useRef(false);
+  // A play asked for while there is no player (the first one is loading, or
+  // one is being replaced). Started by the init effect when the player
+  // arrives; cleared by Stop, Pause, new audio and a failed init.
+  const pendingPlayRef = useRef<{ position: number; endTime?: number } | null>(null);
+  // True from the start of an init until its player arrives or it fails:
+  // only then is there something a queued play can wait for.
+  const playoutInFlightRef = useRef(false);
+
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
+  // The length of the audio is known from the waveform data: it does not wait
+  // for the player (#688). "The player can be used" is `isReady`.
+  const duration = track.waveformData.duration;
+
+  // Peaks are derived during render, so the waveform is drawn on first paint.
+  const trackName = track.name;
+  const trackWaveformData = track.waveformData;
+  const peaksDataArray = useMemo<TrackClipPeaks[]>(() => {
+    try {
+      const durationSamples = Math.ceil(trackWaveformData.duration * sampleRate);
+      const extractedPeaks = extractPeaksFromWaveformData(
+        trackWaveformData as WaveformData,
+        samplesPerPixel,
+        0, // channel index
+        0, // offset
+        durationSamples
+      );
+
+      const clipPeaks: ClipPeaks = {
+        clipId: 'media-element-clip',
+        trackName: trackName ?? 'Track',
+        peaks: {
+          length: extractedPeaks.length,
+          data: [extractedPeaks.data],
+          bits: extractedPeaks.bits,
+        } as PeakData,
+        startSample: 0,
+        durationSamples,
+      };
+
+      return [[clipPeaks]];
+    } catch (err) {
+      console.warn(
+        '[waveform-playlist] Failed to extract peaks from waveform data: ' + String(err)
+      );
+      return [];
+    }
+  }, [trackWaveformData, trackName, samplesPerPixel, sampleRate]);
 
   // The audio of the latest COMMITTED render, read by two things that must not
   // wait for a render or an effect of their own:
@@ -291,6 +363,30 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     latestAudioRef.current = { source: track.source, waveformData: track.waveformData };
   }, [track.source, track.waveformData]);
 
+  // Ends playback with the cursor resting at `cursor`. The player is paused
+  // and moved there too (not `stop()`, which rewinds the element to 0): its
+  // own time must agree with the cursor, because the element reports its
+  // position back (`timeupdate` writes `currentTimeRef`).
+  const restAt = useCallback(
+    (cursor: number) => {
+      const playout = playoutRef.current;
+      if (playout) {
+        playout.pause();
+        playout.seekTo(cursor);
+      }
+      stopAnimationFrameLoop();
+      setIsPlaying(false);
+      playbackEndTimeRef.current = null;
+      currentTimeRef.current = cursor;
+      setCurrentTime(cursor);
+    },
+    [stopAnimationFrameLoop, setIsPlaying]
+  );
+
+  // The init effect starts a queued play when its player arrives, long after
+  // the render that created the effect: it reads the loop starter from here.
+  const startAnimationLoopRef = useRef<() => void>(() => {});
+
   // Initialize playout and load track
   useEffect(() => {
     let cancelled = false;
@@ -298,6 +394,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     // The audio this run's player is for.
     const source = track.source;
     const waveformData = track.waveformData;
+    playoutInFlightRef.current = true;
 
     (async () => {
       try {
@@ -311,6 +408,28 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           return;
         }
         createdPlayout = playout;
+
+        // Subscribed before the track exists: the engine attaches the
+        // listeners when it creates the media element, so neither event can
+        // be missed. "Ready" is the element having its metadata (#688), not
+        // this object existing; a source that cannot be loaded never is.
+        playout.on('loadedmetadata', () => {
+          if (cancelled) return;
+          setIsReady(true);
+          onReady?.();
+        });
+        playout.on('error', (mediaError) => {
+          if (cancelled) return;
+          const detail = mediaError
+            ? ' (code ' +
+              mediaError.code +
+              (mediaError.message ? ': ' + mediaError.message : '') +
+              ')'
+            : '';
+          const error = new Error('Media failed to load: ' + source + detail);
+          console.warn('[waveform-playlist] ' + error.message);
+          onError?.(error);
+        });
 
         playout.addTrack({
           source: track.source,
@@ -329,16 +448,23 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           });
         }
 
-        // Set up playback complete callback
+        // The audio played to its end. The cursor returns to where playback
+        // started, as on Stop. A bounded play that is not the selection rests
+        // at its own end instead: the loop below does the same when it sees
+        // the end first, and which of the two does is a race.
         playout.setOnPlaybackComplete(() => {
-          stopAnimationFrameLoop();
-          setIsPlaying(false);
+          if (cancelled) return;
+          const boundedEnd = playbackEndTimeRef.current;
+          if (boundedEnd !== null && !isSelectionPlayRef.current) {
+            restAt(Math.min(boundedEnd, waveformData.duration));
+            return;
+          }
+          restAt(playStartPositionRef.current);
           setActiveAnnotationId(null);
-          currentTimeRef.current = 0;
-          setCurrentTime(0);
         });
 
         playoutRef.current = playout;
+        playoutInFlightRef.current = false;
         // The cursor may not be at 0: a position kept across a same-audio
         // replacement, or one stored by `seekTo` while there was no player (a
         // restore for this file). Move the new player there now, so its own
@@ -347,9 +473,23 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         if (currentTimeRef.current > 0) {
           playout.seekTo(currentTimeRef.current);
         }
-        setDuration(track.waveformData.duration);
-        onReady?.();
+        // A play asked for while there was no player starts now. The media
+        // element accepts play() before its metadata has loaded.
+        const queued = pendingPlayRef.current;
+        if (queued) {
+          pendingPlayRef.current = null;
+          currentTimeRef.current = queued.position;
+          playbackEndTimeRef.current = queued.endTime ?? null;
+          playout.play(undefined, queued.position);
+          setIsPlaying(true);
+          startAnimationLoopRef.current();
+        }
       } catch (err) {
+        if (!cancelled) {
+          // Nothing will arrive for a queued play to wait for.
+          playoutInFlightRef.current = false;
+          pendingPlayRef.current = null;
+        }
         console.warn('[waveform-playlist] MediaElement playout init failed: ' + String(err));
         onError?.(err instanceof Error ? err : new Error(String(err)));
       }
@@ -363,6 +503,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       // with no audio and no loop, and the playhead and progress overlay
       // (drawn at rest only while not playing) stopped following seeks.
       setIsPlaying(false);
+      // Whatever replaces this player has its own metadata to load.
+      setIsReady(false);
+      playbackEndTimeRef.current = null;
       const latest = latestAudioRef.current;
       if (latest.source !== source || latest.waveformData !== waveformData) {
         // New audio: the old position and the old active annotation mean
@@ -374,6 +517,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         currentTimeRef.current = 0;
         setCurrentTime(0);
         setActiveAnnotationId(null);
+        // A play queued for the old audio, and where a Stop would return to
+        // in it, mean nothing either. (A play queued AFTER this cleanup, for
+        // the new audio, is kept: the cleanup has already run by then.)
+        pendingPlayRef.current = null;
+        playStartPositionRef.current = 0;
+        isSelectionPlayRef.current = false;
       } else {
         // The same audio (or an unmount): keep the listener's place, and
         // bring the state up to it. During playback only the ref advances.
@@ -397,37 +546,10 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     onError,
     stopAnimationFrameLoop,
     setActiveAnnotationId,
+    setIsPlaying,
+    restAt,
     createPlayout,
   ]);
-
-  // Generate peaks from waveform data
-  useEffect(() => {
-    try {
-      const extractedPeaks = extractPeaksFromWaveformData(
-        track.waveformData as WaveformData,
-        samplesPerPixel,
-        0, // channel index
-        0, // offset
-        Math.ceil(track.waveformData.duration * sampleRate) // duration in samples
-      );
-
-      const clipPeaks: ClipPeaks = {
-        clipId: 'media-element-clip',
-        trackName: track.name ?? 'Track',
-        peaks: {
-          length: extractedPeaks.length,
-          data: [extractedPeaks.data],
-          bits: extractedPeaks.bits,
-        } as PeakData,
-        startSample: 0,
-        durationSamples: Math.ceil(track.waveformData.duration * sampleRate),
-      };
-
-      setPeaksDataArray([[clipPeaks]]);
-    } catch (err) {
-      console.warn('[waveform-playlist] Failed to extract peaks from waveform data:', err);
-    }
-  }, [track.waveformData, track.name, samplesPerPixel, sampleRate]);
 
   // Animation loop
   const startAnimationLoop = useCallback(() => {
@@ -449,14 +571,26 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         lookup: annotationLookup,
         time,
         activeId: activeAnnotationIdRef.current,
-        followOnly: continuousPlayRef.current,
-        holdHighlight: false,
+        // Playing the selection takes continuous play out of the picture,
+        // and on the frame that reaches a bounded play's end the highlight
+        // is held (the end check below stops there). As in the WebAudio loop.
+        followOnly: continuousPlayRef.current || isSelectionPlayRef.current,
+        holdHighlight: playbackEndTimeRef.current !== null && time >= playbackEndTimeRef.current,
         setActiveAnnotationId,
       });
       if (activeAnnotationEnded) {
-        // Continuous play off: stop at the end of the active annotation.
-        playoutRef.current?.stop();
-        setIsPlaying(false);
+        // Continuous play off: stop at the end of the active annotation and
+        // return the cursor to where playback started.
+        restAt(playStartPositionRef.current);
+        return;
+      }
+
+      // A bounded play (`play(start, duration)`, the selection) has reached
+      // its end. The selection returns the cursor to its start; any other
+      // range leaves it at the end.
+      const endTime = playbackEndTimeRef.current;
+      if (endTime !== null && time >= endTime) {
+        restAt(isSelectionPlayRef.current ? playStartPositionRef.current : endTime);
         return;
       }
 
@@ -479,42 +613,77 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     isAutomaticScrollRef,
     scrollContainerRef,
     runFrameCallbacks,
+    restAt,
   ]);
+  useLayoutEffect(() => {
+    startAnimationLoopRef.current = startAnimationLoop;
+  }, [startAnimationLoop]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
 
-  // Playback controls
+  // Playback controls. The rules are the WebAudio provider's (#688), so that
+  // one Play, Stop or seek control means the same under either provider.
   const play = useCallback(
-    (startTime?: number) => {
-      if (!playoutRef.current) return;
-
+    async (startTime?: number, playDuration?: number) => {
       const actualStartTime = startTime ?? currentTimeRef.current;
-      playoutRef.current.play(undefined, actualStartTime);
+      const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
+
+      const playout = playoutRef.current;
+      // No player and none on its way (the init failed): nothing to do.
+      if (!playout && !playoutInFlightRef.current) return;
+
+      // Is this the highlighted selection being played? It may start inside
+      // the selection (resuming after a pause) but always runs to its end.
+      const { selectionStart, selectionEnd } = selectionRef.current;
+      isSelectionPlayRef.current =
+        endTime !== undefined &&
+        selectionEnd > selectionStart &&
+        actualStartTime >= selectionStart - 1e-6 &&
+        actualStartTime < selectionEnd &&
+        Math.abs(endTime - selectionEnd) < 1e-6;
+      // Where a Stop (or the play finishing) returns the cursor. For the
+      // selection that is its start even when this play resumed part-way in.
+      playStartPositionRef.current = isSelectionPlayRef.current ? selectionStart : actualStartTime;
+      playbackEndTimeRef.current = endTime ?? null;
+      currentTimeRef.current = actualStartTime;
+
+      if (!playout) {
+        // The player is loading or being replaced: the init effect starts
+        // this when it arrives. `isPlaying` stays false until audio starts.
+        pendingPlayRef.current = { position: actualStartTime, endTime };
+        return;
+      }
+      pendingPlayRef.current = null;
+
+      // The engine schedules the track's fades in `play()`, relative to the
+      // start position; the end is watched by the loop, not by the engine
+      // (its own duration timer does not follow a pause or a rate change).
+      playout.play(undefined, actualStartTime);
       setIsPlaying(true);
       startAnimationLoop();
     },
-    [startAnimationLoop]
+    [startAnimationLoop, setIsPlaying]
   );
 
   const pause = useCallback(() => {
+    // Cancels a play queued for a player that has not arrived.
+    pendingPlayRef.current = null;
     if (!playoutRef.current) return;
 
     playoutRef.current.pause();
     setIsPlaying(false);
     stopAnimationLoop();
     setCurrentTime(playoutRef.current.getCurrentTime());
-  }, [stopAnimationLoop]);
+  }, [stopAnimationLoop, setIsPlaying]);
 
   const stop = useCallback(() => {
-    if (!playoutRef.current) return;
-
-    playoutRef.current.stop();
-    setIsPlaying(false);
-    stopAnimationLoop();
-    currentTimeRef.current = 0;
-    setCurrentTime(0);
+    // Cancels a play queued for a player that has not arrived.
+    pendingPlayRef.current = null;
+    // Return the cursor to where playback started (Audacity-style), with or
+    // without a player.
+    restAt(playStartPositionRef.current);
     setActiveAnnotationId(null);
-  }, [stopAnimationLoop, setActiveAnnotationId]);
+  }, [restAt, setActiveAnnotationId]);
 
   const seekTo = useCallback((time: number) => {
     const trackDuration = latestAudioRef.current.waveformData.duration;
@@ -522,10 +691,83 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     currentTimeRef.current = clampedTime;
     setCurrentTime(clampedTime);
 
-    if (playoutRef.current) {
-      playoutRef.current.seekTo(clampedTime);
+    // Whatever play was running or queued started somewhere else and may
+    // have had an end: from here on this position is where playback began.
+    playStartPositionRef.current = clampedTime;
+    playbackEndTimeRef.current = null;
+    isSelectionPlayRef.current = false;
+    const queued = pendingPlayRef.current;
+    if (queued) {
+      queued.position = clampedTime;
+      queued.endTime = undefined;
+      return;
+    }
+
+    const playout = playoutRef.current;
+    if (!playout) return;
+    if (isPlayingRef.current) {
+      // Restart at the new position instead of moving the element under
+      // the running play: the engine schedules fades in `play()`, so a bare
+      // seek would land mid-fade at the wrong gain.
+      playout.play(undefined, clampedTime);
+    } else {
+      playout.seekTo(clampedTime);
     }
   }, []);
+
+  // Selection. As under the WebAudio provider: the cursor moves to its start,
+  // a range set during playback is played start to end, and a collapsed one
+  // (a cursor move) carries on open-ended from there.
+  const setSelection = useCallback(
+    (start: number, end: number) => {
+      const previous = selectionRef.current;
+      if (previous.selectionStart !== start || previous.selectionEnd !== end) {
+        selectionRef.current = { selectionStart: start, selectionEnd: end };
+        setSelectionState(selectionRef.current);
+      }
+      const cursorMoved = currentTimeRef.current !== start;
+      currentTimeRef.current = start;
+      setCurrentTime(start);
+
+      const playsRange = end > start;
+      const endTime = playsRange ? end : undefined;
+      // Whatever bounded play was running or queued is over: its end, its
+      // start and its active annotation must not outlive it.
+      const replaceBoundedPlay = () => {
+        playbackEndTimeRef.current = endTime ?? null;
+        isSelectionPlayRef.current = playsRange;
+        playStartPositionRef.current = start;
+        if (activeAnnotationIdRef.current !== null) setActiveAnnotationId(null);
+      };
+
+      const queued = pendingPlayRef.current;
+      if (queued) {
+        queued.position = start;
+        queued.endTime = endTime;
+        replaceBoundedPlay();
+        return;
+      }
+
+      const playout = playoutRef.current;
+      if (!isPlayingRef.current) {
+        // Nothing is playing: an earlier play no longer says anything about
+        // this position.
+        isSelectionPlayRef.current = false;
+        playStartPositionRef.current = start;
+        playbackEndTimeRef.current = null;
+        // Only when the start moved: a rightward drag keeps its start, and
+        // must not seek the media element on every pointer move.
+        if (playout && cursorMoved) playout.seekTo(start);
+        return;
+      }
+
+      if (playout) {
+        replaceBoundedPlay();
+        playout.play(undefined, start);
+      }
+    },
+    [activeAnnotationIdRef, setActiveAnnotationId]
+  );
 
   const setPlaybackRate = useCallback((rate: number) => {
     const clampedRate = Math.max(0.5, Math.min(2.0, rate));
@@ -601,6 +843,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const dataValue: MediaElementDataContextValue = useMemo(
     () => ({
       duration,
+      isReady,
       peaksDataArray,
       sampleRate,
       waveHeight,
@@ -617,6 +860,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     }),
     [
       duration,
+      isReady,
       peaksDataArray,
       sampleRate,
       waveHeight,

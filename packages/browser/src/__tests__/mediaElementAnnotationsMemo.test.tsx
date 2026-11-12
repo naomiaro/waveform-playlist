@@ -92,6 +92,11 @@ function createFakePlayout() {
     addTrack: vi.fn(),
     getTrack: () => undefined,
     setOnPlaybackComplete() {},
+    // Reports its metadata as soon as it is asked: "ready" right after creation.
+    on(event: string, listener: () => void) {
+      if (event === 'loadedmetadata') queueMicrotask(listener);
+    },
+    off() {},
     play: vi.fn(),
     pause() {},
     stop() {},
