@@ -6,7 +6,7 @@
  * non-finite or non-positive inputs.
  *
  * Single source of truth for `useIntegratedRecording` (buffer trim) and
- * `PlaylistVisualization` (live preview peak slice). Keep the two in lockstep
+ * the view's recording preview (live preview peak slice). Keep the two in lockstep
  * so the live preview width matches the finalized clip.
  */
 export function audibleLatencySamples(
@@ -30,7 +30,7 @@ export function audibleLatencySamples(
  *
  * Single source of truth for the override-vs-auto decision across dawcore
  * (`RecordingController`) and React (`useIntegratedRecording` finalization +
- * `PlaylistVisualization` live preview). The override branch is the same math as
+ * the view's live preview). The override branch is the same math as
  * the auto branch with `lookAhead = 0`, so both inherit the finite/positive
  * guards in `audibleLatencySamples`.
  */

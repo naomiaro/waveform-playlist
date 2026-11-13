@@ -99,6 +99,34 @@ function MyPlaylist() {
 }
 ```
 
+### Showing the Fade Curves
+
+The fades are applied to the audio whatever the view draws. To draw each clip's fade-in and fade-out curve over its waveform, render `<WaveformFades />` inside `<WaveformTracks>`. The ready-made `<WaveformEditor />` does (together with clip headers); `<Waveform />` does not.
+
+```tsx
+import {
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformFades,
+  WaveformSelection,
+  WaveformPlayhead,
+} from '@waveform-playlist/browser';
+
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformTrackControls />
+  <WaveformTracks>
+    <WaveformFades />
+  </WaveformTracks>
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+```
+
+See [Composing the View](/docs/react/guides/composing-the-view).
+
 ### Fade Configuration
 
 Each fade is defined with just two properties:

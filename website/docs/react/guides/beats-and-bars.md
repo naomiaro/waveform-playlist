@@ -12,17 +12,17 @@ Waveform Playlist can display a musical timescale with bar and beat markers inst
 Wrap your playlist content with `BeatsAndBarsProvider` from `@waveform-playlist/ui-components`:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, WaveformEditor } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks} timescale>
+<WaveformPlaylistProvider tracks={tracks}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
-    <Waveform showClipHeaders />
+    <WaveformEditor />
   </BeatsAndBarsProvider>
 </WaveformPlaylistProvider>
 ```
 
-When `BeatsAndBarsProvider` is present, the timescale automatically switches from temporal (minutes:seconds) to bar and beat markers.
+`<WaveformEditor />` is `<Waveform />` with clip headers and fade curves; both draw the timescale. When `BeatsAndBarsProvider` is present, the timescale automatically switches from temporal (minutes:seconds) to bar and beat markers.
 
 ## Provider Props
 
@@ -34,16 +34,16 @@ When `BeatsAndBarsProvider` is present, the timescale automatically switches fro
 
 ## Snap-to-Grid
 
-Wrap your `Waveform` with `ClipInteractionProvider` to enable drag/move/trim with snap-to-grid. Set `snap` to enable snapping — it auto-detects beats mode from `BeatsAndBarsProvider` context:
+Wrap the view with `ClipInteractionProvider` to enable drag/move/trim with snap-to-grid. Set `snap` to enable snapping — it auto-detects beats mode from `BeatsAndBarsProvider` context:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, ClipInteractionProvider } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, WaveformEditor, ClipInteractionProvider } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks} timescale>
+<WaveformPlaylistProvider tracks={tracks}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
     <ClipInteractionProvider snap>
-      <Waveform showClipHeaders />
+      <WaveformEditor />
     </ClipInteractionProvider>
   </BeatsAndBarsProvider>
 </WaveformPlaylistProvider>

@@ -40,7 +40,7 @@ function MidiPlayer() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} controls={{ show: true, width: 200 }}>
+    <WaveformPlaylistProvider tracks={tracks}>
       <PlayButton /> <StopButton />
       <Waveform />
     </WaveformPlaylistProvider>

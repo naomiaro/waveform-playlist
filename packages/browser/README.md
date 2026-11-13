@@ -4,12 +4,12 @@ React components, hooks, and context providers for building a multitrack Web Aud
 
 ## Features
 
-- **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks
+- **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks. It is a ready-made composition of exported parts (`WaveformRoot`, `WaveformTimescale`, `WaveformTrackControls`, `WaveformTracks`, `WaveformClipHeaders`, `WaveformFades`, `WaveformPlayhead` and more): compose them yourself to choose what is drawn
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
 - **Focused context hooks** — one hook per group of fields that change together (`useIsPlaying`, `useCurrentTime`, `useSelection`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistTimeline`, `usePlaylistMixer`, `useLoop`, `useEditorControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
-- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `setRecordingActive(active, armedTrackId)` suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the session
+- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `useRecordingSession({ isRecording, trackId })` (or `setRecordingActive(active, armedTrackId)` directly) suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the take
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
 - **WAV export** — render the full mix (including effects) offline to a downloadable WAV file
 - **MediaElement player mode** — a lightweight single-track player with pitch-preserving speed control, for podcast/audiobook-style use cases that don't need multitrack mixing
@@ -64,8 +64,6 @@ function MyPlaylist() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={128}
-      timescale
-      controls={{ show: true, width: 200 }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
@@ -95,7 +93,7 @@ Under either provider:
 | `useAnnotations` | `annotations`, `continuousPlay` | an annotation edit, the continuous-play toggle |
 | `usePlaybackControls` | Actions — `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
 | `usePlaybackRefs` | `currentTimeRef` (the live position), `visualTimeRef` (the position to draw), `registerFrameCallback()` / `unregisterFrameCallback()` for 60fps-driven UI (playhead, progress bars) | never |
-| `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
+| `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
 | `usePlaylistSettings` | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | `usePlaylistZoom` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
 

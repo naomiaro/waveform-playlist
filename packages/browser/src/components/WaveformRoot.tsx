@@ -45,7 +45,7 @@ export interface WaveformRootProps {
 }
 
 /**
- * The root of the multitrack view (#685). Internal for now.
+ * The root of the multitrack view (#685), exported from the package.
  *
  * It owns what the parts share and nothing they draw: the size of the
  * timeline, the vertical layout of the rows (one layout for the tracks and

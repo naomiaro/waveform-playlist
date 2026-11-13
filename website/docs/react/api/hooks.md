@@ -58,6 +58,9 @@ import {
   // Keyboard shortcuts
   useKeyboardShortcuts,
   usePlaybackShortcuts,
+
+  // Recording session (with @waveform-playlist/recording)
+  useRecordingSession,
 } from '@waveform-playlist/browser';
 
 // Tone.js batteries-included hooks (import from /tone to keep core bundle engine-free)
@@ -147,8 +150,6 @@ function usePlaylistView(): PlaylistViewContextValue;
 interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
@@ -231,8 +232,8 @@ interface PlaylistMixerContextValue {
 function useTrackReorderPreview(): TrackReorderPreviewContextValue;
 
 interface TrackReorderPreviewContextValue {
-  /** Non-null while a track-reorder drag is live; null otherwise. Custom
-   *  renderTrackControls consumers read this to mirror the drag preview. */
+  /** Non-null while a track-reorder drag is live; null otherwise. A custom
+   *  `renderTrackControls` (on `<WaveformTrackControls>`) reads this to mirror the drag preview. */
   trackDragPreview: TrackDragPreview | null;
   /** Incremented after every track-reorder drag ends. A custom renderTrackControls
    *  that mounts SortableTrackControls itself folds it into its panel keys. */
@@ -597,7 +598,13 @@ function DragDropPlaylist() {
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider tracks={tracks}>
-          <Waveform onRemoveTrack={(index) => removeTrack(tracks[index].id)} />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformTrackControls onRemoveTrack={(index) => removeTrack(tracks[index].id)} />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
         </WaveformPlaylistProvider>
       )}
     </div>
@@ -846,9 +853,9 @@ interface EditorControlsContextValue {
    *  end of existing material, and (2) with an `armedTrackId`, that track's
    *  existing content is transiently muted — punch-in replaces whatever the
    *  take overlaps — and its previous mute state is restored when the
-   *  session ends (audio-only, the UI mute control is untouched). Auto-wired
-   *  from the Waveform `recordingState` prop; overdub flows should also call
-   *  it eagerly (before `play()`). */
+   *  session ends (audio-only, the UI mute control is untouched).
+   *  `useRecordingSession` calls it for the life of a take; overdub flows
+   *  should also call it eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -1070,13 +1077,16 @@ interface UseIntegratedRecordingReturn {
   // Recording state
   isRecording: boolean;
   isPaused: boolean;
+  // The track the running take will be added to (the one selected when
+  // startRecording() was called); null whenever isRecording is false.
+  recordingTrackId: string | null;
 
   // Live microphone levels: { levels, peakLevels, rmsLevels } per channel (0-1).
   // A source, not state: the hook does not re-render as levels change.
   meter: MeterSource;
 
   // Elapsed time and live-preview peaks of the take: { duration, peaks }.
-  // A source, not state. Pass it to <Waveform recordingState={{ …, progress }} />.
+  // A source, not state. Pass it to <WaveformRecordingPreview recordingState={{ …, progress }} />.
   progress: RecordingProgressSource;
 
   // Device management
@@ -1149,6 +1159,34 @@ function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
 
 ---
 
+### useRecordingSession
+
+`WaveformPlaylistProvider` only. Tells the playlist that a take is being recorded into a track, for as long as `isRecording` is true. The provider then keeps playback running past the end of the audio and mutes what the armed track already holds, so a punch-in replaces what it overlaps; the track's own mute state is restored when the take ends or the component unmounts.
+
+```typescript
+function useRecordingSession(options: RecordingSessionOptions): void;
+
+interface RecordingSessionOptions {
+  /** True while a take is being recorded. */
+  isRecording: boolean;
+  /** The track being recorded into, or null when there is none. */
+  trackId: string | null | undefined;
+}
+```
+
+Call it in the component that calls `useIntegratedRecording`. `<WaveformRecordingPreview>` only draws the take: without this hook the armed track is not muted.
+
+```tsx
+import { useRecordingSession } from '@waveform-playlist/browser';
+
+const { isRecording, recordingTrackId } = useIntegratedRecording(tracks, setTracks, selectedTrackId);
+useRecordingSession({ isRecording, trackId: recordingTrackId });
+```
+
+The hook runs `setRecordingActive` (from `useEditorControls()`) in an effect, which is after the render that follows the start of the take. A handler that starts playback together with the recording should also call `setRecordingActive(true, trackId)` itself, before `play()`.
+
+---
+
 ## Drag & Drop Hooks
 
 ### useClipDragHandlers
@@ -1186,6 +1224,7 @@ import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import {
   ClipCollisionModifier,
   ClipInteractionOptions,
+  WaveformEditor,
   useDragSensors,
 } from '@waveform-playlist/browser';
 
@@ -1212,7 +1251,7 @@ function EditablePlaylist() {
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
     >
       <ClipInteractionOptions enabled>
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     </DragDropProvider>
   );
@@ -1754,7 +1793,7 @@ function useRecording(
 
 ### useRecordingProgress
 
-A recording's elapsed time and preview peaks as React state, at most `updateRate` times a second. Use it for slow displays such as an elapsed-time label. The live waveform takes the source itself (`<Waveform recordingState={{ …, progress }} />`).
+A recording's elapsed time and preview peaks as React state, at most `updateRate` times a second. Use it for slow displays such as an elapsed-time label. The live waveform takes the source itself (`<WaveformRecordingPreview recordingState={{ …, progress }} />`).
 
 ```typescript
 function useRecordingProgress(

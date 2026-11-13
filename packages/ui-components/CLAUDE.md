@@ -12,7 +12,7 @@
 - Functional/behavioral properties (callbacks, data, configuration)
 - Properties that control what is rendered or how it behaves
 
-**Example:** All clip header colors in `theme`, but `showClipHeaders` as boolean prop.
+**Example:** All clip header colors in `theme`, but `Clip`'s `showHeader` as a boolean prop (the browser package sets it when the view has a `<WaveformClipHeaders />` part).
 
 **Implementation Pattern:**
 
@@ -255,7 +255,7 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 
 ## Clip-Gain Waveform Scaling (#662)
 
-`Channel`'s optional `gain` prop (default 1) scales the aggregated peak at draw time via `scalePeakByGain` (`utils/peakRendering.ts`: gain magnitude, clamped to ±1, the same object back at unity so the hot path allocates nothing). It is part of `drawVersion`, so a gain change redraws without new peak data. `SmartChannel` forwards it through `...props`; spectrogram and piano-roll ignore it. The browser package opts in with `<Waveform gainScaledWaveforms />` (off by default) and reads each clip's value from `ClipPeaks.gain`. dawcore carries the same helper in its own `utils/peak-rendering.ts` (no cross-package re-exports) — keep the two in step.
+`Channel`'s optional `gain` prop (default 1) scales the aggregated peak at draw time via `scalePeakByGain` (`utils/peakRendering.ts`: gain magnitude, clamped to ±1, the same object back at unity so the hot path allocates nothing). It is part of `drawVersion`, so a gain change redraws without new peak data. `SmartChannel` forwards it through `...props`; spectrogram and piano-roll ignore it. The browser package opts in with `<WaveformTracks gainScaled>` (off by default) and reads each clip's value from `ClipPeaks.gain`. dawcore carries the same helper in its own `utils/peak-rendering.ts` (no cross-package re-exports) — keep the two in step.
 
 ## Small Component Rules (#701)
 

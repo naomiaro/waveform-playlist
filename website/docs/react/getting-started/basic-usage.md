@@ -18,8 +18,8 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function App() {
   const { tracks, loading, error } = useAudioTracks([
@@ -35,8 +35,6 @@ function App() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={128}
-      timescale
-      controls={{ show: true, width: 200 }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
@@ -64,8 +62,6 @@ The provider is the heart of the application. It manages:
   tracks={tracks}           // Required: array of ClipTrack objects
   samplesPerPixel={1024}    // Zoom level (higher = more zoomed out)
   waveHeight={128}          // Height of each track in pixels
-  timescale                 // Show time ruler at top
-  controls={{ show: true, width: 200 }}  // Show track controls
 >
   {/* Children have access to playlist context */}
 </WaveformPlaylistProvider>
@@ -75,9 +71,11 @@ The provider is the heart of the application. It manages:
 
 The `<Waveform />` component renders:
 - Canvas waveform visualization for each track
-- Track controls (mute, solo, volume, pan)
-- Time ruler (if `timescale` is enabled)
+- Track controls (mute, solo, volume, pan), in a 200 px column
+- Time ruler
 - Playhead cursor
+
+`<Waveform />` is a ready-made composition of the view's parts. To leave the time ruler or the track controls out, change the width of the controls column, show clip headers or add your own element, compose the parts yourself: see [Composing the View](/docs/react/guides/composing-the-view).
 
 ### Control Buttons
 
@@ -157,8 +155,8 @@ import {
   ZoomOutButton,
   MasterVolumeControl,
   AudioPosition,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MyPlaylist() {
   const { tracks, loading, error } = useAudioTracks([
@@ -176,8 +174,6 @@ function MyPlaylist() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      timescale
-      controls={{ show: true, width: 180 }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', padding: '1rem' }}>
         <RewindButton />
@@ -200,6 +196,7 @@ export default MyPlaylist;
 
 ## Next Steps
 
+- [Composing the View](/docs/react/guides/composing-the-view) - Choose what the waveform view draws
 - [Loading Audio](/docs/react/guides/loading-audio) - Advanced audio loading with BBC Peaks
 - [Playback Controls](/docs/react/guides/playback-controls) - Detailed playback options
 - [Track Management](/docs/react/guides/track-management) - Mute, solo, volume, pan

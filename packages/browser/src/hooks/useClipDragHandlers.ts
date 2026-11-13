@@ -75,7 +75,7 @@ function sameNeighbours(
  *     onDragEnd={onDragEnd}
  *     modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
  *   >
- *     <Waveform showClipHeaders={true} />
+ *     <WaveformEditor />
  *   </DragDropProvider>
  * );
  * ```

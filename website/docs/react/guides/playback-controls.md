@@ -495,7 +495,7 @@ function FullPlaybackExample() {
   if (loading) return <div>Loading...</div>;
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} timescale>
+    <WaveformPlaylistProvider tracks={tracks}>
       <div style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
         <RewindButton />
         <PlayButton />

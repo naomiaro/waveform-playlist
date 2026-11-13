@@ -96,13 +96,27 @@ function CustomControls() {
 
 ## Custom Playhead
 
-Pass a `renderPlayhead` function to `MediaElementWaveform` to replace the default vertical line with a custom playhead component:
+`<MediaElementWaveform />` is a ready-made composition of the view's parts. To replace the default vertical line with a custom playhead, compose the parts yourself and pass a `renderPlayhead` function to `<WaveformPlayhead>`:
 
 ```tsx
+import {
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+} from '@waveform-playlist/browser';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 
-<MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
+<MediaElementWaveformRoot>
+  <WaveformTimescale />
+  <WaveformTracks />
+  <WaveformSelection />
+  <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+</MediaElementWaveformRoot>
 ```
+
+Leave `<WaveformTimescale />` out for a player without a time ruler. With annotations, add `<MediaElementAnnotationBoxes />` after the tracks and `<MediaElementAnnotationList />` below the root. See [Composing the View](/docs/react/guides/composing-the-view).
 
 `PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/llm-reference)). The props are the same as under `WaveformPlaylistProvider`; read `visualTimeRef.current` to animate (here it is the same ref as `currentTimeRef`). The playhead is hidden while a range is highlighted and playback is stopped or paused.
 
@@ -115,8 +129,10 @@ Pass an `AudioContext` to enable Web Audio routing. This routes audio through a 
 Configure fade in/out on the track config. Requires `audioContext`:
 
 ```tsx
-// Memoized: the provider creates its player again (and stops playback) when a
-// fade object gets a new identity, so the track must not be rebuilt per render.
+// The provider creates its player again (and stops playback) when `source`,
+// `waveformData` (by identity) or `name` changes, or a fade gets another
+// `duration` or `type`. The fades are compared by value, so they may be
+// written inline.
 const track = useMemo(
   () => ({
     source: '/audio/track.mp3',
@@ -129,11 +145,17 @@ const track = useMemo(
 );
 
 <MediaElementPlaylistProvider track={track} audioContext={audioContext}>
-  <MediaElementWaveform showFades />
+  <MediaElementWaveformRoot>
+    <WaveformTracks>
+      <WaveformFades />
+    </WaveformTracks>
+    <WaveformSelection />
+    <WaveformPlayhead />
+  </MediaElementWaveformRoot>
 </MediaElementPlaylistProvider>;
 ```
 
-`showFades` draws the curves over the waveform; the fades themselves need `audioContext`. Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.
+`<WaveformFades />` inside `<WaveformTracks>` draws the curves over the waveform; the fades themselves need `audioContext`. Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.
 
 ### Tone.js Effects
 
@@ -237,7 +259,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 | `useAnnotations()` | an annotation edit, the continuous-play toggle | `annotations`, `continuousPlay` |
 | `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | never | `currentTimeRef` (advances during playback), `visualTimeRef` (the same ref here), `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | a provider prop change | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` (`mono`, `indefinitePlayback` and `fillViewport` are always `false` here) |
+| `usePlaylistView()` | a provider prop change | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` (`mono`, `indefinitePlayback` and `fillViewport` are always `false` here) |
 | `usePlaylistSettings()` | the user changing either setting | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | a zoom level change | `samplesPerPixel` (`canZoomIn` and `canZoomOut` are always `false` here) |
 | `usePlaybackRate()` | the speed changing | `playbackRate`, `setPlaybackRate` |

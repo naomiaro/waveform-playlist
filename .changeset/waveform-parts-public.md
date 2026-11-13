@@ -1,6 +1,7 @@
 ---
 '@waveform-playlist/browser': major
 '@waveform-playlist/recording': patch
+'@waveform-playlist/core': patch
 ---
 
 The view is composed from parts. Each thing the view draws is an exported component that is drawn because it is rendered inside a root:

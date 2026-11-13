@@ -5,8 +5,7 @@
  * active-annotation change during playback, and the rows do not.
  *
  * `WaveformSelection` and `WaveformPlayhead` read shared hooks only and are
- * rendered by both views (`PlaylistVisualization` and `MediaElementPlaylist`,
- * #688). The annotation boxes and the loop region are multitrack only.
+ * rendered under both providers (#688). The annotation boxes and the loop region are multitrack only.
  */
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import {

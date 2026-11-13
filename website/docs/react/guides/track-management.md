@@ -9,15 +9,24 @@ Control individual tracks with mute, solo, volume, and pan controls.
 
 ## Track Controls Component
 
-Enable the built-in track controls panel:
+`<Waveform />` draws the built-in track controls panel in a 200 px column:
 
 ```tsx
-<WaveformPlaylistProvider
-  tracks={tracks}
-  controls={{ show: true, width: 200 }}
->
+<WaveformPlaylistProvider tracks={tracks}>
   <Waveform />
 </WaveformPlaylistProvider>
+```
+
+The panel is a part of the view, `<WaveformTrackControls>`. In your own composition give it a `width`, or leave it out to have no column (see [Composing the View](/docs/react/guides/composing-the-view)):
+
+```tsx
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformTrackControls width={160} />
+  <WaveformTracks />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
 ```
 
 The controls panel displays:
@@ -166,7 +175,7 @@ function TrackSelector() {
 }
 ```
 
-In a playlist rendered by `<Waveform>`, a press on the waveform area of a track's row selects that track, and so does a click on its default track controls (apart from the remove button, the track menu button and the reorder buttons). The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
+In the multitrack view (`<Waveform>`, `<WaveformEditor>` or your own composition in `<WaveformRoot>`), a press on the waveform area of a track's row selects that track, and so does a click on its default track controls (apart from the remove button, the track menu button and the reorder buttons). The selected track's row has the attribute `data-selected="true"`, next to `data-track-id` and `data-track-kind`, so it can be styled or found in a test without reading the state:
 
 ```css
 /* A border drawn over the selected row. The row's clips are painted above the
@@ -328,7 +337,7 @@ function TrackManagementExample() {
   if (loading) return <div>Loading...</div>;
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} timescale>
+    <WaveformPlaylistProvider tracks={tracks}>
       <div>
         {tracks.map((_, index) => (
           <TrackControlRow key={index} trackIndex={index} />

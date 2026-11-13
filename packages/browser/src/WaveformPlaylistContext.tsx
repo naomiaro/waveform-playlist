@@ -320,7 +320,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   //    must not play under the overdub. Engine-level mute (survives adapter
   //    rebuilds), captured/restored around the session; the track's UI mute
   //    state is untouched.
-  // Auto-wired from the view's recordingState prop (by its root); overdub
+  // Called by useRecordingSession for the length of a take; overdub
   // flows also call it eagerly before play() — a render round-trip loses the
   // race against the first animation frame (empty timeline: time 0 >=
   // duration 0 would stop playback instantly).

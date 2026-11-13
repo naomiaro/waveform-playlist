@@ -61,6 +61,7 @@ own app:
 
 - Clip editing (drag / trim / split): wrap the UI in `ClipInteractionProvider`
   — see the website's multi-clip example.
-- Track reordering: `<Waveform trackReordering />` inside
-  `ClipInteractionProvider` — see the stem-tracks example.
+- Track reordering: `<WaveformTrackControls trackReordering />` in your own
+  `<WaveformRoot>` composition, inside `ClipInteractionProvider` — see the
+  stem-tracks example.
 - Single-track playback without Tone.js: see `examples/media-element-player`.

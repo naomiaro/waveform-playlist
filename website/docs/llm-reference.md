@@ -22,14 +22,12 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[];
   children: ReactNode;
-  timescale?: boolean;
   mono?: boolean;
   waveHeight?: number;                    // Default: 80
   samplesPerPixel?: number;               // Default: 1024
   zoomLevels?: number[];
   automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
-  controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }
   annotationList?: {
     annotations?: AnnotationData[];
     editable?: boolean;
@@ -90,12 +88,10 @@ interface MediaElementPlaylistProviderProps {
   audioContext?: AudioContext;            // Enables Web Audio routing (fades, effects)
   samplesPerPixel?: number;              // Default: 1024
   waveHeight?: number;                   // Default: 100
-  timescale?: boolean;                   // Default: false
   playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
-  controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }. Published as usePlaylistView().controls; the MediaElement waveform draws no controls column
   annotationList?: {
     annotations?: any[];
     isContinuousPlay?: boolean;
@@ -278,8 +274,6 @@ interface PlaybackRefsContextValue {
 interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
@@ -398,9 +392,9 @@ interface EditorControlsContextValue {
    *  existing content is transiently muted — punch-in recording replaces
    *  whatever the take overlaps (#579), so the doomed material must not play
    *  under the overdub; its previous mute state is restored when the session
-   *  ends (audio-only, the UI mute control is untouched). Wired automatically
-   *  from the Waveform / PlaylistVisualization `recordingState` prop; overdub
-   *  flows should also call it eagerly (before `play()`). */
+   *  ends (audio-only, the UI mute control is untouched). `useRecordingSession`
+   *  calls it for the life of a take; overdub flows should also call it
+   *  eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -485,7 +479,7 @@ interface PlaylistMixerContextValue {
 interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Both playlist columns derive their display
-   *  layout from it; custom renderTrackControls consumers can read it to
+   *  layout from it; a custom `renderTrackControls` (on WaveformTrackControls) can read it to
    *  mirror the preview in their own UI. */
   trackDragPreview: TrackDragPreview | null;
   /** Internal: incremented after every track-reorder drag interaction ends.
@@ -625,7 +619,7 @@ interface ClipPeaks {
   sampleRate?: number;
   /** Offset into the source audio in samples. */
   offsetSamples?: number;
-  /** The clip's linear gain — drawn into the waveform under `<Waveform gainScaledWaveforms />`. */
+  /** The clip's linear gain — drawn into the waveform under `<WaveformTracks gainScaled>`. */
   gain?: number;
 }
 
@@ -1439,7 +1433,7 @@ Ways to read a source:
 ```typescript
 // 1. Hand it to a component that draws it: no re-render of your component.
 <SegmentedVUMeter meter={meter} />
-<Waveform recordingState={{ isRecording: true, trackId, startSample, progress, bits: 16 }} />
+<WaveformRecordingPreview recordingState={{ isRecording: true, trackId, startSample, progress, bits: 16 }} /> // a child of <WaveformTracks>
 
 // 2. Throttled React state (default 10 updates per second).
 import { useMeterLevels, useThrottledValue } from '@waveform-playlist/ui-components';
@@ -1482,7 +1476,7 @@ interface IntegratedRecordingOptions {
   /** Latency to skip at the start of the recording, in seconds.
    *  Absolute replacement for the auto-computed outputLatency+lookAhead value.
    *  0 disables compensation; negative/non-finite treated as 0.
-   *  Pass the same value to recordingState.latencyOffset so the live preview matches the finalized clip. */
+   *  Pass the same value to the preview's recordingState.latencyOffset so the live preview matches the finalized clip. */
   latencyOffset?: number;
 }
 
@@ -1497,7 +1491,7 @@ interface UseIntegratedRecordingReturn {
    *  they change. Array length = metered channel count. */
   meter: MeterSource;
   /** Elapsed time and live-preview peaks of the take. Stable identity; the
-   *  hook does not re-render as they change. Pass to <Waveform recordingState>. */
+   *  hook does not re-render as they change. Pass to <WaveformRecordingPreview recordingState>. */
   progress: RecordingProgressSource;
   error: Error | null;
   stream: MediaStream | null;
@@ -1757,47 +1751,168 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 
 ---
 
-## Waveform Component Props
+## The View: Roots, Parts, Ready-Made Compositions
+
+The view is composed. A part is drawn because it is rendered inside a root; there are no props that switch a part on. All names are exported from `@waveform-playlist/browser`. Guide: [Composing the View](./react/guides/composing-the-view.md). Coming from the props that used to switch the parts: [upgrade guide](./react/upgrading.md#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed).
+
+```tsx
+// What <Waveform /> renders (WaveformPlaylistProvider):
+<WaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformLoopRegion />
+  <WaveformTrackControls />          {/* a 200 px column */}
+  <WaveformTracks />
+  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+{/* plus <PlaylistAnnotationList> when there are annotations */}
+
+// <WaveformEditor />: the same, with
+<WaveformTracks>
+  <WaveformClipHeaders />
+  <WaveformFades />
+</WaveformTracks>
+
+// What <MediaElementWaveform /> renders (MediaElementPlaylistProvider):
+<MediaElementWaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformTracks />
+  <MediaElementAnnotationBoxes getAnnotationBoxLabel={…} editable={…} linkEndpoints={…} onAnnotationUpdate={…} />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</MediaElementWaveformRoot>
+{/* plus <MediaElementAnnotationList> when there are annotations */}
+```
 
 ```typescript
+// The ready-made compositions take className and annotation options only.
 interface WaveformProps {
-  renderTrackControls?: (trackIndex: number) => ReactNode;
-  // label: "m:ss" in the temporal scale, bar.beat (e.g. "2.3") in beats mode. There is no renderTimestamp.
-  renderTick?: (label: string, pixelPosition: number) => ReactNode;
-  renderPlayhead?: RenderPlayheadFunction;
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
   annotationControls?: AnnotationAction[];
   annotationListConfig?: AnnotationActionOptions;
   annotationTextHeight?: number;
-  scrollActivePosition?: ScrollLogicalPosition;
-  scrollActiveContainer?: 'nearest' | 'all';
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
+  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn; // Default label: annotation.id
+  scrollActivePosition?: ScrollLogicalPosition;    // Default: 'center'
+  scrollActiveContainer?: 'nearest' | 'all';       // Default: 'nearest'
   className?: string;
-  showClipHeaders?: boolean;      // Default: false
-  gainScaledWaveforms?: boolean;  // Default: false. Draw each clip's waveform scaled by clip.gain (clamped)
-  showFades?: boolean;
+}
+type WaveformEditorProps = WaveformProps;
+
+interface MediaElementWaveformProps {
+  annotationTextHeight?: number;
+  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
+  editable?: boolean;                              // Default: false
+  linkEndpoints?: boolean;                         // Default: false
+  onAnnotationUpdate?: OnAnnotationUpdateFn;
+  scrollActivePosition?: ScrollLogicalPosition;    // Default: 'center'
+  scrollActiveContainer?: 'nearest' | 'all';       // Default: 'nearest'
+  className?: string;
+}
+
+// Roots. WaveformRoot: WaveformPlaylistProvider. MediaElementWaveformRoot: MediaElementPlaylistProvider.
+interface WaveformRootProps {
+  className?: string;
+  /** The parts, and anything else to draw over the tracks. */
+  children?: ReactNode;
+}
+interface MediaElementWaveformRootProps {
+  className?: string;
+  /** The parts, and anything else to draw over the track. */
+  children?: ReactNode;
+}
+
+// Parts.
+interface WaveformTimescaleProps {
+  /** Custom tick label. `label` is already formatted for the scale mode:
+   *  "m:ss" in the temporal scale, bar.beat (e.g. "2.3") in beats mode. There is no renderTimestamp. */
+  renderTick?: (label: string, pixelPosition: number) => ReactNode;
+}
+// WaveformLoopRegion: no props. WaveformPlaylistProvider only.
+
+interface WaveformTrackControlsProps {   // WaveformPlaylistProvider only
+  /** Width of the controls column in pixels. Default 200. The root reads it
+   *  from the element, so it must be on the part itself. */
+  width?: number;
+  renderTrackControls?: (trackIndex: number) => ReactNode;
+  /** The close button is drawn only when this is given. */
   onRemoveTrack?: (trackIndex: number) => void;
-  /** Enable vertical track reordering: a drag grip + move up/down buttons on
-   *  each default track control panel. Drag requires ClipInteractionProvider;
-   *  the buttons work regardless. Default: false. */
+  /** A drag grip and move up/down buttons on each default panel. The drag
+   *  requires ClipInteractionProvider; the buttons work regardless. */
   trackReordering?: boolean;
-  recordingState?: {
-    isRecording: boolean;
-    trackId: string;
-    startSample: number;
-    /** The take's elapsed time and per-channel preview peaks, from
-     *  useRecording / useIntegratedRecording. Only the preview clip follows
-     *  it frame by frame. While recording, the displayed timeline grows in
-     *  10-second steps. */
-    progress: RecordingProgressSource;
-    bits: 8 | 16;                       // Bit depth of peak values
-    /** Latency to skip in live preview, in seconds. Must match the latencyOffset passed to
-     *  useIntegratedRecording so the preview aligns with the finalized clip.
-     *  Omit to use the auto-computed value. */
-    latencyOffset?: number;
-  };
+}
+
+interface WaveformTracksProps {
+  /** Draw each clip's waveform scaled by its gain (clamped). Default: false. */
+  gainScaled?: boolean;
+  /** `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview`: markers that
+   *  switch a per-clip part on. Nothing else is rendered from here. */
+  children?: ReactNode;
+}
+// WaveformClipHeaders, WaveformFades: no props. Children of WaveformTracks only.
+
+interface WaveformRecordingPreviewProps {   // child of WaveformTracks; WaveformPlaylistProvider only
+  recordingState: WaveformRecordingState;
+}
+/** Live recording state for the real-time waveform preview. */
+interface WaveformRecordingState {
+  isRecording: boolean;
+  /** Which track is being recorded into. */
+  trackId: string;
+  /** Where on the timeline the take started. */
+  startSample: number;
+  /** The take's elapsed time and per-channel preview peaks, from
+   *  useRecording / useIntegratedRecording. Only the preview clip follows
+   *  it frame by frame. */
+  progress: RecordingProgressSource;
+  /** Bit depth of the peak values. */
+  bits: 8 | 16;
+  /** Latency to skip in the live preview, in seconds. Pass the same value given to
+   *  useIntegratedRecording so preview and finalized clip match. Omit for the auto-computed value. */
+  latencyOffset?: number;
+}
+
+interface WaveformAnnotationBoxesProps {   // WaveformPlaylistProvider only
+  /** Label of an annotation box. Default: annotation.id */
+  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+}
+interface MediaElementAnnotationBoxesProps {   // MediaElementPlaylistProvider
+  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+  /** Whether the edges of a box can be dragged. Default: false. */
+  editable?: boolean;
+  /** Whether dragging an edge also moves the edge of the box it touches. Default: false. */
+  linkEndpoints?: boolean;
+  onAnnotationUpdate?: OnAnnotationUpdateFn;
+}
+// WaveformSelection: no props. Either provider.
+interface WaveformPlayheadProps {   // either provider
+  /** Custom playhead render function. Receives position (pixels) and color from theme. */
+  renderPlayhead?: RenderPlayheadFunction;
+}
+
+// The view only draws a take. This tells the provider one is running
+// (WaveformPlaylistProvider only): playback runs past the end of the audio and
+// the armed track's existing content is muted for the take.
+function useRecordingSession(options: RecordingSessionOptions): void;
+interface RecordingSessionOptions {
+  /** True while a take is being recorded. */
+  isRecording: boolean;
+  /** The track being recorded into, or null when there is none. */
+  trackId: string | null | undefined;
 }
 ```
+
+Rules:
+
+- A part must be a child of its root (a fragment is fine). A part wrapped in your own component is not recognised: a wrapped `WaveformTimescale` / `WaveformTrackControls` is drawn among the tracks, a wrapped `WaveformClipHeaders` does nothing. Development builds warn once in the console (`[waveform-playlist] …`); nothing throws for this.
+- `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview` are children of `WaveformTracks` and draw nothing elsewhere. One `WaveformTracks` per root, as the root's own child.
+- The 30 px timescale strip exists when the root has a `WaveformTimescale` or a `WaveformLoopRegion`; the controls column exists when it has a `WaveformTrackControls`.
+- A child of a root that is not a part is drawn in the scrolling tracks area, in order.
+- Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` and `WaveformAnnotationBoxes` throw, `WaveformTrackControls` draws nothing, `WaveformClipHeaders` shows the track name and nothing drags.
+- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and both annotation rows throw outside a root. `WaveformSelection` and `WaveformPlayhead` draw wherever they are rendered under a provider.
+- Switch a part with `{flag ? <Part /> : null}`; a list of changing length remounts later parts unless they have keys.
+- The time ruler and the controls column are not provider props and not in `usePlaylistView()`: they exist when their parts are rendered.
 
 ---
 
@@ -1839,8 +1954,8 @@ interface PlayheadProps {
   sampleRate: number;
 }
 type RenderPlayheadFunction = (props: PlayheadProps) => React.ReactNode;
-// <Waveform renderPlayhead={PlayheadWithMarker} />
-// <MediaElementWaveform renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
+// <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />   (under either provider's root)
+// <WaveformPlayhead renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
 ```
 
 Removed from `PlayheadProps`: `getPlaybackTime`, `getAudioContextTime`, `playbackStartTimeRef`, `audioStartPositionRef` (call `useEngineRefs()` in the playhead, `WaveformPlaylistProvider` only) and `controlsOffset` (always 0). The props are a plain object: a removed name reads `undefined`. The playhead (default or custom) is not rendered while a range is highlighted and playback is stopped or paused, under either provider; a custom playhead is unmounted while hidden. `PlayheadWithMarker` rendered by your own code needs `visualTimeRef`.
@@ -1883,7 +1998,7 @@ interface ClipInteractionProviderProps {
 }
 ```
 
-Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. Every clip below it (under `Waveform` or `PlaylistVisualization`) can be dragged and trimmed: the provider renders `ClipInteractionOptions` (next), which is the only source of that; `Waveform` has no `interactiveClips` or `touchOptimized` prop. When `snap` is enabled, reads `BeatsAndBarsProvider` context: if `scaleMode="beats"` and `snapTo!="off"`, clips snap to beats/bars; otherwise falls back to timescale-based snapping.
+Declarative wrapper that encapsulates all clip drag/move/trim/snap/collision setup. Replaces manual `DragDropProvider` + `useClipDragHandlers` + `useDragSensors` + modifier configuration. Every clip below it (drawn by `WaveformTracks`, so under `Waveform`, `WaveformEditor` or your own `WaveformRoot`) can be dragged and trimmed: the provider renders `ClipInteractionOptions` (next), which is the only source of that; `Waveform` has no `interactiveClips` or `touchOptimized` prop. When `snap` is enabled, reads `BeatsAndBarsProvider` context: if `scaleMode="beats"` and `snapTo!="off"`, clips snap to beats/bars; otherwise falls back to timescale-based snapping.
 
 #### `ClipInteractionOptions`
 
@@ -1897,7 +2012,7 @@ interface ClipInteractionOptionsProps {
 }
 ```
 
-The one source of the two clip interaction options; each clip reads them from this context. Use it with your own `DragDropProvider` (`<ClipInteractionOptions enabled><Waveform showClipHeaders /></ClipInteractionOptions>`; without `enabled`, clips show no trim handles and their headers do not drag), or nested inside a `ClipInteractionProvider` to change one option for part of the tree (`<ClipInteractionOptions touchOptimized={false}>` keeps 8px handles under a touch-optimized provider). It configures no sensors: pair `touchOptimized` with `useDragSensors({ touchOptimized: true })`.
+The one source of the two clip interaction options; each clip reads them from this context. Use it with your own `DragDropProvider` (`<ClipInteractionOptions enabled><WaveformEditor /></ClipInteractionOptions>`; without `enabled`, clips show no trim handles and their headers do not drag), or nested inside a `ClipInteractionProvider` to change one option for part of the tree (`<ClipInteractionOptions touchOptimized={false}>` keeps 8px handles under a touch-optimized provider). It configures no sensors: pair `touchOptimized` with `useDragSensors({ touchOptimized: true })`.
 
 #### `useClipInteractionEnabled()`
 

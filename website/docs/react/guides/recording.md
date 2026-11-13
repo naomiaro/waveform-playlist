@@ -56,7 +56,7 @@ function RecordingExample() {
   const { tracks } = useAudioTracks([]);
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} timescale>
+    <WaveformPlaylistProvider tracks={tracks}>
       <RecordButton />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -457,9 +457,20 @@ const recording = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
 
 ### Keeping Preview and Clip in Sync
 
-For the live waveform preview to match the finalized clip, pass the **same** value to both `useIntegratedRecording` and the `recordingState.latencyOffset` prop on `<Waveform>`:
+The take is drawn while it is recorded by `<WaveformRecordingPreview>`, a child of `<WaveformTracks>` in your composition of the view. For the live preview to match the finalized clip, pass the **same** value to both `useIntegratedRecording` and the `latencyOffset` field of the preview's `recordingState`:
 
 ```tsx
+import {
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformRecordingPreview,
+  WaveformSelection,
+  WaveformPlayhead,
+  useRecordingSession,
+} from '@waveform-playlist/browser';
+
 const LATENCY = 0.023; // your measured latency, in seconds
 
 const { isRecording, progress, recordingTrackId, ... } =
@@ -468,23 +479,39 @@ const { isRecording, progress, recordingTrackId, ... } =
     latencyOffset: LATENCY,
   });
 
-<Waveform
-  recordingState={isRecording && recordingTrackId ? {
-    isRecording,
-    // The track the take was started on (from useIntegratedRecording): the
-    // take is added there even if another track is selected meanwhile.
-    trackId: recordingTrackId,
-    // startSample is derived by the consumer: the timeline position captured
-    // when recording started — see the full recording example.
-    startSample,
-    // The take's elapsed time and peaks, as a source. Only the preview clip
-    // follows it frame by frame; this component does not re-render.
-    progress,
-    bits: 16,
-    latencyOffset: LATENCY, // must match the value above
-  } : undefined}
-/>
+// While the take runs: playback continues past the end of the audio, and what
+// the armed track already holds is muted (a punch-in replaces it).
+useRecordingSession({ isRecording, trackId: recordingTrackId });
+
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformTrackControls />
+  <WaveformTracks>
+    {isRecording && recordingTrackId ? (
+      <WaveformRecordingPreview
+        recordingState={{
+          isRecording,
+          // The track the take was started on (from useIntegratedRecording): the
+          // take is added there even if another track is selected meanwhile.
+          trackId: recordingTrackId,
+          // startSample is derived by the consumer: the timeline position captured
+          // when recording started — see the full recording example.
+          startSample,
+          // The take's elapsed time and peaks, as a source. Only the preview clip
+          // follows it frame by frame; this component does not re-render.
+          progress,
+          bits: 16,
+          latencyOffset: LATENCY, // must match the value above
+        }}
+      />
+    ) : null}
+  </WaveformTracks>
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
 ```
+
+`<WaveformRecordingPreview>` only draws the take. [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) is what tells the provider that a take is running; call it in the component that calls `useIntegratedRecording`, under `WaveformPlaylistProvider`. A handler that starts playback together with the recording (an overdub) should also call `useEditorControls().setRecordingActive(true, trackId)` before `play()`, because the hook's effect runs a render later.
 
 If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.
 
@@ -576,6 +603,7 @@ import {
   PauseButton,
   StopButton,
   useCurrentTime,
+  useRecordingSession,
 } from '@waveform-playlist/browser';
 import { ExportWavButton } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
@@ -613,7 +641,11 @@ function RecordingControls({
     startRecording,
     stopRecording,
     requestMicAccess,
+    recordingTrackId,
   } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+
+  // Tell the playlist a take is running (see "Keeping Preview and Clip in Sync").
+  useRecordingSession({ isRecording, trackId: recordingTrackId });
 
   const handleAddTrack = () => {
     const newTrack = createTrack({
@@ -668,8 +700,6 @@ function RecordingExample() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      timescale
-      controls={{ show: true, width: 200 }}
     >
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />

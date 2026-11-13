@@ -120,7 +120,7 @@ function Recorder({
   const {
     isRecording,
     meter, // live microphone levels — <SegmentedVUMeter meter={meter} />
-    progress, // the take's elapsed time and live peaks — <Waveform recordingState={{ …, progress }} />
+    progress, // the take's elapsed time and live peaks — <WaveformRecordingPreview recordingState={{ …, progress }} />
     devices,
     selectedDevice,
     requestMicAccess,
@@ -194,7 +194,7 @@ The core AudioWorklet-based recording hook.
 
 #### `useRecordingProgress(progress, options?)`
 
-A recording's `{ duration, peaks }` as React state, at most `options.updateRate` times a second (default: `10`). Use it for slow displays such as an elapsed-time label. Pass the `progress` source itself to `<Waveform recordingState>` for the live preview.
+A recording's `{ duration, peaks }` as React state, at most `options.updateRate` times a second (default: `10`). Use it for slow displays such as an elapsed-time label. Pass the `progress` source itself to `<WaveformRecordingPreview recordingState>` (a child of `<WaveformTracks>` from `@waveform-playlist/browser`) for the live preview.
 
 #### `useMicrophoneLevel(stream, options?)`
 
@@ -226,7 +226,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
 
 **Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
 
-**Overdub with `@waveform-playlist/browser`:** call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
+**Recording into a `@waveform-playlist/browser` playlist:** call `useRecordingSession({ isRecording, trackId: recordingTrackId })` (from `@waveform-playlist/browser`) in the component that calls `useIntegratedRecording`; the view's `<WaveformRecordingPreview>` only draws the take. For an overdub, also call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
 
 ### Types
 

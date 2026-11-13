@@ -24,7 +24,6 @@ import { WaveformPlaylistProvider } from '@waveform-playlist/browser';
   tracks={tracks}
   samplesPerPixel={1024}
   waveHeight={128}
-  timescale
 >
   <Waveform />
 </WaveformPlaylistProvider>
@@ -72,30 +71,7 @@ Zoom level. Higher values show more audio, lower values show more detail.
 
 Height of each track in pixels.
 
-#### `timescale`
-
-**Type:** `boolean`
-**Default:** `false`
-
-Show the time ruler at the top of the playlist.
-
-```tsx
-<WaveformPlaylistProvider tracks={tracks} timescale>
-```
-
-#### `controls`
-
-**Type:** `{ show: boolean; width: number }`
-**Default:** `{ show: false, width: 200 }`
-
-Track controls panel configuration.
-
-```tsx
-<WaveformPlaylistProvider
-  tracks={tracks}
-  controls={{ show: true, width: 180 }}
->
-```
+The time ruler and the column of track controls are not provider props. They are parts of the view: `<Waveform />` draws both (the column 200 px wide), and a composition has them when it renders `<WaveformTimescale />` and `<WaveformTrackControls width={180} />`. See [Composing the View](/docs/react/guides/composing-the-view).
 
 ### Theming
 
@@ -445,9 +421,9 @@ interface EditorControlsContextValue {
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
    *  end of existing material, and (2) with an armedTrackId, that track's
    *  existing content is transiently muted — punch-in replaces whatever the
-   *  take overlaps — and restored when the session ends. Auto-wired from the
-   *  Waveform recordingState prop; overdub flows should also call it eagerly
-   *  (before play()). */
+   *  take overlaps — and restored when the session ends. `useRecordingSession`
+   *  calls it for the life of a take; overdub flows should also call it
+   *  eagerly (before play()). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -460,8 +436,6 @@ What the provider was configured with. Changes on a prop change, not on a settin
 interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   roundedBars: boolean;
@@ -549,8 +523,6 @@ function MyPlaylistProvider({ tracks, children, ...props }: MyPlaylistProps) {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      timescale
-      controls={{ show: true, width: 180 }}
       theme={myTheme}
       {...props}
     >
@@ -573,11 +545,9 @@ interface WaveformPlaylistProviderProps {
   // Display
   samplesPerPixel?: number;
   waveHeight?: number;
-  timescale?: boolean;
   mono?: boolean;
   zoomLevels?: number[];
   automaticScroll?: boolean;
-  controls?: { show: boolean; width: number };
 
   // Theming
   theme?: Partial<WaveformPlaylistTheme>;

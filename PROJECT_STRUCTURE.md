@@ -305,7 +305,7 @@ const clip = createClipFromSeconds({
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
-  │   ├── useViewDefaults.ts            # controls, merged theme, progressBarWidth, timeScaleHeight
+  │   ├── useViewDefaults.ts            # merged theme, progressBarWidth
   │   └── useRequiredContext.ts         # a throwing context read (the providers' hooks use useSlot in contexts/playlistContexts.ts)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
@@ -325,6 +325,7 @@ const clip = createClipFromSeconds({
   │   ├── useOutputMeter.ts             # Master bus output VU metering via worklet (returns a MeterSource)
   │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts
   │   ├── useRecordingLayout.ts         # Channel count and stepped timeline end of a take in progress
+  │   ├── useRecordingSession.ts        # Tells the provider a take is running (setRecordingActive in an effect)
   │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
   │   ├── useSelectionDrag.ts           # The selection drag of both views; commits on release during playback
   │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
@@ -334,16 +335,16 @@ const clip = createClipFromSeconds({
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
-  │   ├── PlaylistVisualization.tsx      # Default composition: WaveformRoot with one part per thing drawn
   │   ├── WaveformRoot.tsx              # Root of the multitrack view: timeline length, row layout, row selection on press, spectrogram modal
-  │   ├── waveformParts.tsx             # The parts by name, the timescale part, sortWaveformParts
+  │   ├── waveformParts.tsx             # The parts by name (exported), the timescale part, sortWaveformParts
+  │   ├── partWarnings.ts               # Development-only warning for a part rendered where it cannot work
   │   ├── waveformLayoutContext.ts      # A root's two layout values (extent, rows) read by the parts
   │   ├── TrackRows.tsx                 # Tracks part: memoized rows, clips, recording preview; per-clip markers
   │   ├── TrackControlsColumn.tsx       # Track-controls part: memoized column (one slot per track)
   │   ├── DefaultTrackControls.tsx      # Default track control panel (memoized)
   │   ├── VisualizationOverlays.tsx     # Selection, playhead, annotation boxes, loop region
   │   ├── visualizationLayout.tsx       # Shared row/slot styled components and channel-count helper
-  │   ├── Waveform.tsx                  # Public waveform component
+  │   ├── Waveform.tsx                  # Ready-made compositions: Waveform, WaveformEditor (clip headers + fades)
   │   ├── ClipInteractionProvider.tsx   # Declarative clip drag/trim/snap/collision
   │   ├── KeyboardShortcuts.tsx         # Declarative keyboard shortcut component (playback, splitting, undo props)
   │   ├── PlaybackControls.tsx          # Play/Pause/Stop/Rewind/FastForward buttons
@@ -357,10 +358,9 @@ const clip = createClipFromSeconds({
   │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider
   │   ├── MediaElementAnnotationList.tsx # Annotation list for MediaElement provider
   │   ├── MediaElementAnnotationBoxes.tsx # MediaElement boxes: provider state + boundary drag wiring
-  │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement): default composition of MediaElementRoot and the view's parts
-  │   ├── MediaElementRoot.tsx          # Root of the MediaElement view (internal): one row, as long as the audio
+  │   ├── MediaElementWaveformRoot.tsx  # Root of the MediaElement view: one row, as long as the audio
   │   ├── waveformFrame.tsx             # What both roots share (internal): parts by place, scrolling frame, layout values, selection drag
-  │   ├── MediaElementWaveform.tsx      # Public MediaElement waveform component
+  │   ├── MediaElementWaveform.tsx      # Ready-made composition for the MediaElement provider
   │   ├── ContextualControls.tsx        # Context-aware wrappers
   │   └── index.tsx                     # Component exports
   ├── modifiers/                        # @dnd-kit drag modifiers
@@ -773,7 +773,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 │   ├─→ PlayButton, PauseButton, StopButton
 │   ├─→ ZoomInButton, ZoomOutButton
 │   ├─→ MasterVolumeControl, TimeFormatSelect
-│   └─→ Waveform (with custom track controls)
+│   └─→ Waveform / WaveformEditor, or WaveformRoot with the view's parts
 │
 ├─→ UI Components (React)
 │   └─→ Canvas Rendering (SmartChannel)
@@ -1010,8 +1010,6 @@ export interface EditorControlsContextValue {
 export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   roundedBars: boolean;
@@ -1451,11 +1449,11 @@ The playlist now provides a **flexible/headless API** using React Context and pr
 
 ### Architecture Pattern
 
-**Hybrid Approach:** Provider + Primitives + Render Props
+**Hybrid Approach:** Provider + Primitives + Composed Parts
 
 - `WaveformPlaylistProvider` wraps your app and provides state via context
 - Primitive components (PlayButton, ZoomInButton, etc.) work anywhere inside the provider
-- `Waveform` component accepts a render prop for custom track controls
+- The view is composed from parts inside `WaveformRoot`; `WaveformTrackControls` accepts a render prop for custom track controls. `Waveform` is the ready-made composition
 - Split context hooks (`usePlaylistTimeline`, `usePlaybackControls`, `useEditorControls`, etc.) provide direct access to state/methods
 
 ### Benefits
@@ -1476,7 +1474,12 @@ import {
   WaveformPlaylistProvider,
   PlayButton,
   StopButton,
-  Waveform,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
   MasterVolumeControl,
   usePlaylistMixer,
   useEditorControls,
@@ -1504,11 +1507,17 @@ function MyPlaylist() {
           <MasterVolumeControl />
         </div>
 
-        <Waveform
-          renderTrackControls={(trackIndex) => (
-            <CustomTrackControls trackIndex={trackIndex} />
-          )}
-        />
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformTrackControls
+            renderTrackControls={(trackIndex) => (
+              <CustomTrackControls trackIndex={trackIndex} />
+            )}
+          />
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
       </div>
     </WaveformPlaylistProvider>
   );

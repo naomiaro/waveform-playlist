@@ -32,7 +32,7 @@ export interface MediaElementWaveformRootProps {
 }
 
 /**
- * The root of the MediaElement view (#685). Internal for now.
+ * The root of the MediaElement view (#685), exported from the package.
  *
  * The counterpart of `WaveformRoot` for `MediaElementPlaylistProvider`: it
  * works out what only this provider knows (the timeline is as long as the
