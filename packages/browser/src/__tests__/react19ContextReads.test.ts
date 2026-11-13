@@ -1,19 +1,30 @@
 // #771: the React packages read a context with `use(Context)` and provide one
-// with `<Context value>` (React 19). This scans source text, tests and stories
-// included, so a new `useContext(` or `<X.Provider>` fails here.
+// with `<Context value>` (React 19). This scans the text of every `.ts` and
+// `.tsx` file under `src` of the packages below, tests and stories included.
+// It fails on the word `useContext` anywhere (a comment or a string too) and
+// on `.Provider` or `.Consumer` after an identifier anywhere, except on the
+// two lines that define the public aliases `AnnotationIntegrationProvider`
+// and `SpectrogramIntegrationProvider`.
 //
-// What it cannot see: `React.useContext` reached through another name
-// (`const read = React.useContext`), and a provider held in a variable
-// (`const P = X.Provider; <P>`). The two exported aliases
-// `AnnotationIntegrationProvider` and `SpectrogramIntegrationProvider` are of
-// that second kind and are public names.
+// What it cannot see: a computed access (`React['useContext']`), and WHERE a
+// `use()` call stands. `use()` may be called in a condition or a loop, so the
+// lint rule that kept `useContext` at the top level does not report a
+// conditional `use()`; keeping every read at the top level of its component
+// or hook is a review matter.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packagesRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
-const REACT_PACKAGES = ['browser', 'annotations', 'ui-components', 'spectrogram', 'recording'];
+const REACT_PACKAGES = [
+  'browser',
+  'annotations',
+  'ui-components',
+  'spectrogram',
+  'recording',
+  'midi',
+];
 const THIS_FILE = fileURLToPath(import.meta.url);
 
 function sourceFiles(dir: string): string[] {
@@ -43,11 +54,14 @@ describe('React 19 context reads (#771)', () => {
     }
   });
 
-  it('no source file calls useContext', () => {
-    expect(matches(/[^A-Za-z0-9_]useContext[^A-Za-z0-9_]/)).toEqual([]);
+  it('no source file mentions useContext', () => {
+    expect(matches(/(^|[^A-Za-z0-9_])useContext($|[^A-Za-z0-9_])/)).toEqual([]);
   });
 
-  it('no source file renders <X.Provider>', () => {
-    expect(matches(/<\/?[A-Za-z0-9_.]+\.Provider[\s>]/)).toEqual([]);
+  it('no source file uses X.Provider or X.Consumer, the two public aliases apart', () => {
+    expect(matches(/[A-Za-z0-9_]\.(Provider|Consumer)($|[^A-Za-z0-9_])/)).toEqual([
+      'browser/src/AnnotationIntegrationContext.tsx:76',
+      'browser/src/SpectrogramIntegrationContext.tsx:47',
+    ]);
   });
 });
