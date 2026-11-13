@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo } from 'react';
 import {
   Playlist,
   Track as TrackComponent,
@@ -13,13 +13,16 @@ import {
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type { Peaks } from '@waveform-playlist/core';
 import {
-  useIsPlaying,
   usePlaybackControls,
   usePlaylistView,
   usePlaylistZoom,
   useMediaElementTrack,
 } from '../contexts/playlistContexts';
-import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
+import {
+  useSelectionDrag,
+  AutomaticScrollFlag,
+  SelectionPreviewContext,
+} from '../hooks/useSelectionDrag';
 import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import { SelectionOverlay, PlayheadOverlay } from './VisualizationOverlays';
@@ -70,7 +73,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   // Not the resting cursor position and not the selection: the playhead, the
   // progress overlay and the selection overlay follow those themselves, so a
   // seek or a selection drag does not render the waveform (#688).
-  const { isPlaying } = useIsPlaying();
   // No annotation state here: it changes at every annotation boundary during
   // playback, and only MediaElementAnnotationBoxes needs it (#744).
   const { setScrollContainer, setSelection } = usePlaybackControls();
@@ -78,10 +80,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   const { sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars } =
     usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-
-  // The selection is the provider's (#769); this component only writes it,
-  // and the shared SelectionOverlay and PlayheadOverlay read it.
-  const [isSelecting, setIsSelecting] = useState(false);
 
   // Local ref for scroll container - also register with context for auto-scroll
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -98,80 +96,18 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   // Calculate dimensions
   const tracksFullWidth = Math.floor((duration * sampleRate) / samplesPerPixel);
 
-  // Mouse handlers for click-to-seek
-  const mouseDownTimeRef = useRef<number>(0);
-  // The element the drag began on (the click overlay), for pointer positions
-  // while the pointer is somewhere else.
-  const dragElementRef = useRef<HTMLDivElement | null>(null);
-
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      // Primary button only: a right-click opens the context menu and its
-      // release may never be delivered.
-      if (e.button !== 0) return;
-      const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const clickTime = (x * samplesPerPixel) / sampleRate;
-
-      mouseDownTimeRef.current = clickTime;
-      dragElementRef.current = e.currentTarget;
-      setIsSelecting(true);
-      setSelection(clickTime, clickTime);
-    },
-    [samplesPerPixel, sampleRate, setSelection]
-  );
-
-  // The drag is followed on the window, not on the overlay: the pointer may
-  // leave the waveform (a fast drag past either end, or drifting above or
-  // below it, which is easy on a single short track) and the button may be
-  // released anywhere. Positions outside the overlay clamp to its ends.
-  const dragTimeAt = (clientX: number): number | null => {
-    const element = dragElementRef.current;
-    const x = element ? clampedOffsetX(element, clientX) : null;
-    return x === null ? null : (x * samplesPerPixel) / sampleRate;
-  };
-
-  const handleDragMove = (e: MouseEvent) => {
-    // During playback the press was a seek; a range is not drawn over it.
-    if (isPlaying) return;
-    const moveTime = dragTimeAt(e.clientX);
-    if (moveTime === null) return;
-    // From where the press landed to the pointer, in order: the cursor
-    // follows the start of the selection.
-    const anchor = mouseDownTimeRef.current;
-    setSelection(Math.min(anchor, moveTime), Math.max(anchor, moveTime));
-  };
-
-  const handleDragEnd = (e: MouseEvent | null) => {
-    setIsSelecting(false);
-
-    // The window lost focus mid-drag: there is no release position. Keep the
-    // selection as the last move left it.
-    if (e === null) return;
-
-    // During playback the press was the seek (`setSelection` restarts a
-    // running play at a collapsed selection) and moves were ignored: there is
-    // nothing left to do, and the release position must not be used anyway
-    // (auto-scroll shifts the overlay between the press and the release).
-    if (isPlaying) return;
-
-    const endTime = dragTimeAt(e.clientX);
-    if (endTime === null) return;
-
-    const anchor = mouseDownTimeRef.current;
-    const start = Math.min(anchor, endTime);
-    const end = Math.max(anchor, endTime);
-
-    // If it's just a click (not a drag), seek to that position
-    if (Math.abs(end - start) < 0.1) {
-      setSelection(start, start);
-    } else {
-      // It was a drag - finalize the selection
-      setSelection(start, end);
-    }
-  };
-
-  useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
+  // The selection drag (shared with the multitrack view). A click while
+  // stopped collapses the selection at its time, which moves the cursor.
+  const {
+    isSelecting,
+    handleMouseDown,
+    preview: selectionPreview,
+    automaticScrollRef,
+  } = useSelectionDrag({
+    samplesPerPixel,
+    sampleRate,
+    onClickWhileStopped: (time) => setSelection(time, time),
+  });
 
   // Every Track, channel and the timescale read this context: a new object per render
   // of this component would re-render them all.
@@ -206,104 +142,110 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   return (
     <DevicePixelRatioProvider>
+      <AutomaticScrollFlag flagRef={automaticScrollRef} />
       <PlaylistInfoContext.Provider value={playlistInfo}>
-        <Playlist
-          theme={theme}
-          backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
-          timescaleBackgroundColor={theme.timescaleBackgroundColor}
-          timescaleWidth={tracksFullWidth}
-          tracksWidth={tracksFullWidth}
-          controlsWidth={controls.show ? controls.width : 0}
-          onTracksMouseDown={handleMouseDown}
-          scrollContainerRef={handleScrollContainerRef}
-          isSelecting={isSelecting}
-          timescale={timeScaleHeight > 0 ? <SmartScale durationMs={duration * 1000} /> : undefined}
-        >
-          <>
-            {peaksDataArray.map((trackClipPeaks, trackIndex) => {
-              // For MediaElement, we have a single track with a single clip
-              const maxChannels =
-                trackClipPeaks.length > 0
-                  ? Math.max(...trackClipPeaks.map((clip) => clip.peaks.data.length))
-                  : 1;
+        <SelectionPreviewContext.Provider value={selectionPreview}>
+          <Playlist
+            theme={theme}
+            backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
+            timescaleBackgroundColor={theme.timescaleBackgroundColor}
+            timescaleWidth={tracksFullWidth}
+            tracksWidth={tracksFullWidth}
+            controlsWidth={controls.show ? controls.width : 0}
+            onTracksMouseDown={handleMouseDown}
+            scrollContainerRef={handleScrollContainerRef}
+            isSelecting={isSelecting}
+            timescale={
+              timeScaleHeight > 0 ? <SmartScale durationMs={duration * 1000} /> : undefined
+            }
+          >
+            <>
+              {peaksDataArray.map((trackClipPeaks, trackIndex) => {
+                // For MediaElement, we have a single track with a single clip
+                const maxChannels =
+                  trackClipPeaks.length > 0
+                    ? Math.max(...trackClipPeaks.map((clip) => clip.peaks.data.length))
+                    : 1;
 
-              return (
-                <TrackComponent
-                  key={trackIndex}
-                  numChannels={maxChannels}
-                  backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
-                  offset={0}
-                  width={tracksFullWidth}
-                  hasClipHeaders={false}
-                  trackId={`media-element-track-${trackIndex}`}
-                  isSelected={true}
-                >
-                  {trackClipPeaks.map((clip, clipIndex) => {
-                    const peaksData = clip.peaks;
-                    const width = peaksData.length;
+                return (
+                  <TrackComponent
+                    key={trackIndex}
+                    numChannels={maxChannels}
+                    backgroundColor={waveformColorToCss(theme.waveOutlineColor)}
+                    offset={0}
+                    width={tracksFullWidth}
+                    hasClipHeaders={false}
+                    trackId={`media-element-track-${trackIndex}`}
+                    isSelected={true}
+                  >
+                    {trackClipPeaks.map((clip, clipIndex) => {
+                      const peaksData = clip.peaks;
+                      const width = peaksData.length;
 
-                    return (
-                      <Clip
-                        key={`${trackIndex}-${clipIndex}`}
-                        clipId={clip.clipId}
-                        trackIndex={trackIndex}
-                        clipIndex={clipIndex}
-                        trackName={clip.trackName}
-                        startSample={clip.startSample}
-                        durationSamples={clip.durationSamples}
-                        samplesPerPixel={samplesPerPixel}
-                        showHeader={false}
-                        disableHeaderDrag={true}
-                        isSelected={true}
-                        trackId={`media-element-track-${trackIndex}`}
-                      >
-                        {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
-                          <ChannelWithProgress
-                            key={`${trackIndex}-${clipIndex}-${channelIndex}`}
-                            index={channelIndex}
-                            data={channelPeaks}
-                            bits={peaksData.bits}
-                            length={width}
-                            isSelected
-                            clipStartSample={clip.startSample}
-                            clipDurationSamples={clip.durationSamples}
-                          />
-                        ))}
-                        {showFades && fadeIn && fadeIn.duration > 0 && (
-                          <FadeOverlay
-                            left={0}
-                            width={Math.floor((fadeIn.duration * sampleRate) / samplesPerPixel)}
-                            type="fadeIn"
-                            curveType={fadeIn.type}
-                          />
-                        )}
-                        {showFades && fadeOut && fadeOut.duration > 0 && (
-                          <FadeOverlay
-                            left={
-                              width - Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)
-                            }
-                            width={Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
-                            type="fadeOut"
-                            curveType={fadeOut.type}
-                          />
-                        )}
-                      </Clip>
-                    );
-                  })}
-                </TrackComponent>
-              );
-            })}
-            <MediaElementAnnotationBoxes
-              width={tracksFullWidth}
-              getAnnotationBoxLabel={getAnnotationBoxLabel}
-              editable={editable}
-              linkEndpoints={linkEndpointsProp}
-              onAnnotationUpdate={onAnnotationUpdate}
-            />
-            <SelectionOverlay />
-            <PlayheadOverlay renderPlayhead={renderPlayhead} />
-          </>
-        </Playlist>
+                      return (
+                        <Clip
+                          key={`${trackIndex}-${clipIndex}`}
+                          clipId={clip.clipId}
+                          trackIndex={trackIndex}
+                          clipIndex={clipIndex}
+                          trackName={clip.trackName}
+                          startSample={clip.startSample}
+                          durationSamples={clip.durationSamples}
+                          samplesPerPixel={samplesPerPixel}
+                          showHeader={false}
+                          disableHeaderDrag={true}
+                          isSelected={true}
+                          trackId={`media-element-track-${trackIndex}`}
+                        >
+                          {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
+                            <ChannelWithProgress
+                              key={`${trackIndex}-${clipIndex}-${channelIndex}`}
+                              index={channelIndex}
+                              data={channelPeaks}
+                              bits={peaksData.bits}
+                              length={width}
+                              isSelected
+                              clipStartSample={clip.startSample}
+                              clipDurationSamples={clip.durationSamples}
+                            />
+                          ))}
+                          {showFades && fadeIn && fadeIn.duration > 0 && (
+                            <FadeOverlay
+                              left={0}
+                              width={Math.floor((fadeIn.duration * sampleRate) / samplesPerPixel)}
+                              type="fadeIn"
+                              curveType={fadeIn.type}
+                            />
+                          )}
+                          {showFades && fadeOut && fadeOut.duration > 0 && (
+                            <FadeOverlay
+                              left={
+                                width -
+                                Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)
+                              }
+                              width={Math.floor((fadeOut.duration * sampleRate) / samplesPerPixel)}
+                              type="fadeOut"
+                              curveType={fadeOut.type}
+                            />
+                          )}
+                        </Clip>
+                      );
+                    })}
+                  </TrackComponent>
+                );
+              })}
+              <MediaElementAnnotationBoxes
+                width={tracksFullWidth}
+                getAnnotationBoxLabel={getAnnotationBoxLabel}
+                editable={editable}
+                linkEndpoints={linkEndpointsProp}
+                onAnnotationUpdate={onAnnotationUpdate}
+              />
+              <SelectionOverlay />
+              <PlayheadOverlay renderPlayhead={renderPlayhead} />
+            </>
+          </Playlist>
+        </SelectionPreviewContext.Provider>
       </PlaylistInfoContext.Provider>
     </DevicePixelRatioProvider>
   );

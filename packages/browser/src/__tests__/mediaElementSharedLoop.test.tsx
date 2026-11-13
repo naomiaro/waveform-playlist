@@ -440,7 +440,7 @@ describe('MediaElement selection lives in the provider', () => {
     await release(200);
   });
 
-  it('controls.play() alone plays on from the cursor, and a press during playback restarts there', async () => {
+  it('controls.play() alone plays on from the cursor, and a drag during playback takes effect on its release', async () => {
     const { playout } = await mount();
     const overlay = clickOverlay();
     await press(overlay, 100);
@@ -456,11 +456,13 @@ describe('MediaElement selection lives in the provider', () => {
     await runFrame();
     expect(probe.animation.isPlaying).toBe(true);
 
+    // The press changes nothing: playback is still the play from 100.
     await press(overlay, 250);
-    expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(250));
+    expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(100));
+    // The release makes the range the selection, and it is played.
     await release(300);
     expect(playout.play).toHaveBeenLastCalledWith(undefined, seconds(250));
-    expect(selections()).toHaveLength(0);
+    expect(selections()).toHaveLength(1);
     await act(async () => probe.controls.stop());
   });
 });

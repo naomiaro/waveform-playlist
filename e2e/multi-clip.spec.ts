@@ -624,4 +624,122 @@ test.describe('Multi-Clip Example', () => {
       }).toPass({ timeout: 5000 });
     });
   });
+
+  // Until 2026-11 a press during playback moved playback at once (and again on
+  // the release), and no range could be drawn while playing. Nothing is
+  // committed before the release now; what the release does depends on the
+  // automatic scroll, which this page starts with switched on.
+  test.describe('Pressing and dragging on the tracks during playback', () => {
+    const seconds = (text: string | null) => {
+      const match = /(\d+):(\d+):(\d+\.\d+)/.exec(text ?? '');
+      return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : NaN;
+    };
+
+    async function startPlayback(page: import('@playwright/test').Page, automaticScroll: boolean) {
+      const checkbox = page.getByRole('checkbox', { name: /automatic scroll/i });
+      if ((await checkbox.isChecked()) !== automaticScroll) await checkbox.click();
+      const readout = page.getByLabel('Audio position');
+      await page.getByRole('button', { name: 'Play', exact: true }).click();
+      await expect(async () => {
+        expect(seconds(await readout.textContent())).toBeGreaterThan(0.2);
+      }).toPass({ timeout: 10000 });
+      // Measured after Play was clicked: clicking it may scroll the page.
+      const row = page.locator('[data-track-row]').nth(1);
+      await expect(row).toBeVisible();
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await row.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const now = async () => seconds(await readout.textContent());
+      // Below the clip header, away from clip boundaries.
+      return { now, y: box!.y + box!.height - 10, left: box!.x };
+    }
+
+    test('automatic scroll off: a drag draws a range without disturbing playback, and the release plays it to its end', async ({
+      page,
+    }) => {
+      const { now, y, left } = await startPlayback(page, false);
+      const selection = page.locator('[data-selection]');
+      const play = page.getByRole('button', { name: 'Play', exact: true });
+
+      // 300 px is 6.4 s on this page; playback is in its first seconds.
+      await page.mouse.move(left + 300, y);
+      await page.mouse.down();
+      await page.waitForTimeout(400);
+      expect(await now()).toBeLessThan(4);
+      await expect(selection).toHaveCount(0);
+
+      await page.mouse.move(left + 340, y, { steps: 4 });
+      await page.mouse.move(left + 370, y, { steps: 4 });
+      await expect(async () => {
+        const selectionBox = await selection.boundingBox();
+        expect(selectionBox).toBeTruthy();
+        expect(Math.abs(selectionBox!.width - 70)).toBeLessThanOrEqual(2);
+        expect(Math.abs(selectionBox!.x - (left + 300))).toBeLessThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
+      // Still the old play: the range is only drawn.
+      expect(await now()).toBeLessThan(4);
+
+      await page.mouse.up();
+      // The range (6.4 s to 7.9 s) is played from its start...
+      await expect(async () => {
+        const time = await now();
+        expect(time).toBeGreaterThanOrEqual(6.3);
+        expect(time).toBeLessThan(8);
+      }).toPass({ timeout: 3000 });
+      await expect(selection).toHaveCount(1);
+      // ...and playback stops at its end, the cursor back at its start.
+      await expect(play).toBeEnabled({ timeout: 6000 });
+      await expect(async () => {
+        expect(Math.abs((await now()) - 6.4)).toBeLessThan(0.1);
+      }).toPass({ timeout: 3000 });
+    });
+
+    test('automatic scroll off: a click moves playback there on the release, once', async ({
+      page,
+    }) => {
+      const { now, y, left } = await startPlayback(page, false);
+
+      await page.mouse.move(left + 300, y);
+      await page.mouse.down();
+      await page.waitForTimeout(700);
+      // Held: playback has not moved to 6.4 s.
+      expect(await now()).toBeLessThan(4);
+      await page.mouse.up();
+
+      await expect(async () => {
+        expect(await now()).toBeGreaterThanOrEqual(6.3);
+      }).toPass({ timeout: 3000 });
+      await expect(page.locator('[data-selection]')).toHaveCount(0);
+      // It carries on from there, and is not sent back to the press again.
+      await page.waitForTimeout(800);
+      expect(await now()).toBeGreaterThan(7);
+      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+    });
+
+    test('automatic scroll on: no range is drawn, and the release seeks once to where the press landed', async ({
+      page,
+    }) => {
+      const { now, y, left } = await startPlayback(page, true);
+      const selection = page.locator('[data-selection]');
+
+      await page.mouse.move(left + 300, y);
+      await page.mouse.down();
+      await page.mouse.move(left + 380, y, { steps: 6 });
+      await page.waitForTimeout(400);
+      await expect(selection).toHaveCount(0);
+      expect(await now()).toBeLessThan(4);
+
+      await page.mouse.up();
+      await expect(async () => {
+        const time = await now();
+        expect(time).toBeGreaterThanOrEqual(6.3);
+        // The press (6.4 s), not the release (8.1 s).
+        expect(time).toBeLessThan(7.8);
+      }).toPass({ timeout: 2000 });
+      await expect(selection).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+    });
+  });
 });
