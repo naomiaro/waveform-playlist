@@ -808,10 +808,13 @@ interface PlaybackControlsContextValue {
    * annotation becomes the active one and is played from its start. With
    * continuous play off, playback ends where the annotation ends. Call it
    * from a box or a row of your own. Each provider plays an annotation its
-   * own way; the result is the same: `WaveformPlaylistProvider` starts a play
-   * of the annotation's length, `MediaElementPlaylistProvider` starts an
-   * open-ended play that its loop ends with the active annotation. A start
-   * that fails is logged as a warning.
+   * own way: `WaveformPlaylistProvider` starts a play of the annotation's
+   * length, `MediaElementPlaylistProvider` starts an open-ended play that its
+   * loop ends with the active annotation. Left alone, both end at the
+   * annotation's end. They differ when something changes during the play:
+   * under MediaElement the play follows an end that is moved, and continuous
+   * play switched on lets it run on; under WebAudio the first keeps the end
+   * it started with. A start that fails is logged as a warning.
    */
   playAnnotation: (annotation: AnnotationData) => void;
 }
