@@ -117,10 +117,12 @@ export const PlaybackRateSelect: React.FC<{ rates?: readonly number[]; className
 };
 
 /**
- * Selection time inputs that use the playlist context
+ * Selection time inputs bound to the provider: its selection, and its time
+ * format (the one `TimeFormatSelect` and `setTimeFormat()` set).
  */
 export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ className }) => {
   const { selectionStart, selectionEnd } = useSelection();
+  const { timeFormat } = usePlaylistSettings();
   const { setSelection } = usePlaybackControls();
 
   return (
@@ -128,6 +130,7 @@ export const SelectionTimeInputs: React.FC<{ className?: string }> = ({ classNam
       selectionStart={selectionStart}
       selectionEnd={selectionEnd}
       onSelectionChange={setSelection}
+      format={timeFormat}
       className={className}
     />
   );

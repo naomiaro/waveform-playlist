@@ -212,6 +212,7 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       fireEvent.click(button);
       expect(downloads).toEqual(['mine.json']);
       expect(blobs).toHaveLength(1);
+      expect(blobs[0].type).toBe('application/json');
       expect(JSON.parse(await blobs[0].text())).toEqual([
         { id: 'n1', begin: '0.000', end: '1.500', lines: ['one'], language: 'en' },
         { id: 'n2', begin: '1.500', end: '3.000', lines: ['two', 'more'], language: 'en' },

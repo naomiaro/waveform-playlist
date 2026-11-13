@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import * as uiComponents from '../index';
 
 describe('ui-components exports (#770)', () => {
-  it('does not export the unused context, the copy of core\'s conversions or the unused position display', () => {
+  it("does not export the unused context, the copy of core's conversions or the unused position display", () => {
     const names = Object.keys(uiComponents);
     for (const gone of [
       'TrackControlsContext',

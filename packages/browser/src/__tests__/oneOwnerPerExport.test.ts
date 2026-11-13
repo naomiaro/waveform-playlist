@@ -21,7 +21,8 @@ function sourceFiles(dir: string): string[] {
 
 // `export { a } from '@scope/pkg'`, `export type { A } from …`, `export * from …`,
 // on one line or several.
-const RE_EXPORT = /export\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s+from\s+'(@(?:waveform-playlist|dawcore)\/[^']+)'/g;
+const RE_EXPORT =
+  /export\s+(?:type\s+)?(?:\{[^}]*\}|\*(?:\s+as\s+\w+)?)\s+from\s+'(@(?:waveform-playlist|dawcore)\/[^']+)'/g;
 
 /** Names an entry point exports, following `export *` and `export { } from` inside the package. */
 function exportedNames(file: string, seen = new Set<string>()): Set<string> {

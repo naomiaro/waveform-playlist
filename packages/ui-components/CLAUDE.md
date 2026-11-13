@@ -262,6 +262,7 @@ All three draggables in `Clip.tsx` include `startSample` and `durationSamples` i
 ## Small Component Rules (#701)
 
 - **No element id is a literal.** An id written in the component is shared by every instance, so two players on a page collide and a label reaches the other one's input. Use `useId()` (alone, or as the stem of a template string: `SelectionTimeInputs`, `SpectrogramSettingsModal`). `oneOwnerPerExport.test.ts` in the browser package scans the React packages for a literal `id=` or `htmlFor=`.
+- **A component reads nothing from the page.** `SelectionTimeInputs` once found the time format with `document.querySelector('.time-format')` and that element's `change` events; it takes `format` as a prop now (the browser package passes the provider's). A value another component holds arrives as a prop or through a context, never through the DOM.
 - **Hover/active styling is CSS only.** `ClipBoundary` once mirrored `:hover` in an `isHovered` state (two renders per hover, and a new styled-components class each time). Use `&:hover` / `&:active`; keep props for states CSS cannot see (`$isDragging`).
 - **`TimeInput` keeps only the in-progress edit in state** (`draft: string | null`); the displayed text is `draft ?? formatTime(value, format)`. `onChange` fires on blur only when there is a draft, so tabbing through never rounds the value to the display format.
 - **`FadeOverlay` memoises its path on `(width, curveType)`** and rounds coordinates to two decimals; `left` and colour change far more often than the shape.

@@ -58,10 +58,6 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
 }) => {
   const { annotations } = useAnnotations();
   const handleDownload = () => {
-    if (annotations.length === 0) {
-      return;
-    }
-
     // Serialize annotations to Aeneas JSON format
     const jsonData = annotations.map((annotation) => serializeAeneas(annotation));
     const jsonString = JSON.stringify(jsonData, null, 2);

@@ -641,14 +641,24 @@ Dropdown for selecting time display format.
 ```
 
 **Options:**
-- `seconds` - 0.000
-- `thousandths` - 0:00.000
-- `hh:mm:ss` - 0:00:00
-- `hh:mm:ss.u` - 0:00:00.0
-- `hh:mm:ss.uu` - 0:00:00.00
-- `hh:mm:ss.uuu` - 0:00:00.000
+- `seconds` - whole seconds: `3726`
+- `thousandths` - seconds with three decimals: `3725.500`
+- `hh:mm:ss` - `01:02:06`
+- `hh:mm:ss.u` - `01:02:05.5`
+- `hh:mm:ss.uu` - `01:02:05.50`
+- `hh:mm:ss.uuu` - `01:02:05.500`
 
 ---
+
+### SelectionTimeInputs
+
+Either provider. Two text inputs for the start and the end of the selection; an edit sets the selection when the input loses focus.
+
+```tsx
+<SelectionTimeInputs />
+```
+
+The times are shown and parsed in the provider's time format: the one `TimeFormatSelect` shows and `usePlaybackControls().setTimeFormat()` sets. No select has to be on the page. The controlled component of the same name in `@waveform-playlist/ui-components` takes the format as a prop: `selectionStart`, `selectionEnd`, `onSelectionChange`, `format` (default `hh:mm:ss.uuu`), `className`.
 
 ## Checkboxes
 

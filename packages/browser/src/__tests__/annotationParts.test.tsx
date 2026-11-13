@@ -95,6 +95,7 @@ import { WaveformTracks } from '../components/waveformParts';
 import { WaveformAnnotationBoxes } from '../components/WaveformAnnotationBoxes';
 import { AnnotationList } from '../components/AnnotationList';
 import { ClipInteractionOptions } from '../contexts/ClipInteractionContext';
+import { SelectionTimeInputs } from '../components/ContextualControls';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
 import { resetPartWarnings } from '../components/partWarnings';
 import { WaveformExtentContext } from '../components/waveformLayoutContext';
@@ -374,7 +375,7 @@ describe('the annotation exports (#686)', () => {
     }
   });
 
-  it('leaves the checkboxes, the download button and core\'s keyboard helpers to their owners (#770)', () => {
+  it("leaves the checkboxes, the download button and core's keyboard helpers to their owners (#770)", () => {
     const names = Object.keys(browser);
     for (const gone of [
       'ContinuousPlayCheckbox',
@@ -873,3 +874,20 @@ describe('the annotation shortcuts read the options of the provider (#686)', () 
     expect(unlinked[1].start).toBe(1);
   });
 });
+
+// Here because this file mounts both providers; not an annotation part.
+describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider'])(
+  'SelectionTimeInputs under %s (#770)',
+  (kind) => {
+    it('shows the provider time format, also when it is set from code and no select is on the page', async () => {
+      const { container } = await mount(kind, <SelectionTimeInputs />);
+      const shown = () => [...container.querySelectorAll('input')].map((input) => input.value);
+      act(() => probe.controls.setSelection(1, 2));
+      expect(shown()).toEqual(['00:00:01.000', '00:00:02.000']);
+      act(() => probe.controls.setTimeFormat('hh:mm:ss'));
+      expect(shown()).toEqual(['00:00:01', '00:00:02']);
+      act(() => probe.controls.setTimeFormat('hh:mm:ss.u'));
+      expect(shown()).toEqual(['00:00:01.0', '00:00:02.0']);
+    });
+  }
+);

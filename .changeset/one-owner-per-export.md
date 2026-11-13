@@ -17,12 +17,14 @@ A name is exported by one package (#770). `browser`, `annotations`, `ui-componen
 `@waveform-playlist/browser`:
 
 - **Removed:** `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `DownloadAnnotationsButton` (import them from `@waveform-playlist/annotations`), and the four control entries of `AnnotationIntegration`, which is now `parseAeneas`, `serializeAeneas`, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper`.
+- **Fixed:** `SelectionTimeInputs` shows the provider's time format under both providers. It followed the first `.time-format` select in the page, so it ignored `setTimeFormat()` called from code, stayed on `hh:mm:ss.uuu` without a `TimeFormatSelect`, and followed another player's select on a page with two.
 - **No longer re-exported:** `ClipTrack`, `AudioClip`, `Fade`, `AnnotationData` (from `@waveform-playlist/core`); `TimeFormat` (from `@waveform-playlist/ui-components`); `EffectsFunction`, `TrackEffectsFunction` (from `@waveform-playlist/playout`); `SpectrogramCanvasRegistration` (from `@waveform-playlist/core`); `getShortcutLabel` (removed, see core).
 
 `@waveform-playlist/ui-components`:
 
 - **Removed:** `TrackControlsContext` and `useTrackControls` (nothing provided or read the context); `samplesToSeconds`, `secondsToSamples`, `samplesToPixels`, `pixelsToSamples`, `pixelsToSeconds`, `secondsToPixels` (copies of core's: import them from `@waveform-playlist/core`); the controlled `AudioPosition` and `AudioPositionProps` (browser's `AudioPosition` is the one); `SpectrogramCanvasRegistration` (from `@waveform-playlist/core`).
 - **Changed:** `AutomaticScrollCheckbox`, `MasterVolumeControl` and `SelectionTimeInputs` generate their element ids with `useId()`. They had the fixed ids `automatic-scroll`, `master-gain`, `audio_start` and `audio_end`, so two of one control on a page shared an id. The input classes are unchanged; a `#master-gain` selector of your own no longer matches.
+- **Changed:** `SelectionTimeInputs` takes `format` (default `hh:mm:ss.uuu`) and no longer looks in the page for an element with the class `time-format`.
 - **Renamed:** `SnapTo` is `BeatsAndBarsSnapTo` (`'bar' | 'beat' | 'off'`). Core's `SnapTo`, a longer list used by the web components, is unchanged.
 
 `@waveform-playlist/spectrogram`: `TrackMenuItem` is no longer exported; the type is `TrackMenuItem` of `@waveform-playlist/ui-components` (the `items` of `TrackMenu`).

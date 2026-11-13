@@ -1,10 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
-import {
-  handleKeyboardEvent,
-  matchesKeyBinding,
-  keyBelongsToFocusedControl,
-} from '../keyboard';
+import { handleKeyboardEvent, matchesKeyBinding, keyBelongsToFocusedControl } from '../keyboard';
 import type { KeyboardShortcut } from '../keyboard';
 
 function makeKeyboardEvent(
