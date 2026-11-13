@@ -276,6 +276,18 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **A design for a pointer interaction says what moves under a still pointer, and how a click is told from a drag, as choices.** On #793 (a drag during playback draws a range) I had not asked what happens with automatic scroll on, where the view scrolls and the audio under a held pointer changes, and I was about to tell a click from a drag by pointer travel, a rule nobody had seen. A side agent raised both before I did; the maintainer's answer (no live selection with automatic scroll on) made the second rule unnecessary. List these two for any press-hold-release design before building.
 
+**A render of a view root alone is about 15 components, not 1** (the root, `Playlist` and its styled elements). On #685 part 2 "the root renders once more on a selection" was approved as +1 and withdrawn before building. Count the frame under the root before quoting a cost.
+
+**Before putting an attribute our guides style on a new element, grep the guides for CSS that targets it.** `data-playlist-state="loading"` on the MediaElement view met the Loading Audio guide's `pointer-events: none` rule: clicks were dead until the metadata arrived (#685 part 2, first review).
+
+**Reusing one view's markup under another provider makes existing selectors match it.** List the selector collisions (`[data-track-row]`, `[data-selected]`, counts of `[data-playlist-state]`) as rows of the behaviour-change table.
+
+**jsdom has no layout: a click test passes on an area of zero height.** Assert the inline height that gives the area its size, and call the click test a control.
+
+**An e2e test that finds its elements through a new attribute fails on the old code for the attribute, not for the behaviour in its title.** Say which of the two the old-code run proved.
+
+**The mutation runner over the full browser suite takes about 35 s per mutant** (54 mutants, 30 minutes, in the background). Nothing else may edit source or run e2e against a dev server meanwhile: the server hot-reloads the mutated file. A mutant reported as REFUSED means prettier re-wrapped the line; fix the string and rerun it.
+
 **`revise-claude-md` runs before the merge is asked for**, so the learnings go in the PR that produced them (#782 was merged without it and needed a docs PR afterwards).
 
 **When hooks move onto shared contexts, list what stops throwing.** After #688 part 2 made both providers render the same context objects, `usePlaybackShortcuts()` (it reads only shared hooks) silently started working under the MediaElement provider, against a decision that there are no shortcuts there; a docs agent noticed, not the tests. After such a move, grep every exported hook and component for the contexts it reads and write down each one that no longer throws under the other provider, before the first review.
