@@ -44,6 +44,21 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
+const dragOptions = vi.hoisted(() => ({ durations: [] as number[] }));
+
+vi.mock('../hooks/useAnnotationDragHandlers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../hooks/useAnnotationDragHandlers')>();
+  return {
+    ...actual,
+    useAnnotationDragHandlers: (
+      options: Parameters<typeof actual.useAnnotationDragHandlers>[0]
+    ) => {
+      dragOptions.durations.push(options.duration);
+      return actual.useAnnotationDragHandlers(options);
+    },
+  };
+});
+
 vi.mock('../components/visualizationLayout', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../components/visualizationLayout')>();
   const { createElement } = await import('react');
@@ -523,6 +538,19 @@ describe('the root renders alone', () => {
     calls = 0;
     await pressAndRelease(0);
     expect(calls).toBe(0);
+  });
+
+  it('an edge drag of an annotation is bounded by the length of the audio', async () => {
+    dragOptions.durations = [];
+    await mount({
+      provider: {
+        annotationList: {
+          annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
+        },
+      },
+    });
+    expect(dragOptions.durations.length).toBeGreaterThan(0);
+    expect(new Set(dragOptions.durations)).toEqual(new Set([SECONDS]));
   });
 
   it('getAnnotationBoxLabel is not called when the player becomes ready, nor on play, pause and stop', async () => {
