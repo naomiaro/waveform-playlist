@@ -328,7 +328,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   //    must not play under the overdub. Engine-level mute (survives adapter
   //    rebuilds), captured/restored around the session; the track's UI mute
   //    state is untouched.
-  // Auto-wired from PlaylistVisualization's recordingState prop; overdub
+  // Auto-wired from the view's recordingState prop (by its root); overdub
   // flows also call it eagerly before play() — a render round-trip loses the
   // race against the first animation frame (empty timeline: time 0 >=
   // duration 0 would stop playback instantly).
@@ -1642,7 +1642,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // its comment), but OptimisticSortingPlugin's own `reorder()` DOM splice
   // fires independently on any drag that commits a real index change and
   // isn't configurable away without losing live index tracking. Bumping this
-  // epoch forces PlaylistVisualization to re-key (remount) the track-controls
+  // epoch forces the view's track-controls part to re-key (remount) its
   // slots after every track-reorder drag ends — committed or canceled, since
   // corruption can occur before a final index is even decided — discarding
   // any corrupted fiber state so the NEXT reorder (drag or button) starts

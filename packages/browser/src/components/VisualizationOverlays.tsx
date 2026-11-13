@@ -34,6 +34,7 @@ import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotatio
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
+import { useWaveformExtent } from './waveformLayoutContext';
 
 /**
  * The highlighted selection range. Renders nothing for a collapsed selection.
@@ -122,7 +123,6 @@ export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead
 };
 
 export interface AnnotationBoxesOverlayProps {
-  width: number;
   /**
    * Custom function to generate the label shown on annotation boxes in the waveform.
    * Receives the annotation data and its index, returns a string label.
@@ -131,11 +131,16 @@ export interface AnnotationBoxesOverlayProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
 }
 
-/** The row of annotation boxes under the tracks. Needs the annotation integration. */
-export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
-  width,
+/**
+ * The row of annotation boxes under the tracks. Needs the annotation
+ * integration. Memoized, and as wide as the root's timeline: a render of the
+ * component that composes the view does not render it while
+ * `getAnnotationBoxLabel` keeps its identity.
+ */
+export const AnnotationBoxesOverlay = React.memo(function AnnotationBoxesOverlay({
   getAnnotationBoxLabel,
-}) => {
+}: AnnotationBoxesOverlayProps) {
+  const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');
   const { annotations, continuousPlay } = useAnnotations();
   const { annotationsEditable } = useAnnotationEditing();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -176,15 +181,14 @@ export const AnnotationBoxesOverlay: React.FC<AnnotationBoxesOverlayProps> = ({
       onSelect={handleAnnotationClick}
     />
   );
-};
+});
 
-export interface LoopRegionOverlayProps {
-  /** Right edge of the timeline in pixels. */
-  maxPosition: number;
-}
-
-/** The draggable loop region in the timescale. Renders nothing while looping is off. */
-export const LoopRegionOverlay: React.FC<LoopRegionOverlayProps> = ({ maxPosition }) => {
+/**
+ * The draggable loop region in the timescale, bounded by the root's timeline.
+ * Renders nothing while looping is off. Memoized: it takes no props.
+ */
+export const LoopRegionOverlay = React.memo(function LoopRegionOverlay() {
+  const { tracksFullWidth: maxPosition } = useWaveformExtent('The loop region');
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { setLoopRegion } = useEditorControls();
@@ -208,4 +212,4 @@ export const LoopRegionOverlay: React.FC<LoopRegionOverlayProps> = ({ maxPositio
       }}
     />
   );
-};
+});

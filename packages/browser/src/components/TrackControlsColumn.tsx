@@ -1,10 +1,14 @@
-import React, { type ReactNode } from 'react';
+import React, { useContext, type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { trackKind } from '@waveform-playlist/core';
-import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
-import { usePlaylistMixer, useEditorControls } from '../contexts/playlistContexts';
-import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
-import type { TrackLayout } from '../utils/trackOrderPreview';
+import {
+  usePlaylistMixer,
+  useEditorControls,
+  useSelectedTrackId,
+  useTrackReorderPreview,
+} from '../contexts/playlistContexts';
+import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
+import { useWaveformRows } from './waveformLayoutContext';
 import { SortableTrackControls } from './SortableTrackControls';
 import { DefaultTrackControls, type DefaultTrackControlsProps } from './DefaultTrackControls';
 import { ControlSlot, TracksLayout } from './visualizationLayout';
@@ -12,48 +16,45 @@ import { ControlSlot, TracksLayout } from './visualizationLayout';
 /** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
-export interface TrackControlsColumnProps {
-  tracks: ClipTrack[];
-  /** Render mode per track id, as resolved by the visualization. */
-  renderModeById: ReadonlyMap<string, RenderMode>;
-  trackLayout: TrackLayout;
-  trackHeightById: ReadonlyMap<string, number>;
-  animateTrackLayout: boolean;
-  selectedTrackId: string | null;
-  trackReorderEpoch: number;
-  trackReordering: boolean;
+export interface TrackControlsPartProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
+  /** The close button is drawn only when this is given. */
   onRemoveTrack?: (trackIndex: number) => void;
-  selectTrack: (trackIndex: number) => void;
-  spectrogram: SpectrogramIntegration | null;
-  setSettingsModalTrackId: (id: string | null) => void;
+  /** A drag grip and move up/down buttons on each default panel. */
+  trackReordering?: boolean;
 }
 
 /**
  * The control panels of all tracks, one height-synced slot per track, for the
- * ControlsColumn outside the scroll area.
+ * ControlsColumn outside the scroll area: the track-controls part of the view
+ * (#685).
  *
- * Memoized (#693): it takes no selection, cursor or annotation state, so a
- * selection drag or an active-annotation change during playback does not
- * re-render the panels. It reads the mixer state itself (#768), so a volume
- * or pan step renders this column and not the visualization shell above it.
+ * Memoized (#693), with only its own three options as props: it takes the
+ * tracks and the layout from the root's rows value, reads the selected track
+ * itself, and no time selection,
+ * cursor or annotation state, so a selection drag or an active-annotation
+ * change during playback does not re-render the panels. It reads the mixer
+ * state itself (#768), so a volume or pan step renders this column and not the
+ * root above it.
  */
-function TrackControlsColumnImpl({
-  tracks,
-  renderModeById,
-  trackLayout,
-  trackHeightById,
-  animateTrackLayout,
-  selectedTrackId,
-  trackReorderEpoch,
-  trackReordering,
+function TrackControlsPartImpl({
   renderTrackControls,
   onRemoveTrack,
-  selectTrack,
-  spectrogram,
-  setSettingsModalTrackId,
-}: TrackControlsColumnProps) {
+  trackReordering = false,
+}: TrackControlsPartProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
+  const {
+    tracks,
+    renderModeById,
+    trackLayout,
+    trackHeightById,
+    animateTrackLayout,
+    selectTrack,
+    setSettingsModalTrackId,
+  } = useWaveformRows('The track controls');
+  const { selectedTrackId } = useSelectedTrackId();
+  const { trackReorderEpoch } = useTrackReorderPreview();
+  const spectrogram = useContext(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
   const { setTrackMute, setTrackSolo, setTrackVolume, setTrackPan, reorderTrack } =
     useEditorControls();
@@ -136,4 +137,4 @@ function TrackControlsColumnImpl({
   );
 }
 
-export const TrackControlsColumn = React.memo(TrackControlsColumnImpl);
+export const TrackControlsPart = React.memo(TrackControlsPartImpl);

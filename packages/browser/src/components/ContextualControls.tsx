@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useId } from 'react';
 import {
   MasterVolumeControl as BaseMasterVolumeControl,
   TimeFormatSelect as BaseTimeFormatSelect,
@@ -67,9 +67,12 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
   useCurrentTime();
   const { timeFormat: format } = usePlaylistSettings();
 
+  // Its own id in the frame registry: under a shared one, a second readout
+  // under the same provider replaced the first one's callback.
+  const id = useId();
+
   // Register per-frame callback during playback — uses raw time for display
   useEffect(() => {
-    const id = 'audio-position';
     if (isPlaying) {
       registerFrameCallback(id, ({ time }) => {
         if (timeRef.current) {
@@ -78,7 +81,7 @@ export const AudioPosition: React.FC<{ className?: string }> = ({ className }) =
       });
     }
     return () => unregisterFrameCallback(id);
-  }, [isPlaying, format, registerFrameCallback, unregisterFrameCallback]);
+  }, [id, isPlaying, format, registerFrameCallback, unregisterFrameCallback]);
 
   // Update when stopped (for seeks)
   useEffect(() => {

@@ -48,7 +48,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
       counts.controls++;
       return createElement(actual.Controls, props);
     },
-    // Rendered unconditionally by `PlaylistVisualization`, so this counts the
+    // Rendered unconditionally by the view's root (`WaveformRoot`), so this counts the
     // shell's own renders (#733).
     Playlist: (props: React.ComponentProps<typeof actual.Playlist>) => {
       counts.shell++;
