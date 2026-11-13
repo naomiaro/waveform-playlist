@@ -27,6 +27,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDynamicTracks } from '@waveform-playlist/browser/tone';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -130,11 +131,8 @@ export function NewTracksExample() {
           samplesPerPixel={8192}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
           mono
-          waveHeight={120}
           automaticScroll={true}
           theme={theme}
-          barWidth={4}
-          barGap={0}
         >
           <Controls>
             <ControlGroup>
@@ -157,17 +155,19 @@ export function NewTracksExample() {
             </ControlGroup>
           </Controls>
 
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls>
-              <DefaultTrackControls />
-              <TrackRemoveButton onRemove={removeTrack} />
-            </WaveformTrackControls>
-            <WaveformTracks />
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls>
+                <DefaultTrackControls />
+                <TrackRemoveButton onRemove={removeTrack} />
+              </WaveformTrackControls>
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
         </WaveformPlaylistProvider>
       )}
     </Container>

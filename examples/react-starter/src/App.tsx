@@ -10,6 +10,7 @@ import {
   ZoomInButton,
   ZoomOutButton,
   MasterVolumeControl,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -156,12 +157,8 @@ export function App() {
         sampleRate={48000}
         samplesPerPixel={1024}
         mono
-        waveHeight={90}
         automaticScroll
         theme={theme}
-        barWidth={3}
-        barGap={1}
-        roundedBars
       >
         <Controls>
           <PlayButton />
@@ -178,7 +175,9 @@ export function App() {
           )}
         </Controls>
 
-        <Waveform />
+        <WaveformViewOptions waveHeight={90} barWidth={3} barGap={1} roundedBars>
+          <Waveform />
+        </WaveformViewOptions>
       </WaveformPlaylistProvider>
     </Page>
   );

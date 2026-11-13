@@ -16,6 +16,7 @@ import {
   PauseButton,
   StopButton,
   loadWaveformData,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -114,22 +115,21 @@ export function MediaElementAnnotationsExample() {
         <MediaElementPlaylistProvider
           track={track}
           samplesPerPixel={1024}
-          waveHeight={128}
           theme={theme}
           automaticScroll
-          barWidth={2}
-          barGap={1}
           annotationList={annotationList}
           onAnnotationsChange={setAnnotations}
         >
           <Transport />
-          <MediaElementWaveformRoot>
-            <WaveformTimescale />
-            <WaveformTracks />
-            <WaveformAnnotationBoxes getLabel={getLabel} />
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </MediaElementWaveformRoot>
+          <WaveformViewOptions waveHeight={128} barWidth={2} barGap={1}>
+            <MediaElementWaveformRoot>
+              <WaveformTimescale />
+              <WaveformTracks />
+              <WaveformAnnotationBoxes getLabel={getLabel} />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </MediaElementWaveformRoot>
+          </WaveformViewOptions>
           <AnnotationList height={300} />
         </MediaElementPlaylistProvider>
       </AnnotationProvider>

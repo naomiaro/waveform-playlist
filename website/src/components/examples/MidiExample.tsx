@@ -27,6 +27,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -412,8 +413,6 @@ export function MidiExample() {
           mono
           theme={{ ...theme, ...gradientTheme }}
           soundFontCache={soundFontCache}
-          progressBarWidth={2}
-          waveHeight={100}
           automaticScroll
         >
           <KeyboardShortcuts playback />
@@ -432,17 +431,19 @@ export function MidiExample() {
             </ToggleGroup>
           </Controls>
 
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls>
-              <DefaultTrackControls />
-              <TrackRemoveButton onRemove={handleRemoveTrack} />
-            </WaveformTrackControls>
-            <WaveformTracks />
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={100} progressBarWidth={2}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls>
+                <DefaultTrackControls />
+                <TrackRemoveButton onRemove={handleRemoveTrack} />
+              </WaveformTrackControls>
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
         </WaveformPlaylistProvider>
       ) : (
         <LoadingOverlay>

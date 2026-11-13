@@ -5,6 +5,7 @@ import {
   MediaElementWaveform,
   loadWaveformData,
   type MediaElementTrackConfig,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { Controls } from './Controls';
 
@@ -108,16 +109,15 @@ export function App() {
         <MediaElementPlaylistProvider
           track={track}
           samplesPerPixel={512}
-          waveHeight={140}
           preservesPitch={preservesPitch}
-          barWidth={2}
-          barGap={0}
           // Surface a player that could not be created (e.g. a missing peer) and
           // media that failed to load.
           onError={handlePlayoutError}
         >
           <Controls preservesPitch={preservesPitch} onPreservesPitchChange={setPreservesPitch} />
-          <MediaElementWaveform />
+          <WaveformViewOptions waveHeight={140} barWidth={2} barGap={0}>
+            <MediaElementWaveform />
+          </WaveformViewOptions>
         </MediaElementPlaylistProvider>
       )}
     </Page>

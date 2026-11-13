@@ -13,6 +13,7 @@ import {
   StopButton,
   AudioPosition,
   AutomaticScrollCheckbox,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useMidiTracks } from '@waveform-playlist/midi';
@@ -208,8 +209,6 @@ export function App() {
         mono
         theme={darkThemeOverrides}
         soundFontCache={soundFontCache}
-        progressBarWidth={2}
-        waveHeight={100}
         automaticScroll
       >
         <Controls>
@@ -225,7 +224,9 @@ export function App() {
           <AutomaticScrollCheckbox />
         </Controls>
 
-        <Waveform />
+        <WaveformViewOptions waveHeight={100} progressBarWidth={2}>
+          <Waveform />
+        </WaveformViewOptions>
       </WaveformPlaylistProvider>
     </Container>
   );

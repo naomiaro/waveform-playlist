@@ -19,6 +19,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -118,7 +119,7 @@ export function MinimalExample() {
   }
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }} progressBarWidth={2}>
+    <WaveformPlaylistProvider tracks={tracks} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
       <Controls>
         <PlayButton />
         <PauseButton />
@@ -127,11 +128,13 @@ export function MinimalExample() {
         {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
       </Controls>
 
-      <WaveformRoot>
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
+      <WaveformViewOptions progressBarWidth={2}>
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

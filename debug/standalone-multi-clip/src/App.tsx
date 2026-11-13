@@ -16,6 +16,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformClipHeaders,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 
 const Controls = styled.div`
@@ -136,7 +137,6 @@ export function App() {
         onTracksChange={setTracks}
         samplesPerPixel={1024}
         mono
-        waveHeight={80}
       >
         <ClipInteractionProvider>
           <Controls>
@@ -144,16 +144,18 @@ export function App() {
             <PauseButton />
             <StopButton />
           </Controls>
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls width={180} />
-            <WaveformTracks>
-              <WaveformClipHeaders />
-            </WaveformTracks>
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={80}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls width={180} />
+              <WaveformTracks>
+                <WaveformClipHeaders />
+              </WaveformTracks>
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </>

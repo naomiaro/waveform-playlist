@@ -23,6 +23,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformClipHeaders,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { AudioTrackConfig } from '@waveform-playlist/browser/tone';
@@ -150,10 +151,7 @@ export function MirSpectrogramExample() {
           sampleRate={48000}
           theme={theme}
           automaticScroll
-          waveHeight={100}
           samplesPerPixel={8192}
-          barWidth={1}
-          barGap={0}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
         >
           <SpectrogramProvider colorMap="viridis">
@@ -169,19 +167,21 @@ export function MirSpectrogramExample() {
             <AutomaticScrollCheckbox />
             <ClearAllButton onClearAll={handleClearAll} />
           </ControlBar>
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls width={180}>
-              <DefaultTrackControls />
-              <TrackRemoveButton onRemove={handleRemoveTrack} />
-            </WaveformTrackControls>
-            <WaveformTracks>
-              <WaveformClipHeaders />
-            </WaveformTracks>
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls width={180}>
+                <DefaultTrackControls />
+                <TrackRemoveButton onRemove={handleRemoveTrack} />
+              </WaveformTrackControls>
+              <WaveformTracks>
+                <WaveformClipHeaders />
+              </WaveformTracks>
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
           </SpectrogramProvider>
         </WaveformPlaylistProvider>
       )}

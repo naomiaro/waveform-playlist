@@ -21,6 +21,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
@@ -142,11 +143,8 @@ export function StemTracksExample() {
         sampleRate={48000}
         samplesPerPixel={512}
         mono
-        waveHeight={100}
         automaticScroll={true}
         theme={theme}
-        barWidth={4}
-        barGap={0}
       >
         <ClipInteractionProvider>
           <KeyboardShortcuts playback />
@@ -177,17 +175,19 @@ export function StemTracksExample() {
 
           </Controls>
 
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls>
-              <DefaultTrackControls />
-              <TrackReorderGrip />
-            </WaveformTrackControls>
-            <WaveformTracks />
-            <WaveformSelection />
-            <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls>
+                <DefaultTrackControls />
+                <TrackReorderGrip />
+              </WaveformTrackControls>
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+            </WaveformRoot>
+          </WaveformViewOptions>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

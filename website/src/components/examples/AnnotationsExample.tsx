@@ -42,6 +42,7 @@ import {
   usePlaylistTimeline,
   usePlaybackRefs,
   useAnnotations,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -450,15 +451,17 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
 
         {/* The annotation boxes wire the drag of their edges themselves;
             the list takes its options (height, action buttons) as props. */}
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          <WaveformTrackControls />
-          <WaveformTracks />
-          <WaveformAnnotationBoxes />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
+        <WaveformViewOptions waveHeight={128} barWidth={4} barGap={0} progressBarWidth={2}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls />
+            <WaveformTracks />
+            <WaveformAnnotationBoxes />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
         <AnnotationList actions={annotationActions} height={300} />
 
         <TimeControlsBar>
@@ -565,12 +568,8 @@ export function AnnotationsExample() {
       sampleRate={48000}
       samplesPerPixel={1024}
       mono
-      waveHeight={128}
       automaticScroll={true}
       theme={theme}
-      barWidth={4}
-      barGap={0}
-      progressBarWidth={2}
       annotationList={{
         annotations: annotations,
         editable: true,
