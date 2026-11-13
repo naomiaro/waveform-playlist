@@ -9,8 +9,8 @@
 // What it cannot see: a computed access (`React['useContext']`), and WHERE a
 // `use()` call stands. `use()` may be called in a condition or a loop, so the
 // lint rule that kept `useContext` at the top level does not report a
-// conditional `use()`; keeping every read at the top level of its component
-// or hook is a review matter.
+// conditional `use()`. A `no-restricted-syntax` rule in the root
+// `eslint.config.mjs` reports those; `conditionalUseLint.test.ts` covers it.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
