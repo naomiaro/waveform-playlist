@@ -28,6 +28,7 @@ const ROUTES = [
   '/examples/multi-clip',
   '/examples/recording',
   '/examples/stem-tracks',
+  '/examples/styling',
   '/examples/wam-effects',
   '/examples/waveform-data',
 ];

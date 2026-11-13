@@ -28,6 +28,7 @@ import {
   PauseButton,
   StopButton,
   AudioPosition,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 import type { AnnotationData, RenderAnnotationItemProps } from '@waveform-playlist/core';
@@ -391,6 +392,50 @@ export const CustomTrackNames: Story = {
     docs: {
       description: {
         story: 'Tracks with custom names showing a typical multitrack recording setup.',
+      },
+    },
+  },
+};
+
+const VIEW_OPTIONS_TRACKS: ClipTrack[] = [
+  { id: 'vocals', name: 'Vocals', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+  { id: 'bass', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+];
+
+/**
+ * `<WaveformViewOptions>` is the one home of the options that only affect how
+ * a view draws. Two views under one provider can differ: the first is a
+ * compact strip, the second the usual view with a taller timescale.
+ */
+export const ViewOptions: Story = {
+  render: () => (
+    <WaveformPlaylistProvider tracks={VIEW_OPTIONS_TRACKS} samplesPerPixel={1024}>
+      <div style={{ padding: '1rem' }}>
+        <WaveformViewOptions waveHeight={24}>
+          <WaveformRoot>
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <div style={{ height: '1rem' }} />
+        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={1} progressBarWidth={3}>
+          <WaveformRoot>
+            <WaveformTimescale height={44} />
+            <WaveformTrackControls />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+      </div>
+    </WaveformPlaylistProvider>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Row height, bar style and playhead width are props of `<WaveformViewOptions>`, set above a view (or above several). The timescale strip takes its own `height`.',
       },
     },
   },
