@@ -110,6 +110,10 @@ export const AutomaticScrollFlag = memo(function AutomaticScrollFlag({
  * clamp to its ends. When the drag ends with no release (the window lost
  * focus, or the `mouseup` was lost), a preview is dropped and playback is untouched; while stopped the
  * selection stays as the last move left it.
+ *
+ * A press made while playing whose release comes after playback has stopped,
+ * with no move in between, is a click that collapses the selection at the
+ * press (the press itself did not, because playback was running).
  */
 export function useSelectionDrag({
   samplesPerPixel,
@@ -126,6 +130,9 @@ export function useSelectionDrag({
   const previewHandle = useMemo(() => createValueSource<SelectionRange | null>(null), []);
   // The time under the pointer where the drag began.
   const pressTimeRef = useRef(0);
+  // This drag has written the selection (the press while stopped, or a move
+  // while stopped). False for a drag that has so far only run during playback.
+  const wroteSelectionRef = useRef(false);
   // The element the drag began on, for pointer positions while the pointer is
   // somewhere else.
   const dragElementRef = useRef<HTMLDivElement | null>(null);
@@ -157,11 +164,17 @@ export function useSelectionDrag({
     pressTimeRef.current = time;
     dragElementRef.current = event.currentTarget;
     setIsSelecting(true);
+    wroteSelectionRef.current = !isPlaying;
     if (!isPlaying) setSelection(time, time);
   };
 
   const handleDragMove = (event: MouseEvent) => {
-    if (isPlaying && automaticScrollRef.current) return;
+    if (isPlaying && automaticScrollRef.current) {
+      // Also when the setting was switched on under a drag that had already
+      // drawn a range: it is withdrawn.
+      previewHandle.publish(null);
+      return;
+    }
     const moveTime = timeAt(event.clientX);
     if (moveTime === null) return;
     const range = rangeTo(moveTime);
@@ -174,6 +187,7 @@ export function useSelectionDrag({
     // Stopped. Also reached when playback stopped (or ended) under a drag
     // that began while it ran: from here it is an ordinary drag.
     previewHandle.publish(null);
+    wroteSelectionRef.current = true;
     setSelection(range.start, range.end);
   };
 
@@ -203,8 +217,16 @@ export function useSelectionDrag({
       return;
     }
 
-    if (isClick) onClickWhileStopped(range.start);
-    else setSelection(range.start, range.end);
+    if (!isClick) {
+      setSelection(range.start, range.end);
+    } else if (wroteSelectionRef.current) {
+      onClickWhileStopped(range.start);
+    } else {
+      // Pressed while playing, and playback has stopped since: the press did
+      // not collapse the selection, so the click does (an older highlighted
+      // range would otherwise stay selected, and Play would play it).
+      setSelection(pressTime, pressTime);
+    }
   };
 
   useWindowDrag(isSelecting, handleDragMove, handleDragEnd);

@@ -1715,6 +1715,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         suppressEngineStopMirrorRef.current = false;
         engineRef.current.seek(start);
         replaceBoundedPlay();
+        // This is a new play: say when and where it started, as `play()` does.
+        // `useEngineRefs()` hands these two to consumers (a custom readout or
+        // playhead), and until 2026-11 they kept describing the play this one
+        // replaced.
+        playbackStartTimeRef.current = getAudioContextTime();
+        audioStartPositionRef.current = start;
         engineRef.current.play(start, endTime);
       }
     },
@@ -1724,6 +1730,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setActiveAnnotationId,
       isLoopEnabledRef,
       activeAnnotationIdRef,
+      getAudioContextTime,
     ]
   );
 

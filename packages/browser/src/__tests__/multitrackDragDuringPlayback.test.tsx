@@ -18,6 +18,7 @@ import {
   useCurrentTime,
   useIsPlaying,
   usePlaybackControls,
+  useEngineRefs,
 } from '../contexts/playlistContexts';
 import { Waveform } from '../components/Waveform';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -58,13 +59,15 @@ function makeTrack(id: string): ClipTrack {
 
 function createFakeAdapter() {
   const play = vi.fn();
+  // The clock the provider reads: a test moves it by hand.
+  const audioContext = {
+    currentTime: 0,
+    sampleRate: SAMPLE_RATE,
+    state: 'running',
+    outputLatency: 0,
+  };
   const adapter = {
-    audioContext: {
-      currentTime: 0,
-      sampleRate: SAMPLE_RATE,
-      state: 'running',
-      outputLatency: 0,
-    } as unknown as AudioContext,
+    audioContext: audioContext as unknown as AudioContext,
     ppqn: 960,
     async init() {},
     setTracks() {},
@@ -85,7 +88,7 @@ function createFakeAdapter() {
     setLoop() {},
     dispose() {},
   } as unknown as PlayoutAdapter;
-  return { adapter, play };
+  return { adapter, play, audioContext };
 }
 
 let probe: {
@@ -94,6 +97,7 @@ let probe: {
   currentTime: number;
   isPlaying: boolean;
   controls: ReturnType<typeof usePlaybackControls>;
+  engineRefs: ReturnType<typeof useEngineRefs>;
 };
 
 const Probe: React.FC = () => {
@@ -103,6 +107,7 @@ const Probe: React.FC = () => {
     currentTime: useCurrentTime().currentTime,
     isPlaying: useIsPlaying().isPlaying,
     controls: usePlaybackControls(),
+    engineRefs: useEngineRefs(),
   };
   return null;
 };
@@ -124,7 +129,7 @@ async function mount({ automaticScroll = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
-  const { adapter, play } = createFakeAdapter();
+  const { adapter, play, audioContext } = createFakeAdapter();
   const createAdapter = () => adapter;
   const tracks = [makeTrack('one'), makeTrack('two')];
   render(
@@ -148,7 +153,7 @@ async function mount({ automaticScroll = false } = {}) {
   const overlay = clickOverlay();
   overlay.getBoundingClientRect = () =>
     ({ left: 0, top: 0, right: 2000, bottom: 160, width: 2000, height: 160 }) as DOMRect;
-  return { overlay, play };
+  return { overlay, play, audioContext };
 }
 
 async function startPlayback() {
@@ -255,5 +260,71 @@ describe('a drag on the tracks of the multitrack view during playback', () => {
     expect(play.mock.calls.length).toBe(playsBefore + 1);
     expect(play.mock.lastCall).toEqual([5, undefined]);
     expect(probe.isPlaying).toBe(true);
+  });
+});
+
+// `useEngineRefs()` hands out when and where the running play started, for a
+// consumer's own readout or playhead. Every restart must keep them true, not
+// only `play()`: the release of a click or a drag restarts through
+// `setSelection`.
+describe('the timing refs of useEngineRefs() after a restart during playback', () => {
+  it('a click: the play started at the click, at the clock time of the release', async () => {
+    const { overlay, audioContext } = await mount();
+    await startPlayback();
+    audioContext.currentTime = 3;
+
+    await press(overlay, 250, 10);
+    await release(250);
+
+    expect(probe.engineRefs.audioStartPositionRef.current).toBe(5);
+    expect(probe.engineRefs.playbackStartTimeRef.current).toBe(3);
+  });
+
+  it('a drag: the play started at the start of the range', async () => {
+    const { overlay, audioContext } = await mount();
+    await startPlayback();
+    audioContext.currentTime = 4;
+
+    await press(overlay, 350, 10);
+    await move(250);
+    await release(250);
+
+    expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 7 });
+    expect(probe.engineRefs.audioStartPositionRef.current).toBe(5);
+    expect(probe.engineRefs.playbackStartTimeRef.current).toBe(4);
+  });
+
+  it('setSelection from code (as SelectionTimeInputs does) during playback', async () => {
+    const { audioContext } = await mount();
+    await startPlayback();
+    audioContext.currentTime = 6;
+
+    await act(async () => {
+      probe.controls.setSelection(2, 4);
+    });
+
+    expect(probe.engineRefs.audioStartPositionRef.current).toBe(2);
+    expect(probe.engineRefs.playbackStartTimeRef.current).toBe(6);
+  });
+});
+
+describe('a press made while playing, released after playback has stopped', () => {
+  it('collapses the selection at the press, so an old range does not stay selected', async () => {
+    const { overlay } = await mount();
+    await act(async () => {
+      probe.controls.setSelection(1, 2);
+    });
+    await startPlayback();
+
+    await press(overlay, 250, 10);
+    expect(probe.selection).toEqual({ selectionStart: 1, selectionEnd: 2 });
+    await act(async () => {
+      probe.controls.stop();
+    });
+    expect(probe.isPlaying).toBe(false);
+    await release(250);
+
+    expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
+    expect(probe.currentTime).toBe(5);
   });
 });

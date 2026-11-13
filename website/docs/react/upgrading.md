@@ -1337,6 +1337,11 @@ While playback is stopped nothing changes: the selection follows the pointer on 
 - `useSelection()` readers (`SelectionTimeInputs`, your own): during a drag made while playing, `selectionStart` / `selectionEnd` keep the OLD selection until the release. Only the highlight shows the range being drawn. `SetLoopRegionButton` (`WaveformPlaylistProvider`) acts on the old selection until then.
 - A press during playback no longer changes `currentTime` or restarts playback. The release does both, once, through `setSelection`: the engine or the player is restarted, and the `play()` of `usePlaybackControls()` is not called.
 
+Two things that follow from it:
+
+- **A press made while playing whose release comes after playback has stopped** (it reached its end, or Stop was pressed) is a click at the pressed position: the cursor moves there and the selection collapses, as for any click while stopped.
+- **`useEngineRefs()`: `playbackStartTimeRef` and `audioStartPositionRef` are now written by every restart**, also the one `setSelection` does during playback. Before, only `play()` wrote them, so after `setSelection(start, end)` during playback (from `SelectionTimeInputs`, or your own code) they still described the play that had been replaced, and a readout computed from them kept counting from the old start. Nothing to change in your code.
+
 **To let listeners select a range while a recording plays,** leave automatic scroll off, or give them `<AutomaticScrollCheckbox />` to switch it off.
 
 ## Keyboard shortcuts yield to the focused control

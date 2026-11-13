@@ -264,6 +264,36 @@ describe('while playing, with automatic scroll off, nothing is committed before 
   });
 });
 
+describe('edges of a drag that outlives the state it began in', () => {
+  it('pressed while playing, playback ended, released without moving: the selection collapses at the press, as for any click', async () => {
+    const { set } = mount({ isPlaying: true });
+    await press(200);
+    expect(setSelection).not.toHaveBeenCalled();
+    await act(async () => {
+      set({ isPlaying: false });
+    });
+    await release(200);
+    // The press did not collapse the selection (playback was running), so
+    // the release has to: otherwise an old highlighted range would stay.
+    expect(setSelection.mock.calls).toEqual([[4, 4]]);
+    expect(onClickWhileStopped).not.toHaveBeenCalled();
+  });
+
+  it('automatic scroll switched on after a range was already drawn: the drawing is withdrawn at the next move', async () => {
+    const { set } = mount({ isPlaying: true, isAutomaticScroll: false });
+    await press(200);
+    await move(350);
+    expect(preview.getSnapshot()).toEqual({ start: 4, end: 7 });
+    await act(async () => {
+      set({ isPlaying: true, isAutomaticScroll: true });
+    });
+    await move(400);
+    expect(preview.getSnapshot()).toBeNull();
+    await release(400);
+    expect(setSelection.mock.calls).toEqual([[4, 4]]);
+  });
+});
+
 describe('the automatic-scroll setting is followed after mount', () => {
   it('switched on during playback: the next drag draws nothing and seeks to the press', async () => {
     const { set } = mount({ isPlaying: true, isAutomaticScroll: false });
