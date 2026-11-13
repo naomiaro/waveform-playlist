@@ -145,7 +145,8 @@ export function useSelectionDrag({
     // release may never be delivered.
     if (event.button !== 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const time = ((event.clientX - rect.left) * samplesPerPixel) / sampleRate;
+    // Never before the start of the timeline, whatever the event says.
+    const time = Math.max(0, ((event.clientX - rect.left) * samplesPerPixel) / sampleRate);
 
     onPress?.({ time, offsetY: event.clientY - rect.top, isPlaying });
 
@@ -180,7 +181,7 @@ export function useSelectionDrag({
     if (event === null) return;
 
     // Where the press landed: what a click during playback seeks to.
-    const pressTime = Math.max(0, pressTimeRef.current);
+    const pressTime = pressTimeRef.current;
 
     if (isPlaying && automaticScrollRef.current) {
       setSelection(pressTime, pressTime);

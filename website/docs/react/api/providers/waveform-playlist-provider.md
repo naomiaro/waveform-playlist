@@ -222,7 +222,7 @@ Array of zoom levels in samples per pixel.
 **Type:** `boolean`
 **Default:** `false`
 
-Auto-scroll to keep playhead visible.
+Auto-scroll to keep playhead visible. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 #### `fillViewport`
 

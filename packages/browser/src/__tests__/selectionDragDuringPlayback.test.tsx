@@ -58,7 +58,7 @@ const Surface: React.FC = () => {
           if (element) {
             // jsdom lays nothing out.
             element.getBoundingClientRect = () =>
-              ({ left: 0, top: 0, right: 1000, bottom: 100, width: 1000, height: 100 }) as DOMRect;
+              ({ left: 0, top: 20, right: 1000, bottom: 120, width: 1000, height: 100 }) as DOMRect;
           }
         }}
       />
@@ -110,12 +110,31 @@ afterEach(async () => {
   vi.clearAllMocks();
 });
 
+describe('what starts a drag', () => {
+  it('only the primary button: a right-click starts nothing', async () => {
+    mount({ isPlaying: false });
+    await act(async () => {
+      fireEvent.mouseDown(surface(), { button: 2, clientX: 200, clientY: 30 });
+    });
+    expect(onPress).not.toHaveBeenCalled();
+    expect(setSelection).not.toHaveBeenCalled();
+    expect(surface().dataset.selecting).toBe('false');
+  });
+
+  it('a click during playback to the left of the element seeks to 0, not to a negative time', async () => {
+    mount({ isPlaying: true });
+    await press(-50);
+    await release(-50);
+    expect(setSelection.mock.calls).toEqual([[0, 0]]);
+  });
+});
+
 describe('while stopped the selection follows the pointer', () => {
   it('press, move and release each write the selection; nothing is previewed', async () => {
     mount({ isPlaying: false });
 
     await press(200, 37);
-    expect(onPress).toHaveBeenCalledWith({ time: 4, offsetY: 37, isPlaying: false });
+    expect(onPress).toHaveBeenCalledWith({ time: 4, offsetY: 17, isPlaying: false });
     expect(setSelection.mock.calls).toEqual([[4, 4]]);
     expect(surface().dataset.selecting).toBe('true');
 
@@ -157,7 +176,7 @@ describe('while playing, with automatic scroll off, nothing is committed before 
   it('the press does not touch the selection', async () => {
     mount({ isPlaying: true });
     await press(200, 37);
-    expect(onPress).toHaveBeenCalledWith({ time: 4, offsetY: 37, isPlaying: true });
+    expect(onPress).toHaveBeenCalledWith({ time: 4, offsetY: 17, isPlaying: true });
     expect(setSelection).not.toHaveBeenCalled();
     expect(surface().dataset.selecting).toBe('true');
     expect(preview.getSnapshot()).toBeNull();
