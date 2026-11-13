@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -13,6 +12,13 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   KeyboardShortcuts,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
@@ -136,9 +142,7 @@ export function StemTracksExample() {
         mono
         waveHeight={100}
         automaticScroll={true}
-        controls={{ show: true, width: 200 }}
         theme={theme}
-        timescale
         barWidth={4}
         barGap={0}
       >
@@ -171,7 +175,14 @@ export function StemTracksExample() {
 
           </Controls>
 
-          <Waveform renderPlayhead={PlayheadWithMarker} trackReordering />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls trackReordering />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+          </WaveformRoot>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

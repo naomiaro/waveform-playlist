@@ -5,10 +5,17 @@ import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-pl
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+  WaveformClipHeaders,
 } from '@waveform-playlist/browser';
 
 const Controls = styled.div`
@@ -130,8 +137,6 @@ export function App() {
         samplesPerPixel={1024}
         mono
         waveHeight={80}
-        timescale
-        controls={{ show: true, width: 180 }}
       >
         <ClipInteractionProvider>
           <Controls>
@@ -139,7 +144,16 @@ export function App() {
             <PauseButton />
             <StopButton />
           </Controls>
-          <Waveform showClipHeaders />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={180} />
+            <WaveformTracks>
+              <WaveformClipHeaders />
+            </WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </>

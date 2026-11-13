@@ -173,7 +173,6 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-
 const ANNOTATIONS = [
   { id: 'n1', start: 0, end: 0.5, lines: ['one'] },
   { id: 'n2', start: 0.5, end: 1, lines: ['two'] },

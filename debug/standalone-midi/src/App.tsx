@@ -209,9 +209,7 @@ export function App() {
         theme={darkThemeOverrides}
         soundFontCache={soundFontCache}
         progressBarWidth={2}
-        controls={{ show: true, width: 200 }}
         waveHeight={100}
-        timescale
         automaticScroll
       >
         <Controls>

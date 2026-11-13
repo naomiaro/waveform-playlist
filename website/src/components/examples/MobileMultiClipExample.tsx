@@ -19,13 +19,20 @@ import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
   loadWaveformData,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
   ZoomInButton,
   ZoomOutButton,
   AudioPosition,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+  WaveformClipHeaders,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -271,9 +278,7 @@ export function MobileMultiClipExample() {
         mono
         waveHeight={120}
         automaticScroll={false}
-        controls={{ show: true, width: 100 }}
         theme={theme}
-        timescale
         barWidth={4}
         barGap={0}
       >
@@ -294,7 +299,16 @@ export function MobileMultiClipExample() {
           </Controls>
 
           {/* The provider's touchOptimized also widens the clip trim handles */}
-          <Waveform showClipHeaders />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={100} />
+            <WaveformTracks>
+              <WaveformClipHeaders />
+            </WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

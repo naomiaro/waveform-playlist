@@ -582,9 +582,7 @@ export function AnnotationsExample() {
       mono
       waveHeight={128}
       automaticScroll={true}
-      controls={{ show: true, width: 200 }}
       theme={theme}
-      timescale
       barWidth={4}
       barGap={0}
       progressBarWidth={2}

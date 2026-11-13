@@ -11,7 +11,6 @@ import React, { useCallback } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -19,6 +18,13 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AutomaticScrollCheckbox,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { useDynamicTracks } from '@waveform-playlist/browser/tone';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -131,9 +137,7 @@ export function NewTracksExample() {
           mono
           waveHeight={120}
           automaticScroll={true}
-          controls={{ show: true, width: 200 }}
           theme={theme}
-          timescale
           barWidth={4}
           barGap={0}
         >
@@ -158,9 +162,14 @@ export function NewTracksExample() {
             </ControlGroup>
           </Controls>
 
-          <Waveform
-            onRemoveTrack={handleRemoveTrack}
-          />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls onRemoveTrack={handleRemoveTrack} />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
         </WaveformPlaylistProvider>
       )}
     </Container>

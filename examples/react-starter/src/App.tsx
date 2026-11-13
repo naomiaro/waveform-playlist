@@ -158,8 +158,6 @@ export function App() {
         mono
         waveHeight={90}
         automaticScroll
-        controls={{ show: true, width: 200 }}
-        timescale
         theme={theme}
         barWidth={3}
         barGap={1}

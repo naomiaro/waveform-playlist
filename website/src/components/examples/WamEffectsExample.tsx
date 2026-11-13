@@ -7,7 +7,6 @@ import {
 } from '@waveform-playlist/playout';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -18,6 +17,13 @@ import {
   AutomaticScrollCheckbox,
   AudioPosition,
   KeyboardShortcuts,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import {
   useAudioTracks,
@@ -563,7 +569,14 @@ const WamControls: React.FC<WamControlsProps> = ({
         </span>
       )}
     </TransportBar>
-    <Waveform />
+    <WaveformRoot>
+      <WaveformTimescale />
+      <WaveformLoopRegion />
+      <WaveformTrackControls width={150} />
+      <WaveformTracks />
+      <WaveformSelection />
+      <WaveformPlayhead />
+    </WaveformRoot>
   </>
 );
 
@@ -738,10 +751,8 @@ export function WamEffectsExample() {
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
         theme={theme}
-        controls={{ show: true, width: 150 }}
         automaticScroll
         effects={masterFx.masterEffects}
-        timescale
         barWidth={2}
         barGap={0}
       >

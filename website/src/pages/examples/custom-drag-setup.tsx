@@ -67,7 +67,7 @@ const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ /* … */ }
   modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
 >
   <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
-    <Waveform showClipHeaders />
+    <WaveformEditor />
   </ClipInteractionOptions>
 </DragDropProvider>`}
           </pre>

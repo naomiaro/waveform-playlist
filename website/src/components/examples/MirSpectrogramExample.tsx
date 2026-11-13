@@ -3,7 +3,6 @@ import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -14,6 +13,14 @@ import {
   AutomaticScrollCheckbox,
   ClearAllButton,
   KeyboardShortcuts,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+  WaveformClipHeaders,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { AudioTrackConfig } from '@waveform-playlist/browser/tone';
@@ -140,14 +147,12 @@ export function MirSpectrogramExample() {
           onTracksChange={setTracks}
           sampleRate={48000}
           theme={theme}
-          timescale
           automaticScroll
           waveHeight={100}
           samplesPerPixel={8192}
           barWidth={1}
           barGap={0}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
-          controls={{ show: true, width: 180 }}
         >
           <SpectrogramProvider colorMap="viridis">
           <KeyboardShortcuts playback />
@@ -162,7 +167,16 @@ export function MirSpectrogramExample() {
             <AutomaticScrollCheckbox />
             <ClearAllButton onClearAll={handleClearAll} />
           </ControlBar>
-          <Waveform onRemoveTrack={handleRemoveTrack} showClipHeaders />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={180} onRemoveTrack={handleRemoveTrack} />
+            <WaveformTracks>
+              <WaveformClipHeaders />
+            </WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
           </SpectrogramProvider>
         </WaveformPlaylistProvider>
       )}

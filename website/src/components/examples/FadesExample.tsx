@@ -14,11 +14,15 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
-  MediaElementWaveform,
   PlayButton,
   PauseButton,
   StopButton,
   loadWaveformData,
+  MediaElementWaveformRoot,
+  WaveformTracks,
+  WaveformFades,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import type { FadeType } from '@waveform-playlist/core';
@@ -117,7 +121,11 @@ function FadePlayer({ fadeType, title, description, waveformData, audioContext, 
       >
         <PlaybackControls />
         <WaveformWrapper>
-          <MediaElementWaveform showFades={showFades} />
+          <MediaElementWaveformRoot>
+            <WaveformTracks>{showFades ? <WaveformFades /> : null}</WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </MediaElementWaveformRoot>
         </WaveformWrapper>
       </MediaElementPlaylistProvider>
     </FadeCard>

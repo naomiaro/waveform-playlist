@@ -152,7 +152,6 @@ export function MediaElementAnnotationsExample() {
           samplesPerPixel={1024}
           waveHeight={128}
           theme={theme}
-          timescale
           automaticScroll
           barWidth={2}
           barGap={1}

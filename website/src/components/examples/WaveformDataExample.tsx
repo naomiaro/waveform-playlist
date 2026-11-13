@@ -236,9 +236,7 @@ export function WaveformDataExample() {
         mono
         waveHeight={100}
         automaticScroll
-        controls={{ show: true, width: 200 }}
         theme={theme}
-        timescale
         barWidth={4}
         barGap={0}
       >

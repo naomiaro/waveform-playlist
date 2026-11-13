@@ -30,7 +30,6 @@ import {
 import '@radix-ui/themes/styles.css';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   usePlaybackControls,
   useEditorControls,
   useEngineRefs,
@@ -46,6 +45,14 @@ import {
   usePlaybackRefs,
   useLoop,
   useIsPlaying,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+  WaveformClipHeaders,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
@@ -432,16 +439,25 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
 
       <ClipInteractionProvider>
         <KeyboardShortcuts playback clipSplitting undo />
-        <Waveform
-          renderTrackControls={(trackIndex) => (
-            <CustomTrackControls trackIndex={trackIndex} />
-          )}
-          renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
-          renderTick={(label, pixelPosition) => {
-            return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
-          }}
-          showClipHeaders
-        />
+        <WaveformRoot>
+          <WaveformTimescale
+            renderTick={(label, pixelPosition) => {
+              return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
+            }}
+          />
+          <WaveformLoopRegion />
+          <WaveformTrackControls
+            width={160}
+            renderTrackControls={(trackIndex) => (
+              <CustomTrackControls trackIndex={trackIndex} />
+            )}
+          />
+          <WaveformTracks>
+            <WaveformClipHeaders />
+          </WaveformTracks>
+          <WaveformSelection />
+          <WaveformPlayhead renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
+        </WaveformRoot>
       </ClipInteractionProvider>
 
       {/* Time Controls Bar */}
@@ -581,9 +597,7 @@ export function FlexibleApiExample() {
           barGap={0}
           barWidth={1}
           automaticScroll
-          controls={{ show: true, width: 160 }}
           theme={customTheme}
-          timescale
         >
           <FlexibleApiContent tracks={tracks} />
         </WaveformPlaylistProvider>

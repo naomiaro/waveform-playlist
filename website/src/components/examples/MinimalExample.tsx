@@ -11,11 +11,14 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
   AudioPosition,
+  WaveformRoot,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -124,7 +127,11 @@ export function MinimalExample() {
         {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
       </Controls>
 
-      <Waveform />
+      <WaveformRoot>
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </WaveformRoot>
     </WaveformPlaylistProvider>
   );
 }

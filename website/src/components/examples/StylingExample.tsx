@@ -14,10 +14,13 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
-  MediaElementWaveform,
   PlayButton,
   StopButton,
   loadWaveformData,
+  MediaElementWaveformRoot,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type WaveformData from 'waveform-data';
@@ -162,7 +165,11 @@ function WaveformVariant({
       roundedBars={roundedBars}
     >
       <PlaybackControls loading={loading} />
-      <MediaElementWaveform />
+      <MediaElementWaveformRoot>
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </MediaElementWaveformRoot>
     </MediaElementPlaylistProvider>
   );
 }

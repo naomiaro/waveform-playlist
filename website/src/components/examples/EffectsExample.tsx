@@ -8,7 +8,6 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -24,6 +23,13 @@ import {
   KeyboardShortcuts,
   usePlaylistTimeline,
   usePlaylistMixer,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import {
   ExportWavButton,
@@ -543,7 +549,14 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         </VisualizerWrapper>
       </TopBar>
 
-      <Waveform renderTrackControls={renderTrackControls} />
+      <WaveformRoot>
+        <WaveformTimescale />
+        <WaveformLoopRegion />
+        <WaveformTrackControls width={150} renderTrackControls={renderTrackControls} />
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </WaveformRoot>
 
       <TimeControlsBar>
         <ControlGroup>
@@ -749,10 +762,8 @@ export function EffectsExample() {
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         waveHeight={100}
         theme={theme}
-        controls={{ show: true, width: 150 }}
         automaticScroll={true}
         effects={masterEffects}
-        timescale={true}
         barWidth={2}
         barGap={0}
       >
