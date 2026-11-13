@@ -70,9 +70,6 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  // Not the resting cursor position and not the selection: the playhead, the
-  // progress overlay and the selection overlay follow those themselves, so a
-  // seek or a selection drag does not render the waveform (#688).
   // No annotation state here: it changes at every annotation boundary during
   // playback, and only MediaElementAnnotationBoxes needs it (#744).
   const { setScrollContainer, setSelection } = usePlaybackControls();
@@ -98,6 +95,10 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
 
   // The selection drag (shared with the multitrack view). A click while
   // stopped collapses the selection at its time, which moves the cursor.
+  // Through it this view follows `isPlaying`, and not the resting cursor or
+  // the selection: the playhead, the progress overlay and the selection
+  // overlay follow those themselves, so a seek or a selection drag does not
+  // render the waveform (#688).
   const {
     isSelecting,
     handleMouseDown,

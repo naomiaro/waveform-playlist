@@ -217,8 +217,9 @@ describe('while playing, with automatic scroll off, nothing is committed before 
   it('the release of a click moves playback to where the PRESS landed, once', async () => {
     mount({ isPlaying: true });
     await press(200);
-    // The pointer drifted two pixels (0.04 s): still a click, at the press.
-    await release(202);
+    // The pointer drifted two pixels to the left (0.04 s): still a click, and
+    // at the press (4 s), not at the start of that tiny range (3.96 s).
+    await release(198);
     expect(setSelection.mock.calls).toEqual([[4, 4]]);
     expect(onClickWhileStopped).not.toHaveBeenCalled();
   });
@@ -227,7 +228,7 @@ describe('while playing, with automatic scroll off, nothing is committed before 
     mount({ isPlaying: true });
     await press(200);
     await move(350);
-    await release(200);
+    await release(199);
     expect(setSelection.mock.calls).toEqual([[4, 4]]);
     expect(preview.getSnapshot()).toBeNull();
   });
@@ -260,6 +261,32 @@ describe('while playing, with automatic scroll off, nothing is committed before 
 
     await release(420);
     expect(setSelection).toHaveBeenLastCalledWith(4, 8.4);
+  });
+});
+
+describe('the automatic-scroll setting is followed after mount', () => {
+  it('switched on during playback: the next drag draws nothing and seeks to the press', async () => {
+    const { set } = mount({ isPlaying: true, isAutomaticScroll: false });
+    await act(async () => {
+      set({ isPlaying: true, isAutomaticScroll: true });
+    });
+    await press(200);
+    await move(350);
+    expect(preview.getSnapshot()).toBeNull();
+    await release(350);
+    expect(setSelection.mock.calls).toEqual([[4, 4]]);
+  });
+
+  it('switched off again: the next drag is a range', async () => {
+    const { set } = mount({ isPlaying: true, isAutomaticScroll: true });
+    await act(async () => {
+      set({ isPlaying: true, isAutomaticScroll: false });
+    });
+    await press(200);
+    await move(350);
+    expect(preview.getSnapshot()).toEqual({ start: 4, end: 7 });
+    await release(350);
+    expect(setSelection.mock.calls).toEqual([[4, 7]]);
   });
 });
 

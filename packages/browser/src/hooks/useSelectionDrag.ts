@@ -59,9 +59,9 @@ export interface SelectionDrag {
  *
  * The drag needs the setting only when an event arrives. Read with
  * `usePlaylistSettings()` in the view itself, a toggle of the setting would
- * render the whole view for a value it never draws (the #768 measurement: 58
- * components against 32 on the multi-clip page). This component is the one
- * that follows the setting; the view renders it and nothing else changes.
+ * render the view's root (in `MediaElementPlaylist`, the whole waveform) for
+ * a value it never draws. This component is the one that follows the
+ * setting; the view renders it and nothing else changes.
  * A layout effect: only a committed value, and in place before any event that
  * follows the commit. Memoized: its one prop is a ref that never changes, so a
  * render of the view does not render it.
@@ -96,8 +96,9 @@ export const AutomaticScrollFlag = memo(function AutomaticScrollFlag({
  *
  * - **Automatic scroll off:** the moves publish the range to `preview` (the
  *   highlight shows it, playback carries on). The release sets that range,
- *   which the provider plays from its start to its end; a range shorter than
- *   0.1 s is a click, and playback moves to where the press landed.
+ *   which the provider plays from its start to its end (open-ended under the
+ *   multitrack provider with looping on); a range shorter than 0.1 s is not
+ *   previewed and is a click: playback moves to where the press landed.
  * - **Automatic scroll on:** no range can be drawn. The view scrolls to keep
  *   the playhead in sight, so the audio moves under a still pointer and the
  *   time under it at the release is not the time at the press. A press and
@@ -107,7 +108,7 @@ export const AutomaticScrollFlag = memo(function AutomaticScrollFlag({
  * The drag is followed on the window (`useWindowDrag`): the pointer may leave
  * the element and the button may be released anywhere; positions outside it
  * clamp to its ends. When the drag ends with no release (the window lost
- * focus), a preview is dropped and playback is untouched; while stopped the
+ * focus, or the `mouseup` was lost), a preview is dropped and playback is untouched; while stopped the
  * selection stays as the last move left it.
  */
 export function useSelectionDrag({

@@ -397,7 +397,8 @@ interface PlaybackControlsContextValue {
   stop: () => void;
   /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
   seekTo: (time: number) => void;
-  /** Sets the selected range and moves the cursor to its start. */
+  /** Sets the selected range and moves the cursor to its start. During playback, playback
+   *  restarts: a range is played start to end, a collapsed one carries on from there. */
   setSelection: (start: number, end: number) => void;
   setTimeFormat: (format: TimeFormat) => void;
   setAutomaticScroll: (enabled: boolean) => void;

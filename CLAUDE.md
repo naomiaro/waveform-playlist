@@ -269,7 +269,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **A bug found on the way goes to the maintainer in the same message, before the fix it was found under is finished.** On #685 a test showed an inline `onTracksChange` re-running the provider's loading effect; I wrote it into a test comment and carried on, and a side agent reported it first. Say what was run, what was only read and what is unverified, then file it (#791).
 
-**A design row about an interaction is written from the handlers, not from the API.** For #782 the row "a drag during playback becomes selection playback" came from reading `setSelection`; the multitrack view's mouse handlers ignore moves while playing and treat the press as a seek, so the row was wrong and had to be corrected in chat after the design was approved. Read the view's pointer handlers for each row that starts with a press, a drag or a key.
+**A design row about an interaction is written from the handlers, not from the API.** For #782 the row "a drag during playback becomes selection playback" came from reading `setSelection`; the multitrack view's mouse handlers at the time ignored moves while playing and treated the press as a seek, so the row was wrong and had to be corrected in chat after the design was approved. Read the view's pointer handlers for each row that starts with a press, a drag or a key.
 
 **`revise-claude-md` runs before the merge is asked for**, so the learnings go in the PR that produced them (#782 was merged without it and needed a docs PR afterwards).
 

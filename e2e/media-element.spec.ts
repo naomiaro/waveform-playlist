@@ -335,7 +335,7 @@ test.describe('Media Element Example', () => {
 
     // Until 2026-11 the press moved playback at once and no range could be
     // drawn while playing. Nothing is committed before the release now.
-    test('during playback a drag draws a range without disturbing playback, and the release plays it to its end', async ({
+    test('during playback a drag draws a range without disturbing playback, and the release plays it until playback stops at its end', async ({
       page,
     }) => {
       const player = page.locator('[data-scroll-container]').first();
@@ -384,6 +384,10 @@ test.describe('Media Element Example', () => {
         expect(x).toBeLessThanOrEqual(421);
       }).toPass({ timeout: 3000 });
       await expect(selection).toHaveCount(1);
+      // It is playing, not resting at the range's start: the playhead moves on.
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(340);
+      }).toPass({ timeout: 3000 });
       // ...to its end, where playback stops.
       await expect(play).toBeEnabled({ timeout: 6000 });
       await expect(pause).toBeDisabled();

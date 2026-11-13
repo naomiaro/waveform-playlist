@@ -689,6 +689,10 @@ test.describe('Multi-Clip Example', () => {
         expect(time).toBeLessThan(8);
       }).toPass({ timeout: 3000 });
       await expect(selection).toHaveCount(1);
+      // It is playing, not resting at the range's start: the position moves on.
+      await expect(async () => {
+        expect(await now()).toBeGreaterThan(6.9);
+      }).toPass({ timeout: 3000 });
       // ...and playback stops at its end, the cursor back at its start.
       await expect(play).toBeEnabled({ timeout: 6000 });
       await expect(async () => {
@@ -696,9 +700,7 @@ test.describe('Multi-Clip Example', () => {
       }).toPass({ timeout: 3000 });
     });
 
-    test('automatic scroll off: a click moves playback there on the release, once', async ({
-      page,
-    }) => {
+    test('automatic scroll off: a click moves playback there on the release', async ({ page }) => {
       const { now, y, left } = await startPlayback(page, false);
 
       await page.mouse.move(left + 300, y);
@@ -712,7 +714,7 @@ test.describe('Multi-Clip Example', () => {
         expect(await now()).toBeGreaterThanOrEqual(6.3);
       }).toPass({ timeout: 3000 });
       await expect(page.locator('[data-selection]')).toHaveCount(0);
-      // It carries on from there, and is not sent back to the press again.
+      // It carries on from there.
       await page.waitForTimeout(800);
       expect(await now()).toBeGreaterThan(7);
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
@@ -739,6 +741,54 @@ test.describe('Multi-Clip Example', () => {
         expect(time).toBeLessThan(7.8);
       }).toPass({ timeout: 2000 });
       await expect(selection).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
+    });
+    // The reason for the rule: with automatic scroll on the view scrolls to
+    // follow the playhead, so the audio moves under a pointer that is held
+    // still. Zoomed in, this page scrolls within a few seconds.
+    test('automatic scroll on, while the view is scrolling: the release seeks to the audio that was pressed, not to what is under the pointer by then', async ({
+      page,
+    }) => {
+      await page.getByRole('button', { name: 'Zoom In' }).click();
+      await page.getByRole('button', { name: 'Zoom In' }).click();
+      const { y } = await startPlayback(page, true);
+      const container = page.locator('[data-scroll-container]').first();
+      const playhead = container.locator('[data-playhead]');
+      const scrollLeft = () => container.evaluate((el) => el.scrollLeft);
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+
+      // Wait until the view follows the playhead.
+      await expect(async () => {
+        expect(await scrollLeft()).toBeGreaterThan(20);
+      }).toPass({ timeout: 20000 });
+      let frame: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        frame = await container.boundingBox();
+        expect(frame).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+
+      // Press ahead of the playhead and hold still while the view scrolls on.
+      const pressX = frame!.x + frame!.width - 60;
+      await page.mouse.move(pressX, y);
+      const scrollAtPress = await scrollLeft();
+      await page.mouse.down();
+      const pressedContentX = scrollAtPress + (pressX - frame!.x);
+      await expect(async () => {
+        expect((await scrollLeft()) - scrollAtPress).toBeGreaterThan(80);
+      }).toPass({ timeout: 10000 });
+      const underPointerNow = (await scrollLeft()) + (pressX - frame!.x);
+      expect(underPointerNow - pressedContentX).toBeGreaterThan(80);
+      await page.mouse.up();
+
+      // Playback is at the audio that was pressed (and moving on from it),
+      // well short of what the pointer is over now.
+      await expect(async () => {
+        const x = await playheadX();
+        expect(x).toBeGreaterThanOrEqual(pressedContentX - 3);
+        expect(x).toBeLessThan(pressedContentX + 60);
+      }).toPass({ timeout: 1000 });
+      await expect(page.locator('[data-selection]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
     });
   });

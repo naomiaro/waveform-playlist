@@ -413,7 +413,7 @@ Switching it on while an annotation is playing lets playback continue past that 
 
 ### AutomaticScrollCheckbox
 
-Toggle for auto-scrolling during playback.
+Toggle for auto-scrolling during playback. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 ```tsx
 <AutomaticScrollCheckbox />

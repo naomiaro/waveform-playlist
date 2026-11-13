@@ -212,6 +212,8 @@ describe('a press on the tracks of the multitrack view', () => {
     expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
     expect(probe.currentTime).toBe(5);
     expect(play.mock.calls.length).toBe(playsBefore + 1);
+    // From the press, open-ended.
+    expect(play.mock.lastCall).toEqual([5, undefined]);
     expect(probe.isPlaying).toBe(true);
   });
 });
@@ -232,6 +234,8 @@ describe('a drag on the tracks of the multitrack view during playback', () => {
     expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 7 });
     expect(highlights()).toBe(1);
     expect(play.mock.calls.length).toBe(playsBefore + 1);
+    // The range, from its start to its end.
+    expect(play.mock.lastCall).toEqual([5, 7]);
     expect(probe.isPlaying).toBe(true);
   });
 
@@ -249,6 +253,7 @@ describe('a drag on the tracks of the multitrack view during playback', () => {
     expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
     expect(highlights()).toBe(0);
     expect(play.mock.calls.length).toBe(playsBefore + 1);
+    expect(play.mock.lastCall).toEqual([5, undefined]);
     expect(probe.isPlaying).toBe(true);
   });
 });
