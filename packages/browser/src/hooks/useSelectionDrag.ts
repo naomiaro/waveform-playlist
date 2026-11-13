@@ -1,4 +1,4 @@
-import { createContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createValueSource, type ValueSource } from '@waveform-playlist/core';
 import {
   useIsPlaying,
@@ -63,17 +63,20 @@ export interface SelectionDrag {
  * components against 32 on the multi-clip page). This component is the one
  * that follows the setting; the view renders it and nothing else changes.
  * A layout effect: only a committed value, and in place before any event that
- * follows the commit.
+ * follows the commit. Memoized: its one prop is a ref that never changes, so a
+ * render of the view does not render it.
  */
-export const AutomaticScrollFlag: React.FC<{ flagRef: React.RefObject<boolean> }> = ({
+export const AutomaticScrollFlag = memo(function AutomaticScrollFlag({
   flagRef,
-}) => {
+}: {
+  flagRef: React.RefObject<boolean>;
+}) {
   const { isAutomaticScroll } = usePlaylistSettings();
   useLayoutEffect(() => {
     flagRef.current = isAutomaticScroll;
   });
   return null;
-};
+});
 
 /**
  * The selection drag of a waveform view, the same under either provider.
