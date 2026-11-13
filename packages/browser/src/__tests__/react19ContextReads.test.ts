@@ -6,7 +6,9 @@
 // two lines that define the public aliases `AnnotationIntegrationProvider`
 // and `SpectrogramIntegrationProvider`.
 //
-// What it cannot see: a computed access (`React['useContext']`), and WHERE a
+// What it cannot see: a computed access (`React['useContext']`), a provider
+// reached as `X?.Provider`, `(X as T).Provider`, `const { Provider } = X` or
+// with a line break before `.Provider`, and WHERE a
 // `use()` call stands. `use()` may be called in a condition or a loop, so the
 // lint rule that kept `useContext` at the top level does not report a
 // conditional `use()`. A `no-restricted-syntax` rule in the root
@@ -35,13 +37,15 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-function matches(pattern: RegExp): string[] {
+function matchingLines(pattern: RegExp): { where: string; text: string }[] {
   return REACT_PACKAGES.flatMap((pkg) =>
     sourceFiles(join(packagesRoot, pkg, 'src')).flatMap((file) =>
       readFileSync(file, 'utf8')
         .split('\n')
-        .flatMap((line, index) =>
-          pattern.test(line) ? [`${relative(packagesRoot, file)}:${index + 1}`] : []
+        .flatMap((text, index) =>
+          pattern.test(text)
+            ? [{ where: `${relative(packagesRoot, file)}:${index + 1}`, text }]
+            : []
         )
     )
   );
@@ -55,13 +59,20 @@ describe('React 19 context reads (#771)', () => {
   });
 
   it('no source file mentions useContext', () => {
-    expect(matches(/(^|[^A-Za-z0-9_])useContext($|[^A-Za-z0-9_])/)).toEqual([]);
+    expect(
+      matchingLines(/(^|[^A-Za-z0-9_])useContext($|[^A-Za-z0-9_])/).map((hit) => hit.where)
+    ).toEqual([]);
   });
 
   it('no source file uses X.Provider or X.Consumer, the two public aliases apart', () => {
-    expect(matches(/[A-Za-z0-9_]\.(Provider|Consumer)($|[^A-Za-z0-9_])/)).toEqual([
-      'browser/src/AnnotationIntegrationContext.tsx:76',
-      'browser/src/SpectrogramIntegrationContext.tsx:47',
+    const ALIAS = /^export const (Annotation|Spectrogram)IntegrationProvider = \w+\.Provider;$/;
+    const hits = matchingLines(/[A-Za-z0-9_]\.(Provider|Consumer)($|[^A-Za-z0-9_])/);
+    expect(hits.filter((hit) => !ALIAS.test(hit.text)).map((hit) => hit.where)).toEqual([]);
+    expect(
+      hits.filter((hit) => ALIAS.test(hit.text)).map((hit) => hit.where.split(':')[0])
+    ).toEqual([
+      'browser/src/AnnotationIntegrationContext.tsx',
+      'browser/src/SpectrogramIntegrationContext.tsx',
     ]);
   });
 });

@@ -9,9 +9,18 @@ import globals from 'globals';
 // the React packages stays at the top level of its component or hook (#771): a
 // component that reads a context only sometimes subscribes only sometimes.
 // The first selector finds a `use()` somewhere inside a branch, a loop, a
-// `switch`, a `try`, or a statement that follows an early return; the second
-// finds one that IS the branch (`on ? use(X) : 0`, `on && use(X)`). A `use()` in
-// the test of an `if` or a ternary always runs and is allowed.
+// `switch`, a `try`, or a statement that follows, in the same block, a `return`
+// or an `if` that contains one; the second finds one that IS the branch
+// (`on ? use(X) : 0`, `on && use(X)`). A `use()` in the test of an `if` or a
+// ternary always runs and is allowed.
+//
+// Not reported (review these by hand): a `use()` in a callback (`rows.map(() =>
+// use(X))`, which `rules-of-hooks` does not report either), in `a ||= use(X)`,
+// as an argument of an optional call, as a default value, after a `throw` or a
+// return inside a preceding loop or `switch`, `React.use()`, and an alias.
+// Reported although it may be fine: any function named `use`; a component
+// defined inside a branch or a loop; a `use()` after an `if` whose only
+// `return` is inside a callback; `for (const x of use(X))`.
 const CONDITIONAL_USE_MESSAGE =
   'use() must be called at the top level of the component or hook, before any early return: ' +
   'a context read in a condition or a loop subscribes only sometimes (#771).';
@@ -28,8 +37,7 @@ const noConditionalUse = [
   },
   {
     selector:
-      ':matches(IfStatement > CallExpression:not(.test), ' +
-      'ConditionalExpression > CallExpression:not(.test), ' +
+      ':matches(ConditionalExpression > CallExpression:not(.test), ' +
       "LogicalExpression > CallExpression.right)[callee.name='use']",
     message: CONDITIONAL_USE_MESSAGE,
   },

@@ -3,9 +3,10 @@
 // `eslint.config.mjs` reports the forms below. This runs the real config over
 // each snippet as if it were a file of this package.
 //
-// What the rule cannot see: a `use()` reached through another name
-// (`const read = use`) or as `React.use()`, and a function named `use` that is
-// not React's (it is reported too).
+// What the rule cannot see is listed above it in `eslint.config.mjs`; the main
+// one is a `use()` inside a callback, which the first two NOT REPORTED cases
+// below record (no lint rule reports it). It also reports any function named
+// `use`, and a read inside a component that is itself defined in a branch.
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 import { join, dirname } from 'node:path';
@@ -20,6 +21,14 @@ async function conditionalUseReports(body: string): Promise<number> {
     filePath: join(repoRoot, 'packages', 'browser', 'src', 'lintSnippet.tsx'),
   });
   return result.messages.filter((message) => message.ruleId === 'no-restricted-syntax').length;
+}
+
+/** Every lint error for the snippet, whatever the rule. */
+async function anyReports(body: string): Promise<number> {
+  const [result] = await eslint.lintText(HEADER + body, {
+    filePath: join(repoRoot, 'packages', 'browser', 'src', 'lintSnippet.tsx'),
+  });
+  return result.messages.filter((message) => message.severity === 2).length;
 }
 
 const REPORTED: Record<string, string> = {
@@ -37,6 +46,24 @@ const REPORTED: Record<string, string> = {
     'export const A = ({ on }: { on: boolean }) => {\n  if (!on) return null;\n  const v = use(C);\n  return <i>{v}</i>;\n};',
   'in a loop':
     'export const A = ({ n }: { n: number }) => {\n  let v = 0;\n  for (let i = 0; i < n; i++) v += use(C);\n  return <i>{v}</i>;\n};',
+  'the right side of ||': 'export const A = ({ v }: { v: number }) => <i>{v || use(C)}</i>;',
+  'the right side of ??': 'export const A = ({ v }: { v?: number }) => <i>{v ?? use(C)}</i>;',
+  'an else if':
+    'export const A = ({ n }: { n: number }) => {\n  let v = 0;\n  if (n === 1) v = 1;\n  else if (n === 2) v = use(C);\n  return <i>{v}</i>;\n};',
+  'after an early return in braces':
+    'export const A = ({ on }: { on: boolean }) => {\n  if (!on) {\n    return null;\n  }\n  const v = use(C);\n  return <i>{v}</i>;\n};',
+  'after a return':
+    'export const useA = () => {\n  return 1;\n  // eslint-disable-next-line no-unreachable\n  use(C);\n};',
+  'a for-of loop':
+    'export const A = ({ rows }: { rows: number[] }) => {\n  let v = 0;\n  for (const row of rows) v += row + use(C);\n  return <i>{v}</i>;\n};',
+  'a for-in loop':
+    'export const A = ({ rows }: { rows: object }) => {\n  let v = 0;\n  for (const key in rows) v += key.length + use(C);\n  return <i>{v}</i>;\n};',
+  'a while loop':
+    'export const A = ({ n }: { n: number }) => {\n  let v = 0;\n  while (v < n) v += use(C) + 1;\n  return <i>{v}</i>;\n};',
+  'a do-while loop':
+    'export const A = ({ n }: { n: number }) => {\n  let v = 0;\n  do v += use(C) + 1;\n  while (v < n);\n  return <i>{v}</i>;\n};',
+  'a try block':
+    'export const A = () => {\n  let v = 0;\n  try {\n    v = use(C);\n  } catch {\n    v = 1;\n  }\n  return <i>{v}</i>;\n};',
   'in a switch':
     'export const A = ({ n }: { n: number }) => {\n  let v = 0;\n  switch (n) {\n    case 1:\n      v = use(C);\n  }\n  return <i>{v}</i>;\n};',
 };
@@ -51,10 +78,23 @@ const ALLOWED: Record<string, string> = {
   'a hook that returns the read': 'export const useA = () => use(C);',
 };
 
+// Conditional reads that no rule reports: recorded so that a change is noticed.
+const NOT_REPORTED: Record<string, string> = {
+  'a callback':
+    'export const A = ({ rows }: { rows: number[] }) => <i>{rows.map(() => use(C))}</i>;',
+  'a useMemo callback':
+    "import { useMemo } from 'react';\nexport const A = () => <i>{useMemo(() => use(C), [])}</i>;",
+};
+
 describe('lint: every use() at the top level (#771)', () => {
   for (const [name, body] of Object.entries(REPORTED)) {
     it(`reports use() in ${name}`, async () => {
       expect(await conditionalUseReports(body)).toBe(1);
+    });
+  }
+  for (const [name, body] of Object.entries(NOT_REPORTED)) {
+    it(`does not see use() in ${name}`, async () => {
+      expect(await anyReports(body)).toBe(0);
     });
   }
   for (const [name, body] of Object.entries(ALLOWED)) {
