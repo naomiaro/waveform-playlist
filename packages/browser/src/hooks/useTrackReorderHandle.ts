@@ -75,7 +75,10 @@ export function useTrackReorderHandle(): TrackReorderHandle {
   });
 
   // The sortable item is the slot's element, which the part owns: it is
-  // handed to dnd-kit here, after the commit that mounted it.
+  // handed to dnd-kit here, after the commit that mounted it. Not in a layout
+  // effect: a child's layout effects run before React attaches its parent's
+  // ref, so the slot's element would still be null on the first mount (tried:
+  // no drag started at all).
   useEffect(() => {
     if (!wiring) return undefined;
     ref(wiring.elementRef.current);

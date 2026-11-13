@@ -27,6 +27,7 @@ export { KeyboardShortcuts } from './KeyboardShortcuts';
 export type { KeyboardShortcutsProps } from './KeyboardShortcuts';
 // The control panel of a track: the default one and the pieces it is made of (#687).
 export { DefaultTrackControls } from './DefaultTrackControls';
+export type { DefaultTrackControlsProps } from './DefaultTrackControls';
 export {
   TrackName,
   TrackMuteButton,

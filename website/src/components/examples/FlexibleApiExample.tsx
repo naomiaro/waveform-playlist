@@ -42,6 +42,7 @@ import {
   usePlaylistSettings,
   usePlaylistTimeline,
   usePlaylistMixer,
+  useTrack,
   usePlaybackRefs,
   useLoop,
   useIsPlaying,
@@ -55,7 +56,7 @@ import {
   WaveformClipHeaders,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import { CLIP_HEADER_HEIGHT, PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
+import { PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Container = styled.div`
@@ -156,8 +157,9 @@ const TrackControlsContainer = styled.div`
   flex-direction: row;
   align-items: center;
   gap: 0.4rem;
-  width: 160px;
-  height: ${60 + CLIP_HEADER_HEIGHT}px;
+  /* The slot is as wide as the column and as tall as the row. */
+  width: 100%;
+  height: 100%;
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
@@ -213,14 +215,12 @@ const GrungyTimestamp = styled.div<{ $left: number }>`
 `;
 
 // Custom Track Controls Component - compact horizontal layout
-const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) => {
-  const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackSolo, setTrackVolume } = useEditorControls();
-  const trackState = trackStates[trackIndex];
+// Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
+const CustomTrackControls: React.FC = () => {
+  const { name: trackName, muted, soloed, volume, isLoading, setMuted, setSoloed, setVolume } =
+    useTrack();
 
-  if (!trackState) return null;
-
-  const trackName = trackState.name || `Track ${trackIndex + 1}`;
+  if (isLoading) return null;
 
   return (
     <TrackControlsContainer>
@@ -228,26 +228,26 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
       <TrackButtonsRow>
         <Button
           size="1"
-          variant={trackState.muted ? "solid" : "outline"}
-          color={trackState.muted ? "red" : "gray"}
-          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
+          variant={muted ? "solid" : "outline"}
+          color={muted ? "red" : "gray"}
+          onClick={() => setMuted(!muted)}
           style={{
             padding: '0 0.4rem',
             minWidth: 0,
-            ...(!trackState.muted && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
+            ...(!muted && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
           }}
         >
           M
         </Button>
         <Button
           size="1"
-          variant={trackState.soloed ? "solid" : "outline"}
-          color={trackState.soloed ? "amber" : "gray"}
-          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
+          variant={soloed ? "solid" : "outline"}
+          color={soloed ? "amber" : "gray"}
+          onClick={() => setSoloed(!soloed)}
           style={{
             padding: '0 0.4rem',
             minWidth: 0,
-            ...(!trackState.soloed && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
+            ...(!soloed && { color: 'rgba(255,255,255,0.9)', borderColor: 'rgba(255,255,255,0.4)' })
           }}
         >
           S
@@ -255,8 +255,8 @@ const CustomTrackControls: React.FC<{ trackIndex: number }> = ({ trackIndex }) =
       </TrackButtonsRow>
       <VolumeSliderContainer>
         <Slider
-          value={[trackState.volume * 100]}
-          onValueChange={([v]) => setTrackVolume(trackIndex, v / 100)}
+          value={[volume * 100]}
+          onValueChange={([v]) => setVolume(v / 100)}
           min={0}
           max={100}
           step={1}
@@ -446,12 +446,9 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
             }}
           />
           <WaveformLoopRegion />
-          <WaveformTrackControls
-            width={160}
-            renderTrackControls={(trackIndex) => (
-              <CustomTrackControls trackIndex={trackIndex} />
-            )}
-          />
+          <WaveformTrackControls width={160}>
+            <CustomTrackControls />
+          </WaveformTrackControls>
           <WaveformTracks>
             <WaveformClipHeaders />
           </WaveformTracks>
@@ -613,7 +610,8 @@ export function FlexibleApiExample() {
             <ul style={{ margin: 0, paddingLeft: '1.5rem' }}>
               <li><Text size="2" color="gray"><code>usePlaybackControls()</code> - Get <code>play</code>, <code>pause</code>, <code>stop</code> functions; <code>useEditorControls()</code> - Get the mixer, zoom and loop setters</Text></li>
               <li><Text size="2" color="gray"><code>useIsPlaying()</code> and <code>usePlaybackRefs()</code> - Get <code>isPlaying</code>, and <code>currentTimeRef</code> for the live position</Text></li>
-              <li><Text size="2" color="gray"><code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get <code>duration</code>, <code>tracks</code>, <code>trackStates</code>, <code>masterVolume</code></Text></li>
+              <li><Text size="2" color="gray"><code>usePlaylistTimeline()</code> and <code>usePlaylistMixer()</code> - Get <code>duration</code>, <code>tracks</code>, <code>masterVolume</code></Text></li>
+              <li><Text size="2" color="gray"><code>useTrack()</code> - Inside the track controls: the track's name, <code>muted</code>, <code>soloed</code>, <code>volume</code> and their setters</Text></li>
               <li><Text size="2" color="gray"><code>usePlaylistSettings()</code>, <code>usePlaylistView()</code> and <code>useLoop()</code> - Get <code>timeFormat</code>, <code>isAutomaticScroll</code>, <code>sampleRate</code>, and the loop region</Text></li>
               <li><Text size="2" color="gray"><code>useSelection()</code> - Get <code>selectionStart</code> and <code>selectionEnd</code></Text></li>
               <li><Text size="2" color="gray"><code>useTimeFormat()</code> - Get <code>formatTime</code> and <code>parseTime</code> for time display/input</Text></li>

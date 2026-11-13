@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import styled from 'styled-components';
 import { ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
 import {
@@ -30,12 +30,23 @@ const MENU_ANCHOR_STYLE = { position: 'absolute', right: 0, top: 0 } as const;
  * `<SpectrogramProvider>`, for an audio track), mute, solo, volume and pan.
  * It is what `<WaveformTrackControls />` renders when it has no children
  * (#687). It has no remove button and no reorder grip: render
- * `<TrackRemoveButton />` or `<TrackReorderGrip />` beside it for those, or
- * your own control, or compose a panel from the pieces.
+ * `<TrackRemoveButton />` or `<TrackReorderGrip />` beside it for those (both
+ * place themselves at an edge of the slot), or compose a panel from the
+ * pieces.
  *
- * It takes no props and reads no context itself: the pieces read the track.
+ * Its children are drawn inside the panel, below the pan slider: the place
+ * for one more control of your own. An element rendered BESIDE the panel is
+ * outside it, and the panel fills the slot, so that element is only visible
+ * when it positions itself, as the remove button and the grip do.
+ *
+ * It reads no context itself: the pieces read the track.
  */
-function DefaultTrackControlsImpl() {
+export interface DefaultTrackControlsProps {
+  /** Drawn inside the panel, below the pan slider. */
+  children?: ReactNode;
+}
+
+function DefaultTrackControlsImpl({ children }: DefaultTrackControlsProps) {
   return (
     <Frame>
       <Header style={HEADER_STYLE}>
@@ -50,6 +61,7 @@ function DefaultTrackControlsImpl() {
       </ButtonGroup>
       <TrackVolumeSlider />
       <TrackPanSlider />
+      {children}
     </Frame>
   );
 }

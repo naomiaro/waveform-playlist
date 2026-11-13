@@ -268,6 +268,28 @@ describe('<WaveformTrackControls> without children', () => {
   });
 });
 
+describe('<DefaultTrackControls> with children', () => {
+  it('draws them inside the panel, after the pan slider, for every track', async () => {
+    mount({
+      tracks: [A, B],
+      controls: (
+        <WaveformTrackControls>
+          <DefaultTrackControls>
+            <Spy />
+          </DefaultTrackControls>
+        </WaveformTrackControls>
+      ),
+    });
+    await ready();
+    const spy = screen.getByTestId('spy-b');
+    const pan = within(slotOf('b')).getByRole('slider', { name: 'Pan' });
+    // Same frame as the pan slider's wrapper, and after it.
+    expect(spy.parentElement).toBe(pan.closest('label')!.parentElement);
+    expect(pan.compareDocumentPosition(spy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(spy.textContent).toBe('Name b');
+  });
+});
+
 describe('the template and useTrack()', () => {
   it('renders the children once per track, each inside its own track', async () => {
     mount({

@@ -39,6 +39,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
   WaveformTracks,
   WaveformClipHeaders,
   WaveformRecordingPreview,
@@ -546,8 +548,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   );
 
   const handleRemoveTrack = useCallback(
-    async (trackIndex: number) => {
-      const trackToRemove = tracks[trackIndex];
+    async (trackId: string) => {
+      const trackToRemove = tracks.find((track) => track.id === trackId);
       if (!trackToRemove) return;
 
       // Stop recording if we're removing the track being recorded to
@@ -563,7 +565,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         setSelectedTrackId(null);
       }
 
-      const remaining = tracks.filter((_, i) => i !== trackIndex);
+      const remaining = tracks.filter((track) => track.id !== trackId);
       setTracks(remaining);
 
       // When the timeline is emptied, send the playhead home. Otherwise the
@@ -709,7 +711,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <WaveformRoot>
           <WaveformTimescale />
           <WaveformLoopRegion />
-          <WaveformTrackControls width={TRACK_CONTROLS_WIDTH} onRemoveTrack={handleRemoveTrack} />
+          <WaveformTrackControls width={TRACK_CONTROLS_WIDTH}>
+            <DefaultTrackControls />
+            <TrackRemoveButton onRemove={handleRemoveTrack} />
+          </WaveformTrackControls>
           <WaveformTracks>
             <WaveformClipHeaders />
             {isRecording && recordingTrackId ? (

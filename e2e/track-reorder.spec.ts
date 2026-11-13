@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Track name lives in a sibling `span` (ellipsis-truncated inline style) inside
- * the same Controls panel as the move buttons: button -> ReorderRail -> Controls.
+ * The name of the track whose control panel a button is in: the slot the
+ * controls part draws per track is `[data-track-controls]`, and the name piece
+ * is `[data-track-name]` (#687).
  */
 function trackNameFromButton(btn: Element): string | null {
-  const panel = btn.closest('div')?.parentElement;
-  return panel?.querySelector<HTMLElement>('span[style*="ellipsis"]')?.textContent ?? null;
+  const slot = btn.closest('[data-track-controls]');
+  return slot?.querySelector<HTMLElement>('[data-track-name]')?.textContent ?? null;
 }
 
 test.describe('Track Reordering', () => {
@@ -60,7 +61,7 @@ test.describe('Track Reordering', () => {
           .map((c) => ({ id: c.getAttribute('data-track-id'), top: c.getBoundingClientRect().top }))
           .sort((a, b) => a.top - b.top)
           .map((r) => r.id),
-        names: [...document.querySelectorAll('span[style*="ellipsis"]')].map((s) => s.textContent),
+        names: [...document.querySelectorAll('[data-track-name]')].map((s) => s.textContent),
       }));
 
     const before = await readState();
@@ -165,7 +166,7 @@ test.describe('Track Reordering', () => {
           .map((c) => ({ id: c.getAttribute('data-track-id'), top: c.getBoundingClientRect().top }))
           .sort((a, b) => a.top - b.top)
           .map((r) => r.id),
-        names: [...document.querySelectorAll('span[style*="ellipsis"]')].map((s) => s.textContent),
+        names: [...document.querySelectorAll('[data-track-name]')].map((s) => s.textContent),
       }));
     const before = await readState();
 

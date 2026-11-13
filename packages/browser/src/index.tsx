@@ -136,7 +136,11 @@ export {
   TrackRemoveButton,
   useTrack,
 } from './components';
-export type { TrackContextValue, TrackRemoveButtonProps } from './components';
+export type {
+  DefaultTrackControlsProps,
+  TrackContextValue,
+  TrackRemoveButtonProps,
+} from './components';
 export { useTrackReorderHandle } from './hooks/useTrackReorderHandle';
 export type { TrackReorderHandle } from './hooks/useTrackReorderHandle';
 export type { KeyboardShortcutsProps } from './components/KeyboardShortcuts';

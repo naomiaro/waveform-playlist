@@ -17,6 +17,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
@@ -108,8 +110,8 @@ export function MirSpectrogramExample() {
     }
   }, [loading, baseTracks]);
 
-  const handleRemoveTrack = useCallback((index: number) => {
-    setTracks(prev => prev.filter((_, i) => i !== index));
+  const handleRemoveTrack = useCallback((trackId: string) => {
+    setTracks(prev => prev.filter((track) => track.id !== trackId));
   }, []);
 
   const handleClearAll = useCallback(() => {
@@ -170,7 +172,10 @@ export function MirSpectrogramExample() {
           <WaveformRoot>
             <WaveformTimescale />
             <WaveformLoopRegion />
-            <WaveformTrackControls width={180} onRemoveTrack={handleRemoveTrack} />
+            <WaveformTrackControls width={180}>
+              <DefaultTrackControls />
+              <TrackRemoveButton onRemove={handleRemoveTrack} />
+            </WaveformTrackControls>
             <WaveformTracks>
               <WaveformClipHeaders />
             </WaveformTracks>

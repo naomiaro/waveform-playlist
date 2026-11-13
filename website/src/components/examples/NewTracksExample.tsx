@@ -22,6 +22,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
@@ -82,13 +84,6 @@ export function NewTracksExample() {
     },
     [addTracks]
   );
-
-  const handleRemoveTrack = (index: number) => {
-    const track = tracks[index];
-    if (track) {
-      removeTrack(track.id);
-    }
-  };
 
   return (
     <Container>
@@ -165,7 +160,10 @@ export function NewTracksExample() {
           <WaveformRoot>
             <WaveformTimescale />
             <WaveformLoopRegion />
-            <WaveformTrackControls onRemoveTrack={handleRemoveTrack} />
+            <WaveformTrackControls>
+              <DefaultTrackControls />
+              <TrackRemoveButton onRemove={removeTrack} />
+            </WaveformTrackControls>
             <WaveformTracks />
             <WaveformSelection />
             <WaveformPlayhead />
