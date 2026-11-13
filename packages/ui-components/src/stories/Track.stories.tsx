@@ -26,21 +26,12 @@ const sampleData = generateSamplePeaks(500, 8);
 const playlistInfo = {
   sampleRate: 48000,
   samplesPerPixel: 1000,
-  zoomLevels: [1000, 1500, 2000, 2500],
   waveHeight: 80,
   timeScaleHeight: 15,
-  controls: {
-    show: true,
-    width: 150,
-  },
-};
-
-const playlistInfoNoControls = {
-  ...playlistInfo,
-  controls: {
-    show: false,
-    width: 150,
-  },
+  barWidth: 1,
+  barGap: 0,
+  roundedBars: false,
+  progressBarWidth: 1,
 };
 
 // Wrapper component that uses theme from context for Channel colors
@@ -157,24 +148,6 @@ export const StereoTrack: Story = {
           <ThemedChannel index={1} data={sampleData} bits={8} length={500} waveHeight={80} />
         </div>
       </div>
-    </Track>
-  ),
-};
-
-export const NoControls: Story = {
-  args: {
-    numChannels: 1,
-  },
-  decorators: [
-    (Story) => (
-      <PlaylistInfoContext.Provider value={playlistInfoNoControls}>
-        <Story />
-      </PlaylistInfoContext.Provider>
-    ),
-  ],
-  render: (args) => (
-    <Track {...args}>
-      <ThemedChannel index={0} data={sampleData} bits={8} length={500} waveHeight={80} />
     </Track>
   ),
 };

@@ -55,7 +55,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   workerPoolSize,
   children,
 }) => {
-  const { waveHeight, mono } = usePlaylistView();
+  const { mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, isReady } = usePlaylistTimeline();
   const { scrollContainerRef } = usePlaybackControls();
@@ -69,6 +69,11 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const spectrogramCanvasRegistryRef = useRef<
     Map<string, Map<number, { canvasIds: string[]; canvasWidths: number[] }>>
   >(new Map());
+  // The height each canvas registered with, by canvas id. The row height is an
+  // option of the view (#689), so this provider, which sits above the views,
+  // learns it from the canvases: a view draws at its own height, and in
+  // "both" mode a canvas is half a row tall.
+  const canvasHeightsRef = useRef<Map<string, number>>(new Map());
   const [spectrogramCanvasVersion, setSpectrogramCanvasVersion] = useState(0);
 
   // Spectrogram refs
@@ -331,6 +336,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
       const canvasIds = indices.map((i) => channelInfo.canvasIds[i]);
       const canvasWidths = indices.map((i) => channelInfo.canvasWidths[i]);
+      // The chunks of one channel are all as tall as the first.
+      const canvasHeight = canvasHeightsRef.current.get(canvasIds[0]);
+      if (canvasHeight === undefined) return;
 
       // Compute correct global pixel offsets by extracting chunk numbers from
       // canvas IDs. With virtual scrolling, the registry may contain non-consecutive
@@ -349,7 +357,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           canvasIds,
           canvasWidths,
           globalPixelOffsets,
-          canvasHeight: waveHeight,
+          canvasHeight,
           devicePixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio : 1,
           samplesPerPixel,
           colorLUT,
@@ -708,7 +716,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     spectrogramConfig,
     spectrogramColorMap,
     trackSpectrogramOverrides,
-    waveHeight,
     samplesPerPixel,
     spectrogramCanvasVersion,
     scrollContainerRef,
@@ -776,6 +783,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         return;
       }
 
+      canvasHeightsRef.current.set(reg.canvasId, reg.heightPx);
       const registry = spectrogramCanvasRegistryRef.current;
       if (!registry.has(reg.clipId)) {
         registry.set(reg.clipId, new Map());
@@ -796,6 +804,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   );
 
   const unregisterSpectrogramCanvas = useCallback((canvasId: string) => {
+    canvasHeightsRef.current.delete(canvasId);
     const pool = spectrogramWorkerRef.current;
     if (pool) {
       try {

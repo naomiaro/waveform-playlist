@@ -44,6 +44,7 @@ import { useAudioTracks, useDynamicEffects, useExportWav } from '@waveform-playl
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -60,21 +61,21 @@ function MyPlaylist() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={128}
-    >
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
         <StopButton />
       </div>
-      <Waveform />
+      <WaveformViewOptions waveHeight={128}>
+        <Waveform />
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }
 ```
+
+`<WaveformViewOptions>` sets the options that only affect how a view draws (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `fillViewport`) for every view below it. They are not provider props. It works under either provider and may sit above the provider, also above several.
 
 Prefer a lightweight single-track player instead? Use `MediaElementPlaylistProvider` with `@waveform-playlist/media-element-playout` — no Tone.js, no AudioBuffer decoding, and pitch-preserving playback rate out of the box.
 
@@ -94,7 +95,7 @@ Under either provider:
 | `useAnnotationOptions` | `editable`, `linkEndpoints`, `continuousPlay`: the three annotation options. They start from the provider's `annotationList` prop and follow it | one of the three being toggled |
 | `usePlaybackControls` | Actions — `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
 | `usePlaybackRefs` | `currentTimeRef` (the live position), `visualTimeRef` (the position to draw), `registerFrameCallback()` / `unregisterFrameCallback()` for 60fps-driven UI (playhead, progress bars) | never |
-| `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
+| `usePlaylistView` | What the provider was configured with that a view also reads: `sampleRate`, `mono`, `indefinitePlayback`. The view options are not here: inside a view, `usePlaylistInfo()` from `@waveform-playlist/ui-components` has the resolved `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` | a provider prop change |
 | `usePlaylistSettings` | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | `usePlaylistZoom` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
 

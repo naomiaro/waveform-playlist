@@ -16,6 +16,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
@@ -304,91 +305,85 @@ export function MediaElementExample() {
   }
 
   return (
-    <Container>
-      {trackConfigs[0] && (
-        <Section>
-          <SectionLabel>Default Playhead</SectionLabel>
-          <MediaElementPlaylistProvider
-            track={trackConfigs[0]}
-            samplesPerPixel={512}
-            waveHeight={120}
-            theme={theme}
-            preservesPitch={preservesPitch}
-            barWidth={2}
-            barGap={0}
-          >
-            <StartAtQueryTime />
-            <PlaybackControls />
-            <Controls style={{ marginTop: '-0.5rem' }}>
-              <ControlGroup>
-                <Label>Preserve Pitch:</Label>
-                <SpeedButton
-                  $active={preservesPitch}
-                  onClick={() => setPreservesPitch(true)}
-                >
-                  On
-                </SpeedButton>
-                <SpeedButton
-                  $active={!preservesPitch}
-                  onClick={() => setPreservesPitch(false)}
-                >
-                  Off
-                </SpeedButton>
-              </ControlGroup>
-            </Controls>
-            <MediaElementWaveformRoot>
-              <WaveformTracks />
-              <WaveformSelection />
-              <WaveformPlayhead />
-            </MediaElementWaveformRoot>
-          </MediaElementPlaylistProvider>
-        </Section>
-      )}
+    // The three players are drawn alike: one set of view options above their providers.
+    <WaveformViewOptions waveHeight={120} barWidth={2} barGap={0}>
+      <Container>
+        {trackConfigs[0] && (
+          <Section>
+            <SectionLabel>Default Playhead</SectionLabel>
+            <MediaElementPlaylistProvider
+              track={trackConfigs[0]}
+              samplesPerPixel={512}
+              theme={theme}
+              preservesPitch={preservesPitch}
+            >
+              <StartAtQueryTime />
+              <PlaybackControls />
+              <Controls style={{ marginTop: '-0.5rem' }}>
+                <ControlGroup>
+                  <Label>Preserve Pitch:</Label>
+                  <SpeedButton
+                    $active={preservesPitch}
+                    onClick={() => setPreservesPitch(true)}
+                  >
+                    On
+                  </SpeedButton>
+                  <SpeedButton
+                    $active={!preservesPitch}
+                    onClick={() => setPreservesPitch(false)}
+                  >
+                    Off
+                  </SpeedButton>
+                </ControlGroup>
+              </Controls>
+              <MediaElementWaveformRoot>
+                <WaveformTracks />
+                <WaveformSelection />
+                <WaveformPlayhead />
+              </MediaElementWaveformRoot>
+            </MediaElementPlaylistProvider>
+          </Section>
+        )}
 
-      {trackConfigs[1] && (
-        <Section>
-          <SectionLabel>Custom Playhead (PlayheadWithMarker) + Timescale</SectionLabel>
-          <MediaElementPlaylistProvider
-            track={trackConfigs[1]}
-            samplesPerPixel={512}
-            waveHeight={120}
-            theme={{ ...theme, playheadColor: '#00bcd4' }}
-            barWidth={2}
-            barGap={0}
-          >
-            <PlaybackControls />
-            <MediaElementWaveformRoot>
-              <WaveformTimescale />
-              <WaveformTracks />
-              <WaveformSelection />
-              <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
-            </MediaElementWaveformRoot>
-          </MediaElementPlaylistProvider>
-        </Section>
-      )}
+        {trackConfigs[1] && (
+          <Section>
+            <SectionLabel>Custom Playhead (PlayheadWithMarker) + Timescale</SectionLabel>
+            <MediaElementPlaylistProvider
+              track={trackConfigs[1]}
+              samplesPerPixel={512}
+              theme={{ ...theme, playheadColor: '#00bcd4' }}
+            >
+              <PlaybackControls />
+              <MediaElementWaveformRoot>
+                <WaveformTimescale />
+                <WaveformTracks />
+                <WaveformSelection />
+                <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+              </MediaElementWaveformRoot>
+            </MediaElementPlaylistProvider>
+          </Section>
+        )}
 
-      {trackConfigs[0] && (
-        <Section>
-          <SectionLabel>Tone.js Effect (BitCrusher via native→Tone bridge)</SectionLabel>
-          <MediaElementPlaylistProvider
-            track={trackConfigs[0]}
-            audioContext={getGlobalAudioContext()}
-            samplesPerPixel={512}
-            waveHeight={120}
-            theme={theme}
-            barWidth={2}
-            barGap={0}
-          >
-            <EffectWiring />
-            <PlaybackControls />
-            <MediaElementWaveformRoot>
-              <WaveformTracks />
-              <WaveformSelection />
-              <WaveformPlayhead />
-            </MediaElementWaveformRoot>
-          </MediaElementPlaylistProvider>
-        </Section>
-      )}
-    </Container>
+        {trackConfigs[0] && (
+          <Section>
+            <SectionLabel>Tone.js Effect (BitCrusher via native→Tone bridge)</SectionLabel>
+            <MediaElementPlaylistProvider
+              track={trackConfigs[0]}
+              audioContext={getGlobalAudioContext()}
+              samplesPerPixel={512}
+              theme={theme}
+            >
+              <EffectWiring />
+              <PlaybackControls />
+              <MediaElementWaveformRoot>
+                <WaveformTracks />
+                <WaveformSelection />
+                <WaveformPlayhead />
+              </MediaElementWaveformRoot>
+            </MediaElementPlaylistProvider>
+          </Section>
+        )}
+      </Container>
+    </WaveformViewOptions>
   );
 }

@@ -21,6 +21,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type WaveformData from 'waveform-data';
@@ -158,18 +159,16 @@ function WaveformVariant({
     <MediaElementPlaylistProvider
       track={trackConfig}
       samplesPerPixel={4096}
-      waveHeight={80}
       theme={theme}
-      barWidth={barWidth}
-      barGap={barGap}
-      roundedBars={roundedBars}
     >
       <PlaybackControls loading={loading} />
-      <MediaElementWaveformRoot>
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </MediaElementWaveformRoot>
+      <WaveformViewOptions barWidth={barWidth} barGap={barGap} roundedBars={roundedBars}>
+        <MediaElementWaveformRoot>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </MediaElementWaveformRoot>
+      </WaveformViewOptions>
     </MediaElementPlaylistProvider>
   );
 }
@@ -202,99 +201,103 @@ export function StylingExample() {
   }
 
   return (
-    <Grid>
-      <Section>
-        <SectionTitle>Default (Continuous)</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 1, barGap: 0</Code> — <Code>waveOutlineColor: '#E0EFF1'</Code>, <Code>waveFillColor: '#4a9eff'</Code>, <Code>waveProgressColor: 'orange'</Code>
-        </SectionDesc>
-        <WaveformVariant barWidth={1} barGap={0} theme={defaultTheme} waveformData={waveformData} />
-      </Section>
+    // One row height for all ten players, set once above their providers;
+    // each player sets its own bars.
+    <WaveformViewOptions waveHeight={80}>
+      <Grid>
+        <Section>
+          <SectionTitle>Default (Continuous)</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 1, barGap: 0</Code> — <Code>waveOutlineColor: '#E0EFF1'</Code>, <Code>waveFillColor: '#4a9eff'</Code>, <Code>waveProgressColor: 'orange'</Code>
+          </SectionDesc>
+          <WaveformVariant barWidth={1} barGap={0} theme={defaultTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Thin Bars</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 1, barGap: 1</Code> — same theme, thin bars with small gaps
-        </SectionDesc>
-        <WaveformVariant barWidth={1} barGap={1} theme={defaultTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Thin Bars</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 1, barGap: 1</Code> — same theme, thin bars with small gaps
+          </SectionDesc>
+          <WaveformVariant barWidth={1} barGap={1} theme={defaultTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Medium Bars</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 2, barGap: 1</Code> — same theme, wider bars for a balanced look
-        </SectionDesc>
-        <WaveformVariant barWidth={2} barGap={1} theme={defaultTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Medium Bars</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 2, barGap: 1</Code> — same theme, wider bars for a balanced look
+          </SectionDesc>
+          <WaveformVariant barWidth={2} barGap={1} theme={defaultTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Wide Bars (SoundCloud Style)</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 3, barGap: 1</Code> — same theme, wide bars like SoundCloud
-        </SectionDesc>
-        <WaveformVariant barWidth={3} barGap={1} theme={defaultTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Wide Bars (SoundCloud Style)</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 3, barGap: 1</Code> — same theme, wide bars like SoundCloud
+          </SectionDesc>
+          <WaveformVariant barWidth={3} barGap={1} theme={defaultTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Extra Wide Bars</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 4, barGap: 2</Code> — <Code>waveProgressColor: 'transparent'</Code> hides the progress overlay
-        </SectionDesc>
-        <WaveformVariant barWidth={4} barGap={2} theme={boldTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Extra Wide Bars</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 4, barGap: 2</Code> — <Code>waveProgressColor: 'transparent'</Code> hides the progress overlay
+          </SectionDesc>
+          <WaveformVariant barWidth={4} barGap={2} theme={boldTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Rounded Bars</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 4, barGap: 2, roundedBars</Code> — pill-shaped bar caps, radius derived
-          from <Code>barWidth / 2</Code>
-        </SectionDesc>
-        <WaveformVariant
-          barWidth={4}
-          barGap={2}
-          roundedBars
-          theme={defaultTheme}
-          waveformData={waveformData}
-        />
-      </Section>
+        <Section>
+          <SectionTitle>Rounded Bars</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 4, barGap: 2, roundedBars</Code> — pill-shaped bar caps, radius derived
+            from <Code>barWidth / 2</Code>
+          </SectionDesc>
+          <WaveformVariant
+            barWidth={4}
+            barGap={2}
+            roundedBars
+            theme={defaultTheme}
+            waveformData={waveformData}
+          />
+        </Section>
 
-      <Section>
-        <SectionTitle>Rounded Thin Bars</SectionTitle>
-        <SectionDesc>
-          <Code>barWidth: 2, barGap: 2, roundedBars</Code> — subtle rounding on narrow bars
-        </SectionDesc>
-        <WaveformVariant
-          barWidth={2}
-          barGap={2}
-          roundedBars
-          theme={neonTheme}
-          waveformData={waveformData}
-        />
-      </Section>
+        <Section>
+          <SectionTitle>Rounded Thin Bars</SectionTitle>
+          <SectionDesc>
+            <Code>barWidth: 2, barGap: 2, roundedBars</Code> — subtle rounding on narrow bars
+          </SectionDesc>
+          <WaveformVariant
+            barWidth={2}
+            barGap={2}
+            roundedBars
+            theme={neonTheme}
+            waveformData={waveformData}
+          />
+        </Section>
 
-      <Section>
-        <SectionTitle>Neon Theme</SectionTitle>
-        <SectionDesc>
-          <Code>waveOutlineColor: '#00ff88'</Code>, <Code>waveProgressColor: '#ff00ff'</Code> on a dark background
-        </SectionDesc>
-        <WaveformVariant barWidth={2} barGap={1} theme={neonTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Neon Theme</SectionTitle>
+          <SectionDesc>
+            <Code>waveOutlineColor: '#00ff88'</Code>, <Code>waveProgressColor: '#ff00ff'</Code> on a dark background
+          </SectionDesc>
+          <WaveformVariant barWidth={2} barGap={1} theme={neonTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Retro Theme</SectionTitle>
-        <SectionDesc>
-          <Code>waveOutlineColor: '#ff6b35'</Code>, <Code>waveProgressColor: '#ffcc00'</Code>, <Code>playheadColor: 'transparent'</Code>
-        </SectionDesc>
-        <WaveformVariant barWidth={2} barGap={0} theme={retroTheme} waveformData={waveformData} />
-      </Section>
+        <Section>
+          <SectionTitle>Retro Theme</SectionTitle>
+          <SectionDesc>
+            <Code>waveOutlineColor: '#ff6b35'</Code>, <Code>waveProgressColor: '#ffcc00'</Code>, <Code>playheadColor: 'transparent'</Code>
+          </SectionDesc>
+          <WaveformVariant barWidth={2} barGap={0} theme={retroTheme} waveformData={waveformData} />
+        </Section>
 
-      <Section>
-        <SectionTitle>Minimal Theme</SectionTitle>
-        <SectionDesc>
-          <Code>waveOutlineColor: '#333'</Code>, <Code>waveFillColor: '#f0f0f0'</Code> — grayscale, no progress contrast
-        </SectionDesc>
-        <WaveformVariant barWidth={1} barGap={2} theme={minimalTheme} waveformData={waveformData} />
-      </Section>
-    </Grid>
+        <Section>
+          <SectionTitle>Minimal Theme</SectionTitle>
+          <SectionDesc>
+            <Code>waveOutlineColor: '#333'</Code>, <Code>waveFillColor: '#f0f0f0'</Code> — grayscale, no progress contrast
+          </SectionDesc>
+          <WaveformVariant barWidth={1} barGap={2} theme={minimalTheme} waveformData={waveformData} />
+        </Section>
+      </Grid>
+    </WaveformViewOptions>
   );
 }

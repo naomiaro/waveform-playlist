@@ -17,6 +17,7 @@ const themeColors = vi.hoisted(() => ({
   waveformDrawMode: undefined as 'inverted' | 'normal' | undefined,
   waveOutlineColor: 'rgb(70, 80, 90)',
   selectedWaveOutlineColor: undefined as string | undefined,
+  spectrogramBackgroundColor: undefined as string | undefined,
 }));
 // What usePlaybackRefs() gives: the position to draw and the frame-callback
 // registry the provider's one animation loop drives (#769, #688).
@@ -79,6 +80,7 @@ beforeEach(() => {
   themeColors.selectedWaveFillColor = undefined;
   themeColors.selectedWaveOutlineColor = undefined;
   themeColors.waveformDrawMode = undefined;
+  themeColors.spectrogramBackgroundColor = undefined;
   internals.visualTimeRef.current = 0;
   internals.callbacks.clear();
   requestedFrames = 0;
@@ -201,5 +203,23 @@ describe('ChannelWithProgress overlay', () => {
     expect(background().style.background).toBe('rgb(100, 110, 120)');
     rerender(<ChannelWithProgress {...props} />);
     expect(background().style.background).toBe('rgb(70, 80, 90)');
+  });
+
+  it('the background behind a spectrogram is the theme key, black without it (#689)', () => {
+    const background = (container: HTMLElement, at = 0) =>
+      (container.firstElementChild as HTMLElement).children[at] as HTMLElement;
+    const first = render(<ChannelWithProgress {...props} renderMode="spectrogram" />);
+    expect(background(first.container).style.background).toBe('rgb(0, 0, 0)');
+    first.unmount();
+
+    themeColors.spectrogramBackgroundColor = 'rgb(5, 6, 7)';
+    const second = render(<ChannelWithProgress {...props} renderMode="spectrogram" />);
+    expect(background(second.container).style.background).toBe('rgb(5, 6, 7)');
+    second.unmount();
+
+    // "both": the upper half is the spectrogram's, the lower the waveform's.
+    const third = render(<ChannelWithProgress {...props} renderMode="both" />);
+    expect(background(third.container, 0).style.background).toBe('rgb(5, 6, 7)');
+    expect(background(third.container, 1).style.background).toBe('rgb(10, 20, 30)');
   });
 });

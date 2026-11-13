@@ -112,7 +112,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useAnnotationOptions()`](#useannotationoptions) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three options being toggled |
 | [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
 | [`usePlaybackRefs()`](#useplaybackrefs) | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | never |
-| [`usePlaylistView()`](#useplaylistview) | sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
+| [`usePlaylistView()`](#useplaylistview) | `sampleRate`, `mono`, `indefinitePlayback` | a provider prop change |
 | [`usePlaylistSettings()`](#useplaylistsettings) | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
 | [`usePlaylistZoom()`](#useplaylistzoom) | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
 
@@ -145,30 +145,39 @@ Upgrading? The [upgrade guide](../upgrading.md#one-set-of-hooks-and-controls-for
 
 ### usePlaylistView
 
-What the provider was configured with. The value changes on a provider prop change (and once when the real sample rate is known), not on a settings click, and never during an interaction.
+What the provider was configured with that a view also reads. The value changes on a provider prop change (and once when the real sample rate is known), not on a settings click, and never during an interaction.
 
 ```typescript
 function usePlaylistView(): PlaylistViewContextValue;
 
 interface PlaylistViewContextValue {
   sampleRate: number;
-  waveHeight: number;
-  barWidth: number;
-  barGap: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
-  roundedBars: boolean;
-  /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
-  progressBarWidth: number;
-  /** Whether tracks are rendered in mono mode. Always false under the MediaElement provider. */
+  /**
+   * Whether tracks are drawn and analysed as one channel. On the provider
+   * because the provider computes the peaks with it. Always false under the
+   * MediaElement provider.
+   */
   mono: boolean;
-  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport).
-   *  Always false under the MediaElement provider. */
+  /**
+   * Whether playback continues past the end of the audio instead of stopping
+   * there. On the provider because its animation loop and `seekTo` follow it;
+   * the multitrack root also draws the timeline as wide as its container
+   * then. Always false under the MediaElement provider.
+   */
   indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container (layout only).
-   *  Always false under the MediaElement provider. */
-  fillViewport: boolean;
 }
 ```
+
+The options that only affect how a view draws (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `fillViewport`) are not in this value: a leftover read of one is `undefined`. They are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions). A component drawn inside a root reads the values the root resolved with `usePlaylistInfo()` from `@waveform-playlist/ui-components`:
+
+```typescript
+import { usePlaylistInfo } from '@waveform-playlist/ui-components';
+
+const { waveHeight, barWidth, barGap, roundedBars, progressBarWidth } = usePlaylistInfo();
+// also: sampleRate, samplesPerPixel, timeScaleHeight
+```
+
+Outside a root `usePlaylistInfo()` returns its defaults, not the options of a `<WaveformViewOptions>` above. `fillViewport` has no reader.
 
 ### usePlaylistSettings
 

@@ -12,6 +12,7 @@ import {
   Clip,
   SpectrogramLabels,
   useTheme,
+  usePlaylistInfo,
   waveformColorToCss,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
@@ -501,7 +502,9 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
   const rows = useWaveformRows('The tracks');
   const { tracksFullWidth: width } = useWaveformExtent('The tracks');
   const { selectedTrackId } = useSelectedRow();
-  const { sampleRate, waveHeight, mono } = usePlaylistView();
+  const { sampleRate, mono } = usePlaylistView();
+  // Published by the root from `<WaveformViewOptions>` (#689).
+  const { waveHeight } = usePlaylistInfo();
   const { samplesPerPixel } = usePlaylistZoom();
   const spectrogram = useContext(SpectrogramIntegrationContext);
   const rootSeesRecordingPreview = useContext(RootSeesRecordingPreviewContext);

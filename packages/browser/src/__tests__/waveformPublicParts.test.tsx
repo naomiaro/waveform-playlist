@@ -507,7 +507,7 @@ describe('a part is drawn by being rendered', () => {
     expect(controlsColumn()?.style.width).toBe('150px');
   });
 
-  it('what the drawing primitives are told: the strip height and the column, from the parts', async () => {
+  it('what the drawing primitives are told: the strip height, from the parts; the column is not their business', async () => {
     let info: ReturnType<typeof usePlaylistInfo> | undefined;
     const Mine: React.FC = () => {
       info = usePlaylistInfo();
@@ -524,14 +524,15 @@ describe('a part is drawn by being rendered', () => {
       </WaveformRoot>
     ));
     expect(info?.timeScaleHeight).toBe(30);
-    expect(info?.controls).toEqual({ show: true, width: 150 });
+    // `controls` and `zoomLevels` left the value in #689: nothing read them.
+    expect(info).not.toHaveProperty('controls');
+    expect(info).not.toHaveProperty('zoomLevels');
     // The spacer above the panels is as tall as the strip and its border.
     expect((controlsColumn()!.firstElementChild as HTMLElement).style.height).toBe('31px');
 
     width = 180;
     rerender();
     await act(async () => {});
-    expect(info?.controls).toEqual({ show: true, width: 180 });
     expect(controlsColumn()?.style.width).toBe('180px');
 
     withTimescale = false;
@@ -1100,24 +1101,17 @@ describe('development warnings for a part that is not where it can work', () => 
   });
 
   it.each([0, -20, Number.NaN])(
-    'a controls column of width %s: warned, not drawn, and 0 for the drawing primitives',
+    'a controls column of width %s: warned and not drawn',
     async (width) => {
-      let info: ReturnType<typeof usePlaylistInfo> | undefined;
-      const Mine: React.FC = () => {
-        info = usePlaylistInfo();
-        return null;
-      };
       const { warn } = await mountMultitrack(() => (
         <WaveformRoot>
           <WaveformTrackControls width={width} />
           <WaveformTracks />
-          <Mine />
         </WaveformRoot>
       ));
       expect(warned(warn, '<WaveformTrackControls width>')).toBe(true);
       expect(controlsColumn()).toBeNull();
       expect(document.querySelectorAll('input[aria-label="Volume"]')).toHaveLength(0);
-      expect(info?.controls).toEqual({ show: false, width: 0 });
     }
   );
 

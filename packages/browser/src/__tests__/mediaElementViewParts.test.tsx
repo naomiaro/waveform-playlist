@@ -77,6 +77,7 @@ import {
   type MediaElementPlaylistProviderProps,
   type MediaElementTrackConfig,
 } from '../MediaElementPlaylistContext';
+import { WaveformViewOptions } from '../components/WaveformViewOptions';
 import { ComposedMediaElementWaveform } from './testCompositions';
 import { usePlaybackControls, useMediaElementTrack } from '../contexts/playlistContexts';
 import {
@@ -260,7 +261,7 @@ describe('the MediaElement view is a root over the frame of the multitrack view'
     expect(row.getAttribute('data-selected')).toBe('true');
     expect(row.hasAttribute('data-track-drag-source')).toBe(false);
     // As tall as one channel: no clip header is drawn.
-    expect((row.parentElement as HTMLElement).style.height).toBe('100px');
+    expect((row.parentElement as HTMLElement).style.height).toBe('80px');
     // The clip keeps the id it had.
     const clip = row.querySelector('[data-clip-container]') as HTMLElement;
     expect(clip.getAttribute('data-track-id')).toBe('media-element-track-0');
@@ -332,7 +333,7 @@ describe('when the peaks cannot be extracted', () => {
     // no clip in it.
     const rows = document.querySelectorAll('[data-track-row]');
     expect(rows.length).toBe(1);
-    expect((rows[0].parentElement as HTMLElement).style.height).toBe('100px');
+    expect((rows[0].parentElement as HTMLElement).style.height).toBe('80px');
     expect(rows[0].querySelectorAll('[data-clip-container]').length).toBe(0);
     const inner = scrollArea().firstElementChild as HTMLElement;
     expect(inner.style.width).toBe(`${CLIP_WIDTH}px`);
@@ -353,8 +354,15 @@ describe('when the peaks cannot be extracted', () => {
     expect(playhead.style.transform).toBe('translate3d(100px, 0, 0)');
   });
 
-  it('the wave height of the provider is the height of the empty row', async () => {
-    await mount({ provider: { track: BROKEN, waveHeight: 64 } });
+  it('the wave height of the view options is the height of the empty row', async () => {
+    await mount({
+      provider: { track: BROKEN },
+      playlist: (
+        <WaveformViewOptions waveHeight={64}>
+          <ComposedMediaElementWaveform />
+        </WaveformViewOptions>
+      ),
+    });
     const row = document.querySelector('[data-track-row]') as HTMLElement;
     expect((row.parentElement as HTMLElement).style.height).toBe('64px');
   });

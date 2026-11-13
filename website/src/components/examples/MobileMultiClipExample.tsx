@@ -33,6 +33,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformClipHeaders,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -276,11 +277,8 @@ export function MobileMultiClipExample() {
         onTracksChange={setTracks}
         samplesPerPixel={1024}
         mono
-        waveHeight={120}
         automaticScroll={false}
         theme={theme}
-        barWidth={4}
-        barGap={0}
       >
         <ClipInteractionProvider touchOptimized>
           <Controls>
@@ -299,16 +297,18 @@ export function MobileMultiClipExample() {
           </Controls>
 
           {/* The provider's touchOptimized also widens the clip trim handles */}
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTrackControls width={100} />
-            <WaveformTracks>
-              <WaveformClipHeaders />
-            </WaveformTracks>
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
+          <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTrackControls width={100} />
+              <WaveformTracks>
+                <WaveformClipHeaders />
+              </WaveformTracks>
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

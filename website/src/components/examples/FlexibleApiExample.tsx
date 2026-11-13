@@ -54,6 +54,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformClipHeaders,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
@@ -439,22 +440,24 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
 
       <ClipInteractionProvider>
         <KeyboardShortcuts playback clipSplitting undo />
-        <WaveformRoot>
-          <WaveformTimescale
-            renderTick={(label, pixelPosition) => {
-              return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
-            }}
-          />
-          <WaveformLoopRegion />
-          <WaveformTrackControls width={160}>
-            <CustomTrackControls />
-          </WaveformTrackControls>
-          <WaveformTracks>
-            <WaveformClipHeaders />
-          </WaveformTracks>
-          <WaveformSelection />
-          <WaveformPlayhead renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
-        </WaveformRoot>
+        <WaveformViewOptions waveHeight={40} barWidth={1} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale
+              renderTick={(label, pixelPosition) => {
+                return <GrungyTimestamp $left={pixelPosition}>{label}</GrungyTimestamp>;
+              }}
+            />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={160}>
+              <CustomTrackControls />
+            </WaveformTrackControls>
+            <WaveformTracks>
+              <WaveformClipHeaders />
+            </WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
+          </WaveformRoot>
+        </WaveformViewOptions>
       </ClipInteractionProvider>
 
       {/* Time Controls Bar */}
@@ -590,9 +593,6 @@ export function FlexibleApiExample() {
           deferEngineRebuild={loading}
           samplesPerPixel={512}
           mono
-          waveHeight={40}
-          barGap={0}
-          barWidth={1}
           automaticScroll
           theme={customTheme}
         >

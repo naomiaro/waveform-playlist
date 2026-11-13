@@ -5,7 +5,6 @@ import {
   MEDIA_ELEMENT_TRACK_ID,
   useMediaElementTrack,
   usePlaybackControls,
-  usePlaylistView,
 } from '../contexts/playlistContexts';
 import { computeTrackLayout } from '../utils/trackOrderPreview';
 import type { TrackClipPeaks } from '../WaveformPlaylistContext';
@@ -13,6 +12,7 @@ import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
 import { useWaveformFrame, useWaveformParts } from './waveformFrame';
+import { useResolvedViewOptions } from './WaveformViewOptions';
 import { warnMisplacedPart } from './partWarnings';
 
 // A MediaElement player has one audio track and nothing a row can be asked to
@@ -53,7 +53,9 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
 }) => {
   const { setSelection } = usePlaybackControls();
   const { duration, peaksDataArray } = useMediaElementTrack();
-  const { waveHeight } = usePlaylistView();
+  // `fillViewport` is not read here: this timeline is as long as its audio.
+  const viewOptions = useResolvedViewOptions();
+  const { waveHeight } = viewOptions;
 
   const parts = useWaveformParts(children);
   if (parts.controls) {
@@ -106,6 +108,7 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
 
   const frame = useWaveformFrame({
     className,
+    viewOptions,
     parts,
     displayDuration: duration,
     rows,

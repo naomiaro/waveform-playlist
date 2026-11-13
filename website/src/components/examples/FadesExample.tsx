@@ -23,6 +23,7 @@ import {
   WaveformFades,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import type { FadeType } from '@waveform-playlist/core';
@@ -114,18 +115,17 @@ function FadePlayer({ fadeType, title, description, waveformData, audioContext, 
         track={trackConfig}
         audioContext={audioContext}
         samplesPerPixel={SAMPLES_PER_PIXEL}
-        waveHeight={80}
         theme={theme}
-        barWidth={4}
-        barGap={0}
       >
         <PlaybackControls />
         <WaveformWrapper>
-          <MediaElementWaveformRoot>
-            <WaveformTracks>{showFades ? <WaveformFades /> : null}</WaveformTracks>
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </MediaElementWaveformRoot>
+          <WaveformViewOptions waveHeight={80} barWidth={4} barGap={0}>
+            <MediaElementWaveformRoot>
+              <WaveformTracks>{showFades ? <WaveformFades /> : null}</WaveformTracks>
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </MediaElementWaveformRoot>
+          </WaveformViewOptions>
         </WaveformWrapper>
       </MediaElementPlaylistProvider>
     </FadeCard>

@@ -599,6 +599,7 @@ import { useState } from 'react';
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -696,11 +697,7 @@ function RecordingExample() {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={100}
-    >
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -713,7 +710,9 @@ function RecordingExample() {
         selectedTrackId={selectedTrackId}
         setSelectedTrackId={setSelectedTrackId}
       />
-      <Waveform />
+      <WaveformViewOptions waveHeight={100}>
+        <Waveform />
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

@@ -120,6 +120,7 @@ export {
   WaveformFades,
   WaveformRecordingPreview,
   WaveformAnnotationBoxes,
+  WaveformViewOptions,
   WaveformSelection,
   WaveformPlayhead,
   KeyboardShortcuts,
@@ -151,6 +152,7 @@ export type { WaveformTracksProps, WaveformRecordingPreviewProps } from './compo
 export type { WaveformTrackControlsProps } from './components/TrackControlsColumn';
 export type { WaveformPlayheadProps } from './components/VisualizationOverlays';
 export type { WaveformAnnotationBoxesProps } from './components/WaveformAnnotationBoxes';
+export type { WaveformViewOptionsProps } from './components/WaveformViewOptions';
 export type { WaveformRecordingState } from './components/visualizationLayout';
 export { useRecordingSession } from './hooks/useRecordingSession';
 export type { RecordingSessionOptions } from './hooks/useRecordingSession';

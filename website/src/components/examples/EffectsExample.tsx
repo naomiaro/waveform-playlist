@@ -35,6 +35,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import {
   ExportWavButton,
@@ -471,30 +472,32 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         </VisualizerWrapper>
       </TopBar>
 
-      <WaveformRoot>
-        <WaveformTimescale />
-        <WaveformLoopRegion />
-        {/* The panel of a track, written once: the pieces are bound to the
-            track they are drawn for. The props are stable, so the panels do
-            not render with this component. */}
-        <WaveformTrackControls width={150}>
-          <TrackRemoveButton onRemove={onDeleteTrack} />
-          <Controls>
-            <Header style={{ justifyContent: 'center' }}>
-              <TrackName />
-            </Header>
-            <ButtonGroup>
-              <TrackMuteButton />
-              <TrackSoloButton />
-            </ButtonGroup>
-            <TrackVolumeSlider />
-            <TrackEffectsButton effectsManager={trackEffectsManager} />
-          </Controls>
-        </WaveformTrackControls>
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
+      <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          {/* The panel of a track, written once: the pieces are bound to the
+              track they are drawn for. The props are stable, so the panels do
+              not render with this component. */}
+          <WaveformTrackControls width={150}>
+            <TrackRemoveButton onRemove={onDeleteTrack} />
+            <Controls>
+              <Header style={{ justifyContent: 'center' }}>
+                <TrackName />
+              </Header>
+              <ButtonGroup>
+                <TrackMuteButton />
+                <TrackSoloButton />
+              </ButtonGroup>
+              <TrackVolumeSlider />
+              <TrackEffectsButton effectsManager={trackEffectsManager} />
+            </Controls>
+          </WaveformTrackControls>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformViewOptions>
 
       <TimeControlsBar>
         <ControlGroup>
@@ -696,12 +699,9 @@ export function EffectsExample() {
         onTracksChange={setTracks}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
-        waveHeight={100}
         theme={theme}
         automaticScroll={true}
         effects={masterEffects}
-        barWidth={2}
-        barGap={0}
       >
         <KeyboardShortcuts playback />
         <EffectsControls

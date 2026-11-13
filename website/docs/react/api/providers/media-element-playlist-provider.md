@@ -37,10 +37,28 @@ import { MediaElementPlaylistProvider, MediaElementWaveform } from '@waveform-pl
     name: 'Episode 1',
   }}
   samplesPerPixel={1024}
-  waveHeight={100}
 >
   <MediaElementWaveform />
 </MediaElementPlaylistProvider>
+```
+
+The options that only affect how the view draws (row height, bar style, playhead width) are not provider props. Set them with [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), which may sit above several providers:
+
+```tsx
+import {
+  MediaElementPlaylistProvider,
+  MediaElementWaveform,
+  WaveformViewOptions,
+} from '@waveform-playlist/browser';
+
+<WaveformViewOptions waveHeight={100} barWidth={2} barGap={1}>
+  <MediaElementPlaylistProvider track={episodeOne}>
+    <MediaElementWaveform />
+  </MediaElementPlaylistProvider>
+  <MediaElementPlaylistProvider track={episodeTwo}>
+    <MediaElementWaveform />
+  </MediaElementPlaylistProvider>
+</WaveformViewOptions>
 ```
 
 ## Props
@@ -84,12 +102,7 @@ interface FadeConfig {
 
 Zoom level for waveform rendering.
 
-#### `waveHeight`
-
-**Type:** `number`
-**Default:** `100`
-
-Height of the waveform track in pixels.
+`waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), not of the provider. `waveHeight` is the height of one channel and is 80 px by default (it was 100 while it was a prop of this provider); the row is that times the number of channels, plus the clip header when the view has one. A leftover one on the provider is a compile error in TypeScript and is ignored in plain JavaScript (the defaults are drawn). See the [upgrade guide](/docs/react/upgrading#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).
 
 The time ruler is not a provider prop. It is a part of the view: `<MediaElementWaveform />` draws it, and a composition has it when it renders `<WaveformTimescale />` inside `<MediaElementWaveformRoot>`. There is no controls column for this player. See [Composing the View](/docs/react/guides/composing-the-view).
 
@@ -129,9 +142,8 @@ Auto-scroll to keep the playhead centered during playback. While it is on, a dra
 #### `theme`
 
 **Type:** `Partial<WaveformPlaylistTheme>`
-**Default:** `defaultTheme`
 
-Custom theme object. See [Theming Guide](/docs/react/guides/theming).
+Theme keys to change. The provider merges the object over `defaultTheme` (`{ ...defaultTheme, ...theme }`), so a key left out keeps its `defaultTheme` value; without the prop the theme is `defaultTheme`. It is a provider prop and not a view option: the transport controls, the checkboxes and the annotation list are drawn outside a view and read it too. See [Theming Guide](/docs/react/guides/theming).
 
 ### Annotations
 
@@ -155,36 +167,6 @@ The action buttons of the annotation list are not set here: pass them to `<Annot
 **Type:** `(annotations: AnnotationData[]) => void`
 
 Called with the full new array on every change to the annotations: the release of an edge drag, a text or id edit in the list, an action button, a `setAnnotations` call of your own. It is the one report of an annotation change. Keep the array in your state and pass it back in `annotationList.annotations`; without this callback an edit is dropped, and a development build warns.
-
-### Waveform Rendering
-
-#### `barWidth`
-
-**Type:** `number`
-**Default:** `1`
-
-Width in pixels of waveform bars.
-
-#### `barGap`
-
-**Type:** `number`
-**Default:** `0`
-
-Spacing in pixels between waveform bars.
-
-#### `roundedBars`
-
-**Type:** `boolean`
-**Default:** `false`
-
-Draw bars with pill-shaped rounded caps (radius `barWidth / 2`). Most visible with `barWidth` ≥ 3 and a non-zero `barGap`.
-
-#### `progressBarWidth`
-
-**Type:** `number`
-**Default:** `barWidth + barGap`
-
-Width in pixels of progress bars.
 
 ### Callbacks
 
@@ -214,7 +196,7 @@ Called when the player could not be created (a missing optional peer, a throwing
 | `useAnnotationOptions()` | `editable`, `linkEndpoints`, `continuousPlay` |
 | `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `playAnnotation` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef` (the same ref as `currentTimeRef` here: a media element reports the audible position), `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`; `mono`, `indefinitePlayback` and `fillViewport` are always `false` |
+| `usePlaylistView()` | `sampleRate`; `mono` and `indefinitePlayback` are always `false`. The view options are not here: inside a root, `usePlaylistInfo()` from `@waveform-playlist/ui-components` has the resolved `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` |
 | `usePlaylistSettings()` | `timeFormat` (default `'hh:mm:ss.uuu'`), `isAutomaticScroll` |
 | `usePlaylistZoom()` | `samplesPerPixel`; `canZoomIn` and `canZoomOut` are always `false` |
 
@@ -277,7 +259,6 @@ interface MediaElementPlaylistProviderProps {
 
   // Display
   samplesPerPixel?: number;
-  waveHeight?: number;
 
   // Web Audio
   audioContext?: AudioContext;
@@ -297,12 +278,6 @@ interface MediaElementPlaylistProviderProps {
   onReady?: () => void;
   onError?: (error: Error) => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
-
-  // Waveform rendering
-  barWidth?: number;
-  barGap?: number;
-  roundedBars?: boolean;
-  progressBarWidth?: number;
 
   // Custom engine
   /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.

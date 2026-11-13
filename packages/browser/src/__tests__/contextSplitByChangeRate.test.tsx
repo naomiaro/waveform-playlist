@@ -216,19 +216,8 @@ describe('each hook returns its own group of fields (#768)', () => {
     await mount();
     const keys = (name: HookName) => Object.keys(values[name] as object).sort();
 
-    expect(keys('view')).toEqual(
-      [
-        'sampleRate',
-        'waveHeight',
-        'barWidth',
-        'barGap',
-        'roundedBars',
-        'progressBarWidth',
-        'mono',
-        'indefinitePlayback',
-        'fillViewport',
-      ].sort()
-    );
+    // The options of one view are `<WaveformViewOptions>` (#689), not here.
+    expect(keys('view')).toEqual(['indefinitePlayback', 'mono', 'sampleRate']);
     expect(keys('settings')).toEqual(['isAutomaticScroll', 'timeFormat']);
     expect(keys('zoom')).toEqual(['canZoomIn', 'canZoomOut', 'samplesPerPixel']);
     expect(keys('timeline')).toEqual(

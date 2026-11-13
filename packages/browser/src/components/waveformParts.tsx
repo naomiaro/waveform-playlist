@@ -33,6 +33,7 @@ import {
 import { WaveformLoopRegion } from './VisualizationOverlays';
 import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
 import { warnMisplacedPart } from './partWarnings';
+import { WaveformViewOptions } from './WaveformViewOptions';
 
 export {
   WaveformTracks,
@@ -46,12 +47,22 @@ export { WaveformTrackControls } from './TrackControlsColumn';
 export interface WaveformTimescaleProps {
   /** Custom tick label. `label` is already formatted for the scale mode. */
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
+  /**
+   * Height in pixels of the timescale strip. The root reads it from the
+   * element, as it reads the width of the controls part: the strip is the
+   * root's own, above the scrolling area. Default: 30
+   */
+  height?: number;
 }
+
+/** Height in pixels of the timescale strip when the timescale part gives none. */
+export const DEFAULT_TIMESCALE_HEIGHT = 30;
 
 /** The time ruler, as long as the root's timeline. */
 export const WaveformTimescale = React.memo(function WaveformTimescale({
   renderTick,
 }: WaveformTimescaleProps) {
+  // `height` is read by the root (`sortWaveformParts`), which draws the strip.
   const { displayDuration } = useWaveformExtent('The timescale');
   if (useContext(WaveformPartPlaceContext) !== 'timescale') {
     warnMisplacedPart(
@@ -79,6 +90,8 @@ export interface SortedWaveformParts {
   tracksOptions: TracksMarkers;
   /** Width of the controls column in pixels, from the controls part; 0 without one. */
   controlsWidth: number;
+  /** Height of the timescale strip in pixels, from the timescale part; 0 without a strip. */
+  timescaleHeight: number;
 }
 
 const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([WaveformTimescale, WaveformLoopRegion]);
@@ -103,7 +116,9 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     content: [],
     tracksOptions: { showClipHeaders: false, showFades: false, recordingState: undefined },
     controlsWidth: 0,
+    timescaleHeight: 0,
   };
+  let timescaleHeightGiven = false;
   let tracksParts = 0;
   const visit = (node: ReactNode) => {
     React.Children.forEach(node, (child) => {
@@ -113,6 +128,26 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           return;
         }
         if (TIMESCALE_PARTS.has(child.type)) {
+          // The first timescale part says how tall the strip is; a strip that
+          // holds only a loop region is the default height.
+          if (child.type === WaveformTimescale && !timescaleHeightGiven) {
+            timescaleHeightGiven = true;
+            const { height } = child.props as WaveformTimescaleProps;
+            // `null` (plain JavaScript) means "not given", like `undefined`.
+            const given = height !== undefined && height !== null;
+            if (given && !(height > 0)) {
+              warnMisplacedPart(
+                '<WaveformTimescale height> must be a positive number of pixels: ' +
+                  String(height) +
+                  ' is replaced by ' +
+                  DEFAULT_TIMESCALE_HEIGHT +
+                  '. Leave the part out to have no timescale.'
+              );
+            }
+            sorted.timescaleHeight = given && height > 0 ? height : DEFAULT_TIMESCALE_HEIGHT;
+          } else if (sorted.timescaleHeight === 0) {
+            sorted.timescaleHeight = DEFAULT_TIMESCALE_HEIGHT;
+          }
           sorted.timescale.push(child);
           sorted.content.push(null);
           return;
@@ -136,6 +171,14 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           sorted.controls.push(child);
           sorted.content.push(null);
           return;
+        }
+        if (child.type === WaveformViewOptions) {
+          // A root reads the options above itself: these do nothing for it,
+          // and the parts inside them are wrapped, so not recognised either.
+          warnMisplacedPart(
+            '<WaveformViewOptions> inside a waveform root does nothing for that root: a root ' +
+              'reads the options above it. Put <WaveformViewOptions> around the root.'
+          );
         }
         if (child.type === WaveformTracks) {
           tracksParts++;

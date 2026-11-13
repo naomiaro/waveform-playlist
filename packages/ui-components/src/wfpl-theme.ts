@@ -145,6 +145,13 @@ export interface WaveformPlaylistTheme {
   pianoRollSelectedNoteColor: string;
   pianoRollBackgroundColor: string;
 
+  /**
+   * Background behind a spectrogram. Optional so that a complete theme
+   * object written before the key existed still type-checks; without it the
+   * colour is `#000`.
+   */
+  spectrogramBackgroundColor?: string;
+
   // Spacing and sizing
   borderRadius: string;
   fontFamily: string;
@@ -217,6 +224,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   pianoRollNoteColor: '#2a7070',
   pianoRollSelectedNoteColor: '#3d9e9e',
   pianoRollBackgroundColor: '#1a1a2e',
+  spectrogramBackgroundColor: '#000',
 
   // Spacing and sizing
   borderRadius: '4px',
@@ -292,6 +300,7 @@ export const darkTheme: WaveformPlaylistTheme = {
   pianoRollNoteColor: '#c49a6c',
   pianoRollSelectedNoteColor: '#e8c090',
   pianoRollBackgroundColor: '#0d0d14',
+  spectrogramBackgroundColor: '#000',
 
   // Spacing and sizing
   borderRadius: '4px',

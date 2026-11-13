@@ -22,12 +22,13 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[];
   children: ReactNode;
-  mono?: boolean;
-  waveHeight?: number;                    // Default: 80
+  /** Draw and analyse every track as one channel. A provider option, not a
+   *  view option: the provider computes the peaks with it. */
+  mono?: boolean;                         // Default: false
   samplesPerPixel?: number;               // Default: 1024
   zoomLevels?: number[];
   automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
-  theme?: Partial<WaveformPlaylistTheme>;
+  theme?: Partial<WaveformPlaylistTheme>; // merged over defaultTheme: { ...defaultTheme, ...theme }
   annotationList?: AnnotationListProp;
   effects?: EffectsFunction;
   /** A track's effects function by track id (`getTrackEffectsFunction` from
@@ -35,27 +36,30 @@ interface WaveformPlaylistProviderProps {
    *  track's audio graph is built; a new function identity rebuilds nothing. */
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   onReady?: () => void;
+  /** Called when audio/engine initialization fails (e.g. a missing optional peer,
+   *  a throwing `createAdapter`, or an invalid `zoomLevels`/`samplesPerPixel`). The
+   *  provider already logs the error; use this to surface it in your UI. */
+  onError?: (err: Error) => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** Called when engine clip operations (move/trim/split) update tracks */
   onTracksChange?: (tracks: ClipTrack[]) => void;
-  barWidth?: number;                      // Default: 1
-  barGap?: number;                        // Default: 0
-  roundedBars?: boolean;                  // Default: false — pill caps, radius barWidth/2
-  progressBarWidth?: number;              // Default: barWidth + barGap
   /** Defer engine build during progressive loading — tracks render but engine isn't built */
   deferEngineRebuild?: boolean;           // Default: false
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
-  /** Disable end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies fillViewport.
-   *  Recording sessions suppress the auto-stop automatically. */
+  /** Disable end-of-timeline auto-stop — roll until explicit stop (DAW style). The multitrack
+   *  view then draws the timeline as wide as its container, as `<WaveformViewOptions fillViewport>`
+   *  does. Recording sessions suppress the auto-stop automatically. A provider option, not a
+   *  view option: the animation loop and `seekTo` follow it. */
   indefinitePlayback?: boolean;           // Default: false
-  /** Timeline visually fills the scroll container even when audio is shorter (layout only) */
-  fillViewport?: boolean;                 // Default: false
   /** Desired AudioContext sample rate for pre-computed peaks matching */
   sampleRate?: number;
   /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
   createAdapter?: () => PlayoutAdapter;
 }
+// Not provider props (#689): waveHeight, barWidth, barGap, roundedBars, progressBarWidth,
+// fillViewport. They are props of <WaveformViewOptions> (see "View options" below).
+// The props type itself is not exported: use React.ComponentProps<typeof WaveformPlaylistProvider>.
 ```
 
 ---
@@ -81,7 +85,6 @@ interface MediaElementPlaylistProviderProps {
   children: ReactNode;
   audioContext?: AudioContext;            // Enables Web Audio routing (fades, effects)
   samplesPerPixel?: number;              // Default: 1024
-  waveHeight?: number;                   // Default: 100
   playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
@@ -90,15 +93,14 @@ interface MediaElementPlaylistProviderProps {
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   onReady?: () => void;                  // the media element has loaded its metadata; once per player. Pass a stable function
   onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); the provider adds no URL to the message. Pass a stable function
-  barWidth?: number;                     // Default: 1
-  barGap?: number;                       // Default: 0
-  roundedBars?: boolean;                 // Default: false — pill caps, radius barWidth/2
-  progressBarWidth?: number;             // Default: barWidth + barGap
   /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.
    *  It must implement on() and emit 'loadedmetadata' (without it isReady never turns true).
    *  The provider also listens for 'timeupdate', 'error' and 'playrejected'. */
   createPlayout?: () => MediaElementPlayout;
 }
+// Not provider props (#689): waveHeight, barWidth, barGap, roundedBars, progressBarWidth.
+// They are props of <WaveformViewOptions>. The default waveHeight is 80 under both providers
+// (it was 100 under this one).
 ```
 
 ---
@@ -307,29 +309,33 @@ interface PlaybackRefsContextValue {
 
 ```typescript
 /**
- * View configuration (#768): what the provider was configured with. Changes
- * on a prop change (and once when the real sample rate is known), never
- * during an interaction.
+ * What the provider was configured with that a view also reads (#768, #689).
+ * Changes on a prop change (and once when the real sample rate is known),
+ * never during an interaction.
+ *
+ * The options that only affect how a view draws (row height, bar style,
+ * playhead width, the filled layout) are not here: they are
+ * `<WaveformViewOptions>`, and what is drawn reads them from ui-components'
+ * `usePlaylistInfo()` inside a root.
  */
 interface PlaylistViewContextValue {
   sampleRate: number;
-  waveHeight: number;
-  barWidth: number;
-  barGap: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
-  roundedBars: boolean;
-  /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
-  progressBarWidth: number;
-  /** Whether tracks are rendered in mono mode. Always false under the MediaElement provider. */
+  /**
+   * Whether tracks are drawn and analysed as one channel. On the provider
+   * because the provider computes the peaks with it. Always false under the
+   * MediaElement provider.
+   */
   mono: boolean;
-  /** Whether playback continues past the end of loaded audio instead of
-   *  auto-stopping (implies the fillViewport layout). Always false under the
-   *  MediaElement provider. */
+  /**
+   * Whether playback continues past the end of the audio instead of stopping
+   * there. On the provider because its animation loop and `seekTo` follow it;
+   * the multitrack root also draws the timeline as wide as its container
+   * then. Always false under the MediaElement provider.
+   */
   indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container even when the
-   *  audio is shorter (layout only). Always false under the MediaElement provider. */
-  fillViewport: boolean;
 }
+// Removed (#689): waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport.
+// A leftover read is undefined.
 ```
 
 ### usePlaylistSettings()
@@ -1849,7 +1855,15 @@ interface WaveformTimescaleProps {
   /** Custom tick label. `label` is already formatted for the scale mode:
    *  "m:ss" in the temporal scale, bar.beat (e.g. "2.3") in beats mode. There is no renderTimestamp. */
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
+  /**
+   * Height in pixels of the timescale strip. The root reads it from the
+   * element, as it reads the width of the controls part: the strip is the
+   * root's own, above the scrolling area. Default: 30
+   */
+  height?: number;
 }
+// A height that is not a positive number: 30 is drawn, one development warning. The first
+// WaveformTimescale among the root's children decides; a strip with only a WaveformLoopRegion is 30.
 // WaveformLoopRegion: no props. WaveformPlaylistProvider only.
 
 interface WaveformTrackControlsProps {   // WaveformPlaylistProvider only
@@ -2097,12 +2111,82 @@ Rules:
 
 - A part must be a child of its root (a fragment is fine). A part wrapped in your own component is not recognised: a wrapped `WaveformTimescale` / `WaveformTrackControls` is drawn among the tracks, a wrapped `WaveformClipHeaders` does nothing. Development builds warn once in the console (`[waveform-playlist] …`); nothing throws for this.
 - `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview` are children of `WaveformTracks` and draw nothing elsewhere. One `WaveformTracks` per root, as the root's own child.
-- The 30 px timescale strip exists when the root has a `WaveformTimescale` or a `WaveformLoopRegion`; the controls column exists when it has a `WaveformTrackControls`.
+- The timescale strip (30 px, or the `height` of the first `WaveformTimescale`) exists when the root has a `WaveformTimescale` or a `WaveformLoopRegion`; the controls column exists when it has a `WaveformTrackControls`.
 - A child of a root that is not a part is drawn in the scrolling tracks area, in order.
 - Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` throws, `WaveformTrackControls` draws nothing as a child of the root (wrapped in a component it throws), `WaveformClipHeaders` shows the track's `name` ("Track" without one) and nothing supports dragging the clip.
 - `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and `WaveformAnnotationBoxes` throw outside a root. `WaveformSelection` and `WaveformPlayhead` draw wherever they are rendered under a provider.
 - Switch a part with `{flag ? <Part /> : null}`; a list of changing length remounts later parts unless they have keys.
 - The time ruler and the controls column are not provider props and not in `usePlaylistView()`: they exist when their parts are rendered.
+
+### View options
+
+Row height, bar style, playhead width and the filled layout are set with `<WaveformViewOptions>` (`@waveform-playlist/browser`), for every root below it, under either provider. It may sit above the provider and above several providers. The roots, the parts, the ready-made compositions and the providers take none of these options. Upgrade entry: [view options](./react/upgrading.md#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).
+
+```typescript
+// packages/browser/src/components/WaveformViewOptions.tsx
+interface WaveformViewOptionsProps {
+  /** Height in pixels of one channel of a track. Default: 80 */
+  waveHeight?: number;
+  /** Width in pixels of a waveform bar. Default: 1 */
+  barWidth?: number;
+  /** Space in pixels between two bars. Default: 0 */
+  barGap?: number;
+  /** Draw bars with rounded caps (radius `barWidth / 2`). Default: false */
+  roundedBars?: boolean;
+  /** Width in pixels of the playhead line. Default: `barWidth + barGap` */
+  progressBarWidth?: number;
+  /**
+   * Draw the timeline at least as wide as its scroll container when the audio
+   * is shorter. `WaveformRoot` only: a MediaElement timeline is as long as
+   * its audio. Default: false
+   */
+  fillViewport?: boolean;
+  children?: ReactNode;
+}
+```
+
+```tsx
+<WaveformViewOptions waveHeight={100} barWidth={2} barGap={1}>
+  <MediaElementPlaylistProvider track={a}><MediaElementWaveform /></MediaElementPlaylistProvider>
+  <MediaElementPlaylistProvider track={b}><MediaElementWaveform /></MediaElementPlaylistProvider>
+</WaveformViewOptions>
+```
+
+- A prop left out is inherited from the `<WaveformViewOptions>` above (`??`, so `0` and `false` are values), then from the defaults. A nested one cannot return an option to its default: write the value (`progressBarWidth={7}` outside and `barWidth={4}` inside leaves the playhead 7 px).
+- It goes ABOVE a root. A root reads the options above itself, so one written among a root's children does nothing for that root, the parts inside it are not recognised, and a development build warns once.
+- Corrected by the root, one development warning per message: `waveHeight` or `barWidth` not above 0 becomes the default; a `barGap` that is `NaN` becomes 0; a `barGap` that makes `barWidth + barGap` less than 1 becomes `1 - barWidth`; a `progressBarWidth` not above 0 becomes `barWidth + barGap` (leave `<WaveformPlayhead>` out to draw no playhead). `null` means not given.
+- Inside a root, the resolved values are read with `usePlaylistInfo()` from `@waveform-playlist/ui-components`. `fillViewport` has no reader.
+- Two roots under one provider share zoom, selection and playback and may differ in view options. Limits (issue #803): automatic scroll moves only the root mounted last; a spectrogram track is drawn in only one of them. Another zoom level: under `MediaElementPlaylistProvider`, another provider (each is independent); under `WaveformPlaylistProvider` with the default Tone.js engine, not available by adding a provider (one instance per page, shared Tone.js transport; issue #805).
+
+```typescript
+// packages/ui-components/src/contexts/PlaylistInfo.tsx
+type PlaylistInfo = {
+  sampleRate: number;
+  samplesPerPixel: number;
+  /** Height in pixels of one channel. Default: 80 */
+  waveHeight: number;
+  /** Height in pixels of the timescale strip; 0 when there is none. */
+  timeScaleHeight: number;
+  /** Width in pixels of waveform bars. Default: 1 */
+  barWidth: number;
+  /** Spacing in pixels between waveform bars. Default: 0 */
+  barGap: number;
+  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
+  roundedBars: boolean;
+  /** Width in pixels of the playhead line. Default: barWidth + barGap. */
+  progressBarWidth: number;
+};
+const usePlaylistInfo: () => PlaylistInfo;      // useContext(PlaylistInfoContext)
+const DEFAULT_WAVE_HEIGHT = 80;
+const DEFAULT_BAR_WIDTH = 1;
+const DEFAULT_BAR_GAP = 0;
+// Without a root above, PlaylistInfoContext's default applies: sampleRate 48000,
+// samplesPerPixel 1000, waveHeight 80, timeScaleHeight 15, barWidth 1, barGap 0,
+// roundedBars false, progressBarWidth 1.
+// Removed (#689): controls, zoomLevels. A PlaylistInfoContext.Provider of your own must give this shape.
+// Theme key spectrogramBackgroundColor (optional, '#000' without it): the background of the area a
+// spectrogram is drawn in; it shows until the spectrogram has been drawn and where a chunk is not mounted.
+```
 
 ---
 

@@ -35,6 +35,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   AnnotationList,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -322,14 +323,16 @@ const MobileAnnotationsContent: React.FC = () => {
           </ControlGroup>
         </Controls>
 
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          <WaveformTracks />
-          <WaveformAnnotationBoxes />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
+        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTracks />
+            <WaveformAnnotationBoxes />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
         <AnnotationList actions={mobileAnnotationActions} height={200} />
 
         <ActiveAnnotationInfo />
@@ -407,11 +410,8 @@ export function MobileAnnotationsExample() {
       sampleRate={48000}
       samplesPerPixel={1024}
       mono
-      waveHeight={100}
       automaticScroll={false}
       theme={theme}
-      barWidth={4}
-      barGap={0}
       annotationList={{
         annotations: annotations,
         editable: true,

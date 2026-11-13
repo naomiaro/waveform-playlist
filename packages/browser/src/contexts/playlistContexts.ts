@@ -179,28 +179,30 @@ export interface PlaybackControlsContextValue {
 }
 
 /**
- * View configuration (#768): what the provider was configured with. Changes
- * on a prop change (and once when the real sample rate is known), never
- * during an interaction.
+ * What the provider was configured with that a view also reads (#768, #689).
+ * Changes on a prop change (and once when the real sample rate is known),
+ * never during an interaction.
+ *
+ * The options that only affect how a view draws (row height, bar style,
+ * playhead width, the filled layout) are not here: they are
+ * `<WaveformViewOptions>`, and what is drawn reads them from ui-components'
+ * `usePlaylistInfo()` inside a root.
  */
 export interface PlaylistViewContextValue {
   sampleRate: number;
-  waveHeight: number;
-  barWidth: number;
-  barGap: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
-  roundedBars: boolean;
-  /** Width in pixels of progress bars. Defaults to barWidth + barGap (fills gaps). */
-  progressBarWidth: number;
-  /** Whether tracks are rendered in mono mode. Always false under the MediaElement provider. */
+  /**
+   * Whether tracks are drawn and analysed as one channel. On the provider
+   * because the provider computes the peaks with it. Always false under the
+   * MediaElement provider.
+   */
   mono: boolean;
-  /** Whether playback continues past the end of loaded audio instead of
-   *  auto-stopping (implies the fillViewport layout). Always false under the
-   *  MediaElement provider. */
+  /**
+   * Whether playback continues past the end of the audio instead of stopping
+   * there. On the provider because its animation loop and `seekTo` follow it;
+   * the multitrack root also draws the timeline as wide as its container
+   * then. Always false under the MediaElement provider.
+   */
   indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container even when the
-   *  audio is shorter (layout only). Always false under the MediaElement provider. */
-  fillViewport: boolean;
 }
 
 /**
@@ -527,9 +529,8 @@ export const usePlaybackControls = () =>
   useSlot(PlaybackControlsContext, 'usePlaybackControls', EITHER);
 
 /**
- * View configuration: `sampleRate`, `waveHeight`, bar style, `mono`,
- * `indefinitePlayback`, `fillViewport`.
- * Re-renders on a prop change.
+ * `{ sampleRate, mono, indefinitePlayback }`: what the provider was
+ * configured with that a view also reads. Re-renders on a prop change.
  */
 export const usePlaylistView = () => useSlot(PlaylistViewContext, 'usePlaylistView', EITHER);
 

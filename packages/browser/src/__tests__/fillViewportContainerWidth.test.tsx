@@ -10,6 +10,7 @@ import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { Waveform } from '../components/Waveform';
+import { WaveformViewOptions } from '../components/WaveformViewOptions';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -152,10 +153,11 @@ const App: React.FC<{ fillViewport?: boolean; indefinitePlayback?: boolean; tick
     sampleRate={SAMPLE_RATE}
     samplesPerPixel={SAMPLES_PER_PIXEL}
     createAdapter={createAdapter}
-    fillViewport={fillViewport}
     indefinitePlayback={indefinitePlayback}
   >
-    <Waveform />
+    <WaveformViewOptions fillViewport={fillViewport}>
+      <Waveform />
+    </WaveformViewOptions>
   </WaveformPlaylistProvider>
 );
 

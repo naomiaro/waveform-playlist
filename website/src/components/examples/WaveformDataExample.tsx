@@ -15,6 +15,7 @@ import {
   loadWaveformData,
   waveformDataToPeaks,
   getWaveformDataMetadata,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 // Channel import removed - no longer using preview rendering
@@ -234,11 +235,8 @@ export function WaveformDataExample() {
         sampleRate={48000}
         samplesPerPixel={1024}
         mono
-        waveHeight={100}
         automaticScroll
         theme={theme}
-        barWidth={4}
-        barGap={0}
       >
         <Controls>
           <ControlGroup>
@@ -265,7 +263,9 @@ export function WaveformDataExample() {
           </ControlGroup>
         </Controls>
 
-        <Waveform />
+        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+          <Waveform />
+        </WaveformViewOptions>
       </WaveformPlaylistProvider>
     </Container>
   );

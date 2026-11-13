@@ -18,6 +18,7 @@ import {
   usePlaylistZoom,
   useEngineRefs,
   WaveformEditor,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -195,10 +196,7 @@ export function CustomDragSetupExample() {
       onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
-      waveHeight={100}
       theme={theme}
-      barWidth={4}
-      barGap={0}
     >
       <Controls>
         <PlayButton />
@@ -226,7 +224,9 @@ export function CustomDragSetupExample() {
       <ClipDragSetup tracks={tracks} onTracksChange={setTracks} touchOptimized={touchOptimized}>
         {/* The one place the clips learn what they may do. Waveform takes no prop for it. */}
         <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
-          <WaveformEditor />
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformEditor />
+          </WaveformViewOptions>
         </ClipInteractionOptions>
       </ClipDragSetup>
     </WaveformPlaylistProvider>

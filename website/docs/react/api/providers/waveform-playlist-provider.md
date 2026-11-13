@@ -20,13 +20,21 @@ import { WaveformPlaylistProvider } from '@waveform-playlist/browser';
 ## Basic Usage
 
 ```tsx
-<WaveformPlaylistProvider
-  tracks={tracks}
-  samplesPerPixel={1024}
-  waveHeight={128}
->
+<WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
   <Waveform />
 </WaveformPlaylistProvider>
+```
+
+The options that only affect how a view draws (row height, bar style, playhead width, the filled layout) are not provider props. Set them with [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), above or below the provider:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
+
+<WaveformViewOptions waveHeight={128} barWidth={2} barGap={1}>
+  <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <Waveform />
+  </WaveformPlaylistProvider>
+</WaveformViewOptions>
 ```
 
 ## Props
@@ -64,12 +72,7 @@ Zoom level. Higher values show more audio, lower values show more detail.
 | 2048 | Overview |
 | 4096+ | Long files |
 
-#### `waveHeight`
-
-**Type:** `number`
-**Default:** `128`
-
-Height of each track in pixels.
+`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` and `fillViewport` are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), not of the provider. A leftover one on the provider is a compile error in TypeScript and is ignored in plain JavaScript (the defaults are drawn). See the [upgrade guide](/docs/react/upgrading#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).
 
 The time ruler and the column of track controls are not provider props. They are parts of the view: `<Waveform />` draws both (the column 200 px wide), and a composition has them when it renders `<WaveformTimescale />` and `<WaveformTrackControls width={180} />`. See [Composing the View](/docs/react/guides/composing-the-view).
 
@@ -78,19 +81,20 @@ The time ruler and the column of track controls are not provider props. They are
 #### `theme`
 
 **Type:** `Partial<WaveformPlaylistTheme>`
-**Default:** `defaultTheme`
 
-Custom theme object. See [Theming Guide](/docs/react/guides/theming).
+Theme keys to change. The provider merges the object over `defaultTheme` (`{ ...defaultTheme, ...theme }`), so a key left out keeps its `defaultTheme` value; without the prop the theme is `defaultTheme`. See [Theming Guide](/docs/react/guides/theming).
 
 ```tsx
 <WaveformPlaylistProvider
   tracks={tracks}
   theme={{
-    waveColor: '#00ff00',
-    cursorColor: '#ff0000',
+    waveFillColor: '#00ff00',
+    playheadColor: '#ff0000',
   }}
 >
 ```
+
+The theme is a provider prop and not a view option: the transport controls, the checkboxes and the annotation list are drawn outside a view and read it too.
 
 ### Audio Effects
 
@@ -159,42 +163,20 @@ const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
 
 Called when all tracks finish loading.
 
-### Waveform Rendering
+#### `onError`
 
-#### `barWidth`
+**Type:** `(err: Error) => void`
 
-**Type:** `number`
-**Default:** `1`
+Called when audio or engine initialization fails, for example a missing optional peer, a `createAdapter` that throws, or an invalid `zoomLevels` / `samplesPerPixel`. The provider already logs the error; use this to show it in your UI.
 
-Width in pixels of waveform bars.
-
-#### `barGap`
-
-**Type:** `number`
-**Default:** `0`
-
-Spacing in pixels between waveform bars.
-
-#### `roundedBars`
-
-**Type:** `boolean`
-**Default:** `false`
-
-Draw bars with pill-shaped rounded caps (radius `barWidth / 2`). Most visible with `barWidth` ≥ 3 and a non-zero `barGap`.
-
-#### `progressBarWidth`
-
-**Type:** `number`
-**Default:** `barWidth + barGap`
-
-Width in pixels of progress bars.
+### Other options
 
 #### `mono`
 
 **Type:** `boolean`
 **Default:** `false`
 
-Render mono waveforms.
+Draw and analyse every track as one channel. It is a provider option and not a view option because the provider computes the peaks with it.
 
 #### `zoomLevels`
 
@@ -209,12 +191,12 @@ Array of zoom levels in samples per pixel.
 
 Auto-scroll to keep playhead visible. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
-#### `fillViewport`
+#### `indefinitePlayback`
 
 **Type:** `boolean`
 **Default:** `false`
 
-Extend the timeline (background + timescale) to fill the visible scroll container even when the audio is shorter. Layout only. Recording UIs typically want this so an empty timeline doesn't collapse to the audio width.
+Disables the automatic stop at the end of the longest track: the transport rolls until an explicit stop or pause. The multitrack view then draws the timeline as wide as its container, as `<WaveformViewOptions fillViewport>` does. It is a provider option and not a view option because the provider's animation loop and `seekTo` follow it. Recording sessions suppress the automatic stop themselves, so most recording UIs do not need it.
 
 :::note End-of-timeline behavior (matched with dawcore)
 By default playback **auto-stops** at the end of the timeline and the cursor returns to the play-start position (player style). `indefinitePlayback` opts out — the transport rolls until an explicit `stop()`/`pause()` (DAW style; same semantics as `<daw-editor indefinite-playback>`). Active recording sessions suppress the auto-stop automatically so punch-in takes can run past the end of existing audio. Selection and annotation playback stop at their explicit ends regardless.
@@ -442,23 +424,20 @@ interface EditorControlsContextValue {
 
 ### View (usePlaylistView)
 
-What the provider was configured with. Changes on a prop change, not on a settings click.
+Either provider. What the provider was configured with that a view also reads. Changes on a prop change (and once when the real sample rate is known), not on a settings click.
 
 ```typescript
 interface PlaylistViewContextValue {
   sampleRate: number;
-  waveHeight: number;
-  barWidth: number;
-  barGap: number;
-  roundedBars: boolean;
-  progressBarWidth: number;
+  /** Whether tracks are drawn and analysed as one channel. Always false under the MediaElement provider. */
   mono: boolean;
-  /** Whether playback rolls past the end instead of auto-stopping (implies fillViewport) */
+  /** Whether playback continues past the end of the audio instead of stopping there.
+   *  Always false under the MediaElement provider. */
   indefinitePlayback: boolean;
-  /** Whether the timeline visually fills the scroll container (layout only) */
-  fillViewport: boolean;
 }
 ```
+
+The view options (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `fillViewport`) are not in this value. They are set with `<WaveformViewOptions>`; a component drawn inside a root reads the resolved values with `usePlaylistInfo()` from `@waveform-playlist/ui-components` (all but `fillViewport`, which has no reader).
 
 ### Settings (usePlaylistSettings)
 
@@ -524,24 +503,25 @@ interface TrackReorderPreviewContextValue {
 Create a custom wrapper with your application's defaults:
 
 ```tsx
-import { WaveformPlaylistProvider, WaveformPlaylistProviderProps } from '@waveform-playlist/browser';
+import type { ComponentProps, ReactNode } from 'react';
+import { WaveformPlaylistProvider, WaveformViewOptions } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 
-interface MyPlaylistProps extends Partial<WaveformPlaylistProviderProps> {
+// The props type is not exported; take it from the component.
+type ProviderProps = ComponentProps<typeof WaveformPlaylistProvider>;
+
+interface MyPlaylistProps extends Partial<ProviderProps> {
   tracks: ClipTrack[];
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 function MyPlaylistProvider({ tracks, children, ...props }: MyPlaylistProps) {
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={100}
-      theme={myTheme}
-      {...props}
-    >
-      {children}
-    </WaveformPlaylistProvider>
+    <WaveformViewOptions waveHeight={100}>
+      <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024} theme={myTheme} {...props}>
+        {children}
+      </WaveformPlaylistProvider>
+    </WaveformViewOptions>
   );
 }
 ```
@@ -558,7 +538,7 @@ interface WaveformPlaylistProviderProps {
 
   // Display
   samplesPerPixel?: number;
-  waveHeight?: number;
+  /** Draw and analyse every track as one channel. The provider computes the peaks with it. */
   mono?: boolean;
   zoomLevels?: number[];
   automaticScroll?: boolean;
@@ -575,15 +555,11 @@ interface WaveformPlaylistProviderProps {
 
   // Callbacks
   onReady?: () => void;
+  /** Called when audio/engine initialization fails. The provider already logs the error. */
+  onError?: (err: Error) => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** Called when engine clip operations (move/trim/split) update tracks */
   onTracksChange?: (tracks: ClipTrack[]) => void;
-
-  // Waveform rendering
-  barWidth?: number;
-  barGap?: number;
-  roundedBars?: boolean;
-  progressBarWidth?: number;
 
   // Advanced
   /** SoundFont cache for sample-based MIDI playback */
@@ -592,12 +568,10 @@ interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;
   /** Disable automatic stop when the cursor reaches the end of the longest
    *  track — the transport rolls until explicit stop (DAW style, = dawcore's
-   *  indefinite-playback). Implies fillViewport. Recording sessions suppress
-   *  the auto-stop automatically. */
+   *  indefinite-playback). The multitrack view then draws the timeline as wide
+   *  as its container, as <WaveformViewOptions fillViewport> does. Recording
+   *  sessions suppress the auto-stop automatically. */
   indefinitePlayback?: boolean;
-  /** Extend the timeline to fill the visible scroll container even when the
-   *  audio is shorter (layout only). Recording UIs typically want this. */
-  fillViewport?: boolean;
   /** Desired AudioContext sample rate. Pre-computed peaks (.dat) render
    *  instantly when they match. On mismatch, falls back to worker. */
   sampleRate?: number;
@@ -609,6 +583,7 @@ interface WaveformPlaylistProviderProps {
 ## See Also
 
 - [Waveform Component](/docs/react/api/components#waveform)
+- [WaveformViewOptions](/docs/react/api/components#waveformviewoptions)
 - [Core Context Hooks](/docs/react/api/hooks#core-context-hooks)
 - [usePlaybackControls Hook](/docs/react/api/hooks#useplaybackcontrols)
 - [useEditorControls Hook](/docs/react/api/hooks#useeditorcontrols)

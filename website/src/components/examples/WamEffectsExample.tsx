@@ -24,6 +24,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import {
   useAudioTracks,
@@ -569,14 +570,16 @@ const WamControls: React.FC<WamControlsProps> = ({
         </span>
       )}
     </TransportBar>
-    <WaveformRoot>
-      <WaveformTimescale />
-      <WaveformLoopRegion />
-      <WaveformTrackControls width={150} />
-      <WaveformTracks />
-      <WaveformSelection />
-      <WaveformPlayhead />
-    </WaveformRoot>
+    <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+      <WaveformRoot>
+        <WaveformTimescale />
+        <WaveformLoopRegion />
+        <WaveformTrackControls width={150} />
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </WaveformRoot>
+    </WaveformViewOptions>
   </>
 );
 
@@ -749,12 +752,9 @@ export function WamEffectsExample() {
         deferEngineRebuild={loading}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
-        waveHeight={100}
         theme={theme}
         automaticScroll
         effects={masterFx.masterEffects}
-        barWidth={2}
-        barGap={0}
       >
         <KeyboardShortcuts playback />
         <WamControls

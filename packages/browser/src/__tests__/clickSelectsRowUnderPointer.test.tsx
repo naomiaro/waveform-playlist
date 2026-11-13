@@ -12,6 +12,7 @@ import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { useSelectedTrackId } from '../contexts/playlistContexts';
 import { Waveform, WaveformEditor } from '../components/Waveform';
+import { WaveformViewOptions } from '../components/WaveformViewOptions';
 import type { ClipTrack, AudioClip, RenderMode } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -110,10 +111,11 @@ async function mount(tracks: ClipTrack[], showClipHeaders = false) {
       tracks={tracks}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
-      waveHeight={WAVE_HEIGHT}
     >
       <Probe />
-      {showClipHeaders ? <WaveformEditor /> : <Waveform />}
+      <WaveformViewOptions waveHeight={WAVE_HEIGHT}>
+        {showClipHeaders ? <WaveformEditor /> : <Waveform />}
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
   await waitFor(() => {

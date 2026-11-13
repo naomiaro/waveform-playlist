@@ -64,6 +64,31 @@ function PeakReadout({ meter }: { meter: MeterSource }) {
 }
 ```
 
+## The drawing context: `usePlaylistInfo()`
+
+The drawing primitives (`Track`, `SmartChannel`, `SmartScale`, `TimeScale`) read what they need from the view they are drawn in through `PlaylistInfoContext`. A root of `@waveform-playlist/browser` (`WaveformRoot`, `MediaElementWaveformRoot`) always publishes it for its view: the options of the `<WaveformViewOptions>` above it (the defaults for those not set), the provider's sample rate, the zoom and the height of the timescale strip. Only where there is no root above do the context's own defaults apply: `sampleRate` 48000, `samplesPerPixel` 1000, `waveHeight` 80, `timeScaleHeight` 15, `barWidth` 1, `barGap` 0, `roundedBars` false, `progressBarWidth` 1.
+
+```tsx
+import { usePlaylistInfo, type PlaylistInfo } from '@waveform-playlist/ui-components';
+
+const {
+  sampleRate,
+  samplesPerPixel,
+  waveHeight, // px of one channel; default 80
+  timeScaleHeight, // px of the timescale strip; inside a root, 0 when the view has none
+  barWidth, // default 1
+  barGap, // default 0
+  roundedBars, // default false
+  progressBarWidth, // px of the playhead line; default barWidth + barGap
+}: PlaylistInfo = usePlaylistInfo();
+```
+
+If you render `PlaylistInfoContext.Provider` yourself, give it every field of `PlaylistInfo` (`roundedBars` and `progressBarWidth` are required; `controls` and `zoomLevels` are no longer part of it). `DEFAULT_WAVE_HEIGHT` (80), `DEFAULT_BAR_WIDTH` (1) and `DEFAULT_BAR_GAP` (0) are exported.
+
+`Channel` never steps less than one pixel from one bar to the next: a `barWidth + barGap` under 1 is drawn with a step of 1.
+
+`SpectrogramChannel` takes the background of its area from the theme key `spectrogramBackgroundColor` (`#000` without it). That background shows until the spectrogram has been drawn and where a chunk is not mounted. A new `waveHeight` mounts new canvases, which are registered again through `onCanvasRegister`.
+
 ## Theming
 
 Wrap your tree in styled-components' `ThemeProvider` with a `WaveformPlaylistTheme` object — `defaultTheme` and `darkTheme` are exported as starting points and can be partially overridden:

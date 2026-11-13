@@ -32,7 +32,7 @@ import {
 } from './providerInternals/useAnnotationState';
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
-import { useViewDefaults } from './providerInternals/useViewDefaults';
+import { useMergedTheme } from './providerInternals/useMergedTheme';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
 import { incrementalTrackChange } from './utils/incrementalTrackChange';
@@ -120,8 +120,11 @@ import {
 
 export interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[]; // Updated to use clip-based model
+  /**
+   * Draw and analyse every track as one channel. A provider option, not a
+   * view option: the provider computes the peaks with it.
+   */
   mono?: boolean;
-  waveHeight?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
@@ -154,14 +157,6 @@ export interface WaveformPlaylistProviderProps {
   onError?: (err: Error) => void;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
-  /** Width in pixels of waveform bars. Default: 1 */
-  barWidth?: number;
-  /** Spacing in pixels between waveform bars. Default: 0 */
-  barGap?: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
-  roundedBars?: boolean;
-  /** Width in pixels of progress bars. Default: barWidth + barGap (fills gaps). */
-  progressBarWidth?: number;
   /** Callback when engine clip operations (move, trim, split) change tracks.
    * The provider calls this so the parent can update its tracks state without
    * triggering a full engine rebuild.
@@ -180,15 +175,12 @@ export interface WaveformPlaylistProviderProps {
   deferEngineRebuild?: boolean;
   /** Disable the automatic stop when the cursor reaches the end of the
    *  longest track — the transport rolls until an explicit stop/pause
-   *  (DAW-style). Implies the fillViewport layout. Recording sessions
-   *  suppress the auto-stop automatically, so most recording UIs don't
-   *  need this. */
+   *  (DAW-style). The multitrack view then draws the timeline as wide as its
+   *  container, as `<WaveformViewOptions fillViewport>` does. Recording
+   *  sessions suppress the auto-stop automatically, so most recording UIs
+   *  don't need this. A provider option, not a view option: the animation
+   *  loop and `seekTo` follow it. */
   indefinitePlayback?: boolean;
-  /** Extend the timeline (background + timescale) to fill the visible scroll
-   *  container even when the audio is shorter. Layout only. Recording UIs
-   *  typically want this so the empty timeline doesn't collapse to the audio
-   *  width. */
-  fillViewport?: boolean;
   /** Desired AudioContext sample rate. Creates a cross-browser AudioContext at
    *  this rate via standardized-audio-context. Pre-computed peaks (.dat files)
    *  render instantly when they match. On mismatch, falls back to worker. */
@@ -206,7 +198,6 @@ export interface WaveformPlaylistProviderProps {
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
   tracks,
   mono = false,
-  waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
   automaticScroll = false,
@@ -217,25 +208,15 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onReady,
   onError,
   onAnnotationsChange,
-  barWidth = 1,
-  barGap = 0,
-  roundedBars = false,
-  progressBarWidth: progressBarWidthProp,
   onTracksChange,
   soundFontCache,
   deferEngineRebuild = false,
   indefinitePlayback = false,
-  fillViewport = false,
   sampleRate: sampleRateProp,
   createAdapter,
   children,
 }) => {
-  const { mergedTheme, progressBarWidth } = useViewDefaults({
-    theme: userThemeProp,
-    barWidth,
-    barGap,
-    progressBarWidth: progressBarWidthProp,
-  });
+  const mergedTheme = useMergedTheme(userThemeProp);
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
   // create a new reference every render, which would trigger engine rebuild via
@@ -1896,26 +1877,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const viewValue: PlaylistViewContextValue = useMemo(
     () => ({
       sampleRate,
-      waveHeight,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
       mono,
       indefinitePlayback,
-      fillViewport,
     }),
-    [
-      sampleRate,
-      waveHeight,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
-      mono,
-      indefinitePlayback,
-      fillViewport,
-    ]
+    [sampleRate, mono, indefinitePlayback]
   );
 
   const settingsValue: PlaylistSettingsContextValue = useMemo(

@@ -16,6 +16,7 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   WaveformEditor,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import {
   BeatsAndBarsProvider,
@@ -223,11 +224,8 @@ export function BeatsAndBarsExample() {
       onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
-      waveHeight={100}
       automaticScroll
       theme={theme}
-      barWidth={4}
-      barGap={0}
       deferEngineRebuild={loading}
       indefinitePlayback
     >
@@ -340,7 +338,9 @@ export function BeatsAndBarsExample() {
             )}
           </Controls>
 
-          <WaveformEditor />
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformEditor />
+          </WaveformViewOptions>
         </ClipInteractionProvider>
       </BeatsAndBarsProvider>
     </WaveformPlaylistProvider>

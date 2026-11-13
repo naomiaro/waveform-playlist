@@ -23,7 +23,8 @@ const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
   },
 }))<WrapperProps>`
   position: absolute;
-  background: #000;
+  /* Shown until the worker has drawn, and where a chunk is not mounted. */
+  background: ${(props) => props.theme?.spectrogramBackgroundColor ?? '#000'};
   transform: translateZ(0);
   backface-visibility: hidden;
 `;
@@ -193,7 +194,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
 
     return (
       <SpectrogramCanvas
-        key={`${length}-${i}`}
+        // The height is in the key: a transferred canvas cannot be resized from
+        // here, and the provider renders at the height a canvas registered with.
+        key={`${length}-${waveHeight}-${i}`}
         $cssWidth={currentWidth}
         $left={chunkLeft}
         width={currentWidth * devicePixelRatio}

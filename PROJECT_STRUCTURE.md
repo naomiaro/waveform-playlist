@@ -311,7 +311,7 @@ const clip = createClipFromSeconds({
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
-  │   ├── useViewDefaults.ts            # merged theme, progressBarWidth
+  │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme
   │   └── useRequiredContext.ts         # a throwing context read (the providers' hooks use useSlot in contexts/playlistContexts.ts)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
@@ -368,6 +368,7 @@ const clip = createClipFromSeconds({
   │   ├── AnnotationList.tsx            # The annotation text list (both providers); not a part of a root
   │   ├── MediaElementWaveformRoot.tsx  # Root of the MediaElement view: one row, as long as the audio
   │   ├── waveformFrame.tsx             # What both roots share (internal): parts by place, scrolling frame, layout values, selection drag
+  │   ├── WaveformViewOptions.tsx       # View options (row height, bar style, playhead width, fillViewport): the context the roots resolve them from
   │   ├── MediaElementWaveform.tsx      # Ready-made composition for the MediaElement provider
   │   ├── ContextualControls.tsx        # Context-aware wrappers
   │   └── index.tsx                     # Component exports
@@ -770,7 +771,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     ├─→ PlaylistControlsContext (stable functions)
     │   └─→ play(), pause(), zoomIn(), setSelection(), etc.
     ├─→ PlaylistViewContext (prop changes)
-    │   └─→ sampleRate, waveHeight, bar style, mono, indefinitePlayback, fillViewport
+    │   └─→ sampleRate, mono, indefinitePlayback
     ├─→ PlaylistSettingsContext (the user changing a setting)
     │   └─→ timeFormat, isAutomaticScroll
     ├─→ PlaylistZoomContext (a zoom)
@@ -842,8 +843,8 @@ Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (
 8. **PlaybackControlsContext** (`usePlaybackControls()`) - The actions both providers have
    - The value never changes
 
-9. **PlaylistViewContext** (`usePlaylistView()`) - What the provider was configured with
-   - Sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport` (the last three always false under the MediaElement provider)
+9. **PlaylistViewContext** (`usePlaylistView()`) - What the provider was configured with that a view also reads
+   - `sampleRate`, `mono`, `indefinitePlayback` (the last two always false under the MediaElement provider). Row height, bar style, playhead width and `fillViewport` are `<WaveformViewOptions>`; a root resolves them and publishes them in ui-components' `PlaylistInfoContext`
    - Changes on a prop change, not on a settings click
 
 10. **PlaylistSettingsContext** (`usePlaylistSettings()`) - The two settings a user toggles
@@ -1023,14 +1024,8 @@ export interface EditorControlsContextValue {
 // 4. View - what the provider was configured with; changes on a prop change
 export interface PlaylistViewContextValue {
   sampleRate: number;
-  waveHeight: number;
-  barWidth: number;
-  barGap: number;
-  roundedBars: boolean;
-  progressBarWidth: number;
   mono: boolean;
   indefinitePlayback: boolean;       // Whether playback continues past end of audio
-  fillViewport: boolean;
 }
 
 // 4a. The two settings a user toggles

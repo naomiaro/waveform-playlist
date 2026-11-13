@@ -20,6 +20,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -74,8 +75,6 @@ export function StereoExample() {
       sampleRate={48000}
       samplesPerPixel={1024}
       theme={theme}
-      barWidth={2}
-      barGap={0}
     >
       <Controls>
         <PlayButton />
@@ -85,12 +84,14 @@ export function StereoExample() {
         {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
       </Controls>
 
-      <WaveformRoot>
-        <WaveformTrackControls />
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
+      <WaveformViewOptions barWidth={2} barGap={0}>
+        <WaveformRoot>
+          <WaveformTrackControls />
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

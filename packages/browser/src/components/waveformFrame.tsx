@@ -24,6 +24,7 @@ import {
   PlaylistInfoContext,
   useTheme,
   waveformColorToCss,
+  type PlaylistInfo,
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
 import {
@@ -47,9 +48,6 @@ import {
 } from './waveformLayoutContext';
 import { sortWaveformParts, WaveformTimescale } from './waveformParts';
 
-/** Height of the timescale strip in pixels, when a root has one. */
-const TIMESCALE_HEIGHT = 30;
-
 /**
  * The parts of the timescale strip, each under a key made of its kind and
  * its number among that kind, so that one coming or going
@@ -65,6 +63,7 @@ function keyedByKind(parts: ReactNode[]): ReactElement[] {
   });
 }
 import type { TracksMarkers } from './TrackRows';
+import type { ResolvedViewOptions } from './WaveformViewOptions';
 
 export interface WaveformPartsByPlace {
   /** The parts of the timescale strip in one element, or null when there is none. */
@@ -77,6 +76,8 @@ export interface WaveformPartsByPlace {
   tracksOptions: TracksMarkers;
   /** Width of the controls column the controls part asks for; 0 without one. */
   controlsWidth: number;
+  /** Height of the timescale strip the timescale part asks for; 0 without a strip. */
+  timescaleHeight: number;
 }
 
 /**
@@ -109,12 +110,15 @@ export function useWaveformParts(children: ReactNode): WaveformPartsByPlace {
       content: createElement(Fragment, null, ...sorted.content),
       tracksOptions: sorted.tracksOptions,
       controlsWidth: sorted.controlsWidth,
+      timescaleHeight: sorted.timescaleHeight,
     };
   }, [children]);
 }
 
 export interface WaveformFrameOptions {
   className: string | undefined;
+  /** From `useResolvedViewOptions()`; published here, memoized on its values, for everything drawn. */
+  viewOptions: ResolvedViewOptions;
   parts: WaveformPartsByPlace;
   /** Length of the drawn timeline in seconds. */
   displayDuration: number;
@@ -142,6 +146,7 @@ export interface WaveformFrameOptions {
  */
 export function useWaveformFrame({
   className,
+  viewOptions,
   parts,
   displayDuration,
   rows,
@@ -153,10 +158,11 @@ export function useWaveformFrame({
 }: WaveformFrameOptions): ReactElement {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { setScrollContainer } = usePlaybackControls();
-  const { sampleRate, waveHeight, barWidth, barGap, roundedBars } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
+  const { waveHeight, barWidth, barGap, roundedBars, progressBarWidth } = viewOptions;
   // The strip exists when a part is drawn in it: rendering the timescale (or
-  // the loop region) is the one switch.
-  const timeScaleHeight = parts.timescale ? TIMESCALE_HEIGHT : 0;
+  // the loop region) is the one switch, and the timescale part says how tall.
+  const timeScaleHeight = parts.timescaleHeight;
   const { samplesPerPixel } = usePlaylistZoom();
 
   const handleScrollContainerRef = useCallback(
@@ -176,29 +182,31 @@ export function useWaveformFrame({
     automaticScrollRef,
   } = useSelectionDrag({ samplesPerPixel, sampleRate, onPress, onClickWhileStopped });
 
-  // Memoized so that consumers of the context (every channel, the timescale)
-  // are not re-rendered by a render of the root that changed none of it.
-  const playlistInfo = useMemo(
+  // The one publication of what a view draws with (#689): the options of
+  // `<WaveformViewOptions>`, resolved by the root, with the zoom, the sample
+  // rate and the strip height. Memoized so that its readers (every channel,
+  // the timescale, the playhead) are not re-rendered by a render of the root
+  // that changed none of it.
+  const playlistInfo = useMemo<PlaylistInfo>(
     () => ({
       samplesPerPixel,
       sampleRate,
-      zoomLevels: [samplesPerPixel],
       waveHeight,
       timeScaleHeight,
-      controls: { show: controlsWidth > 0, width: controlsWidth },
       barWidth,
       barGap,
       roundedBars,
+      progressBarWidth,
     }),
     [
       samplesPerPixel,
       sampleRate,
       waveHeight,
       timeScaleHeight,
-      controlsWidth,
       barWidth,
       barGap,
       roundedBars,
+      progressBarWidth,
     ]
   );
 

@@ -24,13 +24,12 @@ const sampleData8bit = generateSamplePeaks(500, 8);
 const playlistInfo = {
   sampleRate: 48000,
   samplesPerPixel: 1000,
-  zoomLevels: [1000, 1500, 2000, 2500],
   waveHeight: 80,
   timeScaleHeight: 15,
-  controls: {
-    show: false,
-    width: 150,
-  },
+  barWidth: 1,
+  barGap: 0,
+  roundedBars: false,
+  progressBarWidth: 1,
 };
 
 const meta: Meta<typeof SmartChannel> = {

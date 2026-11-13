@@ -47,6 +47,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   useRecordingSession,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
@@ -708,37 +709,39 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
       {/* Waveform */}
       <ClipInteractionProvider>
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          <WaveformTrackControls width={TRACK_CONTROLS_WIDTH}>
-            <DefaultTrackControls />
-            <TrackRemoveButton onRemove={handleRemoveTrack} />
-          </WaveformTrackControls>
-          <WaveformTracks>
-            <WaveformClipHeaders />
-            {isRecording && recordingTrackId ? (
-              <WaveformRecordingPreview
-                recordingState={{
-                  isRecording: true,
-                  // The track the take was started on: selecting another
-                  // track mid-take does not move it.
-                  trackId: recordingTrackId,
-                  startSample: recordingStartSample,
-                  // A source, not values: only the preview clip follows the
-                  // take frame by frame; this component does not re-render.
-                  progress: recordingProgress,
-                  bits: 16,
-                  // Same override the hook uses, so the live preview matches the
-                  // finalized clip (otherwise preview uses the auto value).
-                  latencyOffset,
-                }}
-              />
-            ) : null}
-          </WaveformTracks>
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
+        <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0} fillViewport>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={TRACK_CONTROLS_WIDTH}>
+              <DefaultTrackControls />
+              <TrackRemoveButton onRemove={handleRemoveTrack} />
+            </WaveformTrackControls>
+            <WaveformTracks>
+              <WaveformClipHeaders />
+              {isRecording && recordingTrackId ? (
+                <WaveformRecordingPreview
+                  recordingState={{
+                    isRecording: true,
+                    // The track the take was started on: selecting another
+                    // track mid-take does not move it.
+                    trackId: recordingTrackId,
+                    startSample: recordingStartSample,
+                    // A source, not values: only the preview clip follows the
+                    // take frame by frame; this component does not re-render.
+                    progress: recordingProgress,
+                    bits: 16,
+                    // Same override the hook uses, so the live preview matches the
+                    // finalized clip (otherwise preview uses the auto value).
+                    latencyOffset,
+                  }}
+                />
+              ) : null}
+            </WaveformTracks>
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
       </ClipInteractionProvider>
 
       {/* Position display — bottom bar */}
@@ -794,12 +797,8 @@ export function RecordingExample() {
           onTracksChange={setTracks}
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}
-          waveHeight={100}
           automaticScroll
-          fillViewport
           theme={theme}
-          barWidth={1}
-          barGap={0}
         >
           <RecordingControlsInner
             tracks={tracks}

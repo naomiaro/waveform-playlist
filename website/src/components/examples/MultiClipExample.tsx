@@ -16,6 +16,7 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   WaveformEditor,
+  WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -217,11 +218,8 @@ export function MultiClipExample() {
       onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
-      waveHeight={100}
       automaticScroll={true}
       theme={theme}
-      barWidth={4}
-      barGap={0}
     >
       <ClipInteractionProvider>
         <KeyboardShortcuts playback clipSplitting undo />
@@ -248,7 +246,9 @@ export function MultiClipExample() {
           </ControlGroup>
         </Controls>
 
-        <WaveformEditor />
+        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+          <WaveformEditor />
+        </WaveformViewOptions>
       </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );

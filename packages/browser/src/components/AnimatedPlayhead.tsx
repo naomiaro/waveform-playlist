@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useId } from 'react';
 import styled from 'styled-components';
+import { usePlaylistInfo } from '@waveform-playlist/ui-components';
 import {
   useCurrentTime,
   usePlaylistView,
@@ -44,7 +45,9 @@ export const AnimatedPlayhead: React.FC<AnimatedPlayheadProps> = ({ color = '#ff
   // Subscribed for the re-render only: the resting-position effect below
   // reads the refs.
   useCurrentTime();
-  const { sampleRate, progressBarWidth } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
+  // The view option, published by the root (#689).
+  const { progressBarWidth } = usePlaylistInfo();
   const { samplesPerPixel } = usePlaylistZoom();
 
   // Register per-frame callback during playback

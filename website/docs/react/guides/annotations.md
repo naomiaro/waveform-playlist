@@ -636,6 +636,7 @@ import {
   WaveformAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
   AnnotationList,
   PlayButton,
   PauseButton,
@@ -681,7 +682,6 @@ function AnnotationsExample() {
     <WaveformPlaylistProvider
       tracks={tracks}
       samplesPerPixel={1024}
-      waveHeight={100}
       annotationList={{ annotations, editable: true, linkEndpoints: true }}
       onAnnotationsChange={setAnnotations}
     >
@@ -701,15 +701,17 @@ function AnnotationsExample() {
           <DownloadAnnotationsButton />
         </div>
 
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          <WaveformTrackControls />
-          <WaveformTracks />
-          <WaveformAnnotationBoxes getLabel={boxLabel} />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
+        <WaveformViewOptions waveHeight={100}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls />
+            <WaveformTracks />
+            <WaveformAnnotationBoxes getLabel={boxLabel} />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
         <AnnotationList height={200} actions={annotationActions} />
       </AnnotationProvider>
     </WaveformPlaylistProvider>
