@@ -130,8 +130,12 @@ export interface WaveformPlaylistTheme {
   annotationResizeHandleColor: string;
   annotationResizeHandleActiveColor: string;
   annotationTextItemHoverBackground: string;
-  /** The active row of the annotation list (its edge, tint and glow) and the list's focus rings. */
-  annotationTextItemActiveColor: string;
+  /**
+   * The active row of the annotation list (its edge, tint and glow) and the
+   * list's focus rings. Optional, so a complete theme object written before
+   * the key existed still type-checks; without it the colour is `#ff9800`.
+   */
+  annotationTextItemActiveColor?: string;
 
   // Playlist container background (falls back to waveOutlineColor when unset)
   playlistBackgroundColor?: string;

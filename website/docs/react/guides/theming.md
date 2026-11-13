@@ -302,7 +302,7 @@ interface WaveformPlaylistTheme {
   annotationResizeHandleColor: string;
   annotationResizeHandleActiveColor: string;
   annotationTextItemHoverBackground: string;
-  annotationTextItemActiveColor: string; // the active row of the annotation list and the list's focus rings
+  annotationTextItemActiveColor?: string; // optional (default '#ff9800'): the active row of the annotation list and the list's focus rings
 
   // Spacing and sizing
   borderRadius: string;

@@ -133,7 +133,7 @@ What each option does:
 | Option | On |
 |--------|----|
 | `editable` | The boxes show a handle on each edge, and an edge can be dragged. In the list, the text and the id of a row can be edited in place, and the `actions` buttons are shown. |
-| `linkEndpoints` | See [Linked Endpoints](#linked-endpoints). Read by the edge drag, by the keyboard shortcuts, and handed to list actions. |
+| `linkEndpoints` | See [Linked Endpoints](#linked-endpoints) for the edge drag. The boundary shortcuts read it too: with it on, a nudged edge moves the touching edge of the neighbour by the same step. It is also handed to list actions. |
 | `continuousPlay` | A clicked annotation plays from its start and playback runs on. Off: playback ends where the annotation ends. |
 
 ## The Two Components

@@ -768,11 +768,14 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
         annotationList: { annotations: [] },
       });
       expect(first.container.querySelector('[data-box-row]')).toBeNull();
+      // And mounts no drag provider for it.
+      expect(dragProviderProps).toHaveLength(0);
       cleanup();
       const second = await mount(kind, view(kind, <WaveformAnnotationBoxes />), {
         integration: null,
       });
       expect(second.container.querySelector('[data-box-row]')).toBeNull();
+      expect(dragProviderProps).toHaveLength(0);
     });
 
     it('works without a list, and the list without boxes', async () => {

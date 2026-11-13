@@ -209,8 +209,8 @@ describe('annotation boxes (#740)', () => {
   it('a click after continuous play is switched on plays on past the end', async () => {
     const { adapter } = await mount();
     const play = adapter.play as ReturnType<typeof vi.fn>;
-    // The click handler is a prop of every memoized box; it must be rebuilt
-    // when continuous play changes, not kept from the first render.
+    // The click handler is a prop of every memoized box and never changes:
+    // it reads continuous play when the click happens (#686).
     await act(async () => {
       probe.controls.setContinuousPlay(true);
     });

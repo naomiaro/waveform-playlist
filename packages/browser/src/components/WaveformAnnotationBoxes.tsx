@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -10,6 +10,7 @@ import {
   usePlaylistView,
   usePlaylistZoom,
 } from '../contexts/playlistContexts';
+import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
@@ -64,6 +65,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   // lyric sheet), on an empty timeline or past the end of a take (maintainer's
   // choice, #686). Under the MediaElement root the two lengths are the same.
   const { tracksFullWidth: width, displayDuration } = useWaveformExtent('The annotation boxes');
+  const integration = useContext(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -86,6 +88,9 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
     duration: displayDuration,
     linkEndpoints,
   });
+
+  // Nothing to draw: mount no drag provider either.
+  if (annotations.length === 0 || !integration) return null;
 
   return (
     <DragDropProvider

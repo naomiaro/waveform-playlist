@@ -104,8 +104,10 @@ export interface MediaElementPlaylistProviderProps {
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The annotations (followed) and the initial values of the three annotation
-   * options: `editable`, `linkEndpoints`, `isContinuousPlay`.
+   * The annotations and the three annotation options (`editable`,
+   * `linkEndpoints`, `isContinuousPlay`). The provider follows all four: an
+   * option takes a new value of its field, and a setter or checkbox changes
+   * it in between.
    */
   annotationList?: AnnotationListProp;
   /** Width of waveform bars */

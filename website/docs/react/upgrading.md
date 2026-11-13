@@ -1962,7 +1962,7 @@ Code that waited for `trackStates.length === tracks.length` to know that loading
 
 Apply this entry after the two above (#686).
 
-It replaces names that earlier entries on this page send you to. Where an earlier entry says `useAnnotationEditing()`, `useAnnotations().continuousPlay`, `useEditorControls().setLinkEndpoints` / `.setAnnotationsEditable`, `getAnnotationBoxLabel`, `PlaylistAnnotationList`, `MediaElementAnnotationList` or `MediaElementAnnotationBoxes`, or advises calling `useAnnotationDragHandlers` yourself, rendering the list only when there are annotations, or treating `WaveformAnnotationBoxes`, `LinkEndpointsCheckbox` and `EditableCheckbox` as `WaveformPlaylistProvider` only, go straight to what this entry says.
+It replaces names that earlier entries on this page send you to. Where an earlier entry says `useAnnotationEditing()`, `useAnnotations().continuousPlay`, `useEditorControls().setLinkEndpoints` / `.setAnnotationsEditable`, `getAnnotationBoxLabel`, `PlaylistAnnotationList`, `MediaElementAnnotationList` (with their `controls`, `annotationListConfig` and `renderAnnotationItem` props), `MediaElementAnnotationBoxes` or `onAnnotationUpdate`, says the ready-made views "take `className` and the annotation options they took before", or advises calling `useAnnotationDragHandlers` yourself, rendering the list only when there are annotations, or treating `WaveformAnnotationBoxes`, `LinkEndpointsCheckbox` and `EditableCheckbox` as `WaveformPlaylistProvider` only, go straight to what this entry says.
 
 The annotation options no longer sit on the ready-made views. There are two components, the same under `WaveformPlaylistProvider` and `MediaElementPlaylistProvider`, and each takes its own options:
 
@@ -1976,9 +1976,10 @@ import {
   WaveformPlayhead,
   AnnotationList,
 } from '@waveform-playlist/browser';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 // Defined outside the component: a new function renders every box or row.
-const boxLabel = (annotation, index) => String(index + 1);
+const boxLabel = (annotation: AnnotationData, index: number) => String(index + 1);
 
 <WaveformRoot>
   <WaveformTimescale />
@@ -2130,7 +2131,7 @@ const { setLinkEndpoints, setAnnotationsEditable, setContinuousPlay } = usePlayb
 
 **Find:** `useAnnotationDragHandlers` together with a `DragDropProvider` of yours around the view (the wiring the annotation examples had).
 
-**Replace with:** delete both, with the `useDragSensors` call that fed them. The row of boxes has its own `DragDropProvider`, and yours no longer receives the drag of an annotation edge. If the sensors were `useDragSensors({ touchOptimized: true })`, render `<ClipInteractionOptions touchOptimized>` above the view (a `ClipInteractionProvider touchOptimized` does the same):
+**Replace with:** delete both, with the `useDragSensors` call that fed them. The row of boxes has its own `DragDropProvider`, and yours no longer receives the drag of an annotation edge. If the sensors were `useDragSensors({ touchOptimized: true })`, render `<ClipInteractionOptions touchOptimized>` above the view (a `ClipInteractionProvider touchOptimized` sets it too, and also makes the clips below it draggable):
 
 ```tsx
 // Before
@@ -2174,8 +2175,8 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | `annotationList.editable` / `.linkEndpoints` on `MediaElementPlaylistProvider` | not accepted | accepted |
 | `WaveformPlaylistProvider`, `editable` on, no drag wiring of your own | handles shown, an edge could not be dragged | an edge can be dragged |
 | Your own `DragDropProvider` + `useAnnotationDragHandlers` around the view | moved the edges | receives no annotation drag; the part's own wiring moves them. Harmless, and dead code |
-| Touch drag of an edge under `MediaElementPlaylistProvider` | dnd-kit's default sensors | a pointer sensor that activates after 1 px; with `ClipInteractionOptions touchOptimized` above, a touch must be held 250 ms |
-| `useAnnotationOptions()`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` under `MediaElementPlaylistProvider` | the two checkboxes threw (`useAnnotationEditing needs <WaveformPlaylistProvider>`) | work |
+| Touch drag of an edge | `MediaElementPlaylistProvider`: dnd-kit's default sensors. `WaveformPlaylistProvider`: the sensors of your own wiring | a pointer sensor that activates after 1 px; with `ClipInteractionOptions touchOptimized` above, a touch must be held 250 ms |
+| `useAnnotationOptions()`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` under `MediaElementPlaylistProvider` | the two checkboxes threw (`useAnnotationEditing needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`) | work |
 | The annotation list under `MediaElementPlaylistProvider`, link endpoints | an action always got `linkEndpoints: false` from the list used on its own; the composition's prop from `<MediaElementWaveform>` | the provider's value |
 | An action's `continuousPlay` under `<MediaElementWaveform>` | always `false` (and no action could be given there) | the provider's value |
 | A click on a row of the list | nothing; the `onClick` given to a custom row did nothing | the annotation becomes active and plays from its start, as a click on its box does. In the default row a click in a field that is being edited, or on an action button, does not |
@@ -2183,13 +2184,18 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | The list with no annotations, rendered on its own | an empty box (as high as `height`) | nothing |
 | The list without `<AnnotationProvider>` | threw (also `<Waveform />` and `<MediaElementWaveform />` with annotations) | draws nothing; one development warning |
 | How far an edge can be dragged under `WaveformPlaylistProvider` | with your own wiring: as far as the `duration` you gave `useAnnotationDragHandlers` (the examples gave the audio's length: 0 on an empty timeline, where a dragged edge collapsed) | as far as the timeline is drawn, under both roots: past the end of the audio where the timeline is longer (an empty timeline's 60 s, a recording, a view that fills its container). Under `MediaElementPlaylistProvider` the drawn timeline is the audio, as before |
-| The boundary shortcuts of `<KeyboardShortcuts annotations>` | stop at the end of the audio | unchanged: they still stop at the end of the audio, so on an empty timeline `Shift+}` does not extend an annotation. Drag the edge there |
+| The boundary shortcuts of `<KeyboardShortcuts annotations>` (`Shift+[`, `Shift+]`) | stop at the end of the audio | unchanged, and now reachable in a new way: an end that was dragged past the audio is pulled back to the end of the audio by one press, and on an empty timeline one press sets the end to the start plus 0.1 s. Drag the edge there. Tracked in #801 |
 | A theme with its own `annotationBoxBorder` | ignored: the border of a box, and the glow of the active box, were a fixed `#ff9800` | applied to both. The dark default of the key changed from `#c49a6c` to `#ff9800`, so the default themes draw what they drew |
+| The tints and glows of the active list row, an edited field and the active box | fixed `rgba()` colours | `color-mix()` of the theme colour. In a browser without `color-mix()` (Safari before 16.2, Chrome before 111, Firefox before 113) they are not drawn; the active row keeps its edge and the active box its border |
+| A view with a `<WaveformAnnotationBoxes />` and annotations, under `WaveformPlaylistProvider` | no drag provider of the library's for annotations | the part's own `DragDropProvider` around the row (nothing is mounted while there are no annotations or no `<AnnotationProvider>`) |
+| Two annotation lists on one page | (one list) | each scrolls its own container to the active annotation. In a browser where `scrollIntoView` has no `container` option, both also scroll the page; give one of them `scrollActivePosition="none"` |
+| A row of the list and the keyboard | (a row did nothing) | a row is played with the pointer only: it cannot be focused. The annotation shortcuts of `<KeyboardShortcuts annotations>` (arrows, Enter) play and move between annotations, under `WaveformPlaylistProvider` |
+| `WaveformPlaylistTheme` | no `annotationTextItemActiveColor` | the key is optional in the type, so a complete theme object of yours still compiles; without it the colour is `#ff9800` |
 | The continuous-play toggle | rendered every reader of `useAnnotations()` | renders the readers of `useAnnotationOptions()`; readers of `useAnnotations()` stand still |
 | Toggling editable or link endpoints under `WaveformPlaylistProvider` | rendered readers of `useAnnotationEditing()` | renders readers of `useAnnotationOptions()`, which now include every reader of `continuousPlay` |
 | `WaveformAnnotationBoxes` under `MediaElementPlaylistProvider` | threw | works |
 | The ids of the three checkboxes | `continuous-play`, `link-endpoints`, `editable-annotations` | generated (two of one checkbox no longer share an id) |
-| Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | one more each (the part's `DragDropProvider`) |
+| Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | the same: the part gained its `DragDropProvider` and the list lost a wrapper. A view with boxes and no list renders one component more per move and per boundary |
 
 Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls`, `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />`, the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
 

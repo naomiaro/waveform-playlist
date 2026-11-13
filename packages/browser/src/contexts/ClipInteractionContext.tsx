@@ -4,7 +4,10 @@ import React, { createContext, useContext, useMemo } from 'react';
 export interface ClipInteractionContextValue {
   /** Clips can be dragged and trimmed. */
   enabled: boolean;
-  /** Clips widen their trim handles for touch. */
+  /**
+   * Touch handling below: clips widen their trim handles, and a touch on an
+   * annotation edge must be held (250 ms) before it drags.
+   */
   touchOptimized: boolean;
 }
 
@@ -15,7 +18,11 @@ const ClipInteractionContext = createContext<ClipInteractionContextValue>(NO_CLI
 export interface ClipInteractionOptionsProps {
   /** Clips below can be dragged and trimmed. Left out: inherited (false at the top). */
   enabled?: boolean;
-  /** Clips below get wider trim handles for touch. Left out: inherited (false at the top). */
+  /**
+   * Touch handling below: clips get wider trim handles, and a touch on an
+   * annotation edge must be held (250 ms) before it drags, so a swipe is not
+   * taken for a drag. Left out: inherited (false at the top).
+   */
   touchOptimized?: boolean;
   children: React.ReactNode;
 }

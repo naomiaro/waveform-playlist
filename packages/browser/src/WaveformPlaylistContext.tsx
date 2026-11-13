@@ -127,8 +127,10 @@ export interface WaveformPlaylistProviderProps {
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The annotations (followed) and the initial values of the three annotation
-   * options: `editable`, `linkEndpoints`, `isContinuousPlay`.
+   * The annotations and the three annotation options (`editable`,
+   * `linkEndpoints`, `isContinuousPlay`). The provider follows all four: an
+   * option takes a new value of its field, and a setter or checkbox changes
+   * it in between.
    */
   annotationList?: AnnotationListProp;
   /** Master effects chain (default Tone.js adapter only). */
