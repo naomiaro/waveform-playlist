@@ -1,5 +1,5 @@
-// #771: `react-hooks/rules-of-hooks` reports a conditional `useContext()` and
-// not a conditional `use()`. The `no-restricted-syntax` rule in the root
+// #771: `react-hooks/rules-of-hooks` reports a conditional read made with the
+// older context hook and not a conditional `use()`. The `no-restricted-syntax` rule in the root
 // `eslint.config.mjs` reports the forms below. This runs the real config over
 // each snippet as if it were a file of this package.
 //
