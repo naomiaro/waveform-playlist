@@ -24,18 +24,6 @@ const seen = vi.hoisted(() => ({
   firstState: null as string | null,
 }));
 
-vi.mock('../components/DefaultTrackControls', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../components/DefaultTrackControls')>();
-  const { createElement } = await import('react');
-  return {
-    ...actual,
-    DefaultTrackControls: (props: React.ComponentProps<typeof actual.DefaultTrackControls>) => {
-      seen.panelKinds.push(props.kind);
-      return createElement(actual.DefaultTrackControls, props);
-    },
-  };
-});
-
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
   const { createElement } = await import('react');
@@ -71,6 +59,13 @@ import {
   usePlaylistZoom,
   useEditorControls,
 } from '../contexts/playlistContexts';
+import { useTrack } from '../components/trackContext';
+
+/** A panel that records the kind of the track it is drawn for. */
+const KindSpy: React.FC = () => {
+  seen.panelKinds.push(useTrack().kind);
+  return null;
+};
 import { ComposedWaveform } from './testCompositions';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import {
@@ -269,7 +264,7 @@ describe('each option reaches its part (#685)', () => {
       volume: 1,
       pan: 0,
     } as unknown as ClipTrack;
-    await mount({}, { tracks: [TRACKS[0], midi] });
+    await mount({ trackControls: <KindSpy /> }, { tracks: [TRACKS[0], midi] });
     const kinds = [...document.querySelectorAll('[data-track-row]')].map((row) =>
       row.getAttribute('data-track-kind')
     );
@@ -319,8 +314,9 @@ describe('each option reaches its part (#685)', () => {
     expect(seen.gains.every((gain) => gain === 0.25)).toBe(true);
   });
 
-  it('renderTrackControls replaces the default panel of each track', async () => {
-    await mount({ renderTrackControls: (index) => <i data-custom-panel={index} /> });
+  it('children of the controls part replace the default panel of each track', async () => {
+    const Panel: React.FC = () => <i data-custom-panel={useTrack().index} />;
+    await mount({ trackControls: <Panel /> });
     expect(
       Array.from(document.querySelectorAll('[data-custom-panel]')).map((el) =>
         el.getAttribute('data-custom-panel')
@@ -329,7 +325,7 @@ describe('each option reaches its part (#685)', () => {
     expect(document.querySelectorAll('input[aria-label="Volume"]').length).toBe(0);
   });
 
-  it('onRemoveTrack draws a close button per track and is called with the index', async () => {
+  it('a remove button draws a close button per track and is called with the track id', async () => {
     const onRemoveTrack = vi.fn();
     await mount({ onRemoveTrack });
     const buttons = document.querySelectorAll('[title="Remove track"]');
@@ -337,10 +333,10 @@ describe('each option reaches its part (#685)', () => {
     await act(async () => {
       fireEvent.click(buttons[1]);
     });
-    expect(onRemoveTrack).toHaveBeenCalledWith(1);
+    expect(onRemoveTrack).toHaveBeenCalledWith(TRACKS[1].id);
   });
 
-  it('trackReordering draws a reorder rail per track', async () => {
+  it('a reorder grip draws a reorder rail per track', async () => {
     await mount({ trackReordering: true }, { dragProvider: true });
     expect(seen.rails).toBeGreaterThanOrEqual(2);
   });

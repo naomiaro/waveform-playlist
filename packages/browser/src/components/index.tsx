@@ -25,11 +25,21 @@ export { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
 export * from './PlaylistAnnotationList';
 export { KeyboardShortcuts } from './KeyboardShortcuts';
 export type { KeyboardShortcutsProps } from './KeyboardShortcuts';
-export { SortableTrackControls } from './SortableTrackControls';
-export type {
-  SortableTrackControlsProps,
-  SortableTrackControlsRenderProps,
-} from './SortableTrackControls';
+// The control panel of a track: the default one and the pieces it is made of (#687).
+export { DefaultTrackControls } from './DefaultTrackControls';
+export {
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+  TrackPanSlider,
+  TrackMenuButton,
+  TrackReorderGrip,
+  TrackRemoveButton,
+} from './TrackControlPieces';
+export type { TrackRemoveButtonProps } from './TrackControlPieces';
+export { useTrack } from './trackContext';
+export type { TrackContextValue } from './trackContext';
 
 // Re-export WaveformPlaylistProvider and types from context
 export { WaveformPlaylistProvider } from '../WaveformPlaylistContext';

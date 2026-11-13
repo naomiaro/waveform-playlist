@@ -38,6 +38,15 @@ import { useViewDefaults } from './providerInternals/useViewDefaults';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
 import { incrementalTrackChange } from './utils/incrementalTrackChange';
+import {
+  EMPTY_TRACK_MIXER,
+  alignTrackStates,
+  mixerForTracks,
+  mixerWithAddedTracks,
+  patchTrackState,
+  type TrackMixer,
+} from './utils/trackMixerState';
+import { warnOnce } from './components/partWarnings';
 
 // Types
 export interface ClipPeaks {
@@ -287,7 +296,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // `seekTo` from a layout effect of the same commit already gets the new end.
   const durationRef = useRef(duration);
   durationRef.current = duration;
-  const [trackStates, setTrackStates] = useState<TrackState[]>([]);
+  // The mixer state of the tracks, by track id (#687). The public
+  // `trackStates` array is derived from it and `tracks` below.
+  const [trackMixer, setTrackMixer] = useState<TrackMixer>(EMPTY_TRACK_MIXER);
   const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
   const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
   const [isReady, setIsReady] = useState(false);
@@ -364,7 +375,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     (trackId: string) => trackEffectsRef.current?.(trackId),
     []
   );
-  const trackStatesRef = useRef<TrackState[]>(trackStates);
+  const trackMixerRef = useRef<TrackMixer>(trackMixer);
+  // One entry per track, in the order of `tracks`; `undefined` for a track
+  // that is still loading. The previous array is handed back when no entry
+  // changed, so a move of a trim (new `tracks`, same mixer) does not change
+  // the mixer context value.
+  const alignedTrackStatesRef = useRef<TrackState[]>([]);
+  const trackStates = useMemo(() => {
+    const aligned = alignTrackStates(tracks, trackMixer, alignedTrackStatesRef.current);
+    alignedTrackStatesRef.current = aligned;
+    return aligned;
+  }, [tracks, trackMixer]);
   const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
@@ -495,8 +516,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Keep refs in sync with state
   useEffect(() => {
-    trackStatesRef.current = trackStates;
-  }, [trackStates]);
+    trackMixerRef.current = trackMixer;
+  }, [trackMixer]);
 
   tracksRef.current = tracks;
 
@@ -616,9 +637,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         [...filledTracks, ...addedTracks].forEach(assertTrackKind);
 
         // Merge current UI state into a track before handing it to the engine
-        const currentTrackStates = trackStatesRef.current;
+        const currentTrackMixer = trackMixerRef.current;
         const withUiState = (track: ClipTrack): ClipTrack => {
-          const trackState = currentTrackStates[tracks.indexOf(track)];
+          const trackState = currentTrackMixer.get(track.id);
           return {
             ...track,
             volume: trackState?.volume ?? track.volume,
@@ -653,24 +674,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Initialize track states for the new tracks (preserve existing), and
         // take the names of the filled ones ("x (loading...)" becomes "x").
-        const filledNames = new Map(filledTracks.map((t) => [tracks.indexOf(t), t.name]));
-        setTrackStates((prev) => {
-          const renamed = prev.some((state, i) => (filledNames.get(i) ?? state.name) !== state.name)
-            ? prev.map((state, i) => ({ ...state, name: filledNames.get(i) ?? state.name }))
-            : prev;
-          if (renamed.length === tracks.length) return renamed;
-          const newStates = [...renamed];
-          for (const track of addedTracks) {
-            newStates.push({
-              name: track.name,
-              muted: track.muted,
-              soloed: track.soloed,
-              volume: track.volume,
-              pan: track.pan,
-            });
-          }
-          return newStates;
-        });
+        setTrackMixer((prev) => mixerWithAddedTracks(prev, addedTracks, filledTracks));
 
         prevTracksRef.current = tracks;
         return;
@@ -695,7 +699,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     if (tracks.length === 0) {
       // Clear content state when all tracks are removed.
-      setTrackStates([]);
+      setTrackMixer(EMPTY_TRACK_MIXER);
 
       // Always keep a persistent engine alive — even with no tracks — so the
       // Transport is ready before playback/recording starts. Without this the
@@ -749,25 +753,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       try {
         const maxDuration = timelineDuration(tracks);
 
-        // Initialize or update track states, preserving existing UI state (mute/solo/volume/pan)
-        // Only initialize from ClipTrack props when trackStates is empty or track count changes
-        setTrackStates((prevStates) => {
-          if (prevStates.length === tracks.length) {
-            // Same number of tracks - preserve existing UI state, just update names
-            return prevStates.map((state, i) => ({
-              ...state,
-              name: tracks[i].name,
-            }));
-          }
-          // Track count changed - reinitialize from ClipTrack properties
-          return tracks.map((track) => ({
-            name: track.name,
-            muted: track.muted,
-            soloed: track.soloed,
-            volume: track.volume,
-            pan: track.pan,
-          }));
-        });
+        // A track the mixer knows keeps what the user set (and takes its
+        // current name); a new one starts from its ClipTrack fields; one that
+        // is gone is dropped. By id: the count and the order do not matter.
+        setTrackMixer((prev) => mixerForTracks(prev, tracks));
 
         // Dispose old engine before creating new one. Clear the ref with it:
         // the new adapter is created asynchronously below, and until the new
@@ -814,9 +803,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current);
 
         // Merge current UI state into tracks before passing to engine
-        const currentTrackStates = trackStatesRef.current;
-        const tracksWithState = tracks.map((track, index) => {
-          const trackState = currentTrackStates[index];
+        const currentTrackMixer = trackMixerRef.current;
+        const tracksWithState = tracks.map((track) => {
+          const trackState = currentTrackMixer.get(track.id);
           return {
             ...track,
             volume: trackState?.volume ?? track.volume,
@@ -859,30 +848,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             lastTracksVersionRef.current = state.tracksVersion;
             engineTracksRef.current = state.tracks;
 
-            // trackStates is positionally indexed (no track id of its own) and
-            // is otherwise never touched by reorderTrack — the engine reorder is
-            // "purely organizational" (see PlaylistEngine.reorderTrack) and never
-            // rebuilds. Without this, a track's mixer identity (name/mute/solo/
-            // volume/pan) stays pinned to its OLD index after a reorder, so the
-            // control panel silently shows/controls the wrong track. Re-derive an
-            // id->state map from the pre-reorder pairing (tracksRef/trackStatesRef
-            // reflect the last committed render, i.e. before this mutation) and
-            // re-project it onto the new track order. Guarded to same-length
-            // arrays (addTrack/removeTrack already flow through a full rebuild
-            // that reinitializes trackStates) and to an actual order change (so
-            // non-reorder structural mutations like moveClip/trimClip/splitClip
-            // — which don't change track order — are a no-op here).
-            const oldTracks = tracksRef.current;
-            const oldStates = trackStatesRef.current;
-            if (oldTracks.length === oldStates.length && oldTracks.length === state.tracks.length) {
-              const idToState = new Map(oldTracks.map((t, i) => [t.id, oldStates[i]]));
-              const reordered = state.tracks.map((t, i) => idToState.get(t.id) ?? oldStates[i]);
-              const orderChanged = reordered.some((s, i) => s !== oldStates[i]);
-              if (orderChanged) {
-                setTrackStates(reordered);
-              }
-            }
-
+            // A reorder needs nothing for the mixer: its state is kept by
+            // track id, and `trackStates` is derived from the new `tracks`.
             if (onTracksChange) {
               onTracksChange(state.tracks);
             } else {
@@ -1558,57 +1525,58 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   // Track controls
-  const setTrackMute = useCallback((trackIndex: number, muted: boolean) => {
-    const trackId = tracksRef.current[trackIndex]?.id;
-    if (!trackId) return;
+  // The four mixer setters take a track id (#687; an index until then).
+  const patchTrack = useCallback(
+    (setter: string, trackId: string, patch: Partial<TrackState>): boolean => {
+      if (typeof trackId !== 'string') {
+        warnOnce(
+          `${setter}() takes a track id since the track controls became parts: ` +
+            `${setter}(tracks[index].id, value). A call with anything but a string is ignored.`
+        );
+        return false;
+      }
+      if (!tracksRef.current.some((track) => track.id === trackId)) return false;
+      setTrackMixer((prev) => patchTrackState(prev, trackId, patch));
+      return true;
+    },
+    []
+  );
 
-    setTrackStates((prev) =>
-      prev.map((state, i) => (i === trackIndex ? { ...state, muted } : state))
-    );
+  const setTrackMute = useCallback(
+    (trackId: string, muted: boolean) => {
+      if (patchTrack('setTrackMute', trackId, { muted })) {
+        engineRef.current?.setTrackMute(trackId, muted);
+      }
+    },
+    [patchTrack]
+  );
 
-    if (engineRef.current) {
-      engineRef.current.setTrackMute(trackId, muted);
-    }
-  }, []);
+  const setTrackSolo = useCallback(
+    (trackId: string, soloed: boolean) => {
+      if (patchTrack('setTrackSolo', trackId, { soloed })) {
+        engineRef.current?.setTrackSolo(trackId, soloed);
+      }
+    },
+    [patchTrack]
+  );
 
-  const setTrackSolo = useCallback((trackIndex: number, soloed: boolean) => {
-    const trackId = tracksRef.current[trackIndex]?.id;
-    if (!trackId) return;
+  const setTrackVolume = useCallback(
+    (trackId: string, volume: number) => {
+      if (patchTrack('setTrackVolume', trackId, { volume })) {
+        engineRef.current?.setTrackVolume(trackId, volume);
+      }
+    },
+    [patchTrack]
+  );
 
-    setTrackStates((prev) =>
-      prev.map((state, i) => (i === trackIndex ? { ...state, soloed } : state))
-    );
-
-    if (engineRef.current) {
-      engineRef.current.setTrackSolo(trackId, soloed);
-    }
-  }, []);
-
-  const setTrackVolume = useCallback((trackIndex: number, volume: number) => {
-    const trackId = tracksRef.current[trackIndex]?.id;
-    if (!trackId) return;
-
-    setTrackStates((prev) =>
-      prev.map((state, i) => (i === trackIndex ? { ...state, volume } : state))
-    );
-
-    if (engineRef.current) {
-      engineRef.current.setTrackVolume(trackId, volume);
-    }
-  }, []);
-
-  const setTrackPan = useCallback((trackIndex: number, pan: number) => {
-    const trackId = tracksRef.current[trackIndex]?.id;
-    if (!trackId) return;
-
-    setTrackStates((prev) =>
-      prev.map((state, i) => (i === trackIndex ? { ...state, pan } : state))
-    );
-
-    if (engineRef.current) {
-      engineRef.current.setTrackPan(trackId, pan);
-    }
-  }, []);
+  const setTrackPan = useCallback(
+    (trackId: string, pan: number) => {
+      if (patchTrack('setTrackPan', trackId, { pan })) {
+        engineRef.current?.setTrackPan(trackId, pan);
+      }
+    },
+    [patchTrack]
+  );
 
   const reorderTrack = useCallback(
     (trackId: string, toIndex: number) => {

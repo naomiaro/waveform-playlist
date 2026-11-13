@@ -1,55 +1,51 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import { useContext, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/react/sortable';
 import { RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers';
 import { Feedback } from '@dnd-kit/dom';
 import type { Plugins } from '@dnd-kit/abstract';
 import { createDragPopoverHealer } from '../utils/dragPopoverHealer';
+import { TrackSlotWiringContext, useTrack } from '../components/trackContext';
 
-export interface SortableTrackControlsRenderProps {
-  /** Attach to the slot wrapper element (the sortable item). */
-  ref: (element: Element | null) => void;
-  /** Attach to the drag grip element. */
+export interface TrackReorderHandle {
+  /** Attach to the element the track is dragged by (a grip). */
   handleRef: (element: Element | null) => void;
+  /** True while this track is the one being dragged. */
   isDragSource: boolean;
-}
-
-export interface SortableTrackControlsProps {
-  trackId: string;
-  index: number;
-  disabled?: boolean;
-  children: (props: SortableTrackControlsRenderProps) => React.ReactNode;
 }
 
 const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move' });
 const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEEDBACK];
 
 /**
- * Registers a track-controls row as a vertical sortable item in the ambient
- * DragDropProvider (ClipInteractionProvider). The per-source modifiers
- * REPLACE the provider's clip modifiers for this operation, so track drags
- * are vertical-only and skip clip collision/snap. Data kind 'track-reorder'
+ * Makes the track whose control panel the caller is part of a vertical
+ * sortable item in the ambient `DragDropProvider` (`ClipInteractionProvider`),
+ * dragged by the element `handleRef` is attached to (#687; it replaces
+ * `SortableTrackControls`). `<TrackReorderGrip />` is this hook with the
+ * built-in grip; call it yourself for a grip of your own. Once per panel: two
+ * calls for one track register the same sortable id twice.
+ *
+ * The item that moves is the slot `<WaveformTrackControls>` draws around the
+ * panel, not an element of the caller. The per-source modifiers REPLACE the
+ * provider's clip modifiers for this operation, so track drags are
+ * vertical-only and skip clip collision and snap. Data kind 'track-reorder'
  * is the discriminator the shared drag handlers branch on.
  */
-export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
-  trackId,
-  index,
-  disabled = false,
-  children,
-}) => {
+export function useTrackReorderHandle(): TrackReorderHandle {
+  const { id, index } = useTrack();
+  const wiring = useContext(TrackSlotWiringContext);
   const { ref, handleRef, isDragSource } = useSortable({
-    id: `track-reorder-${trackId}`,
+    id: `track-reorder-${id}`,
     index,
     group: 'playlist-tracks',
     type: 'track',
     accept: ['track'],
-    data: { kind: 'track-reorder', trackId },
+    data: { kind: 'track-reorder', trackId: id },
     modifiers: [RestrictToVerticalAxis],
-    disabled,
     // Per-entity Feedback config (@dnd-kit 0.5+ moved `feedback` out of the
     // hook options into `plugins`). The FUNCTION form extends the sortable's
     // default plugins — a bare array would silently drop
     // OptimisticSortingPlugin, which drives the live `sortable.index` that
-    // drag-commit reads (covered by sortableTrackControlsFeedbackPlugins.test).
+    // drag-commit reads (covered by trackReorderHandleFeedbackPlugins.test).
     //
     // feedback: 'move' (NOT 'none' — see below) disables the Feedback
     // plugin's placeholder/clone splicing for this sortable while KEEPING its
@@ -73,11 +69,26 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
     // 'none', collision (and therefore sortable.index) never updates, so
     // drag-based reordering silently never commits. Boundary trims don't hit
     // this because they're plain useDraggable (no collision-based commit) —
-    // sortables need shape. `isDragSource` (box-shadow lift feedback below)
-    // is a reactive signal, unaffected either way. See browser/CLAUDE.md
-    // "Track Reordering".
+    // sortables need shape. `isDragSource` is a reactive signal, unaffected
+    // either way. See browser/CLAUDE.md "Track Reordering".
     plugins: withMoveFeedback,
   });
+
+  // The sortable item is the slot's element, which the part owns: it is
+  // handed to dnd-kit here, after the commit that mounted it.
+  useEffect(() => {
+    if (!wiring) return undefined;
+    ref(wiring.elementRef.current);
+    return () => ref(null);
+  }, [ref, wiring]);
+
+  // The slot draws itself lifted (opaque, with a shadow) while it is dragged.
+  useEffect(() => {
+    if (!wiring) return undefined;
+    wiring.setDragSource(isDragSource);
+    return () => wiring.setDragSource(false);
+  }, [isDragSource, wiring]);
+
   // `feedback: 'move'` opts out of dnd-kit's placeholder — and with it the
   // plugin's own popover-recovery MutationObserver, which is only created
   // when a placeholder exists. OptimisticSortingPlugin's mid-drag
@@ -85,17 +96,11 @@ export const SortableTrackControls: React.FC<SortableTrackControlsProps> = ({
   // (eventlessly, per spec), leaving the dragged row UA-hidden
   // (`[popover]:not(:popover-open) { display: none }`) for the rest of the
   // drag. Run our own healer while this row is the drag source.
-  const elementRef = useRef<HTMLElement | null>(null);
-  const composedRef = useCallback(
-    (element: Element | null) => {
-      elementRef.current = element instanceof HTMLElement ? element : null;
-      ref(element);
-    },
-    [ref]
-  );
   useEffect(() => {
-    if (!isDragSource || !elementRef.current) return undefined;
-    return createDragPopoverHealer(elementRef.current);
-  }, [isDragSource]);
-  return <>{children({ ref: composedRef, handleRef, isDragSource })}</>;
-};
+    const element = wiring?.elementRef.current;
+    if (!isDragSource || !element) return undefined;
+    return createDragPopoverHealer(element);
+  }, [isDragSource, wiring]);
+
+  return { handleRef, isDragSource };
+}

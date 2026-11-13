@@ -1,183 +1,56 @@
 import React from 'react';
+import styled from 'styled-components';
+import { ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
 import {
-  CloseButton,
-  Controls,
-  Header,
-  Button,
-  ButtonGroup,
-  Slider,
-  SliderWrapper,
-  VolumeDownIcon,
-  VolumeUpIcon,
-  TrackMenu,
-  ReorderRail,
-} from '@waveform-playlist/ui-components';
-import type { RenderMode, TrackKind } from '@waveform-playlist/core';
-import type { TrackState } from '../WaveformPlaylistContext';
-import type { SpectrogramIntegration } from '../SpectrogramIntegrationContext';
-
-export interface DefaultTrackControlsProps {
-  trackIndex: number;
-  trackId: string;
-  trackState: TrackState;
-  /** Audio (default) or MIDI. A MIDI track gets no render-mode menu. */
-  kind?: TrackKind;
-  effectiveRenderMode: RenderMode;
-  selectTrack: (trackIndex: number) => void;
-  onRemoveTrack?: (trackIndex: number) => void;
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
-  spectrogram: SpectrogramIntegration | null;
-  setSettingsModalTrackId: (id: string | null) => void;
-  trackReordering: boolean;
-  reorderTrack: (trackId: string, toIndex: number) => void;
-  trackCount: number;
-  /** Attach to the drag grip element (the `handleRef` from SortableTrackControls). */
-  gripRef?: (element: Element | null) => void;
-  /** True while the track has no mixer state yet (still loading): the mixer
-   *  and reorder controls cannot take effect, so they render disabled. */
-  disabled: boolean;
-}
+  TrackMenuButton,
+  TrackMuteButton,
+  TrackName,
+  TrackPanSlider,
+  TrackSoloButton,
+  TrackVolumeSlider,
+} from './TrackControlPieces';
 
 /**
- * Default track control panel: name/close header, mute/solo, volume/pan sliders,
- * plus an optional drag grip and move up/down buttons when `trackReordering` is
- * enabled. Extracted into its own component (used both directly and wrapped in
- * SortableTrackControls) so the trackReordering branch doesn't change the hook
- * count of the shared JSX.
- *
- * Memoized (#693): every prop is a primitive, a stable callback or this
- * track's own `trackState` object, so a mixer change on one track re-renders
- * that track's panel only.
+ * The frame of the default panel. It makes room on both sides when a
+ * `<TrackReorderGrip />` is rendered beside it (the grip sits at the right
+ * edge of the slot, over the panel).
  */
-function DefaultTrackControlsImpl({
-  trackIndex,
-  trackId,
-  trackState,
-  kind,
-  effectiveRenderMode,
-  selectTrack,
-  onRemoveTrack,
-  setTrackMute,
-  setTrackSolo,
-  setTrackVolume,
-  setTrackPan,
-  spectrogram,
-  setSettingsModalTrackId,
-  trackReordering,
-  reorderTrack,
-  trackCount,
-  gripRef,
-  disabled,
-}: DefaultTrackControlsProps) {
+const Frame = styled(Controls)`
+  *:has(> [data-track-reorder-grip]) > & {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+`;
+
+const HEADER_STYLE = { justifyContent: 'center', position: 'relative' } as const;
+const MENU_ANCHOR_STYLE = { position: 'absolute', right: 0, top: 0 } as const;
+
+/**
+ * The default control panel of a track: its name, the track menu (under a
+ * `<SpectrogramProvider>`, for an audio track), mute, solo, volume and pan.
+ * It is what `<WaveformTrackControls />` renders when it has no children
+ * (#687). It has no remove button and no reorder grip: render
+ * `<TrackRemoveButton />` or `<TrackReorderGrip />` beside it for those, or
+ * your own control, or compose a panel from the pieces.
+ *
+ * It takes no props and reads no context itself: the pieces read the track.
+ */
+function DefaultTrackControlsImpl() {
   return (
-    <Controls
-      onClick={() => selectTrack(trackIndex)}
-      style={
-        trackReordering ? { position: 'relative', paddingLeft: 18, paddingRight: 18 } : undefined
-      }
-    >
-      <Header style={{ justifyContent: 'center', position: 'relative' }}>
-        {onRemoveTrack && (
-          <CloseButton
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemoveTrack(trackIndex);
-            }}
-          />
-        )}
-        <span
-          style={{
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            padding: '0 24px',
-            display: 'block',
-          }}
-        >
-          {trackState.name || `Track ${trackIndex + 1}`}
+    <Frame>
+      <Header style={HEADER_STYLE}>
+        <TrackName />
+        <span style={MENU_ANCHOR_STYLE}>
+          <TrackMenuButton />
         </span>
-        {/* Render modes and spectrogram settings are for audio tracks: a MIDI
-            track is always a piano roll, so the menu would offer nothing. */}
-        {spectrogram?.renderMenuItems && kind !== 'midi' && (
-          <span style={{ position: 'absolute', right: 0, top: 0 }}>
-            <TrackMenu
-              items={(onClose) =>
-                spectrogram.renderMenuItems!({
-                  renderMode: effectiveRenderMode,
-                  onRenderModeChange: (mode) => spectrogram.setTrackRenderMode(trackId, mode),
-                  onOpenSettings: () => setSettingsModalTrackId(trackId),
-                  onClose,
-                })
-              }
-            />
-          </span>
-        )}
       </Header>
       <ButtonGroup>
-        <Button
-          $variant={trackState.muted ? 'danger' : 'outline'}
-          aria-pressed={trackState.muted}
-          disabled={disabled}
-          onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-        >
-          Mute
-        </Button>
-        <Button
-          $variant={trackState.soloed ? 'info' : 'outline'}
-          aria-pressed={trackState.soloed}
-          disabled={disabled}
-          onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-        >
-          Solo
-        </Button>
+        <TrackMuteButton />
+        <TrackSoloButton />
       </ButtonGroup>
-      <SliderWrapper>
-        <VolumeDownIcon />
-        <Slider
-          min="0"
-          max="1"
-          step="0.01"
-          value={trackState.volume}
-          aria-label="Volume"
-          disabled={disabled}
-          onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
-        />
-        <VolumeUpIcon />
-      </SliderWrapper>
-      <SliderWrapper>
-        <span>L</span>
-        <Slider
-          min="-1"
-          max="1"
-          step="0.01"
-          value={trackState.pan}
-          aria-label="Pan"
-          disabled={disabled}
-          onChange={(e) => setTrackPan(trackIndex, parseFloat(e.target.value))}
-        />
-        <span>R</span>
-      </SliderWrapper>
-      {trackReordering && (
-        <ReorderRail
-          style={{ position: 'absolute', right: 2, top: '50%', transform: 'translateY(-50%)' }}
-          gripRef={gripRef as React.Ref<HTMLButtonElement>}
-          onGripClick={(e) => e.stopPropagation()}
-          upDisabled={disabled || trackIndex === 0}
-          downDisabled={disabled || trackIndex === trackCount - 1}
-          onMoveUp={(e) => {
-            e.stopPropagation();
-            reorderTrack(trackId, trackIndex - 1);
-          }}
-          onMoveDown={(e) => {
-            e.stopPropagation();
-            reorderTrack(trackId, trackIndex + 1);
-          }}
-        />
-      )}
-    </Controls>
+      <TrackVolumeSlider />
+      <TrackPanSlider />
+    </Frame>
   );
 }
 

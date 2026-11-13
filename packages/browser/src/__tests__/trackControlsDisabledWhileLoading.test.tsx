@@ -75,7 +75,8 @@ function createFakeAdapter(): PlayoutAdapter {
 
 let trackStateCount = -1;
 const Probe: React.FC = () => {
-  trackStateCount = usePlaylistMixer().trackStates.length;
+  // One entry per track since #687; the entry of a loading track is undefined.
+  trackStateCount = usePlaylistMixer().trackStates.filter(Boolean).length;
   return null;
 };
 

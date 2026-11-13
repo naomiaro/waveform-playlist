@@ -209,11 +209,13 @@ export interface EditorControlsContextValue {
    */
   setCurrentTime: (time: number) => void;
 
-  // Track controls
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id (#687; by index until then). An id no track has
+  // is ignored. Inside a track's control panel, `useTrack()` has the same
+  // actions already bound to that track.
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. The reordered tracks

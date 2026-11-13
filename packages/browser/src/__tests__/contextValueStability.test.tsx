@@ -262,7 +262,7 @@ describe('provider context values keep their identity (#691)', () => {
     const editorBefore = probe.editor;
 
     await act(async () => {
-      probe.editor.setTrackVolume(0, 0.4);
+      probe.editor.setTrackVolume('track-1', 0.4);
     });
 
     expect(probe.mixer.trackStates[0].volume).toBe(0.4);
@@ -363,10 +363,10 @@ describe('provider context values keep their identity (#691)', () => {
     await mount();
 
     await act(async () => {
-      probe.editor.setTrackMute(0, true);
-      probe.editor.setTrackVolume(0, 0.3);
-      probe.editor.setTrackPan(1, -0.5);
-      probe.editor.setTrackSolo(1, true);
+      probe.editor.setTrackMute('track-1', true);
+      probe.editor.setTrackVolume('track-1', 0.3);
+      probe.editor.setTrackPan('track-2', -0.5);
+      probe.editor.setTrackSolo('track-2', true);
     });
 
     expect(probe.mixer.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
