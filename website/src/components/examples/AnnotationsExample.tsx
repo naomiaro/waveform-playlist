@@ -22,10 +22,6 @@ import {
   TimeFormatSelect,
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
-  ContinuousPlayCheckbox,
-  LinkEndpointsCheckbox,
-  DownloadAnnotationsButton,
-  EditableCheckbox,
   AudioPosition,
   WaveformRoot,
   WaveformTimescale,
@@ -44,7 +40,14 @@ import {
   useAnnotations,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
+import {
+  AnnotationProvider,
+  parseAeneas,
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+  DownloadAnnotationsButton,
+  EditableCheckbox,
+} from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { sonnetNotes as defaultNotes } from './sonnetAnnotations';
 

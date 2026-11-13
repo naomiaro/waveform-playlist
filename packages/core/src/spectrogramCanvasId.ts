@@ -15,6 +15,26 @@
  * pure string contract with no FFT/compute dependency.
  */
 
+/**
+ * What a spectrogram canvas registers with: the canvas handed over to the
+ * worker and where it sits. Declared here, once, because the component that
+ * registers (`SpectrogramChannel` in ui-components), the context that carries
+ * the call (browser) and the provider that receives it (spectrogram) are three
+ * packages that all depend on core.
+ *
+ * The receiver looks the track up from `clipId` and derives the canvas's pixel
+ * offset from `chunkIndex`.
+ */
+export interface SpectrogramCanvasRegistration {
+  canvasId: string;
+  canvas: OffscreenCanvas;
+  clipId: string;
+  channelIndex: number;
+  chunkIndex: number;
+  widthPx: number;
+  heightPx: number;
+}
+
 export interface SpectrogramCanvasIdParts {
   clipId: string;
   channelIndex: number;

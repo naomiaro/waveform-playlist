@@ -1,7 +1,11 @@
 import React from 'react';
 import styled from 'styled-components';
 import type { RenderMode } from '@waveform-playlist/core';
-import type { TrackMenuItem } from './types';
+import type { SpectrogramIntegration } from '@waveform-playlist/browser';
+
+/** The items browser's track menu asks the spectrogram integration for:
+ *  ui-components' `TrackMenuItem[]`, named through the type that carries it. */
+type MenuItems = ReturnType<NonNullable<SpectrogramIntegration['renderMenuItems']>>;
 
 const SectionLabel = styled.div`
   font-size: 0.65rem;
@@ -58,14 +62,15 @@ export interface SpectrogramMenuItemsProps {
 }
 
 /**
- * Returns TrackMenuItem[] for the spectrogram display mode radios and settings button.
+ * Returns the track menu items (`TrackMenuItem[]` of ui-components) for the
+ * spectrogram display mode radios and settings button.
  */
 export function SpectrogramMenuItems({
   renderMode,
   onRenderModeChange,
   onOpenSettings,
   onClose,
-}: SpectrogramMenuItemsProps): TrackMenuItem[] {
+}: SpectrogramMenuItemsProps): MenuItems {
   return [
     {
       id: 'spectrogram-display',

@@ -94,11 +94,6 @@ import { MediaElementWaveformRoot } from '../components/MediaElementWaveformRoot
 import { WaveformTracks } from '../components/waveformParts';
 import { WaveformAnnotationBoxes } from '../components/WaveformAnnotationBoxes';
 import { AnnotationList } from '../components/AnnotationList';
-import {
-  ContinuousPlayCheckbox,
-  EditableCheckbox,
-  LinkEndpointsCheckbox,
-} from '../components/AnnotationControls';
 import { ClipInteractionOptions } from '../contexts/ClipInteractionContext';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
 import { resetPartWarnings } from '../components/partWarnings';
@@ -222,24 +217,10 @@ const FakeAnnotationText: React.FC<AnnotationTextIntegrationProps> = (props) => 
   listProps.push(props);
   return <div data-list />;
 };
-const FakeCheckbox =
-  (name: string): React.FC<{ checked: boolean; onChange: (checked: boolean) => void }> =>
-  ({ checked, onChange }) => (
-    <input
-      type="checkbox"
-      aria-label={name}
-      checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-    />
-  );
-
 const INTEGRATION = {
   AnnotationBox: FakeBox,
   AnnotationBoxesWrapper: FakeWrapper,
   AnnotationText: FakeAnnotationText,
-  ContinuousPlayCheckbox: FakeCheckbox('continuous'),
-  LinkEndpointsCheckbox: FakeCheckbox('link'),
-  EditableCheckbox: FakeCheckbox('editable'),
 } as unknown as AnnotationIntegration;
 
 let probe: {
@@ -392,6 +373,20 @@ describe('the annotation exports (#686)', () => {
       expect(names).not.toContain(gone);
     }
   });
+
+  it('leaves the checkboxes, the download button and core\'s keyboard helpers to their owners (#770)', () => {
+    const names = Object.keys(browser);
+    for (const gone of [
+      'ContinuousPlayCheckbox',
+      'LinkEndpointsCheckbox',
+      'EditableCheckbox',
+      'DownloadAnnotationsButton',
+      'getShortcutLabel',
+      'handleKeyboardEvent',
+    ]) {
+      expect(names).not.toContain(gone);
+    }
+  });
 });
 
 describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider'])(
@@ -493,29 +488,6 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(probe.options).toEqual({ editable: false, linkEndpoints: true, continuousPlay: true });
       setAnnotationList({ annotations: ANNOTATIONS, editable: true, linkEndpoints: false });
       expect(probe.options).toEqual({ editable: true, linkEndpoints: true, continuousPlay: true });
-    });
-
-    it('the three checkboxes show and set them', async () => {
-      const { getByLabelText } = await mount(
-        kind,
-        <>
-          <ContinuousPlayCheckbox />
-          <LinkEndpointsCheckbox />
-          <EditableCheckbox />
-        </>,
-        { annotationList: { annotations: ANNOTATIONS, linkEndpoints: true } }
-      );
-      const checked = () =>
-        ['continuous', 'link', 'editable'].map(
-          (name) => (getByLabelText(name) as HTMLInputElement).checked
-        );
-      expect(checked()).toEqual([false, true, false]);
-      fireEvent.click(getByLabelText('continuous'));
-      fireEvent.click(getByLabelText('link'));
-      fireEvent.click(getByLabelText('editable'));
-      expect(probe.options).toEqual({ editable: true, linkEndpoints: false, continuousPlay: true });
-      // Each box shows its own option, also when the option is on.
-      expect(checked()).toEqual([true, false, true]);
     });
   }
 );

@@ -135,9 +135,6 @@ const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
   }
 `;
 
-// Re-export from core
-export type { RenderAnnotationItemProps } from '@waveform-playlist/core';
-
 export interface AnnotationTextProps {
   annotations: AnnotationData[];
   activeAnnotationId?: string;

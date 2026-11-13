@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { handleKeyboardEvent, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
+import { handleKeyboardEvent, type KeyboardShortcut } from '@waveform-playlist/core';
 
 function makeKeyboardEvent(
   key: string,

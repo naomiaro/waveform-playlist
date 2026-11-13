@@ -1,6 +1,3 @@
-// Export types from playout
-export type { EffectsFunction, TrackEffectsFunction } from '@waveform-playlist/playout';
-
 // Export new flexible/headless API
 export { WaveformPlaylistProvider } from './WaveformPlaylistContext';
 export type { TrackState, ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
@@ -69,7 +66,6 @@ export {
   useDragSensors,
   useClipSplitting,
   useKeyboardShortcuts,
-  getShortcutLabel,
   usePlaybackShortcuts,
   useZoomControls,
   useTimeFormat,
@@ -102,10 +98,6 @@ export {
   AudioPosition,
   SelectionTimeInputs,
   AutomaticScrollCheckbox,
-  ContinuousPlayCheckbox,
-  LinkEndpointsCheckbox,
-  EditableCheckbox,
-  DownloadAnnotationsButton,
   Waveform,
   WaveformEditor,
   MediaElementWaveform,
@@ -160,12 +152,6 @@ export type { MediaElementWaveformProps } from './components/MediaElementWavefor
 export type { AnnotationListProps } from './components/AnnotationList';
 export type { AnnotationListProp } from './providerInternals/useAnnotationState';
 
-// Re-export TimeFormat type from ui-components for convenience
-export type { TimeFormat } from '@waveform-playlist/ui-components';
-
-// Re-export core types for convenience
-export type { ClipTrack, AudioClip, Fade, AnnotationData } from '@waveform-playlist/core';
-
 // Export annotation callback types for Waveform components
 export type { GetAnnotationBoxLabelFn } from './types/annotations';
 
@@ -181,10 +167,7 @@ export {
   SpectrogramIntegrationProvider,
   useSpectrogramIntegration,
 } from './SpectrogramIntegrationContext';
-export type {
-  SpectrogramIntegration,
-  SpectrogramCanvasRegistration,
-} from './SpectrogramIntegrationContext';
+export type { SpectrogramIntegration } from './SpectrogramIntegrationContext';
 
 // Export ClipInteractionProvider for encapsulated drag/trim/snap/collision setup
 export { ClipInteractionProvider } from './components/ClipInteractionProvider';

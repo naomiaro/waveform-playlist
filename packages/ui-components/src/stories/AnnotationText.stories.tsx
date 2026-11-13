@@ -53,7 +53,7 @@ const meta: Meta<typeof AnnotationText> = {
     docs: {
       description: {
         component:
-          'Displays a scrollable list of annotations with time ranges. Shows hardcoded light theme colors that need dark theme support.',
+          'Displays a scrollable list of annotations with time ranges. Its colours come from the theme (light fallbacks without one).',
       },
     },
   },

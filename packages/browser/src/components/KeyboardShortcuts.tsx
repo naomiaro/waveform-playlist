@@ -1,5 +1,5 @@
 import React from 'react';
-import type { KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { usePlaybackShortcuts } from '../hooks/usePlaybackShortcuts';
 import { useClipSplitting } from '../hooks/useClipSplitting';
 import { useAnnotationKeyboardControls } from '../hooks/useAnnotationKeyboardControls';

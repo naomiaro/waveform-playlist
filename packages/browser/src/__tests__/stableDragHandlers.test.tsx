@@ -40,7 +40,8 @@ vi.mock('@dnd-kit/react', () => ({
 vi.mock('../hooks/useDragSensors', () => ({ useDragSensors: () => [] }));
 
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
-import { useKeyboardShortcuts, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 

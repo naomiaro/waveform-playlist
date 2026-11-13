@@ -13,9 +13,6 @@ import {
   WaveformTimescale,
   WaveformAnnotationBoxes,
   AnnotationList,
-  ContinuousPlayCheckbox,
-  EditableCheckbox,
-  LinkEndpointsCheckbox,
   DefaultTrackControls,
   TrackName,
   TrackMuteButton,
@@ -30,7 +27,12 @@ import {
   AudioPosition,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { AnnotationProvider } from '@waveform-playlist/annotations';
+import {
+  AnnotationProvider,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  LinkEndpointsCheckbox,
+} from '@waveform-playlist/annotations';
 import type { AnnotationData, RenderAnnotationItemProps } from '@waveform-playlist/core';
 
 const meta: Meta<typeof Waveform> = {

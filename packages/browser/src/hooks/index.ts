@@ -31,8 +31,8 @@ export type { DragSensorOptions } from './useDragSensors';
 export { useClipSplitting } from './useClipSplitting';
 export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipSplitting';
 
-export { useKeyboardShortcuts, getShortcutLabel } from './useKeyboardShortcuts';
-export type { KeyboardShortcut, UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';
+export { useKeyboardShortcuts } from './useKeyboardShortcuts';
+export type { UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';
 
 export { usePlaybackShortcuts } from './usePlaybackShortcuts';
 export type {

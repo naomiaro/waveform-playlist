@@ -5,6 +5,7 @@ import {
   type ColorMapValue,
   type RenderMode,
   type TrackSpectrogramOverrides,
+  type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/core';
 import {
   getColorMap,
@@ -32,7 +33,6 @@ import { SpectrogramSettingsModal } from './components';
 import {
   SpectrogramIntegrationProvider,
   type SpectrogramIntegration,
-  type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/browser';
 import {
   usePlaybackControls,

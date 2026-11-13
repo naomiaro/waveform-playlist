@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { ticksPerBeat, ticksPerBar } from '@waveform-playlist/core';
 
-export type SnapTo = 'bar' | 'beat' | 'off';
+/** The grid a drag snaps to under `BeatsAndBarsProvider`. (Core's `SnapTo` is
+ *  the longer list of grid values the web components take.) */
+export type BeatsAndBarsSnapTo = 'bar' | 'beat' | 'off';
 export type ScaleMode = 'beats' | 'temporal';
 
 export interface BeatsAndBarsContextValue {
   bpm: number;
   timeSignature: [number, number];
-  snapTo: SnapTo;
+  snapTo: BeatsAndBarsSnapTo;
   scaleMode: ScaleMode;
   ticksPerBeat: number;
   ticksPerBar: number;
@@ -16,7 +18,7 @@ export interface BeatsAndBarsContextValue {
 export interface BeatsAndBarsProviderProps {
   bpm: number;
   timeSignature: [number, number];
-  snapTo: SnapTo;
+  snapTo: BeatsAndBarsSnapTo;
   /** Which timescale to render. Defaults to `'beats'`. Set to `'temporal'` to
    *  show minutes:seconds while keeping snap-to-grid active. */
   scaleMode?: ScaleMode;

@@ -5,11 +5,10 @@ import {
   useEditorControls,
   useTimeFormat,
   useKeyboardShortcuts,
-  getShortcutLabel,
   usePlaylistZoom,
   usePlaylistMixer,
 } from '@waveform-playlist/browser';
-import type { KeyboardShortcut } from '@waveform-playlist/browser';
+import { getShortcutLabel, type KeyboardShortcut } from '@waveform-playlist/core';
 import { BaseButton, BaseSlider, BaseSelect } from '../styled';
 import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
 

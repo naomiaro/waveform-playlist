@@ -5,7 +5,8 @@ import {
   useWebAudioProviderOnly,
 } from '../contexts/playlistContexts';
 import { usePlayFromSelectionOrCursor } from './usePlayFromSelectionOrCursor';
-import { useKeyboardShortcuts, type KeyboardShortcut } from './useKeyboardShortcuts';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 export interface UsePlaybackShortcutsOptions {
   /**

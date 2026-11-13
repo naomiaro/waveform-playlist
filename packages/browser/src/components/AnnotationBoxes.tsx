@@ -3,7 +3,8 @@ import {
   AnnotationIntegrationContext,
   type AnnotationBoxIntegrationProps,
 } from '../AnnotationIntegrationContext';
-import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
+import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 
 interface AnnotationBoxItemProps {
   AnnotationBox: React.ComponentType<AnnotationBoxIntegrationProps>;

@@ -2,10 +2,6 @@ import { useEffect, useRef } from 'react';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 
-// Re-export from core for backwards compatibility
-export type { KeyboardShortcut } from '@waveform-playlist/core';
-export { handleKeyboardEvent, getShortcutLabel } from '@waveform-playlist/core';
-
 export interface UseKeyboardShortcutsOptions {
   shortcuts: KeyboardShortcut[];
   enabled?: boolean;

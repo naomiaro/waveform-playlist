@@ -37,8 +37,6 @@ import {
   useSelection,
   KeyboardShortcuts,
   ClipInteractionProvider,
-  type TimeFormat,
-  type ClipTrack,
   usePlaylistSettings,
   usePlaylistTimeline,
   usePlaylistMixer,
@@ -56,8 +54,14 @@ import {
   WaveformClipHeaders,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import { PlayheadWithMarker, formatTime, parseTime } from '@waveform-playlist/ui-components';
+import {
+  PlayheadWithMarker,
+  formatTime,
+  parseTime,
+  type TimeFormat,
+} from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Container = styled.div`

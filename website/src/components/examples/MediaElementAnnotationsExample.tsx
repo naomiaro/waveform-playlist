@@ -9,16 +9,19 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   AnnotationList,
-  ContinuousPlayCheckbox,
-  EditableCheckbox,
-  LinkEndpointsCheckbox,
   PlayButton,
   PauseButton,
   StopButton,
   loadWaveformData,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
+import {
+  AnnotationProvider,
+  parseAeneas,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  LinkEndpointsCheckbox,
+} from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { sonnetNotes } from './sonnetAnnotations';
 

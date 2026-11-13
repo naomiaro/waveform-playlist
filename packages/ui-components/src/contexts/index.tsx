@@ -9,7 +9,6 @@ import {
 } from './PlaylistInfo';
 export type { PlaylistInfo } from './PlaylistInfo';
 import { useTheme } from './Theme';
-import { useTrackControls, TrackControlsContext } from './TrackControls';
 import {
   useScrollViewport,
   useScrollViewportSelector,
@@ -21,7 +20,7 @@ export type { ScrollViewport } from './ScrollViewport';
 export type {
   BeatsAndBarsContextValue,
   BeatsAndBarsProviderProps,
-  SnapTo,
+  BeatsAndBarsSnapTo,
   ScaleMode,
 } from './BeatsAndBars';
 
@@ -32,12 +31,10 @@ export {
   DevicePixelRatioProvider,
   usePlaylistInfo,
   useTheme,
-  useTrackControls,
   PlaylistInfoContext,
   DEFAULT_WAVE_HEIGHT,
   DEFAULT_BAR_WIDTH,
   DEFAULT_BAR_GAP,
-  TrackControlsContext,
   useScrollViewport,
   useScrollViewportSelector,
   useVisibleChunkIndices,

@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import { useAnnotations } from '@waveform-playlist/browser';
 import { serializeAeneas } from '../parsers/aeneas';
-import type { AnnotationData } from '../types';
 
 const StyledButton = styled.button`
   padding: 0.5rem 1rem;
@@ -32,20 +32,25 @@ const StyledButton = styled.button`
 `;
 
 export interface DownloadAnnotationsButtonProps {
-  annotations: AnnotationData[];
+  /** Name of the downloaded file. Default: `annotations.json`. */
   filename?: string;
   disabled?: boolean;
   className?: string;
+  /** The label. Default: `Download JSON`. */
   children?: React.ReactNode;
 }
 
+/**
+ * Downloads the provider's annotations as an array of Aeneas fragments.
+ * Under either playlist provider.
+ */
 export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps> = ({
-  annotations,
   filename = 'annotations.json',
   disabled = false,
   className,
   children = 'Download JSON',
 }) => {
+  const { annotations } = useAnnotations();
   const handleDownload = () => {
     if (annotations.length === 0) {
       return;
