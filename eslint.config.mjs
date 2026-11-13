@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import tsParser from '@typescript-eslint/parser';
 import tsPlugin from '@typescript-eslint/eslint-plugin';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import eslintReact from '@eslint-react/eslint-plugin';
 import globals from 'globals';
 
 // React lets `use()` be called in a condition or a loop, so
@@ -91,8 +92,20 @@ export default [
   },
   {
     files: ['packages/**/src/**/*.{ts,tsx}'],
+    // React 19 spellings (#771): `use(Context)`, `<Context value>`, `ref` as a
+    // prop. Of the plugin only these three rules are on. `no-context-provider`
+    // reports `<FooContext.Provider>` in JSX, for a name ending in `Context`: not
+    // a provider held in a variable or passed to `createElement`, and not
+    // `<X.Consumer>`. The aliases `AnnotationIntegrationProvider` and
+    // `SpectrogramIntegrationProvider` are public names and stay.
+    plugins: {
+      '@eslint-react': eslintReact,
+    },
     rules: {
       'no-restricted-syntax': noConditionalUse,
+      '@eslint-react/no-use-context': 'error',
+      '@eslint-react/no-context-provider': 'error',
+      '@eslint-react/no-forward-ref': 'error',
     },
   },
   {

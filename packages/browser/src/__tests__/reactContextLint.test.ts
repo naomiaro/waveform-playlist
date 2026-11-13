@@ -1,5 +1,8 @@
-// #771: `react-hooks/rules-of-hooks` reports a conditional read made with the
-// older context hook and not a conditional `use()`. The `no-restricted-syntax` rule in the root
+// #771: the lint rules for React 19 context code, run through the real root
+// config. Two parts.
+//
+// 1. `react-hooks/rules-of-hooks` reports a conditional `useContext()` and
+// not a conditional `use()`. The `no-restricted-syntax` rule in the root
 // `eslint.config.mjs` reports the forms below. This runs the real config over
 // each snippet as if it were a file of this package.
 //
@@ -7,6 +10,10 @@
 // one is a `use()` inside a callback, which the first two NOT REPORTED cases
 // below record (no lint rule reports it). It also reports any function named
 // `use`, and a read inside a component that is itself defined in a branch.
+//
+// 2. `@eslint-react/eslint-plugin` reports the old spellings. What it does not
+// report is recorded in the last block, so that a plugin update that changes
+// it is noticed.
 import { describe, it, expect } from 'vitest';
 import { ESLint } from 'eslint';
 import { join, dirname } from 'node:path';
@@ -16,12 +23,14 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..',
 const eslint = new ESLint({ cwd: repoRoot });
 const HEADER = "import React, { createContext, use } from 'react';\nconst C = createContext(0);\n";
 
-async function conditionalUseReports(body: string): Promise<number> {
-  const [result] = await eslint.lintText(HEADER + body, {
+async function reportsOf(ruleId: string, source: string): Promise<number> {
+  const [result] = await eslint.lintText(source, {
     filePath: join(repoRoot, 'packages', 'browser', 'src', 'lintSnippet.tsx'),
   });
-  return result.messages.filter((message) => message.ruleId === 'no-restricted-syntax').length;
+  return result.messages.filter((message) => message.ruleId === ruleId).length;
 }
+
+const conditionalUseReports = (body: string) => reportsOf('no-restricted-syntax', HEADER + body);
 
 /** Every lint error for the snippet, whatever the rule. */
 async function anyReports(body: string): Promise<number> {
@@ -102,4 +111,44 @@ describe('lint: every use() at the top level (#771)', () => {
       expect(await conditionalUseReports(body)).toBe(0);
     });
   }
+});
+
+const OLD_HEADER =
+  "import React, { createContext, forwardRef, useContext } from 'react';\n" +
+  'const FooContext = createContext(0);\n';
+
+describe('lint: React 19 spellings (#771)', () => {
+  it('reports useContext(), bare and through React', async () => {
+    const body =
+      'export const A = () => <i>{useContext(FooContext)}</i>;\n' +
+      'export const B = () => <i>{React.useContext(FooContext)}</i>;\n' +
+      'export const F = forwardRef;';
+    expect(await reportsOf('@eslint-react/no-use-context', OLD_HEADER + body)).toBe(2);
+  });
+
+  it('reports <FooContext.Provider>', async () => {
+    const body =
+      'export const A = () => <FooContext.Provider value={1} />;\n' +
+      'export const B = [useContext, forwardRef];';
+    expect(await reportsOf('@eslint-react/no-context-provider', OLD_HEADER + body)).toBe(1);
+  });
+
+  it('reports forwardRef', async () => {
+    const body =
+      'export const A = forwardRef<HTMLDivElement>((_props, ref) => <div ref={ref} />);\n' +
+      'export const B = useContext;';
+    expect(await reportsOf('@eslint-react/no-forward-ref', OLD_HEADER + body)).toBe(1);
+  });
+
+  it('does not see a provider in an alias, in createElement, a Consumer, or an oddly named context', async () => {
+    const body =
+      'const Slot = createContext(0);\n' +
+      'const Alias = FooContext.Provider;\n' +
+      'export const A = () => <Alias value={1} />;\n' +
+      'export const B = () => React.createElement(FooContext.Provider, { value: 1 });\n' +
+      'export const C = () => <FooContext.Consumer>{(v) => <i>{v}</i>}</FooContext.Consumer>;\n' +
+      'export const D = () => <Slot.Provider value={1} />;\n' +
+      'export const E = [useContext, forwardRef];';
+    expect(await reportsOf('@eslint-react/no-context-provider', OLD_HEADER + body)).toBe(0);
+  });
 });
