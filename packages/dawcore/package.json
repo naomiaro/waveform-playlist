@@ -74,7 +74,7 @@
     "@waveform-playlist/core": "workspace:*",
     "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*",
-    "happy-dom": "^20.10.2",
+    "happy-dom": "^21.0.4",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "vite": "^6.4.3",
