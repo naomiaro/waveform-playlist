@@ -25,9 +25,9 @@ The controls on this page read the nearest playlist provider.
 
 | Works under | Components |
 | --- | --- |
-| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `AnnotationList`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
 | `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
-| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton`, and, among the children of `<WaveformTrackControls>`, `DefaultTrackControls` and the [track control pieces](#track-controls) |
+| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `KeyboardShortcuts`, `ExportWavButton`, and, among the children of `<WaveformTrackControls>`, `DefaultTrackControls` and the [track control pieces](#track-controls) |
 
 A control under a provider that does not serve it throws when it renders, also when a provider of the right kind is further out. The message names the hook and both providers, for example: "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
@@ -50,9 +50,9 @@ import {
   WaveformFades,
   WaveformRecordingPreview,
   WaveformAnnotationBoxes,
-  MediaElementAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
+  AnnotationList,
 } from '@waveform-playlist/browser';
 ```
 
@@ -74,26 +74,20 @@ It renders this composition:
   <WaveformLoopRegion />
   <WaveformTrackControls />
   <WaveformTracks />
-  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformAnnotationBoxes />
   <WaveformSelection />
   <WaveformPlayhead />
 </WaveformRoot>
+<AnnotationList />
 ```
 
-followed by `<PlaylistAnnotationList>` when the playlist has annotations.
+The two annotation components draw nothing while the playlist has no annotations.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `className` | `string` | - | Class of the view's outermost element |
-| `annotationControls` | `AnnotationAction[]` | - | Action buttons on each item of the annotation text list |
-| `annotationListConfig` | `AnnotationActionOptions` | - | Overrides `{ linkEndpoints, continuousPlay }` for the list's actions |
-| `annotationTextHeight` | `number` | - | Height of the annotation text list in pixels |
-| `renderAnnotationItem` | `(props: RenderAnnotationItemProps) => ReactNode` | - | Custom item of the annotation text list |
-| `getAnnotationBoxLabel` | `GetAnnotationBoxLabelFn` | - | Label of an annotation box. Default: the annotation's id |
-| `scrollActivePosition` | `ScrollLogicalPosition` | `'center'` | Where the active annotation is placed when the list scrolls to it |
-| `scrollActiveContainer` | `'nearest' \| 'all'` | `'nearest'` | Which scrollable containers are scrolled |
 
-What the view is made of is not an option of `Waveform`. To leave a part out, give a part an option, set the width of the controls column or add your own element, write the composition yourself with `WaveformRoot`.
+What the view is made of is not an option of `Waveform`. To leave a part out, give a part an option (a label for the annotation boxes, a height or action buttons for the annotation list), set the width of the controls column or add your own element, write the composition yourself with `WaveformRoot`.
 
 Whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, is not a prop either. Wrap the view in `ClipInteractionProvider`, or, with your own `DragDropProvider`, in `ClipInteractionOptions`:
 
@@ -130,30 +124,18 @@ It renders this composition:
 <MediaElementWaveformRoot className={className}>
   <WaveformTimescale />
   <WaveformTracks />
-  <MediaElementAnnotationBoxes
-    getAnnotationBoxLabel={getAnnotationBoxLabel}
-    editable={editable}
-    linkEndpoints={linkEndpoints}
-    onAnnotationUpdate={onAnnotationUpdate}
-  />
+  <WaveformAnnotationBoxes />
   <WaveformSelection />
   <WaveformPlayhead />
 </MediaElementWaveformRoot>
+<AnnotationList />
 ```
-
-followed by `<MediaElementAnnotationList>` when there are annotations.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `className` | `string` | - | Class of the view's outermost element |
-| `annotationTextHeight` | `number` | - | Height of the annotation text list in pixels |
-| `getAnnotationBoxLabel` | `GetAnnotationBoxLabelFn` | - | Label of an annotation box |
-| `renderAnnotationItem` | `(props: RenderAnnotationItemProps) => ReactNode` | - | Custom item of the annotation text list |
-| `editable` | `boolean` | `false` | Annotation boundaries can be dragged |
-| `linkEndpoints` | `boolean` | `false` | Dragging a boundary also moves the boundary of the annotation it touches |
-| `onAnnotationUpdate` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after an edit |
-| `scrollActivePosition` | `ScrollLogicalPosition` | `'center'` | Where the active annotation is placed when the list scrolls to it |
-| `scrollActiveContainer` | `'nearest' \| 'all'` | `'nearest'` | Which scrollable containers are scrolled |
+
+Whether annotations can be edited and whether a dragged edge takes its neighbour along are options of the provider (`annotationList`, [`useAnnotationOptions()`](/docs/react/api/hooks#useannotationoptions)), not props of the view.
 
 ### WaveformRoot and MediaElementWaveformRoot
 
@@ -179,8 +161,7 @@ A press on the tracks area starts the selection drag; under `WaveformRoot` it al
 | `WaveformClipHeaders` | a header on every clip | none | either |
 | `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
 | `WaveformRecordingPreview` | the take being recorded, in its track | `recordingState` | `WaveformPlaylistProvider` |
-| `WaveformAnnotationBoxes` | the row of annotation boxes | `getAnnotationBoxLabel` | `WaveformPlaylistProvider` |
-| `MediaElementAnnotationBoxes` | the row of annotation boxes of the MediaElement player, with its edge drag | `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` | `MediaElementPlaylistProvider` |
+| `WaveformAnnotationBoxes` | the row of annotation boxes, with the drag of their edges | `getLabel`, `height` | either |
 | `WaveformSelection` | the highlighted selection; nothing for a collapsed selection | none | either |
 | `WaveformPlayhead` | the playhead | `renderPlayhead` | either |
 
@@ -237,18 +218,22 @@ Under `MediaElementWaveformRoot` it draws nothing.
 
 It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes what the armed track already holds for the take. See the [Recording guide](/docs/react/guides/recording).
 
-#### WaveformAnnotationBoxes and MediaElementAnnotationBoxes
+#### WaveformAnnotationBoxes
 
-Both need the `AnnotationProvider` of `@waveform-playlist/annotations` and draw nothing without it or without annotations.
+The row of annotation boxes, under either root. It needs the `AnnotationProvider` of `@waveform-playlist/annotations` and draws nothing without it or without annotations.
 
-| Prop | On | Type | Default | Description |
-|------|----|------|---------|-------------|
-| `getAnnotationBoxLabel` | both | `GetAnnotationBoxLabelFn` | the annotation's id | Label of a box |
-| `editable` | `MediaElementAnnotationBoxes` | `boolean` | `false` | The edges of a box can be dragged |
-| `linkEndpoints` | `MediaElementAnnotationBoxes` | `boolean` | `false` | Dragging an edge also moves the edge of the box it touches |
-| `onAnnotationUpdate` | `MediaElementAnnotationBoxes` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after a drag |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `getLabel` | `GetAnnotationBoxLabelFn` | the annotation's id | Label of a box, from the annotation and its index. Pass a function that keeps its identity (defined outside the component, or memoized): a new one renders every box |
+| `height` | `number` | `30` | Height of the row in pixels |
 
-Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`). Dragging an edge needs `useAnnotationDragHandlers` wired into a `DragDropProvider` of your own around the view (see the [Annotations guide](/docs/react/guides/annotations)); `ClipInteractionProvider` handles clip drags and track reordering, not annotation edges. `MediaElementAnnotationBoxes` brings its own drag wiring.
+A click on a box makes its annotation the active one and plays it from its start; with continuous play off, playback ends where the annotation ends.
+
+The part has its own `DragDropProvider` around the row and wires the drag of the edges itself. An edge can be dragged while the provider's `editable` option is on; whether it takes the edge it touches along is the provider's `linkEndpoints` option. The moves are shown as they happen and `onAnnotationsChange` is called once, on release. An edge stops at the end of the audio. A `DragDropProvider` of your own above the view, `ClipInteractionProvider` included, does not receive the drag of an annotation edge.
+
+The drag starts after 1 px of pointer travel. With `touchOptimized` on a `ClipInteractionOptions` or `ClipInteractionProvider` above, a touch must be held 250 ms first.
+
+The border of a box that is not active is the theme's `annotationBoxBorder`. See the [Annotations guide](/docs/react/guides/annotations).
 
 #### WaveformPlayhead
 
@@ -262,10 +247,33 @@ The playhead is shown while playing, and at rest when no range is selected.
 
 - A part is a child of its root, or of a fragment in it. A part wrapped in your own component is not recognised: a wrapped `WaveformTimescale` or `WaveformTrackControls` is drawn in the tracks area, a wrapped `WaveformClipHeaders` does nothing.
 - One `WaveformTracks` per root, as the root's own child.
-- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and both annotation rows throw outside a root ("The timescale must be rendered inside the waveform root").
+- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and `WaveformAnnotationBoxes` throw outside a root ("The timescale must be rendered inside the waveform root").
 - In development a part that is not where it can work says so once in the console. It does not throw.
 
 The full list is in [Composing the View](/docs/react/guides/composing-the-view#where-a-part-must-be).
+
+### AnnotationList
+
+The annotation text list, under either provider. It is not a part of a root: render it anywhere under the provider (below the view, in a sidebar, more than once). It reads the annotations, the active annotation and the three annotation options from the provider, and reports edits through the provider's `onAnnotationsChange`.
+
+```tsx
+<AnnotationList height={300} actions={annotationActions} scrollActivePosition="start" />
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `height` | `number` | - | Height of the list in pixels. Without it the list is at most 200 px high |
+| `actions` | `AnnotationAction[]` | - | Buttons shown on each row while the provider's `editable` option is on. An action is called with the annotation, its index, the annotations and `{ linkEndpoints, continuousPlay }` as the provider has them. Pass an array that keeps its identity: a new one renders every row |
+| `scrollActivePosition` | `ScrollLogicalPosition \| 'none'` | `'center'` | Where the active annotation is put when the list scrolls to it during playback. `'none'`: the list does not follow |
+| `scrollActiveContainer` | `'nearest' \| 'all'` | `'nearest'` | Which containers scroll: only the list, or the page too |
+| `children` | `(item: RenderAnnotationItemProps) => ReactNode` | - | Draws a row in place of the default one. Called with `{ annotation, index, isActive, onClick, formatTime }`. Define it outside the component or memoize it: a new function renders every row |
+
+- It draws nothing while there are no annotations.
+- It needs the `AnnotationProvider` of `@waveform-playlist/annotations`. Without it the list draws nothing, and a development build warns once in the console.
+- A click on a row makes the annotation the active one and plays it from its start, as a click on its box does. In the default row a click in a field that is being edited, or on an action button, does not.
+- While `editable` is on, the text and the id of a default row can be edited in place.
+
+See the [Annotations guide](/docs/react/guides/annotations#annotationlist).
 
 ---
 
@@ -596,7 +604,18 @@ Switching it on while an annotation is playing lets playback continue past that 
 <ContinuousPlayCheckbox />
 ```
 
-It must be inside the `<AnnotationProvider>` of `@waveform-playlist/annotations` and throws without it, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` do.
+It must be inside the `<AnnotationProvider>` of `@waveform-playlist/annotations` and throws without it, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` do. It shows the provider's `continuousPlay` option (`useAnnotationOptions()`) and sets it with `setContinuousPlay` of `usePlaybackControls()`.
+
+### LinkEndpointsCheckbox and EditableCheckbox
+
+Either provider. `LinkEndpointsCheckbox` shows and sets the provider's `linkEndpoints` option: whether a dragged annotation edge takes the edge it touches along. `EditableCheckbox` shows and sets the `editable` option: whether the edges of the annotation boxes can be dragged, and whether the text and ids in the annotation list can be edited and its action buttons are shown.
+
+```tsx
+<LinkEndpointsCheckbox />
+<EditableCheckbox />
+```
+
+The three annotation checkboxes take a `className`. Their labels are "Continuous Play", "Link Endpoints" and "Editable Annotations". The `id` of each input is generated, so the same checkbox can be rendered twice on a page.
 
 ### AutomaticScrollCheckbox
 

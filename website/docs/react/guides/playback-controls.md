@@ -41,9 +41,9 @@ The controls read the nearest playlist provider.
 
 | Works under | Components |
 | --- | --- |
-| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
 | `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
-| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton` (from `@waveform-playlist/browser/tone`) |
+| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `KeyboardShortcuts`, `ExportWavButton` (from `@waveform-playlist/browser/tone`) |
 
 A control used under a provider that does not serve it throws, for example "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
@@ -168,12 +168,14 @@ Available formats:
 
 ## Continuous Play
 
-Enable continuous playback (loop) mode:
+Continuous play is an annotation option, not a loop. Off: playing an annotation stops at that annotation's end. On: playback runs on through the following annotations. For looping see `LoopButton`.
+
+The checkbox needs the `<AnnotationProvider>` of `@waveform-playlist/annotations` above it and throws without it:
 
 ```tsx
 import { ContinuousPlayCheckbox } from '@waveform-playlist/browser';
 
-function LoopControl() {
+function ContinuousPlayControl() {
   return <ContinuousPlayCheckbox />;
 }
 ```
@@ -181,10 +183,10 @@ function LoopControl() {
 Or control it programmatically:
 
 ```tsx
-import { useAnnotations, usePlaybackControls } from '@waveform-playlist/browser';
+import { useAnnotationOptions, usePlaybackControls } from '@waveform-playlist/browser';
 
 function ContinuousPlayToggle() {
-  const { continuousPlay } = useAnnotations();
+  const { continuousPlay } = useAnnotationOptions();
   const { setContinuousPlay } = usePlaybackControls();
 
   return (
@@ -194,7 +196,7 @@ function ContinuousPlayToggle() {
         checked={continuousPlay}
         onChange={(e) => setContinuousPlay(e.target.checked)}
       />
-      Loop
+      Continuous Play
     </label>
   );
 }
@@ -341,8 +343,8 @@ import {
   SetLoopRegionButton,
   LoopButton,
   SelectionTimeInputs,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function LoopExample() {
   const { tracks, loading } = useAudioTracks([
@@ -483,9 +485,8 @@ import {
   AudioPosition,
   TimeFormatSelect,
   AutomaticScrollCheckbox,
-  ContinuousPlayCheckbox,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function FullPlaybackExample() {
   const { tracks, loading } = useAudioTracks([
@@ -508,7 +509,6 @@ function FullPlaybackExample() {
         <TimeFormatSelect />
         <AudioPosition />
         <AutomaticScrollCheckbox />
-        <ContinuousPlayCheckbox />
       </div>
       <Waveform />
     </WaveformPlaylistProvider>

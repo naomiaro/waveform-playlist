@@ -137,15 +137,24 @@ Custom theme object. See [Theming Guide](/docs/react/guides/theming).
 
 #### `annotationList`
 
-**Type:** `{ annotations?: any[]; isContinuousPlay?: boolean }`
+**Type:** `AnnotationListProp`: `{ annotations?: AnnotationData[]; editable?: boolean; linkEndpoints?: boolean; isContinuousPlay?: boolean }`
 
-Annotation configuration. When using editable annotations, pair with `onAnnotationsChange`.
+The annotations and the starting values of the three annotation options. The same prop on both providers.
+
+- `annotations`: the annotations to show. `start` and `end` are numbers, in seconds.
+- `editable`: annotations can be edited (text, ids, edges). Default `false`.
+- `linkEndpoints`: a dragged edge takes the edge it touches along. Default `false`.
+- `isContinuousPlay`: playback runs on past the end of an annotation. Default `false`.
+
+The three options are provider state that follows the prop: each starts from its field, and when the value of a field changes, the option takes the new value. A field left out is `false`. Between two changes of the prop, a setter of `usePlaybackControls()` (`setAnnotationsEditable`, `setLinkEndpoints`, `setContinuousPlay`) or one of the checkboxes changes the option; the prop is not told. Read the options with `useAnnotationOptions()`.
+
+The action buttons of the annotation list are not set here: pass them to `<AnnotationList actions>`.
 
 #### `onAnnotationsChange`
 
 **Type:** `(annotations: AnnotationData[]) => void`
 
-Callback when annotations change. Required for edits to persist.
+Called with the full new array on every change to the annotations: the release of an edge drag, a text or id edit in the list, an action button, a `setAnnotations` call of your own. It is the one report of an annotation change. Keep the array in your state and pass it back in `annotationList.annotations`; without this callback an edit is dropped, and a development build warns.
 
 ### Waveform Rendering
 
@@ -201,8 +210,9 @@ Called when the player could not be created (a missing optional peer, a throwing
 | `useCurrentTime()` | `currentTime`: where the cursor rests. It does not advance during playback |
 | `useSelection()` | `selectionStart`, `selectionEnd` |
 | `useActiveAnnotation()` | `activeAnnotationId` |
-| `useAnnotations()` | `annotations`, `continuousPlay` |
-| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `useAnnotations()` | `annotations` |
+| `useAnnotationOptions()` | `editable`, `linkEndpoints`, `continuousPlay` |
+| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef` (the same ref as `currentTimeRef` here: a media element reports the audible position), `registerFrameCallback`, `unregisterFrameCallback` |
 | `usePlaylistView()` | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`; `mono`, `indefinitePlayback` and `fillViewport` are always `false` |
 | `usePlaylistSettings()` | `timeFormat` (default `'hh:mm:ss.uuu'`), `isAutomaticScroll` |
@@ -247,11 +257,11 @@ interface MediaElementTrackContextValue {
 
 ### Hooks that throw under this provider
 
-`useEditorControls()`, `useEngineRefs()`, `useAnnotationEditing()`, `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()` and `useUndoRedo()` need `WaveformPlaylistProvider`. Under this provider they throw, also when it is nested inside a `WaveformPlaylistProvider`: every hook reads the nearest playlist provider. The message reads, for example, "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
+`useEditorControls()`, `useEngineRefs()`, `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()` and `useUndoRedo()` need `WaveformPlaylistProvider`. Under this provider they throw, also when it is nested inside a `WaveformPlaylistProvider`: every hook reads the nearest playlist provider. The message reads, for example, "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
 ### Controls
 
-The library's `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox` and (inside `<AnnotationProvider>`) `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` work under this provider. `PlaybackRateSelect` works under this provider only. `KeyboardShortcuts`, the loop and zoom buttons, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `ExportWavButton` do not: there is no loop and no zoom here, and the library installs no keyboard shortcuts (`usePlaybackShortcuts()` throws here too; `useKeyboardShortcuts()` and `useAnnotationKeyboardControls()` can be called by your own component). See [Components](/docs/react/api/components#which-provider-each-control-needs).
+The library's `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox` and (inside `<AnnotationProvider>`) `AnnotationList`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` work under this provider. `PlaybackRateSelect` works under this provider only. `KeyboardShortcuts`, the loop and zoom buttons, `MasterVolumeControl` and `ExportWavButton` do not: there is no loop and no zoom here, and the library installs no keyboard shortcuts (`usePlaybackShortcuts()` throws here too; `useKeyboardShortcuts()` and `useAnnotationKeyboardControls()` can be called by your own component). See [Components](/docs/react/api/components#which-provider-each-control-needs).
 
 `playoutRef.current.outputNode` returns the native `GainNode` output — use it to bridge into Tone.js effect chains (see [guide](/docs/react/guides/media-element-playout#tonejs-effects)).
 
@@ -281,10 +291,7 @@ interface MediaElementPlaylistProviderProps {
   theme?: Partial<WaveformPlaylistTheme>;
 
   // Annotations
-  annotationList?: {
-    annotations?: any[];
-    isContinuousPlay?: boolean;
-  };
+  annotationList?: AnnotationListProp; // { annotations?, editable?, linkEndpoints?, isContinuousPlay? }
 
   // Callbacks
   onReady?: () => void;

@@ -34,7 +34,7 @@ export default function MediaElementAnnotationsExamplePage(): React.ReactElement
           Time-synced annotations with <code>MediaElementPlaylistProvider</code>: the audio is
           streamed by an <code>HTMLAudioElement</code> (no Tone.js, no decoding of the whole file)
           and the waveform comes from pre-computed peaks. The boxes under the waveform and the
-          text list follow playback; click a box to play its annotation.
+          text list follow playback; click a box, or a row of the list, to play its annotation.
         </p>
 
         <LazyMediaElementAnnotationsExample />
@@ -43,15 +43,15 @@ export default function MediaElementAnnotationsExamplePage(): React.ReactElement
           <h2>What to try</h2>
           <ul>
             <li>
-              <strong>Continuous play</strong> on: playback runs through the annotations and the
+              <strong>Continuous Play</strong> on: playback runs through the annotations and the
               highlight follows it. Off: a clicked annotation plays to its end and stops.
             </li>
             <li>
-              <strong>Editable</strong>: drag the edges of a box to move an annotation boundary,
+              <strong>Editable Annotations</strong>: drag the edges of a box to move an annotation boundary,
               and edit the text in the list.
             </li>
             <li>
-              <strong>Link endpoints</strong>: dragging a boundary also moves the boundary of the
+              <strong>Link Endpoints</strong>: dragging a boundary also moves the boundary of the
               annotation next to it.
             </li>
           </ul>

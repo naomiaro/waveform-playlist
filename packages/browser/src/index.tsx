@@ -16,6 +16,7 @@ export {
   useSelection,
   useActiveAnnotation,
   useAnnotations,
+  useAnnotationOptions,
   usePlaybackControls,
   usePlaybackRefs,
   usePlaylistView,
@@ -24,7 +25,6 @@ export {
   // WaveformPlaylistProvider only:
   useEditorControls,
   useEngineRefs,
-  useAnnotationOptions,
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,

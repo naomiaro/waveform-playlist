@@ -17,6 +17,7 @@ import {
   useSelection,
   useActiveAnnotation,
   useAnnotations,
+  useAnnotationOptions,
   usePlaybackControls,
   usePlaybackRefs,
   usePlaylistView,
@@ -26,7 +27,6 @@ import {
   // Context hooks: WaveformPlaylistProvider only
   useEditorControls,
   useEngineRefs,
-  useAnnotationEditing,
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
@@ -108,7 +108,8 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useCurrentTime()`](#usecurrenttime) | `currentTime` | a seek, a pause, a stop, a selection whose start moves |
 | [`useSelection()`](#useselection) | `selectionStart`, `selectionEnd` | every pointer move of a selection drag |
 | [`useActiveAnnotation()`](#useactiveannotation) | `activeAnnotationId` | every annotation boundary during playback |
-| [`useAnnotations()`](#useannotations) | `annotations`, `continuousPlay` | an annotation edit, the continuous-play toggle |
+| [`useAnnotations()`](#useannotations) | `annotations` | an annotation edit |
+| [`useAnnotationOptions()`](#useannotationoptions) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three options being toggled |
 | [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
 | [`usePlaybackRefs()`](#useplaybackrefs) | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | never |
 | [`usePlaylistView()`](#useplaylistview) | sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
@@ -119,9 +120,8 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 
 | Hook | Returns | The component re-renders on |
 | --- | --- | --- |
-| [`useEditorControls()`](#useeditorcontrols) | track mixer and order, zoom, loop, undo, annotation editing settings, recording | never |
+| [`useEditorControls()`](#useeditorcontrols) | track mixer and order, zoom, loop, undo, recording | never |
 | [`useEngineRefs()`](#useenginerefs) | `playoutRef`, `isDraggingRef`, the engine's clock refs and functions | never |
-| [`useAnnotationEditing()`](#useannotationediting) | `annotationsEditable`, `linkEndpoints` | either setting being toggled |
 | [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom, loading finishing, peaks arriving |
 | [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change; tracks added, removed or reordered |
 | [`useTrack()`](#usetrack) | one track's id, name, mixer state and bound actions. Only among the children of `<WaveformTrackControls>` | a change of that track's state, position or selection |
@@ -270,29 +270,31 @@ A control panel of your own needs neither field. `<WaveformTrackControls>` keys 
 
 ### useAnnotations
 
-The annotations and whether playback runs on past the end of one. The value changes on an annotation edit and on the continuous-play toggle; an edge drag that uses the preview source changes it once, on release. The active annotation is not here: see [`useActiveAnnotation`](#useactiveannotation). Set the two fields with `setAnnotations` and `setContinuousPlay` from [`usePlaybackControls()`](#useplaybackcontrols).
+Either provider. The annotations. The value changes on an annotation edit; an edge drag that uses the preview source changes it once, on release. The active annotation is not here: see [`useActiveAnnotation`](#useactiveannotation). The three annotation options are not here either: see [`useAnnotationOptions`](#useannotationoptions). Change the annotations with `setAnnotations` from [`usePlaybackControls()`](#useplaybackcontrols), which reports the new array through the provider's `onAnnotationsChange`.
 
 ```typescript
 function useAnnotations(): AnnotationsContextValue;
 
 interface AnnotationsContextValue {
   annotations: AnnotationData[];
+}
+```
+
+### useAnnotationOptions
+
+Either provider. The three annotation options: whether annotations can be edited, whether a dragged edge takes the edge it touches along, and whether playback runs on past the end of an annotation. The value changes when one of them is toggled.
+
+```typescript
+function useAnnotationOptions(): AnnotationOptionsContextValue;
+
+interface AnnotationOptionsContextValue {
+  editable: boolean;
+  linkEndpoints: boolean;
   continuousPlay: boolean;
 }
 ```
 
-### useAnnotationEditing
-
-`WaveformPlaylistProvider` only. Whether annotations can be edited, and how their edges behave. Set the two fields with `setAnnotationsEditable` and `setLinkEndpoints` from [`useEditorControls()`](#useeditorcontrols).
-
-```typescript
-function useAnnotationEditing(): AnnotationEditingContextValue;
-
-interface AnnotationEditingContextValue {
-  annotationsEditable: boolean;
-  linkEndpoints: boolean;
-}
-```
+The options are provider state. Each starts from its field of the provider's `annotationList` prop (`editable`, `linkEndpoints`, `isContinuousPlay`; a field left out is `false`) and takes the field's new value when that value changes. Set them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from [`usePlaybackControls()`](#useplaybackcontrols), or render `<EditableCheckbox />`, `<LinkEndpointsCheckbox />` and `<ContinuousPlayCheckbox />`. A setter does not change the prop; the prop's next change wins for the field that changed.
 
 ### useLoop
 
@@ -350,7 +352,7 @@ interface IsPlayingContextValue {
 ```tsx
 function StatusBar() {
   const { isPlaying } = useIsPlaying();
-  const { continuousPlay } = useAnnotations();
+  const { continuousPlay } = useAnnotationOptions();
   const { duration } = usePlaylistTimeline(); // WaveformPlaylistProvider only
 
   return (
@@ -791,6 +793,8 @@ interface PlaybackControlsContextValue {
   scrollContainerRef: RefObject<HTMLDivElement | null>;
 
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
@@ -864,10 +868,6 @@ interface EditorControlsContextValue {
 
   // Master volume
   setMasterVolume: (volume: number) => void;
-
-  // Annotation editing
-  setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotationsEditable: (enabled: boolean) => void;
 
   // Loop controls
   setLoopEnabled: (enabled: boolean) => void;
@@ -1470,7 +1470,7 @@ function useDragSensors(options?: DragSensorOptions): PluginDescriptor[];
 
 ### useAnnotationDragHandlers
 
-Drag handlers for the edges of annotation boxes, for `@dnd-kit/react`'s `DragDropProvider`.
+Drag handlers for the edges of annotation boxes, for `@dnd-kit/react`'s `DragDropProvider`. `<WaveformAnnotationBoxes>` calls this hook itself and has its own `DragDropProvider`: with the built-in boxes you do not call it, and a `DragDropProvider` of your own around the view receives no annotation drag. Call it for a row of boxes you draw yourself (see the [Annotations guide](/docs/react/guides/annotations#a-row-of-boxes-of-your-own)).
 
 ```typescript
 function useAnnotationDragHandlers(options: {
@@ -2213,16 +2213,33 @@ From `@waveform-playlist/annotations`:
 
 ### useAnnotationControls
 
+A small state hook for an annotation UI that has no playlist provider. It holds two booleans and wraps the boundary function of `@waveform-playlist/core`. It does not hold annotations, and it is not connected to the provider: under a provider, read the options with [`useAnnotationOptions()`](#useannotationoptions).
+
 ```typescript
-function useAnnotationControls(): {
-  annotations: Annotation[];
-  selectedAnnotationId: string | null;
-  addAnnotation: (annotation: Annotation) => void;
-  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
-  deleteAnnotation: (id: string) => void;
-  selectAnnotation: (id: string | null) => void;
-  setAnnotations: (annotations: Annotation[]) => void;
-};
+function useAnnotationControls(options?: UseAnnotationControlsOptions): UseAnnotationControlsReturn;
+
+interface UseAnnotationControlsOptions {
+  initialContinuousPlay?: boolean; // default false
+  initialLinkEndpoints?: boolean;  // default true
+}
+
+interface UseAnnotationControlsReturn {
+  continuousPlay: boolean;
+  linkEndpoints: boolean;
+  setContinuousPlay: (value: boolean) => void;
+  setLinkEndpoints: (value: boolean) => void;
+  /** Returns a new array with one edge moved; does not change its input. */
+  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => AnnotationData[];
+}
+
+interface AnnotationUpdateParams {
+  annotationIndex: number;
+  newTime: number;
+  isDraggingStart: boolean;
+  annotations: AnnotationData[];
+  duration: number;
+  linkEndpoints: boolean;
+}
 ```
 
 ---

@@ -52,17 +52,10 @@ export default function MobileAnnotationsExamplePage(): React.ReactElement {
             borderRadius: '4px',
             overflow: 'auto',
           }}>
-{`// Use touch-optimized sensors for annotation dragging
-const sensors = useDragSensors({ touchOptimized: true });
-
-// Pass the sensors to the DragDropProvider (@dnd-kit/react)
-<DragDropProvider
-  sensors={sensors}
-  onDragStart={onDragStart}
-  onDragMove={onDragMove}
-  onDragEnd={onDragEnd}
-  modifiers={[RestrictToHorizontalAxis]}
->
+{`// The annotation boxes wire the drag of their edges themselves.
+// touchOptimized: a touch is held for 250 ms before it drags an edge,
+// so a swipe still scrolls the waveform.
+<ClipInteractionOptions touchOptimized>
   {/* No track controls column on a narrow screen: leave the part out */}
   <WaveformRoot>
     <WaveformTimescale />
@@ -72,8 +65,8 @@ const sensors = useDragSensors({ touchOptimized: true });
     <WaveformSelection />
     <WaveformPlayhead />
   </WaveformRoot>
-  <PlaylistAnnotationList controls={annotationActions} height={200} />
-</DragDropProvider>`}
+  <AnnotationList actions={annotationActions} height={200} />
+</ClipInteractionOptions>`}
           </pre>
         </div>
       </main>

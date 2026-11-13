@@ -11,7 +11,6 @@ For most use cases, [`ClipInteractionProvider`](/docs/react/guides/beats-and-bar
 
 Use this approach when you need to:
 
-- Combine clip dragging with annotation dragging in a single `DragDropProvider`
 - Add custom modifiers beyond snap-to-grid and collision detection
 - Customize drag start behavior (e.g., custom track selection logic)
 - Use custom sensors or activation constraints
@@ -232,75 +231,28 @@ There are two separate snap mechanisms:
 
 Both snap the **absolute position** to the grid, not the drag delta. This means an off-grid clip will snap to the nearest grid line when moved.
 
-## Combining with Annotation Dragging
+## Annotation Edges Need No Wiring Here
 
-The main reason to use manual setup is combining clip and annotation drag in a single `DragDropProvider`. The [Annotations example](/examples/annotations) demonstrates this pattern:
+A clip drag setup has no annotation branch. `<WaveformAnnotationBoxes>` has its own `DragDropProvider` around the row of boxes and calls `useAnnotationDragHandlers` itself, so the drag of an annotation edge never reaches a `DragDropProvider` of yours above the view, and your clip handlers do not have to tell the two kinds of drag apart.
 
 ```tsx
-import {
-  useClipDragHandlers,
-  useAnnotationDragHandlers,
-  useDragSensors,
-  ClipInteractionOptions,
-  WaveformEditor,
-} from '@waveform-playlist/browser';
-
-function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnotationsChange }) {
-  const sensors = useDragSensors();
-
-  // Clip drag handlers
-  const {
-    onDragStart: clipDragStart,
-    onDragMove: clipDragMove,
-    onDragEnd: clipDragEnd,
-  } = useClipDragHandlers({ tracks, onTracksChange, /* ... */ });
-
-  // Annotation drag handlers
-  const {
-    onDragStart: annotationDragStart,
-    onDragMove: annotationDragMove,
-    onDragEnd: annotationDragEnd,
-  } = useAnnotationDragHandlers({
-    annotations,
-    onAnnotationsChange,
-    // from usePlaybackControls(): the drag is shown through the preview and
-    // onAnnotationsChange is called once, on release
-    preview: annotationPreview,
-    /* ... */
-  });
-
-  // Combine handlers — route based on drag source type
-  const onDragStart = (event) => {
-    const data = event.operation?.source?.data;
-    if (data?.boundary) {
-      // Annotation boundary or clip boundary
-      if (data.annotationId) {
-        annotationDragStart(event);
-      } else {
-        clipDragStart(event);
-      }
-    } else {
-      clipDragStart(event);
-    }
-  };
-
-  // Similar routing for onDragMove and onDragEnd...
-
-  return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
-    >
-      <ClipInteractionOptions enabled>
-        <WaveformEditor />
-      </ClipInteractionOptions>
-    </DragDropProvider>
-  );
-}
+<DragDropProvider
+  sensors={sensors}
+  onDragStart={onDragStart}
+  onDragMove={onDragMove}
+  onDragEnd={onDragEnd}
+  modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
+>
+  <ClipInteractionOptions enabled>
+    {/* The clip handlers above; the annotation boxes inside the view handle their own edges. */}
+    <WaveformEditor />
+  </ClipInteractionOptions>
+</DragDropProvider>
 ```
+
+Whether an edge can be dragged is the provider's `editable` option, and `linkEndpoints` decides whether it takes its neighbour along (see the [Annotations guide](/docs/react/guides/annotations)). The one setting the annotation drag takes from above is `touchOptimized` of `ClipInteractionOptions` (or `ClipInteractionProvider`): with it, a touch on an edge handle must be held 250 ms before the drag starts.
+
+`useAnnotationDragHandlers` stays exported for a row of boxes you draw yourself; that row needs a `DragDropProvider` of its own.
 
 ## Touch-Optimized Sensors
 
@@ -396,5 +348,5 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 ## See Also
 
 - [Beats & Bars](/docs/react/guides/beats-and-bars) — Musical timescale with `ClipInteractionProvider`
-- [Annotations Example](/examples/annotations) — Combined clip + annotation dragging
+- [Annotations guide](/docs/react/guides/annotations) — the annotation boxes and the drag of their edges
 - [LLM API Reference](/docs/llm-reference) — Complete TypeScript interfaces

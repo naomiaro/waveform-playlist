@@ -10,7 +10,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 - **Focused context hooks** — one hook per group of fields that change together (`useIsPlaying`, `useCurrentTime`, `useSelection`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistTimeline`, `usePlaylistMixer`, `useLoop`, `useEditorControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
 - **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `useRecordingSession({ isRecording, trackId })` (or `setRecordingActive(active, armedTrackId)` directly) suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the take
-- **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`
+- **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`. Under either provider, `<WaveformAnnotationBoxes>` (a part of the view; it wires the drag of the box edges itself) and `<AnnotationList>` (the text list, anywhere under the provider) draw the annotations
 - **WAV export** — render the full mix (including effects) offline to a downloadable WAV file
 - **MediaElement player mode** — a lightweight single-track player with pitch-preserving speed control, for podcast/audiobook-style use cases that don't need multitrack mixing
 
@@ -90,7 +90,8 @@ Under either provider:
 | `useCurrentTime` | `currentTime` — where the cursor rests; does not advance during playback | a seek, a pause, a stop and a leftward selection drag |
 | `useSelection` | `selectionStart`, `selectionEnd` | every pointer move of a selection drag, so only components that show the selection should call it |
 | `useActiveAnnotation` | `activeAnnotationId` | every annotation boundary during playback, so only components that show the active annotation should call it |
-| `useAnnotations` | `annotations`, `continuousPlay` | an annotation edit, the continuous-play toggle |
+| `useAnnotations` | `annotations` | an annotation edit |
+| `useAnnotationOptions` | `editable`, `linkEndpoints`, `continuousPlay`: the three annotation options. They start from the provider's `annotationList` prop and follow it | one of the three being toggled |
 | `usePlaybackControls` | Actions — `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
 | `usePlaybackRefs` | `currentTimeRef` (the live position), `visualTimeRef` (the position to draw), `registerFrameCallback()` / `unregisterFrameCallback()` for 60fps-driven UI (playhead, progress bars) | never |
 | `usePlaylistView` | What the provider was configured with: `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` | a provider prop change |
@@ -101,9 +102,8 @@ Under either provider:
 
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
-| `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo, annotation editing settings, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
+| `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
 | `useEngineRefs` | `playoutRef` (the engine), `isDraggingRef`, `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
-| `useAnnotationEditing` | `annotationsEditable`, `linkEndpoints` | either setting being toggled |
 | `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
 | `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`; `undefined` for a track that is still loading), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
 | `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isLoading`, `isSelected`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |

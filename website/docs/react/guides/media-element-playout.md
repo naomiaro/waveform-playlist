@@ -116,7 +116,7 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 </MediaElementWaveformRoot>
 ```
 
-Leave `<WaveformTimescale />` out for a player without a time ruler. With annotations, add `<MediaElementAnnotationBoxes />` after the tracks and `<MediaElementAnnotationList />` below the root. See [Composing the View](/docs/react/guides/composing-the-view).
+Leave `<WaveformTimescale />` out for a player without a time ruler. With annotations, add `<WaveformAnnotationBoxes />` after the tracks and `<AnnotationList />` below the root: the same two components as under `WaveformPlaylistProvider`. Whether annotations can be edited is the provider's option (`annotationList={{ annotations, editable: true }}`, or `<EditableCheckbox />`); see the [Annotations guide](/docs/react/guides/annotations). See [Composing the View](/docs/react/guides/composing-the-view).
 
 `PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/llm-reference)). The props are the same as under `WaveformPlaylistProvider`; read `visualTimeRef.current` to animate (here it is the same ref as `currentTimeRef`). The playhead is hidden while a range is highlighted and playback is stopped or paused.
 
@@ -255,8 +255,9 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 | `useCurrentTime()` | a seek, a pause, a stop, each move of a leftward selection drag | `currentTime` (where the cursor rests; does not advance during playback) |
 | `useSelection()` | each move of a selection drag | `selectionStart`, `selectionEnd` |
 | `useActiveAnnotation()` | each annotation boundary during playback | `activeAnnotationId` |
-| `useAnnotations()` | an annotation edit, the continuous-play toggle | `annotations`, `continuousPlay` |
-| `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `useAnnotations()` | an annotation edit | `annotations` |
+| `useAnnotationOptions()` | one of the three annotation options being toggled | `editable`, `linkEndpoints`, `continuousPlay` |
+| `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | never | `currentTimeRef` (advances during playback), `visualTimeRef` (the same ref here), `registerFrameCallback`, `unregisterFrameCallback` |
 | `usePlaylistView()` | a provider prop change | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` (`mono`, `indefinitePlayback` and `fillViewport` are always `false` here) |
 | `usePlaylistSettings()` | the user changing either setting | `timeFormat`, `isAutomaticScroll` |

@@ -22,8 +22,8 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MinimalExample() {
   const { tracks, loading } = useAudioTracks([
@@ -96,9 +96,9 @@ Time-synchronized text annotations for podcasts, interviews, and transcription.
 [View Annotations Example](/examples/annotations)
 
 Features:
-- Create annotations from selection
-- Drag to move annotations
-- Resize annotation boundaries
+- Add an annotation at the playhead
+- Click a box or a row of the list to play an annotation
+- Move annotation boundaries by dragging the edges of a box
 - Edit annotation text
 - Export/import annotation data
 

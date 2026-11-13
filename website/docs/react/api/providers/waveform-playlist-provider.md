@@ -120,15 +120,24 @@ Like `effects`, this prop is used by the default Tone.js adapter only. With `cre
 
 #### `annotationList`
 
-**Type:** `{ annotations?: any[]; editable?: boolean; isContinuousPlay?: boolean; linkEndpoints?: boolean; controls?: any[] }`
+**Type:** `AnnotationListProp`: `{ annotations?: AnnotationData[]; editable?: boolean; linkEndpoints?: boolean; isContinuousPlay?: boolean }`
 
-Annotation configuration. When using editable annotations, pair with `onAnnotationsChange`.
+The annotations and the starting values of the three annotation options. The same prop on both providers.
+
+- `annotations`: the annotations to show. `start` and `end` are numbers, in seconds.
+- `editable`: annotations can be edited (text, ids, edges). Default `false`.
+- `linkEndpoints`: a dragged edge takes the edge it touches along. Default `false`.
+- `isContinuousPlay`: playback runs on past the end of an annotation. Default `false`.
+
+The three options are provider state that follows the prop: each starts from its field, and when the value of a field changes, the option takes the new value. A field left out is `false`. Between two changes of the prop, a setter of `usePlaybackControls()` (`setAnnotationsEditable`, `setLinkEndpoints`, `setContinuousPlay`) or one of the checkboxes changes the option; the prop is not told. Read the options with `useAnnotationOptions()`.
+
+The action buttons of the annotation list are not set here: pass them to `<AnnotationList actions>`.
 
 #### `onAnnotationsChange`
 
 **Type:** `(annotations: AnnotationData[]) => void`
 
-Callback when annotations change. Required for editable annotations to persist.
+Called with the full new array on every change to the annotations: the release of an edge drag, a text or id edit in the list, an action button, a `setAnnotations` call of your own (the annotation shortcuts of `<KeyboardShortcuts annotations />` go through `setAnnotations` too). It is the one report of an annotation change. Keep the array in your state and pass it back in `annotationList.annotations`; without this callback an edit is dropped, and a development build warns.
 
 ### Callbacks
 
@@ -319,18 +328,18 @@ Either provider.
 ```typescript
 interface AnnotationsContextValue {
   annotations: AnnotationData[];
-  continuousPlay: boolean;
 }
 ```
 
-### Annotation editing (useAnnotationEditing)
+### Annotation options (useAnnotationOptions)
 
-`WaveformPlaylistProvider` only.
+Either provider.
 
 ```typescript
-interface AnnotationEditingContextValue {
-  annotationsEditable: boolean;
+interface AnnotationOptionsContextValue {
+  editable: boolean;
   linkEndpoints: boolean;
+  continuousPlay: boolean;
 }
 ```
 
@@ -382,6 +391,8 @@ interface PlaybackControlsContextValue {
   setScrollContainer: (element: HTMLDivElement | null) => void;
   scrollContainerRef: RefObject<HTMLDivElement | null>;
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
   annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
@@ -411,8 +422,6 @@ interface EditorControlsContextValue {
   zoomIn: () => void;
   zoomOut: () => void;
   setMasterVolume: (volume: number) => void;
-  setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotationsEditable: (enabled: boolean) => void;
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
@@ -561,13 +570,7 @@ interface WaveformPlaylistProviderProps {
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
 
   // Annotations
-  annotationList?: {
-    annotations?: any[];
-    editable?: boolean;
-    isContinuousPlay?: boolean;
-    linkEndpoints?: boolean;
-    controls?: any[];
-  };
+  annotationList?: AnnotationListProp; // { annotations?, editable?, linkEndpoints?, isContinuousPlay? }
 
   // Callbacks
   onReady?: () => void;
