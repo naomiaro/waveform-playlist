@@ -1,6 +1,4 @@
 import React, {
-  createElement,
-  Fragment,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -11,20 +9,12 @@ import React, {
   useCallback,
 } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  Playlist,
-  PlaylistInfoContext,
-  DevicePixelRatioProvider,
-  useTheme,
-  waveformColorToCss,
-  CLIP_HEADER_HEIGHT,
-} from '@waveform-playlist/ui-components';
+import { DevicePixelRatioProvider, CLIP_HEADER_HEIGHT } from '@waveform-playlist/ui-components';
 import {
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
   useTrackReorderPreview,
-  usePlaybackControls,
   useEditorControls,
 } from '../contexts/playlistContexts';
 import {
@@ -33,24 +23,14 @@ import {
   trackIdAtOffset,
 } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
-import {
-  useSelectionDrag,
-  AutomaticScrollFlag,
-  SelectionPreviewContext,
-} from '../hooks/useSelectionDrag';
 import { useRecordingLayout } from '../hooks/useRecordingLayout';
-import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
+import { trackKind, type RenderMode, type SpectrogramConfig } from '@waveform-playlist/core';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
 import { trackRenderMode } from '../utils/trackRenderMode';
 import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
-import {
-  WaveformExtentContext,
-  WaveformRowsContext,
-  type WaveformExtentValue,
-  type WaveformRowsValue,
-} from './waveformLayoutContext';
-import { sortWaveformParts } from './waveformParts';
+import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
+import { useWaveformFrame, useWaveformParts } from './waveformFrame';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -68,11 +48,12 @@ export interface WaveformRootProps {
 /**
  * The root of the multitrack view (#685). Internal for now.
  *
- * It owns what the parts share and nothing they draw: the scrolling frame
- * (`Playlist`), the size of the timeline, the vertical layout of the rows
- * (one layout for the tracks and the controls column, so they cannot
- * disagree), the pointer handlers of the selection drag, the context for the
- * drawing primitives and the spectrogram settings modal.
+ * It owns what the parts share and nothing they draw: the size of the
+ * timeline, the vertical layout of the rows (one layout for the tracks and
+ * the controls column, so they cannot disagree), what a press on the tracks
+ * does beyond the selection drag, and the spectrogram settings modal. The
+ * scrolling frame (`Playlist`), the selection drag and the context for the
+ * drawing primitives are shared with the MediaElement root: `useWaveformFrame`.
  *
  * It renders on its own state (a drag in progress, the settings modal, the
  * measured container width), on play and stop (its selection drag reads
@@ -87,22 +68,9 @@ export interface WaveformRootProps {
  * across a render that did not change it.
  */
 export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children }) => {
-  const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
-
-  const { setScrollContainer } = usePlaybackControls();
   const { setSelectedTrackId, setCurrentTime, setRecordingActive } = useEditorControls();
-  const {
-    sampleRate,
-    waveHeight,
-    timeScaleHeight,
-    controls,
-    barWidth,
-    barGap,
-    roundedBars,
-    mono,
-    indefinitePlayback,
-    fillViewport,
-  } = usePlaylistView();
+  const { sampleRate, waveHeight, controls, mono, indefinitePlayback, fillViewport } =
+    usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { peaksDataArray, tracks, duration, isReady } = usePlaylistTimeline();
   const { trackDragPreview } = useTrackReorderPreview();
@@ -110,25 +78,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
   const spectrogram = useContext(SpectrogramIntegrationContext);
 
-  // The parts by place, and what the tracks part was given. The part
-  // elements are passed on as they were given, never cloned: that is what
-  // lets React skip every part when this component renders alone (same
-  // element, nothing to do). The memo only saves sorting them again.
-  const parts = useMemo(() => {
-    const sorted = sortWaveformParts(children);
-    return {
-      // One element per place, with the parts as its positional children
-      // (they carry no keys).
-      timescale:
-        sorted.timescale.length > 0 ? createElement(Fragment, null, ...sorted.timescale) : null,
-      controls:
-        sorted.controls.length > 0
-          ? [createElement(Fragment, { key: 'controls' }, ...sorted.controls)]
-          : undefined,
-      content: createElement(Fragment, null, ...sorted.content),
-      tracksOptions: sorted.tracksOptions,
-    };
-  }, [children]);
+  // The parts by place, and what the tracks part was given.
+  const parts = useWaveformParts(children);
   const { showClipHeaders, recordingState } = parts.tracksOptions;
 
   // Sync the recording session (and its armed track) to the provider so the
@@ -202,18 +153,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
   const closeSettingsModal = useCallback(() => setSettingsModalTrackId(null), []);
 
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-
+  // The frame hands over the scroll container (a state setter: stable).
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
-
-  const handleScrollContainerRef = useCallback(
-    (element: HTMLDivElement | null) => {
-      scrollContainerRef.current = element;
-      setScrollContainerElement(element);
-      setScrollContainer(element);
-    },
-    [setScrollContainer]
-  );
 
   // Fill the visible scroll container when requested — indefinitePlayback
   // implies it (endless playback needs an endless-looking timeline);
@@ -248,8 +189,6 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     // Grows in steps, not with every frame of the take (#695).
     displayDuration = Math.max(displayDuration, recordingLayout.displayEndSeconds);
   }
-
-  const tracksFullWidth = Math.floor((displayDuration * sampleRate) / samplesPerPixel);
 
   // Reads `tracks` through a ref so its identity survives `tracks` changes: it
   // is a prop of every memoized clip and control panel.
@@ -300,17 +239,57 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     [displayOrderIds, trackHeightById]
   );
 
-  // The selection drag (shared with the MediaElement view). The multitrack
-  // extras: a press selects the row under the pointer, and a click while
-  // stopped moves the cursor only (the selection the press collapsed stays).
-  const {
-    isSelecting,
-    handleMouseDown,
-    preview: selectionPreview,
-    automaticScrollRef,
-  } = useSelectionDrag({
-    samplesPerPixel,
-    sampleRate,
+  const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
+
+  // What the parts need to know of each track. Changes with `tracks`, as the
+  // peaks beside it do.
+  const rowList = useMemo<WaveformRow[]>(
+    () => tracks.map((track) => ({ id: track.id, kind: trackKind(track) })),
+    [tracks]
+  );
+  const dragSourceTrackId = trackDragPreview?.trackId ?? null;
+
+  const rows = useMemo<WaveformRowsValue>(
+    () => ({
+      rows: rowList,
+      peaksDataArray,
+      showClipHeaders,
+      trackHeightById,
+      trackLayout,
+      animateTrackLayout,
+      renderModeById,
+      spectrogramHelpersById,
+      selectTrack,
+      setSettingsModalTrackId,
+      recordingChannelCount,
+      dragSourceTrackId,
+    }),
+    [
+      rowList,
+      peaksDataArray,
+      showClipHeaders,
+      trackHeightById,
+      trackLayout,
+      animateTrackLayout,
+      renderModeById,
+      spectrogramHelpersById,
+      selectTrack,
+      recordingChannelCount,
+      dragSourceTrackId,
+    ]
+  );
+
+  // The frame, with the multitrack extras of the selection drag: a press
+  // selects the row under the pointer, and a click while stopped moves the
+  // cursor only (the selection the press collapsed stays).
+  const frame = useWaveformFrame({
+    className,
+    parts,
+    displayDuration,
+    rows,
+    playlistState: isReady ? 'ready' : 'loading',
+    controlsWidth: controls.show ? controls.width : 0,
+    onScrollContainer: setScrollContainerElement,
     onPress: ({ offsetY }) => {
       // The row under the pointer, from the layout the rows are positioned with.
       const clickedTrackId = trackIdAtOffset(
@@ -326,98 +305,9 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     onClickWhileStopped: setCurrentTime,
   });
 
-  const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
-
-  // Memoized so that consumers of the context (every channel, the timescale)
-  // are not re-rendered by a render of this component that changed none of it.
-  const playlistInfo = useMemo(
-    () => ({
-      samplesPerPixel,
-      sampleRate,
-      zoomLevels: [samplesPerPixel],
-      waveHeight,
-      timeScaleHeight,
-      controls,
-      barWidth,
-      barGap,
-      roundedBars,
-    }),
-    [
-      samplesPerPixel,
-      sampleRate,
-      waveHeight,
-      timeScaleHeight,
-      controls,
-      barWidth,
-      barGap,
-      roundedBars,
-    ]
-  );
-
-  const extent = useMemo<WaveformExtentValue>(
-    () => ({ displayDuration, tracksFullWidth }),
-    [displayDuration, tracksFullWidth]
-  );
-
-  const rows = useMemo<WaveformRowsValue>(
-    () => ({
-      tracks,
-      peaksDataArray,
-      showClipHeaders,
-      trackHeightById,
-      trackLayout,
-      animateTrackLayout,
-      renderModeById,
-      spectrogramHelpersById,
-      selectTrack,
-      setSettingsModalTrackId,
-      recordingChannelCount,
-    }),
-    [
-      tracks,
-      peaksDataArray,
-      showClipHeaders,
-      trackHeightById,
-      trackLayout,
-      animateTrackLayout,
-      renderModeById,
-      spectrogramHelpersById,
-      selectTrack,
-      recordingChannelCount,
-    ]
-  );
-
   return (
     <DevicePixelRatioProvider>
-      <AutomaticScrollFlag flagRef={automaticScrollRef} />
-      <PlaylistInfoContext.Provider value={playlistInfo}>
-        <WaveformExtentContext.Provider value={extent}>
-          <WaveformRowsContext.Provider value={rows}>
-            <SelectionPreviewContext.Provider value={selectionPreview}>
-              <Playlist
-                className={className}
-                theme={theme}
-                backgroundColor={
-                  theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
-                }
-                timescaleBackgroundColor={theme.timescaleBackgroundColor}
-                timescaleWidth={tracksFullWidth}
-                tracksWidth={tracksFullWidth}
-                controlsWidth={controls.show ? controls.width : 0}
-                onTracksMouseDown={handleMouseDown}
-                scrollContainerRef={handleScrollContainerRef}
-                isSelecting={isSelecting}
-                data-playlist-state={isReady ? 'ready' : 'loading'}
-                trackControlsSlots={parts.controls}
-                timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
-                timescale={timeScaleHeight > 0 && parts.timescale ? parts.timescale : undefined}
-              >
-                {parts.content}
-              </Playlist>
-            </SelectionPreviewContext.Provider>
-          </WaveformRowsContext.Provider>
-        </WaveformExtentContext.Provider>
-      </PlaylistInfoContext.Provider>
+      {frame}
       {spectrogram?.SettingsModal &&
         typeof document !== 'undefined' &&
         createPortal(

@@ -9,7 +9,6 @@ import {
 } from '@waveform-playlist/ui-components';
 import {
   resolveRecordingOffsetSamples,
-  trackKind,
   type Peaks,
   type RenderMode,
   type TrackKind,
@@ -20,8 +19,7 @@ import {
   useEngineRefs,
   usePlaylistView,
   usePlaylistZoom,
-  useSelectedTrackId,
-  useTrackReorderPreview,
+  useSelectedRow,
 } from '../contexts/playlistContexts';
 import {
   SpectrogramIntegrationContext,
@@ -431,9 +429,10 @@ export interface TracksPartProps {
 /**
  * All track rows: the tracks part of the view (#685).
  *
- * It takes the tracks, their peaks and the layout from the root's rows value
- * (not from the provider's timeline value, see waveformLayoutContext.ts),
- * reads the selected track itself, and is
+ * It takes the rows, their peaks and the layout from the root's rows value
+ * (not from a provider's track value, see waveformLayoutContext.ts) and the
+ * selected row from a context both providers serve (`useSelectedRow`), so it
+ * draws under either provider. It is
  * deliberately free of the time selection, the cursor and the annotation
  * state: those change on every pointer move of a selection drag and
  * throughout playback, and nothing in a track row depends on them. Read one
@@ -447,16 +446,15 @@ export interface TracksPartProps {
 export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, children }) => {
   const rows = useWaveformRows('The tracks');
   const { tracksFullWidth: width } = useWaveformExtent('The tracks');
-  const { selectedTrackId } = useSelectedTrackId();
-  const { trackDragPreview } = useTrackReorderPreview();
+  const { selectedTrackId } = useSelectedRow();
   const { sampleRate, waveHeight, mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const spectrogram = useContext(SpectrogramIntegrationContext);
   const { showFades, recordingState } = scanTracksParts(children);
-  const dragSourceTrackId = trackDragPreview?.trackId ?? null;
   const {
-    tracks,
+    rows: rowList,
     peaksDataArray,
+    dragSourceTrackId,
     trackLayout,
     renderModeById,
     spectrogramHelpersById,
@@ -466,7 +464,7 @@ export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, chil
   return (
     <TracksLayout $height={trackLayout.totalHeight}>
       {peaksDataArray.map((trackClipPeaks, trackIndex) => {
-        const track = tracks[trackIndex];
+        const track = rowList[trackIndex];
         if (!track) return null;
 
         const isArmed = recordingState?.isRecording === true && recordingState.trackId === track.id;
@@ -484,7 +482,7 @@ export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, chil
             width={width}
             isSelected={track.id === selectedTrackId}
             isDragSource={track.id === dragSourceTrackId}
-            kind={trackKind(track)}
+            kind={track.kind}
             renderMode={renderModeById.get(track.id) ?? 'waveform'}
             numChannels={getTrackChannelCount(trackClipPeaks, recordingChannels)}
             waveHeight={waveHeight}

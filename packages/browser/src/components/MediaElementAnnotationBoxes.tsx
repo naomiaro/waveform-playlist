@@ -13,6 +13,7 @@ import {
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
+import { useWaveformExtent } from './waveformLayoutContext';
 import type {
   AnnotationData,
   GetAnnotationBoxLabelFn,
@@ -23,27 +24,28 @@ const HORIZONTAL_ONLY = [RestrictToHorizontalAxis];
 const NO_MODIFIERS: never[] = [];
 
 export interface MediaElementAnnotationBoxesProps {
-  /** Width of the row in pixels (the full timeline width). */
-  width: number;
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  editable: boolean;
-  linkEndpoints: boolean;
+  editable?: boolean;
+  linkEndpoints?: boolean;
   onAnnotationUpdate?: OnAnnotationUpdateFn;
 }
 
 /**
  * The annotation boxes of the MediaElement player, with the drag wiring for
- * their edges. This is the only part of `MediaElementPlaylist` that reads the
- * annotations and the active annotation, so an annotation boundary during
- * playback renders this and not the waveform (#744).
+ * their edges: the annotation-boxes part of the MediaElement view. It is the
+ * only part of that view that reads the annotations and the active
+ * annotation, so an annotation boundary during playback renders this and not
+ * the waveform (#744). As wide as the root's timeline. Memoized: a render of
+ * the component that composes the view does not render it while its props
+ * keep their identity.
  */
-export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesProps> = ({
-  width,
+export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnotationBoxes({
   getAnnotationBoxLabel,
-  editable,
-  linkEndpoints,
+  editable = false,
+  linkEndpoints = false,
   onAnnotationUpdate,
-}) => {
+}: MediaElementAnnotationBoxesProps) {
+  const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -112,4 +114,4 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
       />
     </DragDropProvider>
   );
-};
+});

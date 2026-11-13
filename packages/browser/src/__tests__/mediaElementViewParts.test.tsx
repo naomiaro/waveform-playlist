@@ -1,0 +1,481 @@
+// @vitest-environment jsdom
+//
+// #685, part 2. The MediaElement view is a root with the same parts as the
+// multitrack view: the tracks part, the timescale part, the shared overlays.
+// What that changes for a consumer is asserted here, one test per row of the
+// upgrade guide's table.
+import './jsdom-polyfills'; // must be first — sets globals the import graph needs
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
+import React from 'react';
+import WaveformData from 'waveform-data';
+import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import type { WaveformDataObject } from '@waveform-playlist/core';
+
+const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0, frame: 0, scale: 0 }));
+
+vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    Clip: (props: React.ComponentProps<typeof actual.Clip>) => {
+      counts.clip++;
+      return createElement(actual.Clip, props);
+    },
+    SmartChannel: (props: React.ComponentProps<typeof actual.SmartChannel>) => {
+      counts.channel++;
+      return createElement(actual.SmartChannel, props);
+    },
+    Track: (props: React.ComponentProps<typeof actual.Track>) => {
+      counts.track++;
+      return createElement(actual.Track, props);
+    },
+    Playlist: (props: React.ComponentProps<typeof actual.Playlist>) => {
+      counts.frame++;
+      return createElement(actual.Playlist, props);
+    },
+    SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
+      counts.scale++;
+      return createElement(actual.SmartScale, props);
+    },
+  };
+});
+
+import {
+  MediaElementPlaylistProvider,
+  type MediaElementPlaylistProviderProps,
+  type MediaElementTrackConfig,
+} from '../MediaElementPlaylistContext';
+import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { usePlaybackControls, useMediaElementTrack } from '../contexts/playlistContexts';
+import {
+  AnnotationIntegrationContext,
+  type AnnotationIntegration,
+} from '../AnnotationIntegrationContext';
+import type { PlayheadProps } from '@waveform-playlist/ui-components';
+
+const INTEGRATION = {
+  AnnotationBox: ({ label }: { label: string }) => <span data-box>{label}</span>,
+  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AnnotationText: () => null,
+} as unknown as AnnotationIntegration;
+
+const SAMPLE_RATE = 44100;
+const SOURCE_SCALE = 441;
+// 44.1 px per second, and a clip that does not end on a pixel: 8 s is 352.8 px,
+// so the clip is 352 px wide and its peaks are one longer.
+const SAMPLES_PER_PIXEL = 1000;
+const SECONDS = 8;
+const CLIP_WIDTH = Math.floor((SECONDS * SAMPLE_RATE) / SAMPLES_PER_PIXEL);
+const LENGTH = (SECONDS * SAMPLE_RATE) / SOURCE_SCALE;
+const TRACK: MediaElementTrackConfig = {
+  source: 'test.mp3',
+  name: 'Test',
+  waveformData: WaveformData.create({
+    version: 2,
+    channels: 1,
+    sample_rate: SAMPLE_RATE,
+    samples_per_pixel: SOURCE_SCALE,
+    bits: 8,
+    length: LENGTH,
+    data: Array.from({ length: LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -10 : 10)),
+  }) as unknown as WaveformDataObject,
+};
+
+function createFakePlayout() {
+  const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
+  const fake = {
+    time: 0,
+    addTrack: vi.fn(),
+    getTrack: () => undefined,
+    setOnPlaybackComplete() {},
+    on(event: string, listener: (...args: unknown[]) => void) {
+      if (!listeners.has(event)) listeners.set(event, new Set());
+      listeners.get(event)!.add(listener);
+    },
+    off() {},
+    emit(event: string, ...args: unknown[]) {
+      listeners.get(event)?.forEach((listener) => listener(...args));
+    },
+    play: vi.fn((_when?: number, offset?: number) => {
+      fake.time = offset ?? 0;
+    }),
+    pause: vi.fn(),
+    stop: vi.fn(),
+    seekTo: vi.fn((time: number) => {
+      fake.time = time;
+    }),
+    setPlaybackRate() {},
+    getCurrentTime: () => fake.time,
+    dispose: vi.fn(),
+  };
+  return fake;
+}
+
+let controls: ReturnType<typeof usePlaybackControls>;
+let trackValue: ReturnType<typeof useMediaElementTrack>;
+const Probe: React.FC = () => {
+  controls = usePlaybackControls();
+  trackValue = useMediaElementTrack();
+  return null;
+};
+
+const resetCounts = () => {
+  counts.clip = 0;
+  counts.channel = 0;
+  counts.track = 0;
+  counts.frame = 0;
+  counts.scale = 0;
+};
+
+beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
+  vi.restoreAllMocks();
+});
+
+interface MountOptions {
+  playlist?: React.ReactElement;
+  provider?: Partial<MediaElementPlaylistProviderProps>;
+  /** Leave the player without its metadata. */
+  notReady?: boolean;
+}
+
+async function mount({ playlist, provider, notReady = false }: MountOptions = {}) {
+  const fake = createFakePlayout();
+  const createPlayout = () => fake as unknown as MediaElementPlayout;
+  const view = render(
+    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={createPlayout}
+        {...provider}
+      >
+        {playlist ?? <MediaElementPlaylist />}
+        <Probe />
+      </MediaElementPlaylistProvider>
+    </AnnotationIntegrationContext.Provider>
+  );
+  await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
+  if (!notReady) {
+    await act(async () => {
+      fake.emit('loadedmetadata');
+    });
+  }
+  resetCounts();
+  return { fake, view };
+}
+
+const root = () => document.querySelector('[data-playlist-state]') as HTMLElement | null;
+const scrollArea = () => document.querySelector('[data-scroll-container]') as HTMLElement;
+
+/** The click overlay: the last, childless child of the tracks container. */
+function clickOverlay(): HTMLElement {
+  const playhead = document.querySelector('[data-playhead]') as HTMLElement;
+  const element = playhead.parentElement!.lastElementChild as HTMLElement;
+  element.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: CLIP_WIDTH, height: 100 }) as DOMRect;
+  return element;
+}
+
+describe('the MediaElement view has the root of the multitrack view', () => {
+  it('className is on the outermost element, the one with data-playlist-state', async () => {
+    await mount({ playlist: <MediaElementPlaylist className="mine" /> });
+    expect(root()).not.toBeNull();
+    expect(root()!.classList.contains('mine')).toBe(true);
+    expect(root()!.contains(scrollArea())).toBe(true);
+  });
+
+  it('data-playlist-state follows the player: loading until it has its metadata', async () => {
+    const { fake } = await mount({ notReady: true });
+    expect(root()!.getAttribute('data-playlist-state')).toBe('loading');
+    // The waveform does not wait for the player.
+    expect(document.querySelectorAll('[data-clip-container]').length).toBe(1);
+    await act(async () => {
+      fake.emit('loadedmetadata');
+    });
+    expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
+  });
+
+  it('theme.playlistBackgroundColor is the background, when set', async () => {
+    await mount({ provider: { theme: { playlistBackgroundColor: 'rgb(1, 2, 3)' } } });
+    const inner = scrollArea().firstElementChild as HTMLElement;
+    expect(getComputedStyle(inner).background).toContain('rgb(1, 2, 3)');
+  });
+
+  it('without it the background is the wave outline colour, as before', async () => {
+    await mount({ provider: { theme: { waveOutlineColor: 'rgb(9, 8, 7)' } } });
+    const inner = scrollArea().firstElementChild as HTMLElement;
+    expect(getComputedStyle(inner).background).toContain('rgb(9, 8, 7)');
+  });
+
+  it('the one track is a row, marked as an audio track and as selected', async () => {
+    await mount();
+    const rows = document.querySelectorAll('[data-track-row]');
+    expect(rows.length).toBe(1);
+    const row = rows[0] as HTMLElement;
+    expect(row.getAttribute('data-track-id')).toBe('media-element-track-0');
+    expect(row.getAttribute('data-track-kind')).toBe('audio');
+    expect(row.getAttribute('data-selected')).toBe('true');
+    // The clip keeps the id it had.
+    const clip = row.querySelector('[data-clip-container]') as HTMLElement;
+    expect(clip.getAttribute('data-track-id')).toBe('media-element-track-0');
+  });
+
+  it('controls.show draws no controls column: the scroll area is the only child', async () => {
+    await mount({ provider: { controls: { show: true, width: 150 } } });
+    expect(root()!.children.length).toBe(1);
+    expect(root()!.firstElementChild).toBe(scrollArea());
+  });
+
+  it('the timeline is as long as the audio, with a timescale when the provider asks for one', async () => {
+    counts.scale = 0;
+    await mount({ provider: { timescale: true } });
+    const inner = scrollArea().firstElementChild as HTMLElement;
+    expect(inner.style.width).toBe(`${CLIP_WIDTH}px`);
+    cleanup();
+    counts.scale = 0;
+    render(
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        timescale
+        createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
+      >
+        <MediaElementPlaylist />
+      </MediaElementPlaylistProvider>
+    );
+    expect(counts.scale).toBeGreaterThan(0);
+  });
+
+  it('no timescale is drawn when the provider does not ask for one', async () => {
+    counts.scale = 0;
+    render(
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
+      >
+        <MediaElementPlaylist />
+      </MediaElementPlaylistProvider>
+    );
+    expect(counts.scale).toBe(0);
+  });
+});
+
+describe('when the peaks cannot be extracted', () => {
+  const BROKEN: MediaElementTrackConfig = {
+    source: 'test.mp3',
+    waveformData: new Proxy(
+      {},
+      {
+        get(_target, key) {
+          if (key === 'sample_rate') return SAMPLE_RATE;
+          if (key === 'duration') return SECONDS;
+          throw new Error('broken waveform data');
+        },
+      }
+    ) as unknown as WaveformDataObject,
+  };
+
+  it('an empty timeline of the length of the audio is drawn, not the text "Loading waveform..."', async () => {
+    await mount({
+      playlist: <MediaElementPlaylist className="mine" />,
+      provider: { track: BROKEN },
+    });
+    expect(document.body.textContent).not.toContain('Loading waveform');
+    expect(root()!.classList.contains('mine')).toBe(true);
+    expect(document.querySelectorAll('[data-track-row]').length).toBe(0);
+    const inner = scrollArea().firstElementChild as HTMLElement;
+    expect(inner.style.width).toBe(`${CLIP_WIDTH}px`);
+  });
+});
+
+describe('fades are the clip’s', () => {
+  const FADED: MediaElementTrackConfig = {
+    ...TRACK,
+    fadeIn: { duration: 1, type: 'linear' },
+    fadeOut: { duration: 2, type: 'sCurve' },
+  };
+  const fadeBoxes = () =>
+    [...document.querySelectorAll('[data-clip-container] svg')].map(
+      (svg) => svg.parentElement as HTMLElement
+    );
+
+  it('the provider puts the track’s fades on its one clip', async () => {
+    await mount({ provider: { track: FADED } });
+    const clip = trackValue.peaksDataArray[0][0];
+    expect(clip.fadeIn).toEqual({ duration: 1, type: 'linear' });
+    expect(clip.fadeOut).toEqual({ duration: 2, type: 'sCurve' });
+    // Still the provider's fields.
+    expect(trackValue.fadeIn).toEqual({ duration: 1, type: 'linear' });
+  });
+
+  it('no fade is drawn without showFades', async () => {
+    await mount({ provider: { track: FADED } });
+    expect(fadeBoxes().length).toBe(0);
+  });
+
+  it('with showFades the fade-out ends where the clip ends', async () => {
+    await mount({ playlist: <MediaElementPlaylist showFades />, provider: { track: FADED } });
+    const boxes = fadeBoxes();
+    expect(boxes.length).toBe(2);
+    const fadeInWidth = Math.floor((1 * SAMPLE_RATE) / SAMPLES_PER_PIXEL);
+    const fadeOutWidth = Math.floor((2 * SAMPLE_RATE) / SAMPLES_PER_PIXEL);
+    expect(boxes[0].style.left).toBe('0px');
+    expect(boxes[0].style.width).toBe(`${fadeInWidth}px`);
+    // From the clip width (352), not from the peaks length (353).
+    expect(trackValue.peaksDataArray[0][0].peaks.length).toBe(CLIP_WIDTH + 1);
+    expect(boxes[1].style.left).toBe(`${CLIP_WIDTH - fadeOutWidth}px`);
+    expect(boxes[1].style.width).toBe(`${fadeOutWidth}px`);
+  });
+
+  it('a change of the fades alone does not extract the peaks again', async () => {
+    const fake = createFakePlayout();
+    const ui = (track: MediaElementTrackConfig) => (
+      <MediaElementPlaylistProvider
+        track={track}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={() => fake as unknown as MediaElementPlayout}
+      >
+        <MediaElementPlaylist showFades />
+        <Probe />
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(FADED));
+    const before = trackValue.peaksDataArray[0][0];
+    await act(async () => {
+      view.rerender(ui({ ...FADED, fadeIn: { duration: 3, type: 'linear' } }));
+    });
+    const after = trackValue.peaksDataArray[0][0];
+    expect(after.fadeIn).toEqual({ duration: 3, type: 'linear' });
+    expect(after).not.toBe(before);
+    expect(after.peaks).toBe(before.peaks);
+  });
+});
+
+describe('the root renders alone', () => {
+  const pressAndRelease = async (x: number) => {
+    const overlay = clickOverlay();
+    await act(async () => {
+      fireEvent.mouseDown(overlay, { button: 0, clientX: x, clientY: 5 });
+    });
+    await act(async () => {
+      fireEvent.mouseUp(window, { button: 0, clientX: x, clientY: 5 });
+    });
+  };
+
+  it('the counters work: a mount renders the frame, the row, the clip and the channel', async () => {
+    resetCounts();
+    render(
+      <MediaElementPlaylistProvider
+        track={TRACK}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
+      >
+        <MediaElementPlaylist />
+      </MediaElementPlaylistProvider>
+    );
+    expect(counts.frame).toBeGreaterThan(0);
+    expect(counts.track).toBeGreaterThan(0);
+    expect(counts.clip).toBeGreaterThan(0);
+    expect(counts.channel).toBeGreaterThan(0);
+  });
+
+  it('a press and its release render the frame and no track, clip or channel', async () => {
+    await mount();
+    await pressAndRelease(100);
+    expect(counts.frame).toBeGreaterThan(0);
+    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+    // The click did its work: the cursor is where the press landed.
+    const playhead = document.querySelector('[data-playhead]') as HTMLElement;
+    expect(playhead.style.transform).toBe('translate3d(100px, 0, 0)');
+  });
+
+  it('play, pause and stop render the frame and no track, clip or channel', async () => {
+    await mount();
+    await act(async () => {
+      await controls.play();
+    });
+    act(() => controls.pause());
+    await act(async () => {
+      await controls.play();
+    });
+    act(() => controls.stop());
+    expect(counts.frame).toBeGreaterThan(0);
+    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+  });
+
+  it('the player becoming ready renders the frame and no track, clip or channel', async () => {
+    const { fake } = await mount({ notReady: true });
+    await act(async () => {
+      fake.emit('loadedmetadata');
+    });
+    expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
+    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+  });
+
+  it('a custom playhead is not called for a press and its release at the cursor', async () => {
+    let calls = 0;
+    const renderPlayhead = (_props: PlayheadProps) => {
+      calls++;
+      return <div data-playhead />;
+    };
+    await mount({ playlist: <MediaElementPlaylist renderPlayhead={renderPlayhead} /> });
+    // The cursor is at 0 and stays there: nothing the playhead follows changes.
+    calls = 0;
+    await pressAndRelease(0);
+    expect(calls).toBe(0);
+  });
+
+  it('getAnnotationBoxLabel is not called for a press and its release', async () => {
+    let calls = 0;
+    const label = () => {
+      calls++;
+      return 'x';
+    };
+    await mount({
+      playlist: <MediaElementPlaylist getAnnotationBoxLabel={label} />,
+      provider: {
+        annotationList: {
+          annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
+        },
+      },
+    });
+    // The box is drawn with the label, as wide as the annotation's place on
+    // the root's timeline.
+    expect(calls).toBeGreaterThan(0);
+    expect(document.querySelector('[data-box]')!.textContent).toBe('x');
+    calls = 0;
+    await pressAndRelease(0);
+    expect(calls).toBe(0);
+  });
+});
+
+describe('the selected row is the nearest provider\u2019s', () => {
+  it('a MediaElement player inside a multitrack provider draws its own row as selected', async () => {
+    const { WaveformPlaylistProvider } = await import('../WaveformPlaylistContext');
+    const fake = createFakePlayout();
+    render(
+      <WaveformPlaylistProvider tracks={[]}>
+        <MediaElementPlaylistProvider
+          track={TRACK}
+          samplesPerPixel={SAMPLES_PER_PIXEL}
+          createPlayout={() => fake as unknown as MediaElementPlayout}
+        >
+          <MediaElementPlaylist />
+        </MediaElementPlaylistProvider>
+      </WaveformPlaylistProvider>
+    );
+    await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
+    const row = document.querySelector('[data-track-row]') as HTMLElement;
+    expect(row.getAttribute('data-selected')).toBe('true');
+  });
+});

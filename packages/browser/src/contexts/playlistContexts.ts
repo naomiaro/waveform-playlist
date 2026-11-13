@@ -25,6 +25,9 @@ export type { FrameData };
 const WEB_AUDIO = 'WaveformPlaylistProvider';
 const MEDIA_ELEMENT = 'MediaElementPlaylistProvider';
 
+/** The id of the one track of a MediaElement player (its row and its clip carry it). */
+export const MEDIA_ELEMENT_TRACK_ID = 'media-element-track-0';
+
 /**
  * What a provider puts in a context it does not serve. The hook then throws
  * and names the provider that is needed, instead of reading an outer provider
@@ -404,6 +407,14 @@ export const PlaybackControlsContext = slot<PlaybackControlsContextValue>();
 export const PlaylistViewContext = slot<PlaylistViewContextValue>();
 export const PlaylistSettingsContext = slot<PlaylistSettingsContextValue>();
 export const PlaylistZoomContext = slot<PlaylistZoomContextValue>();
+/**
+ * INTERNAL (the context and its hook are not exported from the package): which
+ * row the view draws as selected. Both providers serve it, so the tracks part
+ * of the view needs no provider-specific hook: the multitrack provider gives
+ * the value of `useSelectedTrackId()` (the same object), the MediaElement
+ * provider its one track, always.
+ */
+export const SelectedRowContext = slot<SelectedTrackIdContextValue>();
 
 // WaveformPlaylistProvider only
 export const EditorControlsContext = slot<EditorControlsContextValue>();
@@ -528,6 +539,13 @@ export const useLoop = () => useSlot(LoopContext, 'useLoop', WEB_AUDIO);
 /** `{ selectedTrackId }`. Re-renders when another track is selected. */
 export const useSelectedTrackId = () =>
   useSlot(SelectedTrackIdContext, 'useSelectedTrackId', WEB_AUDIO);
+
+/**
+ * INTERNAL (not exported from the package): `{ selectedTrackId }` for the row
+ * the view draws as selected, under either provider. Consumers use
+ * `useSelectedTrackId()`, which only the multitrack provider serves.
+ */
+export const useSelectedRow = () => useSlot(SelectedRowContext, 'The tracks of the view', EITHER);
 
 /** `{ canUndo, canRedo }`. Re-renders after an edit. */
 export const useUndoRedo = () => useSlot(UndoRedoContext, 'useUndoRedo', WEB_AUDIO);

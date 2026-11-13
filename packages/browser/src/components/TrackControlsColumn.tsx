@@ -1,6 +1,5 @@
 import React, { useContext, type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import { trackKind } from '@waveform-playlist/core';
 import {
   usePlaylistMixer,
   useEditorControls,
@@ -44,7 +43,7 @@ function TrackControlsPartImpl({
 }: TrackControlsPartProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
   const {
-    tracks,
+    rows: tracks,
     renderModeById,
     trackLayout,
     trackHeightById,
@@ -72,7 +71,7 @@ function TrackControlsPartImpl({
             volume: 1.0,
             pan: 0,
           },
-          kind: trackKind(track),
+          kind: track.kind,
           effectiveRenderMode: renderModeById.get(track.id) ?? 'waveform',
           selectTrack,
           onRemoveTrack,

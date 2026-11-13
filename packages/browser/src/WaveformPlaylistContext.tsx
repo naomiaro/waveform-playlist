@@ -88,6 +88,7 @@ import {
   PlaylistViewContext,
   PlaylistZoomContext,
   SelectedTrackIdContext,
+  SelectedRowContext,
   SelectionContext,
   TrackReorderPreviewContext,
   UndoRedoContext,
@@ -2002,31 +2003,35 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
                       <PlaylistZoomContext.Provider value={zoomValue}>
                         <UndoRedoContext.Provider value={undoRedoValue}>
                           <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
-                            <LoopContext.Provider value={loopValue}>
-                              <AnnotationEditingContext.Provider value={annotationEditingValue}>
-                                <AnnotationsContext.Provider value={annotationsValue}>
-                                  <IsPlayingContext.Provider value={isPlayingValue}>
-                                    <ActiveAnnotationContext.Provider value={activeAnnotationValue}>
-                                      <CurrentTimeContext.Provider value={currentTimeValue}>
-                                        <SelectionContext.Provider value={selectionValue}>
-                                          <TrackReorderPreviewContext.Provider
-                                            value={reorderPreviewValue}
-                                          >
-                                            <PlaylistMixerContext.Provider value={mixerValue}>
-                                              <PlaylistTimelineContext.Provider
-                                                value={timelineValue}
-                                              >
-                                                {children}
-                                              </PlaylistTimelineContext.Provider>
-                                            </PlaylistMixerContext.Provider>
-                                          </TrackReorderPreviewContext.Provider>
-                                        </SelectionContext.Provider>
-                                      </CurrentTimeContext.Provider>
-                                    </ActiveAnnotationContext.Provider>
-                                  </IsPlayingContext.Provider>
-                                </AnnotationsContext.Provider>
-                              </AnnotationEditingContext.Provider>
-                            </LoopContext.Provider>
+                            <SelectedRowContext.Provider value={selectedTrackIdValue}>
+                              <LoopContext.Provider value={loopValue}>
+                                <AnnotationEditingContext.Provider value={annotationEditingValue}>
+                                  <AnnotationsContext.Provider value={annotationsValue}>
+                                    <IsPlayingContext.Provider value={isPlayingValue}>
+                                      <ActiveAnnotationContext.Provider
+                                        value={activeAnnotationValue}
+                                      >
+                                        <CurrentTimeContext.Provider value={currentTimeValue}>
+                                          <SelectionContext.Provider value={selectionValue}>
+                                            <TrackReorderPreviewContext.Provider
+                                              value={reorderPreviewValue}
+                                            >
+                                              <PlaylistMixerContext.Provider value={mixerValue}>
+                                                <PlaylistTimelineContext.Provider
+                                                  value={timelineValue}
+                                                >
+                                                  {children}
+                                                </PlaylistTimelineContext.Provider>
+                                              </PlaylistMixerContext.Provider>
+                                            </TrackReorderPreviewContext.Provider>
+                                          </SelectionContext.Provider>
+                                        </CurrentTimeContext.Provider>
+                                      </ActiveAnnotationContext.Provider>
+                                    </IsPlayingContext.Provider>
+                                  </AnnotationsContext.Provider>
+                                </AnnotationEditingContext.Provider>
+                              </LoopContext.Provider>
+                            </SelectedRowContext.Provider>
                           </SelectedTrackIdContext.Provider>
                         </UndoRedoContext.Provider>
                       </PlaylistZoomContext.Provider>
