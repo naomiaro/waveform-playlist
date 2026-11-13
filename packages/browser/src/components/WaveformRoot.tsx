@@ -71,9 +71,12 @@ export interface WaveformRootProps {
  * disagree), the pointer handlers of the selection drag, the context for the
  * drawing primitives and the spectrogram settings modal.
  *
- * It renders on its own "a drag is in progress" state, on play and stop (its
- * drag handlers read `isPlaying`), and on every change of the timeline, the
- * zoom and the view settings. None of that renders a part by itself: the
+ * It renders on its own state (a drag in progress, the settings modal, the
+ * measured container width), on play and stop (its drag handlers read
+ * `isPlaying`), on every change of the timeline, the zoom, the view settings,
+ * the reorder preview, the spectrogram integration and the theme, on a
+ * recording layout step, and whenever the component that composes it renders.
+ * None of that renders a part by itself: the
  * parts are `children`, whose elements are the same as on the previous render
  * unless the component that composed them rendered too, and each part follows
  * the two layout values below and the provider contexts it reads. Keep it so:

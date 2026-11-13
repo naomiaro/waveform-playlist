@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 //
 // #685, step 1: the multitrack view is a root with parts as its children. A
-// render of the root alone (a press, a release, a selected track) hands the
-// parts the same elements as before, so React skips them; each part follows
-// only the contexts it reads.
+// render of the root alone (a press, a release) hands the parts the same
+// elements as before, so React skips them; each part follows only the
+// contexts it reads. A selected track does not render the root at all: the
+// tracks part and the controls part read it.
 //
 // Also here: two `AudioPosition`s under one provider each keep their own
 // frame callback (they used to share the id 'audio-position').
@@ -256,7 +257,7 @@ describe('the root renders alone (#685)', () => {
     expect(counts.track).toBeGreaterThanOrEqual(3);
   });
 
-  it('selecting a track from code renders the two rows and panels involved, not the root', async () => {
+  it('selecting a track from code renders at most the two rows involved, no control panel and not the root', async () => {
     await mount();
 
     await act(async () => {
@@ -266,6 +267,8 @@ describe('the root renders alone (#685)', () => {
     expect(probe.selectedTrackId).toBe('t2');
     expect(counts.track).toBeGreaterThan(0);
     expect(counts.track).toBeLessThanOrEqual(2);
+    // The slot's background follows the selection; the memoized panel in it does not render.
+    expect(counts.controls).toBe(0);
     expect(counts.shell).toBe(0);
     expect(counts.scale).toBe(0);
     expect(counts.boxes).toBe(0);
@@ -297,15 +300,18 @@ describe('the root renders alone (#685)', () => {
     expect(counts.layout).toBe(0);
   });
 
-  it('a render of the composing component with the same props renders the tracks part alone', async () => {
+  it('a render of the composing component with the same props renders the root and the tracks part, and no memoized part or row', async () => {
     const { rerenderSame } = await mount();
 
     await act(async () => {
       rerenderSame();
     });
 
-    // The tracks part has children, so it cannot be skipped; the timescale,
-    // the annotation row and the track controls are memoized and are.
+    // The root gets new children and the tracks part has children of its own,
+    // so neither can be skipped (nor the playhead, which is not memoized);
+    // the timescale, the annotation row and the track controls are memoized
+    // and are.
+    expect(counts.shell).toBe(1);
     expect(counts.layout).toBe(1);
     expect(counts.scale).toBe(0);
     expect(counts.boxes).toBe(0);

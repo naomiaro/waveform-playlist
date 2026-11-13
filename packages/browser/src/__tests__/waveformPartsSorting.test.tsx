@@ -101,7 +101,7 @@ describe('sortWaveformParts', () => {
     expect(sorted.tracksOptions).toMatchObject({ showClipHeaders: true, showFades: false });
   });
 
-  it('a part that is switched off keeps its position, so the parts after it stay mounted', () => {
+  it('a part that is switched off keeps its position in the tracks-area list', () => {
     const tracks = <TracksPart />;
     const withScale = sortWaveformParts([<TimescalePart key="s" />, tracks]);
     const without = sortWaveformParts([false, tracks]);

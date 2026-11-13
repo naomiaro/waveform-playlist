@@ -134,7 +134,8 @@ export interface AnnotationBoxesOverlayProps {
 /**
  * The row of annotation boxes under the tracks. Needs the annotation
  * integration. Memoized, and as wide as the root's timeline: a render of the
- * component that composes the view does not render it.
+ * component that composes the view does not render it while
+ * `getAnnotationBoxLabel` keeps its identity.
  */
 export const AnnotationBoxesOverlay = React.memo(function AnnotationBoxesOverlay({
   getAnnotationBoxLabel,

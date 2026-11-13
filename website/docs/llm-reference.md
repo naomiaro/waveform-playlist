@@ -355,8 +355,8 @@ interface EditorControlsContextValue {
   reorderTrack: (trackId: string, toIndex: number) => void;
 
   /** Internal: call after every track-reorder DRAG interaction ends
-   *  (committed or canceled) to force PlaylistVisualization to remount the
-   *  track-controls slots, discarding any @dnd-kit sortable-plugin DOM
+   *  (committed or canceled) to force the view's track-controls part to remount
+   *  its slots, discarding any @dnd-kit sortable-plugin DOM
    *  corruption. Not needed for button-driven reorderTrack calls (they never
    *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
   bumpTrackReorderEpoch: () => void;
@@ -487,7 +487,7 @@ interface TrackReorderPreviewContextValue {
    *  mirror the preview in their own UI. */
   trackDragPreview: TrackDragPreview | null;
   /** Internal: incremented after every track-reorder drag interaction ends.
-   *  PlaylistVisualization folds this into the track-controls slot `key` to
+   *  The view's track-controls part folds this into each slot's `key` to
    *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
    *  (see bumpTrackReorderEpoch in EditorControlsContextValue). */
   trackReorderEpoch: number;

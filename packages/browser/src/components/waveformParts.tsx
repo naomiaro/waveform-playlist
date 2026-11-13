@@ -12,9 +12,9 @@
  * A part is the component that draws, not a wrapper that forwards to one:
  * the tracks part is in TrackRows.tsx, the controls in
  * TrackControlsColumn.tsx, the overlays in VisualizationOverlays.tsx. The
- * parts with no children are memoized: the component that composes them
- * usually re-renders with the tracks (it holds them), and a part whose props
- * did not change should not follow.
+ * parts with no children are memoized, except the playhead: the component
+ * that composes them usually re-renders with the tracks (it holds them), and
+ * a part whose props did not change should not follow.
  */
 import React, { type ReactNode } from 'react';
 import { SmartScale } from '@waveform-playlist/ui-components';

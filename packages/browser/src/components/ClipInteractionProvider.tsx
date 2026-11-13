@@ -173,7 +173,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         // sortable plugins can splice React-owned DOM nodes (Feedback's
         // placeholder, OptimisticSortingPlugin's reorder()) during the drag
         // that just ended, desyncing React's fiber tree from the true DOM.
-        // Bumping this forces PlaylistVisualization to remount the
+        // Bumping this forces the view's track-controls part to remount the
         // track-controls slots, healing the corruption before the next
         // reorder (drag or button) needs to touch the DOM. See
         // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.

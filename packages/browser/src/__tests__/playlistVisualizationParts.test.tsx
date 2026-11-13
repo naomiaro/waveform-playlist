@@ -2,7 +2,8 @@
 //
 // #685, step 1: `PlaylistVisualization` is the default composition of the
 // view's parts. Each of its props must reach the part it configures, and a
-// part that is switched off must not be drawn.
+// part that is switched off must not be drawn. `recordingState` is not here:
+// recordingPreviewSubscription.test.tsx mounts the view with it.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
@@ -164,7 +165,8 @@ const ProbeChild: React.FC = () => {
 };
 
 const CONTROLS = { show: true, width: 200 };
-const NO_CONTROLS = { show: false, width: 0 };
+// A width, so that only `show` hides the column (a width of 0 hides it by itself).
+const NO_CONTROLS = { show: false, width: 200 };
 const ANNOTATION_LIST = { annotations: [{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }] };
 const TRACKS = [makeTrack('t1'), makeTrack('t2')];
 
@@ -235,7 +237,12 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
 
   it('the timescale and the loop region are not drawn when the provider has no timescale', async () => {
     await mount({}, { timescale: false });
+    await act(async () => {
+      editor.setLoopRegion(0.2, 0.6);
+      editor.setLoopEnabled(true);
+    });
     expect(seen.scale).toBe(0);
+    expect(seen.loopMax).toEqual([]);
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);
   });
 
@@ -322,6 +329,28 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
       editor.setTrackDragPreview({ trackId: 't2', toIndex: 0 });
     });
     expect(marked()).toEqual(['t2']);
+  });
+
+  it('renderTick draws the tick labels of the timescale', async () => {
+    await mount({ renderTick: (label) => <i data-custom-tick={label} /> });
+    expect(document.querySelectorAll('[data-custom-tick]').length).toBeGreaterThan(0);
+  });
+
+  it('renderPlayhead is not called for a track selection or a reorder preview (#685)', async () => {
+    const renderPlayhead = vi.fn(() => <i data-custom-playhead="" />);
+    await mount({ renderPlayhead });
+    const calls = renderPlayhead.mock.calls.length;
+    expect(calls).toBeGreaterThan(0);
+
+    await act(async () => {
+      editor.setSelectedTrackId('t2');
+    });
+    await act(async () => {
+      editor.setTrackDragPreview({ trackId: 't2', toIndex: 0 });
+    });
+
+    expect(document.querySelector('[data-track-row][data-selected="true"]')).not.toBeNull();
+    expect(renderPlayhead.mock.calls.length).toBe(calls);
   });
 
   it('renderPlayhead draws the custom playhead', async () => {
