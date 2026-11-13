@@ -140,6 +140,14 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Rule:** Packages must not re-export symbols from other packages. Consumers import from the canonical source directly. This prevents transitive dependency issues (e.g., #373 where dawcore pulled in React via recording's re-exports). When moving functions between packages, update all import sites — don't leave re-exports for backwards compat.
 
+### One Owner per Exported Name (#770)
+
+**Rule:** a name is exported by one package. Bound controls live in the lowest package that can reach their state (the four annotation controls are in `annotations`, which reads browser's hooks). The pairs that remain on purpose are the five controlled/bound controls of ui-components and browser. `packages/browser/src/__tests__/oneOwnerPerExport.test.ts` scans the entries of browser (also `./tone`), annotations, ui-components, spectrogram, recording and core; its header lists what it cannot see. To find overlaps yourself, compare the name sets of each `dist/index.d.ts`, and check second entries (`./tone`) too.
+
+**No literal element id, and nothing read from the page (maintainer, 2026-11-13).** Ids come from `useId()`; a value another component holds arrives as a prop or a context, never through `document.querySelector`. The same test scans for a literal `id=` / `htmlFor=`.
+
+**Every string a component draws can be supplied by the app (translation frameworks).** `children` for a label, `title` for a tooltip; no English-only helper (`getShortcutLabel` was removed for this). The rest of the library is #808.
+
 ### Declarative Over Imperative
 
 **Rule:** Consumer code should read as a declaration of what they want, not how to set it up. When multiple hooks/providers must be wired together, create a higher-level component that reads from context internally and exposes simple boolean props.
@@ -243,6 +251,14 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **To see "peak data that cannot be read" in a browser**, serve the `.dat` with its `samples_per_pixel` field multiplied (`probes/emptyrow685.cjs`: a `page.route` handler that fetches the file and rewrites bytes 12 to 15); the resample to the provider's finer zoom then throws.
 - **A documentation agent reads source: do not run a mutation script while it works.** Start the mutation run when the agent has returned, and read source yourself with `git show HEAD:<file>` while mutants are being applied.
 - **Quote grep globs: the shell here is zsh.** `grep -rn x packages --include=*.ts` stops with `no matches found: --include=*.ts` when no file in the current directory matches the glob, and in a chained command the output of the other parts still prints, so the search looks complete. On #752 this hid `buildTrackFromConfig.ts`, the one WRITER of the field being removed, until typecheck was run. Write `--include='*.ts'`, and when any part of a command prints an error, run the search again before using its result.
+- **`git grep -E` here has no `\b`:** a pattern with it matches nothing and prints nothing, which reads as "none found". Use `-w`, or a character class before the word. An empty result from a search that should have hits means the search is wrong.
+- **My own `pnpm build` breaks my own dev server too** (the same "Can't resolve '@dawcore/components'" overlay): restart the 3077 server after any build, before a probe or an e2e run.
+- **Keep `examples/*.html` and `debug/` out of a repo-wide attribute grep** (hundreds of page-level ids); scan `packages` and `website/src`.
+- **A mutant must break the property through the path the test reads.** Two survivors on #770 added a duplicate name to a file the entry point does not export; the guard is about entry points. And a survivor on a line no caller can reach (a guard behind a disabled button) means the line goes, not that a test is missing.
+- **jsdom: `fireEvent.click` on a disabled input still toggles it.** Use the element's own `click()`, which honours `disabled` as a real click does.
+- **A test in `annotations` can mount the real providers** from browser's `dist`: `createAdapter` / `createPlayout` fakes, and `waveformData: { sample_rate, duration }` is enough for `MediaElementPlaylistProvider` when nothing draws.
+- **"Measured" in a doc means a test in the repository.** A number from a throwaway test is written as that.
+- **A late code change while a docs agent is writing:** send it the new facts with `SendMessage`; do not wait and patch its output.
 - **Removing a public field: trace its writers as well as its readers, and report every public surface it reaches before removing it.** `ClipTrack.effects` (#752) had two readers in the Tone adapter, but also a writer (`AudioTrackConfig.effects`, copied onto the track by `buildTrackFromConfig`) and a type that existed only for it (core's `TrackEffectsFunction`). Removing the field removed a working option of `useAudioTracks`, which the maintainer had not been asked about and which needed a replacement (`AudioTrackConfig.id`). When a removal turns out to reach a second public surface, stop and say so, with what replaces it.
 - **"Remove it if it is unused": unused as an input is not unused.** After #756 nothing needed `'piano-roll'` to be SET (`ClipTrack.renderMode`, `<daw-track render-mode>`), but it was still the value the renderers switched on in four packages (`SmartChannel`, `ChannelWithProgress`, `TrackRows`, the `<daw-editor>` template). Grep the value's readers before answering, say which it is, and ask when removing it changes a public type or prop (#763: the maintainer chose "remove it entirely", and the discriminator became the track's `kind` and the clip's `midiNotes`).
 - **A sentence that says a component "ignores X" needs a test that passes X in the form that reaches the other branch.** `SmartChannel` was documented as ignoring `renderMode` for a clip with notes, and its test passed `renderMode="spectrogram"` without the spectrogram props, so it never entered the spectrogram branch that came first (#763, first review). Order the branches so the claim is true, and give the test every prop the competing branch requires.
@@ -352,6 +368,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **A prediction is not a measurement: say which one a number is.** On #686 the maintainer was told the built-in drag would cost one component per move (measured in a prototype) and that a toggle would fall to about 22 (a guess). Both were wrong on the real build (47 unchanged; 221). Write "predicted" or "measured in the prototype" next to a number, and replace it the moment the build is measured; a doc reviewer found the stale "+1" row in the upgrade guide.
 
 **Two A/B questions open at once get one "B".** Ask one lettered question at a time, or give the options distinct names ("border: orange / amber").
+
+**A question goes in its own message, in plain words first.** On #770 `LABEL-FIX-HERE or LABEL-ISSUE` sat in the middle of a status update and was not seen as a question. Say what was found, what the two outcomes are, then name the options.
 
 **`website` aliases `annotations`, `recording`, `engine`, `spectrogram` and `midi` to source** (`website/docusaurus.config.ts`), so a prototype may edit them with only the dev server running. Bulk file changes under a running Docusaurus dev server can abort it (rspack panic, SIGABRT): check the server's log before trusting a probe after a large patch.
 
