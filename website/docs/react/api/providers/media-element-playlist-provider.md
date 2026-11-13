@@ -104,7 +104,7 @@ Show the time ruler at the top of the playlist.
 **Type:** `{ show: boolean; width: number }`
 **Default:** `{ show: false, width: 0 }`
 
-Track controls panel configuration.
+Published as `usePlaylistView().controls`. The MediaElement waveform draws no controls column (this player has no track controls), so the value changes nothing on screen.
 
 ### Web Audio
 
@@ -249,6 +249,7 @@ interface MediaElementTrackContextValue {
    * replaced player loads. Use this, not `duration`, as "the player can be used".
    */
   isReady: boolean;
+  /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;

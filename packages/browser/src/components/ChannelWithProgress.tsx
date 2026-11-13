@@ -189,8 +189,8 @@ const ClipProgress: React.FC<ClipProgressProps> = ({
 
 /**
  * SmartChannel wrapper that adds an animated progress overlay showing the
- * played portion of the waveform. Used under either provider: the multitrack
- * rows and `MediaElementPlaylist` both render it. The channel itself reads no
+ * played portion of the waveform. Used under either provider: the rows of
+ * the tracks part render it in both views. The channel itself reads no
  * playback state; its `ClipProgress` child does.
  */
 export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
@@ -210,8 +210,8 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
   const drawMode = theme?.waveformDrawMode || 'inverted';
 
   // A selected channel without a selected colour in the theme falls back to
-  // the unselected one. (MediaElementPlaylist always renders its one track
-  // selected.)
+  // the unselected one. (The MediaElement view's one row is always the
+  // selected one.)
   const selected = smartChannelProps.isSelected;
   const backgroundColor =
     drawMode === 'inverted'

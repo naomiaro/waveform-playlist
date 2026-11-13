@@ -8,11 +8,11 @@ import {
   usePlaybackControls,
   usePlaylistView,
   usePlaylistZoom,
-  useMediaElementTrack,
 } from '../contexts/playlistContexts';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
+import { useWaveformExtent } from './waveformLayoutContext';
 import type {
   AnnotationData,
   GetAnnotationBoxLabelFn,
@@ -23,8 +23,6 @@ const HORIZONTAL_ONLY = [RestrictToHorizontalAxis];
 const NO_MODIFIERS: never[] = [];
 
 export interface MediaElementAnnotationBoxesProps {
-  /** Width of the row in pixels (the full timeline width). */
-  width: number;
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
   editable: boolean;
   linkEndpoints: boolean;
@@ -33,17 +31,24 @@ export interface MediaElementAnnotationBoxesProps {
 
 /**
  * The annotation boxes of the MediaElement player, with the drag wiring for
- * their edges. This is the only part of `MediaElementPlaylist` that reads the
- * annotations and the active annotation, so an annotation boundary during
- * playback renders this and not the waveform (#744).
+ * their edges: the annotation-boxes part of the MediaElement view. It is the
+ * only part of that view that reads the annotations and the active
+ * annotation, so an annotation boundary during playback renders this and not
+ * the waveform (#744). As wide as the root's timeline. Memoized: a render of
+ * the component that composes the view does not render it while its props
+ * keep their identity.
  */
-export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesProps> = ({
-  width,
+export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnotationBoxes({
   getAnnotationBoxLabel,
   editable,
   linkEndpoints,
   onAnnotationUpdate,
-}) => {
+}: MediaElementAnnotationBoxesProps) {
+  // The length of the timeline is the root's, which under this provider is
+  // the length of the audio. Not `useMediaElementTrack()`: that value also
+  // changes when the player becomes ready and with the track's name and fades.
+  const { tracksFullWidth: width, displayDuration: duration } =
+    useWaveformExtent('The annotation boxes');
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -51,7 +56,6 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
   // The drag publishes its moves to the preview and reports once, on
   // release; the boxes follow the preview meanwhile.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-  const { duration } = useMediaElementTrack();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
 
@@ -112,4 +116,4 @@ export const MediaElementAnnotationBoxes: React.FC<MediaElementAnnotationBoxesPr
       />
     </DragDropProvider>
   );
-};
+});

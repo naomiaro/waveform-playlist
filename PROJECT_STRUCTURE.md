@@ -335,9 +335,9 @@ const clip = createClipFromSeconds({
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
   │   ├── PlaylistVisualization.tsx      # Default composition: WaveformRoot with one part per thing drawn
-  │   ├── WaveformRoot.tsx              # Root of the view: sizes, row layout, selection-drag handlers, part sorting
+  │   ├── WaveformRoot.tsx              # Root of the multitrack view: timeline length, row layout, row selection on press, spectrogram modal
   │   ├── waveformParts.tsx             # The parts by name, the timescale part, sortWaveformParts
-  │   ├── waveformLayoutContext.ts      # The root's two layout values (extent, rows) read by the parts
+  │   ├── waveformLayoutContext.ts      # A root's two layout values (extent, rows) read by the parts
   │   ├── TrackRows.tsx                 # Tracks part: memoized rows, clips, recording preview; per-clip markers
   │   ├── TrackControlsColumn.tsx       # Track-controls part: memoized column (one slot per track)
   │   ├── DefaultTrackControls.tsx      # Default track control panel (memoized)
@@ -357,7 +357,9 @@ const clip = createClipFromSeconds({
   │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider
   │   ├── MediaElementAnnotationList.tsx # Annotation list for MediaElement provider
   │   ├── MediaElementAnnotationBoxes.tsx # MediaElement boxes: provider state + boundary drag wiring
-  │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement)
+  │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement): default composition of MediaElementRoot and the view's parts
+  │   ├── MediaElementRoot.tsx          # Root of the MediaElement view (internal): one row, as long as the audio
+  │   ├── waveformFrame.tsx             # What both roots share (internal): parts by place, scrolling frame, layout values, selection drag
   │   ├── MediaElementWaveform.tsx      # Public MediaElement waveform component
   │   ├── ContextualControls.tsx        # Context-aware wrappers
   │   └── index.tsx                     # Component exports
@@ -799,9 +801,9 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-`packages/browser/src/contexts/playlistContexts.ts` defines **21 contexts**, one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
+`packages/browser/src/contexts/playlistContexts.ts` defines **22 contexts** (21 public and the internal `SelectedRowContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
 
-Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (10):
+Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (10 public, plus the internal `SelectedRowContext`):
 
 1. **IsPlayingContext** (`useIsPlaying()`) - Changes on play, pause and stop
 
@@ -881,7 +883,7 @@ Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistPro
 
 ### Context Splitting for Performance (2025-01-21)
 
-The providers use **21 separate contexts** (19 served by `WaveformPlaylistProvider`, 12 by `MediaElementPlaylistProvider`, 10 of them by both), one per group of fields that change together, to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
+The providers use **22 separate contexts** (20 served by `WaveformPlaylistProvider`, 13 by `MediaElementPlaylistProvider`, 11 of them by both; one of the 11 is internal), one per group of fields that change together, to optimize performance by isolating different update frequencies. This prevents unnecessary re-renders when frequently changing values (the selection during a drag, the cursor position on a seek, the active annotation during playback) update. Per-frame values never go through React state: they are read from refs and frame callbacks.
 
 **Architecture:**
 

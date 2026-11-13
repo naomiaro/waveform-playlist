@@ -133,7 +133,7 @@ const track = useMemo(
 </MediaElementPlaylistProvider>;
 ```
 
-Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.
+`showFades` draws the curves over the waveform; the fades themselves need `audioContext`. Fade types: `'linear'`, `'logarithmic'`, `'exponential'`, `'sCurve'`. See the [Fades example](/examples/fades) for a comparison of all four curves.
 
 ### Tone.js Effects
 

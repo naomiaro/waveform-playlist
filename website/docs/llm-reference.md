@@ -95,7 +95,7 @@ interface MediaElementPlaylistProviderProps {
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
-  controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }
+  controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }. Published as usePlaylistView().controls; the MediaElement waveform draws no controls column
   annotationList?: {
     annotations?: any[];
     isContinuousPlay?: boolean;
@@ -559,6 +559,7 @@ interface MediaElementTrackContextValue {
    * replaced player loads. Use this, not `duration`, as "the player can be used".
    */
   isReady: boolean;
+  /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;

@@ -18,7 +18,21 @@ const seen = vi.hoisted(() => ({
   headers: 0,
   loopMax: [] as number[],
   boxRowWidth: [] as number[],
+  panelKinds: [] as (string | undefined)[],
+  firstState: null as string | null,
 }));
+
+vi.mock('../components/DefaultTrackControls', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/DefaultTrackControls')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    DefaultTrackControls: (props: React.ComponentProps<typeof actual.DefaultTrackControls>) => {
+      seen.panelKinds.push(props.kind);
+      return createElement(actual.DefaultTrackControls, props);
+    },
+  };
+});
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -172,7 +186,7 @@ const TRACKS = [makeTrack('t1'), makeTrack('t2')];
 
 async function mount(
   props: PlaylistVisualizationProps = {},
-  { timescale = true, controls = CONTROLS, dragProvider = false } = {}
+  { timescale = true, controls = CONTROLS, dragProvider = false, tracks = TRACKS } = {}
 ) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -183,6 +197,7 @@ async function mount(
   seen.headers = 0;
   seen.loopMax = [];
   seen.boxRowWidth = [];
+  seen.panelKinds = [];
   isReady = false;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
@@ -190,7 +205,7 @@ async function mount(
   render(
     <AnnotationIntegrationContext.Provider value={INTEGRATION}>
       <WaveformPlaylistProvider
-        tracks={TRACKS}
+        tracks={tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
         annotationList={ANNOTATION_LIST}
@@ -202,6 +217,9 @@ async function mount(
       </WaveformPlaylistProvider>
     </AnnotationIntegrationContext.Provider>
   );
+  // Before the engine is built.
+  seen.firstState =
+    document.querySelector('[data-playlist-state]')?.getAttribute('data-playlist-state') ?? null;
   await waitFor(() => expect(isReady).toBe(true));
   await act(async () => {});
 }
@@ -233,6 +251,41 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
     await mount({ className: 'my-view' });
     const root = document.querySelector('[data-playlist-state]');
     expect(root?.classList.contains('my-view')).toBe(true);
+  });
+
+  it('the state is "loading" until the playlist is ready', async () => {
+    await mount();
+    expect(seen.firstState).toBe('loading');
+    expect(
+      document.querySelector('[data-playlist-state]')?.getAttribute('data-playlist-state')
+    ).toBe('ready');
+  });
+
+  it('a MIDI track is a MIDI row with a MIDI panel; an audio track is an audio one', async () => {
+    const midi = {
+      id: 'm1',
+      name: 'm1',
+      kind: 'midi',
+      clips: [],
+      muted: false,
+      soloed: false,
+      volume: 1,
+      pan: 0,
+    } as unknown as ClipTrack;
+    await mount({}, { tracks: [TRACKS[0], midi] });
+    const kinds = [...document.querySelectorAll('[data-track-row]')].map((row) =>
+      row.getAttribute('data-track-kind')
+    );
+    expect(kinds).toEqual(['audio', 'midi']);
+    expect(seen.panelKinds.slice(-2)).toEqual(['audio', 'midi']);
+  });
+
+  it('the controls column leaves a gap as tall as the timescale above the panels', async () => {
+    await mount();
+    const column = document.querySelector('[data-playlist-state]')!
+      .firstElementChild as HTMLElement;
+    // 30 px of timescale and its 1 px border.
+    expect((column.firstElementChild as HTMLElement).style.height).toBe('31px');
   });
 
   it('the timescale and the loop region are not drawn when the provider has no timescale', async () => {

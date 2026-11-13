@@ -261,7 +261,7 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     expect(counts.channel).toBe(0);
   });
 
-  it('play and pause render the shell and not the selection highlight', async () => {
+  it('play and pause render neither the track nor the selection highlight', async () => {
     const { reset } = await mount();
     act(() => controls.setSelection(2, 4));
     expect(counts.selection).toBeGreaterThan(0);
@@ -270,9 +270,10 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
       await controls.play(2, 2);
     });
     act(() => controls.pause());
-    // The shell rendered (its drag handlers read isPlaying)...
-    expect(counts.track).toBeGreaterThan(0);
-    // ...and the memoized highlight did not.
+    // The root's render (its drag handlers read isPlaying) does not reach the
+    // row (#685)...
+    expect(counts.track).toBe(0);
+    // ...and neither is the memoized highlight.
     expect(counts.selection).toBe(0);
   });
 });

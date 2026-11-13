@@ -1,7 +1,8 @@
 /**
- * The parts of the multitrack view (#685). Internal for now: `PlaylistVisualization`
- * composes them inside `WaveformRoot`, and nothing here is exported from the
- * package yet.
+ * The parts of the view (#685). Internal for now: `PlaylistVisualization`
+ * composes them inside `WaveformRoot` and `MediaElementPlaylist` composes the
+ * ones its provider can serve inside `MediaElementRoot`; nothing here is
+ * exported from the package yet.
  *
  * A part reads what it draws from the provider's contexts and from the root's
  * two layout values (waveformLayoutContext.ts); its props are the options of

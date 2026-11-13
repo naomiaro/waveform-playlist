@@ -44,6 +44,8 @@ import {
   PlaylistViewContext,
   PlaylistZoomContext,
   SelectedTrackIdContext,
+  SelectedRowContext,
+  MEDIA_ELEMENT_TRACK_ID,
   SelectionContext,
   TrackReorderPreviewContext,
   UndoRedoContext,
@@ -60,6 +62,10 @@ import {
   type PlaylistZoomContextValue,
   type SelectionContextValue,
 } from './contexts/playlistContexts';
+
+// The one row of the view is always drawn as selected. One object, so the
+// context value never changes.
+const ONLY_ROW_SELECTED = { selectedTrackId: MEDIA_ELEMENT_TRACK_ID };
 
 // Configuration for a single media element track
 export interface MediaElementTrackConfig {
@@ -306,7 +312,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Peaks are derived during render, so the waveform is drawn on first paint.
   const trackName = track.name;
   const trackWaveformData = track.waveformData;
-  const peaksDataArray = useMemo<TrackClipPeaks[]>(() => {
+  // The peaks alone first: a new name or new fades must not extract them again.
+  const trackPeaks = useMemo<{ peaks: PeakData; durationSamples: number } | null>(() => {
     try {
       const durationSamples = Math.ceil(trackWaveformData.duration * sampleRate);
       const extractedPeaks = extractPeaksFromWaveformData(
@@ -316,27 +323,39 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
         0, // offset
         durationSamples
       );
-
-      const clipPeaks: ClipPeaks = {
-        clipId: 'media-element-clip',
-        trackName: trackName ?? 'Track',
+      return {
         peaks: {
           length: extractedPeaks.length,
           data: [extractedPeaks.data],
           bits: extractedPeaks.bits,
         } as PeakData,
-        startSample: 0,
         durationSamples,
       };
-
-      return [[clipPeaks]];
     } catch (err) {
       console.warn(
         '[waveform-playlist] Failed to extract peaks from waveform data: ' + String(err)
       );
-      return [];
+      return null;
     }
-  }, [trackWaveformData, trackName, samplesPerPixel, sampleRate]);
+  }, [trackWaveformData, samplesPerPixel, sampleRate]);
+
+  // The one clip of the one track. It carries the track's fades, so the view
+  // draws them as it draws any clip's (#685).
+  const trackFadeIn = track.fadeIn;
+  const trackFadeOut = track.fadeOut;
+  const peaksDataArray = useMemo<TrackClipPeaks[]>(() => {
+    if (!trackPeaks) return [];
+    const clipPeaks: ClipPeaks = {
+      clipId: 'media-element-clip',
+      trackName: trackName ?? 'Track',
+      peaks: trackPeaks.peaks,
+      startSample: 0,
+      durationSamples: trackPeaks.durationSamples,
+      fadeIn: trackFadeIn,
+      fadeOut: trackFadeOut,
+    };
+    return [[clipPeaks]];
+  }, [trackPeaks, trackName, trackFadeIn, trackFadeOut]);
 
   // The audio of the latest COMMITTED render, read by two things that must not
   // wait for a render or an effect of their own:
@@ -931,8 +950,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [playbackRate, setPlaybackRate]
   );
 
-  const trackFadeIn = track.fadeIn;
-  const trackFadeOut = track.fadeOut;
   const trackValue: MediaElementTrackContextValue = useMemo(
     () => ({
       duration,
@@ -973,7 +990,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
                                           >
                                             <CurrentTimeContext.Provider value={currentTimeValue}>
                                               <SelectionContext.Provider value={selection}>
-                                                {children}
+                                                <SelectedRowContext.Provider
+                                                  value={ONLY_ROW_SELECTED}
+                                                >
+                                                  {children}
+                                                </SelectedRowContext.Provider>
                                               </SelectionContext.Provider>
                                             </CurrentTimeContext.Provider>
                                           </ActiveAnnotationContext.Provider>

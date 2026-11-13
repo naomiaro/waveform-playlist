@@ -1,6 +1,5 @@
 import React, { useContext, type ReactNode } from 'react';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import { trackKind } from '@waveform-playlist/core';
 import {
   usePlaylistMixer,
   useEditorControls,
@@ -30,7 +29,7 @@ export interface TrackControlsPartProps {
  * (#685).
  *
  * Memoized (#693), with only its own three options as props: it takes the
- * tracks and the layout from the root's rows value, reads the selected track
+ * rows and the layout from the root's rows value, reads the selected track
  * itself, and no time selection,
  * cursor or annotation state, so a selection drag or an active-annotation
  * change during playback does not re-render the panels. It reads the mixer
@@ -44,7 +43,7 @@ function TrackControlsPartImpl({
 }: TrackControlsPartProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
   const {
-    tracks,
+    rows: tracks,
     renderModeById,
     trackLayout,
     trackHeightById,
@@ -72,7 +71,7 @@ function TrackControlsPartImpl({
             volume: 1.0,
             pan: 0,
           },
-          kind: trackKind(track),
+          kind: track.kind,
           effectiveRenderMode: renderModeById.get(track.id) ?? 'waveform',
           selectTrack,
           onRemoveTrack,

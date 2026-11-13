@@ -26,7 +26,7 @@ export interface AnnotationTextIntegrationProps {
 
 /**
  * Props the browser package passes to the AnnotationBox component.
- * Mirrors what PlaylistVisualization and MediaElementPlaylist actually use.
+ * Mirrors what the two views' annotation-box parts actually use.
  */
 export interface AnnotationBoxIntegrationProps {
   annotationId: string;
@@ -42,7 +42,7 @@ export interface AnnotationBoxIntegrationProps {
 
 /**
  * Props the browser package passes to the AnnotationBoxesWrapper component.
- * Mirrors what PlaylistVisualization and MediaElementPlaylist actually use.
+ * Mirrors what the two views' annotation-box parts actually use.
  */
 export interface AnnotationBoxesWrapperIntegrationProps {
   children?: React.ReactNode;

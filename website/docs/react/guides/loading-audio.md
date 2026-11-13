@@ -310,6 +310,8 @@ useEffect(() => {
 
 ### React Hook
 
+Under `MediaElementPlaylistProvider` there is no `waveform-playlist:ready` event, and the hook is `useMediaElementTrack().isReady`. Under `WaveformPlaylistProvider`:
+
 Access the `isReady` state from the `usePlaylistTimeline()` hook:
 
 ```tsx
@@ -328,7 +330,7 @@ function LoadingIndicator() {
 
 ### Data Attribute (CSS/Testing)
 
-The playlist container has a `data-playlist-state` attribute:
+The playlist container has a `data-playlist-state` attribute. Under `WaveformPlaylistProvider` it is `"ready"` once the tracks are loaded and the engine is built; under `MediaElementPlaylistProvider` it is `"ready"` from the first render, because the waveform is drawn from pre-computed peaks and does not wait for the player (`useMediaElementTrack().isReady` says whether the player has loaded):
 
 ```css
 /* Dim the playlist while loading */

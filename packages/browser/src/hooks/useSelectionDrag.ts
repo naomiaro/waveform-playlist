@@ -49,7 +49,7 @@ export interface SelectionDrag {
   handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
   /** For `SelectionPreviewContext.Provider`. The same object for the life of the component. */
   preview: ValueSource<SelectionRange | null>;
-  /** For `<AutomaticScrollFlag flagRef>`, which the view must render. */
+  /** For `<AutomaticScrollFlag flagRef>`, which the caller must render (`useWaveformFrame` does). */
   automaticScrollRef: React.RefObject<boolean>;
 }
 
@@ -58,10 +58,10 @@ export interface SelectionDrag {
  * nothing.
  *
  * The drag needs the setting only when an event arrives. Read with
- * `usePlaylistSettings()` in the view itself, a toggle of the setting would
- * render the view's root (in `MediaElementPlaylist`, the whole waveform) for
- * a value it never draws. This component is the one that follows the
- * setting; the view renders it and nothing else changes.
+ * `usePlaylistSettings()` in a root of the view, a toggle of the setting would
+ * render that root and its frame for a value they never draw. This component
+ * is the one that follows the setting; the frame renders it and nothing else
+ * changes.
  * A layout effect: only a committed value, and in place before any event that
  * follows the commit. Memoized: its one prop is a ref that never changes, so a
  * render of the view does not render it.
