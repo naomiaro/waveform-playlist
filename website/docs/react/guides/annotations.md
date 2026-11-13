@@ -412,6 +412,8 @@ Without `preview`, `onAnnotationsChange` is called on every pointer move. Escape
 
 The handlers act on a draggable whose data is `{ annotationId, annotationIndex, edge: 'start' | 'end' }`; a drag with other data is ignored. The `AnnotationBox` of the annotations package registers its two edge handles that way.
 
+For the click on one of your boxes, call `playAnnotation(annotation)` from `usePlaybackControls()`. It is what the built-in boxes and list rows call: the annotation becomes the active one and plays from its start, and with continuous play off playback ends where the annotation ends. The function never changes, so it can be a prop of memoized boxes.
+
 ## Annotation Package Components
 
 `@waveform-playlist/annotations` exports the components the two browser components are built from. Use them for an annotation UI that does not go through the provider. They take everything as props and read no playlist context.

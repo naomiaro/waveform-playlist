@@ -274,6 +274,7 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setAnnotations',
         'annotationPreview',
         'setActiveAnnotationId',
+        'playAnnotation',
       ].sort()
     );
     expect(keys('editorControls')).toEqual(

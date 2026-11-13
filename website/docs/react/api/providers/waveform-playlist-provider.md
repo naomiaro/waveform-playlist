@@ -396,6 +396,7 @@ interface PlaybackControlsContextValue {
   setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
   annotationPreview: ValueSourceHandle<AnnotationData[] | null>; // edge drag in progress; stable
   setActiveAnnotationId: (id: string | null) => void;
+  playAnnotation: (annotation: AnnotationData) => void; // what a click on a box or a list row does
 }
 ```
 

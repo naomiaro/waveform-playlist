@@ -8,7 +8,6 @@ import {
   usePlaybackControls,
 } from '../contexts/playlistContexts';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
-import { usePlayAnnotation } from '../hooks/usePlayAnnotation';
 import { warnOnce } from './partWarnings';
 
 export interface AnnotationListProps {
@@ -65,10 +64,9 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview } = usePlaybackControls();
+  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
   // While an edge is dragged, the times in the list follow it.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-  const playAnnotation = usePlayAnnotation();
 
   // The fourth argument of an action. Memoized: it is a dependency of a
   // handler given to every memoized row.

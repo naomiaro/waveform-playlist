@@ -15,7 +15,6 @@ import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { useDragSensors } from '../hooks/useDragSensors';
-import { usePlayAnnotation } from '../hooks/usePlayAnnotation';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnnotationBoxes } from './AnnotationBoxes';
 import { useWaveformExtent } from './waveformLayoutContext';
@@ -69,14 +68,13 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview } = usePlaybackControls();
+  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { touchOptimized } = useClipInteraction();
   const theme = useTheme() as Partial<WaveformPlaylistTheme>;
   // While an edge is dragged, the boxes follow the drag.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-  const playAnnotation = usePlayAnnotation();
   const sensors = useDragSensors({ touchOptimized });
 
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({

@@ -778,6 +778,69 @@ describe('MediaElement annotation playback goes through the shared loop step', (
     await act(async () => probe.controls.stop());
   });
 
+  it('playAnnotation, continuous play off: plays to the end of the annotation, cursor back at its start (#686)', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.playAnnotation(ANNOTATIONS[1]);
+    });
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(probe.animation.isPlaying).toBe(true);
+
+    playout.time = 3.9;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+
+    playout.time = 4;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(playout.seekTo).toHaveBeenLastCalledWith(2);
+    expect(probe.state.activeAnnotationId).toBe('n2');
+  });
+
+  it('playAnnotation, then continuous play switched on during the play: playback runs on (#686)', async () => {
+    const { playout } = await mount({ annotationList: { annotations: ANNOTATIONS } });
+    await act(async () => {
+      probe.controls.playAnnotation(ANNOTATIONS[0]);
+    });
+    playout.time = 1;
+    await runFrame();
+    act(() => probe.controls.setContinuousPlay(true));
+
+    playout.time = 2.5; // past the end of n1
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(probe.state.activeAnnotationId).toBe('n2');
+    expect(playout.pause).not.toHaveBeenCalled();
+    await act(async () => probe.controls.stop());
+  });
+
+  it('playAnnotation follows an end that is moved later during the play (#686)', async () => {
+    const { playout, setAnnotationList } = await mount({
+      annotationList: { annotations: ANNOTATIONS },
+    });
+    await act(async () => {
+      probe.controls.playAnnotation(ANNOTATIONS[0]);
+    });
+    playout.time = 1;
+    await runFrame();
+    // n1 now ends at 3, n2 starts there.
+    setAnnotationList({
+      annotations: [
+        { ...ANNOTATIONS[0], end: 3 },
+        { ...ANNOTATIONS[1], start: 3 },
+      ],
+    });
+
+    playout.time = 2.5; // past the old end, before the new one
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+
+    playout.time = 3;
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(false);
+    expect(playout.seekTo).toHaveBeenLastCalledWith(0);
+  });
+
   it('continuous play taken from the annotationList prop reaches the loop (#686)', async () => {
     const { playout, setAnnotationList } = await mount({
       annotationList: { annotations: ANNOTATIONS },

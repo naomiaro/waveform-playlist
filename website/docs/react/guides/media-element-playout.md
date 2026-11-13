@@ -257,7 +257,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 | `useActiveAnnotation()` | each annotation boundary during playback | `activeAnnotationId` |
 | `useAnnotations()` | an annotation edit | `annotations` |
 | `useAnnotationOptions()` | one of the three annotation options being toggled | `editable`, `linkEndpoints`, `continuousPlay` |
-| `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `playAnnotation` |
 | `usePlaybackRefs()` | never | `currentTimeRef` (advances during playback), `visualTimeRef` (the same ref here), `registerFrameCallback`, `unregisterFrameCallback` |
 | `usePlaylistView()` | a provider prop change | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` (`mono`, `indefinitePlayback` and `fillViewport` are always `false` here) |
 | `usePlaylistSettings()` | the user changing either setting | `timeFormat`, `isAutomaticScroll` |

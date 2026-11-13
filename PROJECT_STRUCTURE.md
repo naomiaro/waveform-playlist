@@ -318,7 +318,6 @@ const clip = createClipFromSeconds({
   │   ├── useAnnotationDragHandlers.ts  # Annotation drag logic
   │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
   │   ├── useAnnotationsWithPreview.ts  # The annotations to draw while an edge drag is in progress
-  │   ├── usePlayAnnotation.ts          # What a click on a box or a list row does: make the annotation active and play it
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useAudioTracks.ts             # Track loading and management
   │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine)
@@ -989,6 +988,7 @@ export interface PlaybackControlsContextValue {
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
+  playAnnotation: (annotation: AnnotationData) => void; // a click on a box or a list row
 }
 
 // 3b. The actions only the multitrack editor has (WaveformPlaylistProvider only)

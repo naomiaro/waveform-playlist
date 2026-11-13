@@ -162,6 +162,17 @@ export interface PlaybackControlsContextValue {
    */
   annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
+  /**
+   * What a click on an annotation does (its box, or its row in the list): the
+   * annotation becomes the active one and is played from its start. With
+   * continuous play off, playback ends where the annotation ends. Call it
+   * from a box or a row of your own. Each provider plays an annotation its
+   * own way; the result is the same: `WaveformPlaylistProvider` starts a play
+   * of the annotation's length, `MediaElementPlaylistProvider` starts an
+   * open-ended play that its loop ends with the active annotation. A start
+   * that fails is logged as a warning.
+   */
+  playAnnotation: (annotation: AnnotationData) => void;
 }
 
 /**

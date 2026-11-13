@@ -37,7 +37,6 @@ const FILES = [
   'components/WaveformAnnotationBoxes.tsx',
   'components/AnnotationList.tsx',
   'components/AnnotationBoxes.tsx',
-  'hooks/usePlayAnnotation.ts',
   'providerInternals/useAnnotationState.ts',
   'index.tsx',
   'soundFontSync.ts',

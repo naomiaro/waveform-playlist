@@ -2005,6 +2005,7 @@ The row of boxes wires the drag of its edges itself. `<Waveform />`, `<WaveformE
 | `<AnnotationList>` | the annotation text list, anywhere under either provider. Props: `height` (pixels; without it at most 200), `actions` (buttons on each row while editable), `scrollActivePosition` (`'center'` by default, `'start'`, `'end'`, `'nearest'`, or `'none'` for a list that does not follow playback), `scrollActiveContainer` (`'nearest'` by default, or `'all'`), and a function child that draws a row. Type: `AnnotationListProps` |
 | `useAnnotationOptions()` | `{ editable, linkEndpoints, continuousPlay }`. Both providers. Type: `AnnotationOptionsContextValue` |
 | `usePlaybackControls().setAnnotationsEditable`, `.setLinkEndpoints` | next to `setContinuousPlay`, under both providers |
+| `usePlaybackControls().playAnnotation(annotation)` | what a click on a box or a list row does: the annotation becomes active and plays from its start, to its end when continuous play is off. For a box or a row of your own. Both providers |
 | `AnnotationListProp` | the type of the `annotationList` prop of both providers: `{ annotations?, editable?, linkEndpoints?, isContinuousPlay? }` |
 | theme key `annotationTextItemActiveColor` | the edge, tint and glow of the active row of the list, and the list's focus rings. Default `#ff9800` in both themes (the value that was fixed) |
 
@@ -2180,7 +2181,7 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | The annotation list under `MediaElementPlaylistProvider`, link endpoints | an action always got `linkEndpoints: false` from the list used on its own; the composition's prop from `<MediaElementWaveform>` | the provider's value |
 | An action's `continuousPlay` under `<MediaElementWaveform>` | always `false` (and no action could be given there) | the provider's value |
 | A click on a row of the list | nothing; the `onClick` given to a custom row did nothing | the annotation becomes active and plays from its start, as a click on its box does. In the default row a click in a field that is being edited, or on an action button, does not |
-| A click on a box under `MediaElementPlaylistProvider`, continuous play off | `play(start)`; the provider's loop ended playback at the annotation's end | `play(start, length)`, as under `WaveformPlaylistProvider`. Playback ends at the same place |
+| A click on a box | each provider's box part started playback its own way | the same two ways, through `usePlaybackControls().playAnnotation`: nothing changes in how a clicked annotation plays, under either provider |
 | The list with no annotations, rendered on its own | an empty box (as high as `height`) | nothing |
 | The list without `<AnnotationProvider>` | threw (also `<Waveform />` and `<MediaElementWaveform />` with annotations) | draws nothing; one development warning |
 | How far an edge can be dragged under `WaveformPlaylistProvider` | with your own wiring: as far as the `duration` you gave `useAnnotationDragHandlers` (the examples gave the audio's length: 0 on an empty timeline, where a dragged edge collapsed) | as far as the timeline is drawn, under both roots: past the end of the audio where the timeline is longer (an empty timeline's 60 s, a recording, a view that fills its container). Under `MediaElementPlaylistProvider` the drawn timeline is the audio, as before |

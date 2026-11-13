@@ -877,6 +877,25 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [registerFrameCallback, unregisterFrameCallback]
   );
 
+  // What a click on an annotation does (#686). An open-ended play: where it
+  // ends (the annotation's end, or not at all with continuous play) is the
+  // animation loop's job, which follows the option and the annotation as they
+  // are at that moment. Never changes.
+  const playAnnotation = useCallback(
+    (annotation: AnnotationData) => {
+      setActiveAnnotationId(annotation.id);
+      play(annotation.start).catch((err) => {
+        console.warn(
+          '[waveform-playlist] Failed to start playback for annotation ' +
+            annotation.id +
+            ': ' +
+            String(err)
+        );
+      });
+    },
+    [play, setActiveAnnotationId]
+  );
+
   // Never changes.
   const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
@@ -895,6 +914,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     }),
     [
       play,
@@ -912,6 +932,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     ]
   );
 

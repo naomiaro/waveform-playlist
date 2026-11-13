@@ -1773,6 +1773,28 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [setCurrentTimeRefs]
   );
 
+  // What a click on an annotation does (#686). A play of the annotation's
+  // length, so the audio ends on the sample; with continuous play on, an
+  // open-ended one. Continuous play is read when the click happens, so the
+  // function never changes.
+  const playAnnotation = useCallback(
+    (annotation: AnnotationData) => {
+      setActiveAnnotationId(annotation.id);
+      const playDuration = continuousPlayRef.current
+        ? undefined
+        : annotation.end - annotation.start;
+      play(annotation.start, playDuration).catch((err) => {
+        console.warn(
+          '[waveform-playlist] Failed to start playback for annotation ' +
+            annotation.id +
+            ': ' +
+            String(err)
+        );
+      });
+    },
+    [play, setActiveAnnotationId, continuousPlayRef]
+  );
+
   // The actions both providers have (#688). Never changes.
   const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
@@ -1791,6 +1813,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     }),
     [
       play,
@@ -1808,6 +1831,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     ]
   );
 

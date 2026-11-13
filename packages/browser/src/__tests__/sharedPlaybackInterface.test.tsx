@@ -208,6 +208,7 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
     'annotationPreview',
     'pause',
     'play',
+    'playAnnotation',
     'scrollContainerRef',
     'seekTo',
     'setActiveAnnotationId',
