@@ -63,6 +63,7 @@ describe('sameTemplate', () => {
     const list = (n: number) => [<A key="a" />, <B key="b" />].slice(0, n);
     expect(sameTemplate(list(2), list(2))).toBe(true);
     expect(sameTemplate(list(2), list(1))).toBe(false);
+    expect(sameTemplate(list(1), list(2))).toBe(false);
     expect(
       sameTemplate(
         <>
@@ -78,17 +79,20 @@ describe('sameTemplate', () => {
   });
 
   it('compares a style object one level deep, and no other object', () => {
-    expect(sameTemplate(<div style={{ height: '100%' }} />, <div style={{ height: '100%' }} />)).toBe(
-      true
-    );
-    expect(sameTemplate(<div style={{ height: '100%' }} />, <div style={{ height: '50%' }} />)).toBe(
-      false
-    );
-    expect(sameTemplate(<div style={{ height: 1 }} />, <div style={{ height: 1, width: 1 }} />)).toBe(
-      false
-    );
+    expect(
+      sameTemplate(<div style={{ height: '100%' }} />, <div style={{ height: '100%' }} />)
+    ).toBe(true);
+    expect(
+      sameTemplate(<div style={{ height: '100%' }} />, <div style={{ height: '50%' }} />)
+    ).toBe(false);
+    expect(
+      sameTemplate(<div style={{ height: 1 }} />, <div style={{ height: 1, width: 1 }} />)
+    ).toBe(false);
     expect(sameTemplate(<div style={{ height: 1 }} />, <div style={{ width: 1 }} />)).toBe(false);
     expect(sameTemplate(<div style={{ height: 1 }} />, <div />)).toBe(false);
+    const none = null as unknown as React.CSSProperties;
+    expect(sameTemplate(<div style={{ height: 1 }} />, <div style={none} />)).toBe(false);
+    expect(sameTemplate(<div style={none} />, <div style={{ height: 1 }} />)).toBe(false);
     const Data: React.FC<{ data: object }> = () => null;
     expect(sameTemplate(<Data data={{ a: 1 }} />, <Data data={{ a: 1 }} />)).toBe(false);
   });

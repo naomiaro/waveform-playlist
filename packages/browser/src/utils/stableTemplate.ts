@@ -19,7 +19,9 @@ function sameStyle(a: unknown, b: unknown): boolean {
   const one = a as Record<string, unknown>;
   const other = b as Record<string, unknown>;
   const keys = Object.keys(one);
-  return keys.length === Object.keys(other).length && keys.every((k) => Object.is(one[k], other[k]));
+  return (
+    keys.length === Object.keys(other).length && keys.every((k) => Object.is(one[k], other[k]))
+  );
 }
 
 /**

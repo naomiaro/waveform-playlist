@@ -132,4 +132,13 @@ describe('alignTrackStates', () => {
     const changed = patchTrackState(mixer, 'a', { pan: 1 });
     expect(alignTrackStates([track('a'), track('b')], changed, first)).not.toBe(first);
   });
+
+  it('does not return a previous array of another length', () => {
+    const mixer = mixerForTracks(EMPTY_TRACK_MIXER, [track('a'), track('b')]);
+    const two = alignTrackStates([track('a'), track('b')], mixer, []);
+    const one = alignTrackStates([track('a')], mixer, two);
+    expect(one).toHaveLength(1);
+    const none = alignTrackStates([], mixer, two);
+    expect(none).toHaveLength(0);
+  });
 });

@@ -315,15 +315,23 @@ describe('each hook returns its own group of fields (#768)', () => {
 describe('an action re-renders only the readers of the group it changes (#768)', () => {
   it('a track volume change: the mixer', async () => {
     await mount();
-    expect(await rendered(() => values.editorControls.setTrackVolume('track-1', 0.4))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackVolume('track-1', 0.4))).toEqual([
+      'mixer',
+    ]);
     expect(values.mixer.trackStates[0].volume).toBe(0.4);
   });
 
   it('a mute, a solo and a pan change: the mixer', async () => {
     await mount();
-    expect(await rendered(() => values.editorControls.setTrackMute('track-1', true))).toEqual(['mixer']);
-    expect(await rendered(() => values.editorControls.setTrackSolo('track-2', true))).toEqual(['mixer']);
-    expect(await rendered(() => values.editorControls.setTrackPan('track-2', -0.5))).toEqual(['mixer']);
+    expect(await rendered(() => values.editorControls.setTrackMute('track-1', true))).toEqual([
+      'mixer',
+    ]);
+    expect(await rendered(() => values.editorControls.setTrackSolo('track-2', true))).toEqual([
+      'mixer',
+    ]);
+    expect(await rendered(() => values.editorControls.setTrackPan('track-2', -0.5))).toEqual([
+      'mixer',
+    ]);
   });
 
   it('a master volume change: the mixer', async () => {

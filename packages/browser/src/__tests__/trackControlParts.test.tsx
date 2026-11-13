@@ -18,6 +18,22 @@ import {
   SpectrogramIntegrationContext,
   type SpectrogramIntegration,
 } from '../SpectrogramIntegrationContext';
+const layoutCounts = vi.hoisted(() => ({ slots: 0 }));
+vi.mock('../components/visualizationLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/visualizationLayout')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    // Rendered once per render of a track's slot.
+    ControlSlot: (props: React.ComponentProps<typeof actual.ControlSlot>) => {
+      layoutCounts.slots++;
+      return createElement(actual.ControlSlot, props);
+    },
+  };
+});
+
+import { DragDropProvider } from '@dnd-kit/react';
+import { DragDropManager } from '@dnd-kit/dom';
 import * as api from '../index';
 import {
   WaveformPlaylistProvider,
@@ -38,6 +54,8 @@ import {
   usePlaylistMixer,
   usePlaylistTimeline,
   useSelectedTrackId,
+  useEditorControls,
+  type EditorControlsContextValue,
   type TrackContextValue,
 } from '../index';
 
@@ -128,7 +146,21 @@ const Spy: React.FC = () => {
   return <span data-testid={'spy-' + track.id}>{track.name}</span>;
 };
 
-let probe: { isReady: boolean; trackStateCount: number; selectedTrackId: string | null };
+let probe: {
+  isReady: boolean;
+  trackStateCount: number;
+  selectedTrackId: string | null;
+  controls: EditorControlsContextValue;
+};
+// How often the template of each track was mounted.
+const mounts = new Map<string, number>();
+const MountSpy: React.FC = () => {
+  const { id } = useTrack();
+  React.useEffect(() => {
+    mounts.set(id, (mounts.get(id) ?? 0) + 1);
+  }, [id]);
+  return null;
+};
 const Probe: React.FC = () => {
   const { isReady } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
@@ -137,6 +169,7 @@ const Probe: React.FC = () => {
     isReady,
     trackStateCount: trackStates.filter(Boolean).length,
     selectedTrackId,
+    controls: useEditorControls(),
   };
   return null;
 };
@@ -201,6 +234,7 @@ afterEach(async () => {
   resetPartWarnings();
   seen.clear();
   renders.clear();
+  mounts.clear();
 });
 
 const A = makeTrack('a');
@@ -480,6 +514,65 @@ describe('the template and useTrack()', () => {
     expect(seen.get('a')).toMatchObject({ index: 2, isLast: true });
   });
 
+  it('a track moved twice moves from where it is, not from where it was mounted', async () => {
+    const D = makeTrack('d');
+    let tracks = [A, B, C, D];
+    const view = mount({
+      tracks,
+      onTracksChange: (next) => {
+        tracks = next;
+        view.update({ tracks });
+      },
+      controls: (
+        <WaveformTrackControls>
+          <Spy />
+        </WaveformTrackControls>
+      ),
+    });
+    await ready();
+    await act(async () => seen.get('b')!.moveDown());
+    expect(tracks.map((t) => t.id)).toEqual(['a', 'c', 'b', 'd']);
+    // From the middle to the middle: neither isFirst nor isLast changed.
+    expect(seen.get('b')).toMatchObject({ index: 2, isFirst: false, isLast: false });
+    await act(async () => seen.get('b')!.moveDown());
+    expect(tracks.map((t) => t.id)).toEqual(['a', 'c', 'd', 'b']);
+    await act(async () => seen.get('b')!.moveUp());
+    await act(async () => seen.get('b')!.moveUp());
+    expect(tracks.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('a change of one track renders the slot of that track only', async () => {
+    mount({ tracks: [A, B, C], controls: <WaveformTrackControls /> });
+    await ready();
+    layoutCounts.slots = 0;
+    act(() => probe.controls.setTrackVolume('b', 0.2));
+    expect(layoutCounts.slots).toBe(1);
+  });
+
+  it('the slots are mounted again after a reorder drag, and only then', async () => {
+    mount({
+      tracks: [A, B],
+      controls: (
+        <WaveformTrackControls>
+          <MountSpy />
+        </WaveformTrackControls>
+      ),
+    });
+    await ready();
+    expect([...mounts.entries()]).toEqual([
+      ['a', 1],
+      ['b', 1],
+    ]);
+    act(() => probe.controls.setTrackMute('a', true));
+    expect(mounts.get('a')).toBe(1);
+    // What the interaction provider calls when a reorder drag ends.
+    act(() => probe.controls.bumpTrackReorderEpoch());
+    expect([...mounts.entries()]).toEqual([
+      ['a', 2],
+      ['b', 2],
+    ]);
+  });
+
   it('throws outside the controls part, and says where it belongs', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(() => render(<Spy />)).toThrow(/useTrack.*<WaveformTrackControls>/);
@@ -699,16 +792,49 @@ describe('<TrackReorderGrip />', () => {
       fireEvent.click(within(slotOf('a')).getByRole('button', { name: 'Move track down' }));
     });
     expect(tracks.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    await act(async () => {
+      fireEvent.click(within(slotOf('c')).getByRole('button', { name: 'Move track up' }));
+    });
+    expect(tracks.map((t) => t.id)).toEqual(['b', 'c', 'a']);
     fireEvent.click(within(slotOf('a')).getByRole('button', { name: 'Drag to reorder track' }));
     expect(probe.selectedTrackId).toBeNull();
+  });
+
+  it("registers the track's slot as the sortable item and the grip as its handle", async () => {
+    const manager = new DragDropManager();
+    const adapter = createFakeAdapter();
+    render(
+      <DragDropProvider manager={manager}>
+        <WaveformPlaylistProvider tracks={[A, B]} createAdapter={() => adapter}>
+          <Probe />
+          <WaveformRoot>
+            {WITH_GRIP}
+            <WaveformTracks />
+          </WaveformRoot>
+        </WaveformPlaylistProvider>
+      </DragDropProvider>
+    );
+    await ready();
+    const source = manager.registry.draggables.get('track-reorder-b')!;
+    expect(source).toBeDefined();
+    expect(source.element).toBe(slotOf('b'));
+    expect(source.handle).toBe(
+      within(slotOf('b')).getByRole('button', { name: 'Drag to reorder track' })
+    );
   });
 
   it('the move buttons are disabled while the track is loading', async () => {
     mount({ tracks: [A, B], loading: true, controls: WITH_GRIP });
     await screen.findAllByRole('button', { name: 'Mute' });
-    expect(
-      within(slotOf('a')).getByRole('button', { name: 'Move track down' })
-    ).toHaveProperty('disabled', true);
+    expect(within(slotOf('a')).getByRole('button', { name: 'Move track down' })).toHaveProperty(
+      'disabled',
+      true
+    );
+    // Not the first track: only the loading disables this one.
+    expect(within(slotOf('b')).getByRole('button', { name: 'Move track up' })).toHaveProperty(
+      'disabled',
+      true
+    );
   });
 });
 
@@ -729,7 +855,9 @@ describe('<TrackMenuButton />', () => {
       {
         id: 'mode',
         content: (
-          <button onClick={() => props.onRenderModeChange('both')}>mode is {props.renderMode}</button>
+          <button onClick={() => props.onRenderModeChange('both')}>
+            mode is {props.renderMode}
+          </button>
         ),
       },
       { id: 'settings', content: <button onClick={props.onOpenSettings}>open settings</button> },
@@ -778,6 +906,67 @@ describe('<TrackMenuButton />', () => {
     expect(settings[settings.length - 1].open).toBe(true);
   });
 
+  it('the default panel has the menu', async () => {
+    mount({ tracks: [A], controls: <WaveformTrackControls />, spectrogram });
+    await ready();
+    expect(screen.getByRole('button', { name: 'Track menu' })).toBeTruthy();
+  });
+
+  it('draws nothing when the integration offers no menu items', async () => {
+    const { renderMenuItems: _none, ...withoutMenu } = spectrogram;
+    mount({ tracks: [A], controls: MENU, spectrogram: withoutMenu as SpectrogramIntegration });
+    await ready();
+    expect(screen.queryByRole('button', { name: 'Track menu' })).toBeNull();
+    // The integration is there: the actions of useTrack() still work.
+    expect(seen.get('a')!.hasSpectrogram).toBe(true);
+  });
+
+  it('renderMode is the mode the integration has for the track', async () => {
+    const withOverride = {
+      ...spectrogram,
+      trackSpectrogramOverrides: new Map([['b', { renderMode: 'both' }]]),
+    } as unknown as SpectrogramIntegration;
+    mount({ tracks: [A, B], controls: MENU, spectrogram: withOverride });
+    await ready();
+    expect(seen.get('a')!.renderMode).toBe('waveform');
+    expect(seen.get('b')!.renderMode).toBe('both');
+    fireEvent.click(within(slotOf('b')).getByRole('button', { name: 'Track menu' }));
+    expect(screen.getByText('mode is both')).toBeTruthy();
+  });
+
+  it('the actions reach the integration that is there now, not the one from the first render', async () => {
+    setTrackRenderMode.mockClear();
+    const later = vi.fn();
+    const view = mount({ tracks: [A], controls: MENU, spectrogram });
+    await ready();
+    const before = seen.get('a')!;
+    await act(async () =>
+      view.update({ spectrogram: { ...spectrogram, setTrackRenderMode: later } })
+    );
+    // The action is the same function, and it calls the new integration.
+    expect(seen.get('a')!.setRenderMode).toBe(before.setRenderMode);
+    act(() => seen.get('a')!.setRenderMode('both'));
+    expect(later).toHaveBeenCalledWith('a', 'both');
+    expect(setTrackRenderMode).not.toHaveBeenCalled();
+  });
+
+  it('openSpectrogramSettings() without an integration opens nothing, also once one is there', async () => {
+    settings.length = 0;
+    const view = mount({
+      tracks: [A],
+      controls: (
+        <WaveformTrackControls>
+          <Spy />
+        </WaveformTrackControls>
+      ),
+    });
+    await ready();
+    act(() => seen.get('a')!.openSpectrogramSettings());
+    await act(async () => view.update({ spectrogram }));
+    expect(settings.length).toBeGreaterThan(0);
+    expect(settings.every((call) => call.open === false)).toBe(true);
+  });
+
   it('a panel of the consumer opens the settings and sets the mode through useTrack()', async () => {
     settings.length = 0;
     setTrackRenderMode.mockClear();
@@ -805,11 +994,7 @@ describe('the removed props', () => {
     mount({
       tracks: [A],
       controls: (
-        <Loose
-          renderTrackControls={renderTrackControls}
-          onRemoveTrack={() => {}}
-          trackReordering
-        />
+        <Loose renderTrackControls={renderTrackControls} onRemoveTrack={() => {}} trackReordering />
       ),
     });
     await ready();

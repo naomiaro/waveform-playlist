@@ -193,9 +193,9 @@ const TrackSummary: React.FC = () => {
   );
 };
 
-const TracksThatCanBeRemoved: React.FC<{ children: (remove: (id: string) => void) => React.ReactNode }> = ({
-  children,
-}) => {
+const TracksThatCanBeRemoved: React.FC<{
+  children: (remove: (id: string) => void) => React.ReactNode;
+}> = ({ children }) => {
   const [tracks, setTracks] = React.useState(() => createEmptyTracks(3));
   const remove = React.useCallback(
     (trackId: string) => setTracks((current) => current.filter((track) => track.id !== trackId)),
@@ -232,7 +232,7 @@ export const TrackControlsWithRemoveAndReorder: Story = {
     docs: {
       description: {
         story:
-          'The default panel with one control of the story\'s own inside it (`useTrack()`), a remove button and a reorder grip beside it. A remove button and a grip are drawn by being rendered. The move buttons work here; dragging the grip needs a `ClipInteractionProvider` above the view.',
+          "The default panel with one control of the story's own inside it (`useTrack()`), a remove button and a reorder grip beside it. A remove button and a grip are drawn by being rendered. The move buttons work here; dragging the grip needs a `ClipInteractionProvider` above the view.",
       },
     },
   },

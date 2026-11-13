@@ -56,14 +56,17 @@ function makeTrack(id: string): ClipTrack {
 interface FakeAdapter extends PlayoutAdapter {
   builds: ClipTrack[][];
   calls: Array<[string, string, unknown]>;
+  updates: Array<[string, ClipTrack]>;
 }
 
 function createFakeAdapter(): FakeAdapter {
   const builds: ClipTrack[][] = [];
   const calls: Array<[string, string, unknown]> = [];
+  const updates: Array<[string, ClipTrack]> = [];
   return {
     builds,
     calls,
+    updates,
     audioContext: {
       currentTime: 0,
       sampleRate: SAMPLE_RATE,
@@ -77,7 +80,9 @@ function createFakeAdapter(): FakeAdapter {
     },
     addTrack() {},
     removeTrack() {},
-    updateTrack() {},
+    updateTrack(id: string, track: ClipTrack) {
+      updates.push([id, track]);
+    },
     play() {},
     pause() {},
     stop() {},
@@ -258,6 +263,72 @@ describe('a track keeps its mixer state when the list of tracks changes', () => 
       ['a', false, 1],
       ['z', false, 0.6],
     ]);
+  });
+
+  it('tracks put in another order by the consumer: the rebuilt engine gets each track its own values', async () => {
+    const a = makeTrack('a');
+    const b = makeTrack('b');
+    const { adapter, setTracks } = mount([a, b]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => {
+      probe.controls.setTrackVolume('a', 0.3);
+      probe.controls.setTrackMute('b', true);
+    });
+
+    await act(async () => {
+      setTracks([b, a]);
+    });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+
+    expect(probe.trackStates.map((s) => [s.name, s.volume, s.muted])).toEqual([
+      ['b', 1, true],
+      ['a', 0.3, false],
+    ]);
+    const built = adapter.builds[adapter.builds.length - 1];
+    expect(built.map((t) => [t.id, t.volume, t.muted])).toEqual([
+      ['b', 1, true],
+      ['a', 0.3, false],
+    ]);
+  });
+
+  it('a placeholder that gets its clips is handed to the engine with what the user set on it', async () => {
+    const a = makeTrack('a');
+    const placeholder = { ...makeTrack('p'), name: 'p (loading...)', clips: [] } as ClipTrack;
+    const { adapter, setTracks } = mount([a, placeholder]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => {
+      probe.controls.setTrackMute('p', true);
+      probe.controls.setTrackVolume('p', 0.2);
+    });
+    const buildsBefore = adapter.builds.length;
+
+    await act(async () => {
+      setTracks([a, { ...placeholder, name: 'p', clips: [makeClip('p-clip')] } as ClipTrack]);
+    });
+
+    // Applied to the running engine, not by a rebuild.
+    expect(adapter.builds.length).toBe(buildsBefore);
+    expect(adapter.updates).toHaveLength(1);
+    expect(adapter.updates[0][0]).toBe('p');
+    expect(adapter.updates[0][1]).toMatchObject({ muted: true, volume: 0.2 });
+    expect(probe.trackStates[1]).toMatchObject({ name: 'p', muted: true, volume: 0.2 });
+  });
+
+  it('an emptied timeline forgets the mixer state: the same track added again starts from its fields', async () => {
+    const a = makeTrack('a');
+    const { setTracks } = mount([a]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => probe.controls.setTrackMute('a', true));
+    expect(probe.trackStates[0].muted).toBe(true);
+
+    await act(async () => {
+      setTracks([]);
+    });
+    await act(async () => {
+      setTracks([a]);
+    });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    expect(probe.trackStates[0].muted).toBe(false);
   });
 
   it('new track objects with the same ids leave the published array alone', async () => {

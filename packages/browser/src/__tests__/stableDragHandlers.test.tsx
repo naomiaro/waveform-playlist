@@ -344,7 +344,6 @@ describe('ClipInteractionProvider: the track-reorder preview', () => {
     // The late one.
     over(event(0));
     expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }, null]);
-
   });
 });
 
