@@ -349,7 +349,11 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
       editor.setTrackDragPreview({ trackId: 't2', toIndex: 0 });
     });
 
+    // Both took effect in the view.
     expect(document.querySelector('[data-track-row][data-selected="true"]')).not.toBeNull();
+    expect(
+      document.querySelector('[data-track-row][data-track-drag-source="true"]')
+    ).not.toBeNull();
     expect(renderPlayhead.mock.calls.length).toBe(calls);
   });
 
