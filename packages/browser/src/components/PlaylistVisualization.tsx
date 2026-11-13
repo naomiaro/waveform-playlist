@@ -66,11 +66,11 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   getAnnotationBoxLabel,
   className,
   showClipHeaders = false,
-  gainScaledWaveforms = false,
+  gainScaledWaveforms,
   showFades = false,
   onRemoveTrack,
   recordingState,
-  trackReordering = false,
+  trackReordering,
 }) => (
   <WaveformRoot className={className}>
     <TimescalePart renderTick={renderTick} />

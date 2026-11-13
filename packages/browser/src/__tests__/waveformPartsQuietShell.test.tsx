@@ -19,6 +19,9 @@ const counts = vi.hoisted(() => ({
   boxes: 0,
   controls: 0,
   track: 0,
+  // `TracksLayout` is rendered once by the tracks part and once by the
+  // track-controls part: their own renders, whatever the rows below do.
+  layout: 0,
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
@@ -41,6 +44,18 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     Track: (props: React.ComponentProps<typeof actual.Track>) => {
       counts.track++;
       return createElement(actual.Track, props);
+    },
+  };
+});
+
+vi.mock('../components/visualizationLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/visualizationLayout')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    TracksLayout: (props: React.ComponentProps<typeof actual.TracksLayout>) => {
+      counts.layout++;
+      return createElement(actual.TracksLayout, props);
     },
   };
 });
@@ -179,6 +194,7 @@ function resetCounts() {
   counts.boxes = 0;
   counts.controls = 0;
   counts.track = 0;
+  counts.layout = 0;
 }
 
 async function mount(reset = true) {
@@ -186,7 +202,9 @@ async function mount(reset = true) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  render(
+  // A new `<PlaylistVisualization />` element on every call, with the same
+  // (no) props: what a parent's re-render hands it.
+  const ui = () => (
     <WaveformPlaylistProvider
       tracks={TRACKS}
       sampleRate={SAMPLE_RATE}
@@ -199,9 +217,11 @@ async function mount(reset = true) {
       <PlaylistVisualization />
     </WaveformPlaylistProvider>
   );
+  const utils = render(ui());
   await waitFor(() => expect(probe.isReady).toBe(true));
   await act(async () => {});
   if (reset) resetCounts();
+  return { rerenderSame: () => utils.rerender(ui()) };
 }
 
 /** The click overlay: the last, childless sibling above the track rows. */
@@ -273,6 +293,24 @@ describe('the root renders alone (#685)', () => {
     expect(counts.boxes).toBe(0);
     expect(counts.track).toBe(0);
     expect(counts.controls).toBe(0);
+    // Not even the tracks part or the track-controls part themselves.
+    expect(counts.layout).toBe(0);
+  });
+
+  it('a render of the composing component with the same props renders the tracks part alone', async () => {
+    const { rerenderSame } = await mount();
+
+    await act(async () => {
+      rerenderSame();
+    });
+
+    // The tracks part has children, so it cannot be skipped; the timescale,
+    // the annotation row and the track controls are memoized and are.
+    expect(counts.layout).toBe(1);
+    expect(counts.scale).toBe(0);
+    expect(counts.boxes).toBe(0);
+    expect(counts.controls).toBe(0);
+    expect(counts.track).toBe(0);
   });
 });
 

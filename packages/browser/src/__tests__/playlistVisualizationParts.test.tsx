@@ -15,6 +15,8 @@ const seen = vi.hoisted(() => ({
   gains: [] as number[],
   rails: 0,
   headers: 0,
+  loopMax: [] as number[],
+  boxRowWidth: [] as number[],
 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
@@ -30,6 +32,10 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
       seen.gains.push((props as { gain?: number }).gain ?? 1);
       return createElement(actual.SmartChannel, props);
     },
+    TimescaleLoopRegion: (props: React.ComponentProps<typeof actual.TimescaleLoopRegion>) => {
+      seen.loopMax.push(props.maxPosition as number);
+      return createElement(actual.TimescaleLoopRegion, props);
+    },
     ReorderRail: (props: React.ComponentProps<typeof actual.ReorderRail>) => {
       seen.rails++;
       return createElement(actual.ReorderRail, props);
@@ -43,7 +49,11 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 });
 
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { usePlaylistTimeline } from '../contexts/playlistContexts';
+import {
+  usePlaylistTimeline,
+  usePlaylistZoom,
+  useEditorControls,
+} from '../contexts/playlistContexts';
 import { PlaylistVisualization } from '../components/PlaylistVisualization';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import {
@@ -137,12 +147,19 @@ const INTEGRATION = {
   AnnotationBox: (props: AnnotationBoxIntegrationProps) => (
     <span data-box={props.annotationId}>{props.label}</span>
   ),
-  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AnnotationBoxesWrapper: ({ children, width }: { children?: React.ReactNode; width: number }) => {
+    seen.boxRowWidth.push(width);
+    return <div>{children}</div>;
+  },
 } as unknown as AnnotationIntegration;
 
 let isReady = false;
+let samplesPerPixel = 0;
+let editor: ReturnType<typeof useEditorControls>;
 const ProbeChild: React.FC = () => {
   isReady = usePlaylistTimeline().isReady;
+  samplesPerPixel = usePlaylistZoom().samplesPerPixel;
+  editor = useEditorControls();
   return null;
 };
 
@@ -162,6 +179,8 @@ async function mount(
   seen.gains = [];
   seen.rails = 0;
   seen.headers = 0;
+  seen.loopMax = [];
+  seen.boxRowWidth = [];
   isReady = false;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
@@ -274,6 +293,35 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
   it('getAnnotationBoxLabel labels the annotation boxes', async () => {
     await mount({ getAnnotationBoxLabel: (annotation) => `label-${annotation.id}` });
     expect(document.querySelector('[data-box="n1"]')?.textContent).toBe('label-n1');
+  });
+
+  it('the loop region and the annotation row are as wide as the timeline', async () => {
+    await mount();
+    // One second of audio: the timeline is that long, in pixels at this zoom.
+    const timelineWidth = Math.floor(SAMPLE_RATE / samplesPerPixel);
+    expect(timelineWidth).toBeGreaterThan(0);
+    expect(seen.boxRowWidth[seen.boxRowWidth.length - 1]).toBe(timelineWidth);
+
+    expect(seen.loopMax).toEqual([]);
+    await act(async () => {
+      editor.setLoopRegion(0.2, 0.6);
+      editor.setLoopEnabled(true);
+    });
+    expect(seen.loopMax.length).toBeGreaterThan(0);
+    expect(seen.loopMax[seen.loopMax.length - 1]).toBe(timelineWidth);
+  });
+
+  it('the row of the track being dragged to a new place is marked', async () => {
+    await mount();
+    const marked = () =>
+      Array.from(document.querySelectorAll('[data-track-row][data-track-drag-source="true"]')).map(
+        (row) => row.getAttribute('data-track-id')
+      );
+    expect(marked()).toEqual([]);
+    await act(async () => {
+      editor.setTrackDragPreview({ trackId: 't2', toIndex: 0 });
+    });
+    expect(marked()).toEqual(['t2']);
   });
 
   it('renderPlayhead draws the custom playhead', async () => {

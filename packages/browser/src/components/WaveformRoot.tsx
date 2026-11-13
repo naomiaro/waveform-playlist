@@ -105,9 +105,10 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
   const spectrogram = useContext(SpectrogramIntegrationContext);
 
-  // The parts by place, and what the tracks part was given. Memoized on
-  // `children`: a render of this component alone must hand React the very
-  // same elements, or every part renders with it.
+  // The parts by place, and what the tracks part was given. The part
+  // elements are passed on as they were given, never cloned: that is what
+  // lets React skip every part when this component renders alone (same
+  // element, nothing to do). The memo only saves sorting them again.
   const parts = useMemo(() => {
     const sorted = sortWaveformParts(children);
     return {
