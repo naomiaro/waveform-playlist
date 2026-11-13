@@ -1,8 +1,8 @@
 /**
- * The parts of the view (#685). Internal for now: `PlaylistVisualization`
- * composes them inside `WaveformRoot` and `MediaElementPlaylist` composes the
- * ones its provider can serve inside `MediaElementWaveformRoot`; nothing here is
- * exported from the package yet.
+ * The parts of the view (#685), exported from the package: a consumer
+ * composes them inside `WaveformRoot` (or, the ones its provider can serve,
+ * inside `MediaElementWaveformRoot`). `Waveform`, `WaveformEditor` and
+ * `MediaElementWaveform` are ready-made compositions of them.
  *
  * A part reads what it draws from the provider's contexts and from the root's
  * two layout values (waveformLayoutContext.ts); its props are the options of
@@ -17,7 +17,7 @@
  * that composes them usually re-renders with the tracks (it holds them), and
  * a part whose props did not change should not follow.
  */
-import React, { type ReactNode } from 'react';
+import React, { useContext, type ReactNode } from 'react';
 import { SmartScale } from '@waveform-playlist/ui-components';
 import {
   WaveformTracks,
@@ -25,9 +25,14 @@ import {
   type TracksMarkers,
   type WaveformTracksProps,
 } from './TrackRows';
-import { WaveformTrackControls } from './TrackControlsColumn';
+import {
+  DEFAULT_TRACK_CONTROLS_WIDTH,
+  WaveformTrackControls,
+  type WaveformTrackControlsProps,
+} from './TrackControlsColumn';
 import { WaveformLoopRegion } from './VisualizationOverlays';
-import { useWaveformExtent } from './waveformLayoutContext';
+import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
+import { warnMisplacedPart } from './partWarnings';
 
 export {
   WaveformTracks,
@@ -48,6 +53,13 @@ export const WaveformTimescale = React.memo(function WaveformTimescale({
   renderTick,
 }: WaveformTimescaleProps) {
   const { displayDuration } = useWaveformExtent('The timescale');
+  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+    warnMisplacedPart(
+      '<WaveformTimescale> is drawn among the tracks, not in the timescale strip: the root ' +
+        'recognises a part by its element type, so it must be a child of the root (a fragment ' +
+        'is fine), not wrapped in another component.'
+    );
+  }
   return <SmartScale durationMs={displayDuration * 1000} renderTick={renderTick} />;
 });
 
@@ -70,6 +82,8 @@ export interface SortedWaveformParts {
   content: ReactNode[];
   /** The per-clip parts of the tracks part (all off when there is none). */
   tracksOptions: TracksMarkers;
+  /** Width of the controls column in pixels, from the controls part; 0 without one. */
+  controlsWidth: number;
 }
 
 const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([WaveformTimescale, WaveformLoopRegion]);
@@ -92,7 +106,9 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     controls: [],
     content: [],
     tracksOptions: { showClipHeaders: false, showFades: false, recordingState: undefined },
+    controlsWidth: 0,
   };
+  let tracksParts = 0;
   const visit = (node: ReactNode) => {
     React.Children.forEach(node, (child) => {
       if (React.isValidElement(child)) {
@@ -106,11 +122,17 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           return;
         }
         if (CONTROLS_PARTS.has(child.type)) {
+          // The first controls part says how wide the column is.
+          if (sorted.controls.length === 0) {
+            sorted.controlsWidth =
+              (child.props as WaveformTrackControlsProps).width ?? DEFAULT_TRACK_CONTROLS_WIDTH;
+          }
           sorted.controls.push(child);
           sorted.content.push(null);
           return;
         }
         if (child.type === WaveformTracks) {
+          tracksParts++;
           sorted.tracksOptions = scanTracksParts((child.props as WaveformTracksProps).children);
         }
       }
@@ -122,5 +144,11 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     });
   };
   visit(children);
+  if (tracksParts > 1) {
+    warnMisplacedPart(
+      'A waveform root has more than one <WaveformTracks>: each draws every row, and the row ' +
+        'heights follow the per-clip parts of the last one.'
+    );
+  }
   return sorted;
 }

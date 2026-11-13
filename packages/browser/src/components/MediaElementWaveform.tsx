@@ -1,9 +1,15 @@
 import React, { useMemo } from 'react';
 import type { RenderAnnotationItemProps } from '@waveform-playlist/core';
-import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import { useAnnotations } from '../contexts/playlistContexts';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
-import { MediaElementPlaylist } from './MediaElementPlaylist';
+import { MediaElementWaveformRoot } from './MediaElementWaveformRoot';
+import {
+  WaveformPlayhead,
+  WaveformSelection,
+  WaveformTimescale,
+  WaveformTracks,
+} from './waveformParts';
+import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
 import {
   MediaElementAnnotationList,
   type MediaElementAnnotationListProps,
@@ -12,6 +18,11 @@ import {
 // Re-export annotation types for convenience
 export type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 
+/**
+ * The annotation options (until #686 gives the annotation parts their own)
+ * and `className`. What the view is made of is not an option here: compose
+ * the parts inside `MediaElementWaveformRoot` for anything else.
+ */
 export interface MediaElementWaveformProps {
   /** Height in pixels for the annotation text list */
   annotationTextHeight?: number;
@@ -36,10 +47,6 @@ export interface MediaElementWaveformProps {
   scrollActivePosition?: ScrollLogicalPosition;
   /** Which scrollable containers to scroll: 'nearest' (only the annotation list) or 'all' (including viewport). Defaults to 'nearest'. */
   scrollActiveContainer?: 'nearest' | 'all';
-  /** Custom playhead render function. Receives position, color, and animation refs for smooth 60fps animation. */
-  renderPlayhead?: RenderPlayheadFunction;
-  /** Show fade in/out overlays on the waveform. Defaults to false. */
-  showFades?: boolean;
   className?: string;
 }
 
@@ -54,17 +61,34 @@ const AnnotationListWhenPresent: React.FC<MediaElementAnnotationListProps> = (pr
   return <MediaElementAnnotationList {...props} />;
 };
 
+// The same elements on every render, so a render of the composition does not
+// render these parts (see Waveform.tsx).
+const TIMESCALE = <WaveformTimescale />;
+const TRACKS = <WaveformTracks />;
+const SELECTION = <WaveformSelection />;
+const PLAYHEAD = <WaveformPlayhead />;
+
 /**
- * Simplified Waveform component for MediaElementPlaylistProvider
+ * The view of `MediaElementPlaylistProvider`, ready-made: the timescale, the
+ * one track, the annotation boxes, the selection and the playhead, with the
+ * annotation text list below when there are annotations.
  *
- * This is a stripped-down version of Waveform that works with the
- * MediaElement context. It supports:
- * - Single track visualization
- * - Click to seek
- * - Annotation display and click-to-play
- * - Playhead animation
+ * It is a composition of the public parts with no options for them. To leave
+ * the timescale out, show fades or use your own playhead, write the
+ * composition yourself:
  *
- * For multi-track editing, use the full Waveform with WaveformPlaylistProvider.
+ * ```tsx
+ * <MediaElementWaveformRoot>
+ *   <WaveformTimescale />
+ *   <WaveformTracks>
+ *     <WaveformFades />
+ *   </WaveformTracks>
+ *   <MediaElementAnnotationBoxes />
+ *   <WaveformSelection />
+ *   <WaveformPlayhead renderPlayhead={…} />
+ * </MediaElementWaveformRoot>
+ * <MediaElementAnnotationList />
+ * ```
  */
 export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   annotationTextHeight,
@@ -75,8 +99,6 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
   onAnnotationUpdate,
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
-  renderPlayhead,
-  showFades = false,
   className,
 }) => {
   // Kept across renders: a new object re-renders every item of the list.
@@ -87,15 +109,18 @@ export const MediaElementWaveform: React.FC<MediaElementWaveformProps> = ({
 
   return (
     <>
-      <MediaElementPlaylist
-        getAnnotationBoxLabel={getAnnotationBoxLabel}
-        editable={editable}
-        linkEndpoints={linkEndpoints}
-        onAnnotationUpdate={onAnnotationUpdate}
-        renderPlayhead={renderPlayhead}
-        showFades={showFades}
-        className={className}
-      />
+      <MediaElementWaveformRoot className={className}>
+        {TIMESCALE}
+        {TRACKS}
+        <MediaElementAnnotationBoxes
+          getAnnotationBoxLabel={getAnnotationBoxLabel}
+          editable={editable}
+          linkEndpoints={linkEndpoints}
+          onAnnotationUpdate={onAnnotationUpdate}
+        />
+        {SELECTION}
+        {PLAYHEAD}
+      </MediaElementWaveformRoot>
       <AnnotationListWhenPresent
         height={annotationTextHeight}
         renderAnnotationItem={renderAnnotationItem}

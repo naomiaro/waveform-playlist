@@ -137,7 +137,6 @@ describe('spectrogram settings modal on a track with no config', () => {
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        controls={{ show: true, width: 200 }}
       >
         <SpectrogramIntegrationProvider value={INTEGRATION}>
           <Probe />

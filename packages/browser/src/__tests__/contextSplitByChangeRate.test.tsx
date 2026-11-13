@@ -219,8 +219,6 @@ describe('each hook returns its own group of fields (#768)', () => {
       [
         'sampleRate',
         'waveHeight',
-        'timeScaleHeight',
-        'controls',
         'barWidth',
         'barGap',
         'roundedBars',

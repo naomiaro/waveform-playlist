@@ -1,4 +1,5 @@
 import React, { useContext, type ReactNode } from 'react';
+import { warnMisplacedPart } from './partWarnings';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import {
   usePlaylistMixer,
@@ -7,7 +8,7 @@ import {
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
-import { useWaveformRows } from './waveformLayoutContext';
+import { useWaveformRows, WaveformPartPlaceContext } from './waveformLayoutContext';
 import { SortableTrackControls } from './SortableTrackControls';
 import { DefaultTrackControls, type DefaultTrackControlsProps } from './DefaultTrackControls';
 import { ControlSlot, TracksLayout } from './visualizationLayout';
@@ -15,7 +16,16 @@ import { ControlSlot, TracksLayout } from './visualizationLayout';
 /** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
+/** Width of the controls column when the part does not say. */
+export const DEFAULT_TRACK_CONTROLS_WIDTH = 200;
+
 export interface WaveformTrackControlsProps {
+  /**
+   * Width of the controls column in pixels. Default 200. The root reads it
+   * from the element (the column is its own, beside the scrolling area), so it
+   * must be on the part itself.
+   */
+  width?: number;
   renderTrackControls?: (trackIndex: number) => ReactNode;
   /** The close button is drawn only when this is given. */
   onRemoveTrack?: (trackIndex: number) => void;
@@ -51,6 +61,13 @@ function WaveformTrackControlsImpl({
     selectTrack,
     setSettingsModalTrackId,
   } = useWaveformRows('The track controls');
+  if (useContext(WaveformPartPlaceContext) !== 'controls') {
+    warnMisplacedPart(
+      '<WaveformTrackControls> is drawn among the tracks, not in the controls column: the root ' +
+        'recognises a part by its element type, so it must be a child of the root (a fragment ' +
+        'is fine), not wrapped in another component.'
+    );
+  }
   const { selectedTrackId } = useSelectedTrackId();
   const { trackReorderEpoch } = useTrackReorderPreview();
   const spectrogram = useContext(SpectrogramIntegrationContext);

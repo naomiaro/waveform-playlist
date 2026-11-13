@@ -66,7 +66,7 @@ export interface UseRecordingReturn {
    * Elapsed time and live-preview peaks of the take. Its identity is stable
    * for the life of the hook, and the hook does NOT re-render as they change
    * (once per animation frame while recording). Pass it to
-   * `<Waveform recordingState={{ …, progress }} />`, call
+   * `<WaveformRecordingPreview recordingState={{ …, progress }} />`, call
    * `progress.subscribe()`, or use `useRecordingProgress(progress)` for
    * throttled React state. After a stop, `duration` is the recorded buffer's
    * length; the next start resets both.

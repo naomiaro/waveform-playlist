@@ -19,7 +19,7 @@ import {
   useActiveAnnotation,
   useSelection,
 } from '../contexts/playlistContexts';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 const SAMPLE_RATE = 44100;
 const SOURCE_SCALE = 441;
@@ -199,7 +199,7 @@ async function mount(options: MountOptions = {}) {
       automaticScroll={options.automaticScroll}
     >
       <ProbeChild />
-      {options.playlist ? <MediaElementPlaylist /> : null}
+      {options.playlist ? <ComposedMediaElementWaveform /> : null}
     </MediaElementPlaylistProvider>
   );
   const view = render(tree());

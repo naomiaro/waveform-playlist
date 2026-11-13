@@ -115,17 +115,12 @@ import {
 
 export interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[]; // Updated to use clip-based model
-  timescale?: boolean;
   mono?: boolean;
   waveHeight?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
-  controls?: {
-    show: boolean;
-    width: number;
-  };
   annotationList?: {
     annotations?: AnnotationData[];
     editable?: boolean;
@@ -207,14 +202,12 @@ export interface WaveformPlaylistProviderProps {
 
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
   tracks,
-  timescale = false,
   mono = false,
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
   automaticScroll = false,
   theme: userThemeProp,
-  controls: controlsProp,
   annotationList,
   effects,
   trackEffects,
@@ -235,13 +228,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   createAdapter,
   children,
 }) => {
-  const { controls, mergedTheme, progressBarWidth, timeScaleHeight } = useViewDefaults({
-    controls: controlsProp,
+  const { mergedTheme, progressBarWidth } = useViewDefaults({
     theme: userThemeProp,
     barWidth,
     barGap,
     progressBarWidth: progressBarWidthProp,
-    timescale,
   });
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
@@ -1932,8 +1923,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     () => ({
       sampleRate,
       waveHeight,
-      timeScaleHeight,
-      controls,
       barWidth,
       barGap,
       roundedBars,
@@ -1945,8 +1934,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [
       sampleRate,
       waveHeight,
-      timeScaleHeight,
-      controls,
       barWidth,
       barGap,
       roundedBars,

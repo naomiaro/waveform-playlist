@@ -107,21 +107,44 @@ export {
   EditableCheckbox,
   DownloadAnnotationsButton,
   Waveform,
+  WaveformEditor,
   MediaElementWaveform,
-  MediaElementPlaylist,
   MediaElementAnnotationList,
-  PlaylistVisualization,
   PlaylistAnnotationList,
+  WaveformRoot,
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformRecordingPreview,
+  WaveformAnnotationBoxes,
+  MediaElementAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
   KeyboardShortcuts,
   SortableTrackControls,
 } from './components';
 export type { KeyboardShortcutsProps } from './components/KeyboardShortcuts';
 export type { ClearAllButtonProps } from './components/PlaybackControls';
-export type { WaveformProps } from './components/Waveform';
+export type { WaveformProps, WaveformEditorProps } from './components/Waveform';
+export type { WaveformRootProps } from './components/WaveformRoot';
+export type { MediaElementWaveformRootProps } from './components/MediaElementWaveformRoot';
+export type { WaveformTimescaleProps } from './components/waveformParts';
+export type { WaveformTracksProps, WaveformRecordingPreviewProps } from './components/TrackRows';
+export type { WaveformTrackControlsProps } from './components/TrackControlsColumn';
+export type {
+  WaveformAnnotationBoxesProps,
+  WaveformPlayheadProps,
+} from './components/VisualizationOverlays';
+export type { MediaElementAnnotationBoxesProps } from './components/MediaElementAnnotationBoxes';
+export type { WaveformRecordingState } from './components/visualizationLayout';
+export { useRecordingSession } from './hooks/useRecordingSession';
+export type { RecordingSessionOptions } from './hooks/useRecordingSession';
 export type { MediaElementWaveformProps } from './components/MediaElementWaveform';
-export type { MediaElementPlaylistProps } from './components/MediaElementPlaylist';
 export type { MediaElementAnnotationListProps } from './components/MediaElementAnnotationList';
-export type { PlaylistVisualizationProps } from './components/PlaylistVisualization';
 export type { PlaylistAnnotationListProps } from './components/PlaylistAnnotationList';
 export type {
   SortableTrackControlsProps,

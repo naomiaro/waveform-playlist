@@ -99,7 +99,6 @@ describe('default track controls while tracks are loading', () => {
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        controls={{ show: true, width: 200 }}
         deferEngineRebuild={loading}
       >
         <Probe />

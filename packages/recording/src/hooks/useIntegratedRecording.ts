@@ -81,7 +81,7 @@ export interface UseIntegratedRecordingReturn {
   /**
    * Elapsed time and live-preview peaks of the take (`useRecording`'s
    * `progress`). The hook does not re-render as they change: pass it to
-   * `<Waveform recordingState={{ …, progress }} />` or read it with
+   * `<WaveformRecordingPreview recordingState={{ …, progress }} />` or read it with
    * `progress.subscribe()` / `useRecordingProgress(progress)`.
    */
   progress: RecordingProgressSource;
@@ -262,7 +262,7 @@ export function useIntegratedRecording(
 
       // Latency compensation: an explicit latencyOffset (seconds) replaces the
       // auto-computed outputLatency + lookAhead window. Shared resolver with the
-      // live preview in PlaylistVisualization — keep both using the same value so
+      // live preview (`WaveformRecordingPreview`) — keep both using the same value so
       // trim widths match.
       const audioContext = getGlobalAudioContext();
       const outputLatency = audioContext.outputLatency ?? 0;

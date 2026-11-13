@@ -21,7 +21,7 @@ vi.mock('../components/MediaElementAnnotationBoxes', () => ({
 }));
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 const WAVEFORM_DATA = WaveformData.create({
   version: 2,
@@ -77,7 +77,7 @@ describe('MediaElementPlaylist hands its annotation props to the boxes', () => {
     const label = () => 'x';
     const onUpdate = () => {};
     mount(
-      <MediaElementPlaylist
+      <ComposedMediaElementWaveform
         getAnnotationBoxLabel={label}
         editable
         linkEndpoints
@@ -93,7 +93,7 @@ describe('MediaElementPlaylist hands its annotation props to the boxes', () => {
   });
 
   it('editable and linkEndpoints are false when left out', () => {
-    mount(<MediaElementPlaylist />);
+    mount(<ComposedMediaElementWaveform />);
     expect(lastProps()).toEqual({
       getAnnotationBoxLabel: undefined,
       editable: false,

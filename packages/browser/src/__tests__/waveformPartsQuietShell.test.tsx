@@ -84,7 +84,7 @@ import {
   PlaylistSettingsContext,
   type PlaybackRefsContextValue,
 } from '../contexts/playlistContexts';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -180,7 +180,6 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const CONTROLS = { show: true, width: 200 };
 const ANNOTATION_LIST = {
   annotations: [
     { id: 'n1', start: 0, end: 0.5, lines: ['one'] },
@@ -203,7 +202,7 @@ async function mount(reset = true) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  // A new `<PlaylistVisualization />` element on every call, with the same
+  // A new `<ComposedWaveform />` element on every call, with the same
   // (no) props: what a parent's re-render hands it.
   const ui = () => (
     <WaveformPlaylistProvider
@@ -211,11 +210,9 @@ async function mount(reset = true) {
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       annotationList={ANNOTATION_LIST}
-      controls={CONTROLS}
-      timescale
     >
       <ProbeChild />
-      <PlaylistVisualization />
+      <ComposedWaveform />
     </WaveformPlaylistProvider>
   );
   const utils = render(ui());
@@ -329,15 +326,13 @@ describe('only the root reads the timeline (#685)', () => {
     const renderTrackControls = vi.fn((index: number) => <i data-custom-panel={index} />);
     // One element for the whole test: the component that composes the view
     // does not render, only the provider gets a new function.
-    const view = <PlaylistVisualization renderTrackControls={renderTrackControls} />;
+    const view = <ComposedWaveform renderTrackControls={renderTrackControls} />;
     const ui = () => (
       <WaveformPlaylistProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
         onTracksChange={() => {}}
-        controls={CONTROLS}
-        timescale
       >
         <ProbeChild />
         {view}

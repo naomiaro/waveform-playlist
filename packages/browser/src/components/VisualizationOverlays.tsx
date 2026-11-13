@@ -34,7 +34,8 @@ import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotatio
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
-import { useWaveformExtent } from './waveformLayoutContext';
+import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
+import { warnMisplacedPart } from './partWarnings';
 import { SelectionPreviewContext, type SelectionRange } from '../hooks/useSelectionDrag';
 
 const subscribeToNothing = () => () => {};
@@ -205,6 +206,13 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
  */
 export const WaveformLoopRegion = React.memo(function WaveformLoopRegion() {
   const { tracksFullWidth: maxPosition } = useWaveformExtent('The loop region');
+  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+    warnMisplacedPart(
+      '<WaveformLoopRegion> is drawn among the tracks, not in the timescale strip: the root ' +
+        'recognises a part by its element type, so it must be a child of the root (a fragment ' +
+        'is fine), not wrapped in another component.'
+    );
+  }
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { setLoopRegion } = useEditorControls();

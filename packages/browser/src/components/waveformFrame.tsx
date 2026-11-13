@@ -39,11 +39,30 @@ import {
 } from '../hooks/useSelectionDrag';
 import {
   WaveformExtentContext,
+  WaveformPartPlaceContext,
   WaveformRowsContext,
   type WaveformExtentValue,
   type WaveformRowsValue,
 } from './waveformLayoutContext';
-import { sortWaveformParts } from './waveformParts';
+import { sortWaveformParts, WaveformTimescale } from './waveformParts';
+
+/** Height of the timescale strip in pixels, when a root has one. */
+const TIMESCALE_HEIGHT = 30;
+
+/**
+ * The parts of the timescale strip, each under a key made of its kind and
+ * its number among that kind, so that one coming or going
+ * (`{flag && <WaveformTimescale />}`) does not remount the others. The part
+ * elements themselves are passed on untouched.
+ */
+function keyedByKind(parts: ReactNode[]): ReactElement[] {
+  const seen = { timescale: 0, loop: 0 };
+  return parts.map((part) => {
+    const kind =
+      React.isValidElement(part) && part.type === WaveformTimescale ? 'timescale' : 'loop';
+    return createElement(Fragment, { key: `${kind}-${seen[kind]++}` }, part);
+  });
+}
 import type { TracksMarkers } from './TrackRows';
 
 export interface WaveformPartsByPlace {
@@ -55,6 +74,8 @@ export interface WaveformPartsByPlace {
   content: ReactElement;
   /** The per-clip parts the tracks part was given (all off without one). */
   tracksOptions: TracksMarkers;
+  /** Width of the controls column the controls part asks for; 0 without one. */
+  controlsWidth: number;
 }
 
 /**
@@ -70,13 +91,22 @@ export function useWaveformParts(children: ReactNode): WaveformPartsByPlace {
       // One element per place, with the parts as its positional children
       // (they carry no keys).
       timescale:
-        sorted.timescale.length > 0 ? createElement(Fragment, null, ...sorted.timescale) : null,
+        sorted.timescale.length > 0 ? (
+          <WaveformPartPlaceContext.Provider value="timescale">
+            {keyedByKind(sorted.timescale)}
+          </WaveformPartPlaceContext.Provider>
+        ) : null,
       controls:
         sorted.controls.length > 0
-          ? [createElement(Fragment, { key: 'controls' }, ...sorted.controls)]
+          ? [
+              <WaveformPartPlaceContext.Provider key="controls" value="controls">
+                {createElement(Fragment, null, ...sorted.controls)}
+              </WaveformPartPlaceContext.Provider>,
+            ]
           : undefined,
       content: createElement(Fragment, null, ...sorted.content),
       tracksOptions: sorted.tracksOptions,
+      controlsWidth: sorted.controlsWidth,
     };
   }, [children]);
 }
@@ -121,8 +151,10 @@ export function useWaveformFrame({
 }: WaveformFrameOptions): ReactElement {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { setScrollContainer } = usePlaybackControls();
-  const { sampleRate, waveHeight, timeScaleHeight, controls, barWidth, barGap, roundedBars } =
-    usePlaylistView();
+  const { sampleRate, waveHeight, barWidth, barGap, roundedBars } = usePlaylistView();
+  // The strip exists when a part is drawn in it: rendering the timescale (or
+  // the loop region) is the one switch.
+  const timeScaleHeight = parts.timescale ? TIMESCALE_HEIGHT : 0;
   const { samplesPerPixel } = usePlaylistZoom();
 
   const handleScrollContainerRef = useCallback(
@@ -151,7 +183,7 @@ export function useWaveformFrame({
       zoomLevels: [samplesPerPixel],
       waveHeight,
       timeScaleHeight,
-      controls,
+      controls: { show: controlsWidth > 0, width: controlsWidth },
       barWidth,
       barGap,
       roundedBars,
@@ -161,7 +193,7 @@ export function useWaveformFrame({
       sampleRate,
       waveHeight,
       timeScaleHeight,
-      controls,
+      controlsWidth,
       barWidth,
       barGap,
       roundedBars,
@@ -196,7 +228,7 @@ export function useWaveformFrame({
                 data-playlist-state={playlistState}
                 trackControlsSlots={parts.controls}
                 timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
-                timescale={timeScaleHeight > 0 && parts.timescale ? parts.timescale : undefined}
+                timescale={parts.timescale ?? undefined}
               >
                 {parts.content}
               </Playlist>

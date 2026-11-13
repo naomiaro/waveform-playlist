@@ -1,0 +1,516 @@
+// @vitest-environment jsdom
+//
+// #685, step 3: the parts of the view are public and the consumer composes
+// them. What that changes is asserted here, row by row of the upgrade guide:
+// the three ready-made compositions, the parts that are drawn by being
+// rendered (the timescale, the controls column and its width), the removed
+// props and provider options, the recording session hook, and the
+// development warnings for a part that is not where it can work.
+import './jsdom-polyfills'; // must be first — sets globals the import graph needs
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, act, waitFor, cleanup } from '@testing-library/react';
+import React from 'react';
+import WaveformData from 'waveform-data';
+import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import type { WaveformDataObject, ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { PlayoutAdapter } from '@waveform-playlist/engine';
+
+const counts = vi.hoisted(() => ({ loopMounts: 0, layout: 0 }));
+
+vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
+  const { createElement, useEffect } = await import('react');
+  return {
+    ...actual,
+    TimescaleLoopRegion: (props: React.ComponentProps<typeof actual.TimescaleLoopRegion>) => {
+      useEffect(() => {
+        counts.loopMounts++;
+      }, []);
+      return createElement(actual.TimescaleLoopRegion, props);
+    },
+  };
+});
+
+vi.mock('../components/visualizationLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/visualizationLayout')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    // Rendered once per render of the tracks part and of the controls part.
+    TracksLayout: (props: React.ComponentProps<typeof actual.TracksLayout>) => {
+      counts.layout++;
+      return createElement(actual.TracksLayout, props);
+    },
+  };
+});
+
+import * as api from '../index';
+import {
+  WaveformPlaylistProvider,
+  MediaElementPlaylistProvider,
+  Waveform,
+  WaveformEditor,
+  MediaElementWaveform,
+  WaveformRoot,
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformRecordingPreview,
+  WaveformSelection,
+  WaveformPlayhead,
+  useRecordingSession,
+  useEditorControls,
+  usePlaylistTimeline,
+  usePlaylistView,
+  type WaveformRecordingState,
+} from '../index';
+
+if (typeof globalThis.requestAnimationFrame === 'undefined') {
+  globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
+    setTimeout(() => cb(performance.now()), 16) as unknown as number;
+  globalThis.cancelAnimationFrame = (id: number) => clearTimeout(id);
+}
+
+const SAMPLE_RATE = 48000;
+
+function makeTrack(id: string): ClipTrack {
+  const data: number[] = [];
+  for (let i = 0; i < 400; i++) data.push(-(i % 100), i % 100);
+  const clip = {
+    id: `${id}-clip`,
+    startSample: 0,
+    durationSamples: SAMPLE_RATE,
+    offsetSamples: 0,
+    sampleRate: SAMPLE_RATE,
+    sourceDurationSamples: SAMPLE_RATE * 2,
+    gain: 1,
+    waveformData: WaveformData.create({
+      version: 2,
+      channels: 1,
+      sample_rate: SAMPLE_RATE,
+      samples_per_pixel: 256,
+      bits: 16,
+      length: 400,
+      data,
+    }),
+  } as AudioClip;
+  return {
+    id,
+    name: `name-${id}`,
+    clips: [clip],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  } as ClipTrack;
+}
+const TRACKS = [makeTrack('t1'), makeTrack('t2')];
+
+function createFakeAdapter() {
+  return {
+    audioContext: {
+      currentTime: 0,
+      sampleRate: SAMPLE_RATE,
+      state: 'running',
+      outputLatency: 0,
+    } as unknown as AudioContext,
+    ppqn: 960,
+    async init() {},
+    setTracks() {},
+    addTrack() {},
+    removeTrack() {},
+    updateTrack() {},
+    play() {},
+    pause() {},
+    stop() {},
+    seek() {},
+    getCurrentTime: () => 0,
+    isPlaying: () => false,
+    setMasterVolume() {},
+    setTrackVolume() {},
+    setTrackMute: vi.fn(),
+    setTrackSolo() {},
+    setTrackPan() {},
+    setLoop() {},
+    dispose() {},
+  };
+}
+
+let probe: {
+  editor: ReturnType<typeof useEditorControls>;
+  isReady: boolean;
+  view: ReturnType<typeof usePlaylistView>;
+};
+const Probe: React.FC = () => {
+  probe = {
+    editor: useEditorControls(),
+    isReady: usePlaylistTimeline().isReady,
+    view: usePlaylistView(),
+  };
+  return null;
+};
+
+async function mountMultitrack(tree: () => React.ReactElement) {
+  vi.spyOn(console, 'log').mockImplementation(() => {});
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const adapter = createFakeAdapter();
+  const createAdapter = () => adapter as unknown as PlayoutAdapter;
+  const ui = () => (
+    <WaveformPlaylistProvider
+      tracks={TRACKS}
+      sampleRate={SAMPLE_RATE}
+      createAdapter={createAdapter}
+    >
+      <Probe />
+      {tree()}
+    </WaveformPlaylistProvider>
+  );
+  const view = render(ui());
+  await waitFor(() => expect(probe.isReady).toBe(true));
+  await act(async () => {});
+  counts.layout = 0;
+  return { adapter, warn, rerender: () => view.rerender(ui()) };
+}
+
+const SECONDS = 8;
+const ME_RATE = 44100;
+const ME_LENGTH = (SECONDS * ME_RATE) / 441;
+const ME_TRACK = {
+  source: 'test.mp3',
+  name: 'Test',
+  waveformData: WaveformData.create({
+    version: 2,
+    channels: 1,
+    sample_rate: ME_RATE,
+    samples_per_pixel: 441,
+    bits: 8,
+    length: ME_LENGTH,
+    data: Array.from({ length: ME_LENGTH * 2 }, (_, i) => (i % 2 === 0 ? -10 : 10)),
+  }) as unknown as WaveformDataObject,
+};
+
+async function mountMediaElement(tree: React.ReactElement) {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const fake = {
+    addTrack: vi.fn(),
+    getTrack: () => undefined,
+    setOnPlaybackComplete() {},
+    on() {},
+    off() {},
+    play: vi.fn(),
+    pause: vi.fn(),
+    stop: vi.fn(),
+    seekTo: vi.fn(),
+    setPlaybackRate() {},
+    getCurrentTime: () => 0,
+    dispose: vi.fn(),
+  };
+  render(
+    <MediaElementPlaylistProvider
+      track={ME_TRACK}
+      samplesPerPixel={1000}
+      createPlayout={() => fake as unknown as MediaElementPlayout}
+    >
+      {tree}
+    </MediaElementPlaylistProvider>
+  );
+  await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
+  await act(async () => {});
+  return { warn };
+}
+
+afterEach(async () => {
+  await act(async () => {
+    cleanup();
+  });
+  vi.restoreAllMocks();
+});
+
+const root = () => document.querySelector('[data-playlist-state]') as HTMLElement;
+const scrollArea = () => document.querySelector('[data-scroll-container]') as HTMLElement;
+/** The controls column: the root's first child when there is one beside the scroll area. */
+const controlsColumn = () =>
+  root().children.length === 2 ? (root().firstElementChild as HTMLElement) : null;
+/** The ruler draws its first tick label as text. */
+const hasRuler = () => (scrollArea().textContent ?? '').includes('0:00');
+const hasHeaders = () => (scrollArea().textContent ?? '').includes('name-t1');
+
+describe('the package exports', () => {
+  it('has the roots, the parts, the compositions and the recording hook', () => {
+    const names = [
+      'WaveformRoot',
+      'MediaElementWaveformRoot',
+      'WaveformTimescale',
+      'WaveformLoopRegion',
+      'WaveformTrackControls',
+      'WaveformTracks',
+      'WaveformClipHeaders',
+      'WaveformFades',
+      'WaveformRecordingPreview',
+      'WaveformAnnotationBoxes',
+      'MediaElementAnnotationBoxes',
+      'WaveformSelection',
+      'WaveformPlayhead',
+      'Waveform',
+      'WaveformEditor',
+      'MediaElementWaveform',
+      'useRecordingSession',
+    ];
+    const missing = names.filter((name) => !(name in api));
+    expect(missing).toEqual([]);
+  });
+
+  it('no longer has the two prop-driven views', () => {
+    expect('PlaylistVisualization' in api).toBe(false);
+    expect('MediaElementPlaylist' in api).toBe(false);
+  });
+});
+
+describe('the ready-made compositions', () => {
+  it('<Waveform />: a ruler and a 200 px controls column, with no provider option for either', async () => {
+    await mountMultitrack(() => <Waveform />);
+    expect(hasRuler()).toBe(true);
+    expect(controlsColumn()?.style.width).toBe('200px');
+    expect(hasHeaders()).toBe(false);
+  });
+
+  it('<WaveformEditor />: the same with clip headers', async () => {
+    await mountMultitrack(() => <WaveformEditor />);
+    expect(hasRuler()).toBe(true);
+    expect(controlsColumn()?.style.width).toBe('200px');
+    expect(hasHeaders()).toBe(true);
+  });
+
+  it('<MediaElementWaveform />: a ruler, with no provider option for it', async () => {
+    await mountMediaElement(<MediaElementWaveform />);
+    expect(hasRuler()).toBe(true);
+    expect(document.querySelectorAll('[data-track-row]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-playhead]')).toHaveLength(1);
+  });
+
+  it('a removed prop left on <Waveform> is ignored', async () => {
+    const leftover = { showClipHeaders: true, onRemoveTrack: () => {} } as object;
+    await mountMultitrack(() => <Waveform {...leftover} />);
+    expect(hasHeaders()).toBe(false);
+    expect(document.querySelector('[aria-label*="emove"]')).toBeNull();
+  });
+
+  it('a render of the parent of <Waveform /> does not render the tracks or the controls', async () => {
+    const { rerender } = await mountMultitrack(() => <Waveform />);
+    rerender();
+    await act(async () => {});
+    expect(counts.layout).toBe(0);
+  });
+});
+
+describe('a part is drawn by being rendered', () => {
+  it('no timescale part: no ruler', async () => {
+    await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(hasRuler()).toBe(false);
+    expect(controlsColumn()).toBeNull();
+  });
+
+  it('the controls column is as wide as the part says', async () => {
+    await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTrackControls width={150} />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(controlsColumn()?.style.width).toBe('150px');
+  });
+
+  it('the view value has neither `controls` nor `timeScaleHeight`', async () => {
+    await mountMultitrack(() => <Waveform />);
+    expect('controls' in probe.view).toBe(false);
+    expect('timeScaleHeight' in probe.view).toBe(false);
+  });
+
+  it('the loop region stays mounted when the timescale before it comes and goes', async () => {
+    let withTimescale = true;
+    const { rerender } = await mountMultitrack(() => (
+      <WaveformRoot>
+        {withTimescale && <WaveformTimescale />}
+        <WaveformLoopRegion />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    await act(async () => {
+      probe.editor.setLoopRegion(0.2, 0.6);
+      probe.editor.setLoopEnabled(true);
+    });
+    expect(counts.loopMounts).toBe(1);
+    withTimescale = false;
+    rerender();
+    await act(async () => {});
+    withTimescale = true;
+    rerender();
+    await act(async () => {});
+    expect(counts.loopMounts).toBe(1);
+  });
+
+  it('MediaElement: fades, selection and playhead composed by hand, no ruler', async () => {
+    await mountMediaElement(
+      <MediaElementWaveformRoot>
+        <WaveformTracks>
+          <WaveformFades />
+        </WaveformTracks>
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </MediaElementWaveformRoot>
+    );
+    expect(hasRuler()).toBe(false);
+    expect(document.querySelectorAll('[data-playhead]')).toHaveLength(1);
+  });
+});
+
+describe('the recording session', () => {
+  // One snapshot object: a new one per call would re-render without end.
+  const SNAPSHOT = { duration: 0, peaks: [] };
+  const PROGRESS = {
+    subscribe: () => () => {},
+    getSnapshot: () => SNAPSHOT,
+  } as unknown as WaveformRecordingState['progress'];
+  const recording = (isRecording: boolean): WaveformRecordingState => ({
+    isRecording,
+    trackId: 't1',
+    startSample: 0,
+    progress: PROGRESS,
+    bits: 16,
+  });
+
+  it('the preview part alone does not mute the armed track', async () => {
+    let isRecording = false;
+    const { adapter, rerender } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks>
+          <WaveformRecordingPreview recordingState={recording(isRecording)} />
+        </WaveformTracks>
+      </WaveformRoot>
+    ));
+    isRecording = true;
+    rerender();
+    await act(async () => {});
+    expect(adapter.setTrackMute).not.toHaveBeenCalled();
+  });
+
+  it('useRecordingSession mutes the armed track for the take and restores it', async () => {
+    let isRecording = false;
+    const Session: React.FC = () => {
+      useRecordingSession({ isRecording, trackId: 't1' });
+      return null;
+    };
+    const { adapter, rerender } = await mountMultitrack(() => <Session />);
+    expect(adapter.setTrackMute).not.toHaveBeenCalled();
+    isRecording = true;
+    rerender();
+    await act(async () => {});
+    expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t1', true);
+    isRecording = false;
+    rerender();
+    await act(async () => {});
+    expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t1', false);
+  });
+
+  it('the session ends when the component that holds it unmounts', async () => {
+    let mounted = true;
+    const Session: React.FC = () => {
+      useRecordingSession({ isRecording: true, trackId: 't2' });
+      return null;
+    };
+    const { adapter, rerender } = await mountMultitrack(() => (mounted ? <Session /> : <span />));
+    // The provider was still loading when the effect first ran; a take starts later.
+    await act(async () => {
+      probe.editor.setRecordingActive(true, 't2');
+    });
+    expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t2', true);
+    mounted = false;
+    rerender();
+    await act(async () => {});
+    expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t2', false);
+  });
+});
+
+describe('development warnings for a part that is not where it can work', () => {
+  const warned = (warn: { mock: { calls: unknown[][] } }, text: string) =>
+    warn.mock.calls.some((call) => String(call[0]).includes(text));
+
+  it('a per-clip marker outside <WaveformTracks>', async () => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks />
+        <WaveformClipHeaders />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformClipHeaders>')).toBe(true);
+    expect(hasHeaders()).toBe(false);
+  });
+
+  it('a child of <WaveformTracks> that is not one of its markers', async () => {
+    const Wrapped = () => <WaveformFades />;
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks>
+          <Wrapped />
+        </WaveformTracks>
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformTracks>')).toBe(true);
+  });
+
+  it('a timescale wrapped in another component', async () => {
+    const Wrapped = () => <WaveformTimescale />;
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <Wrapped />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformTimescale>')).toBe(true);
+  });
+
+  it('a controls part wrapped in another component', async () => {
+    const Wrapped = () => <WaveformTrackControls />;
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <Wrapped />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformTrackControls>')).toBe(true);
+  });
+
+  it('two tracks parts in one root', async () => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, 'more than one <WaveformTracks>')).toBe(true);
+  });
+
+  it('a controls part under the MediaElement root', async () => {
+    const { warn } = await mountMediaElement(
+      <MediaElementWaveformRoot>
+        <WaveformTrackControls />
+        <WaveformTracks />
+      </MediaElementWaveformRoot>
+    );
+    expect(warned(warn, 'MediaElementWaveformRoot')).toBe(true);
+    expect(controlsColumn()).toBeNull();
+  });
+
+  it('nothing is warned for the ready-made compositions', async () => {
+    const { warn } = await mountMultitrack(() => <WaveformEditor />);
+    expect(warn.mock.calls.filter((call) => String(call[0]).includes('<Waveform'))).toEqual([]);
+  });
+});

@@ -13,6 +13,7 @@ import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
 import { useWaveformFrame, useWaveformParts } from './waveformFrame';
+import { warnMisplacedPart } from './partWarnings';
 
 // A MediaElement player has one audio track and nothing a row can be asked to
 // do: module constants, so the rows value changes only with the peaks, the
@@ -55,6 +56,12 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
   const { waveHeight } = usePlaylistView();
 
   const parts = useWaveformParts(children);
+  if (parts.controls) {
+    warnMisplacedPart(
+      '<WaveformTrackControls> draws nothing inside <MediaElementWaveformRoot>: a MediaElement ' +
+        'player has one track and no mixer. Remove it.'
+    );
+  }
   const { showClipHeaders } = parts.tracksOptions;
 
   const rows = useMemo<WaveformRowsValue>(() => {

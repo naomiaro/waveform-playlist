@@ -158,8 +158,6 @@ export interface PlaybackControlsContextValue {
 export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */

@@ -1,5 +1,4 @@
 import React, { ReactNode } from 'react';
-import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type {
   AnnotationAction,
   AnnotationActionOptions,
@@ -7,8 +6,18 @@ import type {
 } from '@waveform-playlist/core';
 import { useAnnotations } from '../contexts/playlistContexts';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
-import { PlaylistVisualization } from './PlaylistVisualization';
-import type { WaveformRecordingState } from './visualizationLayout';
+import { WaveformRoot } from './WaveformRoot';
+import {
+  WaveformAnnotationBoxes,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformLoopRegion,
+  WaveformPlayhead,
+  WaveformSelection,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
+} from './waveformParts';
 import { PlaylistAnnotationList, type PlaylistAnnotationListProps } from './PlaylistAnnotationList';
 
 /**
@@ -22,13 +31,13 @@ const AnnotationListWhenPresent: React.FC<PlaylistAnnotationListProps> = (props)
   return <PlaylistAnnotationList {...props} />;
 };
 
+/**
+ * The props of the two ready-made multitrack views. They are the annotation
+ * options (until #686 gives the annotation parts their own) and `className`:
+ * what the view is made of is not an option here. For anything else, compose
+ * the parts inside `WaveformRoot`.
+ */
 export interface WaveformProps {
-  renderTrackControls?: (trackIndex: number) => ReactNode;
-  /** Custom render function for timescale tick labels. `label` is a formatted string
-   * (bar/beat notation like "2.3" in beats mode, or "m:ss" in temporal mode). */
-  renderTick?: (label: string, pixelPosition: number) => ReactNode;
-  /** Custom playhead render function. Receives position (pixels) and color from theme. */
-  renderPlayhead?: RenderPlayheadFunction;
   annotationControls?: AnnotationAction[];
   annotationListConfig?: AnnotationActionOptions;
   annotationTextHeight?: number; // Height in pixels for the annotation text list
@@ -48,32 +57,34 @@ export interface WaveformProps {
   /** Which scrollable containers to scroll: 'nearest' (only the annotation list) or 'all' (including viewport). Defaults to 'nearest'. */
   scrollActiveContainer?: 'nearest' | 'all';
   className?: string;
-  showClipHeaders?: boolean; // Show headers on clips for visual organization
-  /** Draw each clip's waveform scaled by its `gain` (clamped to the channel
-   *  height) so levelled clips look the way they sound. Default: false —
-   *  waveforms show source level. Draw-time only; peaks are not regenerated. */
-  gainScaledWaveforms?: boolean;
-  showFades?: boolean; // Show fade in/out overlays on clips
-  /** Callback when a track's close button is clicked. Only renders close button when provided. */
-  onRemoveTrack?: (trackIndex: number) => void;
-  /** Enable vertical track reordering: a drag grip + move up/down buttons on
-   *  each default track control panel. Drag requires ClipInteractionProvider
-   *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
-  trackReordering?: boolean;
-  // Live recording state for real-time waveform preview
-  recordingState?: WaveformRecordingState;
 }
 
-/**
- * Waveform visualization component that uses the playlist context.
- *
- * Composes PlaylistVisualization (waveform + tracks) and
- * PlaylistAnnotationList (annotation text list below the waveform).
- */
-export const Waveform: React.FC<WaveformProps> = ({
-  renderTrackControls,
-  renderTick,
-  renderPlayhead,
+export type WaveformEditorProps = WaveformProps;
+
+// The parts that take no option are the same elements on every render: a
+// render of the composition then hands the root children it has seen, and
+// React skips every one of them (the tracks part included, which is not
+// memoized because a consumer's children usually are new).
+const TIMESCALE = <WaveformTimescale />;
+const LOOP_REGION = <WaveformLoopRegion />;
+const TRACK_CONTROLS = <WaveformTrackControls />;
+const TRACKS = <WaveformTracks />;
+const TRACKS_WITH_HEADERS_AND_FADES = (
+  <WaveformTracks>
+    <WaveformClipHeaders />
+    <WaveformFades />
+  </WaveformTracks>
+);
+const SELECTION = <WaveformSelection />;
+const PLAYHEAD = <WaveformPlayhead />;
+
+interface CompositionProps extends WaveformProps {
+  tracks: React.ReactElement;
+}
+
+/** Not a component: called by the two below, so neither gains a layer. */
+function composeWaveform({
+  tracks,
   annotationControls,
   annotationListConfig,
   annotationTextHeight,
@@ -82,29 +93,18 @@ export const Waveform: React.FC<WaveformProps> = ({
   scrollActivePosition = 'center',
   scrollActiveContainer = 'nearest',
   className,
-  showClipHeaders = false,
-  gainScaledWaveforms = false,
-  showFades = false,
-  onRemoveTrack,
-  trackReordering = false,
-  recordingState,
-}) => {
+}: CompositionProps) {
   return (
     <>
-      <PlaylistVisualization
-        renderTrackControls={renderTrackControls}
-        renderTick={renderTick}
-        renderPlayhead={renderPlayhead}
-        annotationControls={annotationControls}
-        getAnnotationBoxLabel={getAnnotationBoxLabel}
-        className={className}
-        showClipHeaders={showClipHeaders}
-        gainScaledWaveforms={gainScaledWaveforms}
-        showFades={showFades}
-        onRemoveTrack={onRemoveTrack}
-        trackReordering={trackReordering}
-        recordingState={recordingState}
-      />
+      <WaveformRoot className={className}>
+        {TIMESCALE}
+        {LOOP_REGION}
+        {TRACK_CONTROLS}
+        {tracks}
+        <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+        {SELECTION}
+        {PLAYHEAD}
+      </WaveformRoot>
       <AnnotationListWhenPresent
         height={annotationTextHeight}
         renderAnnotationItem={renderAnnotationItem}
@@ -115,4 +115,38 @@ export const Waveform: React.FC<WaveformProps> = ({
       />
     </>
   );
-};
+}
+
+/**
+ * The multitrack view, ready-made: the timescale, the loop region, the track
+ * controls (200 px), the tracks, the annotation boxes, the selection and the
+ * playhead, with the annotation text list below when there are annotations.
+ *
+ * It is a composition of the public parts with no options for them. To leave
+ * a part out, give one an option (`renderTick`, `onRemoveTrack`, a column
+ * width) or add your own element, write the composition yourself:
+ *
+ * ```tsx
+ * <WaveformRoot>
+ *   <WaveformTimescale />
+ *   <WaveformLoopRegion />
+ *   <WaveformTrackControls />
+ *   <WaveformTracks />
+ *   <WaveformAnnotationBoxes />
+ *   <WaveformSelection />
+ *   <WaveformPlayhead />
+ * </WaveformRoot>
+ * <PlaylistAnnotationList />
+ * ```
+ */
+export const Waveform: React.FC<WaveformProps> = (props) =>
+  composeWaveform({ ...props, tracks: TRACKS });
+
+/**
+ * `Waveform` with clip headers and fade curves: `<WaveformTracks>` holds
+ * `<WaveformClipHeaders />` and `<WaveformFades />`. Inside a
+ * `ClipInteractionProvider` the header is what a clip is dragged by, and the
+ * trim handles come with it.
+ */
+export const WaveformEditor: React.FC<WaveformEditorProps> = (props) =>
+  composeWaveform({ ...props, tracks: TRACKS_WITH_HEADERS_AND_FADES });

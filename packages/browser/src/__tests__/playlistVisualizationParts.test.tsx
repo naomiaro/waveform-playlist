@@ -69,14 +69,14 @@ import {
   usePlaylistZoom,
   useEditorControls,
 } from '../contexts/playlistContexts';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedWaveform } from './testCompositions';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
   type AnnotationBoxIntegrationProps,
 } from '../AnnotationIntegrationContext';
-import type { PlaylistVisualizationProps } from '../components/PlaylistVisualization';
+import type { ComposedWaveformProps } from './testCompositions';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -178,15 +178,12 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const CONTROLS = { show: true, width: 200 };
-// A width, so that only `show` hides the column (a width of 0 hides it by itself).
-const NO_CONTROLS = { show: false, width: 200 };
 const ANNOTATION_LIST = { annotations: [{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }] };
 const TRACKS = [makeTrack('t1'), makeTrack('t2')];
 
 async function mount(
-  props: PlaylistVisualizationProps = {},
-  { timescale = true, controls = CONTROLS, dragProvider = false, tracks = TRACKS } = {}
+  props: ComposedWaveformProps = {},
+  { dragProvider = false, tracks = TRACKS } = {}
 ) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -201,7 +198,7 @@ async function mount(
   isReady = false;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  const view = <PlaylistVisualization {...props} />;
+  const view = <ComposedWaveform {...props} />;
   render(
     <AnnotationIntegrationContext.Provider value={INTEGRATION}>
       <WaveformPlaylistProvider
@@ -209,8 +206,6 @@ async function mount(
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
         annotationList={ANNOTATION_LIST}
-        controls={controls}
-        timescale={timescale}
       >
         <ProbeChild />
         {dragProvider ? <ClipInteractionProvider>{view}</ClipInteractionProvider> : view}
@@ -288,22 +283,20 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
     expect((column.firstElementChild as HTMLElement).style.height).toBe('31px');
   });
 
-  it('the timescale and the loop region are not drawn when the provider has no timescale', async () => {
-    await mount({}, { timescale: false });
+  it('the timescale is not drawn without its part', async () => {
+    await mount({ noTimescale: true });
     await act(async () => {
       editor.setLoopRegion(0.2, 0.6);
       editor.setLoopEnabled(true);
     });
     expect(seen.scale).toBe(0);
-    expect(seen.loopMax).toEqual([]);
+    // The loop region is a part of its own: the strip is there for it.
+    expect(seen.loopMax.length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);
   });
 
-  it('the controls are not drawn when the provider hides them', async () => {
-    await mount(
-      { renderTrackControls: () => <i data-custom-panel="" /> },
-      { controls: NO_CONTROLS }
-    );
+  it('no controls are drawn without the controls part', async () => {
+    await mount({ noControls: true });
     expect(document.querySelectorAll('[data-custom-panel]').length).toBe(0);
     expect(document.querySelectorAll('input[aria-label="Volume"]').length).toBe(0);
   });
