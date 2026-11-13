@@ -93,7 +93,8 @@ test.describe('Track controls', () => {
     await ready(page, baseURL, 'flexible-api');
     const slots = page.locator('[data-track-controls]');
     await expect(slots.nth(1)).toBeVisible();
-    const mute = (index: number) => slots.nth(index).getByRole('button', { name: 'M', exact: true });
+    const mute = (index: number) =>
+      slots.nth(index).getByRole('button', { name: 'M', exact: true });
     const before0 = await mute(0).getAttribute('data-accent-color');
 
     await mute(1).click();
@@ -126,8 +127,9 @@ test.describe('Track controls', () => {
     const mute = slots.nth(1).getByRole('button', { name: 'Mute', exact: true });
     await mute.click();
     await expect(mute).toHaveAttribute('aria-pressed', 'true');
-    await expect(
-      slots.nth(0).getByRole('button', { name: 'Mute', exact: true })
-    ).toHaveAttribute('aria-pressed', 'false');
+    await expect(slots.nth(0).getByRole('button', { name: 'Mute', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
   });
 });
