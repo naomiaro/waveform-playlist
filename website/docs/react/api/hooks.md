@@ -33,6 +33,8 @@ import {
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
+  useTrack, // inside <WaveformTrackControls> only
+  useTrackReorderHandle, // inside <WaveformTrackControls> only
 
   // Context hooks: MediaElementPlaylistProvider only
   usePlaybackRate,
@@ -122,6 +124,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useAnnotationEditing()`](#useannotationediting) | `annotationsEditable`, `linkEndpoints` | either setting being toggled |
 | [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom, loading finishing, peaks arriving |
 | [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change; tracks added, removed or reordered |
+| [`useTrack()`](#usetrack) | one track's id, name, mixer state and bound actions. Only among the children of `<WaveformTrackControls>` | a change of that track's state, position or selection |
 | [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
 | [`useLoop()`](#useloop) | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | [`useSelectedTrackId()`](#useselectedtrackid) | `selectedTrackId` | another track being selected |
@@ -222,7 +225,29 @@ interface PlaylistMixerContextValue {
   trackStates: TrackState[];
   masterVolume: number;
 }
+
+interface TrackState {
+  name: string;
+  muted: boolean;
+  soloed: boolean;
+  volume: number;
+  pan: number;
+}
 ```
+
+`trackStates` has one entry per track, in the order of `usePlaylistTimeline().tracks`: `trackStates[i]` belongs to `tracks[i]`, and `trackStates.length` equals `tracks.length`. The entry of a track the provider is still loading is `undefined` at that track's position, which can be in the middle of the array. The TypeScript type does not say so, so guard every read:
+
+```tsx
+const anySolo = trackStates.some((s) => s?.soloed);
+const loadedCount = trackStates.filter(Boolean).length;
+const volume = trackStates[i]?.volume ?? 1;
+```
+
+The provider keeps this state by track id. A track keeps its mute, solo, volume and pan for as long as its id is in `tracks`: when other tracks are removed, when tracks are added in front of it, and when it is reordered. A track with a new id starts from the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack`. The `name` follows the track's `name`.
+
+The array keeps its identity while no entry changed (a move of a trim or another clip edit gives new `tracks` and the same `trackStates`), and a change to one track replaces the object of that track only.
+
+To change a value, call the setters of [`useEditorControls()`](#useeditorcontrols) with the track's id. Inside a track's control panel, [`useTrack()`](#usetrack) has the values and the setters of that one track.
 
 ### useTrackReorderPreview
 
@@ -232,14 +257,16 @@ interface PlaylistMixerContextValue {
 function useTrackReorderPreview(): TrackReorderPreviewContextValue;
 
 interface TrackReorderPreviewContextValue {
-  /** Non-null while a track-reorder drag is live; null otherwise. A custom
-   *  `renderTrackControls` (on `<WaveformTrackControls>`) reads this to mirror the drag preview. */
+  /** Non-null while a track-reorder drag is live: the dragged track and the
+   *  index it would drop at. Null otherwise. */
   trackDragPreview: TrackDragPreview | null;
-  /** Incremented after every track-reorder drag ends. A custom renderTrackControls
-   *  that mounts SortableTrackControls itself folds it into its panel keys. */
+  /** Internal: incremented after every track-reorder drag ends. The
+   *  track-controls part folds it into the key of each track's slot. */
   trackReorderEpoch: number;
 }
 ```
+
+A control panel of your own needs neither field. `<WaveformTrackControls>` keys the slot around every panel with `trackReorderEpoch` itself, so the panel is remounted after each reorder drag whatever it contains; do not add the epoch to keys of your own. Read `trackDragPreview` only to mirror the drag somewhere outside the view.
 
 ### useAnnotations
 
@@ -600,7 +627,10 @@ function DragDropPlaylist() {
         <WaveformPlaylistProvider tracks={tracks}>
           <WaveformRoot>
             <WaveformTimescale />
-            <WaveformTrackControls onRemoveTrack={(index) => removeTrack(tracks[index].id)} />
+            <WaveformTrackControls>
+              <DefaultTrackControls />
+              <TrackRemoveButton onRemove={removeTrack} />
+            </WaveformTrackControls>
             <WaveformTracks />
             <WaveformSelection />
             <WaveformPlayhead />
@@ -809,11 +839,13 @@ interface EditorControlsContextValue {
    *  from a control; this is for the view's own press and drag handling. */
   setCurrentTime: (time: number) => void;
 
-  // Track controls
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id. An id no track has is ignored. Inside a
+  // track's control panel, `useTrack()` has the same actions already bound
+  // to that track.
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. The reordered tracks
    *  array flows back through onTracksChange. */
@@ -859,6 +891,174 @@ interface EditorControlsContextValue {
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
+
+The four mixer setters take the track's **id** (they took its index before; see the [upgrade guide](../upgrading.md#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)). A first argument that is not a string is ignored, and in development each setter says so once in the console. A string that is no track's id is ignored without a message.
+
+```tsx
+const { tracks } = usePlaylistTimeline();
+const { setTrackMute, setTrackVolume } = useEditorControls();
+
+setTrackMute(tracks[0].id, true);
+tracks.forEach((track) => setTrackVolume(track.id, 0.8));
+```
+
+---
+
+## useTrack
+
+The track whose control panel the calling component is part of. `WaveformPlaylistProvider` only, and only among the children of [`<WaveformTrackControls>`](/docs/react/api/components#waveformtrackcontrols), which renders its children once per track, each copy inside that track's context. The built-in pieces (`<TrackMuteButton />` and the others) are components that call this hook.
+
+### Signature
+
+```typescript
+function useTrack(): TrackContextValue;
+```
+
+### Returns
+
+```typescript
+interface TrackContextValue {
+  /** The track's id. */
+  id: string;
+  /** `'audio'` or `'midi'`. */
+  kind: TrackKind;
+  /** The track's position in the list of tracks, from 0. Changes on a reorder. */
+  index: number;
+
+  /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
+  name: string;
+  muted: boolean;
+  soloed: boolean;
+  /** 0 to 1. */
+  volume: number;
+  /** -1 (left) to 1 (right). */
+  pan: number;
+  /** How the track is drawn. Always `'waveform'` for a MIDI track. */
+  renderMode: RenderMode;
+
+  /**
+   * True while the provider has no mixer state for the track (it is still
+   * loading): the engine does not know it yet, so the mixer actions and a
+   * reorder would have no effect. The built-in pieces are disabled then.
+   */
+  isLoading: boolean;
+  /** Whether this is the selected track. */
+  isSelected: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  /**
+   * True for an audio track under a `<SpectrogramProvider>`: `setRenderMode`
+   * and `openSpectrogramSettings` then do something.
+   */
+  hasSpectrogram: boolean;
+
+  // Actions. Each keeps its identity for as long as the track's slot is mounted.
+  setMuted: (muted: boolean) => void;
+  setSoloed: (soloed: boolean) => void;
+  setVolume: (volume: number) => void;
+  setPan: (pan: number) => void;
+  /** Makes this the selected track. */
+  select: () => void;
+  /** Moves the track one position up. Nothing happens for the first track. */
+  moveUp: () => void;
+  /** Moves the track one position down. Nothing happens for the last track. */
+  moveDown: () => void;
+  /** Nothing happens without a `<SpectrogramProvider>`. */
+  setRenderMode: (mode: RenderMode) => void;
+  /** Opens the spectrogram settings of this track. Nothing happens without a `<SpectrogramProvider>`. */
+  openSpectrogramSettings: () => void;
+}
+```
+
+While the track is loading, `muted` and `soloed` are `false`, `volume` is 1, `pan` is 0 and `name` is "Track N".
+
+The value changes when something about this track changes: its mixer state, its position (a reorder, or a track removed above it), whether it is selected, its render mode. A volume step on one track renders the components that call `useTrack()` in that track's panel and in no other. Selecting a track renders them in two panels: the one that stops being selected and the one that becomes selected.
+
+The part remounts every slot after a reorder drag ends (the slot's key includes `useTrackReorderPreview().trackReorderEpoch`), so React state held inside a panel is reset then. A reorder by the move buttons does not remount.
+
+### Example
+
+```tsx
+import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
+
+function TrackStrip() {
+  const { name, muted, volume, isLoading, setMuted, setVolume } = useTrack();
+  return (
+    <div style={{ height: '100%', padding: 8, boxSizing: 'border-box' }}>
+      <strong>{name}</strong>
+      <button disabled={isLoading} aria-pressed={muted} onClick={() => setMuted(!muted)}>
+        Mute
+      </button>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={volume}
+        disabled={isLoading}
+        aria-label="Volume"
+        onChange={(e) => setVolume(parseFloat(e.target.value))}
+      />
+    </div>
+  );
+}
+
+<WaveformTrackControls width={180}>
+  <TrackStrip />
+</WaveformTrackControls>
+```
+
+### Where it throws
+
+Outside the children of `<WaveformTrackControls>` the hook throws `useTrack must be used within <WaveformTrackControls>…`. That is the case for a mixer strip elsewhere on the page, and everywhere under `MediaElementPlaylistProvider`. There, read `usePlaylistMixer().trackStates` and call the setters of `useEditorControls()` with a track id.
+
+---
+
+## useTrackReorderHandle
+
+Makes the track whose control panel the caller is part of draggable by an element of your own, to reorder the tracks. `<TrackReorderGrip />` is this hook with the built-in grip. Only among the children of `<WaveformTrackControls>`, and the drag needs a `ClipInteractionProvider` above the view.
+
+### Signature
+
+```typescript
+function useTrackReorderHandle(): TrackReorderHandle;
+
+interface TrackReorderHandle {
+  /** Attach to the element the track is dragged by (a grip). */
+  handleRef: (element: Element | null) => void;
+  /** True while this track is the one being dragged. */
+  isDragSource: boolean;
+}
+```
+
+### Example
+
+```tsx
+function MyGrip() {
+  const { handleRef, isDragSource } = useTrackReorderHandle();
+  return (
+    <button
+      ref={handleRef}
+      aria-label="Drag to reorder"
+      onClick={(e) => e.stopPropagation()}
+      style={{ cursor: isDragSource ? 'grabbing' : 'grab' }}
+    >
+      ⠿
+    </button>
+  );
+}
+
+<WaveformTrackControls>
+  <DefaultTrackControls />
+  <MyGrip />
+</WaveformTrackControls>
+```
+
+- The element that moves is the slot `<WaveformTrackControls>` draws around the panel, not an element of yours. The part draws it lifted (opaque, with a shadow) while it is dragged.
+- The drag is vertical only and skips clip collision and snapping.
+- Call it once per panel: two calls for one track register the same item twice. So not together with `<TrackReorderGrip />`.
+- `<MyGrip />` above is written beside the default panel, where it is outside the visible slot unless it positions itself (`position: absolute`); or put it inside your own panel.
+- For move buttons, `useTrack()` has `moveUp`, `moveDown`, `isFirst` and `isLast`.
 
 ---
 

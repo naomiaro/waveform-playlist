@@ -294,7 +294,9 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 // Zoom is not saved: there is no setter for samplesPerPixel (only zoomIn /
 // zoomOut), so a saved zoom level could not be restored.
 function SaveLoadState() {
-  // trackStates: { name, muted, soloed, volume, pan } per track
+  const { tracks } = usePlaylistTimeline();
+  // trackStates[i] is the { name, muted, soloed, volume, pan } of tracks[i];
+  // undefined while that track is still loading
   const { trackStates } = usePlaylistMixer();
   // The ref, not useCurrentTime(): the position is only read when Save is pressed
   const { currentTimeRef } = usePlaybackRefs();
@@ -304,7 +306,11 @@ function SaveLoadState() {
   const saveState = () => {
     const state = {
       cursorPosition: currentTimeRef.current ?? 0,
-      trackStates,
+      // Saved by track id: a position is not an identity.
+      mixer: tracks.flatMap((track, i) => {
+        const state = trackStates[i];
+        return state ? [{ id: track.id, ...state }] : [];
+      }),
     };
     localStorage.setItem('playlistState', JSON.stringify(state));
   };
@@ -314,11 +320,12 @@ function SaveLoadState() {
     if (saved) {
       const state = JSON.parse(saved);
       seekTo(state.cursorPosition);
-      state.trackStates.forEach((t: (typeof trackStates)[number], index: number) => {
-        setTrackMute(index, t.muted);
-        setTrackSolo(index, t.soloed);
-        setTrackVolume(index, t.volume);
-        setTrackPan(index, t.pan);
+      // The setters take a track id and ignore an id no track has.
+      state.mixer.forEach((t: { id: string } & (typeof trackStates)[number]) => {
+        setTrackMute(t.id, t.muted);
+        setTrackSolo(t.id, t.soloed);
+        setTrackVolume(t.id, t.volume);
+        setTrackPan(t.id, t.pan);
       });
     }
   };

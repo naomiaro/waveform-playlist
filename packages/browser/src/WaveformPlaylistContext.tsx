@@ -1597,7 +1597,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // leaving its parent/nextSibling different from what React's fiber tree
   // still believes. That desync is permanent for the session: every LATER
   // React-driven reorder (button OR drag) computes correct data but silently
-  // fails to patch the DOM for these rows. `SortableTrackControls` already
+  // fails to patch the DOM for these rows. `useTrackReorderHandle` already
   // sets `feedback: 'move'` to avoid the placeholder-splice half of this (see
   // its comment), but OptimisticSortingPlugin's own `reorder()` DOM splice
   // fires independently on any drag that commits a real index change and

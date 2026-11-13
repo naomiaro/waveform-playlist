@@ -41,7 +41,7 @@ npm install @waveform-playlist/browser tone @dnd-kit/react
 >
 > **v14:** effects, WAV export, output metering, and the `useAudioTracks`/`useDynamicTracks` loaders import from `@waveform-playlist/browser/tone`.
 >
-> **v16:** `@dnd-kit/*` `^0.5.0` is required (`^0.3` is no longer supported). `noDropAnimationPlugins` was removed — `Clip`, `AnnotationBox`, and `SortableTrackControls` configure their own `@dnd-kit` Feedback behavior, so a custom `DragDropProvider` needs no `plugins` prop. `@dnd-kit/dom` is now a declared peer of `ui-components` and `annotations`.
+> **v16:** `@dnd-kit/*` `^0.5.0` is required (`^0.3` is no longer supported). `noDropAnimationPlugins` was removed — `Clip`, `AnnotationBox`, and the track reorder handle (`<TrackReorderGrip />` / `useTrackReorderHandle()`; `SortableTrackControls` until the next major) configure their own `@dnd-kit` Feedback behavior, so a custom `DragDropProvider` needs no `plugins` prop. `@dnd-kit/dom` is now a declared peer of `ui-components` and `annotations`.
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';

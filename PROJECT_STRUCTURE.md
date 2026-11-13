@@ -169,7 +169,7 @@ const clip = createClipFromSeconds({
 - **Structure:**
   ```
   src/
-  ├── components/        # Public components (37 files)
+  ├── components/        # Public components
   │   ├── Playlist.tsx           # Main container
   │   ├── Track.tsx              # Individual track
   │   ├── Clip.tsx               # Audio clip (draggable)
@@ -194,19 +194,25 @@ const clip = createClipFromSeconds({
   │   ├── TimeFormatSelect.tsx   # Time format dropdown
   │   ├── MasterVolumeControl.tsx # Volume slider
   │   ├── AutomaticScrollCheckbox.tsx # Auto-scroll toggle
-  │   ├── Controls.tsx           # Track controls container
+  │   ├── PlaybackRateSelect.tsx # Playback speed dropdown
   │   ├── TrackMenu.tsx          # Per-track dropdown menu
-  │   ├── Header.tsx             # Header component
-  │   ├── Button.tsx             # Base button
-  │   ├── ButtonGroup.tsx        # Button group layout
-  │   ├── CloseButton.tsx        # Close/dismiss button
-  │   ├── Slider.tsx             # Range slider
-  │   ├── SliderWrapper.tsx      # Slider container
-  │   ├── DotsIcon.tsx           # Menu dots icon
-  │   ├── TrashIcon.tsx          # Delete icon
-  │   ├── VolumeDownIcon.tsx     # Volume down icon
-  │   ├── VolumeUpIcon.tsx       # Volume up icon
-  │   └── TrackControls/         # Mute, solo, volume, pan
+  │   └── TrackControls/         # The primitives a track control panel is built from
+  │       ├── Controls.tsx       # Panel container (fills its slot)
+  │       ├── Header.tsx         # Header row (the track name)
+  │       ├── Button.tsx         # Compact button (mute, solo)
+  │       ├── ButtonGroup.tsx    # Button group layout
+  │       ├── CloseButton.tsx    # Close/remove button
+  │       ├── Slider.tsx         # Range slider
+  │       ├── SliderWrapper.tsx  # Slider row with icons
+  │       ├── ReorderRail.tsx    # Drag grip with move up / move down buttons
+  │       ├── GripIcon.tsx       # Drag grip icon
+  │       ├── MoveUpIcon.tsx     # Move up icon
+  │       ├── MoveDownIcon.tsx   # Move down icon
+  │       ├── DotsIcon.tsx       # Menu dots icon
+  │       ├── TrashIcon.tsx      # Delete icon
+  │       ├── VolumeDownIcon.tsx # Volume down icon
+  │       ├── VolumeUpIcon.tsx   # Volume up icon
+  │       └── index.tsx
   ├── contexts/          # React contexts
   │   ├── ScrollViewport.tsx    # Virtual scrolling: viewport state, chunk visibility
   │   ├── ClipViewportOrigin.tsx # Clip pixel offset for correct chunk culling
@@ -331,17 +337,20 @@ const clip = createClipFromSeconds({
   │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
+  │   ├── useTrackReorderHandle.ts      # Reorder drag handle for the track whose panel the caller is in (dnd-kit sortable)
   │   ├── useUndoState.ts              # Undo/redo state (engine delegation + onEngineState)
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
   │   ├── WaveformRoot.tsx              # Root of the multitrack view: timeline length, row layout, row selection on press, spectrogram modal
   │   ├── waveformParts.tsx             # The parts by name (exported), the timescale part, sortWaveformParts
-  │   ├── partWarnings.ts               # Development-only warning for a part rendered where it cannot work
+  │   ├── partWarnings.ts               # Development-only warnings, once per message: a part rendered where it cannot work, a call with an argument of an older signature
   │   ├── waveformLayoutContext.ts      # A root's two layout values (extent, rows) read by the parts
   │   ├── TrackRows.tsx                 # Tracks part: memoized rows, clips, recording preview; per-clip markers
-  │   ├── TrackControlsColumn.tsx       # Track-controls part: memoized column (one slot per track)
-  │   ├── DefaultTrackControls.tsx      # Default track control panel (memoized)
+  │   ├── TrackControlsColumn.tsx       # Track-controls part: memoized column; renders its children once per track, in a memoized slot with that track's context
+  │   ├── trackContext.ts               # The per-track context of the controls part: useTrack(), TrackContextValue; internal shared and slot-wiring contexts
+  │   ├── TrackControlPieces.tsx        # The pieces of a panel: TrackName, TrackMuteButton, TrackSoloButton, TrackVolumeSlider, TrackPanSlider, TrackMenuButton, TrackRemoveButton, TrackReorderGrip
+  │   ├── DefaultTrackControls.tsx      # Default track control panel, composed from the pieces (memoized; children drawn below the pan slider)
   │   ├── VisualizationOverlays.tsx     # Selection, playhead, annotation boxes, loop region
   │   ├── visualizationLayout.tsx       # Shared row/slot styled components and channel-count helper
   │   ├── Waveform.tsx                  # Ready-made compositions: Waveform, WaveformEditor (clip headers + fades)
@@ -366,6 +375,11 @@ const clip = createClipFromSeconds({
   ├── modifiers/                        # @dnd-kit drag modifiers
   │   ├── ClipCollisionModifier.ts      # Prevents overlapping clips during drag
   │   └── SnapToGridModifier.ts         # Snap-to-grid (beats or timescale mode)
+  ├── utils/                            # Pure helpers (among them:)
+  │   ├── trackMixerState.ts            # Mixer state by track id; the positional trackStates array derived from it
+  │   ├── stableTemplate.ts             # Keeps the controls part's children while a new render hands it equal ones
+  │   ├── derivePeaks.ts                # Peaks per clip, derived during render
+  │   └── incrementalTrackChange.ts     # Which tracks changes can be applied to a running engine
   ├── playout/                           # Optional-engine resolution (#510)
   │   ├── resolvePlayoutAdapter.ts       # Dynamic-imports @waveform-playlist/playout + tone
   │   └── resolveMediaElementPlayout.ts  # Dynamic-imports @waveform-playlist/media-element-playout
@@ -977,11 +991,11 @@ export interface PlaybackControlsContextValue {
 // 3b. The actions only the multitrack editor has (WaveformPlaylistProvider only)
 export interface EditorControlsContextValue {
   setCurrentTime: (time: number) => void;
-  // Track controls
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
   bumpTrackReorderEpoch: () => void;
   setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
@@ -1043,6 +1057,9 @@ export interface PlaylistTimelineContextValue {
 
 // 4d. Mixer - changes on every mute, solo, volume or pan change, and when tracks are added, removed or reordered
 export interface PlaylistMixerContextValue {
+  // One entry per track, in the order of `tracks`; undefined at the position
+  // of a track that is still loading. Derived from the provider's mixer state,
+  // which is a map by track id (utils/trackMixerState.ts).
   trackStates: TrackState[];
   masterVolume: number;
 }
@@ -1453,17 +1470,16 @@ The playlist now provides a **flexible/headless API** using React Context and pr
 
 - `WaveformPlaylistProvider` wraps your app and provides state via context
 - Primitive components (PlayButton, ZoomInButton, etc.) work anywhere inside the provider
-- The view is composed from parts inside `WaveformRoot`; `WaveformTrackControls` accepts a render prop for custom track controls. `Waveform` is the ready-made composition
+- The view is composed from parts inside `WaveformRoot`. The children of `WaveformTrackControls` are the control panel of one track, rendered once per track inside that track's context (`useTrack()`); the default panel and its pieces are exported. `Waveform` is the ready-made composition
 - Split context hooks (`usePlaylistTimeline`, `usePlaybackControls`, `useEditorControls`, etc.) provide direct access to state/methods
 
 ### Benefits
 
 1. **Maximum Flexibility** - Place controls anywhere in your layout
-2. **Customizable Track Controls** - Use render prop to completely customize track UI
+2. **Customizable Track Controls** - Compose a track's panel from the exported pieces, or write your own with `useTrack()`
 3. **Access to State** - Build entirely custom components using the hook
 4. **Type Safety** - Full TypeScript support with auto-completion
 5. **Good Defaults** - Waveform provides sensible default track controls
-6. **Backward Compatible** - Old class-based API and WaveformPlaylistComponent still work
 
 ### Usage Patterns
 
@@ -1481,17 +1497,16 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   MasterVolumeControl,
-  usePlaylistMixer,
-  useEditorControls,
+  useTrack,
 } from '@waveform-playlist/browser';
 
-// Custom track controls
-const CustomTrackControls = ({ trackIndex }) => {
-  const { trackStates } = usePlaylistMixer();
-  const { setTrackMute } = useEditorControls();
+// Custom track controls: rendered once per track by WaveformTrackControls,
+// and useTrack() is the track this copy is drawn for
+const CustomTrackControls = () => {
+  const { muted, isLoading, setMuted } = useTrack();
   return (
-    <button onClick={() => setTrackMute(trackIndex, !trackStates[trackIndex].muted)}>
-      {trackStates[trackIndex].muted ? 'Unmute' : 'Mute'}
+    <button disabled={isLoading} onClick={() => setMuted(!muted)}>
+      {muted ? 'Unmute' : 'Mute'}
     </button>
   );
 };
@@ -1509,11 +1524,9 @@ function MyPlaylist() {
 
         <WaveformRoot>
           <WaveformTimescale />
-          <WaveformTrackControls
-            renderTrackControls={(trackIndex) => (
-              <CustomTrackControls trackIndex={trackIndex} />
-            )}
-          />
+          <WaveformTrackControls>
+            <CustomTrackControls />
+          </WaveformTrackControls>
           <WaveformTracks />
           <WaveformSelection />
           <WaveformPlayhead />

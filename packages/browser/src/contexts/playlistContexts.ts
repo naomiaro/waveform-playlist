@@ -349,8 +349,8 @@ export interface PlaylistMixerContextValue {
 export interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Both playlist columns derive their display
-   *  layout from it; custom renderTrackControls consumers can read it to
-   *  mirror the preview in their own UI. */
+   *  layout from it; a track's panel can read it to mirror the preview in
+   *  its own UI. */
   trackDragPreview: TrackDragPreview | null;
   /** Internal: incremented after every track-reorder drag interaction ends.
    *  The view's track-controls part folds this into each slot's `key` to

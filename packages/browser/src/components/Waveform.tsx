@@ -123,8 +123,9 @@ function composeWaveform({
  * playhead, with the annotation text list below when there are annotations.
  *
  * It is a composition of the public parts with no options for them. To leave
- * a part out, give one an option (`renderTick`, `onRemoveTrack`, a column
- * width) or add your own element, write the composition yourself:
+ * a part out, give one an option (`renderTick`, a column width), compose the
+ * panel of a track (a remove button, a reorder grip, your own control) or
+ * add your own element, write the composition yourself:
  *
  * ```tsx
  * <WaveformRoot>
