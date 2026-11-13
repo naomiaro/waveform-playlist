@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import {
   handleKeyboardEvent,
-  getShortcutLabel,
   matchesKeyBinding,
   keyBelongsToFocusedControl,
 } from '../keyboard';
@@ -439,27 +438,11 @@ describe('handleKeyboardEvent', () => {
   });
 });
 
-describe('getShortcutLabel', () => {
-  it('returns uppercase key for simple shortcut', () => {
-    expect(getShortcutLabel({ key: 's', action: () => {} })).toBe('S');
-  });
-
-  it('includes Ctrl for ctrlKey shortcut', () => {
-    expect(getShortcutLabel({ key: 'z', ctrlKey: true, action: () => {} })).toBe('Ctrl+Z');
-  });
-
-  it('includes Shift for shiftKey shortcut', () => {
-    expect(getShortcutLabel({ key: 's', shiftKey: true, action: () => {} })).toBe('Shift+S');
-  });
-
-  it('combines multiple modifiers', () => {
-    const label = getShortcutLabel({
-      key: 's',
-      ctrlKey: true,
-      shiftKey: true,
-      action: () => {},
-    });
-    expect(label).toBe('Ctrl+Shift+S');
+describe('the labels of a shortcut (#770)', () => {
+  // Core draws no text for a shortcut: the words for keys and modifiers are the
+  // app's, in its own language. `getShortcutLabel` (English only) is removed.
+  it('are not built by core', async () => {
+    expect(Object.keys(await import('../index'))).not.toContain('getShortcutLabel');
   });
 });
 

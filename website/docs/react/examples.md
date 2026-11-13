@@ -139,7 +139,8 @@ Host third-party [Web Audio Modules (WAM 2.0)](https://www.webaudiomodules.com/)
 [View WAM! Kick It Up a Notch](/examples/wam-effects)
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 import {
   useDynamicEffects,
   useActiveEffects,

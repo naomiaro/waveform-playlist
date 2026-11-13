@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import styled from 'styled-components';
 import { BaseSlider, BaseLabel } from '../styled/index';
 
@@ -34,6 +34,8 @@ export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
   disabled = false,
   className,
 }) => {
+  // Generated: two of this control on one page must not share an id.
+  const id = useId();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Convert percentage (0-100) to linear gain (0-1.0)
     onChange(parseFloat(e.target.value) / 100);
@@ -41,14 +43,14 @@ export const MasterVolumeControl: React.FC<MasterVolumeControlProps> = ({
 
   return (
     <VolumeContainer className={className}>
-      <VolumeLabel htmlFor="master-gain">Master Volume</VolumeLabel>
+      <VolumeLabel htmlFor={id}>Master Volume</VolumeLabel>
       <VolumeSlider
         min="0"
         max="100"
         value={volume * 100}
         onChange={handleChange}
         disabled={disabled}
-        id="master-gain"
+        id={id}
       />
     </VolumeContainer>
   );

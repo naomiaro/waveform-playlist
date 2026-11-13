@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { TimeInput } from './TimeInput';
 import { type TimeFormat } from '../utils/timeFormat';
 
@@ -15,6 +15,8 @@ export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
   onSelectionChange,
   className,
 }) => {
+  // Generated: two of this component on one page must not share ids.
+  const id = useId();
   const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
 
   // Listen to the external time-format dropdown
@@ -53,7 +55,7 @@ export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
   return (
     <div className={className}>
       <TimeInput
-        id="audio_start"
+        id={`${id}-start`}
         label="Start of audio selection"
         value={selectionStart}
         format={timeFormat}
@@ -61,7 +63,7 @@ export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
         onChange={handleStartChange}
       />
       <TimeInput
-        id="audio_end"
+        id={`${id}-end`}
         label="End of audio selection"
         value={selectionEnd}
         format={timeFormat}

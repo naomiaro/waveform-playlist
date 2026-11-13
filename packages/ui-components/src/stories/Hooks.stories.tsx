@@ -8,7 +8,7 @@ import {
   usePlaylistZoom,
   usePlaylistMixer,
 } from '@waveform-playlist/browser';
-import { getShortcutLabel, type KeyboardShortcut } from '@waveform-playlist/core';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { BaseButton, BaseSlider, BaseSelect } from '../styled';
 import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
 
@@ -18,6 +18,20 @@ import type { TimeFormat as TimeFormatType } from '../utils/timeFormat';
  * A component that uses hooks and exposes their state for testing/visualization.
  * This pattern allows us to test hooks in Storybook by creating wrapper components.
  */
+
+// The library draws no text for a shortcut: an app names the keys and the
+// modifiers in its own words (and language) from the shortcut's fields.
+const KEY_NAMES: Record<string, string> = { ' ': 'Space', Delete: 'Delete' };
+const shortcutLabel = (shortcut: KeyboardShortcut): string =>
+  [
+    shortcut.metaKey ? 'Cmd' : null,
+    shortcut.ctrlKey ? 'Ctrl' : null,
+    shortcut.altKey ? 'Alt' : null,
+    shortcut.shiftKey ? 'Shift' : null,
+    KEY_NAMES[shortcut.key] ?? shortcut.key.toUpperCase(),
+  ]
+    .filter(Boolean)
+    .join('+');
 
 // Zoom controls via context hooks demo
 const ZoomControlsDemo: React.FC = () => {
@@ -208,7 +222,7 @@ const KeyboardShortcutsDemo: React.FC = () => {
         <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
           {shortcuts.map((s, i) => (
             <li key={i}>
-              <code>{getShortcutLabel(s)}</code> - {s.description}
+              <code>{shortcutLabel(s)}</code> - {s.description}
             </li>
           ))}
         </ul>

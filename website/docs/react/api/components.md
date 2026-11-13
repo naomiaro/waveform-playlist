@@ -21,11 +21,11 @@ import {
 
 ## Which Provider Each Control Needs
 
-The controls on this page read the nearest playlist provider.
+The controls on this page read the nearest playlist provider. They are exports of `@waveform-playlist/browser` (`ExportWavButton` of `@waveform-playlist/browser/tone`), except the three annotation checkboxes and `DownloadAnnotationsButton`, which are exports of `@waveform-playlist/annotations`.
 
 | Works under | Components |
 | --- | --- |
-| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `AnnotationList`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, `AnnotationList` (it draws nothing without `<AnnotationProvider>`), and, from `@waveform-playlist/annotations`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
 | `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
 | `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `KeyboardShortcuts`, `ExportWavButton`, and, among the children of `<WaveformTrackControls>`, `DefaultTrackControls` and the [track control pieces](#track-controls) |
 
@@ -662,21 +662,27 @@ Toggle for continuous play, which governs annotation playback:
 Switching it on while an annotation is playing lets playback continue past that annotation. Playing the selection (the Play button or Space with a selection highlighted) is not affected by the toggle: the selection plays from its start to its end either way. An annotation you click follows the toggle even while a selection is highlighted elsewhere, and the selection stays highlighted. It is not the loop control; see `LoopButton`.
 
 ```tsx
+import { ContinuousPlayCheckbox } from '@waveform-playlist/annotations';
+
 <ContinuousPlayCheckbox />
 ```
 
-It must be inside the `<AnnotationProvider>` of `@waveform-playlist/annotations` and throws without it, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` do. It shows the provider's `continuousPlay` option (`useAnnotationOptions()`) and sets it with `setContinuousPlay` of `usePlaybackControls()`.
+It is an export of `@waveform-playlist/annotations`, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` are. The four need a playlist provider above them (either one) and throw without one; they do not need `<AnnotationProvider>`. It shows the provider's `continuousPlay` option (`useAnnotationOptions()`) and sets it with `setContinuousPlay` of `usePlaybackControls()`.
 
 ### LinkEndpointsCheckbox and EditableCheckbox
 
 Either provider. `LinkEndpointsCheckbox` shows and sets the provider's `linkEndpoints` option: whether a dragged annotation edge takes the edge it touches along. `EditableCheckbox` shows and sets the `editable` option: whether the edges of the annotation boxes can be dragged, and whether the text and ids in the annotation list can be edited and its action buttons are shown.
 
 ```tsx
+import { LinkEndpointsCheckbox, EditableCheckbox } from '@waveform-playlist/annotations';
+
 <LinkEndpointsCheckbox />
-<EditableCheckbox />
+<EditableCheckbox>Allow editing</EditableCheckbox>
 ```
 
-The three annotation checkboxes take a `className`. Their labels are "Continuous Play", "Link Endpoints" and "Editable Annotations". The `id` of each input is generated, so the same checkbox can be rendered twice on a page.
+The three annotation checkboxes take `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and a `className`, set on the element that wraps the input and its label. The `id` of each input is generated, so the same checkbox can be rendered twice on a page.
+
+`DownloadAnnotationsButton` (also `@waveform-playlist/annotations`, either provider) downloads the provider's annotations as an array of Aeneas fragments. Props: `filename` (default `annotations.json`), `children` (the label, default "Download JSON"), `title` (the tooltip), `disabled`, `className`. It is also disabled while there are no annotations.
 
 ### AutomaticScrollCheckbox
 
@@ -804,7 +810,7 @@ Export the playlist to a WAV file.
 | `trackIndex` | `number` | - | Track index for individual export |
 | `bitDepth` | `16 \| 32` | `16` | WAV bit depth (16-bit PCM or 32-bit float) |
 | `applyEffects` | `boolean` | `true` | Apply fades and other clip effects |
-| `effectsFunction` | `EffectsFunction` | - | Tone.js effects chain for export with effects |
+| `effectsFunction` | `OfflineEffectsFunction` | - | Effects chain for the offline render, e.g. `createOfflineEffectsFunction()` of `useDynamicEffects()` |
 | `className` | `string` | - | CSS class name |
 | `onExportComplete` | `(blob: Blob) => void` | - | Callback when export succeeds |
 | `onExportError` | `(error: Error) => void` | - | Callback when export fails |

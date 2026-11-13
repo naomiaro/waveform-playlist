@@ -71,7 +71,8 @@ WAM support is layered onto the existing effects hooks — `useDynamicEffects()`
 ### Adding a WAM plugin
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 import {
   useDynamicEffects,
   useActiveEffects,

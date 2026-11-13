@@ -38,6 +38,11 @@ export interface DownloadAnnotationsButtonProps {
   className?: string;
   /** The label. Default: `Download JSON`. */
   children?: React.ReactNode;
+  /**
+   * The tooltip. Default: an English sentence, a different one when there is
+   * nothing to download. Given, it is used in both cases.
+   */
+  title?: string;
 }
 
 /**
@@ -49,6 +54,7 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
   disabled = false,
   className,
   children = 'Download JSON',
+  title,
 }) => {
   const { annotations } = useAnnotations();
   const handleDownload = () => {
@@ -82,7 +88,10 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
       disabled={disabled || annotations.length === 0}
       className={className}
       title={
-        annotations.length === 0 ? 'No annotations to download' : 'Download the annotations as JSON'
+        title ??
+        (annotations.length === 0
+          ? 'No annotations to download'
+          : 'Download the annotations as JSON')
       }
     >
       {children}

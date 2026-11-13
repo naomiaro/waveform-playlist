@@ -24,7 +24,7 @@ import { useState } from 'react';
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
-import type { AnnotationData } from '@waveform-playlist/browser';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 function AnnotatedPlaylist() {
   const { tracks, loading } = useAudioTracks([
@@ -57,7 +57,7 @@ function AnnotatedPlaylist() {
 
 - the row of boxes draws nothing, without a warning;
 - the text list draws nothing and, in a development build, writes one warning to the console;
-- the three checkboxes and the download button (below) throw.
+- the three checkboxes and the download button (below) still work: they read the playlist provider, not `AnnotationProvider`.
 
 The annotations are still held by the provider and `useAnnotations()` still returns them.
 
@@ -152,7 +152,7 @@ import {
   WaveformPlayhead,
   AnnotationList,
 } from '@waveform-playlist/browser';
-import type { AnnotationData } from '@waveform-playlist/browser';
+import type { AnnotationData } from '@waveform-playlist/core';
 
 // Defined outside the component: a new function renders every box.
 const boxLabel = (annotation: AnnotationData, index: number) => String(index + 1);
@@ -269,7 +269,7 @@ A custom row has no editable fields and no action buttons: those belong to the d
 
 ### Option Checkboxes
 
-Three checkboxes show and set the provider's options, and a button downloads the annotations. Import them from `@waveform-playlist/browser`; they need `AnnotationProvider` above them and throw without it. They work under both providers.
+Three checkboxes show and set the provider's options, and a button downloads the annotations. Import them from `@waveform-playlist/annotations`. They work under both providers and need only the playlist provider above them, not `AnnotationProvider`; without a playlist provider they throw.
 
 ```tsx
 import {
@@ -277,7 +277,7 @@ import {
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
-} from '@waveform-playlist/browser';
+} from '@waveform-playlist/annotations';
 
 <ContinuousPlayCheckbox />
 <LinkEndpointsCheckbox />
@@ -285,7 +285,16 @@ import {
 <DownloadAnnotationsButton filename="annotations.json" />
 ```
 
-Their labels are "Continuous Play", "Link Endpoints" and "Editable Annotations". Each takes a `className`. The download button writes the annotations as Aeneas JSON and is disabled while there are none.
+The checkboxes take two props: `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and `className`, on the element that wraps the input and its label. Their props type is `AnnotationCheckboxProps`.
+
+The download button writes the provider's annotations as Aeneas JSON. Its props: `filename` (default `annotations.json`), `children`, the label (default "Download JSON"), `title`, `disabled` and `className`. It is also disabled while there are no annotations. `title` is the tooltip: left out, it is "No annotations to download" while there are none and "Download the annotations as JSON" otherwise; given, it is used in both cases. Every string the four controls draw can so be supplied by your app: `children` on all four, `title` on the button.
+
+```tsx
+<EditableCheckbox>Allow editing</EditableCheckbox>
+<DownloadAnnotationsButton filename="chapters.json" disabled={saving}>
+  Save chapters
+</DownloadAnnotationsButton>
+```
 
 ### Linked Endpoints
 
@@ -481,43 +490,9 @@ import { AnnotationBoxesWrapper, AnnotationBox } from '@waveform-playlist/annota
 </AnnotationBoxesWrapper>
 ```
 
-### AnnotationsTrack
-
-A layout container with the same props as `AnnotationBoxesWrapper` and a default height of 100. It takes no annotations and draws none.
-
 ### Checkboxes and Download Button
 
-The package's own `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` are the controlled forms of the ones above: the checkboxes take `checked` and `onChange`, the button takes `annotations` and `filename`. Use the ones from `@waveform-playlist/browser` under a provider.
-
-### useAnnotationControls
-
-A hook for a UI that has no playlist provider. It holds two booleans as state and wraps the boundary function of `@waveform-playlist/core`. Nothing in the browser package calls it, and it is not connected to the provider's options: under a provider use `useAnnotationOptions()`.
-
-```typescript
-import { useAnnotationControls } from '@waveform-playlist/annotations';
-
-const {
-  continuousPlay,             // boolean
-  linkEndpoints,              // boolean
-  setContinuousPlay,          // (value: boolean) => void
-  setLinkEndpoints,           // (value: boolean) => void
-  updateAnnotationBoundaries, // (params) => AnnotationData[]
-} = useAnnotationControls({
-  initialContinuousPlay: false, // default false
-  initialLinkEndpoints: true,   // default true
-});
-
-const updated = updateAnnotationBoundaries({
-  annotationIndex,
-  newTime,          // seconds
-  isDraggingStart,  // true: the start edge; false: the end edge
-  annotations,
-  duration,
-  linkEndpoints,
-});
-```
-
-`updateAnnotationBoundaries` returns a new array and does not change the one it is given.
+`ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` are described under [Option Checkboxes](#option-checkboxes). They read the playlist provider and have no controlled form (no `checked`, `onChange` or `annotations` props). For a checkbox with a state of your own, build one from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components`. To save annotations without a provider, serialize them yourself: `annotations.map(serializeAeneas)` ([Aeneas Format](#aeneas-format)).
 
 ## Styling Annotations
 
@@ -574,7 +549,7 @@ const exported = annotations.map(serializeAeneas);
 
 ### Download Button
 
-`<DownloadAnnotationsButton filename="annotations.json" />` from `@waveform-playlist/browser` downloads the provider's annotations as an array of Aeneas fragments.
+`<DownloadAnnotationsButton filename="annotations.json" />` from `@waveform-playlist/annotations` downloads the provider's annotations as an array of Aeneas fragments.
 
 ### Custom Export
 
@@ -641,16 +616,17 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  KeyboardShortcuts,
+} from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import {
+  AnnotationProvider,
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
-  KeyboardShortcuts,
-} from '@waveform-playlist/browser';
-import type { AnnotationData } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import { AnnotationProvider } from '@waveform-playlist/annotations';
-import type { AnnotationAction } from '@waveform-playlist/core';
+} from '@waveform-playlist/annotations';
+import type { AnnotationData, AnnotationAction } from '@waveform-playlist/core';
 
 const annotationActions: AnnotationAction[] = [
   {

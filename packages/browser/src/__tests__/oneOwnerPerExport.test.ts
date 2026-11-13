@@ -1,6 +1,6 @@
 // #770: a name has one owner. No source file of the React packages re-exports
-// from another workspace package, and no two of their entry points export the
-// same name (the allowed pairs are listed, each with its reason).
+// from another workspace package, and no two entry points (theirs and core's)
+// export the same name (the allowed pairs are listed, each with its reason).
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -85,6 +85,11 @@ const CONTROLLED_AND_BOUND = [
   'TimeFormatSelect',
 ];
 
+// What the name check covers: the React packages and core, which they all build on.
+const NAME_OWNERS = [...REACT_PACKAGES, 'core'];
+// Not one thing with two owners: a type in core, a component in ui-components.
+const DIFFERENT_KINDS = ['Track (core, ui-components)'];
+
 describe('one owner per exported name (#770)', () => {
   it.each(REACT_PACKAGES)('%s re-exports nothing from another workspace package', (pkg) => {
     const found = sourceFiles(join(packagesRoot, pkg, 'src')).flatMap((file) =>
@@ -96,21 +101,49 @@ describe('one owner per exported name (#770)', () => {
   });
 
   it('no two entry points export the same name, apart from the controlled and bound pairs', () => {
-    const names = new Map(REACT_PACKAGES.map((pkg) => [pkg, exportedNames(entryOf(pkg))]));
+    const names = new Map(NAME_OWNERS.map((pkg) => [pkg, exportedNames(entryOf(pkg))]));
     // The scan must have found the entries, or an empty result means nothing.
-    for (const pkg of REACT_PACKAGES) expect(names.get(pkg)!.size).toBeGreaterThan(5);
+    for (const pkg of NAME_OWNERS) expect(names.get(pkg)!.size).toBeGreaterThan(5);
+    expect(names.get('core')!.has('samplesToPixels')).toBe(true);
+    expect(names.get('core')!.has('SnapTo')).toBe(true);
     expect(names.get('browser')!.has('WaveformPlaylistProvider')).toBe(true);
     expect(names.get('ui-components')!.has('BaseCheckbox')).toBe(true);
     const shared: string[] = [];
-    REACT_PACKAGES.forEach((a, i) =>
-      REACT_PACKAGES.slice(i + 1).forEach((b) => {
+    NAME_OWNERS.forEach((a, i) =>
+      NAME_OWNERS.slice(i + 1).forEach((b) => {
         for (const name of names.get(a)!) {
-          if (names.get(b)!.has(name)) shared.push(`${name} (${a}, ${b})`);
+          if (names.get(b)!.has(name)) shared.push(`${name} (${[a, b].sort().join(', ')})`);
         }
       })
     );
     expect(shared.sort()).toEqual(
-      CONTROLLED_AND_BOUND.map((name) => `${name} (browser, ui-components)`).sort()
+      [
+        ...CONTROLLED_AND_BOUND.map((name) => `${name} (browser, ui-components)`),
+        ...DIFFERENT_KINDS,
+      ].sort()
     );
+  });
+});
+
+// Kept in this file because it is the same scan of the same sources.
+describe('no fixed element ids (maintainer, 2026-11-13: "we should never have fixed ids")', () => {
+  // An id written as a literal is shared by every instance of the component, so
+  // two players on a page collide and a label reaches the other one's input.
+  // Ids come from `useId()` (alone or as the stem of a template string).
+  const FIXED_ID = /[^A-Za-z](?:id|htmlFor)=(?:"[^"]+"|'[^']+'|\{(?:"[^"]+"|'[^']+')\})/g;
+
+  it.each(REACT_PACKAGES)('%s writes no literal id or htmlFor', (pkg) => {
+    const found = sourceFiles(join(packagesRoot, pkg, 'src')).flatMap((file) =>
+      [...readFileSync(file, 'utf8').matchAll(FIXED_ID)].map(
+        (match) => `${relative(packagesRoot, file)}: ${match[0].trim()}`
+      )
+    );
+    expect(found).toEqual([]);
+  });
+
+  it('the scan sees a literal id when there is one', () => {
+    const sample = '<input id="master-gain" />\n<label htmlFor={\'x\'}>';
+    expect([...sample.matchAll(FIXED_ID)]).toHaveLength(2);
+    expect([...'<input id={id} /> <a trackId="t1" />'.matchAll(FIXED_ID)]).toHaveLength(0);
   });
 });

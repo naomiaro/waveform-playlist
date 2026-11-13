@@ -8,13 +8,13 @@
 
 - `WaveformAnnotationBoxes` (through the internal `AnnotationBoxes`, plain `useContext`): draws nothing, silently. Also nothing when there are no annotations.
 - `AnnotationList` (plain `useContext`): returns `null` first when there are no annotations; with annotations and no provider it returns `null` and writes one development warning (`warnOnce`).
-- `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `DownloadAnnotationsButton` (browser's wrappers in `AnnotationControls.tsx`, `useAnnotationIntegration()`): throw.
+- `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` (`src/components/AnnotationCheckboxes.tsx`) and `DownloadAnnotationsButton`: work. They live in THIS package (#770), are not in the integration, and read browser's `useAnnotationOptions()`, `usePlaybackControls()` and `useAnnotations()`; without a playlist provider those hooks throw. They have no controlled form. The integration (`AnnotationIntegration`) is `parseAeneas`, `serializeAeneas`, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper`: what browser's own views draw.
 
 **Throwing Context Hooks (Kent C. Dodds Pattern):**
-`useAnnotationIntegration()` throws if used without the provider. This follows the [Kent C. Dodds context pattern](https://kentcdodds.com/blog/how-to-use-react-context-effectively) — fail fast with a clear error instead of silently rendering nothing.
+`useAnnotationIntegration()` throws if used without the provider. This follows the [Kent C. Dodds context pattern](https://kentcdodds.com/blog/how-to-use-react-context-effectively) — fail fast with a clear error instead of silently rendering nothing. It is exported for consumers; no component of the library calls it since #770.
 
 ```typescript
-// The checkbox and download wrappers: throw if <AnnotationProvider> is missing
+// A consumer component that cannot work without <AnnotationProvider>: throws when it is missing
 const integration = useAnnotationIntegration();
 
 // The parts of a view that must render with or without annotations
@@ -26,7 +26,7 @@ const annotationIntegration = useContext(AnnotationIntegrationContext);
 
 ## Annotation Provider Pattern
 
-**Critical:** When using `annotationList` on either provider, always pair it with `onAnnotationsChange`. Without the callback, annotation edits won't persist and a development console warning fires. `onAnnotationsChange` is the one report of an annotation change: the components take no `onAnnotationUpdate` (only the package's own `AnnotationText` and `Annotation` keep that prop, which `AnnotationList` feeds with the provider's `setAnnotations`).
+**Critical:** When using `annotationList` on either provider, always pair it with `onAnnotationsChange`. Without the callback, annotation edits won't persist and a development console warning fires. `onAnnotationsChange` is the one report of an annotation change: the components take no `onAnnotationUpdate` (only the package's own `AnnotationText` keeps that prop, which `AnnotationList` feeds with the provider's `setAnnotations`).
 
 The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop (`useFollowedOption` in `packages/browser/src/providerInternals/useAnnotationState.ts`); the browser reads them with `useAnnotationOptions()` under both providers.
 

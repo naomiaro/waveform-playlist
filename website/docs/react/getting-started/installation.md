@@ -10,10 +10,21 @@ description: "Install Waveform Playlist packages via npm or pnpm for React multi
 Install the main package and its required peer dependencies:
 
 ```bash npm2yarn
-npm install @waveform-playlist/browser tone @dnd-kit/react
+npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-playlist/core tone @dnd-kit/react
 ```
 
 If you already have React and styled-components in your project, you're ready to go!
+
+### Types and helpers come from `@waveform-playlist/core`
+
+`@waveform-playlist/browser` exports its own components, hooks and types and re-exports nothing from the other packages. The types of the data you pass in (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`) and the helpers that build it (`createTrack`, `createClipFromSeconds`) are exports of `@waveform-playlist/core`, and the pages of this documentation import them from there:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
+```
+
+`@waveform-playlist/core` is a dependency of `@waveform-playlist/browser`, so it is always installed with it. An import of it in your own code resolves under a package manager with a flat `node_modules` (npm) even when your project does not list it; under a strict one (pnpm) it does not. The install line above therefore names it. The same holds for `@waveform-playlist/ui-components`, also a dependency of browser, when you import from it (for example the `TimeFormat` type or `usePlaylistInfo`): add it to your project then. Keep all `@waveform-playlist/*` packages on the versions of one release, so that a single copy of each is installed.
 
 ## Peer Dependencies
 
@@ -123,16 +134,6 @@ import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 ## TypeScript
 
 All packages include TypeScript definitions. No additional `@types` packages are needed.
-
-## CDN Usage
-
-For quick prototyping, you can use the UMD build from a CDN:
-
-```html
-<script src="https://unpkg.com/@waveform-playlist/browser/dist/index.umd.js"></script>
-```
-
-Note: CDN usage is not recommended for production applications.
 
 ## Next Steps
 

@@ -11,8 +11,8 @@ Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform
 - **Drag-to-edit boundaries** — move an annotation's start or end by dragging the edge of its box, with optional linked endpoints so adjacent segments stay contiguous. `<WaveformAnnotationBoxes>` wires the drag itself
 - **Continuous play mode** — off: playing an annotation stops at its end; on: playback runs on through the following annotations
 - **Aeneas import/export** — `parseAeneas` / `serializeAeneas` for the Aeneas forced-alignment JSON format
-- **Prebuilt controls** — checkboxes for continuous play, linked endpoints, editable mode, and a JSON download button
-- **Composable building blocks** — use `AnnotationsTrack`, `AnnotationBox`, `AnnotationBoxesWrapper`, and `AnnotationText` directly for custom annotation UIs
+- **Prebuilt controls** — `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton`, bound to the playlist provider above them (either one)
+- **Composable building blocks** — use `AnnotationBox`, `AnnotationBoxesWrapper`, and `AnnotationText` directly for custom annotation UIs
 
 ## Installation
 
@@ -67,7 +67,7 @@ interface AnnotationData {
 }
 ```
 
-`annotationList` also takes `linkEndpoints` and `isContinuousPlay`. The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop. Read them with `useAnnotationOptions()` and change them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from `usePlaybackControls()`, or render the checkboxes that `@waveform-playlist/browser` exports:
+`annotationList` also takes `linkEndpoints` and `isContinuousPlay`. The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop. Read them with `useAnnotationOptions()` and change them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from `usePlaybackControls()`, or render this package's checkboxes:
 
 ```tsx
 import {
@@ -78,17 +78,19 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   AnnotationList,
+} from '@waveform-playlist/browser';
+import {
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
-} from '@waveform-playlist/browser';
+} from '@waveform-playlist/annotations';
 
-// Under either provider, inside <AnnotationProvider>:
+// Under either playlist provider:
 <ContinuousPlayCheckbox />
 <LinkEndpointsCheckbox />
-<EditableCheckbox />
-<DownloadAnnotationsButton />
+<EditableCheckbox>Allow editing</EditableCheckbox>
+<DownloadAnnotationsButton filename="chapters.json">Save chapters</DownloadAnnotationsButton>
 
 <WaveformRoot>
   <WaveformTimescale />
@@ -100,9 +102,11 @@ import {
 <AnnotationList height={300} />
 ```
 
-Without `AnnotationProvider` the boxes and the list draw nothing, and the checkboxes and the download button throw.
+Without `AnnotationProvider` the boxes and the list draw nothing. The checkboxes and the download button do not need it: they read the playlist provider (`useAnnotationOptions()`, `usePlaybackControls()`, `useAnnotations()` of `@waveform-playlist/browser`) and throw without one.
 
-The components this package exports under the same names (`ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `DownloadAnnotationsButton`) are the controlled forms, with `checked` / `onChange` or `annotations` props. They, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper` and `useAnnotationControls` (two booleans of state and the boundary function of `@waveform-playlist/core`; not connected to the provider) are for an annotation UI that does not go through a playlist provider.
+The checkboxes take `children` (the label; default "Continuous Play", "Link Endpoints", "Editable Annotations") and `className`. The download button takes `filename` (default `annotations.json`), `children` (the label; default "Download JSON"), `title` (the tooltip; default one of two English sentences), `disabled` and `className`, and is also disabled while there are no annotations. Every string the four controls draw can be supplied by your app. None of the four has a controlled form: `checked`, `onChange` and `annotations` props are not read.
+
+`AnnotationText`, `AnnotationBox` and `AnnotationBoxesWrapper` are driven by props, for an annotation UI that does not go through a playlist provider. For a checkbox with a state of your own there, build one from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components`; move an edge with `updateAnnotationBoundaries` of `@waveform-playlist/core`; save with `annotations.map(serializeAeneas)`.
 
 `parseAeneas(fragment)` converts one Aeneas fragment to one annotation, and `serializeAeneas(annotation)` converts one back: `fragments.map(parseAeneas)`.
 

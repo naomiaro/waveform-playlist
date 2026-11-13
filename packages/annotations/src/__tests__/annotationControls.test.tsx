@@ -207,6 +207,7 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       );
       const button = getByRole('button', { name: 'Download JSON' }) as HTMLButtonElement;
       expect(button.disabled).toBe(false);
+      expect(button.title).toBe('Download the annotations as JSON');
       expect(button.className).toContain('dl');
       fireEvent.click(button);
       expect(downloads).toEqual(['mine.json']);
@@ -249,6 +250,16 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(button.title).toBe('No annotations to download');
       fireEvent.click(button);
       expect(click).not.toHaveBeenCalled();
+    });
+
+    it('the download button: `title` replaces the tooltip, with and without annotations', async () => {
+      const first = await mount(kind, <DownloadAnnotationsButton title="Télécharger" />);
+      expect((first.getByRole('button') as HTMLButtonElement).title).toBe('Télécharger');
+      first.unmount();
+      const second = await mount(kind, <DownloadAnnotationsButton title="Télécharger" />, {
+        annotations: [],
+      });
+      expect((second.getByRole('button') as HTMLButtonElement).title).toBe('Télécharger');
     });
   }
 );
