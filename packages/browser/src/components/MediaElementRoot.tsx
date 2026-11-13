@@ -14,7 +14,8 @@ import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
 import { useWaveformFrame, useWaveformParts } from './waveformFrame';
 
 // A MediaElement player has one audio track and nothing a row can be asked to
-// do: module constants, so the rows value changes only with the peaks.
+// do: module constants, so the rows value changes only with the peaks, the
+// wave height and the clip-headers marker.
 const ONE_ROW: ReadonlyArray<WaveformRow> = [{ id: MEDIA_ELEMENT_TRACK_ID, kind: 'audio' }];
 const NO_ROWS: ReadonlyArray<WaveformRow> = [];
 const NO_RENDER_MODES: ReadonlyMap<string, RenderMode> = new Map();
@@ -38,7 +39,8 @@ export interface MediaElementRootProps {
  * It renders on what the frame follows (a drag in progress, play and stop, the
  * view settings, the theme), when the track or its peaks change, when the
  * player becomes ready, and whenever the component that composes it renders.
- * None of that renders a part by itself; see `WaveformRoot`.
+ * The root's render never renders a part; a part renders when a value it
+ * reads changes. See `WaveformRoot`.
  *
  * No controls column is drawn: there is no controls part for this provider.
  */

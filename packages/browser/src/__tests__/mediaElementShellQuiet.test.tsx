@@ -270,8 +270,8 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
       await controls.play(2, 2);
     });
     act(() => controls.pause());
-    // The root rendered alone (its drag handlers read isPlaying): the row is
-    // not its concern (#685)...
+    // The root's render (its drag handlers read isPlaying) does not reach the
+    // row (#685)...
     expect(counts.track).toBe(0);
     // ...and neither is the memoized highlight.
     expect(counts.selection).toBe(0);

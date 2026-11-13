@@ -310,6 +310,9 @@ useEffect(() => {
 
 ### React Hook
 
+Under `MediaElementPlaylistProvider` there is no `waveform-playlist:ready` event, and the hook is `useMediaElementTrack().isReady`.
+
+
 Access the `isReady` state from the `usePlaylistTimeline()` hook:
 
 ```tsx

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * The MediaElement waveform is drawn by the parts of the multitrack view
- * (#685): its root carries the loading state, its one track is a row, and
+ * (#685): its root carries the state attribute, its one track is a row, and
  * fades are the clip's.
  */
 test.describe('MediaElement view: root, row and fades', () => {

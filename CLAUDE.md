@@ -288,7 +288,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **"It may paint unpositioned for a frame" can be measured.** A reviewer read that a playhead mounted as playback starts has no transform until its first frame callback. `probes/flash688.cjs` installs a `MutationObserver` for the element and records its `style.transform` when added and in the next three animation frames: by the first frame it was at the range start, 8 loads of 8 on both kinds of page (Chromium). Run that before proposing a fix for a first-frame concern.
 
-**The Playwright suite is not part of CI**, and there is one way to run it (`pnpm test`, everything, about a minute plus the builds; 250 tests as of 2026-11-12). #779 tracks tags and scripts for running it by area. Until then the full run on the PR's head commit is the rule.
+**The Playwright suite is not part of CI**, and there is one way to run it (`pnpm test`, everything, about a minute plus the builds; 258 tests as of 2026-11-12, after #685 part 2). #779 tracks tags and scripts for running it by area. Until then the full run on the PR's head commit is the rule.
 
 **Before changing how an interaction computes its result, find the e2e test and the PR that set the current behaviour.** On #749 the annotation edge drag was changed to compute each move from the drag-start state (dawcore does it that way). That removed what #747 had established and the maintainer had tried by hand: with Link endpoints on, an edge dragged into a separated neighbour carries it along. Only `e2e/media-element-annotations.spec.ts` caught it; every unit test passed. The React hook and dawcore's handler differ here on purpose.
 

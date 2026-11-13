@@ -1354,7 +1354,7 @@ Four things that follow from it:
 
 | | Before | Now |
 | --- | --- | --- |
-| `className` | reached an element only in the failure case of the last row of this table | is on the playlist's outermost element, as for `<Waveform>` |
+| `className` | reached an element only when the peak data could not be read (see that row below) | is on the playlist's outermost element, as for `<Waveform>` |
 | `theme.playlistBackgroundColor` | ignored; the background was always `waveOutlineColor` | used when set; `waveOutlineColor` otherwise |
 | `data-playlist-state` | absent | on the outermost element: `"loading"` until the media element has loaded its metadata (and again while a replaced player loads), then `"ready"`. It is `useMediaElementTrack().isReady`. The waveform itself is drawn from the first render and does not wait for it |
 | The track's row | the track's element was a direct child of the tracks container | one `[data-track-row]` element with `data-track-id="media-element-track-0"`, `data-track-kind="audio"` and `data-selected="true"` (the one track is always drawn in the selected colours, as before), inside a positioning container: two more `div`s around the track |
@@ -1362,17 +1362,19 @@ Four things that follow from it:
 | `useMediaElementTrack().peaksDataArray` | the one clip had no fades | the one clip carries the track's `fadeIn` / `fadeOut` (`peaksDataArray[0][0].fadeIn`). The array is a new one when the fades or the name change; the peaks inside (`peaksDataArray[0][0].peaks`) keep their identity then |
 | The provider's `controls` prop with `show: true` | an empty column of that width to the left of the waveform | no column: there are no track controls for this player. The value is still in `usePlaylistView().controls` |
 | Peak data that cannot be read (the provider logs a warning) | the text "Loading waveform..." in a `div`, for good | an empty timeline of the audio's length, with the timescale when the provider asks for one, and no row |
-| A custom `renderPlayhead` | also called on every press and release on the waveform and when the player became ready | called on play, pause and stop, a seek, a selection change, a view-setting or theme change, and when the component that renders `<MediaElementWaveform>` re-renders (and, as before, not while a range is highlighted at rest) |
-| `getAnnotationBoxLabel` | also called for every annotation on every press and release on the waveform, and on play, pause and stop | called when the row of boxes itself renders: when the annotations (also each move of an edge drag), the active annotation, the view settings or the length of the timeline change, or when one of `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` is a new value |
+| A custom `renderPlayhead` | also called on every press and release on the waveform and when the player became ready | called on play, pause and stop, a seek, a selection change, a view-setting, zoom or theme change, and when the component that renders `<MediaElementWaveform>` re-renders (and, as before, not while a range is highlighted at rest) |
+| `getAnnotationBoxLabel` | also called for every annotation on every press and release on the waveform, and on play, pause and stop | called when the row of boxes itself renders: when the annotations (also each move of an edge drag), the active annotation, the view settings or the length of the timeline change, when the player becomes ready or is replaced, when the track, its name or its fades change, or when one of `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` is a new value |
 
 **Find:** nothing in code. Check:
 
 - CSS or tests that reach the waveform by its position in the markup (a child or sibling selector from the scroll container down to the clip). Use the attributes: `[data-playlist-state]`, `[data-scroll-container]`, `[data-track-row]`, `[data-clip-container]`.
 - A test that waits for the waveform can now wait for `[data-playlist-state="ready"]`, which also means the player can be played and seeked.
+- CSS or tests written for the multitrack view now match this player too. `[data-track-row]`, `[data-track-kind]` and `[data-selected="true"]` match its one row, always (a rule that highlights the selected row highlights it permanently); `[data-playlist-state]` matches its root, so a count of playlists on a page with both kinds of player goes up; `[data-track-id="media-element-track-0"]` matches three elements (the row, the track, the clip), was two.
+- When the peak data cannot be read, the annotation boxes, the selection highlight, the playhead and the click to seek are still there, over the row of annotation boxes. Without annotations the area below the timescale has no height and cannot be clicked.
 - A layout that relied on the empty controls column for a left margin: give the element around the waveform that margin.
 - A `renderPlayhead` or `getAnnotationBoxLabel` that reads something that changes without any of the things listed: read it with the hook for it (the playhead function may call hooks), or pass a new function when it changes.
 
-**What renders when:** a press, a release, play, pause, stop and the player becoming ready no longer render the track, its clip and its channels: only the frame around them renders. Per pointer move of a selection drag nothing changes.
+**What renders when:** a press, a release, play, pause, stop and the player becoming ready no longer render the track, its clip and its channels. The frame around them renders, and the parts that follow that state themselves: the playhead and the progress overlay on play, pause and stop, the annotation boxes when the player becomes ready. Per pointer move of a selection drag nothing changes.
 
 ## Keyboard shortcuts yield to the focused control
 

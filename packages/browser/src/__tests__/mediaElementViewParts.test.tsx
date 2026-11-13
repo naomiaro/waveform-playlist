@@ -2,8 +2,9 @@
 //
 // #685, part 2. The MediaElement view is a root with the same parts as the
 // multitrack view: the tracks part, the timescale part, the shared overlays.
-// What that changes for a consumer is asserted here, one test per row of the
-// upgrade guide's table.
+// What that changes for a consumer is asserted here: the rows of the upgrade
+// guide's table about markup, fades, the controls column and the failure case,
+// and for the two call-frequency rows the press and its release.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
@@ -201,8 +202,8 @@ function clickOverlay(): HTMLElement {
   return element;
 }
 
-describe('the MediaElement view has the root of the multitrack view', () => {
-  it('className is on the outermost element, the one with data-playlist-state', async () => {
+describe('the MediaElement view is a root over the frame of the multitrack view', () => {
+  it('className is on the element with data-playlist-state, which holds the scroll area', async () => {
     await mount({ playlist: <MediaElementPlaylist className="mine" /> });
     expect(root()).not.toBeNull();
     expect(root()!.classList.contains('mine')).toBe(true);
@@ -439,6 +440,7 @@ describe('the root renders alone', () => {
       fake.emit('loadedmetadata');
     });
     expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
+    expect(counts.frame).toBeGreaterThan(0);
     expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
   });
 
@@ -485,8 +487,7 @@ describe('the root renders alone', () => {
         },
       },
     });
-    // The box is drawn with the label, as wide as the annotation's place on
-    // the root's timeline.
+    // The box is drawn with the label, in a row as wide as the root's timeline.
     expect(calls).toBeGreaterThan(0);
     expect(document.querySelector('[data-box]')!.textContent).toBe('x');
     expect(document.querySelector('[data-boxes-width]')!.getAttribute('data-boxes-width')).toBe(
