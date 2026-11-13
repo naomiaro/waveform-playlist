@@ -257,6 +257,8 @@ type AnnotationListProp = {
 };
 
 interface MountOptions {
+  /** Multitrack provider only. */
+  tracks?: ClipTrack[];
   annotationList?: AnnotationListProp;
   integration?: AnnotationIntegration | null;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
@@ -287,7 +289,7 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
     <AnnotationIntegrationContext.Provider value={integration}>
       {kind === 'WaveformPlaylistProvider' ? (
         <WaveformPlaylistProvider
-          tracks={TRACKS}
+          tracks={options.tracks ?? TRACKS}
           sampleRate={SAMPLE_RATE}
           samplesPerPixel={882}
           zoomLevels={[441, 882, 1764]}
@@ -571,6 +573,14 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(probe.active.activeAnnotationId).toBe('n2');
     });
 
+    it('keeps the click handler across a continuous-play toggle', async () => {
+      await mount(kind, <AnnotationList />);
+      const before = lastList().onAnnotationClick;
+      expect(before).toBeTypeOf('function');
+      act(() => probe.controls.setContinuousPlay(true));
+      expect(lastList().onAnnotationClick).toBe(before);
+    });
+
     it('keeps what it hands the list across an active-annotation change', async () => {
       await mount(kind, <AnnotationList />);
       const before = lastList();
@@ -701,6 +711,18 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(probe.active.activeAnnotationId).toBe('n2');
     });
 
+    it('a toggle of continuous play or link endpoints renders no box', async () => {
+      await mount(kind, view(kind, <WaveformAnnotationBoxes />));
+      const before = { ...boxProps };
+      act(() => probe.controls.setContinuousPlay(true));
+      act(() => probe.controls.setLinkEndpoints(true));
+      // The fake box records its props on every render: the same objects.
+      for (const id of Object.keys(before)) expect(boxProps[id]).toBe(before[id]);
+      // An editable toggle does render them: each gets or loses its handles.
+      act(() => probe.controls.setAnnotationsEditable(true));
+      for (const id of Object.keys(before)) expect(boxProps[id]).not.toBe(before[id]);
+    });
+
     it('follows the preview of an edge drag', async () => {
       await mount(kind, view(kind, <WaveformAnnotationBoxes />));
       const moved = [{ ...ANNOTATIONS[0], end: 0.5 }, ...ANNOTATIONS.slice(1)];
@@ -793,3 +815,18 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
     });
   }
 );
+
+describe('the edge of an annotation is dragged no further than the audio (#686)', () => {
+  it('multitrack: an empty timeline is drawn 60 s long, and the drag is given 0', async () => {
+    const { container } = await mount(
+      'WaveformPlaylistProvider',
+      view('WaveformPlaylistProvider', <WaveformAnnotationBoxes />),
+      { tracks: [] }
+    );
+    // The row is as wide as the drawn timeline: 60 s at 50 px per second.
+    expect(container.querySelectorAll('[data-box]')).toHaveLength(3);
+    expect(lastWrapper().width).toBe(60 * 50);
+    // The clamp is the audio's length, and there is no audio.
+    expect(lastDrag().duration).toBe(0);
+  });
+});

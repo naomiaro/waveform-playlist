@@ -322,6 +322,11 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   // drag) re-renders that annotation's row and not all of them.
   const annotationsRef = useRef(annotations);
   annotationsRef.current = annotations;
+  // The options an action is called with are only needed when its button is
+  // pressed. Read through a ref, a change of them (a link-endpoints or
+  // continuous-play toggle) does not give every row a new handler.
+  const annotationListConfigRef = useRef(annotationListConfig);
+  annotationListConfigRef.current = annotationListConfig;
 
   const handleTextEdit = useCallback(
     (index: number, newText: string) => {
@@ -359,10 +364,15 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
       if (!onAnnotationUpdate) return;
 
       const annotationsCopy = [...annotationsRef.current];
-      control.action(annotationsCopy[index], index, annotationsCopy, annotationListConfig || {});
+      control.action(
+        annotationsCopy[index],
+        index,
+        annotationsCopy,
+        annotationListConfigRef.current || {}
+      );
       onAnnotationUpdate(annotationsCopy);
     },
-    [annotationListConfig, onAnnotationUpdate]
+    [onAnnotationUpdate]
   );
 
   return (
