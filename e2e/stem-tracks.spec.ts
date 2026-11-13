@@ -351,7 +351,7 @@ test.describe('Stem Tracks Example', () => {
   });
 
   test.describe('Custom Playhead (PlayheadWithMarker)', () => {
-    // The Stem Tracks example uses renderPlayhead={PlayheadWithMarker},
+    // The Stem Tracks example uses <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />,
     // which calls useEffect internally. This test verifies the hook isolation
     // pattern works — no "Rendered more hooks" errors during playback.
     test('playback with custom playhead produces no console errors', async ({ page }) => {

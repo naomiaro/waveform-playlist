@@ -154,18 +154,20 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 ### Boolean Props Convention
 
-**Rule:** Boolean props should default to `false` so they can be enabled with shorthand syntax.
+**Rule:** a boolean prop is for an independent option of ONE component, and it defaults to `false` so it can be enabled with shorthand syntax.
 
 ```typescript
-// ✅ GOOD - Default to false, enable with shorthand
-<Waveform timescale />           // Enables timescale
-<Waveform showClipHeaders />     // Enables clip headers
+// ✅ GOOD - an option of the component that takes it, off by default
+<WaveformTracks gainScaled />
+<WaveformTrackControls trackReordering />
 
-// ❌ AVOID - Default to true requires explicit false
-<Waveform timescale={false} />   // Awkward to disable
+// ❌ AVOID - default true needs an explicit false
+<WaveformTracks sourceLevel={false} />
 ```
 
 **Why:** JSX shorthand `<Component prop />` is equivalent to `<Component prop={true} />`. Defaulting to `false` enables this clean opt-in pattern.
+
+**Not for "does this part exist" (#685).** Whether something is drawn is decided by rendering its component, not by a boolean on a parent: `<WaveformClipHeaders />` inside `<WaveformTracks>`, not `<Waveform showClipHeaders />`; `<WaveformTimescale />` in the root, not `timescale` on the provider. A boolean that switches a part on puts every part's options on one root and needs a second source as soon as the part has options of its own. When a combination is common, give it a name as a ready-made composition (`<WaveformEditor />`), which takes no options for its parts.
 
 ### Styled Components
 
@@ -385,7 +387,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 - **Old-code check for a new e2e test (#762):** after `git checkout main -- <source file>`, run `pnpm --filter <pkg> build` before the spec. Without it the first run did not show an attribute added in another file of the same package, and both tests failed for the wrong reason. Keep a control test that passes on the old code, so a failure of the real test means the bug and not the setup.
 - **MediaElement pages have `[data-playlist-state]` since #685 part 2**, always `"ready"`: it says the view is mounted, not that the media element has loaded (for that read `useMediaElementTrack().isReady` or use the provider's `onReady`; the Play button is enabled before the media has loaded); older specs wait for `[data-scroll-container] canvas`, which still works. The clip there is itself an `[aria-roledescription="draggable"]`, so annotation handle counts are off by one: wait for `toHaveCount(1)` (the clip; dnd-kit adds the attribute late, so never a one-shot `count()`) before enabling Editable, then expect 1 + 2 per annotation. `probes/select744.cjs` is `select740.cjs` with a `READY` env var for the wait selector.
 - **In the fiber-walk probe, a context consumer rendered directly under the provider (no component in between, e.g. `<MediaElementWaveform>` as a child of the provider) is charged to the provider** (the provider renders on its own state change and passes the flag down through its stable `children`). "Everything is under the provider root" therefore does not mean the provider's parent re-rendered; once the consumers stop following the value they appear as their own roots.
-- **Clip drag/trim live on `/examples/multi-clip`** (`<Waveform showClipHeaders />`); `/examples/stem-tracks` renders NO clip headers (`[data-clip-id]` never appears) — it's the track-reorder page. Don't wait on a header selector there.
+- **Clip drag/trim live on `/examples/multi-clip`** (`<WaveformEditor />`); `/examples/stem-tracks` renders NO clip headers (`[data-clip-id]` never appears) — it's the track-reorder page. Don't wait on a header selector there.
 - **Verifying a drop animation is disabled:** sample `document.getAnimations()` immediately after `page.mouse.up()` — dnd-kit's Feedback drop animation is a Web Animation on the dragged element, so an empty list is rAF-independent proof of `dropAnimation: null`; a settled final position is NOT (the element animates back and then jumps).
 - **Firefox `innerText` excludes non-selected `<option>` text** (Chromium includes it) — assert `select.options` structurally, never via body-text probes, in cross-browser checks.
 - **Pages importing `tone` have ≥2 AudioContexts** — Tone's orphaned default (created at import, before `getGlobalContext()`/`configureGlobalContext` replaces it) coexists with the app's global one; in native mode both are native `AudioContext`s and the orphan can even report `running`. When instrumenting the graph (analyser taps, context probes), select by MEASURED SIGNAL (RMS > 0), never by constructor name or `state`.
@@ -518,7 +520,7 @@ Docusaurus-native React components (no Jekyll). See `website/CLAUDE.md` for the 
 Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Documentation" below). The patterns kept here are cross-cutting — they apply across packages or to build/release infrastructure.
 
 1. **Sample-Based Math** — Use integer samples (and `startTick` for tempo-independent positioning) for all timeline calculations. Duration and offset are sample-only; `startTick` is authoritative when present, `startSample` is a derived cache. Helpers: `createClip()` (samples known), `createClipFromTicks()` (tick-based, variable-tempo), `createClipFromSeconds()` (legacy time-based).
-2. **Adding a New Rendering Mode** — Cross-package change: `RenderMode` type in core → theme colors + `*Channel` component in ui-components → `SmartChannel` branch → `ChannelWithProgress` background → `ClipPeaks` data fields in browser → `PlaylistVisualization` auto-detection. Follow `Channel.tsx` virtual-scrolling pattern.
+2. **Adding a New Rendering Mode** — Cross-package change: `RenderMode` type in core → theme colors + `*Channel` component in ui-components → `SmartChannel` branch → `ChannelWithProgress` background → `ClipPeaks` data fields in browser → `WaveformRoot` auto-detection (`renderModeById`). Follow `Channel.tsx` virtual-scrolling pattern.
 3. **Grep Comments When Renaming APIs** — When renaming a prop or option, grep for the old name in comments too. Mechanical find-replace on code misses adjacent comments that describe the old behavior.
    The same applies when logic MOVES out of a file that keeps its name: on #685 twenty sentences in the package notes, two JSDoc blocks (copied into `llm-reference.md`) and the file list of `staticEngineImports.test.ts` still pointed at `PlaylistVisualization.tsx`, by then a 90-line composition.
 4. **Prefer Props Over Mount/Unmount for Optional Providers** — When a provider controls both data and rendering, add a mode prop instead of conditional mount/unmount. Unmounting tears down the subtree and loses state; a prop switch is cheaper and keeps context consumers stable.
