@@ -48,7 +48,7 @@ export interface MediaElementRootProps {
  */
 export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, children }) => {
   const { setSelection } = usePlaybackControls();
-  const { duration, peaksDataArray, isReady } = useMediaElementTrack();
+  const { duration, peaksDataArray } = useMediaElementTrack();
   const { waveHeight } = usePlaylistView();
 
   const parts = useWaveformParts(children);
@@ -99,7 +99,9 @@ export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, c
     parts,
     displayDuration: duration,
     rows,
-    playlistState: isReady ? 'ready' : 'loading',
+    // The waveform is drawn from the provider's first render: it does not
+    // wait for the player (`useMediaElementTrack().isReady` is that).
+    playlistState: 'ready',
     controlsWidth: 0,
     onClickWhileStopped: collapseSelectionAt,
   });

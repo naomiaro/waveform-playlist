@@ -4,7 +4,8 @@
 // multitrack view: the tracks part, the timescale part, the shared overlays.
 // What that changes for a consumer is asserted here: the rows of the upgrade
 // guide's table about markup, fades, the controls column and the failure case,
-// and for the two call-frequency rows the press and its release.
+// and the two call-frequency rows (for `renderPlayhead` the press and its
+// release only).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
@@ -210,14 +211,15 @@ describe('the MediaElement view is a root over the frame of the multitrack view'
     expect(root()!.contains(scrollArea())).toBe(true);
   });
 
-  it('data-playlist-state follows the player: loading until it has its metadata', async () => {
+  it('data-playlist-state is "ready" from the first render: the waveform does not wait for the player', async () => {
     const { fake } = await mount({ notReady: true });
-    expect(root()!.getAttribute('data-playlist-state')).toBe('loading');
-    // The waveform does not wait for the player.
+    expect(trackValue.isReady).toBe(false);
+    expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
     expect(document.querySelectorAll('[data-clip-container]').length).toBe(1);
     await act(async () => {
       fake.emit('loadedmetadata');
     });
+    expect(trackValue.isReady).toBe(true);
     expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
   });
 
@@ -460,14 +462,13 @@ describe('the root renders alone', () => {
     expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
   });
 
-  it('the player becoming ready renders the frame and no track, clip or channel', async () => {
+  it('the player becoming ready renders no track, clip or channel', async () => {
     const { fake } = await mount({ notReady: true });
     await act(async () => {
       fake.emit('loadedmetadata');
     });
-    expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
-    expect(counts.frame).toBeGreaterThan(0);
-    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+    expect(trackValue.isReady).toBe(true);
+    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0, layout: 0 });
   });
 
   it('an automatic-scroll toggle does not render the frame', async () => {
@@ -521,6 +522,41 @@ describe('the root renders alone', () => {
     );
     calls = 0;
     await pressAndRelease(0);
+    expect(calls).toBe(0);
+  });
+
+  it('getAnnotationBoxLabel is not called when the player becomes ready, nor on play, pause and stop', async () => {
+    let calls = 0;
+    const label = () => {
+      calls++;
+      return 'x';
+    };
+    // The annotation lies after the positions played here, so it never
+    // becomes the active one (that would render the boxes, rightly).
+    const { fake } = await mount({
+      playlist: <MediaElementPlaylist getAnnotationBoxLabel={label} />,
+      provider: {
+        annotationList: {
+          annotations: [{ id: 'a', start: 6, end: 7, lines: ['a'] }],
+        },
+      },
+      notReady: true,
+    });
+    expect(calls).toBeGreaterThan(0);
+    calls = 0;
+    await act(async () => {
+      fake.emit('loadedmetadata');
+    });
+    expect(trackValue.isReady).toBe(true);
+    expect(calls).toBe(0);
+    await act(async () => {
+      await controls.play();
+    });
+    act(() => controls.pause());
+    await act(async () => {
+      await controls.play();
+    });
+    act(() => controls.stop());
     expect(calls).toBe(0);
   });
 });

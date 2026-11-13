@@ -8,7 +8,6 @@ import {
   usePlaybackControls,
   usePlaylistView,
   usePlaylistZoom,
-  useMediaElementTrack,
 } from '../contexts/playlistContexts';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
@@ -45,7 +44,11 @@ export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnot
   linkEndpoints,
   onAnnotationUpdate,
 }: MediaElementAnnotationBoxesProps) {
-  const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');
+  // The length of the timeline is the root's, which under this provider is
+  // the length of the audio. Not `useMediaElementTrack()`: that value also
+  // changes when the player becomes ready and with the track's name and fades.
+  const { tracksFullWidth: width, displayDuration: duration } =
+    useWaveformExtent('The annotation boxes');
   const annotationIntegration = useContext(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -53,7 +56,6 @@ export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnot
   // The drag publishes its moves to the preview and reports once, on
   // release; the boxes follow the preview meanwhile.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-  const { duration } = useMediaElementTrack();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
 

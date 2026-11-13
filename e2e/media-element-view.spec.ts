@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * fades are the clip's.
  */
 test.describe('MediaElement view: root, row and fades', () => {
-  test('every player becomes ready and holds one selected audio row with its clip', async ({
+  test('every player is marked ready and holds one selected audio row with its clip', async ({
     page,
     baseURL,
   }) => {
