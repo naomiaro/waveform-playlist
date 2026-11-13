@@ -3,7 +3,8 @@
 // scanned (their main entries, browser's `./tone` entry and core's) export the
 // same name; the pairs that do are listed, each with its reason.
 //
-// What the scans cannot see (none present when this was written): a name
+// What the scans cannot see (none present when this was written, except the
+// radio group name `render-mode` of the spectrogram menu, #808): a name
 // imported and then exported in a second statement, or exported as an alias
 // (`export const X = Imported`), is caught only by the name check, so only when
 // its owner is one of the entries scanned; `export default`, `export * as`,

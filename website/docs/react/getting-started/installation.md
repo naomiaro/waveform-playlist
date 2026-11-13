@@ -36,7 +36,7 @@ Waveform Playlist requires the following peer dependencies:
 | `react-dom` | ^19.0.0 | React DOM rendering |
 | `styled-components` | ^6.0.0 | CSS-in-JS styling |
 | `tone` | ^15.0.0 | Web Audio framework. An optional peer: needed for `WaveformPlaylistProvider`'s default engine, not for `MediaElementPlaylistProvider` or an adapter of your own |
-| `@waveform-playlist/playout` | same release as `browser` | The Tone.js engine `WaveformPlaylistProvider` loads by default. An optional peer, so a package manager does not install it for you |
+| `@waveform-playlist/playout` | the range `browser` declares as its peer (the two packages have their own version numbers) | The Tone.js engine `WaveformPlaylistProvider` loads by default. An optional peer, so a package manager does not install it for you |
 | `@dnd-kit/react` | ^0.5.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 
 ### Which Tone.js version?

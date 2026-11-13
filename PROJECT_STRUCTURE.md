@@ -11,7 +11,7 @@ Waveform-playlist is a **monorepo** organized with pnpm workspaces. It's a multi
 ```
 waveform-playlist/
 ├── packages/              # Workspace packages (modular architecture)
-│   ├── annotations/       # 📦 OPTIONAL: Annotation components & hooks
+│   ├── annotations/       # 📦 OPTIONAL: Annotation components
 │   ├── browser/           # Main React package (provider, hooks, components)
 │   ├── core/              # Core types and interfaces
 │   ├── dawcore/           # Web Components (Lit) — framework-agnostic DAW UI (@dawcore/components)
@@ -483,7 +483,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 - **Type:** Optional package (install separately)
 - **Purpose:** Complete annotation support for time-synchronized text segments
-- **Tech:** React, styled-components, custom hooks
+- **Tech:** React, styled-components
 - **Install:** `npm install @waveform-playlist/annotations`
 - **Structure:**
   ```
