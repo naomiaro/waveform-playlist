@@ -52,9 +52,12 @@ import {
   WaveformAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
   AnnotationList,
 } from '@waveform-playlist/browser';
 ```
+
+The roots, the parts and the three ready-made compositions take no option for row height or bar style. Those are set with [`<WaveformViewOptions>`](#waveformviewoptions).
 
 ### Waveform
 
@@ -154,7 +157,7 @@ A press on the tracks area starts the selection drag; under `WaveformRoot` it al
 
 | Part | Draws | Props | Provider |
 | --- | --- | --- | --- |
-| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
+| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick`, `height` | either |
 | `WaveformLoopRegion` | the draggable loop region, in the same strip; nothing while looping is off | none | `WaveformPlaylistProvider` |
 | `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width`; children: the control panel of one track | `WaveformPlaylistProvider` |
 | `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three parts below | either |
@@ -167,11 +170,12 @@ A press on the tracks area starts the selection drag; under `WaveformRoot` it al
 
 #### WaveformTimescale
 
-| Prop | Type | Description |
-|------|------|-------------|
-| `renderTick` | `(label: string, pixelPosition: number) => ReactNode` | Custom tick label. `label` is already formatted for the scale mode |
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `renderTick` | `(label: string, pixelPosition: number) => ReactNode` | - | Custom tick label. `label` is already formatted for the scale mode |
+| `height` | `number` | `30` | Height in pixels of the timescale strip. The root reads it from the element, as it reads the `width` of the controls part, so it must be on the part itself |
 
-The strip is 30 px tall and exists when a root has a `WaveformTimescale` or a `WaveformLoopRegion`.
+The strip exists when a root has a `WaveformTimescale` or a `WaveformLoopRegion`. The first `WaveformTimescale` among the root's children decides its height; a strip that holds only a `WaveformLoopRegion` is 30 px tall. A `height` that is not a positive number is replaced by 30, with one warning in development; to have no timescale, leave the part out.
 
 #### WaveformTrackControls
 
@@ -242,6 +246,57 @@ The border of a box that is not active is the theme's `annotationBoxBorder`. See
 | `renderPlayhead` | `RenderPlayheadFunction` | Custom playhead. See [Custom Playhead](#custom-playhead) |
 
 The playhead is shown while playing, and at rest when no range is selected.
+
+### WaveformViewOptions
+
+Sets the options that only affect how a view draws, for every root below it, under either provider. It draws nothing itself. It may sit below the provider, above it, or above several providers; the roots, the parts and the ready-made compositions take none of these options.
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
+
+<WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
+  <WaveformPlaylistProvider tracks={tracks}>
+    <Waveform />
+  </WaveformPlaylistProvider>
+</WaveformViewOptions>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `waveHeight` | `number` | `80` | Height in pixels of one channel of a track |
+| `barWidth` | `number` | `1` | Width in pixels of a waveform bar |
+| `barGap` | `number` | `0` | Space in pixels between two bars |
+| `roundedBars` | `boolean` | `false` | Draw bars with rounded caps (radius `barWidth / 2`). Most visible with `barWidth` of 3 or more and a `barGap` above 0 |
+| `progressBarWidth` | `number` | `barWidth + barGap` | Width in pixels of the playhead line |
+| `fillViewport` | `boolean` | `false` | Draw the timeline at least as wide as its scroll container when the audio is shorter. `WaveformRoot` only: `MediaElementWaveformRoot` ignores it, because a MediaElement timeline is as long as its audio |
+| `children` | `ReactNode` | - | The tree the options apply to |
+
+The type is `WaveformViewOptionsProps`.
+
+**Inheritance.** A prop that is left out is taken from the `<WaveformViewOptions>` above, and from the defaults when there is none. `0` and `false` are values, not "left out". Nest one to change a single option for part of the tree:
+
+```tsx
+<WaveformViewOptions waveHeight={100} barWidth={2} barGap={1}>
+  <MediaElementPlaylistProvider track={first}>
+    <MediaElementWaveform />
+  </MediaElementPlaylistProvider>
+  {/* this player: 60 px rows, the bar style from above */}
+  <WaveformViewOptions waveHeight={60}>
+    <MediaElementPlaylistProvider track={second}>
+      <MediaElementWaveform />
+    </MediaElementPlaylistProvider>
+  </WaveformViewOptions>
+</WaveformViewOptions>
+```
+
+**Values that cannot be drawn** are corrected by the root, with one warning per message in development:
+
+- a `waveHeight` or a `barWidth` that is not above 0 is replaced by the default (80, 1);
+- a `barGap` that makes `barWidth + barGap` less than 1 is raised until the next bar is one pixel on (the gap becomes `1 - barWidth`).
+
+**Reading the values.** A component drawn inside a root reads the resolved `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` with `usePlaylistInfo()` from `@waveform-playlist/ui-components`. `usePlaylistView()` does not have them, and `fillViewport` has no reader.
+
+`mono`, `indefinitePlayback` and `theme` stay on the provider: the provider computes the peaks with `mono`, its animation loop and `seekTo` follow `indefinitePlayback`, and the theme is also read by controls drawn outside a view. With `indefinitePlayback` on, `WaveformRoot` draws the timeline as wide as its container, as `fillViewport` does.
 
 ### Where a Part Must Be
 
@@ -824,6 +879,7 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -850,11 +906,7 @@ function FullFeaturedPlaylist() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={100}
-    >
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
       {/* Transport Controls */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <RewindButton />
@@ -889,15 +941,18 @@ function FullFeaturedPlaylist() {
         <ExportWavButton filename="my-mix" />
       </div>
 
-      {/* The view: the parts of <Waveform /> without the annotation row, with a 180 px controls column */}
-      <WaveformRoot>
-        <WaveformTimescale />
-        <WaveformLoopRegion />
-        <WaveformTrackControls width={180} />
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
+      {/* The view: the parts of <Waveform /> without the annotation row, with a 180 px controls column
+          and 100 px rows */}
+      <WaveformViewOptions waveHeight={100}>
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          <WaveformTrackControls width={180} />
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

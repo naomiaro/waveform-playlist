@@ -212,7 +212,7 @@ Customize waveform appearance with bar width, gap controls, theming, and playbac
 
 Features:
 - Light/dark mode support with Docusaurus theme integration
-- `barWidth` - Control the width of waveform bars
+- `barWidth` - Control the width of waveform bars (a prop of `<WaveformViewOptions>`, like the next two)
 - `barGap` - Add spacing between bars
 - `roundedBars` - Pill-shaped bar caps (radius `barWidth / 2`)
 - `waveProgressColor` - Colored fill behind played portion

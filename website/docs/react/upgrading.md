@@ -248,7 +248,7 @@ const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
 
-**Note:** `usePlaylistData()` is removed later in this major. `timeFormat` is now on `usePlaylistSettings()`, `waveHeight` and `timeScaleHeight` on `usePlaylistView()`, and `tracks` on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields). `usePlaylistControls()` and `useMediaElementControls()` are removed later too: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+**Note:** `usePlaylistData()` is removed later in this major. `timeFormat` went to `usePlaylistSettings()` and `tracks` to `usePlaylistTimeline()`. `waveHeight` and `timeScaleHeight` went to `usePlaylistView()` and were removed from it again by later entries: `timeScaleHeight` in [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed), `waveHeight` in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers) (a prop of `<WaveformViewOptions>`; inside a root, `usePlaylistInfo().waveHeight`). See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields). `usePlaylistControls()` and `useMediaElementControls()` are removed later too: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 ## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
 
@@ -468,7 +468,7 @@ All of them are exported from `@waveform-playlist/browser` and must be called in
 
 | Hook                       | Returns                                                                                                                                                                                                                                             | The component re-renders on                        |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport`                                                                                    | a provider prop change (and once when the real sample rate is known)|
+| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (`waveHeight`, the four bar and playhead fields and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers))                                                                                    | a provider prop change (and once when the real sample rate is known)|
 | `usePlaylistSettings()`    | `timeFormat`, `isAutomaticScroll`                                                                                                                                                                                                                   | the user changing either setting                                    |
 | `usePlaylistZoom()`        | `samplesPerPixel`, `canZoomIn`, `canZoomOut`                                                                                                                                                                                                        | a zoom                                             |
 | `usePlaylistTimeline()`    | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange`                                                                                                                                                                                 | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing (`isReady`), peaks arriving|
@@ -491,7 +491,7 @@ The value types are exported too: `PlaylistViewContextValue`, `PlaylistSettingsC
 
 **Find:** `usePlaylistData`, `usePlaylistState`, `usePlaybackAnimation` and `usePlaylistDataOptional` (imports and calls).
 
-**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
+**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses. (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).)
 
 From `usePlaylistData()`:
 
@@ -884,7 +884,7 @@ Under either provider:
 | `useAnnotations()` | `annotations`, `continuousPlay` |
 | `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (the last three are always `false` under `MediaElementPlaylistProvider`) |
+| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (`waveHeight`, the four bar and playhead fields and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) (the last three are always `false` under `MediaElementPlaylistProvider`) |
 | `usePlaylistSettings()` | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` (the last two are always `false` under `MediaElementPlaylistProvider`) |
 
@@ -918,7 +918,7 @@ Type names: `PlaylistControlsContextValue`, `PlaylistAnnotationsContextValue`, `
 - `\buseMediaElement(Animation|State|Controls|Data)\b`
 - `\b(PlaylistControls|PlaylistAnnotations|MediaElement(Animation|State|Controls|Data))ContextValue\b`
 
-**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
+**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses. (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).)
 
 From `usePlaylistControls()`:
 
@@ -1226,7 +1226,7 @@ A component re-renders only for the hooks it calls. The four removed hooks carri
    ```
 
 2. **A `useMediaElementState()` reader** no longer re-renders when the active annotation changes, unless it calls `useActiveAnnotation()`.
-3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
+3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`; `waveHeight` and the bar fields moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
 4. **Under `WaveformPlaylistProvider`, a `usePlaylistAnnotations()` reader moved to `useAnnotations()`** no longer re-renders on the Editable and Link-endpoints toggles, unless it calls `useAnnotationEditing()`.
 5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek. (At this step it was also called on every move of a leftward selection drag; since the next section it is not called while a range is highlighted and playback is stopped or paused, so with a range highlighted only play and a seek during playback call it.)
 
@@ -1588,7 +1588,7 @@ In development a part that is not where it can work says so once in the console 
 | `<Waveform />` under a provider with `controls.width` other than 200 | a column of that width | 200 px |
 | `<MediaElementWaveform />` under a provider without `timescale` | no ruler | a ruler |
 | `<WaveformEditor />` where `<Waveform showClipHeaders />` was, with clips that have fades | no fade curves | the fade curves are drawn |
-| `usePlaylistInfo()` of `@waveform-playlist/ui-components`, read inside a root: `controls`, `timeScaleHeight` | what the provider's `controls` and `timescale` props said | worked out from the parts: `{ show: true, width }` of the controls part, or `{ show: false, width: 0 }` without one or with a width that is not positive (always under the MediaElement provider), and 30 or 0 |
+| `usePlaylistInfo()` of `@waveform-playlist/ui-components`, read inside a root: `controls` (removed in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)), `timeScaleHeight` | what the provider's `controls` and `timescale` props said | worked out from the parts: `{ show: true, width }` of the controls part, or `{ show: false, width: 0 }` without one or with a width that is not positive (always under the MediaElement provider), and 30 or 0 |
 | `useMediaElementTrack().fadeIn` / `.fadeOut` | the object of the latest `track` prop | the first object seen while `duration` and `type` are the same, so the hook's value no longer changes on every render of a parent that writes the fade inline |
 | A composition with `<WaveformLoopRegion />` and no `<WaveformTimescale />` | (not possible) | the 30 px strip is there for the loop region alone |
 | `<WaveformTimescale>` switched off and on beside a `<WaveformLoopRegion>` | (not possible) | the loop region stays mounted |
@@ -2201,6 +2201,199 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | the same: the part gained its `DragDropProvider` and the list lost a wrapper. A view with boxes and no list renders one component more per move and per boundary |
 
 Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls`, `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />`, the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
+
+## The options that only affect how a view draws are `<WaveformViewOptions>`; they leave the providers
+
+**Packages:** `@waveform-playlist/browser` (major), `@waveform-playlist/ui-components` (major: the shape of `PlaylistInfoContext`), `@waveform-playlist/spectrogram`. Both providers.
+
+Apply this entry after the ones above (#689).
+
+It replaces names that earlier entries on this page send you to. Where an earlier entry says `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` or `fillViewport` is on `usePlaylistView()`, or passes one of them to a provider, go straight to what this entry says.
+
+The row height, the bar style, the playhead width and the filled layout are no longer props of `WaveformPlaylistProvider` and `MediaElementPlaylistProvider`. One component sets them, for every waveform root below it, under either provider:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
+
+<WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
+  <WaveformPlaylistProvider tracks={tracks}>
+    <Waveform />
+  </WaveformPlaylistProvider>
+</WaveformViewOptions>
+```
+
+`<WaveformViewOptions>` may sit below the provider, above it, or above several providers. A prop that is left out is taken from the `<WaveformViewOptions>` above it, and from the defaults when there is none (`0` and `false` are values, not "left out"). The roots, the parts and the three ready-made views (`<Waveform />`, `<WaveformEditor />`, `<MediaElementWaveform />`) take none of these options.
+
+`mono`, `indefinitePlayback` and `theme` stay on the provider. The provider computes the peaks with `mono`. Its animation loop and `seekTo` follow `indefinitePlayback` (the multitrack root also draws the timeline as wide as its container then, as `fillViewport` does). The theme is read by the transport controls, the checkboxes and the annotation list too, which are drawn outside a view.
+
+### New exports
+
+| Export | Is |
+| --- | --- |
+| `<WaveformViewOptions>` (`@waveform-playlist/browser`) | the view options. Props: `waveHeight` (pixels of one channel of a track; default 80), `barWidth` (default 1), `barGap` (default 0), `roundedBars` (default `false`), `progressBarWidth` (pixels of the playhead line; default `barWidth + barGap`), `fillViewport` (default `false`; `WaveformRoot` only, `MediaElementWaveformRoot` ignores it), `children`. Type: `WaveformViewOptionsProps` |
+| `<WaveformTimescale height>` | height in pixels of the timescale strip (default 30). The root reads it from the element. The first `<WaveformTimescale>` among the root's children decides; a strip with only a `<WaveformLoopRegion>` is 30 px |
+| `PlaylistInfo` (`@waveform-playlist/ui-components`) | the type of the `usePlaylistInfo()` value |
+| `DEFAULT_WAVE_HEIGHT`, `DEFAULT_BAR_WIDTH`, `DEFAULT_BAR_GAP` (`@waveform-playlist/ui-components`) | 80, 1, 0 |
+| theme key `spectrogramBackgroundColor` | the background behind a spectrogram. Optional in `WaveformPlaylistTheme`; `#000` in both default themes and when the key is missing (the value that was fixed) |
+
+### Removed
+
+| Removed | Use |
+| --- | --- |
+| `waveHeight` on `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` | `<WaveformViewOptions waveHeight>` |
+| `barWidth` on both providers | `<WaveformViewOptions barWidth>` |
+| `barGap` on both providers | `<WaveformViewOptions barGap>` |
+| `roundedBars` on both providers | `<WaveformViewOptions roundedBars>` |
+| `progressBarWidth` on both providers | `<WaveformViewOptions progressBarWidth>` |
+| `fillViewport` on `WaveformPlaylistProvider` | `<WaveformViewOptions fillViewport>` |
+| `usePlaylistView().waveHeight` | inside a root: `usePlaylistInfo().waveHeight` from `@waveform-playlist/ui-components` |
+| `usePlaylistView().barWidth` | inside a root: `usePlaylistInfo().barWidth` |
+| `usePlaylistView().barGap` | inside a root: `usePlaylistInfo().barGap` |
+| `usePlaylistView().roundedBars` | inside a root: `usePlaylistInfo().roundedBars` |
+| `usePlaylistView().progressBarWidth` | inside a root: `usePlaylistInfo().progressBarWidth` |
+| `usePlaylistView().fillViewport` | nothing reads it back: keep the value where you pass it to `<WaveformViewOptions>` |
+| `usePlaylistInfo().controls` (`@waveform-playlist/ui-components`) | nothing: no component read it. The width of the controls column is the `width` you give `<WaveformTrackControls>` |
+| `usePlaylistInfo().zoomLevels` | nothing: no component read it. The zoom levels are the provider's `zoomLevels` prop |
+
+`usePlaylistView()` is now `{ sampleRate, mono, indefinitePlayback }`.
+
+Removed names do not throw and have no shim. In plain JavaScript a leftover provider prop is ignored and a leftover field read is `undefined`; TypeScript reports each of them.
+
+### Find and replace
+
+**Find:** `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` or `fillViewport` on `<WaveformPlaylistProvider>` or `<MediaElementPlaylistProvider>`.
+
+**Replace with:** the same props on a `<WaveformViewOptions>` around the view, or around the provider.
+
+```tsx
+// Before
+<WaveformPlaylistProvider
+  tracks={tracks}
+  mono
+  theme={theme}
+  waveHeight={100}
+  barWidth={3}
+  barGap={1}
+  roundedBars
+  fillViewport
+>
+  <Waveform />
+</WaveformPlaylistProvider>
+
+// After
+<WaveformPlaylistProvider tracks={tracks} mono theme={theme}>
+  <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars fillViewport>
+    <Waveform />
+  </WaveformViewOptions>
+</WaveformPlaylistProvider>
+```
+
+Several players with the same options need one element:
+
+```tsx
+// Before
+<MediaElementPlaylistProvider track={first} waveHeight={60} barWidth={2} barGap={1}>
+  <MediaElementWaveform />
+</MediaElementPlaylistProvider>
+<MediaElementPlaylistProvider track={second} waveHeight={60} barWidth={2} barGap={1}>
+  <MediaElementWaveform />
+</MediaElementPlaylistProvider>
+
+// After
+<WaveformViewOptions waveHeight={60} barWidth={2} barGap={1}>
+  <MediaElementPlaylistProvider track={first}>
+    <MediaElementWaveform />
+  </MediaElementPlaylistProvider>
+  <MediaElementPlaylistProvider track={second}>
+    <MediaElementWaveform />
+  </MediaElementPlaylistProvider>
+</WaveformViewOptions>
+```
+
+**Find:** `<MediaElementPlaylistProvider` without a `waveHeight` prop.
+
+**Replace with:** if the row must stay 100 px tall, `<WaveformViewOptions waveHeight={100}>` around it. The default is 80 under both providers now.
+
+**Find:** `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` or `fillViewport` next to `usePlaylistView(`, including destructurings (`const { sampleRate, waveHeight } = usePlaylistView()`).
+
+**Replace with:** in a component drawn inside a root (a child of the root that is not a part, a custom playhead, a panel of the track controls), `usePlaylistInfo()` of `@waveform-playlist/ui-components`:
+
+```tsx
+// Before
+const { sampleRate, waveHeight, barWidth } = usePlaylistView();
+
+// After
+import { usePlaylistView } from '@waveform-playlist/browser';
+import { usePlaylistInfo } from '@waveform-playlist/ui-components';
+
+const { sampleRate } = usePlaylistView();
+const { waveHeight, barWidth } = usePlaylistInfo();
+```
+
+Outside a root `usePlaylistInfo()` returns its defaults, not the options of a `<WaveformViewOptions>` above. A component there that needs one of the numbers keeps it in a constant or in state and passes the same value to `<WaveformViewOptions>`.
+
+**Find:** `PlaylistInfoContext.Provider` rendered by your own code (around `Track`, `SmartChannel`, `SmartScale` or `TimeScale` of `@waveform-playlist/ui-components` used directly).
+
+**Replace with:** a value of the new shape. Remove `controls` and `zoomLevels`; add `roundedBars` and `progressBarWidth`, which are required now:
+
+```tsx
+// Before
+<PlaylistInfoContext.Provider
+  value={{
+    sampleRate,
+    samplesPerPixel,
+    zoomLevels: [256, 512, 1024],
+    waveHeight: 80,
+    timeScaleHeight: 30,
+    controls: { show: false, width: 0 },
+    barWidth: 1,
+    barGap: 0,
+  }}
+>
+
+// After
+<PlaylistInfoContext.Provider
+  value={{
+    sampleRate,
+    samplesPerPixel,
+    waveHeight: 80,
+    timeScaleHeight: 30,
+    barWidth: 1,
+    barGap: 0,
+    roundedBars: false,
+    progressBarWidth: 1,
+  }}
+>
+```
+
+**Find:** `controls` or `zoomLevels` read from `usePlaylistInfo()` or `useContext(PlaylistInfoContext)`.
+
+**Replace with:** your own values (see the table above). Both reads are `undefined` now.
+
+### Behaviour changes
+
+| | Before | Now |
+| --- | --- | --- |
+| One of the six props left on a provider in plain JavaScript | applied | ignored: the defaults are drawn (80 px rows, bars 1 px wide with no gap and square ends, a playhead line 1 px wide, a timeline that does not fill its container) |
+| `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `fillViewport` read from `usePlaylistView()` in plain JavaScript | the provider's values | `undefined` |
+| `waveHeight` under `MediaElementPlaylistProvider` when none is set | 100 | 80, the one default under both providers. Add `<WaveformViewOptions waveHeight={100}>` to look as before |
+| A change of one of the options | changed the value of `usePlaylistView()`: every reader of that hook rendered | renders the roots below that `<WaveformViewOptions>` and what reads `usePlaylistInfo()` in them. The value of `usePlaylistView()` does not change |
+| A spectrogram in "both" mode (spectrogram above waveform, each half a row tall) | the worker rendered the spectrogram at the full row height into a canvas half a row tall | the worker renders at the height the canvas has: half the row. `SpectrogramProvider` no longer reads a row height; it uses the height each canvas registered with |
+| The value of `PlaylistInfoContext` (`usePlaylistInfo()`) | had `controls` and `zoomLevels`; `roundedBars` and `progressBarWidth` were optional in the type, and inside a root `progressBarWidth` was not provided | no `controls`, no `zoomLevels`; `roundedBars` and `progressBarWidth` are required in the type and provided inside a root. A `PlaylistInfoContext.Provider` of your own must give the new shape |
+| `barWidth + barGap` equal to 0 | a blank waveform | the gap is raised until the next bar is one pixel on (`1 - barWidth`), with one warning in development. The same for any `barWidth + barGap` less than 1. A negative sum, read from the code and not tried: the loop that draws the bars stepped backwards and did not reach its end |
+| A `waveHeight` or a `barWidth` that is not above 0 | used as given | replaced by the default (80, 1), with one warning in development |
+| `Channel` of `@waveform-playlist/ui-components` used directly, with `barWidth + barGap` less than 1 | as the two rows above | steps one pixel from bar to bar, without a warning |
+| The height of the timescale strip | 30 px | 30 px, or the `height` of the first `<WaveformTimescale>`. A `height` that is not a positive number: 30 is drawn, with one warning in development |
+| The background behind a spectrogram | a fixed `#000` | the theme's `spectrogramBackgroundColor`, `#000` in both default themes and without the key. The key is optional in `WaveformPlaylistTheme`, so a complete theme object of yours still compiles |
+| Two views under one provider | the same row height, bar style and playhead width in both (the provider's) | each root draws with the `<WaveformViewOptions>` above it, so the two may differ in row height, bar style and playhead width. They share the provider's zoom, selection and playback, as before: a view at another zoom level is a second provider. Two limits remain, tracked in [#803](https://github.com/naomiaro/waveform-playlist/issues/803): automatic scroll moves only the view that mounted last, and a spectrogram track is drawn in only one of the two views |
+
+Not changed: `mono`, `indefinitePlayback`, `theme`, `samplesPerPixel`, `zoomLevels`, `automaticScroll` and `sampleRate` on the providers; `usePlaylistView().sampleRate`, `.mono` and `.indefinitePlayback`; `usePlaylistInfo().sampleRate`, `.samplesPerPixel`, `.waveHeight`, `.timeScaleHeight`, `.barWidth` and `.barGap`. The empty timeline is still 60 s long and a timeline being recorded still grows in steps of 10 s; both are fixed values ([#804](https://github.com/naomiaro/waveform-playlist/issues/804)).
+
+### What to check after the replacement
+
+1. Search the whole project (examples and tests too) for `waveHeight=`, `barWidth=`, `barGap=`, `roundedBars`, `progressBarWidth=` and `fillViewport`: each remaining match must be on a `<WaveformViewOptions>`.
+2. Every MediaElement player whose provider had no `waveHeight`: each channel is drawn 80 px tall where it was 100.
+3. Every destructuring of `usePlaylistView()`: only `sampleRate`, `mono` and `indefinitePlayback` exist.
 
 ## Keyboard shortcuts yield to the focused control
 

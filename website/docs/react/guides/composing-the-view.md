@@ -17,7 +17,7 @@ Three compositions are ready-made. Use one when it fits, and write your own when
 | `<WaveformEditor />` | `WaveformPlaylistProvider` | `<Waveform />` with clip headers and fade curves |
 | `<MediaElementWaveform />` | `MediaElementPlaylistProvider` | timescale, the one track, annotation boxes, selection, playhead; the annotation text list below when there are annotations |
 
-They take `className` only: nothing about what is drawn, and no option of a part. See the [Components reference](/docs/react/api/components#the-view-roots-parts-and-ready-made-compositions) for the props.
+They take `className` only: nothing about what is drawn, no option of a part, and no row height or bar style (those are [view options](#view-options)). See the [Components reference](/docs/react/api/components#the-view-roots-parts-and-ready-made-compositions) for the props.
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
@@ -33,7 +33,7 @@ import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 | --- | --- | --- | --- |
 | `WaveformRoot` | the frame: the scrolling area and the places the parts go to | `className` | `WaveformPlaylistProvider` |
 | `MediaElementWaveformRoot` | the same for the MediaElement player | `className` | `MediaElementPlaylistProvider` |
-| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
+| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick`, `height` (pixels, default 30) | either |
 | `WaveformLoopRegion` | the draggable loop region, in the same strip | none | `WaveformPlaylistProvider` |
 | `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200); children: the control panel of one track | `WaveformPlaylistProvider` |
 | `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three below | either |
@@ -128,7 +128,7 @@ A bare waveform, with no ruler and no controls:
 
 What each part does when it is there:
 
-- **`WaveformTimescale`** and **`WaveformLoopRegion`** share a 30 px strip above the tracks. The strip exists when a root has either of them. The loop region draws nothing while looping is off.
+- **`WaveformTimescale`** and **`WaveformLoopRegion`** share a strip above the tracks. The strip exists when a root has either of them. It is as tall as the `height` of the first `<WaveformTimescale>` (30 px by default; the root reads it from the element), and 30 px when it holds only a loop region. The loop region draws nothing while looping is off.
 - **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` (a positive number, 200 by default) is read by the root from the element; with `0`, a negative number or `NaN` no column is drawn and a development warning says so.
 - The children of **`WaveformTrackControls`** are the control panel of one track; the part renders them once per track. Without children it draws `<DefaultTrackControls />`. See [The Panel of a Track](#the-panel-of-a-track).
 - **`WaveformClipHeaders`** adds a header to every clip and to the height of every row. Inside a `ClipInteractionProvider` the header is what a clip is dragged by, and the trim handles come with it.
@@ -186,6 +186,65 @@ The two annotation elements draw nothing without annotations. A player without a
 ```
 
 There are no track controls, no loop region and no recording for this player.
+
+## View Options
+
+The row height, the bar style, the playhead width and the filled layout are not props of a root, a part or a provider. They are props of `<WaveformViewOptions>`, which sets them for every root below it:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
+
+<WaveformPlaylistProvider tracks={tracks}>
+  <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
+    <Waveform />
+  </WaveformViewOptions>
+</WaveformPlaylistProvider>
+```
+
+| Prop | Default | Is |
+| --- | --- | --- |
+| `waveHeight` | `80` | height in pixels of one channel of a track |
+| `barWidth` | `1` | width in pixels of a waveform bar |
+| `barGap` | `0` | space in pixels between two bars |
+| `roundedBars` | `false` | bars with rounded caps (radius `barWidth / 2`) |
+| `progressBarWidth` | `barWidth + barGap` | width in pixels of the playhead line |
+| `fillViewport` | `false` | the timeline is drawn at least as wide as its scroll container when the audio is shorter. `WaveformRoot` only; `MediaElementWaveformRoot` ignores it |
+
+- It works under either provider, and it may sit **above** the provider, also above several: one element styles every player on a page.
+- A prop that is left out is taken from the `<WaveformViewOptions>` above, then from the defaults. `0` and `false` count as values. Nest one to change a single option for part of the tree.
+- A `waveHeight` or `barWidth` that is not above 0 is replaced by the default, and a `barGap` that would put the next bar less than one pixel on is raised until the step is one pixel; each with one warning in development.
+- `mono`, `indefinitePlayback` and `theme` are provider props. The provider computes the peaks with `mono`; its animation loop and `seekTo` follow `indefinitePlayback` (and `WaveformRoot` then draws the timeline as wide as its container, as `fillViewport` does); the theme is also read by controls outside a view.
+
+The props are in the [Components reference](/docs/react/api/components#waveformviewoptions).
+
+### Two Views Under One Provider
+
+Two roots under one provider draw the same playlist. They share what the provider holds: the zoom, the selection, playback and the cursor. They can differ in the view options, because each root reads the `<WaveformViewOptions>` above it:
+
+```tsx
+<WaveformPlaylistProvider tracks={tracks}>
+  {/* tall rows, thin bars */}
+  <WaveformViewOptions waveHeight={120}>
+    <Waveform />
+  </WaveformViewOptions>
+
+  {/* compact rows, wide rounded bars, no ruler and no controls */}
+  <WaveformViewOptions waveHeight={40} barWidth={3} barGap={1} roundedBars>
+    <WaveformRoot>
+      <WaveformTracks />
+      <WaveformSelection />
+      <WaveformPlayhead />
+    </WaveformRoot>
+  </WaveformViewOptions>
+</WaveformPlaylistProvider>
+```
+
+Views that share a provider share its zoom: a second view at another zoom level (an overview) needs a second provider.
+
+Two limits of two views under one provider, tracked in [#803](https://github.com/naomiaro/waveform-playlist/issues/803):
+
+- Automatic scroll moves only the view that mounted last.
+- A track drawn as a spectrogram is drawn in only one of the two views.
 
 ## Switching a Part On and Off
 

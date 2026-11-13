@@ -64,6 +64,29 @@ function PeakReadout({ meter }: { meter: MeterSource }) {
 }
 ```
 
+## The drawing context: `usePlaylistInfo()`
+
+The drawing primitives (`Track`, `SmartChannel`, `SmartScale`, `TimeScale`) read what they need from the view they are drawn in through `PlaylistInfoContext`. The roots of `@waveform-playlist/browser` publish it once per view, from the options of its `<WaveformViewOptions>`; without one above, the context's defaults apply.
+
+```tsx
+import { usePlaylistInfo, type PlaylistInfo } from '@waveform-playlist/ui-components';
+
+const {
+  sampleRate,
+  samplesPerPixel,
+  waveHeight, // px of one channel; default 80
+  timeScaleHeight, // px of the timescale strip; 0 when a view has none
+  barWidth, // default 1
+  barGap, // default 0
+  roundedBars, // default false
+  progressBarWidth, // px of the playhead line; default barWidth + barGap
+}: PlaylistInfo = usePlaylistInfo();
+```
+
+If you render `PlaylistInfoContext.Provider` yourself, give it every field of `PlaylistInfo` (`roundedBars` and `progressBarWidth` are required; `controls` and `zoomLevels` are no longer part of it). `DEFAULT_WAVE_HEIGHT` (80), `DEFAULT_BAR_WIDTH` (1) and `DEFAULT_BAR_GAP` (0) are exported.
+
+`Channel` never steps less than one pixel from one bar to the next: a `barWidth + barGap` under 1 is drawn with a step of 1.
+
 ## Theming
 
 Wrap your tree in styled-components' `ThemeProvider` with a `WaveformPlaylistTheme` object — `defaultTheme` and `darkTheme` are exported as starting points and can be partially overridden:

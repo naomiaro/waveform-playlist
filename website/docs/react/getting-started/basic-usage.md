@@ -15,6 +15,7 @@ The simplest way to get started is with the `useAudioTracks` hook and the provid
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -31,17 +32,15 @@ function App() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={128}
-    >
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
         <StopButton />
       </div>
-      <Waveform />
+      <WaveformViewOptions waveHeight={128}>
+        <Waveform />
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }
@@ -61,11 +60,26 @@ The provider is the heart of the application. It manages:
 <WaveformPlaylistProvider
   tracks={tracks}           // Required: array of ClipTrack objects
   samplesPerPixel={1024}    // Zoom level (higher = more zoomed out)
-  waveHeight={128}          // Height of each track in pixels
 >
   {/* Children have access to playlist context */}
 </WaveformPlaylistProvider>
 ```
+
+### WaveformViewOptions
+
+The options that only affect how the view draws are set with `<WaveformViewOptions>`, not on the provider. It applies to every view below it and may sit above or below the provider:
+
+```tsx
+<WaveformViewOptions
+  waveHeight={128}   // Height of one channel of a track in pixels (default 80)
+  barWidth={2}       // Width of a waveform bar in pixels (default 1)
+  barGap={1}         // Space between two bars in pixels (default 0)
+>
+  <Waveform />
+</WaveformViewOptions>
+```
+
+See [WaveformViewOptions](/docs/react/api/components#waveformviewoptions) for every option.
 
 ### Waveform Component
 
@@ -146,6 +160,7 @@ function Controls() {
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -170,11 +185,7 @@ function MyPlaylist() {
   if (error) return <div>Error: {error}</div>;
 
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      samplesPerPixel={1024}
-      waveHeight={100}
-    >
+    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', padding: '1rem' }}>
         <RewindButton />
         <PlayButton />
@@ -186,7 +197,9 @@ function MyPlaylist() {
         <MasterVolumeControl />
         <AudioPosition />
       </div>
-      <Waveform />
+      <WaveformViewOptions waveHeight={100}>
+        <Waveform />
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

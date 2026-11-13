@@ -28,7 +28,7 @@ export default function StylingExamplePage(): React.ReactElement {
         <h1>Waveform Styling</h1>
         <p>
           Customize the visual appearance of waveforms using <code>barWidth</code>, <code>barGap</code>, and{' '}
-          <code>roundedBars</code> props, combined with theme colors.
+          <code>roundedBars</code> props of <code>&lt;WaveformViewOptions&gt;</code>, combined with theme colors.
         </p>
 
         <div style={{ marginTop: '2rem' }}>

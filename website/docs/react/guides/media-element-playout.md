@@ -24,6 +24,7 @@ Use `WaveformPlaylistProvider` (Tone.js) when you need multi-track mixing, sampl
 import {
   MediaElementPlaylistProvider,
   MediaElementWaveform,
+  WaveformViewOptions,
   PlayButton,
   PauseButton,
   StopButton,
@@ -49,10 +50,11 @@ function MyPlayer() {
         name: 'My Track',
       }}
       samplesPerPixel={512}
-      waveHeight={100}
     >
       <PlaybackControls />
-      <MediaElementWaveform />
+      <WaveformViewOptions waveHeight={100}>
+        <MediaElementWaveform />
+      </WaveformViewOptions>
     </MediaElementPlaylistProvider>
   );
 }
@@ -69,6 +71,8 @@ function PlaybackControls() {
   );
 }
 ```
+
+The row height, the bar style and the playhead width are not provider props: they are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), which sets them for every view below it. It may sit above the provider, so one element can style several players on a page. Without it the row is 80 px tall.
 
 The transport buttons, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs` and `AutomaticScrollCheckbox` are the same components `WaveformPlaylistProvider` uses; each reads the nearest provider, so several players on one page each get their own set. `PlaybackRateSelect` works under `MediaElementPlaylistProvider` only: a `<select>` of speeds (`rates`, default 0.5, 0.75, 1, 1.25, 1.5, 2). See [Playback Controls](./playback-controls.md#which-controls-work-under-which-provider) for the full list.
 
@@ -259,7 +263,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 | `useAnnotationOptions()` | one of the three annotation options being toggled | `editable`, `linkEndpoints`, `continuousPlay` |
 | `usePlaybackControls()` | never | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `playAnnotation` |
 | `usePlaybackRefs()` | never | `currentTimeRef` (advances during playback), `visualTimeRef` (the same ref here), `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | a provider prop change | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` (`mono`, `indefinitePlayback` and `fillViewport` are always `false` here) |
+| `usePlaylistView()` | a provider prop change | `sampleRate` (`mono` and `indefinitePlayback` are always `false` here) |
 | `usePlaylistSettings()` | the user changing either setting | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | a zoom level change | `samplesPerPixel` (`canZoomIn` and `canZoomOut` are always `false` here) |
 | `usePlaybackRate()` | the speed changing | `playbackRate`, `setPlaybackRate` |

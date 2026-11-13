@@ -169,7 +169,7 @@ function CustomTrackControls() {
 
 Four things to know:
 
-- **Size.** Each track has a slot in the column: as wide as the column (the `width` of the part) and as tall as the track's row, with `overflow: hidden`, so a panel taller than the row is cut off. A mono track's row is `waveHeight` tall (80 px by default), plus the clip header's height when the view has `<WaveformClipHeaders />`; the panel above has four lines of controls and does not fit in that, so give the provider a larger `waveHeight` (128, say) or lay the controls out in fewer lines. Fill the slot with `height: 100%`. Do not compute the row height yourself: it depends on the number of channels (also of a take being recorded) and on the clip headers.
+- **Size.** Each track has a slot in the column: as wide as the column (the `width` of the part) and as tall as the track's row, with `overflow: hidden`, so a panel taller than the row is cut off. A mono track's row is `waveHeight` tall (80 px by default), plus the clip header's height when the view has `<WaveformClipHeaders />`; the panel above has four lines of controls and does not fit in that, so set a larger `waveHeight` with `<WaveformViewOptions>` (128, say) or lay the controls out in fewer lines. Fill the slot with `height: 100%`. Do not compute the row height yourself: it depends on the number of channels (also of a take being recorded) and on the clip headers.
 - **Selection.** A click anywhere in a slot selects the track, in your own panel too. A control of yours that must not select calls `event.stopPropagation()` in its click handler. `useTrack().isSelected` says whether the track is the selected one.
 - **Loading.** While the provider is still loading a track, `useTrack().isLoading` is true and a value set with the mixer actions is not kept. Disable your controls, or return `null`.
 - **Where it works.** `useTrack()` and the pieces work only among the children of `<WaveformTrackControls>`. Anywhere else they throw. For a mixer elsewhere on the page see [Mixer State Outside the Panel](#mixer-state-outside-the-panel).
@@ -574,18 +574,20 @@ function TrackManagementExample() {
   if (loading) return <div>Loading...</div>;
 
   return (
-    // Rows of 128 px: the panel below has four lines of controls.
-    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} waveHeight={128}>
-      <WaveformRoot>
-        <WaveformTimescale />
-        <WaveformTrackControls width={200}>
-          <TrackControlRow />
-          <TrackRemoveButton onRemove={removeTrack} />
-        </WaveformTrackControls>
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
+    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
+      {/* Rows of 128 px: the panel below has four lines of controls. */}
+      <WaveformViewOptions waveHeight={128}>
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformTrackControls width={200}>
+            <TrackControlRow />
+            <TrackRemoveButton onRemove={removeTrack} />
+          </WaveformTrackControls>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
 }

@@ -28,6 +28,8 @@
 
 ## Theme Provider Pattern
 
+The theme stays on the providers (#689): it is not an option of one view, the controls outside a view read it. The view's sizes and bar style are `<WaveformViewOptions>` in the browser package, published to the primitives through `PlaylistInfoContext` (`{ sampleRate, samplesPerPixel, waveHeight, timeScaleHeight, barWidth, barGap, roundedBars, progressBarWidth }`; `controls` and `zoomLevels` were removed, nothing read them). `barStep()` in `utils/peakRendering.ts` keeps `Channel`'s bar loop at a step of at least one pixel. `SpectrogramChannel` keys its canvases on `waveHeight` so a new height registers new canvases.
+
 **Decision:** Use styled-components `ThemeProvider` at the `WaveformPlaylistProvider` level.
 
 **Implementation:**
