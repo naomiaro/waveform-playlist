@@ -690,7 +690,7 @@ import { LinkEndpointsCheckbox, EditableCheckbox } from '@waveform-playlist/anno
 <EditableCheckbox>Allow editing</EditableCheckbox>
 ```
 
-The three annotation checkboxes take `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and a `className`, set on the element that wraps the input and its label. The `id` of each input is generated, so the same checkbox can be rendered twice on a page.
+The three annotation checkboxes take `disabled`, `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and a `className`, set on the element that wraps the input and its label. The `id` of each input is generated, so the same checkbox can be rendered twice on a page.
 
 `DownloadAnnotationsButton` (also `@waveform-playlist/annotations`, either provider) downloads the provider's annotations as an array of Aeneas fragments. Props: `filename` (default `annotations.json`), `children` (the label, default "Download JSON"), `title` (the tooltip), `disabled`, `className`. It is also disabled while there are no annotations.
 

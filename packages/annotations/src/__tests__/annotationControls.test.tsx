@@ -173,6 +173,43 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(options.editable).toBe(true);
     });
 
+    it('`disabled` disables each checkbox; a click then changes nothing', async () => {
+      const { getByLabelText } = await mount(
+        kind,
+        <>
+          <ContinuousPlayCheckbox disabled />
+          <LinkEndpointsCheckbox disabled />
+          <EditableCheckbox disabled />
+          <EditableCheckbox>Still on</EditableCheckbox>
+        </>
+      );
+      const boxes = ['Continuous Play', 'Link Endpoints', 'Editable Annotations'].map(
+        (label) => getByLabelText(label) as HTMLInputElement
+      );
+      expect(boxes.map((box) => box.disabled)).toEqual([true, true, true]);
+      expect((getByLabelText('Still on') as HTMLInputElement).disabled).toBe(false);
+      // The element's own click(), which a disabled input ignores as a real
+      // click does (a dispatched synthetic event would get through in jsdom).
+      act(() => boxes.forEach((box) => box.click()));
+      expect(options).toEqual({ continuousPlay: false, linkEndpoints: false, editable: false });
+      act(() => (getByLabelText('Still on') as HTMLInputElement).click());
+      expect(options.editable).toBe(true);
+    });
+
+    it('`children={null}` is "not given": the default label is drawn, so the box keeps its name', async () => {
+      const { getByLabelText } = await mount(
+        kind,
+        <>
+          <ContinuousPlayCheckbox>{null}</ContinuousPlayCheckbox>
+          <LinkEndpointsCheckbox>{null}</LinkEndpointsCheckbox>
+          <EditableCheckbox>{null}</EditableCheckbox>
+        </>
+      );
+      for (const label of ['Continuous Play', 'Link Endpoints', 'Editable Annotations']) {
+        expect(getByLabelText(label)).toBeTruthy();
+      }
+    });
+
     it('two of one checkbox do not share an id', async () => {
       const { container } = await mount(
         kind,

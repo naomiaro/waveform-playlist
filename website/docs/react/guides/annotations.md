@@ -285,7 +285,7 @@ import {
 <DownloadAnnotationsButton filename="annotations.json" />
 ```
 
-The checkboxes take two props: `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and `className`, on the element that wraps the input and its label. Their props type is `AnnotationCheckboxProps`.
+The checkboxes take `disabled` and two more props: `children`, the label (default "Continuous Play", "Link Endpoints" and "Editable Annotations"), and `className`, on the element that wraps the input and its label. Their props type is `AnnotationCheckboxProps`.
 
 The download button writes the provider's annotations as Aeneas JSON. Its props: `filename` (default `annotations.json`), `children`, the label (default "Download JSON"), `title`, `disabled` and `className`. It is also disabled while there are no annotations. `title` is the tooltip: left out, it is "No annotations to download" while there are none and "Download the annotations as JSON" otherwise; given, it is used in both cases. Every string the four controls draw can so be supplied by your app: `children` on all four, `title` on the button.
 

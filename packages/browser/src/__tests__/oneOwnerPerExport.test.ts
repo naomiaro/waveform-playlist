@@ -1,6 +1,16 @@
-// #770: a name has one owner. No source file of the React packages re-exports
-// from another workspace package, and no two entry points (theirs and core's)
-// export the same name (the allowed pairs are listed, each with its reason).
+// #770: a name has one owner. No source file of the five packages below
+// re-exports from another workspace package, and no two of the entry points
+// scanned (their main entries, browser's `./tone` entry and core's) export the
+// same name; the pairs that do are listed, each with its reason.
+//
+// What the scans cannot see (none present when this was written): a name
+// imported and then exported in a second statement, or exported as an alias
+// (`export const X = Imported`), is caught only by the name check, so only when
+// its owner is one of the entries scanned; `export default`, `export * as`,
+// `export let`, a destructured `export const { a }`; an id held in a constant,
+// a template string without `${}`, `.attrs({ id })`, a radio `name`. The other
+// packages (midi, engine, playout, media-element-playout, the web components)
+// are not scanned: #807.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -58,16 +68,18 @@ function exportedNames(file: string, seen = new Set<string>()): Set<string> {
     }
   }
   for (const match of text.matchAll(
-    /export\s+(?:declare\s+)?(?:const|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
+    /export\s+(?:declare\s+)?(?:async\s+)?(?:const|function\*?|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
   )) {
     names.add(match[1]);
   }
   return names;
 }
 
+/** `pkg` is a package directory, or `browser/tone` for browser's second entry. */
 function entryOf(pkg: string): string {
-  const src = join(packagesRoot, pkg, 'src');
-  return [join(src, 'index.tsx'), join(src, 'index.ts')].find((candidate) => {
+  const [dir, entry = 'index'] = pkg.split('/');
+  const src = join(packagesRoot, dir, 'src');
+  return [join(src, `${entry}.tsx`), join(src, `${entry}.ts`)].find((candidate) => {
     try {
       return statSync(candidate).isFile();
     } catch {
@@ -86,10 +98,14 @@ const CONTROLLED_AND_BOUND = [
   'TimeFormatSelect',
 ];
 
-// What the name check covers: the React packages and core, which they all build on.
-const NAME_OWNERS = [...REACT_PACKAGES, 'core'];
+// What the name check covers: the React packages, browser's `./tone` entry, and
+// core, which they all build on.
+const NAME_OWNERS = [...REACT_PACKAGES, 'browser/tone', 'core'];
 // Not one thing with two owners: a type in core, a component in ui-components.
 const DIFFERENT_KINDS = ['Track (core, ui-components)'];
+// Two different functions under one name, older than #770 and not yet renamed
+// (#807). Listed so that the next one is noticed; remove the entry with the rename.
+const KNOWN_AND_TRACKED = ['createEffectInstance (browser/tone, core)'];
 
 describe('one owner per exported name (#770)', () => {
   it.each(REACT_PACKAGES)('%s re-exports nothing from another workspace package', (pkg) => {
@@ -107,6 +123,7 @@ describe('one owner per exported name (#770)', () => {
     for (const pkg of NAME_OWNERS) expect(names.get(pkg)!.size).toBeGreaterThan(5);
     expect(names.get('core')!.has('samplesToPixels')).toBe(true);
     expect(names.get('core')!.has('SnapTo')).toBe(true);
+    expect(names.get('browser/tone')!.has('useAudioTracks')).toBe(true);
     expect(names.get('browser')!.has('WaveformPlaylistProvider')).toBe(true);
     expect(names.get('ui-components')!.has('BaseCheckbox')).toBe(true);
     const shared: string[] = [];
@@ -121,6 +138,7 @@ describe('one owner per exported name (#770)', () => {
       [
         ...CONTROLLED_AND_BOUND.map((name) => `${name} (browser, ui-components)`),
         ...DIFFERENT_KINDS,
+        ...KNOWN_AND_TRACKED,
       ].sort()
     );
   });
@@ -131,9 +149,10 @@ describe('no fixed element ids (maintainer, 2026-11-13: "we should never have fi
   // An id written as a literal is shared by every instance of the component, so
   // two players on a page collide and a label reaches the other one's input.
   // Ids come from `useId()` (alone or as the stem of a template string).
-  const FIXED_ID = /[^A-Za-z](?:id|htmlFor)=(?:"[^"]+"|'[^']+'|\{(?:"[^"]+"|'[^']+')\})/g;
+  const FIXED_ID =
+    /[^A-Za-z-](?:id|htmlFor|aria-labelledby|aria-describedby|aria-controls)=(?:"[^"]+"|'[^']+'|\{(?:"[^"]+"|'[^']+')\})/g;
 
-  it.each(REACT_PACKAGES)('%s writes no literal id or htmlFor', (pkg) => {
+  it.each(REACT_PACKAGES)('%s writes no literal id, htmlFor or id reference', (pkg) => {
     const found = sourceFiles(join(packagesRoot, pkg, 'src')).flatMap((file) =>
       [...readFileSync(file, 'utf8').matchAll(FIXED_ID)].map(
         (match) => `${relative(packagesRoot, file)}: ${match[0].trim()}`
@@ -143,8 +162,9 @@ describe('no fixed element ids (maintainer, 2026-11-13: "we should never have fi
   });
 
   it('the scan sees a literal id when there is one', () => {
-    const sample = '<input id="master-gain" />\n<label htmlFor={\'x\'}>';
-    expect([...sample.matchAll(FIXED_ID)]).toHaveLength(2);
+    const sample =
+      '<input id="master-gain" />\n<label htmlFor={\'x\'}>\n<div aria-labelledby="title" />';
+    expect([...sample.matchAll(FIXED_ID)]).toHaveLength(3);
     expect([...'<input id={id} /> <a trackId="t1" />'.matchAll(FIXED_ID)]).toHaveLength(0);
   });
 });

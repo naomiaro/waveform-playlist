@@ -505,7 +505,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Visual: AnnotationBox, AnnotationBoxesWrapper
   - Text: AnnotationText
   - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox, DownloadAnnotationsButton
-- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0
+- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0, `@waveform-playlist/browser` (the controls read its hooks; the provider fills its integration context), `@dnd-kit/react` and `@dnd-kit/dom` (the edge handles of `AnnotationBox`)
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
 - **Documentation:** See `website/docs/react/getting-started/installation.md`

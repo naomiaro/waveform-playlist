@@ -28,7 +28,7 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-playlist/core tone @dnd-kit/react
 ```
 
-> **Note**: `tone` and `@dnd-kit/react` are peer dependencies and must be installed separately. `@dnd-kit/dom` and `@dnd-kit/abstract` are also declared peers (they install automatically as dependencies of `@dnd-kit/react`).
+> **Note**: `tone`, `@waveform-playlist/playout` (the Tone.js engine, an optional peer) and `@dnd-kit/react` are peer dependencies and must be installed separately. `@waveform-playlist/core` is a dependency of `browser`; it is on the line because your own code imports types and helpers from it, which a strict package manager (pnpm) allows only for packages you list. `@dnd-kit/dom` and `@dnd-kit/abstract` are also declared peers (they install automatically as dependencies of `@dnd-kit/react`).
 
 > **v14:** the playout engines are optional peers. Install the one(s) you use:
 > - WebAudio/Tone path: `npm install @waveform-playlist/browser @waveform-playlist/playout tone`

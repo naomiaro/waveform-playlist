@@ -14,7 +14,7 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 **Upgrading from an earlier major:** see the [upgrade guide](./react/upgrading.md) — one Find / Replace-with entry per breaking change.
 
-**One owner per name (#770):** a name is exported by one package, and `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package. Import data types and helpers (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`, `createTrack`, `KeyboardShortcut`, `handleKeyboardEvent`, the sample/pixel/second conversions, `SpectrogramCanvasRegistration`) from `@waveform-playlist/core`; `TimeFormat`, `TrackMenuItem` and `BeatsAndBarsSnapTo` from `@waveform-playlist/ui-components`; `EffectsFunction` and `TrackEffectsFunction` from `@waveform-playlist/playout`; the annotation checkboxes and `DownloadAnnotationsButton` from `@waveform-playlist/annotations`. The only names two entry points share are `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`: the one in `ui-components` is driven by props, the one in `browser` reads the provider and wraps it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.)
+**One owner per name (#770):** among the React packages a name is exported by one package, and `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package. Import data types and helpers (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`, `createTrack`, `KeyboardShortcut`, `handleKeyboardEvent`, the sample/pixel/second conversions, `SpectrogramCanvasRegistration`) from `@waveform-playlist/core`; `TimeFormat`, `TrackMenuItem` and `BeatsAndBarsSnapTo` from `@waveform-playlist/ui-components`; `EffectsFunction` and `TrackEffectsFunction` from `@waveform-playlist/playout`; the annotation checkboxes and `DownloadAnnotationsButton` from `@waveform-playlist/annotations`. Among the main entries of those five packages, `@waveform-playlist/browser/tone` and `@waveform-playlist/core`, the names two entry points share on purpose are `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`: the one in `ui-components` is driven by props, the one in `browser` reads the provider and wraps it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) One more pair is left: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and a different one in `@waveform-playlist/core`.
 
 ---
 
@@ -2206,7 +2206,7 @@ Under either provider (from @waveform-playlist/browser):
 Under either provider (from @waveform-playlist/annotations; no <AnnotationProvider> needed,
 a playlist provider is; NOT exported by @waveform-playlist/browser since #770):
          ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox
-           props { className?, children? }  (children = the label; type AnnotationCheckboxProps)
+           props { className?, disabled?, children? }  (children = the label; type AnnotationCheckboxProps)
          DownloadAnnotationsButton
            props { filename?, disabled?, className?, children?, title? }  (children = the label,
            default "Download JSON"; filename default "annotations.json"; title = the tooltip,
@@ -2518,7 +2518,8 @@ export { SpectrogramProvider, SpectrogramMenuItems, SpectrogramSettingsModal } f
 
 // Integration context (from @waveform-playlist/browser)
 export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@waveform-playlist/browser';
-export type { SpectrogramIntegration, SpectrogramWorkerApi } from '@waveform-playlist/browser';
+export type { SpectrogramIntegration } from '@waveform-playlist/browser';
+// SpectrogramWorkerApi (above) is a type of @dawcore/spectrogram; browser does not export it.
 // SpectrogramCanvasRegistration (what a spectrogram canvas registers with) is declared once,
 // in @waveform-playlist/core; browser and ui-components do not export it.
 // TrackMenuItem (what SpectrogramMenuItems returns an array of) is from
