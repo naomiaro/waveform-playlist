@@ -77,7 +77,7 @@ import {
   type MediaElementPlaylistProviderProps,
   type MediaElementTrackConfig,
 } from '../MediaElementPlaylistContext';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 import { usePlaybackControls, useMediaElementTrack } from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
@@ -191,7 +191,7 @@ async function mount({ playlist, provider, notReady = false }: MountOptions = {}
         createPlayout={createPlayout}
         {...provider}
       >
-        {playlist ?? <MediaElementPlaylist />}
+        {playlist ?? <ComposedMediaElementWaveform />}
         <Probe />
       </MediaElementPlaylistProvider>
     </AnnotationIntegrationContext.Provider>
@@ -220,7 +220,7 @@ function clickOverlay(): HTMLElement {
 
 describe('the MediaElement view is a root over the frame of the multitrack view', () => {
   it('className is on the element with data-playlist-state, which holds the scroll area', async () => {
-    await mount({ playlist: <MediaElementPlaylist className="mine" /> });
+    await mount({ playlist: <ComposedMediaElementWaveform className="mine" /> });
     expect(root()).not.toBeNull();
     expect(root()!.classList.contains('mine')).toBe(true);
     expect(root()!.contains(scrollArea())).toBe(true);
@@ -266,33 +266,32 @@ describe('the MediaElement view is a root over the frame of the multitrack view'
     expect(clip.getAttribute('data-track-id')).toBe('media-element-track-0');
   });
 
-  it('controls.show draws no controls column: the scroll area is the only child', async () => {
-    await mount({ provider: { controls: { show: true, width: 150 } } });
+  it('no controls column: the scroll area is the only child', async () => {
+    await mount();
     expect(root()!.children.length).toBe(1);
     expect(root()!.firstElementChild).toBe(scrollArea());
   });
 
-  it('the timeline is as long as the audio, with a timescale when the provider asks for one', async () => {
+  it('the timeline is as long as the audio, with a timescale when its part is rendered', async () => {
     counts.scale = 0;
-    await mount({ provider: { timescale: true } });
+    await mount();
     const inner = scrollArea().firstElementChild as HTMLElement;
     expect(inner.style.width).toBe(`${CLIP_WIDTH}px`);
+    expect(counts.scale).toBe(0);
     cleanup();
-    counts.scale = 0;
     render(
       <MediaElementPlaylistProvider
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
-        timescale
         createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
       >
-        <MediaElementPlaylist />
+        <ComposedMediaElementWaveform />
       </MediaElementPlaylistProvider>
     );
     expect(counts.scale).toBeGreaterThan(0);
   });
 
-  it('no timescale is drawn when the provider does not ask for one', async () => {
+  it('no timescale is drawn without its part', async () => {
     counts.scale = 0;
     render(
       <MediaElementPlaylistProvider
@@ -300,7 +299,7 @@ describe('the MediaElement view is a root over the frame of the multitrack view'
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
       >
-        <MediaElementPlaylist />
+        <ComposedMediaElementWaveform noTimescale />
       </MediaElementPlaylistProvider>
     );
     expect(counts.scale).toBe(0);
@@ -324,7 +323,7 @@ describe('when the peaks cannot be extracted', () => {
 
   it('an empty row as tall as the wave height is drawn, not the text "Loading waveform..."', async () => {
     await mount({
-      playlist: <MediaElementPlaylist className="mine" />,
+      playlist: <ComposedMediaElementWaveform className="mine" />,
       provider: { track: BROKEN },
     });
     expect(document.body.textContent).not.toContain('Loading waveform');
@@ -387,7 +386,10 @@ describe('fades are the clip’s', () => {
   });
 
   it('with showFades the fade-out ends where the clip ends', async () => {
-    await mount({ playlist: <MediaElementPlaylist showFades />, provider: { track: FADED } });
+    await mount({
+      playlist: <ComposedMediaElementWaveform showFades />,
+      provider: { track: FADED },
+    });
     const boxes = fadeBoxes();
     expect(boxes.length).toBe(2);
     const fadeInWidth = Math.floor((1 * SAMPLE_RATE) / SAMPLES_PER_PIXEL);
@@ -408,7 +410,7 @@ describe('fades are the clip’s', () => {
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={() => fake as unknown as MediaElementPlayout}
       >
-        <MediaElementPlaylist showFades />
+        <ComposedMediaElementWaveform showFades />
         <Probe />
       </MediaElementPlaylistProvider>
     );
@@ -421,6 +423,73 @@ describe('fades are the clip’s', () => {
     expect(after.fadeIn).toEqual({ duration: 3, type: 'linear' });
     expect(after).not.toBe(before);
     expect(after.peaks).toBe(before.peaks);
+  });
+
+  it('fades written inline are compared by value: an equal new object builds neither a new clip nor a new player', async () => {
+    const fake = createFakePlayout();
+    const created = vi.fn(() => fake as unknown as MediaElementPlayout);
+    // A new track object with new, equal fade objects on every call: what an
+    // unmemoized `track` with inline fades is on every render of its parent.
+    const inline = (): MediaElementTrackConfig => ({
+      ...TRACK,
+      fadeIn: { duration: 1, type: 'linear' },
+      fadeOut: { duration: 2, type: 'sCurve' },
+    });
+    const ui = (track: MediaElementTrackConfig) => (
+      <MediaElementPlaylistProvider
+        track={track}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={created}
+      >
+        <ComposedMediaElementWaveform showFades />
+        <Probe />
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(inline()));
+    await waitFor(() => expect(fake.addTrack).toHaveBeenCalledTimes(1));
+    // The player is given the fades.
+    expect(fake.addTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fadeIn: { duration: 1, type: 'linear' },
+        fadeOut: { duration: 2, type: 'sCurve' },
+      })
+    );
+    const clipBefore = trackValue.peaksDataArray[0][0];
+    const arrayBefore = trackValue.peaksDataArray;
+    const fadeInBefore = trackValue.fadeIn;
+    const valueBefore = trackValue;
+
+    await act(async () => {
+      view.rerender(ui(inline()));
+    });
+    await act(async () => {});
+    expect(trackValue.peaksDataArray).toBe(arrayBefore);
+    // The hook's value does not change either, and hands out the first objects.
+    expect(trackValue.fadeIn).toBe(fadeInBefore);
+    expect(trackValue).toBe(valueBefore);
+    expect(trackValue.peaksDataArray[0][0]).toBe(clipBefore);
+    expect(created).toHaveBeenCalledTimes(1);
+    expect(fake.dispose).not.toHaveBeenCalled();
+  });
+
+  it('a fade with another value still builds a new player', async () => {
+    const fake = createFakePlayout();
+    const created = vi.fn(() => fake as unknown as MediaElementPlayout);
+    const ui = (track: MediaElementTrackConfig) => (
+      <MediaElementPlaylistProvider
+        track={track}
+        samplesPerPixel={SAMPLES_PER_PIXEL}
+        createPlayout={created}
+      >
+        <ComposedMediaElementWaveform showFades />
+      </MediaElementPlaylistProvider>
+    );
+    const view = render(ui(FADED));
+    await waitFor(() => expect(created).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      view.rerender(ui({ ...FADED, fadeOut: { duration: 4, type: 'sCurve' } }));
+    });
+    await waitFor(() => expect(created).toHaveBeenCalledTimes(2));
   });
 });
 
@@ -443,7 +512,7 @@ describe('the root renders alone', () => {
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={() => createFakePlayout() as unknown as MediaElementPlayout}
       >
-        <MediaElementPlaylist />
+        <ComposedMediaElementWaveform />
       </MediaElementPlaylistProvider>
     );
     expect(counts.frame).toBeGreaterThan(0);
@@ -508,7 +577,7 @@ describe('the root renders alone', () => {
       calls++;
       return <div data-playhead />;
     };
-    await mount({ playlist: <MediaElementPlaylist renderPlayhead={renderPlayhead} /> });
+    await mount({ playlist: <ComposedMediaElementWaveform renderPlayhead={renderPlayhead} /> });
     // The cursor is at 0 and stays there: nothing the playhead follows changes.
     calls = 0;
     await pressAndRelease(0);
@@ -522,7 +591,7 @@ describe('the root renders alone', () => {
       return 'x';
     };
     await mount({
-      playlist: <MediaElementPlaylist getAnnotationBoxLabel={label} />,
+      playlist: <ComposedMediaElementWaveform getAnnotationBoxLabel={label} />,
       provider: {
         annotationList: {
           annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
@@ -562,7 +631,7 @@ describe('the root renders alone', () => {
     // The annotation lies after the positions played here, so it never
     // becomes the active one (that would render the boxes, rightly).
     const { fake } = await mount({
-      playlist: <MediaElementPlaylist getAnnotationBoxLabel={label} />,
+      playlist: <ComposedMediaElementWaveform getAnnotationBoxLabel={label} />,
       provider: {
         annotationList: {
           annotations: [{ id: 'a', start: 6, end: 7, lines: ['a'] }],
@@ -600,7 +669,7 @@ describe('the selected row is the nearest provider\u2019s', () => {
           samplesPerPixel={SAMPLES_PER_PIXEL}
           createPlayout={() => fake as unknown as MediaElementPlayout}
         >
-          <MediaElementPlaylist />
+          <ComposedMediaElementWaveform />
         </MediaElementPlaylistProvider>
       </WaveformPlaylistProvider>
     );

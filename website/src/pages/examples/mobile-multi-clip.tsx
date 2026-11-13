@@ -60,7 +60,7 @@ export default function MobileMultiClipExamplePage(): React.ReactElement {
           }}>
 {`// With ClipInteractionProvider: one prop
 <ClipInteractionProvider touchOptimized>
-  <Waveform showClipHeaders />
+  <WaveformEditor />
 </ClipInteractionProvider>
 
 // With your own DragDropProvider:
@@ -69,7 +69,7 @@ const sensors = useDragSensors({ touchOptimized: true });
 
 // 2. Tell the clips: interactive, with wider trim handles
 <ClipInteractionOptions enabled touchOptimized>
-  <Waveform showClipHeaders />
+  <WaveformEditor />
 </ClipInteractionOptions>`}
           </pre>
         </div>

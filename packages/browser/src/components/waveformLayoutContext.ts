@@ -55,6 +55,25 @@ export interface WaveformRowsValue {
   dragSourceTrackId: string | null;
 }
 
+/**
+ * Where in the root a part is being rendered: the timescale strip, the
+ * controls column, or the scrolling tracks area (the default: everything the
+ * root does not recognise lands there). Read only for the development
+ * warning of a part that ended up in the wrong place, which happens when it
+ * is wrapped in another component: the root sorts its children by type.
+ */
+export type WaveformPartPlace = 'timescale' | 'controls' | 'tracks';
+export const WaveformPartPlaceContext = createContext<WaveformPartPlace>('tracks');
+
+/**
+ * Whether the root found a recording-preview marker in its tracks part. Read
+ * by the tracks part alone, for the development warning of a tracks part the
+ * root cannot see into (one wrapped in another component). A value of its own
+ * and not a field of the rows value: the controls part reads that one, and
+ * must not render because the marker came or went.
+ */
+export const RootSeesRecordingPreviewContext = createContext(false);
+
 export const WaveformExtentContext = createContext<WaveformExtentValue | null>(null);
 export const WaveformRowsContext = createContext<WaveformRowsValue | null>(null);
 

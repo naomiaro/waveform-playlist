@@ -6,7 +6,6 @@ import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
   KeyboardShortcuts,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -16,6 +15,7 @@ import {
   AudioPosition,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
+  WaveformEditor,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -219,9 +219,7 @@ export function MultiClipExample() {
       mono
       waveHeight={100}
       automaticScroll={true}
-      controls={{ show: true, width: 200 }}
       theme={theme}
-      timescale
       barWidth={4}
       barGap={0}
     >
@@ -250,7 +248,7 @@ export function MultiClipExample() {
           </ControlGroup>
         </Controls>
 
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );

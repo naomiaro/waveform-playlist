@@ -1,6 +1,5 @@
 import React, {
   useContext,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -46,7 +45,7 @@ export interface WaveformRootProps {
 }
 
 /**
- * The root of the multitrack view (#685). Internal for now.
+ * The root of the multitrack view (#685), exported from the package.
  *
  * It owns what the parts share and nothing they draw: the size of the
  * timeline, the vertical layout of the rows (one layout for the tracks and
@@ -68,9 +67,8 @@ export interface WaveformRootProps {
  * across a render that did not change it.
  */
 export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children }) => {
-  const { setSelectedTrackId, setCurrentTime, setRecordingActive } = useEditorControls();
-  const { sampleRate, waveHeight, controls, mono, indefinitePlayback, fillViewport } =
-    usePlaylistView();
+  const { setSelectedTrackId, setCurrentTime } = useEditorControls();
+  const { sampleRate, waveHeight, mono, indefinitePlayback, fillViewport } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { peaksDataArray, tracks, duration, isReady } = usePlaylistTimeline();
   const { trackDragPreview } = useTrackReorderPreview();
@@ -81,21 +79,6 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   // The parts by place, and what the tracks part was given.
   const parts = useWaveformParts(children);
   const { showClipHeaders, recordingState } = parts.tracksOptions;
-
-  // Sync the recording session (and its armed track) to the provider so the
-  // armed track's existing content is transiently muted for the take —
-  // punch-in replaces whatever it overlaps (#579/#589). The cleanup releases
-  // the session on recording end AND on unmount, restoring the track's
-  // previous mute state. Consumers that start playback in the same handler
-  // as the recording should also call setRecordingActive eagerly so the
-  // doomed material never blips before this effect commits.
-  const recordingActive = !!recordingState?.isRecording;
-  const armedTrackId = recordingState?.trackId ?? null;
-  useEffect(() => {
-    if (!recordingActive) return undefined;
-    setRecordingActive(true, armedTrackId);
-    return () => setRecordingActive(false);
-  }, [recordingActive, armedTrackId, setRecordingActive]);
 
   // Per-track spectrogram rendering helpers (memoized) — only computed when spectrogram is available
   const spectrogramHelpersById = useMemo(() => {
@@ -288,7 +271,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     displayDuration,
     rows,
     playlistState: isReady ? 'ready' : 'loading',
-    controlsWidth: controls.show ? controls.width : 0,
+    controlsWidth: parts.controlsWidth,
     onScrollContainer: setScrollContainerElement,
     onPress: ({ offsetY }) => {
       // The row under the pointer, from the layout the rows are positioned with.

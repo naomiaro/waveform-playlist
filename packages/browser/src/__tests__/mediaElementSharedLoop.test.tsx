@@ -72,7 +72,7 @@ import {
   useMediaElementTrack,
   useActiveAnnotation,
 } from '../contexts/playlistContexts';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 const SAMPLE_RATE = 44100;
 const SOURCE_SCALE = 441;
@@ -240,7 +240,7 @@ interface MountOptions {
   strict?: boolean;
   restoreOnSource?: boolean;
   onReady?: () => void;
-  renderPlayhead?: React.ComponentProps<typeof MediaElementPlaylist>['renderPlayhead'];
+  renderPlayhead?: React.ComponentProps<typeof ComposedMediaElementWaveform>['renderPlayhead'];
 }
 
 async function mount(options: MountOptions = {}) {
@@ -257,13 +257,12 @@ async function mount(options: MountOptions = {}) {
         onReady={options.onReady}
         automaticScroll={options.automaticScroll}
         annotationList={options.annotationList}
-        timescale
       >
         <ProbeChild />
         {options.restoreOnSource ? <RestoreOnSource source={track.source} /> : null}
         {showPlaylist
           ? Array.from({ length: playlists }, (_, i) => (
-              <MediaElementPlaylist key={i} renderPlayhead={options.renderPlayhead} />
+              <ComposedMediaElementWaveform key={i} renderPlayhead={options.renderPlayhead} />
             ))
           : null}
       </MediaElementPlaylistProvider>
@@ -373,7 +372,7 @@ describe('MediaElement selection lives in the provider', () => {
     expect(probe.animation.currentTime).toBe(seconds(150));
   });
 
-  it('the selection survives a remount of MediaElementPlaylist', async () => {
+  it('the selection survives a remount of the view', async () => {
     const { show } = await mount();
     const overlay = clickOverlay();
     await press(overlay, 100);

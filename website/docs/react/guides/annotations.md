@@ -44,7 +44,6 @@ function AnnotatedPlaylist() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      timescale
       annotationList={{
         annotations,
         editable: true,
@@ -136,9 +135,27 @@ When using the integrated pattern, `<Waveform />` accepts these annotation-relat
 />
 ```
 
+`<WaveformEditor />` takes the same props. In your own composition the two pieces are separate components: `<WaveformAnnotationBoxes>` is a part of the view, and `<PlaylistAnnotationList>` is the text list below it.
+
+```tsx
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformTrackControls />
+  <WaveformTracks />
+  <WaveformAnnotationBoxes
+    getAnnotationBoxLabel={(annotation, index) => `${index + 1}. ${annotation.lines[0]}`}
+  />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+<PlaylistAnnotationList height={200} controls={annotationActions} />
+```
+
+`<PlaylistAnnotationList>` renders its list also when there are no annotations (`<Waveform />` leaves it out then), and throws without `AnnotationProvider`. See [Composing the View](/docs/react/guides/composing-the-view).
+
 ## Browser Hooks
 
-The browser package provides hooks for annotation interactions. These are used internally by `<Waveform />` but can also be used directly for custom UIs.
+The browser package provides hooks for annotation interactions. Use them to wire annotation dragging and keyboard control into your own UI. `<Waveform />` does not call `useAnnotationDragHandlers` itself: dragging an edge under `WaveformPlaylistProvider` needs it in a `DragDropProvider` of your own (`MediaElementAnnotationBoxes` wires its own).
 
 ### useAnnotationDragHandlers
 
@@ -586,7 +603,6 @@ function AnnotationsExample() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      timescale
       annotationList={{
         annotations,
         editable,

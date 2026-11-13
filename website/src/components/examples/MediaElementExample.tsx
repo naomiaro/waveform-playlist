@@ -6,12 +6,16 @@ import {
   usePlaybackControls,
   useMediaElementTrack,
   loadWaveformData,
-  MediaElementWaveform,
   PlayButton,
   PauseButton,
   StopButton,
   PlaybackRateSelect,
   AudioPosition,
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
@@ -332,7 +336,11 @@ export function MediaElementExample() {
                 </SpeedButton>
               </ControlGroup>
             </Controls>
-            <MediaElementWaveform />
+            <MediaElementWaveformRoot>
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </MediaElementWaveformRoot>
           </MediaElementPlaylistProvider>
         </Section>
       )}
@@ -345,12 +353,16 @@ export function MediaElementExample() {
             samplesPerPixel={512}
             waveHeight={120}
             theme={{ ...theme, playheadColor: '#00bcd4' }}
-            timescale
             barWidth={2}
             barGap={0}
           >
             <PlaybackControls />
-            <MediaElementWaveform renderPlayhead={PlayheadWithMarker} />
+            <MediaElementWaveformRoot>
+              <WaveformTimescale />
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+            </MediaElementWaveformRoot>
           </MediaElementPlaylistProvider>
         </Section>
       )}
@@ -369,7 +381,11 @@ export function MediaElementExample() {
           >
             <EffectWiring />
             <PlaybackControls />
-            <MediaElementWaveform />
+            <MediaElementWaveformRoot>
+              <WaveformTracks />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </MediaElementWaveformRoot>
           </MediaElementPlaylistProvider>
         </Section>
       )}

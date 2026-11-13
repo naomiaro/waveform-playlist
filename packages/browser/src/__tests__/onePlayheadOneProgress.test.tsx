@@ -24,8 +24,8 @@ import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedMediaElementWaveform } from './testCompositions';
+import { ComposedWaveform } from './testCompositions';
 import {
   usePlaybackControls,
   usePlaylistTimeline,
@@ -146,7 +146,7 @@ function createFakePlayout() {
   return fake;
 }
 
-async function mountMediaElement(playlist: React.ReactElement = <MediaElementPlaylist />) {
+async function mountMediaElement(playlist: React.ReactElement = <ComposedMediaElementWaveform />) {
   const fake = createFakePlayout();
   const createPlayout = () => fake as unknown as MediaElementPlayout;
   const view = render(
@@ -270,7 +270,7 @@ function expectRemovedPropsToBeAbsent(props: PlayheadProps) {
 describe('a custom playhead gets the same props under both providers', () => {
   it('MediaElementPlaylistProvider: the seven shared props, visualTimeRef included', async () => {
     const { calls, renderPlayhead, last } = capturePlayhead();
-    await mountMediaElement(<MediaElementPlaylist renderPlayhead={renderPlayhead} />);
+    await mountMediaElement(<ComposedMediaElementWaveform renderPlayhead={renderPlayhead} />);
     expect(calls.length).toBeGreaterThan(0);
     expect(Object.keys(last()).sort()).toEqual(SHARED_PROPS);
     // No output latency to compensate for: one ref serves as both.
@@ -286,7 +286,7 @@ describe('a custom playhead gets the same props under both providers', () => {
 
   it('WaveformPlaylistProvider: the same seven', async () => {
     const { calls, renderPlayhead, last } = capturePlayhead();
-    await mountWebAudio(<PlaylistVisualization renderPlayhead={renderPlayhead} />);
+    await mountWebAudio(<ComposedWaveform renderPlayhead={renderPlayhead} />);
     expect(calls.length).toBeGreaterThan(0);
     expect(Object.keys(last()).sort()).toEqual(SHARED_PROPS);
     expect(last().visualTimeRef).not.toBe(last().currentTimeRef);
@@ -298,7 +298,9 @@ describe('a custom playhead gets the same props under both providers', () => {
 
   it('isPlaying follows playback, under either provider', async () => {
     const mediaElement = capturePlayhead();
-    await mountMediaElement(<MediaElementPlaylist renderPlayhead={mediaElement.renderPlayhead} />);
+    await mountMediaElement(
+      <ComposedMediaElementWaveform renderPlayhead={mediaElement.renderPlayhead} />
+    );
     expect(mediaElement.last().isPlaying).toBe(false);
     await act(async () => {
       await controls.play();
@@ -311,7 +313,7 @@ describe('a custom playhead gets the same props under both providers', () => {
     });
 
     const webAudio = capturePlayhead();
-    await mountWebAudio(<PlaylistVisualization renderPlayhead={webAudio.renderPlayhead} />);
+    await mountWebAudio(<ComposedWaveform renderPlayhead={webAudio.renderPlayhead} />);
     expect(webAudio.last().isPlaying).toBe(false);
     await act(async () => {
       await controls.play(0);
@@ -323,14 +325,16 @@ describe('a custom playhead gets the same props under both providers', () => {
 
   it('the five removed props are not passed, under either provider', async () => {
     const mediaElement = capturePlayhead();
-    await mountMediaElement(<MediaElementPlaylist renderPlayhead={mediaElement.renderPlayhead} />);
+    await mountMediaElement(
+      <ComposedMediaElementWaveform renderPlayhead={mediaElement.renderPlayhead} />
+    );
     expectRemovedPropsToBeAbsent(mediaElement.last());
     await act(async () => {
       cleanup();
     });
 
     const webAudio = capturePlayhead();
-    await mountWebAudio(<PlaylistVisualization renderPlayhead={webAudio.renderPlayhead} />);
+    await mountWebAudio(<ComposedWaveform renderPlayhead={webAudio.renderPlayhead} />);
     expectRemovedPropsToBeAbsent(webAudio.last());
   });
 });
@@ -371,7 +375,7 @@ describe('the resting playhead under MediaElementPlaylistProvider', () => {
   it('a custom playhead is not rendered either while a range is highlighted at rest', async () => {
     const { renderPlayhead } = capturePlayhead();
     const { view } = await mountMediaElement(
-      <MediaElementPlaylist renderPlayhead={renderPlayhead} />
+      <ComposedMediaElementWaveform renderPlayhead={renderPlayhead} />
     );
     expect(view.container.querySelector('[data-custom-playhead]')).not.toBeNull();
     act(() => controls.setSelection(2, 4));
@@ -383,8 +387,8 @@ describe('two visualizations under one WaveformPlaylistProvider', () => {
   it('each animates its own playhead', async () => {
     const { adapter, view } = await mountWebAudio(
       <>
-        <PlaylistVisualization />
-        <PlaylistVisualization />
+        <ComposedWaveform />
+        <ComposedWaveform />
       </>
     );
     const playheads = () =>
@@ -416,8 +420,8 @@ describe('the MediaElement copies are gone', () => {
     expect(existsSync(resolve(components, 'ChannelWithMediaElementProgress.tsx'))).toBe(false);
   });
 
-  it('MediaElementPlaylist defines no playhead wrapper, selection overlay or stub ref of its own', () => {
-    const source = readFileSync(resolve(components, 'MediaElementPlaylist.tsx'), 'utf8');
+  it('MediaElementWaveform defines no playhead wrapper, selection overlay or stub ref of its own', () => {
+    const source = readFileSync(resolve(components, 'MediaElementWaveform.tsx'), 'utf8');
     expect(source).not.toMatch(/ZERO_REF/);
     expect(source).not.toMatch(/CustomMediaElementPlayhead/);
     expect(source).not.toMatch(/MediaElementSelectionOverlay/);

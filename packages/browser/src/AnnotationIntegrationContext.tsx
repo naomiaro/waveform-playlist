@@ -106,7 +106,7 @@ export function useAnnotationIntegration(): AnnotationIntegration {
     throw new Error(
       'useAnnotationIntegration must be used within <AnnotationProvider>. ' +
         'Install @waveform-playlist/annotations and wrap your app with <AnnotationProvider>. ' +
-        'See: https://waveform-playlist.naomiaro.com/docs/guides/annotations'
+        'See: https://naomiaro.github.io/waveform-playlist/docs/react/guides/annotations'
     );
   }
   return context;

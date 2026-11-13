@@ -200,6 +200,16 @@ describe('a press on the tracks of the multitrack view', () => {
     expect(probe.currentTime).toBe(5);
   });
 
+  it('while stopped, released a little to the left: the cursor goes to the release, the collapsed selection stays', async () => {
+    const { overlay } = await mount();
+
+    // 50 px per second: 3 px are 0.06 s, under the 0.1 s that makes a drag.
+    await press(overlay, 250, 10);
+    await release(247);
+    expect(probe.currentTime).toBeCloseTo(4.94, 5);
+    expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
+  });
+
   it('while playing: selects the row, and moves neither the cursor nor playback', async () => {
     const { overlay, play } = await mount();
     await startPlayback();

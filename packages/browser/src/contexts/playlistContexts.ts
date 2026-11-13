@@ -158,8 +158,6 @@ export interface PlaybackControlsContextValue {
 export interface PlaylistViewContextValue {
   sampleRate: number;
   waveHeight: number;
-  timeScaleHeight: number;
-  controls: { show: boolean; width: number };
   barWidth: number;
   barGap: number;
   /** Draw bars with pill-shaped rounded caps (radius barWidth/2). */
@@ -264,9 +262,9 @@ export interface EditorControlsContextValue {
    *  existing content is transiently muted — punch-in recording replaces
    *  whatever the take overlaps (#579), so the doomed material must not play
    *  under the overdub; its previous mute state is restored when the session
-   *  ends (audio-only, the UI mute control is untouched). Wired automatically
-   *  from the Waveform / PlaylistVisualization `recordingState` prop; overdub
-   *  flows should also call it eagerly (before `play()`). */
+   *  ends (audio-only, the UI mute control is untouched). `useRecordingSession`
+   *  calls it for the length of a take; overdub flows should also call it
+   *  eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
@@ -502,8 +500,8 @@ export const usePlaybackControls = () =>
   useSlot(PlaybackControlsContext, 'usePlaybackControls', EITHER);
 
 /**
- * View configuration: `sampleRate`, `waveHeight`, `timeScaleHeight`,
- * `controls`, bar style, `mono`, `indefinitePlayback`, `fillViewport`.
+ * View configuration: `sampleRate`, `waveHeight`, bar style, `mono`,
+ * `indefinitePlayback`, `fillViewport`.
  * Re-renders on a prop change.
  */
 export const usePlaylistView = () => useSlot(PlaylistViewContext, 'usePlaylistView', EITHER);

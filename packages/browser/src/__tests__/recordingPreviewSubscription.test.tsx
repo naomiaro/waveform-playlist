@@ -51,7 +51,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedWaveform } from './testCompositions';
 import { recordingDisplayEnd } from '../hooks/useRecordingLayout';
 import {
   createValueSource,
@@ -139,8 +139,6 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const CONTROLS = { show: true, width: 200 };
-
 function resetCounts() {
   counts.clip = {};
   counts.channel = 0;
@@ -182,10 +180,9 @@ async function mountRecording(initial: RecordingProgress) {
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createAdapter={createAdapter}
-      controls={CONTROLS}
     >
       <ProbeChild />
-      <PlaylistVisualization showClipHeaders recordingState={recordingState} />
+      <ComposedWaveform showClipHeaders recordingState={recordingState} />
     </WaveformPlaylistProvider>
   );
   await waitFor(() => expect(isReady).toBe(true));

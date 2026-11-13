@@ -24,8 +24,10 @@ const NO_MODIFIERS: never[] = [];
 
 export interface MediaElementAnnotationBoxesProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  editable: boolean;
-  linkEndpoints: boolean;
+  /** Whether the edges of a box can be dragged. Default: false. */
+  editable?: boolean;
+  /** Whether dragging an edge also moves the edge of the box it touches. Default: false. */
+  linkEndpoints?: boolean;
   onAnnotationUpdate?: OnAnnotationUpdateFn;
 }
 
@@ -40,8 +42,8 @@ export interface MediaElementAnnotationBoxesProps {
  */
 export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnotationBoxes({
   getAnnotationBoxLabel,
-  editable,
-  linkEndpoints,
+  editable = false,
+  linkEndpoints = false,
   onAnnotationUpdate,
 }: MediaElementAnnotationBoxesProps) {
   // The length of the timeline is the root's, which under this provider is

@@ -38,7 +38,6 @@ import { MediaElementPlaylistProvider, MediaElementWaveform } from '@waveform-pl
   }}
   samplesPerPixel={1024}
   waveHeight={100}
-  timescale
 >
   <MediaElementWaveform />
 </MediaElementPlaylistProvider>
@@ -92,19 +91,7 @@ Zoom level for waveform rendering.
 
 Height of the waveform track in pixels.
 
-#### `timescale`
-
-**Type:** `boolean`
-**Default:** `false`
-
-Show the time ruler at the top of the playlist.
-
-#### `controls`
-
-**Type:** `{ show: boolean; width: number }`
-**Default:** `{ show: false, width: 0 }`
-
-Published as `usePlaylistView().controls`. The MediaElement waveform draws no controls column (this player has no track controls), so the value changes nothing on screen.
+The time ruler is not a provider prop. It is a part of the view: `<MediaElementWaveform />` draws it, and a composition has it when it renders `<WaveformTimescale />` inside `<MediaElementWaveformRoot>`. There is no controls column for this player. See [Composing the View](/docs/react/guides/composing-the-view).
 
 ### Web Audio
 
@@ -217,7 +204,7 @@ Called when the player could not be created (a missing optional peer, a throwing
 | `useAnnotations()` | `annotations`, `continuousPlay` |
 | `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef` (the same ref as `currentTimeRef` here: a media element reports the audible position), `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`; `mono`, `indefinitePlayback` and `fillViewport` are always `false` |
+| `usePlaylistView()` | `sampleRate`, `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`; `mono`, `indefinitePlayback` and `fillViewport` are always `false` |
 | `usePlaylistSettings()` | `timeFormat` (default `'hh:mm:ss.uuu'`), `isAutomaticScroll` |
 | `usePlaylistZoom()` | `samplesPerPixel`; `canZoomIn` and `canZoomOut` are always `false` |
 
@@ -281,8 +268,6 @@ interface MediaElementPlaylistProviderProps {
   // Display
   samplesPerPixel?: number;
   waveHeight?: number;
-  timescale?: boolean;
-  controls?: { show: boolean; width: number };
 
   // Web Audio
   audioContext?: AudioContext;

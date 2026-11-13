@@ -12,7 +12,7 @@ import { centrePlayhead } from '../providerInternals/useScrollFollow';
 import { useScrollFollow } from '../providerInternals/useScrollFollow';
 import { useFrameCallbacks } from '../providerInternals/useFrameCallbacks';
 import { useAnnotationState } from '../providerInternals/useAnnotationState';
-import { useViewDefaults, DEFAULT_CONTROLS } from '../providerInternals/useViewDefaults';
+import { useViewDefaults } from '../providerInternals/useViewDefaults';
 
 const ANNOTATIONS: AnnotationData[] = [
   { id: 'a', start: 0, end: 1, lines: ['a'] },
@@ -343,46 +343,30 @@ describe('useAnnotationState', () => {
 });
 
 describe('useViewDefaults', () => {
-  const base = { barWidth: 2, barGap: 1, timescale: false } as const;
+  const base = { barWidth: 2, barGap: 1 } as const;
 
   it('fills the defaults', () => {
     const { result } = renderHook(() =>
-      useViewDefaults({
-        ...base,
-        controls: undefined,
-        theme: undefined,
-        progressBarWidth: undefined,
-      })
+      useViewDefaults({ ...base, theme: undefined, progressBarWidth: undefined })
     );
-    expect(result.current.controls).toBe(DEFAULT_CONTROLS);
     expect(result.current.progressBarWidth).toBe(3);
-    expect(result.current.timeScaleHeight).toBe(0);
     expect(result.current.mergedTheme.playheadColor).toBeDefined();
   });
 
   it('keeps identities across renders with equal inline objects', () => {
     const { result, rerender } = renderHook(
-      ({ width, color }) =>
-        useViewDefaults({
-          ...base,
-          timescale: true,
-          controls: { show: true, width },
-          theme: { playheadColor: color },
-          progressBarWidth: 7,
-        }),
-      { initialProps: { width: 200, color: 'red' } }
+      ({ color }) =>
+        useViewDefaults({ ...base, theme: { playheadColor: color }, progressBarWidth: 7 }),
+      { initialProps: { color: 'red' } }
     );
     const first = result.current;
     expect(first.progressBarWidth).toBe(7);
-    expect(first.timeScaleHeight).toBe(30);
     expect(first.mergedTheme.playheadColor).toBe('red');
 
-    rerender({ width: 200, color: 'red' });
-    expect(result.current.controls).toBe(first.controls);
+    rerender({ color: 'red' });
     expect(result.current.mergedTheme).toBe(first.mergedTheme);
 
-    rerender({ width: 250, color: 'blue' });
-    expect(result.current.controls).toEqual({ show: true, width: 250 });
+    rerender({ color: 'blue' });
     expect(result.current.mergedTheme.playheadColor).toBe('blue');
   });
 });

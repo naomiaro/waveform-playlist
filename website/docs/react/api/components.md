@@ -1,6 +1,6 @@
 ---
 sidebar_position: 2
-description: "React component API reference for Waveform, buttons, controls, and playhead components"
+description: "React component API reference for the waveform view (roots, parts, ready-made compositions), buttons, controls, and playhead components"
 ---
 
 # Components
@@ -31,36 +31,71 @@ The controls on this page read the nearest playlist provider.
 
 A control under a provider that does not serve it throws when it renders, also when a provider of the right kind is further out. The message names the hook and both providers, for example: "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
-## Waveform
+## The View: Roots, Parts and Ready-Made Compositions
 
-The main visualization component that renders tracks and handles interactions.
+The waveform view is composed. Each thing it draws is a component, a **part**, and it is drawn because it is rendered inside a **root**. Three ready-made compositions cover the common cases. The guide is [Composing the View](/docs/react/guides/composing-the-view).
 
 ```tsx
-<Waveform />
+import {
+  Waveform,
+  WaveformEditor,
+  MediaElementWaveform,
+  WaveformRoot,
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformRecordingPreview,
+  WaveformAnnotationBoxes,
+  MediaElementAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+} from '@waveform-playlist/browser';
 ```
 
-### Features
+### Waveform
 
-- Canvas-based waveform rendering
-- Click to seek
-- Drag to select
-- Drag clips to move/trim
-- Keyboard shortcuts
-- Custom playhead rendering
+The multitrack view, ready-made: the timescale, the loop region, the track controls (a 200 px column), the tracks, the annotation boxes, the selection and the playhead, with the annotation text list below when there are annotations.
 
-### Props
+```tsx
+<WaveformPlaylistProvider tracks={tracks}>
+  <Waveform />
+</WaveformPlaylistProvider>
+```
+
+It renders this composition:
+
+```tsx
+<WaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformLoopRegion />
+  <WaveformTrackControls />
+  <WaveformTracks />
+  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+```
+
+followed by `<PlaylistAnnotationList>` when the playlist has annotations.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `showClipHeaders` | `boolean` | `false` | Show clip name headers above waveforms |
-| `gainScaledWaveforms` | `boolean` | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height), so clips levelled with clip gain look the way they sound. Draw-time only — peaks are not regenerated |
-| `renderPlayhead` | `RenderPlayheadFunction` | - | Custom playhead render function |
-| `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom track controls renderer |
-| `trackReordering` | `boolean` | `false` | Show a drag grip + move up/down buttons on the default track control panel for vertical track reordering. Drag requires `ClipInteractionProvider`; the buttons work regardless |
+| `className` | `string` | - | Class of the view's outermost element |
+| `annotationControls` | `AnnotationAction[]` | - | Action buttons on each item of the annotation text list |
+| `annotationListConfig` | `AnnotationActionOptions` | - | Overrides `{ linkEndpoints, continuousPlay }` for the list's actions |
+| `annotationTextHeight` | `number` | - | Height of the annotation text list in pixels |
+| `renderAnnotationItem` | `(props: RenderAnnotationItemProps) => ReactNode` | - | Custom item of the annotation text list |
+| `getAnnotationBoxLabel` | `GetAnnotationBoxLabelFn` | - | Label of an annotation box. Default: the annotation's id |
+| `scrollActivePosition` | `ScrollLogicalPosition` | `'center'` | Where the active annotation is placed when the list scrolls to it |
+| `scrollActiveContainer` | `'nearest' \| 'all'` | `'nearest'` | Which scrollable containers are scrolled |
 
-Note: The `timescale` prop is set on `WaveformPlaylistProvider`, not on `Waveform`.
+What the view is made of is not an option of `Waveform`. To leave a part out, give a part an option, set the width of the controls column or add your own element, write the composition yourself with `WaveformRoot`.
 
-Note: whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, is not a `Waveform` prop. Wrap the `Waveform` in `ClipInteractionProvider`, or, with your own `DragDropProvider`, in `ClipInteractionOptions`:
+Whether clips can be dragged and trimmed, and whether their trim handles are widened for touch, is not a prop either. Wrap the view in `ClipInteractionProvider`, or, with your own `DragDropProvider`, in `ClipInteractionOptions`:
 
 | `ClipInteractionOptions` prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -69,21 +104,164 @@ Note: whether clips can be dragged and trimmed, and whether their trim handles a
 
 See [Custom Drag Setup](/docs/react/guides/custom-drag-setup#clipinteractionoptions).
 
-### Usage
+### WaveformEditor
+
+`Waveform` with clip headers and fade curves: its tracks part holds `<WaveformClipHeaders />` and `<WaveformFades />`. Same props as `Waveform` (`WaveformEditorProps`). Inside a `ClipInteractionProvider` the header is what a clip is dragged by, and the trim handles come with it.
 
 ```tsx
-<WaveformPlaylistProvider tracks={tracks}>
-  <Waveform />
-</WaveformPlaylistProvider>
+<ClipInteractionProvider>
+  <WaveformEditor />
+</ClipInteractionProvider>
 ```
 
-The Waveform component reads configuration from the provider context.
+### MediaElementWaveform
+
+The view of `MediaElementPlaylistProvider`, ready-made: the timescale, the one track, the annotation boxes, the selection and the playhead, with the annotation text list below when there are annotations.
+
+```tsx
+<MediaElementPlaylistProvider track={track}>
+  <MediaElementWaveform />
+</MediaElementPlaylistProvider>
+```
+
+It renders this composition:
+
+```tsx
+<MediaElementWaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformTracks />
+  <MediaElementAnnotationBoxes
+    getAnnotationBoxLabel={getAnnotationBoxLabel}
+    editable={editable}
+    linkEndpoints={linkEndpoints}
+    onAnnotationUpdate={onAnnotationUpdate}
+  />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</MediaElementWaveformRoot>
+```
+
+followed by `<MediaElementAnnotationList>` when there are annotations.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `className` | `string` | - | Class of the view's outermost element |
+| `annotationTextHeight` | `number` | - | Height of the annotation text list in pixels |
+| `getAnnotationBoxLabel` | `GetAnnotationBoxLabelFn` | - | Label of an annotation box |
+| `renderAnnotationItem` | `(props: RenderAnnotationItemProps) => ReactNode` | - | Custom item of the annotation text list |
+| `editable` | `boolean` | `false` | Annotation boundaries can be dragged |
+| `linkEndpoints` | `boolean` | `false` | Dragging a boundary also moves the boundary of the annotation it touches |
+| `onAnnotationUpdate` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after an edit |
+| `scrollActivePosition` | `ScrollLogicalPosition` | `'center'` | Where the active annotation is placed when the list scrolls to it |
+| `scrollActiveContainer` | `'nearest' \| 'all'` | `'nearest'` | Which scrollable containers are scrolled |
+
+### WaveformRoot and MediaElementWaveformRoot
+
+The frame of the view: the scrolling area, the timescale strip above it and the controls column beside it. A root sorts its children into those places by the type of the element; a child that is not a part is drawn in the scrolling tracks area, in the order written.
+
+`WaveformRoot` needs `WaveformPlaylistProvider`; `MediaElementWaveformRoot` needs `MediaElementPlaylistProvider`. Each throws under the other provider.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `className` | `string` | Class of the view's outermost element |
+| `children` | `ReactNode` | The parts, and anything else to draw over the tracks |
+
+A press on the tracks area starts the selection drag; under `WaveformRoot` it also selects the track under the pointer.
+
+### Parts
+
+| Part | Draws | Props | Provider |
+| --- | --- | --- | --- |
+| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
+| `WaveformLoopRegion` | the draggable loop region, in the same strip; nothing while looping is off | none | `WaveformPlaylistProvider` |
+| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width`, `renderTrackControls`, `onRemoveTrack`, `trackReordering` | `WaveformPlaylistProvider` |
+| `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three parts below | either |
+| `WaveformClipHeaders` | a header on every clip | none | either |
+| `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
+| `WaveformRecordingPreview` | the take being recorded, in its track | `recordingState` | `WaveformPlaylistProvider` |
+| `WaveformAnnotationBoxes` | the row of annotation boxes | `getAnnotationBoxLabel` | `WaveformPlaylistProvider` |
+| `MediaElementAnnotationBoxes` | the row of annotation boxes of the MediaElement player, with its edge drag | `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` | `MediaElementPlaylistProvider` |
+| `WaveformSelection` | the highlighted selection; nothing for a collapsed selection | none | either |
+| `WaveformPlayhead` | the playhead | `renderPlayhead` | either |
+
+#### WaveformTimescale
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `renderTick` | `(label: string, pixelPosition: number) => ReactNode` | Custom tick label. `label` is already formatted for the scale mode |
+
+The strip is 30 px tall and exists when a root has a `WaveformTimescale` or a `WaveformLoopRegion`.
+
+#### WaveformTrackControls
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | `200` | Width of the controls column in pixels. The root reads it from the element, so it must be on the part itself |
+| `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom control panel for a track |
+| `onRemoveTrack` | `(trackIndex: number) => void` | - | The close button of the default panel is drawn only when this is given |
+| `trackReordering` | `boolean` | `false` | A drag grip and move up/down buttons on each default panel. The drag requires `ClipInteractionProvider` (or another `@dnd-kit/react` `DragDropProvider`); the buttons work regardless |
+
+Under `MediaElementWaveformRoot` it draws nothing.
+
+#### WaveformTracks
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `gainScaled` | `boolean` | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height), so clips levelled with clip gain look the way they sound. Draw-time only: peaks are not regenerated |
+| `children` | `ReactNode` | - | `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview`. Nothing else is rendered from here |
+
+`WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` are markers: `WaveformTracks` and the root read them from its children, and they draw nothing anywhere else. With clip interaction enabled, the header is what a clip is dragged by, and the trim handles come with it. Under `MediaElementPlaylistProvider` the header shows the track's `name` ("Track" without one), and nothing supports dragging the clip: leave clip interaction off above that provider.
+
+```tsx
+<WaveformTracks gainScaled>
+  <WaveformClipHeaders />
+  {showFades ? <WaveformFades /> : null}
+</WaveformTracks>
+```
+
+#### WaveformRecordingPreview
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `recordingState` | `WaveformRecordingState` | The take: `isRecording`, `trackId`, `startSample`, `progress` (from `useIntegratedRecording` / `useRecording`), `bits`, optional `latencyOffset` |
+
+It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes what the armed track already holds for the take. See the [Recording guide](/docs/react/guides/recording).
+
+#### WaveformAnnotationBoxes and MediaElementAnnotationBoxes
+
+Both need the `AnnotationProvider` of `@waveform-playlist/annotations` and draw nothing without it or without annotations.
+
+| Prop | On | Type | Default | Description |
+|------|----|------|---------|-------------|
+| `getAnnotationBoxLabel` | both | `GetAnnotationBoxLabelFn` | the annotation's id | Label of a box |
+| `editable` | `MediaElementAnnotationBoxes` | `boolean` | `false` | The edges of a box can be dragged |
+| `linkEndpoints` | `MediaElementAnnotationBoxes` | `boolean` | `false` | Dragging an edge also moves the edge of the box it touches |
+| `onAnnotationUpdate` | `MediaElementAnnotationBoxes` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after a drag |
+
+Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`). Dragging an edge needs `useAnnotationDragHandlers` wired into a `DragDropProvider` of your own around the view (see the [Annotations guide](/docs/react/guides/annotations)); `ClipInteractionProvider` handles clip drags and track reordering, not annotation edges. `MediaElementAnnotationBoxes` brings its own drag wiring.
+
+#### WaveformPlayhead
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `renderPlayhead` | `RenderPlayheadFunction` | Custom playhead. See [Custom Playhead](#custom-playhead) |
+
+The playhead is shown while playing, and at rest when no range is selected.
+
+### Where a Part Must Be
+
+- A part is a child of its root, or of a fragment in it. A part wrapped in your own component is not recognised: a wrapped `WaveformTimescale` or `WaveformTrackControls` is drawn in the tracks area, a wrapped `WaveformClipHeaders` does nothing.
+- One `WaveformTracks` per root, as the root's own child.
+- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and both annotation rows throw outside a root ("The timescale must be rendered inside the waveform root").
+- In development a part that is not where it can work says so once in the console. It does not throw.
+
+The full list is in [Composing the View](/docs/react/guides/composing-the-view#where-a-part-must-be).
 
 ---
 
 ## Custom Playhead
 
-Replace the default playhead with a custom component using the `renderPlayhead` prop.
+Replace the default playhead with a custom component: pass `renderPlayhead` to `<WaveformPlayhead>` in your composition.
 
 ### PlayheadProps
 
@@ -118,7 +296,7 @@ interface PlayheadProps {
 
 `position` is enough for a playhead that only needs to be right while stopped. To move during playback, read `visualTimeRef.current` in your own animation frame while `isPlaying` is true, as `PlayheadWithMarker` does.
 
-The playhead is not rendered (and `renderPlayhead` is not called) while a range is highlighted and playback is stopped or paused.
+`<WaveformPlayhead>` renders nothing (and `renderPlayhead` is not called) while a range is highlighted and playback is stopped or paused.
 
 Engine values are not props. A playhead for `WaveformPlaylistProvider` that needs one calls [`useEngineRefs()`](/docs/react/api/hooks#useenginerefs); the function passed as `renderPlayhead` may call hooks, the same ones on every render (or return your own component: `(props) => <MyPlayhead {...props} />`). A custom playhead is unmounted while it is hidden, so state it holds starts again.
 
@@ -135,9 +313,9 @@ import { Playhead, PlayheadWithMarker } from '@waveform-playlist/ui-components';
 A simple vertical line (used by default):
 
 ```tsx
-<Waveform />
+<WaveformPlayhead />
 // or explicitly:
-<Waveform renderPlayhead={(props) => <Playhead {...props} />} />
+<WaveformPlayhead renderPlayhead={(props) => <Playhead {...props} />} />
 ```
 
 #### PlayheadWithMarker
@@ -145,10 +323,14 @@ A simple vertical line (used by default):
 A playhead with a triangle marker at the top, positioned to sit in the timescale area:
 
 ```tsx
-<Waveform
-  timescale
-  renderPlayhead={(props) => <PlayheadWithMarker {...props} />}
-/>
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformLoopRegion />
+  <WaveformTrackControls />
+  <WaveformTracks />
+  <WaveformSelection />
+  <WaveformPlayhead renderPlayhead={(props) => <PlayheadWithMarker {...props} />} />
+</WaveformRoot>
 ```
 
 ### Custom Playhead Example
@@ -178,7 +360,7 @@ const GlowingPlayhead = ({ position, color = '#ff0000' }) => (
 );
 
 // Usage
-<Waveform renderPlayhead={(props) => <GlowingPlayhead {...props} />} />
+<WaveformPlayhead renderPlayhead={(props) => <GlowingPlayhead {...props} />} />
 ```
 
 ### Performance Tips
@@ -329,16 +511,9 @@ Slider for overall output volume.
 
 **Range:** 0 (silent) to 1 (full)
 
-### TrackVolumeControl
+### Track volume
 
-Volume slider for a specific track.
-
-```tsx
-<TrackVolumeControl trackIndex={0} />
-```
-
-**Props:**
-- `trackIndex` (required): Index of the track
+There is no exported per-track volume component. The volume slider of a track is part of the default control panel that `<WaveformTrackControls />` draws. For your own slider, read the value from `usePlaylistMixer().trackStates[trackIndex].volume` and set it with `useEditorControls().setTrackVolume(trackIndex, volume)`, in a panel you pass as `renderTrackControls`.
 
 ---
 
@@ -411,6 +586,8 @@ Switching it on while an annotation is playing lets playback continue past that 
 <ContinuousPlayCheckbox />
 ```
 
+It must be inside the `<AnnotationProvider>` of `@waveform-playlist/annotations` and throws without it, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` do.
+
 ### AutomaticScrollCheckbox
 
 Toggle for auto-scrolling during playback. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
@@ -423,13 +600,9 @@ Toggle for auto-scrolling during playback. While it is on, a drag on the wavefor
 
 ## Track Controls
 
-### TrackControls
+### The default panel
 
-Built-in control panel for a track.
-
-```tsx
-<TrackControls trackIndex={0} />
-```
+The built-in control panel of a track is not exported as a component of its own: `<WaveformTrackControls />` draws one per track.
 
 **Includes:**
 - Track name
@@ -437,10 +610,14 @@ Built-in control panel for a track.
 - Solo button
 - Volume slider
 - Pan slider
+- A close button, when `onRemoveTrack` is given
+- A drag grip and move up/down buttons, with `trackReordering`
+
+Pass `renderTrackControls` to draw your own panel instead.
 
 ### SortableTrackControls
 
-Registers a custom track-controls row as a vertical drag source for reordering. Use this when rendering your own track control panel (via `renderTrackControls`) instead of the default one — the default panel already wires this up internally when `trackReordering` is set on `Waveform`.
+Registers a custom track-controls row as a vertical drag source for reordering. Use this when rendering your own track control panel (via `renderTrackControls` on `<WaveformTrackControls>`) instead of the default one — the default panel already wires this up internally when `trackReordering` is set on `<WaveformTrackControls>`.
 
 ```tsx
 <SortableTrackControls trackId={track.id} index={trackIndex}>
@@ -558,7 +735,13 @@ const createEffectsChain = (masterVolume, destination, isOffline) => {
 ```tsx
 import {
   WaveformPlaylistProvider,
-  Waveform,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
   PlayButton,
   PauseButton,
   StopButton,
@@ -571,11 +754,9 @@ import {
   MasterVolumeControl,
   AudioPosition,
   TimeFormatSelect,
-  ContinuousPlayCheckbox,
   AutomaticScrollCheckbox,
-  ExportWavButton,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { ExportWavButton, useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function FullFeaturedPlaylist() {
   const { tracks, loading, error } = useAudioTracks([
@@ -591,8 +772,6 @@ function FullFeaturedPlaylist() {
       tracks={tracks}
       samplesPerPixel={1024}
       waveHeight={100}
-      timescale
-      controls={{ show: true, width: 180 }}
     >
       {/* Transport Controls */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -620,7 +799,6 @@ function FullFeaturedPlaylist() {
 
       {/* Options */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        <ContinuousPlayCheckbox />
         <AutomaticScrollCheckbox />
       </div>
 
@@ -629,8 +807,15 @@ function FullFeaturedPlaylist() {
         <ExportWavButton filename="my-mix" />
       </div>
 
-      {/* Waveform */}
-      <Waveform />
+      {/* The view: the parts of <Waveform /> without the annotation row, with a 180 px controls column */}
+      <WaveformRoot>
+        <WaveformTimescale />
+        <WaveformLoopRegion />
+        <WaveformTrackControls width={180} />
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </WaveformRoot>
     </WaveformPlaylistProvider>
   );
 }

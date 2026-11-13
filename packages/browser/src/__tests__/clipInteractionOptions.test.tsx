@@ -4,7 +4,7 @@
 // widened for touch, has ONE source: a context that each clip reads.
 // `ClipInteractionProvider` sets it; `ClipInteractionOptions` sets it for a
 // consumer with their own DragDropProvider. `<Waveform>` and
-// `<PlaylistVisualization>` take neither as a prop.
+// `<ComposedWaveform>` take neither as a prop.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
@@ -48,8 +48,8 @@ vi.mock('../hooks/useDragSensors', async (importOriginal) => {
 
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
-import { Waveform } from '../components/Waveform';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { Waveform, WaveformEditor } from '../components/Waveform';
+import { ComposedWaveform } from './testCompositions';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 // Through the package entry, so the export itself is covered.
 import { ClipInteractionOptions, useClipInteractionEnabled } from '../index';
@@ -179,7 +179,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <ClipInteractionProvider touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     ));
 
@@ -195,7 +195,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <ClipInteractionProvider>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     ));
 
@@ -207,7 +207,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </>
     ));
 
@@ -220,7 +220,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <ClipInteractionOptions enabled touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
 
@@ -233,7 +233,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <ClipInteractionOptions enabled>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
 
@@ -246,7 +246,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionProvider touchOptimized>
         <ClipInteractionOptions touchOptimized={false}>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionOptions>
       </ClipInteractionProvider>
     ));
@@ -262,7 +262,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionProvider touchOptimized>
         <ClipInteractionOptions enabled={false}>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionOptions>
       </ClipInteractionProvider>
     ));
@@ -276,7 +276,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container } = await mount((probe) => (
       <ClipInteractionOptions touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
 
@@ -289,7 +289,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container, rerender } = await mount((probe) => (
       <ClipInteractionOptions enabled={enabled}>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
     expect(handleWidths(container)).toEqual([]);
@@ -314,9 +314,9 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <>
         {probe}
         {/* @ts-expect-error interactiveClips was removed in #690 */}
-        <Waveform showClipHeaders interactiveClips />
+        <Waveform interactiveClips />
         {/* @ts-expect-error touchOptimized was removed in #690 */}
-        <PlaylistVisualization showClipHeaders touchOptimized />
+        <ComposedWaveform showClipHeaders touchOptimized />
       </>
     ));
 
@@ -329,7 +329,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionOptions touchOptimized>
         <ClipInteractionProvider>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionProvider>
       </ClipInteractionOptions>
     ));
@@ -344,7 +344,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionOptions touchOptimized>
         <ClipInteractionProvider touchOptimized={false}>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionProvider>
       </ClipInteractionOptions>
     ));
@@ -358,7 +358,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionProvider touchOptimized>
         <ClipInteractionProvider>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionProvider>
       </ClipInteractionProvider>
     ));
@@ -372,7 +372,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     await mount((probe) => (
       <ClipInteractionProvider>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     ));
 
@@ -384,7 +384,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <ClipInteractionOptions enabled={false}>
         <ClipInteractionProvider>
           {probe}
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionProvider>
       </ClipInteractionOptions>
     ));
@@ -397,18 +397,18 @@ describe('clip interaction options have one source, the context (#690)', () => {
     await mount((probe) => (
       <ClipInteractionProvider touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     ));
 
     expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: true });
   });
 
-  it('PlaylistVisualization used directly reads the same context', async () => {
+  it('a composition written by hand reads the same context', async () => {
     const { container } = await mount((probe) => (
       <ClipInteractionProvider touchOptimized>
         {probe}
-        <PlaylistVisualization showClipHeaders />
+        <ComposedWaveform showClipHeaders />
       </ClipInteractionProvider>
     ));
 
@@ -421,7 +421,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { container, rerender } = await mount((probe) => (
       <ClipInteractionOptions enabled touchOptimized={touch}>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
     expect(new Set(handleWidths(container))).toEqual(new Set([CLIP_BOUNDARY_WIDTH]));
@@ -439,7 +439,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { rerender } = await mount((probe) => (
       <ClipInteractionProvider touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionProvider>
     ));
     await act(async () => {});
@@ -456,7 +456,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     const { rerender } = await mount((probe) => (
       <ClipInteractionOptions enabled touchOptimized>
         {probe}
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     ));
     await act(async () => {});

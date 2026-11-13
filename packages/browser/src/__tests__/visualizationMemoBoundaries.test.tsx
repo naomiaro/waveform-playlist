@@ -73,7 +73,7 @@ import {
   usePlaylistZoom,
   useSelectedTrackId,
 } from '../contexts/playlistContexts';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -173,8 +173,6 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const CONTROLS = { show: true, width: 200 };
-
 const ANNOTATIONS = [
   { id: 'n1', start: 0, end: 0.5, lines: ['one'] },
   { id: 'n2', start: 0.5, end: 1, lines: ['two'] },
@@ -205,11 +203,9 @@ async function mount(initialTracks: ClipTrack[], { annotations = false } = {}) {
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       annotationList={annotationList}
-      controls={CONTROLS}
-      timescale
     >
       <ProbeChild />
-      <PlaylistVisualization showClipHeaders />
+      <ComposedWaveform showClipHeaders />
     </WaveformPlaylistProvider>
   );
   const utils = render(ui(initialTracks));
@@ -326,11 +322,9 @@ describe('visualization memo boundaries (#693)', () => {
         tracks={threeTracks().tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={() => adapter}
-        controls={CONTROLS}
-        timescale
       >
         <ProbeChild />
-        <PlaylistVisualization showClipHeaders />
+        <ComposedWaveform showClipHeaders />
       </WaveformPlaylistProvider>
     );
     await waitFor(() => expect(probe.data.isReady).toBe(true));
@@ -507,7 +501,7 @@ describe('visualization memo boundaries (#693)', () => {
         createAdapter={() => adapter}
       >
         <ProbeChild />
-        <PlaylistVisualization
+        <ComposedWaveform
           renderPlayhead={({ position }) => {
             positions.push(position);
             return <div data-custom-playhead />;

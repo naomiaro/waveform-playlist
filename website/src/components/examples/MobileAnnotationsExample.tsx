@@ -26,7 +26,6 @@ import {
   AudioPosition,
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
-  Waveform,
   usePlaybackControls,
   useActiveAnnotation,
   useAnnotationDragHandlers,
@@ -36,6 +35,14 @@ import {
   usePlaylistTimeline,
   useAnnotations,
   useAnnotationEditing,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTracks,
+  WaveformAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+  PlaylistAnnotationList,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -283,7 +290,7 @@ interface MobileAnnotationsContentProps {
 }
 
 const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
-  const { sampleRate, controls } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
   const { annotations, continuousPlay } = useAnnotations();
@@ -352,10 +359,17 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
           </ControlGroup>
         </Controls>
 
-        <Waveform
-          annotationControls={mobileAnnotationActions}
-          annotationTextHeight={200}
-        />
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          <WaveformTracks />
+          <WaveformAnnotationBoxes />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+        {annotations.length > 0 ? (
+          <PlaylistAnnotationList controls={mobileAnnotationActions} height={200} />
+        ) : null}
 
         <ActiveAnnotationInfo />
       </Container>
@@ -434,9 +448,7 @@ export function MobileAnnotationsExample() {
       mono
       waveHeight={100}
       automaticScroll={false}
-      controls={{ show: false, width: 0 }}
       theme={theme}
-      timescale
       barWidth={4}
       barGap={0}
       annotationList={{

@@ -19,7 +19,7 @@ import {
   useActiveAnnotation,
   useSelection,
 } from '../contexts/playlistContexts';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 const SAMPLE_RATE = 44100;
 const SOURCE_SCALE = 441;
@@ -199,7 +199,7 @@ async function mount(options: MountOptions = {}) {
       automaticScroll={options.automaticScroll}
     >
       <ProbeChild />
-      {options.playlist ? <MediaElementPlaylist /> : null}
+      {options.playlist ? <ComposedMediaElementWaveform /> : null}
     </MediaElementPlaylistProvider>
   );
   const view = render(tree());
@@ -444,7 +444,7 @@ describe('the selection is played, and setting it moves the cursor', () => {
   });
 });
 
-describe('the drag in MediaElementPlaylist', () => {
+describe('the drag in the MediaElement view', () => {
   function overlay(): HTMLElement {
     const playhead = document.querySelector('[data-playhead]') as HTMLElement;
     const element = playhead.parentElement!.lastElementChild as HTMLElement;

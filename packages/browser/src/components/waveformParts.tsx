@@ -1,8 +1,8 @@
 /**
- * The parts of the view (#685). Internal for now: `PlaylistVisualization`
- * composes them inside `WaveformRoot` and `MediaElementPlaylist` composes the
- * ones its provider can serve inside `MediaElementRoot`; nothing here is
- * exported from the package yet.
+ * The parts of the view (#685), exported from the package: a consumer
+ * composes them inside `WaveformRoot` (or, the ones its provider can serve,
+ * inside `MediaElementWaveformRoot`). `Waveform`, `WaveformEditor` and
+ * `MediaElementWaveform` are ready-made compositions of them.
  *
  * A part reads what it draws from the provider's contexts and from the root's
  * two layout values (waveformLayoutContext.ts); its props are the options of
@@ -17,51 +17,58 @@
  * that composes them usually re-renders with the tracks (it holds them), and
  * a part whose props did not change should not follow.
  */
-import React, { type ReactNode } from 'react';
+import React, { useContext, type ReactNode } from 'react';
 import { SmartScale } from '@waveform-playlist/ui-components';
 import {
-  TracksPart,
+  WaveformTracks,
   scanTracksParts,
-  type TracksPartOptions,
-  type TracksPartProps,
+  type TracksMarkers,
+  type WaveformTracksProps,
 } from './TrackRows';
-import { TrackControlsPart } from './TrackControlsColumn';
 import {
-  AnnotationBoxesOverlay,
-  LoopRegionOverlay,
-  PlayheadOverlay,
-  SelectionOverlay,
-} from './VisualizationOverlays';
-import { useWaveformExtent } from './waveformLayoutContext';
+  DEFAULT_TRACK_CONTROLS_WIDTH,
+  WaveformTrackControls,
+  type WaveformTrackControlsProps,
+} from './TrackControlsColumn';
+import { WaveformLoopRegion } from './VisualizationOverlays';
+import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
+import { warnMisplacedPart } from './partWarnings';
 
 export {
-  TracksPart,
-  ClipHeadersPart,
-  FadesPart,
-  RecordingPreviewPart,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformRecordingPreview,
   scanTracksParts,
 } from './TrackRows';
-export { TrackControlsPart } from './TrackControlsColumn';
+export { WaveformTrackControls } from './TrackControlsColumn';
 
-export interface TimescalePartProps {
+export interface WaveformTimescaleProps {
   /** Custom tick label. `label` is already formatted for the scale mode. */
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
 }
 
 /** The time ruler, as long as the root's timeline. */
-export const TimescalePart = React.memo(function TimescalePart({ renderTick }: TimescalePartProps) {
+export const WaveformTimescale = React.memo(function WaveformTimescale({
+  renderTick,
+}: WaveformTimescaleProps) {
   const { displayDuration } = useWaveformExtent('The timescale');
+  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+    warnMisplacedPart(
+      '<WaveformTimescale> is drawn among the tracks, not in the timescale strip: the root ' +
+        'recognises a part by its element type, so it must be a child of the root (a fragment ' +
+        'is fine), not wrapped in another component.'
+    );
+  }
   return <SmartScale durationMs={displayDuration * 1000} renderTick={renderTick} />;
 });
 
-/** The draggable loop region, drawn over the timescale. */
-export const LoopRegionPart = LoopRegionOverlay;
-/** The row of annotation boxes under the tracks. */
-export const AnnotationBoxesPart = AnnotationBoxesOverlay;
-/** The highlighted selection. */
-export const SelectionPart = SelectionOverlay;
-/** The playhead. */
-export const PlayheadPart = PlayheadOverlay;
+export {
+  WaveformAnnotationBoxes,
+  WaveformLoopRegion,
+  WaveformPlayhead,
+  WaveformSelection,
+} from './VisualizationOverlays';
 
 export interface SortedWaveformParts {
   /** Drawn in the timescale strip, in order. */
@@ -74,11 +81,13 @@ export interface SortedWaveformParts {
    */
   content: ReactNode[];
   /** The per-clip parts of the tracks part (all off when there is none). */
-  tracksOptions: TracksPartOptions;
+  tracksOptions: TracksMarkers;
+  /** Width of the controls column in pixels, from the controls part; 0 without one. */
+  controlsWidth: number;
 }
 
-const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([TimescalePart, LoopRegionPart]);
-const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([TrackControlsPart]);
+const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([WaveformTimescale, WaveformLoopRegion]);
+const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([WaveformTrackControls]);
 
 /**
  * Sorts the root's children into the places a playlist has. Fragments are
@@ -87,9 +96,10 @@ const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([TrackControlsPart]);
  *
  * The elements are returned as they were given (no clone, no new key), so a
  * render of the root that received the same children hands React the same
- * elements and the parts are skipped. Call it from a `useMemo` on `children`,
- * and render each list as the children of one element (spread, not an array):
- * the elements have no keys.
+ * elements and the parts are skipped. Call it from a `useMemo` on `children`.
+ * The elements have no keys of their own: render the tracks-area and controls
+ * lists as the children of one element (spread, not an array), and give the
+ * strip's parts a key by kind (`useWaveformParts` does both).
  */
 export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
   const sorted: SortedWaveformParts = {
@@ -97,7 +107,9 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     controls: [],
     content: [],
     tracksOptions: { showClipHeaders: false, showFades: false, recordingState: undefined },
+    controlsWidth: 0,
   };
+  let tracksParts = 0;
   const visit = (node: ReactNode) => {
     React.Children.forEach(node, (child) => {
       if (React.isValidElement(child)) {
@@ -111,12 +123,28 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           return;
         }
         if (CONTROLS_PARTS.has(child.type)) {
+          // The first controls part says how wide the column is.
+          if (sorted.controls.length === 0) {
+            const { width } = child.props as WaveformTrackControlsProps;
+            // `null` (plain JavaScript) means "not given", like `undefined`.
+            const given = width !== undefined && width !== null;
+            if (given && !(width > 0)) {
+              warnMisplacedPart(
+                '<WaveformTrackControls width> must be a positive number of pixels: with ' +
+                  String(width) +
+                  ' no controls column is drawn. Leave the part out to have none.'
+              );
+            }
+            // Not a positive number: no column, and 0 for whoever reads the width.
+            sorted.controlsWidth = !given ? DEFAULT_TRACK_CONTROLS_WIDTH : width > 0 ? width : 0;
+          }
           sorted.controls.push(child);
           sorted.content.push(null);
           return;
         }
-        if (child.type === TracksPart) {
-          sorted.tracksOptions = scanTracksParts((child.props as TracksPartProps).children);
+        if (child.type === WaveformTracks) {
+          tracksParts++;
+          sorted.tracksOptions = scanTracksParts((child.props as WaveformTracksProps).children);
         }
       }
       // Every child keeps one position in the tracks area, also one that is
@@ -127,5 +155,17 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     });
   };
   visit(children);
+  if (sorted.controls.length > 1) {
+    warnMisplacedPart(
+      'A waveform root has more than one <WaveformTrackControls>: each draws a panel for every ' +
+        'track in the one controls column, which is as wide as the first says.'
+    );
+  }
+  if (tracksParts > 1) {
+    warnMisplacedPart(
+      'A waveform root has more than one <WaveformTracks>: each draws every row, and the row ' +
+        'heights follow the per-clip parts of the last one.'
+    );
+  }
   return sorted;
 }

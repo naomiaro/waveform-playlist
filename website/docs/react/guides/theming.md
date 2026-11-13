@@ -234,7 +234,7 @@ function OceanThemedPlaylist() {
         <PauseButton />
         <StopButton />
       </div>
-      <Waveform timescale />
+      <Waveform />
     </WaveformPlaylistProvider>
   );
 }

@@ -24,6 +24,7 @@ import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useViewDefaults } from './providerInternals/useViewDefaults';
 import { useTimeFormat } from './hooks/useTimeFormat';
+import { useShallowStable } from './hooks/useShallowStable';
 import {
   BLOCKED,
   ActiveAnnotationContext,
@@ -88,8 +89,6 @@ export interface MediaElementPlaylistProviderProps {
   samplesPerPixel?: number;
   /** Height of each waveform track */
   waveHeight?: number;
-  /** Show timescale */
-  timescale?: boolean;
   /** Playback rate (default 1). Not clamped by the provider: the bundled
    *  engine is created at it as given, while `setPlaybackRate` clamps to
    *  0.5–2. The user's `setPlaybackRate` overrides it; a later change of this
@@ -102,8 +101,6 @@ export interface MediaElementPlaylistProviderProps {
   automaticScroll?: boolean;
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
-  /** Track controls configuration */
-  controls?: { show: boolean; width: number };
   /** Annotations */
   annotationList?: {
     annotations?: AnnotationData[];
@@ -165,12 +162,10 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   track,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   waveHeight = 100,
-  timescale = false,
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
   theme: userThemeProp,
-  controls: controlsProp,
   annotationList,
   barWidth = 1,
   barGap = 0,
@@ -183,13 +178,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   createPlayout,
   children,
 }) => {
-  const { controls, mergedTheme, progressBarWidth, timeScaleHeight } = useViewDefaults({
-    controls: controlsProp,
+  const { mergedTheme, progressBarWidth } = useViewDefaults({
     theme: userThemeProp,
     barWidth,
     barGap,
     progressBarWidth: progressBarWidthProp,
-    timescale,
   });
 
   // State
@@ -341,8 +334,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   // The one clip of the one track. It carries the track's fades, so the view
   // draws them as it draws any clip's (#685).
-  const trackFadeIn = track.fadeIn;
-  const trackFadeOut = track.fadeOut;
+  // Compared by value: a fade written inline (`fadeIn: { duration: 1 }` in a
+  // `track` that is not memoized) is a new object on every render of the
+  // parent, and must neither build a new clip nor a new player (below).
+  const trackFadeIn = useShallowStable(track.fadeIn);
+  const trackFadeOut = useShallowStable(track.fadeOut);
   const peaksDataArray = useMemo<TrackClipPeaks[]>(() => {
     if (!trackPeaks) return [];
     const clipPeaks: ClipPeaks = {
@@ -463,8 +459,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
           peaks: track.waveformData,
           name: track.name,
           audioContext,
-          fadeIn: track.fadeIn,
-          fadeOut: track.fadeOut,
+          fadeIn: trackFadeIn,
+          fadeOut: trackFadeOut,
         });
 
         // The media element reports its position about four times a second,
@@ -587,8 +583,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     track.source,
     track.waveformData,
     track.name,
-    track.fadeIn,
-    track.fadeOut,
+    trackFadeIn,
+    trackFadeOut,
     audioContext,
     initialPlaybackRate,
     preservesPitch,
@@ -919,8 +915,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     () => ({
       sampleRate,
       waveHeight,
-      timeScaleHeight,
-      controls,
       barWidth,
       barGap,
       roundedBars,
@@ -929,16 +923,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       indefinitePlayback: false,
       fillViewport: false,
     }),
-    [
-      sampleRate,
-      waveHeight,
-      timeScaleHeight,
-      controls,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
-    ]
+    [sampleRate, waveHeight, barWidth, barGap, roundedBars, progressBarWidth]
   );
   const zoomValue: PlaylistZoomContextValue = useMemo(
     () => ({ samplesPerPixel, canZoomIn: false, canZoomOut: false }),

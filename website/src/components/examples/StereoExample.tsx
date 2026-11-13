@@ -11,11 +11,15 @@ import React from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
   AudioPosition,
+  WaveformRoot,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -72,7 +76,6 @@ export function StereoExample() {
       theme={theme}
       barWidth={2}
       barGap={0}
-      controls={{ show: true, width: 200 }}
     >
       <Controls>
         <PlayButton />
@@ -82,7 +85,12 @@ export function StereoExample() {
         {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
       </Controls>
 
-      <Waveform />
+      <WaveformRoot>
+        <WaveformTrackControls />
+        <WaveformTracks />
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </WaveformRoot>
     </WaveformPlaylistProvider>
   );
 }

@@ -11,7 +11,7 @@ import { render, act, cleanup, fireEvent, waitFor } from '@testing-library/react
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { useSelectedTrackId } from '../contexts/playlistContexts';
-import { Waveform } from '../components/Waveform';
+import { Waveform, WaveformEditor } from '../components/Waveform';
 import type { ClipTrack, AudioClip, RenderMode } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -113,7 +113,7 @@ async function mount(tracks: ClipTrack[], showClipHeaders = false) {
       waveHeight={WAVE_HEIGHT}
     >
       <Probe />
-      <Waveform showClipHeaders={showClipHeaders} />
+      {showClipHeaders ? <WaveformEditor /> : <Waveform />}
     </WaveformPlaylistProvider>
   );
   await waitFor(() => {

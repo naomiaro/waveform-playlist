@@ -51,8 +51,8 @@ export interface ClipPeaks {
   midiNotes?: MidiNoteData[];
   sampleRate?: number;
   offsetSamples?: number;
-  /** The clip's linear gain — drawn into the waveform when `<Waveform
-   *  gainScaledWaveforms />` is set. */
+  /** The clip's linear gain — drawn into the waveform when
+   *  `<WaveformTracks gainScaled />` is set. */
   gain?: number;
 }
 
@@ -115,17 +115,12 @@ import {
 
 export interface WaveformPlaylistProviderProps {
   tracks: ClipTrack[]; // Updated to use clip-based model
-  timescale?: boolean;
   mono?: boolean;
   waveHeight?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
-  controls?: {
-    show: boolean;
-    width: number;
-  };
   annotationList?: {
     annotations?: AnnotationData[];
     editable?: boolean;
@@ -207,14 +202,12 @@ export interface WaveformPlaylistProviderProps {
 
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
   tracks,
-  timescale = false,
   mono = false,
   waveHeight = 80,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
   automaticScroll = false,
   theme: userThemeProp,
-  controls: controlsProp,
   annotationList,
   effects,
   trackEffects,
@@ -235,13 +228,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   createAdapter,
   children,
 }) => {
-  const { controls, mergedTheme, progressBarWidth, timeScaleHeight } = useViewDefaults({
-    controls: controlsProp,
+  const { mergedTheme, progressBarWidth } = useViewDefaults({
     theme: userThemeProp,
     barWidth,
     barGap,
     progressBarWidth: progressBarWidthProp,
-    timescale,
   });
 
   // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
@@ -329,7 +320,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   //    must not play under the overdub. Engine-level mute (survives adapter
   //    rebuilds), captured/restored around the session; the track's UI mute
   //    state is untouched.
-  // Auto-wired from the view's recordingState prop (by its root); overdub
+  // Called by useRecordingSession for the length of a take; overdub
   // flows also call it eagerly before play() — a render round-trip loses the
   // race against the first animation frame (empty timeline: time 0 >=
   // duration 0 would stop playback instantly).
@@ -1932,8 +1923,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     () => ({
       sampleRate,
       waveHeight,
-      timeScaleHeight,
-      controls,
       barWidth,
       barGap,
       roundedBars,
@@ -1945,8 +1934,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [
       sampleRate,
       waveHeight,
-      timeScaleHeight,
-      controls,
       barWidth,
       barGap,
       roundedBars,

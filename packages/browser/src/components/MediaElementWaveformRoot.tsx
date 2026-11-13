@@ -13,6 +13,7 @@ import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
 import { useWaveformFrame, useWaveformParts } from './waveformFrame';
+import { warnMisplacedPart } from './partWarnings';
 
 // A MediaElement player has one audio track and nothing a row can be asked to
 // do: module constants, so the rows value changes only with the peaks, the
@@ -24,14 +25,14 @@ const NO_RENDER_MODES: ReadonlyMap<string, RenderMode> = new Map();
 const NO_SPECTROGRAM_HELPERS: ReadonlyMap<string, SpectrogramTrackHelpers> = new Map();
 const nothing = () => {};
 
-export interface MediaElementRootProps {
+export interface MediaElementWaveformRootProps {
   className?: string;
   /** The parts, and anything else to draw over the track. */
   children?: ReactNode;
 }
 
 /**
- * The root of the MediaElement view (#685). Internal for now.
+ * The root of the MediaElement view (#685), exported from the package.
  *
  * The counterpart of `WaveformRoot` for `MediaElementPlaylistProvider`: it
  * works out what only this provider knows (the timeline is as long as the
@@ -46,12 +47,21 @@ export interface MediaElementRootProps {
  *
  * No controls column is drawn: there is no controls part for this provider.
  */
-export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, children }) => {
+export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> = ({
+  className,
+  children,
+}) => {
   const { setSelection } = usePlaybackControls();
   const { duration, peaksDataArray } = useMediaElementTrack();
   const { waveHeight } = usePlaylistView();
 
   const parts = useWaveformParts(children);
+  if (parts.controls) {
+    warnMisplacedPart(
+      '<WaveformTrackControls> draws nothing inside <MediaElementWaveformRoot>: a MediaElement ' +
+        'player has one track and no mixer. Remove it.'
+    );
+  }
   const { showClipHeaders } = parts.tracksOptions;
 
   const rows = useMemo<WaveformRowsValue>(() => {

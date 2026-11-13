@@ -17,7 +17,7 @@ function shallowEqual(a: object, b: object): boolean {
  * Returns the previous object while the new one is shallow-equal to it.
  *
  * Consumers usually pass small config objects as inline literals
- * (`controls={{ show: true, width: 200 }}`), which have a new identity on every
+ * (`theme={{ playheadColor: 'red' }}`), which have a new identity on every
  * render of the parent. Passing such a prop through this hook before using it
  * as a `useMemo` dependency keeps the memo from being invalidated by a render
  * in which the object's contents did not change.

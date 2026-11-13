@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 //
-// #685, step 1: `PlaylistVisualization` is the default composition of the
-// view's parts. Each of its props must reach the part it configures, and a
-// part that is switched off must not be drawn. `recordingState` is not here:
+// #685: the view is a composition of parts. Each option must reach the part
+// it configures, and a part that is left out must not be drawn. The view here
+// is `ComposedWaveform` (testCompositions.tsx): the parts composed as a
+// consumer would, with one prop per option (until step 3 this file mounted
+// the prop-driven `PlaylistVisualization`, hence its name). `recordingState` is not here:
 // recordingPreviewSubscription.test.tsx mounts the view with it.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -69,14 +71,14 @@ import {
   usePlaylistZoom,
   useEditorControls,
 } from '../contexts/playlistContexts';
-import { PlaylistVisualization } from '../components/PlaylistVisualization';
+import { ComposedWaveform } from './testCompositions';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
   type AnnotationBoxIntegrationProps,
 } from '../AnnotationIntegrationContext';
-import type { PlaylistVisualizationProps } from '../components/PlaylistVisualization';
+import type { ComposedWaveformProps } from './testCompositions';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -178,15 +180,12 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const CONTROLS = { show: true, width: 200 };
-// A width, so that only `show` hides the column (a width of 0 hides it by itself).
-const NO_CONTROLS = { show: false, width: 200 };
 const ANNOTATION_LIST = { annotations: [{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }] };
 const TRACKS = [makeTrack('t1'), makeTrack('t2')];
 
 async function mount(
-  props: PlaylistVisualizationProps = {},
-  { timescale = true, controls = CONTROLS, dragProvider = false, tracks = TRACKS } = {}
+  props: ComposedWaveformProps = {},
+  { dragProvider = false, tracks = TRACKS } = {}
 ) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -201,7 +200,7 @@ async function mount(
   isReady = false;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  const view = <PlaylistVisualization {...props} />;
+  const view = <ComposedWaveform {...props} />;
   render(
     <AnnotationIntegrationContext.Provider value={INTEGRATION}>
       <WaveformPlaylistProvider
@@ -209,8 +208,6 @@ async function mount(
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
         annotationList={ANNOTATION_LIST}
-        controls={controls}
-        timescale={timescale}
       >
         <ProbeChild />
         {dragProvider ? <ClipInteractionProvider>{view}</ClipInteractionProvider> : view}
@@ -231,7 +228,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('PlaylistVisualization hands each prop to its part (#685)', () => {
+describe('each option reaches its part (#685)', () => {
   it('with no props: rows, panels and a timescale; no headers, fades, gain scaling, close buttons or reorder rails', async () => {
     await mount();
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);
@@ -288,22 +285,20 @@ describe('PlaylistVisualization hands each prop to its part (#685)', () => {
     expect((column.firstElementChild as HTMLElement).style.height).toBe('31px');
   });
 
-  it('the timescale and the loop region are not drawn when the provider has no timescale', async () => {
-    await mount({}, { timescale: false });
+  it('the timescale is not drawn without its part', async () => {
+    await mount({ noTimescale: true });
     await act(async () => {
       editor.setLoopRegion(0.2, 0.6);
       editor.setLoopEnabled(true);
     });
     expect(seen.scale).toBe(0);
-    expect(seen.loopMax).toEqual([]);
+    // The loop region is a part of its own: the strip is there for it.
+    expect(seen.loopMax.length).toBeGreaterThan(0);
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);
   });
 
-  it('the controls are not drawn when the provider hides them', async () => {
-    await mount(
-      { renderTrackControls: () => <i data-custom-panel="" /> },
-      { controls: NO_CONTROLS }
-    );
+  it('no controls are drawn without the controls part', async () => {
+    await mount({ noControls: true });
     expect(document.querySelectorAll('[data-custom-panel]').length).toBe(0);
     expect(document.querySelectorAll('input[aria-label="Volume"]').length).toBe(0);
   });

@@ -4,9 +4,8 @@
  * re-render on every pointer move of a selection drag and on every
  * active-annotation change during playback, and the rows do not.
  *
- * `SelectionOverlay` and `PlayheadOverlay` read shared hooks only and are
- * rendered by both views (`PlaylistVisualization` and `MediaElementPlaylist`,
- * #688). The annotation boxes and the loop region are multitrack only.
+ * `WaveformSelection` and `WaveformPlayhead` read shared hooks only and are
+ * rendered under both providers (#688). The annotation boxes and the loop region are multitrack only.
  */
 import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import {
@@ -34,7 +33,8 @@ import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotatio
 import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
-import { useWaveformExtent } from './waveformLayoutContext';
+import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
+import { warnMisplacedPart } from './partWarnings';
 import { SelectionPreviewContext, type SelectionRange } from '../hooks/useSelectionDrag';
 
 const subscribeToNothing = () => () => {};
@@ -47,7 +47,7 @@ const noPreview = (): SelectionRange | null => null;
  * a press) is not its concern, only the selection, the zoom, the view settings
  * and the theme are.
  */
-export const SelectionOverlay: React.FC = React.memo(function SelectionOverlay() {
+export const WaveformSelection: React.FC = React.memo(function WaveformSelection() {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { selectionStart, selectionEnd } = useSelection();
   const { sampleRate } = usePlaylistView();
@@ -108,7 +108,7 @@ const CustomPlayhead: React.FC<{
   }) as React.ReactElement;
 };
 
-export interface PlayheadOverlayProps {
+export interface WaveformPlayheadProps {
   /** Custom playhead render function. Receives position (pixels) and color from theme. */
   renderPlayhead?: RenderPlayheadFunction;
 }
@@ -117,7 +117,7 @@ export interface PlayheadOverlayProps {
  * The playhead: shown while playing, and at rest when no range is selected.
  * The same under either provider.
  */
-export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead }) => {
+export const WaveformPlayhead: React.FC<WaveformPlayheadProps> = ({ renderPlayhead }) => {
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isPlaying } = useIsPlaying();
   const { selectionStart, selectionEnd } = useSelection();
@@ -138,7 +138,7 @@ export const PlayheadOverlay: React.FC<PlayheadOverlayProps> = ({ renderPlayhead
   );
 };
 
-export interface AnnotationBoxesOverlayProps {
+export interface WaveformAnnotationBoxesProps {
   /**
    * Custom function to generate the label shown on annotation boxes in the waveform.
    * Receives the annotation data and its index, returns a string label.
@@ -153,9 +153,9 @@ export interface AnnotationBoxesOverlayProps {
  * component that composes the view does not render it while
  * `getAnnotationBoxLabel` keeps its identity.
  */
-export const AnnotationBoxesOverlay = React.memo(function AnnotationBoxesOverlay({
+export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBoxes({
   getAnnotationBoxLabel,
-}: AnnotationBoxesOverlayProps) {
+}: WaveformAnnotationBoxesProps) {
   const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');
   const { annotations, continuousPlay } = useAnnotations();
   const { annotationsEditable } = useAnnotationEditing();
@@ -203,8 +203,15 @@ export const AnnotationBoxesOverlay = React.memo(function AnnotationBoxesOverlay
  * The draggable loop region in the timescale, bounded by the root's timeline.
  * Renders nothing while looping is off. Memoized: it takes no props.
  */
-export const LoopRegionOverlay = React.memo(function LoopRegionOverlay() {
+export const WaveformLoopRegion = React.memo(function WaveformLoopRegion() {
   const { tracksFullWidth: maxPosition } = useWaveformExtent('The loop region');
+  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+    warnMisplacedPart(
+      '<WaveformLoopRegion> is drawn among the tracks, not in the timescale strip: the root ' +
+        'recognises a part by its element type, so it must be a child of the root (a fragment ' +
+        'is fine), not wrapped in another component.'
+    );
+  }
   const theme = useTheme() as WaveformPlaylistTheme;
   const { isLoopEnabled, loopStart, loopEnd } = useLoop();
   const { setLoopRegion } = useEditorControls();

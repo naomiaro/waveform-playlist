@@ -7,21 +7,21 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import {
-  AnnotationBoxesPart,
-  ClipHeadersPart,
-  FadesPart,
-  LoopRegionPart,
-  RecordingPreviewPart,
-  SelectionPart,
-  TimescalePart,
-  TrackControlsPart,
-  TracksPart,
+  WaveformAnnotationBoxes,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformLoopRegion,
+  WaveformRecordingPreview,
+  WaveformSelection,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
   scanTracksParts,
   sortWaveformParts,
 } from '../components/waveformParts';
-import type { VisualizationRecordingState } from '../components/visualizationLayout';
+import type { WaveformRecordingState } from '../components/visualizationLayout';
 
-const RECORDING = { isRecording: true, trackId: 't1' } as VisualizationRecordingState;
+const RECORDING = { isRecording: true, trackId: 't1' } as WaveformRecordingState;
 
 describe('scanTracksParts', () => {
   it('finds nothing among no children', () => {
@@ -33,15 +33,15 @@ describe('scanTracksParts', () => {
   });
 
   it('finds each per-clip part on its own', () => {
-    expect(scanTracksParts(<ClipHeadersPart />)).toMatchObject({
+    expect(scanTracksParts(<WaveformClipHeaders />)).toMatchObject({
       showClipHeaders: true,
       showFades: false,
     });
-    expect(scanTracksParts(<FadesPart />)).toMatchObject({
+    expect(scanTracksParts(<WaveformFades />)).toMatchObject({
       showClipHeaders: false,
       showFades: true,
     });
-    expect(scanTracksParts(<RecordingPreviewPart recordingState={RECORDING} />)).toEqual({
+    expect(scanTracksParts(<WaveformRecordingPreview recordingState={RECORDING} />)).toEqual({
       showClipHeaders: false,
       showFades: false,
       recordingState: RECORDING,
@@ -52,12 +52,12 @@ describe('scanTracksParts', () => {
     const on = false as boolean;
     const found = scanTracksParts(
       <>
-        {on ? <ClipHeadersPart /> : null}
-        {on && <FadesPart />}
+        {on ? <WaveformClipHeaders /> : null}
+        {on && <WaveformFades />}
         <>
-          <FadesPart />
+          <WaveformFades />
           <>
-            <ClipHeadersPart />
+            <WaveformClipHeaders />
           </>
         </>
       </>
@@ -66,23 +66,23 @@ describe('scanTracksParts', () => {
   });
 
   it('does not see a part wrapped in another component', () => {
-    const Wrapped = () => <ClipHeadersPart />;
+    const Wrapped = () => <WaveformClipHeaders />;
     expect(scanTracksParts(<Wrapped />).showClipHeaders).toBe(false);
   });
 });
 
 describe('sortWaveformParts', () => {
   it('puts each part in its place and keeps the elements it was given', () => {
-    const timescale = <TimescalePart />;
-    const loop = <LoopRegionPart />;
-    const controls = <TrackControlsPart />;
+    const timescale = <WaveformTimescale />;
+    const loop = <WaveformLoopRegion />;
+    const controls = <WaveformTrackControls />;
     const tracks = (
-      <TracksPart>
-        <ClipHeadersPart />
-      </TracksPart>
+      <WaveformTracks>
+        <WaveformClipHeaders />
+      </WaveformTracks>
     );
-    const boxes = <AnnotationBoxesPart />;
-    const selection = <SelectionPart />;
+    const boxes = <WaveformAnnotationBoxes />;
+    const selection = <WaveformSelection />;
     const own = <div data-own="" />;
 
     const sorted = sortWaveformParts([timescale, loop, controls, tracks, boxes, own, selection]);
@@ -102,8 +102,8 @@ describe('sortWaveformParts', () => {
   });
 
   it('a part that is switched off keeps its position in the tracks-area list', () => {
-    const tracks = <TracksPart />;
-    const withScale = sortWaveformParts([<TimescalePart key="s" />, tracks]);
+    const tracks = <WaveformTracks />;
+    const withScale = sortWaveformParts([<WaveformTimescale key="s" />, tracks]);
     const without = sortWaveformParts([false, tracks]);
 
     expect(withScale.content.indexOf(tracks)).toBe(1);
@@ -113,8 +113,8 @@ describe('sortWaveformParts', () => {
   });
 
   it('looks through fragments', () => {
-    const controls = <TrackControlsPart />;
-    const tracks = <TracksPart />;
+    const controls = <WaveformTrackControls />;
+    const tracks = <WaveformTracks />;
     const sorted = sortWaveformParts(
       <>
         <>
@@ -128,7 +128,7 @@ describe('sortWaveformParts', () => {
   });
 
   it('a wrapped part is drawn in the tracks area, and text is kept', () => {
-    const Wrapped = () => <TimescalePart />;
+    const Wrapped = () => <WaveformTimescale />;
     const wrapped = <Wrapped />;
     const sorted = sortWaveformParts([wrapped, 'text']);
     expect(sorted.timescale).toEqual([]);
@@ -137,7 +137,7 @@ describe('sortWaveformParts', () => {
   });
 
   it('with no tracks part, the per-clip options are all off', () => {
-    expect(sortWaveformParts(<SelectionPart />).tracksOptions).toEqual({
+    expect(sortWaveformParts(<WaveformSelection />).tracksOptions).toEqual({
       showClipHeaders: false,
       showFades: false,
       recordingState: undefined,

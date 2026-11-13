@@ -20,7 +20,7 @@ import {
   type AnnotationIntegration,
   type AnnotationBoxIntegrationProps,
 } from '../AnnotationIntegrationContext';
-import { AnnotationBoxesOverlay } from '../components/VisualizationOverlays';
+import { WaveformAnnotationBoxes } from '../components/VisualizationOverlays';
 import { WaveformExtentContext } from '../components/waveformLayoutContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -130,7 +130,7 @@ const ANNOTATION_LIST = { annotations: ANNOTATIONS };
 // The row takes its width from the root of the view (#685); there is no root here.
 const EXTENT = { displayDuration: 60, tracksFullWidth: 2000 };
 
-type LabelFn = React.ComponentProps<typeof AnnotationBoxesOverlay>['getAnnotationBoxLabel'];
+type LabelFn = React.ComponentProps<typeof WaveformAnnotationBoxes>['getAnnotationBoxLabel'];
 
 async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -149,7 +149,7 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
       >
         <ProbeChild />
         <WaveformExtentContext.Provider value={EXTENT}>
-          <AnnotationBoxesOverlay getAnnotationBoxLabel={getLabel} />
+          <WaveformAnnotationBoxes getAnnotationBoxLabel={getLabel} />
         </WaveformExtentContext.Provider>
       </WaveformPlaylistProvider>
     </AnnotationIntegrationContext.Provider>

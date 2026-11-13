@@ -38,7 +38,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
 });
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 import { usePlaybackControls } from '../contexts/playlistContexts';
 import type { PlayheadProps } from '@waveform-playlist/ui-components';
 
@@ -133,7 +133,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-async function mount(playlist: React.ReactElement = <MediaElementPlaylist />) {
+async function mount(playlist: React.ReactElement = <ComposedMediaElementWaveform />) {
   const fake = createFakePlayout();
   const createPlayout = () => fake as unknown as MediaElementPlayout;
   const view = render(
@@ -228,7 +228,7 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
       positions.push(props.position);
       return <div data-custom-playhead />;
     };
-    await mount(<MediaElementPlaylist renderPlayhead={renderPlayhead} />);
+    await mount(<ComposedMediaElementWaveform renderPlayhead={renderPlayhead} />);
     act(() => controls.seekTo(2));
     expect(positions[positions.length - 1]).toBe(2 * PX_PER_SECOND);
   });

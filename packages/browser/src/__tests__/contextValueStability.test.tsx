@@ -215,8 +215,8 @@ const CHILDREN = (
   </>
 );
 
-// `inlineProps` passes fresh `controls` and `theme` object literals on every
-// render of the wrapper, which is how most consumers write them.
+// `inlineProps` passes a fresh `theme` object literal on every render of the
+// wrapper, which is how most consumers write it.
 async function mount({ inlineProps = false } = {}) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -230,9 +230,7 @@ async function mount({ inlineProps = false } = {}) {
       tracks={tracks}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
-      {...(inlineProps
-        ? { controls: { show: true, width: 200 }, theme: { playheadColor: 'red' } }
-        : {})}
+      {...(inlineProps ? { theme: { playheadColor: 'red' } } : {})}
     >
       {CHILDREN}
     </WaveformPlaylistProvider>
@@ -305,7 +303,6 @@ describe('provider context values keep their identity (#691)', () => {
     const dataBefore = probe.view;
     const timelineBefore = probe.timeline;
     const themeBefore = probe.theme;
-    expect(probe.view.controls).toEqual({ show: true, width: 200 });
 
     await act(async () => {
       rerender();

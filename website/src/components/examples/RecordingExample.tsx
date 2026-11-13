@@ -19,7 +19,6 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   // PlayButton, PauseButton, StopButton omitted — recording example uses
   // custom versions that are disabled during recording
   AudioPosition,
@@ -36,9 +35,23 @@ import {
   useLoop,
   useSelectedTrackId,
   useIsPlaying,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformRecordingPreview,
+  WaveformSelection,
+  WaveformPlayhead,
+  useRecordingSession,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
+
+// The width of the controls column: given to the controls part, and used by
+// the recording auto-scroll below.
+const TRACK_CONTROLS_WIDTH = 200;
 import {
   RecordButton,
   TransportPlayButton,
@@ -173,7 +186,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const { currentTimeRef } = usePlaybackRefs();
   const { isPlaying } = useIsPlaying();
   const { currentTime } = useCurrentTime();
-  const { sampleRate, controls } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
   const { isAutomaticScroll } = usePlaylistSettings();
   const { samplesPerPixel } = usePlaylistZoom();
   const { scrollContainerRef, play, stop, pause, seekTo } = usePlaybackControls();
@@ -233,6 +246,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     latencyOffset,
   });
 
+  // The take's session: while recording, the provider keeps playback running
+  // and mutes what the armed track already holds. The preview part in the
+  // view only draws the take.
+  useRecordingSession({
+    isRecording: isRecording && recordingTrackId !== null,
+    trackId: recordingTrackId,
+  });
+
   // Sample rate info — flag potential resampling between mic and AudioContext
   const micSampleRate = stream?.getAudioTracks()[0]?.getSettings()?.sampleRate ?? null;
   const ctxSampleRate = sampleRate;
@@ -270,7 +291,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       // Arm the recorded track BEFORE starting playback: punch-in replaces
       // whatever the take overlaps, so its existing content is transiently
       // muted for the session and must never blip. Release is automatic via
-      // the Waveform's recordingState sync when the recording ends.
+      // useRecordingSession when the recording ends.
       setRecordingActive(true, selectedTrackId);
       const started = await startRecording();
       if (!started || cancelRecordingStartRef.current) {
@@ -488,7 +509,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   useEffect(() => {
     if (!isRecording || !isAutomaticScroll) return;
 
-    const controlWidth = controls.show ? controls.width : 0;
+    const controlWidth = TRACK_CONTROLS_WIDTH;
     const bufferZone = 100;
 
     const follow = ({ duration }: { duration: number }) => {
@@ -509,7 +530,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
     follow(recordingProgress.getSnapshot());
     return recordingProgress.subscribe(follow);
-  }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, controls, scrollContainerRef]);
+  }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, scrollContainerRef]);
 
   // Handle dropped/selected audio files
   const handleFiles = useCallback(
@@ -685,12 +706,15 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
       {/* Waveform */}
       <ClipInteractionProvider>
-        <Waveform
-          showClipHeaders
-          onRemoveTrack={handleRemoveTrack}
-          recordingState={
-            isRecording && recordingTrackId
-              ? {
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          <WaveformTrackControls width={TRACK_CONTROLS_WIDTH} onRemoveTrack={handleRemoveTrack} />
+          <WaveformTracks>
+            <WaveformClipHeaders />
+            {isRecording && recordingTrackId ? (
+              <WaveformRecordingPreview
+                recordingState={{
                   isRecording: true,
                   // The track the take was started on: selecting another
                   // track mid-take does not move it.
@@ -703,10 +727,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
                   // Same override the hook uses, so the live preview matches the
                   // finalized clip (otherwise preview uses the auto value).
                   latencyOffset,
-                }
-              : undefined
-          }
-        />
+                }}
+              />
+            ) : null}
+          </WaveformTracks>
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
       </ClipInteractionProvider>
 
       {/* Position display — bottom bar */}
@@ -765,9 +792,7 @@ export function RecordingExample() {
           waveHeight={100}
           automaticScroll
           fillViewport
-          controls={{ show: true, width: 200 }}
           theme={theme}
-          timescale
           barWidth={1}
           barGap={0}
         >

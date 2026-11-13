@@ -112,7 +112,6 @@ export function App() {
           preservesPitch={preservesPitch}
           barWidth={2}
           barGap={0}
-          timescale
           // Surface a player that could not be created (e.g. a missing peer) and
           // media that failed to load.
           onError={handlePlayoutError}

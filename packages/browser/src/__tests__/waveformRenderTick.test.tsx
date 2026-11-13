@@ -9,7 +9,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { Waveform } from '../components/Waveform';
+import { ComposedWaveform } from './testCompositions';
+import { WaveformTimescale } from '../components/waveformParts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -91,7 +92,6 @@ function mount(waveform: React.ReactElement) {
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createAdapter={createAdapter}
-      timescale
     >
       {waveform}
     </WaveformPlaylistProvider>
@@ -104,11 +104,11 @@ function labelToMs(label: string): number {
   return (minutes * 60 + seconds) * 1000;
 }
 
-describe('<Waveform> timescale label callbacks', () => {
+describe('<WaveformTimescale> label callbacks', () => {
   it('renderTick receives the formatted label and its pixel position', async () => {
     const calls = new Map<string, number>();
     mount(
-      <Waveform
+      <ComposedWaveform
         renderTick={(label, pixelPosition) => {
           calls.set(label, pixelPosition);
           return <span data-tick={label}>{label}</span>;
@@ -138,7 +138,7 @@ describe('<Waveform> timescale label callbacks', () => {
     // unused @ts-expect-error (the prop coming back) fails it. vitest does not
     // typecheck, so the assertion below only keeps the element in use.
     // @ts-expect-error -- removed in #714; use renderTick
-    const element = <Waveform renderTimestamp={() => null} />;
-    expect(element.type).toBe(Waveform);
+    const element = <WaveformTimescale renderTimestamp={() => null} />;
+    expect(element.type).toBe(WaveformTimescale);
   });
 });

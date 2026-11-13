@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// #685, part 2: `MediaElementPlaylist` is a composition. Its four annotation
-// props must reach the annotation-boxes part as they were given.
+// #685: the MediaElement view is a composition. The four annotation options
+// must reach the annotation-boxes part as they were given (the view here is
+// `ComposedMediaElementWaveform`, testCompositions.tsx).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
@@ -21,7 +22,7 @@ vi.mock('../components/MediaElementAnnotationBoxes', () => ({
 }));
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
-import { MediaElementPlaylist } from '../components/MediaElementPlaylist';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 const WAVEFORM_DATA = WaveformData.create({
   version: 2,
@@ -72,12 +73,12 @@ function mount(playlist: React.ReactElement) {
   );
 }
 
-describe('MediaElementPlaylist hands its annotation props to the boxes', () => {
+describe('the annotation options reach the MediaElement boxes', () => {
   it('as given', () => {
     const label = () => 'x';
     const onUpdate = () => {};
     mount(
-      <MediaElementPlaylist
+      <ComposedMediaElementWaveform
         getAnnotationBoxLabel={label}
         editable
         linkEndpoints
@@ -93,7 +94,7 @@ describe('MediaElementPlaylist hands its annotation props to the boxes', () => {
   });
 
   it('editable and linkEndpoints are false when left out', () => {
-    mount(<MediaElementPlaylist />);
+    mount(<ComposedMediaElementWaveform />);
     expect(lastProps()).toEqual({
       getAnnotationBoxLabel: undefined,
       editable: false,

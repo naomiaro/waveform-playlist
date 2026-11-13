@@ -34,7 +34,7 @@ import {
   ClipCollisionModifier,
   SnapToGridModifier,     // Only if using snap-to-grid
   ClipInteractionOptions, // Tells the clips they can be dragged and trimmed
-  Waveform,
+  WaveformEditor,
 } from '@waveform-playlist/browser';
 ```
 
@@ -85,7 +85,7 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
       ]}
     >
       <ClipInteractionOptions enabled>
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     </DragDropProvider>
   );
@@ -178,7 +178,7 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
       modifiers={modifiers}
     >
       <ClipInteractionOptions enabled>
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     </DragDropProvider>
   );
@@ -242,7 +242,7 @@ import {
   useAnnotationDragHandlers,
   useDragSensors,
   ClipInteractionOptions,
-  Waveform,
+  WaveformEditor,
 } from '@waveform-playlist/browser';
 
 function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnotationsChange }) {
@@ -295,7 +295,7 @@ function PlaylistWithAnnotations({ tracks, onTracksChange, annotations, onAnnota
       modifiers={[RestrictToHorizontalAxis, ClipCollisionModifier.configure({ tracks, samplesPerPixel })]}
     >
       <ClipInteractionOptions enabled>
-        <Waveform showClipHeaders />
+        <WaveformEditor />
       </ClipInteractionOptions>
     </DragDropProvider>
   );
@@ -316,7 +316,7 @@ The sensors do not change the size of the trim handles. Widen them with `touchOp
 
 ```tsx
 <ClipInteractionOptions enabled touchOptimized>
-  <Waveform showClipHeaders />
+  <WaveformEditor />
 </ClipInteractionOptions>
 ```
 
@@ -339,7 +339,7 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 <ClipInteractionProvider touchOptimized>
   {/* Touch-delay sensors, but the normal 8px handles */}
   <ClipInteractionOptions touchOptimized={false}>
-    <Waveform showClipHeaders />
+    <WaveformEditor />
   </ClipInteractionOptions>
 </ClipInteractionProvider>
 ```

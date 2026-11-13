@@ -10,7 +10,6 @@ import styled from 'styled-components';
 import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -19,6 +18,13 @@ import {
   KeyboardShortcuts,
   usePlaybackControls,
   usePlaylistSettings,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -408,9 +414,7 @@ export function MidiExample() {
           theme={{ ...theme, ...gradientTheme }}
           soundFontCache={soundFontCache}
           progressBarWidth={2}
-          controls={{ show: true, width: 200 }}
           waveHeight={100}
-          timescale
           automaticScroll
         >
           <KeyboardShortcuts playback />
@@ -429,7 +433,14 @@ export function MidiExample() {
             </ToggleGroup>
           </Controls>
 
-          <Waveform onRemoveTrack={handleRemoveTrack} />
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls onRemoveTrack={handleRemoveTrack} />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
         </WaveformPlaylistProvider>
       ) : (
         <LoadingOverlay>

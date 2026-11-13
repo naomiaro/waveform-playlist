@@ -26,7 +26,8 @@ Peer dependencies: `react` (^19.0.0), `styled-components` (^6.0.0), `@dnd-kit/re
 
 ```tsx
 import { useState } from 'react';
-import { WaveformPlaylistProvider, Waveform, useAudioTracks } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 
 function AnnotatedPlaylist() {
@@ -43,7 +44,6 @@ function AnnotatedPlaylist() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      timescale
       annotationList={{
         annotations,
         editable: true,

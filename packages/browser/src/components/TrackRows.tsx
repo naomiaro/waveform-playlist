@@ -1,4 +1,12 @@
-import React, { useCallback, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { warnMisplacedPart } from './partWarnings';
 import {
   Track as TrackComponent,
   Clip,
@@ -25,23 +33,30 @@ import {
   SpectrogramIntegrationContext,
   type SpectrogramIntegration,
 } from '../SpectrogramIntegrationContext';
-import { useWaveformExtent, useWaveformRows } from './waveformLayoutContext';
+import {
+  RootSeesRecordingPreviewContext,
+  useWaveformExtent,
+  useWaveformRows,
+} from './waveformLayoutContext';
 import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import {
   TrackRowPositioner,
   TracksLayout,
   getTrackChannelCount,
-  type VisualizationRecordingState,
+  type WaveformRecordingState,
 } from './visualizationLayout';
 
 type FrequencyScaleFn = (f: number, minF: number, maxF: number) => number;
 
-/** Options that are the same for every clip of the playlist. */
-interface ClipDisplayOptions {
-  samplesPerPixel: number;
-  sampleRate: number;
-  showClipHeaders: boolean;
+/**
+ * What every clip of the view is drawn with and no row uses: set once by the
+ * tracks part, read by each clip (#685). A context and not props, so the
+ * options do not travel through the row. The value changes only when one of
+ * its fields does (a per-clip part comes or goes, the spectrogram integration
+ * changes), and then every clip renders, as it must.
+ */
+interface ClipDisplayValue {
   gainScaledWaveforms: boolean;
   showFades: boolean;
   selectTrack: (trackIndex: number) => void;
@@ -49,7 +64,16 @@ interface ClipDisplayOptions {
   unregisterSpectrogramCanvas: SpectrogramIntegration['unregisterSpectrogramCanvas'] | undefined;
 }
 
-interface ClipViewProps extends ClipDisplayOptions {
+const ClipDisplayContext = createContext<ClipDisplayValue | null>(null);
+
+/** What a row uses itself and hands each of its clips. */
+interface RowDisplayOptions {
+  samplesPerPixel: number;
+  sampleRate: number;
+  showClipHeaders: boolean;
+}
+
+interface ClipViewProps extends RowDisplayOptions {
   clip: ClipPeaks;
   trackId: string;
   trackIndex: number;
@@ -77,12 +101,15 @@ const ClipView = React.memo(function ClipView({
   samplesPerPixel,
   sampleRate,
   showClipHeaders,
-  gainScaledWaveforms,
-  showFades,
-  selectTrack,
-  registerSpectrogramCanvas,
-  unregisterSpectrogramCanvas,
 }: ClipViewProps) {
+  // Always present: a clip is only ever rendered by the tracks part.
+  const {
+    gainScaledWaveforms,
+    showFades,
+    selectTrack,
+    registerSpectrogramCanvas,
+    unregisterSpectrogramCanvas,
+  } = useContext(ClipDisplayContext) as ClipDisplayValue;
   // The one source of both options (#690): set by `ClipInteractionProvider`
   // or `ClipInteractionOptions` above, never passed down as props.
   const { enabled: interactiveClips, touchOptimized } = useClipInteraction();
@@ -149,7 +176,7 @@ const ClipView = React.memo(function ClipView({
 });
 
 interface RecordingPreviewClipProps {
-  recordingState: VisualizationRecordingState;
+  recordingState: WaveformRecordingState;
   trackId: string;
   trackIndex: number;
   clipIndex: number;
@@ -242,7 +269,7 @@ const RecordingPreviewClip: React.FC<RecordingPreviewClipProps> = ({
   );
 };
 
-interface TrackRowProps extends ClipDisplayOptions {
+interface TrackRowProps extends RowDisplayOptions {
   trackId: string;
   trackIndex: number;
   trackClipPeaks: TrackClipPeaks;
@@ -258,7 +285,7 @@ interface TrackRowProps extends ClipDisplayOptions {
   waveHeight: number;
   mono: boolean;
   /** Set only on the track being recorded into. */
-  recordingState: VisualizationRecordingState | undefined;
+  recordingState: WaveformRecordingState | undefined;
   /** Set only for a spectrogram track whose config asks for labels. */
   spectrogramConfig: SpectrogramConfig | undefined;
   frequencyScaleFn: FrequencyScaleFn | undefined;
@@ -288,10 +315,11 @@ const TrackRow = React.memo(function TrackRow({
   recordingState,
   spectrogramConfig,
   frequencyScaleFn,
-  ...clipOptions
+  samplesPerPixel,
+  sampleRate,
+  showClipHeaders,
 }: TrackRowProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
-  const { sampleRate, samplesPerPixel, showClipHeaders } = clipOptions;
 
   return (
     <TrackRowPositioner
@@ -338,7 +366,9 @@ const TrackRow = React.memo(function TrackRow({
             clipIndex={clipIndex}
             isSelected={isSelected}
             renderMode={renderMode}
-            {...clipOptions}
+            samplesPerPixel={samplesPerPixel}
+            sampleRate={sampleRate}
+            showClipHeaders={showClipHeaders}
           />
         ))}
         {recordingState?.isRecording && (
@@ -366,39 +396,54 @@ export interface SpectrogramTrackHelpers {
   config: SpectrogramConfig | undefined;
 }
 
+const MARKER_OUTSIDE_TRACKS = (name: string) =>
+  `<${name}> does nothing here: it must be a child of <WaveformTracks> (a fragment is fine), ` +
+  'not wrapped in another component and not a child of the root.';
+
 /**
  * Marker: clips get a header. With clip interaction enabled the header is also
  * what a clip is dragged by, and the trim handles come with it. It adds to the
  * height of every row, which is why the root must know of it before anything
  * is drawn: it renders nothing itself.
  */
-export const ClipHeadersPart: React.FC = () => null;
+export const WaveformClipHeaders: React.FC = () => {
+  // A marker is read from the children of the tracks part and never rendered
+  // there: when this runs, it was put somewhere else.
+  warnMisplacedPart(MARKER_OUTSIDE_TRACKS('WaveformClipHeaders'));
+  return null;
+};
 
 /** Marker: clips show their fade-in and fade-out curves. Renders nothing itself. */
-export const FadesPart: React.FC = () => null;
+export const WaveformFades: React.FC = () => {
+  warnMisplacedPart(MARKER_OUTSIDE_TRACKS('WaveformFades'));
+  return null;
+};
 
-export interface RecordingPreviewPartProps {
-  recordingState: VisualizationRecordingState;
+export interface WaveformRecordingPreviewProps {
+  recordingState: WaveformRecordingState;
 }
 
 /**
  * Marker: the take being recorded is drawn into its track as it grows. The
  * preview clip is drawn by that track's row; this renders nothing itself.
  */
-export const RecordingPreviewPart: React.FC<RecordingPreviewPartProps> = () => null;
+export const WaveformRecordingPreview: React.FC<WaveformRecordingPreviewProps> = () => {
+  warnMisplacedPart(MARKER_OUTSIDE_TRACKS('WaveformRecordingPreview'));
+  return null;
+};
 
-export interface TracksPartOptions {
+export interface TracksMarkers {
   showClipHeaders: boolean;
   showFades: boolean;
-  recordingState: VisualizationRecordingState | undefined;
+  recordingState: WaveformRecordingState | undefined;
 }
 
 /**
  * Which per-clip parts are among the children of the tracks part. Looks
  * through fragments; a part wrapped in another component is not seen.
  */
-export function scanTracksParts(children: ReactNode): TracksPartOptions {
-  const found: TracksPartOptions = {
+export function scanTracksParts(children: ReactNode): TracksMarkers {
+  const found: TracksMarkers = {
     showClipHeaders: false,
     showFades: false,
     recordingState: undefined,
@@ -406,12 +451,18 @@ export function scanTracksParts(children: ReactNode): TracksPartOptions {
   const visit = (node: ReactNode) => {
     React.Children.forEach(node, (child) => {
       if (!React.isValidElement(child)) return;
-      if (child.type === ClipHeadersPart) found.showClipHeaders = true;
-      else if (child.type === FadesPart) found.showFades = true;
-      else if (child.type === RecordingPreviewPart) {
-        found.recordingState = (child.props as RecordingPreviewPartProps).recordingState;
+      if (child.type === WaveformClipHeaders) found.showClipHeaders = true;
+      else if (child.type === WaveformFades) found.showFades = true;
+      else if (child.type === WaveformRecordingPreview) {
+        found.recordingState = (child.props as WaveformRecordingPreviewProps).recordingState;
       } else if (child.type === React.Fragment) {
         visit((child.props as { children?: ReactNode }).children);
+      } else {
+        warnMisplacedPart(
+          '<WaveformTracks> ignores a child that is not <WaveformClipHeaders>, <WaveformFades> or ' +
+            '<WaveformRecordingPreview>. A marker wrapped in another component is not seen: ' +
+            'render it directly (a fragment is fine).'
+        );
       }
     });
   };
@@ -419,10 +470,13 @@ export function scanTracksParts(children: ReactNode): TracksPartOptions {
   return found;
 }
 
-export interface TracksPartProps {
+export interface WaveformTracksProps {
   /** Draw each clip's waveform scaled by its gain. */
   gainScaled?: boolean;
-  /** `ClipHeadersPart`, `FadesPart`, `RecordingPreviewPart`. */
+  /**
+   * `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview`: markers that
+   * switch a per-clip part on. Nothing else is rendered from here.
+   */
   children?: ReactNode;
 }
 
@@ -443,14 +497,16 @@ export interface TracksPartProps {
  * rows below are memoized and get primitives, stable callbacks and the
  * identity-stable pieces of the peaks.
  */
-export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, children }) => {
+export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = false, children }) => {
   const rows = useWaveformRows('The tracks');
   const { tracksFullWidth: width } = useWaveformExtent('The tracks');
   const { selectedTrackId } = useSelectedRow();
   const { sampleRate, waveHeight, mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const spectrogram = useContext(SpectrogramIntegrationContext);
-  const { showFades, recordingState } = scanTracksParts(children);
+  const rootSeesRecordingPreview = useContext(RootSeesRecordingPreviewContext);
+  const scanned = scanTracksParts(children);
+  const { showFades, recordingState } = scanned;
   const {
     rows: rowList,
     peaksDataArray,
@@ -461,46 +517,74 @@ export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, chil
     recordingChannelCount,
   } = rows;
 
+  if (scanned.showClipHeaders !== rows.showClipHeaders) {
+    warnMisplacedPart(
+      '<WaveformTracks> and its root disagree about <WaveformClipHeaders>, so the rows have the ' +
+        'wrong height: the root reads the per-clip parts from a <WaveformTracks> that is its ' +
+        'own child (a fragment is fine), not one wrapped in another component, and from the ' +
+        'last one when there are several.'
+    );
+  }
+  if ((recordingState !== undefined) !== rootSeesRecordingPreview) {
+    warnMisplacedPart(
+      '<WaveformTracks> and its root disagree about <WaveformRecordingPreview>, so the timeline ' +
+        'does not grow with the take: the root reads the per-clip parts from a <WaveformTracks> ' +
+        'that is its own child (a fragment is fine), not one wrapped in another component, and ' +
+        'from the last one when there are several.'
+    );
+  }
+  const { selectTrack } = rows;
+  const registerSpectrogramCanvas = spectrogram?.registerSpectrogramCanvas;
+  const unregisterSpectrogramCanvas = spectrogram?.unregisterSpectrogramCanvas;
+  const clipDisplay = useMemo<ClipDisplayValue>(
+    () => ({
+      gainScaledWaveforms: gainScaled,
+      showFades,
+      selectTrack,
+      registerSpectrogramCanvas,
+      unregisterSpectrogramCanvas,
+    }),
+    [gainScaled, showFades, selectTrack, registerSpectrogramCanvas, unregisterSpectrogramCanvas]
+  );
+
   return (
-    <TracksLayout $height={trackLayout.totalHeight}>
-      {peaksDataArray.map((trackClipPeaks, trackIndex) => {
-        const track = rowList[trackIndex];
-        if (!track) return null;
+    <ClipDisplayContext.Provider value={clipDisplay}>
+      <TracksLayout $height={trackLayout.totalHeight}>
+        {peaksDataArray.map((trackClipPeaks, trackIndex) => {
+          const track = rowList[trackIndex];
+          if (!track) return null;
 
-        const isArmed = recordingState?.isRecording === true && recordingState.trackId === track.id;
-        const recordingChannels = isArmed ? recordingChannelCount : 0;
-        const helpers = spectrogramHelpersById.get(track.id);
+          const isArmed =
+            recordingState?.isRecording === true && recordingState.trackId === track.id;
+          const recordingChannels = isArmed ? recordingChannelCount : 0;
+          const helpers = spectrogramHelpersById.get(track.id);
 
-        return (
-          <TrackRow
-            key={track.id}
-            trackId={track.id}
-            trackIndex={trackIndex}
-            trackClipPeaks={trackClipPeaks}
-            top={trackLayout.topById.get(track.id) ?? 0}
-            animate={rows.animateTrackLayout}
-            width={width}
-            isSelected={track.id === selectedTrackId}
-            isDragSource={track.id === dragSourceTrackId}
-            kind={track.kind}
-            renderMode={renderModeById.get(track.id) ?? 'waveform'}
-            numChannels={getTrackChannelCount(trackClipPeaks, recordingChannels)}
-            waveHeight={waveHeight}
-            mono={mono}
-            recordingState={isArmed ? recordingState : undefined}
-            spectrogramConfig={helpers?.config}
-            frequencyScaleFn={helpers?.frequencyScaleFn}
-            samplesPerPixel={samplesPerPixel}
-            sampleRate={sampleRate}
-            showClipHeaders={rows.showClipHeaders}
-            gainScaledWaveforms={gainScaled}
-            showFades={showFades}
-            selectTrack={rows.selectTrack}
-            registerSpectrogramCanvas={spectrogram?.registerSpectrogramCanvas}
-            unregisterSpectrogramCanvas={spectrogram?.unregisterSpectrogramCanvas}
-          />
-        );
-      })}
-    </TracksLayout>
+          return (
+            <TrackRow
+              key={track.id}
+              trackId={track.id}
+              trackIndex={trackIndex}
+              trackClipPeaks={trackClipPeaks}
+              top={trackLayout.topById.get(track.id) ?? 0}
+              animate={rows.animateTrackLayout}
+              width={width}
+              isSelected={track.id === selectedTrackId}
+              isDragSource={track.id === dragSourceTrackId}
+              kind={track.kind}
+              renderMode={renderModeById.get(track.id) ?? 'waveform'}
+              numChannels={getTrackChannelCount(trackClipPeaks, recordingChannels)}
+              waveHeight={waveHeight}
+              mono={mono}
+              recordingState={isArmed ? recordingState : undefined}
+              spectrogramConfig={helpers?.config}
+              frequencyScaleFn={helpers?.frequencyScaleFn}
+              samplesPerPixel={samplesPerPixel}
+              sampleRate={sampleRate}
+              showClipHeaders={rows.showClipHeaders}
+            />
+          );
+        })}
+      </TracksLayout>
+    </ClipDisplayContext.Provider>
   );
 };

@@ -468,7 +468,7 @@ All of them are exported from `@waveform-playlist/browser` and must be called in
 
 | Hook                       | Returns                                                                                                                                                                                                                                             | The component re-renders on                        |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport`                                                                                    | a provider prop change (and once when the real sample rate is known)|
+| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport`                                                                                    | a provider prop change (and once when the real sample rate is known)|
 | `usePlaylistSettings()`    | `timeFormat`, `isAutomaticScroll`                                                                                                                                                                                                                   | the user changing either setting                                    |
 | `usePlaylistZoom()`        | `samplesPerPixel`, `canZoomIn`, `canZoomOut`                                                                                                                                                                                                        | a zoom                                             |
 | `usePlaylistTimeline()`    | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange`                                                                                                                                                                                 | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing (`isReady`), peaks arriving|
@@ -884,7 +884,7 @@ Under either provider:
 | `useAnnotations()` | `annotations`, `continuousPlay` |
 | `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (the last three are always `false` under `MediaElementPlaylistProvider`) |
+| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (the last three are always `false` under `MediaElementPlaylistProvider`) |
 | `usePlaylistSettings()` | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` (the last two are always `false` under `MediaElementPlaylistProvider`) |
 
@@ -1359,9 +1359,9 @@ Four things that follow from it:
 | `data-playlist-state` | absent | on the outermost element, and always `"ready"`: the waveform is drawn from the first render and does not wait for the player. Whether the player has loaded its media is `useMediaElementTrack().isReady`, as before |
 | The track's row | the track's element was a direct child of the tracks container | one `[data-track-row]` element with `data-track-id="media-element-track-0"`, `data-track-kind="audio"` and `data-selected="true"` (the one track is always drawn in the selected colours, as before), inside a positioning container: two more `div`s around the track. The row is positioned absolutely inside that container, which has the row's height |
 | Fades (`showFades`) | the fade-out curve was placed from the length of the peak data | placed from the clip's width, so it ends where the clip ends: up to one pixel further left |
-| `useMediaElementTrack().peaksDataArray` | the one clip had no fades | the one clip carries the track's `fadeIn` / `fadeOut` (`peaksDataArray[0][0].fadeIn`). The array is a new one when the fades or the name change; the peaks inside (`peaksDataArray[0][0].peaks`) keep their identity then. A fade written inline (`fadeIn: { duration: 1 }` in a `track` object that is built on every render) is a new object each time, so the array is then a new one on every render of the provider's parent: memoize the `track` object, as the guide does |
-| The provider's `controls` prop with `show: true` | an empty column of that width to the left of the waveform | no column: there are no track controls for this player. The value is still in `usePlaylistView().controls` |
-| Peak data that cannot be read (the provider logs a warning) | the text "Loading waveform..." in a `div`, for good | the track's row, empty: as long as the audio and one `waveHeight` tall, with the timescale when the provider asks for one. `useMediaElementTrack().peaksDataArray` is still `[]` |
+| `useMediaElementTrack().peaksDataArray` | the one clip had no fades | the one clip carries the track's `fadeIn` / `fadeOut` (`peaksDataArray[0][0].fadeIn`). The array is a new one when the fades or the name change; the peaks inside (`peaksDataArray[0][0].peaks`) keep their identity then. The fades are compared by value (`duration`, `type`), so a fade written inline (`fadeIn: { duration: 1 }` in a `track` object that is built on every render) changes nothing while its values are the same |
+| The provider's `controls` prop with `show: true` | an empty column of that width to the left of the waveform | no column: there are no track controls for this player. (The prop itself is removed in [the next entry](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed).) |
+| Peak data that cannot be read (the provider logs a warning) | the text "Loading waveform..." in a `div`, for good | the track's row, empty: as long as the audio and one `waveHeight` tall, under the timescale when there is one. `useMediaElementTrack().peaksDataArray` is still `[]` |
 | A custom `renderPlayhead` | also called on every press and release on the waveform and when the player became ready | called on play, pause and stop, a seek, a selection change, a view-setting, zoom or theme change, and when the component that renders `<MediaElementWaveform>` re-renders (and, as before, not while a range is highlighted at rest) |
 | `getAnnotationBoxLabel` | also called for every annotation on every press and release on the waveform, on play, pause and stop, and when the player became ready | called when the row of boxes itself renders: when the annotations (also each move of an edge drag), the active annotation, the view settings, the zoom or the length of the timeline change, or when one of `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` is a new value |
 
@@ -1375,6 +1375,232 @@ Four things that follow from it:
 - A `renderPlayhead` or `getAnnotationBoxLabel` that reads something that changes without any of the things listed: read it with the hook for it (the playhead function may call hooks), or pass a new function when it changes.
 
 **What renders when:** inside another provider, the track's row now follows an outer `SpectrogramProvider` (it renders when that provider's value changes; nothing drawn differs). A press, a release, play, pause, stop and the player becoming ready no longer render the track, its clip and its channels. The frame around them renders, and the parts that follow that state themselves: the playhead and the progress overlay on play, pause and stop. Per pointer move of a selection drag nothing changes.
+
+## The view is composed from parts; the show and render props and the providers' `timescale` and `controls` are removed
+
+**Packages:** `@waveform-playlist/browser`. Both providers.
+
+What the view draws is no longer switched by props on `<Waveform>` and on the provider. Each thing that is drawn is a component, a **part**, and it is drawn because you render it inside a **root**:
+
+```tsx
+import {
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+  PlaylistAnnotationList,
+} from '@waveform-playlist/browser';
+
+<WaveformRoot className="my-playlist">
+  <WaveformTimescale renderTick={renderTick} />
+  <WaveformLoopRegion />
+  <WaveformTrackControls width={180} onRemoveTrack={removeTrack} />
+  <WaveformTracks gainScaled>
+    <WaveformClipHeaders />
+    <WaveformFades />
+  </WaveformTracks>
+  <WaveformAnnotationBoxes />
+  <WaveformSelection />
+  <WaveformPlayhead renderPlayhead={renderPlayhead} />
+</WaveformRoot>
+<PlaylistAnnotationList />
+```
+
+| Part | Draws | Options | Provider |
+| --- | --- | --- | --- |
+| `WaveformRoot` | the frame: the scrolling area, and the places the parts go to | `className` | `WaveformPlaylistProvider` |
+| `MediaElementWaveformRoot` | the same for the MediaElement player | `className` | `MediaElementPlaylistProvider` |
+| `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
+| `WaveformLoopRegion` | the draggable loop region, in the same strip | none | `WaveformPlaylistProvider` |
+| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200), `renderTrackControls`, `onRemoveTrack`, `trackReordering` | `WaveformPlaylistProvider` |
+| `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three below | either |
+| `WaveformClipHeaders` | a header on every clip; inside a `ClipInteractionProvider` it is what a clip is dragged by, and the trim handles come with it | none | either (under the MediaElement provider the header shows the track's `name`, or "Track" without one; nothing there supports dragging the clip, so leave clip interaction off above that provider) |
+| `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
+| `WaveformRecordingPreview` | the take being recorded, in its track | `recordingState` | `WaveformPlaylistProvider` |
+| `WaveformAnnotationBoxes` | the row of annotation boxes | `getAnnotationBoxLabel` | `WaveformPlaylistProvider` |
+| `MediaElementAnnotationBoxes` | the same for the MediaElement player, with its edge drag | `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` | `MediaElementPlaylistProvider` |
+| `WaveformSelection` | the highlighted selection | none | either |
+| `WaveformPlayhead` | the playhead | `renderPlayhead` | either |
+
+Three compositions are ready-made. They take `className` and the annotation options they took before, and nothing else:
+
+| Component | Is |
+| --- | --- |
+| `<Waveform />` | timescale, loop region, track controls (200 px), tracks, annotation boxes, selection, playhead; the annotation text list below when there are annotations |
+| `<WaveformEditor />` | `<Waveform />` with `<WaveformClipHeaders />` and `<WaveformFades />` in its tracks |
+| `<MediaElementWaveform />` | timescale, the track, annotation boxes, selection, playhead; the annotation text list below when there are annotations |
+
+For anything else (a part left out, an option on a part, a narrower column, your own element among the parts) write the composition yourself. The children of a root that are not parts are drawn in the scrolling tracks area, in the order you wrote them.
+
+### Removed
+
+| Removed | Was on |
+| --- | --- |
+| `showClipHeaders`, `showFades`, `gainScaledWaveforms`, `trackReordering`, `onRemoveTrack`, `recordingState`, `renderTrackControls`, `renderTick`, `renderPlayhead` | `<Waveform>` |
+| `renderPlayhead`, `showFades` | `<MediaElementWaveform>` |
+| `timescale`, `controls` | `<WaveformPlaylistProvider>`, `<MediaElementPlaylistProvider>` |
+| `timeScaleHeight`, `controls` | the value of `usePlaylistView()` |
+| `PlaylistVisualization`, `PlaylistVisualizationProps` | exports |
+| `MediaElementPlaylist`, `MediaElementPlaylistProps` | exports |
+
+A removed prop that is still passed is ignored (TypeScript reports it; plain JavaScript does not): no headers and so no drag handles for a leftover `showClipHeaders`, no close button for `onRemoveTrack`, no preview for `recordingState`, the default playhead for `renderPlayhead`. A leftover read of `usePlaylistView().controls` is `undefined`, so `usePlaylistView().controls.show` throws a `TypeError`.
+
+### Find and replace
+
+Decide per `<Waveform>` (or `<MediaElementWaveform>`) from the props it has and from the two props of the provider above it.
+
+**1. The provider.** Delete `timescale` and `controls` from `<WaveformPlaylistProvider>` and `<MediaElementPlaylistProvider>`, and remember what they were.
+
+**2. `<Waveform>` with none of the removed props**, under a provider that had `timescale` and `controls={{ show: true, width: 200 }}`: keep `<Waveform />`.
+
+**3. `<Waveform showClipHeaders />` and nothing else removed**, under the same provider: `<WaveformEditor />`. It also draws fade curves for clips that have a `fadeIn` or `fadeOut`, which `<Waveform showClipHeaders />` did not (`showFades` was off). To keep them undrawn, use step 4 with `<WaveformClipHeaders />` alone.
+
+**4. Every other `<Waveform>`:** write the composition. Start from this, which is what `<Waveform />` renders:
+
+```tsx
+<WaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformLoopRegion />
+  <WaveformTrackControls />
+  <WaveformTracks />
+  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+<PlaylistAnnotationList
+  height={annotationTextHeight}
+  controls={annotationControls}
+  annotationListConfig={annotationListConfig}
+  renderAnnotationItem={renderAnnotationItem}
+  scrollActivePosition={scrollActivePosition}
+  scrollActiveContainer={scrollActiveContainer}
+/>
+```
+
+then apply each row that matches. The two annotation elements belong to a playlist with annotations: `<PlaylistAnnotationList>` throws without the `AnnotationProvider` of `@waveform-playlist/annotations`, and it renders its (empty) list when there are no annotations, where `<Waveform />` leaves the list out. Without annotations delete both elements; to keep the list conditional, render it when `useAnnotations().annotations.length > 0`.
+
+| Was | Becomes |
+| --- | --- |
+| the provider had no `timescale` | delete `<WaveformTimescale />` and `<WaveformLoopRegion />` |
+| the provider had no `controls`, or `controls.show` was `false` | delete `<WaveformTrackControls />` |
+| `controls={{ show: true, width: N }}`, N not 200 | `<WaveformTrackControls width={N} />` |
+| `renderTick={f}` | `<WaveformTimescale renderTick={f} />` |
+| `renderTrackControls={f}` | `<WaveformTrackControls renderTrackControls={f} />` |
+| `onRemoveTrack={f}` | `<WaveformTrackControls onRemoveTrack={f} />` |
+| `trackReordering` | `<WaveformTrackControls trackReordering />` |
+| `gainScaledWaveforms` | `<WaveformTracks gainScaled>` |
+| `showClipHeaders` | `<WaveformClipHeaders />` as a child of `<WaveformTracks>` |
+| `showFades` | `<WaveformFades />` as a child of `<WaveformTracks>` |
+| `showClipHeaders={flag}` (a variable) | `<WaveformTracks>{flag ? <WaveformClipHeaders /> : null}</WaveformTracks>` |
+| `renderPlayhead={f}` | `<WaveformPlayhead renderPlayhead={f} />` |
+| `recordingState={state}` | `<WaveformTracks>{state ? <WaveformRecordingPreview recordingState={state} /> : null}</WaveformTracks>`, **and** `useRecordingSession` (below) |
+| `<PlaylistVisualization …props />` | the same composition without `<PlaylistAnnotationList>` |
+
+**5. `<MediaElementWaveform>`** with neither removed prop, under a provider that had `timescale`: keep it. Otherwise write the composition, which is what `<MediaElementWaveform />` renders:
+
+```tsx
+<MediaElementWaveformRoot className={className}>
+  <WaveformTimescale />
+  <WaveformTracks />
+  <MediaElementAnnotationBoxes
+    getAnnotationBoxLabel={getAnnotationBoxLabel}
+    editable={editable}
+    linkEndpoints={linkEndpoints}
+    onAnnotationUpdate={onAnnotationUpdate}
+  />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</MediaElementWaveformRoot>
+<MediaElementAnnotationList
+  height={annotationTextHeight}
+  renderAnnotationItem={renderAnnotationItem}
+  editable={editable}
+  onAnnotationUpdate={onAnnotationUpdate}
+  annotationListConfig={{ linkEndpoints, continuousPlay: false }}
+  scrollActivePosition={scrollActivePosition}
+  scrollActiveContainer={scrollActiveContainer}
+/>
+```
+
+| Was | Becomes |
+| --- | --- |
+| the provider had no `timescale` | delete `<WaveformTimescale />` |
+| `showFades` | `<WaveformTracks><WaveformFades /></WaveformTracks>` |
+| `renderPlayhead={f}` | `<WaveformPlayhead renderPlayhead={f} />` |
+| `<MediaElementPlaylist …props />` | the same composition without `<MediaElementAnnotationList>` |
+
+The same holds for the two annotation elements here: without annotations delete both, or render `<MediaElementAnnotationList>` when `useAnnotations().annotations.length > 0`, as `<MediaElementWaveform />` does.
+
+**6. A recording.** The view used to tell the provider that a take was running: for as long as `recordingState.isRecording` was true, the provider kept playback running past the end of the audio and muted what the armed track already held. `<WaveformRecordingPreview>` only draws the take. Call the hook in the component that calls `useIntegratedRecording` (it must be under `WaveformPlaylistProvider`):
+
+```tsx
+import { useRecordingSession } from '@waveform-playlist/browser';
+
+const { isRecording, recordingTrackId } = useIntegratedRecording(/* … */);
+useRecordingSession({ isRecording, trackId: recordingTrackId });
+```
+
+Without it a punch-in plays the armed track's old audio under the take, and a take on an empty timeline stops playback at once. The type of the `recordingState` prop is exported as `WaveformRecordingState`.
+
+**7. `usePlaylistView()`.** Search for `controls` and `timeScaleHeight` next to `usePlaylistView()` (also a destructuring: `const { sampleRate, controls } = usePlaylistView()`), and replace each read. The fields are `undefined` now, so `controls.show` throws at the moment the code runs, which may be inside an effect or a handler and not on first render.
+
+- The width of the controls column is the `width` you gave `<WaveformTrackControls>` (200 without one). Code that needs the number (scroll arithmetic, a layout beside the playlist) keeps it in a constant and passes the same constant to the part:
+
+  ```tsx
+  const TRACK_CONTROLS_WIDTH = 200;
+
+  <WaveformTrackControls width={TRACK_CONTROLS_WIDTH} />;
+  // was: const controlWidth = controls.show ? controls.width : 0;
+  const controlWidth = TRACK_CONTROLS_WIDTH;
+  ```
+
+- The ruler's strip is 30 px tall when a root has a `<WaveformTimescale>` or a `<WaveformLoopRegion>`, and absent otherwise.
+
+### Where a part must be
+
+The root recognises a part by the type of the element, and so does `<WaveformTracks>` for its three children. Therefore:
+
+- A part must be a child of its root, or of a fragment in it. A part **wrapped in your own component** is not recognised: a wrapped `<WaveformTimescale>` or `<WaveformTrackControls>` is drawn in the tracks area, a wrapped `<WaveformClipHeaders>` does nothing. Wrap the whole root in your component, not a part.
+- `<WaveformClipHeaders>`, `<WaveformFades>` and `<WaveformRecordingPreview>` are children of `<WaveformTracks>` and draw nothing anywhere else. `<WaveformTracks>` renders no other child.
+- One `<WaveformTracks>` per root, and it must be the root's own child (not wrapped): the root reads the clip headers from it for the row heights, and the recording preview for the length of the timeline during a take. Text among its children is dropped without a warning.
+- `<WaveformTrackControls width>` must be a positive number: with `0`, a negative number or `NaN` no column is drawn. One `<WaveformTrackControls>` per root: a second one draws a second panel for every track in the same column.
+- Each root throws under the other provider (`useEditorControls needs WaveformPlaylistProvider, …` for `<WaveformRoot>`, `useMediaElementTrack needs MediaElementPlaylistProvider, …` for `<MediaElementWaveformRoot>`).
+- `<WaveformLoopRegion>`, `<WaveformTrackControls>`, `<WaveformRecordingPreview>` and `<WaveformAnnotationBoxes>` need `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` the loop region throws (`useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`) and so do the annotation boxes (the same message for `useAnnotationEditing`); the track controls draw nothing as a child of the root, and throw the same kind of message when they are wrapped in a component and so rendered among the tracks; the recording preview throws once a take runs into the player's track.
+- `<MediaElementAnnotationBoxes>` is for `MediaElementPlaylistProvider`. Under `WaveformPlaylistProvider` it draws, but an edge can be dragged past the end of the audio to the end of the drawn timeline: use `<WaveformAnnotationBoxes>` there.
+- `<WaveformTimescale>`, `<WaveformTracks>`, `<WaveformLoopRegion>`, `<WaveformTrackControls>` and both annotation rows throw outside a root (`The timescale must be rendered inside the waveform root`). `<WaveformSelection>` and `<WaveformPlayhead>` draw wherever they are rendered under a provider; they are positioned for the tracks area.
+- Switching a part on and off: write `{flag ? <Part /> : null}` (or `flag && <Part />`). The parts after it then keep their state. A list whose length changes (`parts.filter(Boolean)`) remounts the parts after the one that went, unless they have keys.
+- Two roots under one provider both draw the playlist, each with its own playhead and selection drag; automatic scroll follows the root that mounted last.
+
+In development a part that is not where it can work says so once in the console (`[waveform-playlist] <WaveformTimescale> is drawn among the tracks…`). It does not throw.
+
+### What changes on screen
+
+| | Before | Now |
+| --- | --- | --- |
+| `<Waveform />` under a provider without `timescale` | no ruler | a ruler (and the loop region in its strip while looping is on) |
+| `<Waveform />` under a provider without `controls`, or with `show: false` | no controls column | a 200 px controls column |
+| `<Waveform />` under a provider with `controls.width` other than 200 | a column of that width | 200 px |
+| `<MediaElementWaveform />` under a provider without `timescale` | no ruler | a ruler |
+| `<WaveformEditor />` where `<Waveform showClipHeaders />` was, with clips that have fades | no fade curves | the fade curves are drawn |
+| `usePlaylistInfo()` of `@waveform-playlist/ui-components`, read inside a root: `controls`, `timeScaleHeight` | what the provider's `controls` and `timescale` props said | worked out from the parts: `{ show: true, width }` of the controls part, or `{ show: false, width: 0 }` without one or with a width that is not positive (always under the MediaElement provider), and 30 or 0 |
+| `useMediaElementTrack().fadeIn` / `.fadeOut` | the object of the latest `track` prop | the first object seen while `duration` and `type` are the same, so the hook's value no longer changes on every render of a parent that writes the fade inline |
+| A composition with `<WaveformLoopRegion />` and no `<WaveformTimescale />` | (not possible) | the 30 px strip is there for the loop region alone |
+| `<WaveformTimescale>` switched off and on beside a `<WaveformLoopRegion>` | (not possible) | the loop region stays mounted |
+| A take being recorded, without `useRecordingSession` | the armed track was muted for the take, and playback ran past the end of the audio | neither |
+| A fade written inline on a MediaElement `track` that is built on every render | the player was disposed and created again on every render of the provider's parent (playback stopped, the media loaded again) | compared by value: nothing happens while `duration` and `type` are the same |
+| A render of the component that renders `<Waveform />`, `<WaveformEditor />` or `<MediaElementWaveform />` | rendered the tracks part (not its rows) | does not: the composition hands the root the same elements each time |
+
+### What to check after the replacement
+
+- Every page that had no ruler or no controls column and still renders `<Waveform />` or `<MediaElementWaveform />`: it has them now.
+- A recording: mute state of the armed track during a take, and that playback continues on an empty timeline.
+- Code that wrapped `<Waveform>` to add its own props for the removed ones: it can render the composition directly.
 
 ## Keyboard shortcuts yield to the focused control
 

@@ -6,7 +6,6 @@ import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
   KeyboardShortcuts,
-  Waveform,
   PlayButton,
   PauseButton,
   StopButton,
@@ -16,6 +15,7 @@ import {
   AudioPosition,
   AutomaticScrollCheckbox,
   MasterVolumeControl,
+  WaveformEditor,
 } from '@waveform-playlist/browser';
 import {
   BeatsAndBarsProvider,
@@ -225,9 +225,7 @@ export function BeatsAndBarsExample() {
       mono
       waveHeight={100}
       automaticScroll
-      controls={{ show: true, width: 200 }}
       theme={theme}
-      timescale
       barWidth={4}
       barGap={0}
       deferEngineRebuild={loading}
@@ -342,7 +340,7 @@ export function BeatsAndBarsExample() {
             )}
           </Controls>
 
-          <Waveform showClipHeaders />
+          <WaveformEditor />
         </ClipInteractionProvider>
       </BeatsAndBarsProvider>
     </WaveformPlaylistProvider>

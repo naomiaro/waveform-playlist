@@ -4,6 +4,11 @@ import type { ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformRoot,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
   PlayButton,
   PauseButton,
   StopButton,
@@ -120,18 +125,20 @@ export const MultipleEmptyTracks: Story = {
 
 export const WithoutTimescale: Story = {
   render: () => (
-    <WaveformPlaylistProvider
-      tracks={createEmptyTracks(2)}
-      samplesPerPixel={1024}
-      // Note: timescale is not set, so no timescale will be displayed
-    >
+    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <PlayButton />
           <PauseButton />
           <StopButton />
         </div>
-        <Waveform />
+        {/* No <WaveformTimescale />: a part is drawn because it is rendered. */}
+        <WaveformRoot>
+          <WaveformTrackControls />
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
       </div>
     </WaveformPlaylistProvider>
   ),
@@ -139,7 +146,30 @@ export const WithoutTimescale: Story = {
     docs: {
       description: {
         story:
-          'Waveform without the timescale ruler - controlled via the `timescale` prop on WaveformPlaylistProvider. Useful for compact layouts.',
+          'The view composed without the timescale ruler: `<WaveformRoot>` with the track controls, the tracks, the selection and the playhead, and no `<WaveformTimescale />`. Useful for compact layouts. `<Waveform />` is the ready-made composition with the ruler.',
+      },
+    },
+  },
+};
+
+export const Bare: Story = {
+  render: () => (
+    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
+      <div style={{ padding: '1rem' }}>
+        {/* Only the tracks, the selection and the playhead: no ruler, no controls column. */}
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </div>
+    </WaveformPlaylistProvider>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The bare view: `<WaveformRoot>` with the tracks, the selection and the playhead, and neither `<WaveformTimescale />` nor `<WaveformTrackControls />`. A part is drawn because it is rendered.',
       },
     },
   },
