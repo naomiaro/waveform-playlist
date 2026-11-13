@@ -367,12 +367,12 @@ test.describe('Media Element Example', () => {
       await expect(selection).toHaveCount(0);
 
       // The drag is drawn; playback is still the old play.
-      await page.mouse.move(box!.x + 360, y, { steps: 4 });
       await page.mouse.move(box!.x + 420, y, { steps: 4 });
+      await page.mouse.move(box!.x + 540, y, { steps: 4 });
       await expect(async () => {
         const selectionBox = await selection.boundingBox();
         expect(selectionBox).toBeTruthy();
-        expect(Math.abs(selectionBox!.width - 120)).toBeLessThanOrEqual(2);
+        expect(Math.abs(selectionBox!.width - 240)).toBeLessThanOrEqual(2);
       }).toPass({ timeout: 5000 });
       expect(await playheadX()).toBeLessThan(250);
 
@@ -381,7 +381,7 @@ test.describe('Media Element Example', () => {
       await expect(async () => {
         const x = await playheadX();
         expect(x).toBeGreaterThanOrEqual(299);
-        expect(x).toBeLessThanOrEqual(421);
+        expect(x).toBeLessThanOrEqual(541);
       }).toPass({ timeout: 3000 });
       await expect(selection).toHaveCount(1);
       // It is playing, not resting at the range's start: the playhead moves on.
@@ -389,7 +389,7 @@ test.describe('Media Element Example', () => {
         expect(await playheadX()).toBeGreaterThan(340);
       }).toPass({ timeout: 3000 });
       // ...to its end, where playback stops.
-      await expect(play).toBeEnabled({ timeout: 6000 });
+      await expect(play).toBeEnabled({ timeout: 8000 });
       await expect(pause).toBeDisabled();
     });
 

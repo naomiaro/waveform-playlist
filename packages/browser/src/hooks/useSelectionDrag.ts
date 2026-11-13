@@ -111,9 +111,11 @@ export const AutomaticScrollFlag = memo(function AutomaticScrollFlag({
  * focus, or the `mouseup` was lost), a preview is dropped and playback is untouched; while stopped the
  * selection stays as the last move left it.
  *
- * A press made while playing whose release comes after playback has stopped,
- * with no move in between, is a click that collapses the selection at the
- * press (the press itself did not, because playback was running).
+ * A press made while playing whose release comes after playback has stopped
+ * follows the stopped rules at the release. With the pointer under 0.1 s from
+ * the press it is a click that collapses the selection at the press (the
+ * press itself did not, because playback was running); further away, the
+ * range becomes the selection, unplayed.
  */
 export function useSelectionDrag({
   samplesPerPixel,

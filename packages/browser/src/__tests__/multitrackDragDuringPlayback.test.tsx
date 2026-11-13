@@ -268,7 +268,7 @@ describe('a drag on the tracks of the multitrack view during playback', () => {
 // only `play()`: the release of a click or a drag restarts through
 // `setSelection`.
 describe('the timing refs of useEngineRefs() after a restart during playback', () => {
-  it('a click: the play started at the click, at the clock time of the release', async () => {
+  it('a click: the play started at the click, at the clock time of the restart', async () => {
     const { overlay, audioContext } = await mount();
     await startPlayback();
     audioContext.currentTime = 3;

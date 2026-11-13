@@ -279,6 +279,20 @@ describe('edges of a drag that outlives the state it began in', () => {
     expect(onClickWhileStopped).not.toHaveBeenCalled();
   });
 
+  it('a range drawn while playing, playback ended, released without a further move: the range becomes the selection', async () => {
+    const { set } = mount({ isPlaying: true });
+    await press(200);
+    await move(350);
+    expect(preview.getSnapshot()).toEqual({ start: 4, end: 7 });
+    await act(async () => {
+      set({ isPlaying: false });
+    });
+    await release(350);
+    expect(setSelection.mock.calls).toEqual([[4, 7]]);
+    expect(onClickWhileStopped).not.toHaveBeenCalled();
+    expect(preview.getSnapshot()).toBeNull();
+  });
+
   it('automatic scroll switched on after a range was already drawn: the drawing is withdrawn at the next move', async () => {
     const { set } = mount({ isPlaying: true, isAutomaticScroll: false });
     await press(200);

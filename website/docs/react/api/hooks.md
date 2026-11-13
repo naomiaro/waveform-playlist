@@ -742,7 +742,8 @@ interface PlaybackControlsContextValue {
   /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
   seekTo: (time: number) => void;
   /** Sets the selected range and moves the cursor to its start. During playback, playback
-   *  restarts: a range is played start to end, a collapsed one carries on from there. */
+   *  restarts: a range is played start to end (open-ended under WaveformPlaylistProvider with
+   *  looping on), a collapsed one carries on from there. */
   setSelection: (start: number, end: number) => void;
 
   setTimeFormat: (format: TimeFormat) => void;

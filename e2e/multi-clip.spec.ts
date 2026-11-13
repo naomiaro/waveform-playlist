@@ -670,23 +670,24 @@ test.describe('Multi-Clip Example', () => {
       expect(await now()).toBeLessThan(4);
       await expect(selection).toHaveCount(0);
 
-      await page.mouse.move(left + 340, y, { steps: 4 });
-      await page.mouse.move(left + 370, y, { steps: 4 });
+      await page.mouse.move(left + 380, y, { steps: 4 });
+      await page.mouse.move(left + 450, y, { steps: 4 });
       await expect(async () => {
         const selectionBox = await selection.boundingBox();
         expect(selectionBox).toBeTruthy();
-        expect(Math.abs(selectionBox!.width - 70)).toBeLessThanOrEqual(2);
+        expect(Math.abs(selectionBox!.width - 150)).toBeLessThanOrEqual(2);
         expect(Math.abs(selectionBox!.x - (left + 300))).toBeLessThanOrEqual(2);
       }).toPass({ timeout: 5000 });
       // Still the old play: the range is only drawn.
       expect(await now()).toBeLessThan(4);
 
       await page.mouse.up();
-      // The range (6.4 s to 7.9 s) is played from its start...
+      // The range (6.4 s to 9.6 s: long enough to be seen playing) is played
+      // from its start...
       await expect(async () => {
         const time = await now();
         expect(time).toBeGreaterThanOrEqual(6.3);
-        expect(time).toBeLessThan(8);
+        expect(time).toBeLessThan(9.7);
       }).toPass({ timeout: 3000 });
       await expect(selection).toHaveCount(1);
       // It is playing, not resting at the range's start: the position moves on.
@@ -694,7 +695,7 @@ test.describe('Multi-Clip Example', () => {
         expect(await now()).toBeGreaterThan(6.9);
       }).toPass({ timeout: 3000 });
       // ...and playback stops at its end, the cursor back at its start.
-      await expect(play).toBeEnabled({ timeout: 6000 });
+      await expect(play).toBeEnabled({ timeout: 8000 });
       await expect(async () => {
         expect(Math.abs((await now()) - 6.4)).toBeLessThan(0.1);
       }).toPass({ timeout: 3000 });
@@ -760,7 +761,7 @@ test.describe('Multi-Clip Example', () => {
 
       // Wait until the view follows the playhead.
       await expect(async () => {
-        expect(await scrollLeft()).toBeGreaterThan(20);
+        expect(await scrollLeft()).toBeGreaterThan(60);
       }).toPass({ timeout: 20000 });
       let frame: { x: number; y: number; width: number; height: number } | null = null;
       await expect(async () => {
@@ -775,18 +776,21 @@ test.describe('Multi-Clip Example', () => {
       await page.mouse.down();
       const pressedContentX = scrollAtPress + (pressX - frame!.x);
       await expect(async () => {
-        expect((await scrollLeft()) - scrollAtPress).toBeGreaterThan(80);
+        expect((await scrollLeft()) - scrollAtPress).toBeGreaterThan(220);
       }).toPass({ timeout: 10000 });
       const underPointerNow = (await scrollLeft()) + (pressX - frame!.x);
-      expect(underPointerNow - pressedContentX).toBeGreaterThan(80);
+      expect(underPointerNow - pressedContentX).toBeGreaterThan(220);
       await page.mouse.up();
 
       // Playback is at the audio that was pressed (and moving on from it),
       // well short of what the pointer is over now.
       await expect(async () => {
         const x = await playheadX();
+        // The few pixels below: the view scrolled between reading its
+        // position and the press. The bound above is 0.6 s of playback; what
+        // the pointer is over by now is more than 220 px on.
         expect(x).toBeGreaterThanOrEqual(pressedContentX - 3);
-        expect(x).toBeLessThan(pressedContentX + 60);
+        expect(x).toBeLessThan(pressedContentX + 120);
       }).toPass({ timeout: 1000 });
       await expect(page.locator('[data-selection]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
