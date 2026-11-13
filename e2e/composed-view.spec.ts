@@ -23,8 +23,11 @@ test.describe('Composed views: each page draws the parts it renders', () => {
     await expect(roots.nth(2)).not.toContainText(ruler);
     for (let index = 0; index < 3; index++) {
       await expect(roots.nth(index).locator('> *')).toHaveCount(1);
-      await expect(roots.nth(index).locator('[data-playhead]')).toHaveCount(1);
     }
+    // The default playhead in the first and the third; the second draws its own.
+    await expect(roots.nth(0).locator('[data-playhead]')).toHaveCount(1);
+    await expect(roots.nth(1).locator('[data-playhead]')).toHaveCount(0);
+    await expect(roots.nth(2).locator('[data-playhead]')).toHaveCount(1);
   });
 
   test('effects: a timescale and a controls column as wide as its part says (150 px)', async ({

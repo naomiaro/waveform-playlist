@@ -290,7 +290,7 @@ interface MobileAnnotationsContentProps {
 }
 
 const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
-  const { sampleRate, controls } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
   const { annotations, continuousPlay } = useAnnotations();

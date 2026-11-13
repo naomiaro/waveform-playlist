@@ -48,6 +48,10 @@ import {
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
+
+// The width of the controls column: given to the controls part, and used by
+// the recording auto-scroll below.
+const TRACK_CONTROLS_WIDTH = 200;
 import {
   RecordButton,
   TransportPlayButton,
@@ -182,7 +186,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const { currentTimeRef } = usePlaybackRefs();
   const { isPlaying } = useIsPlaying();
   const { currentTime } = useCurrentTime();
-  const { sampleRate, controls } = usePlaylistView();
+  const { sampleRate } = usePlaylistView();
   const { isAutomaticScroll } = usePlaylistSettings();
   const { samplesPerPixel } = usePlaylistZoom();
   const { scrollContainerRef, play, stop, pause, seekTo } = usePlaybackControls();
@@ -502,7 +506,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   useEffect(() => {
     if (!isRecording || !isAutomaticScroll) return;
 
-    const controlWidth = controls.show ? controls.width : 0;
+    const controlWidth = TRACK_CONTROLS_WIDTH;
     const bufferZone = 100;
 
     const follow = ({ duration }: { duration: number }) => {
@@ -523,7 +527,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
     follow(recordingProgress.getSnapshot());
     return recordingProgress.subscribe(follow);
-  }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, controls, scrollContainerRef]);
+  }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, scrollContainerRef]);
 
   // Handle dropped/selected audio files
   const handleFiles = useCallback(
@@ -702,7 +706,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <WaveformRoot>
           <WaveformTimescale />
           <WaveformLoopRegion />
-          <WaveformTrackControls onRemoveTrack={handleRemoveTrack} />
+          <WaveformTrackControls width={TRACK_CONTROLS_WIDTH} onRemoveTrack={handleRemoveTrack} />
           <WaveformTracks>
             <WaveformClipHeaders />
             {isRecording && recordingTrackId ? (
