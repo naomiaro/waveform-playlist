@@ -9,5 +9,5 @@ The MediaElement waveform (`<MediaElementWaveform>`, `<MediaElementPlaylist>`) i
 - `theme.playlistBackgroundColor` is used when set.
 - With `showFades`, the fade-out curve is placed from the clip's width (up to one pixel further left). The one clip in `useMediaElementTrack().peaksDataArray` carries the track's fades.
 - The provider's `controls={{ show: true, … }}` no longer draws an empty column.
-- Peak data that cannot be read gives an empty timeline, not the text "Loading waveform...".
+- Peak data that cannot be read gives the track's row with nothing in it (one `waveHeight` tall, still clickable), not the text "Loading waveform...".
 - A press, a release, play, pause and stop no longer render the track, its clip and its channels. `getAnnotationBoxLabel` is no longer called for them, and `renderPlayhead` is no longer called for a press or release that does not move the cursor (it is still called on play, pause and stop).

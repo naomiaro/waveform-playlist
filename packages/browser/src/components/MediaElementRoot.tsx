@@ -8,6 +8,7 @@ import {
   usePlaylistView,
 } from '../contexts/playlistContexts';
 import { computeTrackLayout } from '../utils/trackOrderPreview';
+import type { TrackClipPeaks } from '../WaveformPlaylistContext';
 import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
@@ -17,7 +18,8 @@ import { useWaveformFrame, useWaveformParts } from './waveformFrame';
 // do: module constants, so the rows value changes only with the peaks, the
 // wave height and the clip-headers marker.
 const ONE_ROW: ReadonlyArray<WaveformRow> = [{ id: MEDIA_ELEMENT_TRACK_ID, kind: 'audio' }];
-const NO_ROWS: ReadonlyArray<WaveformRow> = [];
+// The peaks of a row with no clip: what is drawn when the provider has none.
+const ONE_EMPTY_ROW: TrackClipPeaks[] = [[]];
 const NO_RENDER_MODES: ReadonlyMap<string, RenderMode> = new Map();
 const NO_SPECTROGRAM_HELPERS: ReadonlyMap<string, SpectrogramTrackHelpers> = new Map();
 const nothing = () => {};
@@ -33,7 +35,7 @@ export interface MediaElementRootProps {
  *
  * The counterpart of `WaveformRoot` for `MediaElementPlaylistProvider`: it
  * works out what only this provider knows (the timeline is as long as the
- * audio; there is one row, when its peaks could be extracted) and hands it to
+ * audio; there is one row, empty when its peaks could not be extracted) and hands it to
  * the shared frame. The parts are the multitrack view's.
  *
  * It renders on what the frame follows (a drag in progress, play and stop, the
@@ -53,12 +55,14 @@ export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, c
   const { showClipHeaders } = parts.tracksOptions;
 
   const rows = useMemo<WaveformRowsValue>(() => {
-    // No peaks: they could not be extracted (the provider logged it). The
-    // timeline is drawn without a row.
-    const rowList = peaksDataArray.length > 0 ? ONE_ROW : NO_ROWS;
+    // No peaks: they could not be extracted (the provider logged it). The row
+    // is drawn all the same, one channel tall and with no clip in it, so the
+    // timeline keeps its height and can be clicked.
+    const rowList = ONE_ROW;
+    const rowPeaks = peaksDataArray.length > 0 ? peaksDataArray : ONE_EMPTY_ROW;
     const trackHeightById = new Map<string, number>();
     rowList.forEach((row, index) => {
-      const channels = getTrackChannelCount(peaksDataArray[index], 0);
+      const channels = getTrackChannelCount(rowPeaks[index], 0);
       trackHeightById.set(
         row.id,
         waveHeight * channels + (showClipHeaders ? CLIP_HEADER_HEIGHT : 0)
@@ -66,7 +70,7 @@ export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, c
     });
     return {
       rows: rowList,
-      peaksDataArray,
+      peaksDataArray: rowPeaks,
       showClipHeaders,
       trackHeightById,
       trackLayout: computeTrackLayout(

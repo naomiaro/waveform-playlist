@@ -305,16 +305,42 @@ describe('when the peaks cannot be extracted', () => {
     ) as unknown as WaveformDataObject,
   };
 
-  it('an empty timeline of the length of the audio is drawn, not the text "Loading waveform..."', async () => {
+  it('an empty row as tall as the wave height is drawn, not the text "Loading waveform..."', async () => {
     await mount({
       playlist: <MediaElementPlaylist className="mine" />,
       provider: { track: BROKEN },
     });
     expect(document.body.textContent).not.toContain('Loading waveform');
     expect(root()!.classList.contains('mine')).toBe(true);
-    expect(document.querySelectorAll('[data-track-row]').length).toBe(0);
+    // The row is there, as tall as one channel and as long as the audio, with
+    // no clip in it.
+    const rows = document.querySelectorAll('[data-track-row]');
+    expect(rows.length).toBe(1);
+    expect((rows[0].parentElement as HTMLElement).style.height).toBe('100px');
+    expect(rows[0].querySelectorAll('[data-clip-container]').length).toBe(0);
     const inner = scrollArea().firstElementChild as HTMLElement;
     expect(inner.style.width).toBe(`${CLIP_WIDTH}px`);
+    // The provider's own value is unchanged: no peaks.
+    expect(trackValue.peaksDataArray).toEqual([]);
+  });
+
+  it('a click on the empty row still moves the cursor there', async () => {
+    await mount({ provider: { track: BROKEN } });
+    const overlay = clickOverlay();
+    await act(async () => {
+      fireEvent.mouseDown(overlay, { button: 0, clientX: 100, clientY: 5 });
+    });
+    await act(async () => {
+      fireEvent.mouseUp(window, { button: 0, clientX: 100, clientY: 5 });
+    });
+    const playhead = document.querySelector('[data-playhead]') as HTMLElement;
+    expect(playhead.style.transform).toBe('translate3d(100px, 0, 0)');
+  });
+
+  it('the wave height of the provider is the height of the empty row', async () => {
+    await mount({ provider: { track: BROKEN, waveHeight: 64 } });
+    const row = document.querySelector('[data-track-row]') as HTMLElement;
+    expect((row.parentElement as HTMLElement).style.height).toBe('64px');
   });
 });
 
