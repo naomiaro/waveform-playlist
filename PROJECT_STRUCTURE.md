@@ -333,9 +333,12 @@ const clip = createClipFromSeconds({
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
-  │   ├── PlaylistVisualization.tsx      # Visualization shell: sizes, layout, selection-drag handlers
-  │   ├── TrackRows.tsx                 # Memoized track rows, clips and recording preview
-  │   ├── TrackControlsColumn.tsx       # Memoized controls column (one slot per track)
+  │   ├── PlaylistVisualization.tsx      # Default composition: WaveformRoot with one part per thing drawn
+  │   ├── WaveformRoot.tsx              # Root of the view: sizes, row layout, selection-drag handlers, part sorting
+  │   ├── waveformParts.tsx             # The parts by name, the timescale part, sortWaveformParts
+  │   ├── waveformLayoutContext.ts      # The root's two layout values (extent, rows) read by the parts
+  │   ├── TrackRows.tsx                 # Tracks part: memoized rows, clips, recording preview; per-clip markers
+  │   ├── TrackControlsColumn.tsx       # Track-controls part: memoized column (one slot per track)
   │   ├── DefaultTrackControls.tsx      # Default track control panel (memoized)
   │   ├── VisualizationOverlays.tsx     # Selection, playhead, annotation boxes, loop region
   │   ├── visualizationLayout.tsx       # Shared row/slot styled components and channel-count helper
