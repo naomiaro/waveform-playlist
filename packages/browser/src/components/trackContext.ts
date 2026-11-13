@@ -21,7 +21,7 @@ export interface TrackContextValue {
   /** The track's position in the list of tracks, from 0. Changes on a reorder. */
   index: number;
 
-  /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
+  /** The track's name, or "Track N" (N is the position, from 1) when it has none and while it is loading. */
   name: string;
   muted: boolean;
   soloed: boolean;
@@ -34,8 +34,9 @@ export interface TrackContextValue {
 
   /**
    * True while the provider has no mixer state for the track (it is still
-   * loading): the engine does not know it yet, so the mixer actions and a
-   * reorder would have no effect. The built-in pieces are disabled then.
+   * loading): the engine does not know it yet, so a value set with the mixer
+   * actions is not kept and a reorder does nothing. The built-in pieces are
+   * disabled then.
    */
   isLoading: boolean;
   /** Whether this is the selected track. */
@@ -48,7 +49,8 @@ export interface TrackContextValue {
    */
   hasSpectrogram: boolean;
 
-  // Actions. Each keeps its identity for as long as the track's slot is mounted.
+  // Actions. Each keeps its identity while the track's slot is mounted and a
+  // track menu neither becomes available nor stops being so.
   setMuted: (muted: boolean) => void;
   setSoloed: (soloed: boolean) => void;
   setVolume: (volume: number) => void;
@@ -116,6 +118,8 @@ export const TrackControlsSharedContext = createContext<TrackControlsShared | nu
 export interface TrackSlotWiring {
   elementRef: RefObject<HTMLDivElement | null>;
   setDragSource: (isDragSource: boolean) => void;
+  /** How many reorder handles are mounted in the slot (one is right). */
+  handleCount: { current: number };
 }
 
 export const TrackSlotWiringContext = createContext<TrackSlotWiring | null>(null);

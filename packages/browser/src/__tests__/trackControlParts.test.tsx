@@ -823,6 +823,29 @@ describe('<TrackReorderGrip />', () => {
     );
   });
 
+  it('a second handle in one panel warns once, and one handle does not', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const about = () =>
+      warn.mock.calls.filter((call) => String(call[0]).includes('more than one reorder handle'));
+    mount({ tracks: [A, B], controls: WITH_GRIP });
+    await ready();
+    expect(about()).toHaveLength(0);
+    await act(async () => cleanup());
+    mount({
+      tracks: [A, B],
+      controls: (
+        <WaveformTrackControls>
+          <DefaultTrackControls />
+          <TrackReorderGrip />
+          <TrackReorderGrip />
+        </WaveformTrackControls>
+      ),
+    });
+    await ready();
+    // Two tracks, one message.
+    expect(about()).toHaveLength(1);
+  });
+
   it('the move buttons are disabled while the track is loading', async () => {
     mount({ tracks: [A, B], loading: true, controls: WITH_GRIP });
     await screen.findAllByRole('button', { name: 'Mute' });

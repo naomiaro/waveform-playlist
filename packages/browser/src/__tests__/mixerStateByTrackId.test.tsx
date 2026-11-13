@@ -314,6 +314,10 @@ describe('a track keeps its mixer state when the list of tracks changes', () => 
     expect(probe.trackStates[1]).toMatchObject({ name: 'p', muted: true, volume: 0.2 });
   });
 
+  // A control: it passed before #687 too (a changed count re-created every
+  // state), and it goes through a rebuild for 0 tracks, whose
+  // `mixerForTracks(prev, [])` drops the entries. It pins the behaviour, not
+  // the line that clears the map in the keep-the-engine branch.
   it('an emptied timeline forgets the mixer state: the same track added again starts from its fields', async () => {
     const a = makeTrack('a');
     const { setTracks } = mount([a]);

@@ -184,7 +184,10 @@ function TrackControlsSlotImpl({
   // For a reorder handle inside the panel (`useTrackReorderHandle`).
   const elementRef = useRef<HTMLDivElement | null>(null);
   const [isDragSource, setDragSource] = useState(false);
-  const wiring = useMemo<TrackSlotWiring>(() => ({ elementRef, setDragSource }), []);
+  const wiring = useMemo<TrackSlotWiring>(
+    () => ({ elementRef, setDragSource, handleCount: { current: 0 } }),
+    []
+  );
 
   return (
     <ControlSlot

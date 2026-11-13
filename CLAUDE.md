@@ -161,7 +161,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 ```typescript
 // ✅ GOOD - an option of the component that takes it, off by default
 <WaveformTracks gainScaled />
-<WaveformTrackControls trackReordering />
+<ClipInteractionOptions touchOptimized>
 
 // ❌ AVOID - a (made-up) prop that defaults to true needs an explicit false
 <SomePart shown={false} />

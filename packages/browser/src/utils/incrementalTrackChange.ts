@@ -38,9 +38,8 @@ export function incrementalTrackChange(
     filled.push(current);
   }
 
-  // The engine appends an added track, and the mixer state is stored by
-  // position with new states appended too: the tracks that were there must
-  // keep their places, with the new ones after them.
+  // The engine appends an added track: the tracks that were there must keep
+  // their places, with the new ones after them.
   if (prevTracks.some((track, index) => tracks[index].id !== track.id)) return null;
   const prevIds = new Set(prevTracks.map((track) => track.id));
   const added = tracks.filter((track) => !prevIds.has(track.id));

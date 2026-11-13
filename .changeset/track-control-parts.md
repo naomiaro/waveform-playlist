@@ -32,7 +32,7 @@ Behaviour:
 - Mixer state (mute, solo, volume, pan) is kept by track id. Removing a track no longer puts the remaining tracks back at the values of their `ClipTrack` (and the rebuilt engine no longer takes its values from the old list by position); a track keeps its state when tracks are removed, added in front of it or reordered, and a new id starts from its `ClipTrack` fields.
 - `usePlaylistMixer().trackStates` has one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` at its own position, where the array used to be shorter. Its length equals `tracks.length`; the TypeScript type is still `TrackState[]`. Read `trackStates[i]?.soloed`, count loaded tracks with `trackStates.filter(Boolean).length`.
 - The `trackStates` array keeps its identity while no entry changed (a move of a trim; a re-load caused by a new `onTracksChange` function no longer publishes new state objects).
-- A click anywhere in a track's slot of the controls column selects the track, in a panel of your own too. The remove button, the track menu button and the reorder grip and buttons do not select.
+- A click anywhere in a track's slot of the controls column selects the track, in a panel of your own too. The remove button, the button of the track menu and the reorder grip and buttons do not select; a render-mode choice in the open track menu does, as before.
 - `onRemove` gets the track id; the removed `onRemoveTrack` got the index.
 - The part compares its children with the previous ones (element types, keys, props; `children` recursively, `style` one level deep) and keeps the previous ones while they are equal, so children written inline do not render the panels. A function or object written inline as a prop renders every panel on each render of the composing component.
 - `useTrack()` and the pieces throw outside the children of `<WaveformTrackControls>` (so also under `MediaElementPlaylistProvider`). Outside the view use `usePlaylistMixer()` and the id setters.
@@ -40,6 +40,8 @@ Behaviour:
 - `<DefaultTrackControls>` has no remove button and no grip. `TrackRemoveButton` places itself at the top left of the slot, `TrackReorderGrip` at its right edge. A custom panel gets the slot: as wide as the column, as tall as the row, `overflow: hidden`; fill it with `height: 100%`.
 - A mixer change renders the pieces of that track's panel only; selecting a track renders the pieces of the two panels concerned.
 - `useExportWav`: a track that is still loading is exported with the mixer fields of its `ClipTrack`. `exportWav` used to fail on it.
-- A dragover that dnd-kit sends after a canceled track-reorder drag no longer leaves the reorder preview set.
+- A second reorder handle in one panel warns once in the console in development.
+- `exportWav`: a track that is still loading is rendered with the fields of its `ClipTrack` (it failed with a `TypeError`), and its `soloed` counts for the solo rule.
+- Internal: `ClipInteractionProvider` ignores a dragover that arrives when no track-reorder drag is in progress (dnd-kit sends one after the dragend of a canceled drag once the slot's element is registered by the reorder handle).
 
 The upgrade guide has the find-and-replace for each removed name.

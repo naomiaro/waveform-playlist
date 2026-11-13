@@ -532,7 +532,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
             >
               {trackStates.map((state, index) => (
                 <option key={index} value={index}>
-                  {state.name || `Track ${index + 1}`}
+                  {/* No entry yet for a track that is still loading. */}
+                  {state?.name || `Track ${index + 1}`}
                 </option>
               ))}
             </ExportSelect>

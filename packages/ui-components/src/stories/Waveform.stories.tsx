@@ -3,6 +3,7 @@ import React from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
+  ClipInteractionProvider,
   Waveform,
   WaveformRoot,
   WaveformTrackControls,
@@ -203,7 +204,10 @@ const TracksThatCanBeRemoved: React.FC<{
   );
   return (
     <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} samplesPerPixel={1024}>
-      <div style={{ padding: '1rem' }}>{children(remove)}</div>
+      {/* Handles a drag by the reorder grip. */}
+      <ClipInteractionProvider>
+        <div style={{ padding: '1rem' }}>{children(remove)}</div>
+      </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );
 };
@@ -232,7 +236,7 @@ export const TrackControlsWithRemoveAndReorder: Story = {
     docs: {
       description: {
         story:
-          "The default panel with one control of the story's own inside it (`useTrack()`), a remove button and a reorder grip beside it. A remove button and a grip are drawn by being rendered. The move buttons work here; dragging the grip needs a `ClipInteractionProvider` above the view.",
+          "The default panel with one control of the story's own inside it (`useTrack()`), a remove button and a reorder grip beside it. A remove button and a grip are drawn by being rendered. The move buttons need nothing else; dragging by the grip is handled by the `ClipInteractionProvider` around the view.",
       },
     },
   },

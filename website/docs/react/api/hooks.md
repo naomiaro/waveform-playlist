@@ -939,7 +939,8 @@ interface TrackContextValue {
   /**
    * True while the provider has no mixer state for the track (it is still
    * loading): the engine does not know it yet, so the mixer actions and a
-   * reorder would have no effect. The built-in pieces are disabled then.
+   * reorder does nothing; a value set with the mixer actions is not kept. The
+   * built-in pieces are disabled then.
    */
   isLoading: boolean;
   /** Whether this is the selected track. */
@@ -952,7 +953,8 @@ interface TrackContextValue {
    */
   hasSpectrogram: boolean;
 
-  // Actions. Each keeps its identity for as long as the track's slot is mounted.
+  // Actions. Each keeps its identity while the track's slot is mounted and a
+  // track menu neither becomes available nor stops being so.
   setMuted: (muted: boolean) => void;
   setSoloed: (soloed: boolean) => void;
   setVolume: (volume: number) => void;
@@ -1010,7 +1012,7 @@ function TrackStrip() {
 
 ### Where it throws
 
-Outside the children of `<WaveformTrackControls>` the hook throws `useTrack must be used within <WaveformTrackControls>…`. That is the case for a mixer strip elsewhere on the page, and everywhere under `MediaElementPlaylistProvider`. There, read `usePlaylistMixer().trackStates` and call the setters of `useEditorControls()` with a track id.
+Outside the children of `<WaveformTrackControls>` the hook throws `useTrack must be used within <WaveformTrackControls>…`. That is the case for a mixer strip elsewhere on the page: there, read `usePlaylistMixer().trackStates` and call the setters of `useEditorControls()` with a track id. It is also the case everywhere under `MediaElementPlaylistProvider`, which has one track and no mixer (those two hooks throw there as well).
 
 ---
 

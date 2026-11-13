@@ -6,7 +6,7 @@
  * written inline are new element objects on every render of the component
  * that composes the view, which usually holds the tracks and renders on every
  * move of a trim: handed on as they are, they rendered every piece of every
- * track each time (measured on the multi-clip example: 237 components per
+ * track each time (measured with a prototype on the multi-clip example: 237 components per
  * trim move against 83). Two elements describe the same thing when their
  * type, key and props are equal, so the previous template can stand in for an
  * equal new one, and React then skips everything below it.

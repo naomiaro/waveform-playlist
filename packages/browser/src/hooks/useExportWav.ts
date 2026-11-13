@@ -182,7 +182,7 @@ export function useExportWav(): UseExportWavReturn {
 
         // Check for solo - if any track is soloed, only play soloed tracks.
         // Skip solo logic for individual export — the user explicitly chose the track.
-        const hasSolo = mode === 'master' && trackStates.some((state) => state?.soloed);
+        const hasSolo = mode === 'master' && tracks.some((_, index) => stateOf(index).soloed);
 
         const reportProgress = (p: number) => {
           setProgress(p);

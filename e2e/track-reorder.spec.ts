@@ -102,7 +102,7 @@ test.describe('Track Reordering', () => {
     // still be visible. OptimisticSortingPlugin's insertAdjacentElement
     // splice force-dismisses dnd-kit's top-layer popover (eventlessly), and
     // a dismissed [popover] element is UA-hidden (display: none) — the
-    // dragPopoverHealer in SortableTrackControls must have re-shown it.
+    // dragPopoverHealer run by useTrackReorderHandle must have re-shown it.
     const midDrag = await page.evaluate(() => {
       const el = document.querySelector('[data-dnd-dragging]');
       if (!el) return null;

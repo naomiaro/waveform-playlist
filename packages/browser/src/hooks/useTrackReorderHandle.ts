@@ -4,6 +4,7 @@ import { RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers';
 import { Feedback } from '@dnd-kit/dom';
 import type { Plugins } from '@dnd-kit/abstract';
 import { createDragPopoverHealer } from '../utils/dragPopoverHealer';
+import { warnOnce } from '../components/partWarnings';
 import { TrackSlotWiringContext, useTrack } from '../components/trackContext';
 
 export interface TrackReorderHandle {
@@ -84,6 +85,23 @@ export function useTrackReorderHandle(): TrackReorderHandle {
     ref(wiring.elementRef.current);
     return () => ref(null);
   }, [ref, wiring]);
+
+  // One handle per panel: a second one registers the same sortable id again.
+  useEffect(() => {
+    if (!wiring) return undefined;
+    const { handleCount } = wiring;
+    handleCount.current += 1;
+    if (handleCount.current > 1) {
+      warnOnce(
+        'A track control panel has more than one reorder handle (<TrackReorderGrip /> or ' +
+          'useTrackReorderHandle()): each registers the track as the same sortable item. ' +
+          'Render one per panel.'
+      );
+    }
+    return () => {
+      handleCount.current -= 1;
+    };
+  }, [wiring]);
 
   // The slot draws itself lifted (opaque, with a shadow) while it is dragged.
   useEffect(() => {

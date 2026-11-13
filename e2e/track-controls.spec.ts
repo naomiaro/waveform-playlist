@@ -68,6 +68,8 @@ test.describe('Track controls', () => {
     expect(after.map((panel) => panel.id)).toEqual(
       before.filter((_, index) => index !== 2).map((panel) => panel.id)
     );
+    // Nothing is selected. (The removed track's row is gone either way: that
+    // a click on the button does not select is the unit test's to show.)
     await expect(page.locator('[data-track-row][data-selected="true"]')).toHaveCount(0);
   });
 
@@ -107,9 +109,9 @@ test.describe('Track controls', () => {
   }) => {
     await ready(page, baseURL, 'effects');
     const slots = page.locator('[data-track-controls]');
-    await expect(slots.first()).toBeVisible();
-    const count = await slots.count();
-    expect(count).toBeGreaterThan(1);
+    // The page loads four stems; wait for all four panels before looping.
+    await expect(slots).toHaveCount(4);
+    const count = 4;
     for (let index = 0; index < count; index++) {
       const slot = slots.nth(index);
       await expect(slot.getByRole('button', { name: 'Mute', exact: true })).toHaveCount(1);

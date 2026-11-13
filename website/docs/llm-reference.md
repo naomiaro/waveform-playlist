@@ -1879,7 +1879,8 @@ interface TrackContextValue {
 
   /** True while the provider has no mixer state for the track (it is still
    *  loading): the engine does not know it yet, so the mixer actions and a
-   *  reorder would have no effect. The built-in pieces are disabled then.
+   *  reorder does nothing; a value set with the mixer actions is not kept. The
+   *  built-in pieces are disabled then.
    *  muted/soloed/volume/pan read false/false/1/0 and name "Track N". */
   isLoading: boolean;
   /** Whether this is the selected track. */
@@ -1890,7 +1891,8 @@ interface TrackContextValue {
    *  and `openSpectrogramSettings` then do something. */
   hasSpectrogram: boolean;
 
-  // Actions. Each keeps its identity for as long as the track's slot is mounted.
+  // Actions. Each keeps its identity while the track's slot is mounted and a
+  // track menu neither becomes available nor stops being so.
   setMuted: (muted: boolean) => void;
   setSoloed: (soloed: boolean) => void;
   setVolume: (volume: number) => void;
@@ -1945,8 +1947,11 @@ function useTrackReorderHandle(): TrackReorderHandle;
 //   row, overflow hidden. A custom panel fills it with height: 100%. The element inside
 //   the slot that holds the panel has data-track-controls="<track id>"; it is the element
 //   a reorder drag moves.
-// - A click anywhere in a slot selects the track. TrackRemoveButton, TrackMenuButton and
-//   the grip and buttons of TrackReorderGrip do not select.
+// - A click anywhere in a slot selects the track. TrackRemoveButton, the button of
+//   TrackMenuButton and the grip and buttons of TrackReorderGrip do not select; a
+//   render-mode choice in the open track menu does.
+// - Children that are false, 0 or '' draw empty panels; only null and undefined mean
+//   "the default panel". One reorder handle per panel.
 // - TrackRemoveButton places itself at the slot's top left, TrackReorderGrip at its right
 //   edge (the default panel makes room for the grip). DefaultTrackControls fills the
 //   slot: an element rendered BESIDE it in the flow is outside the visible slot, so a
