@@ -511,16 +511,9 @@ Slider for overall output volume.
 
 **Range:** 0 (silent) to 1 (full)
 
-### TrackVolumeControl
+### Track volume
 
-Volume slider for a specific track.
-
-```tsx
-<TrackVolumeControl trackIndex={0} />
-```
-
-**Props:**
-- `trackIndex` (required): Index of the track
+There is no exported per-track volume component. The volume slider of a track is part of the default control panel that `<WaveformTrackControls />` draws. For your own slider, read the value from `usePlaylistMixer().trackStates[trackIndex].volume` and set it with `useEditorControls().setTrackVolume(trackIndex, volume)`, in a panel you pass as `renderTrackControls`.
 
 ---
 
@@ -593,6 +586,8 @@ Switching it on while an annotation is playing lets playback continue past that 
 <ContinuousPlayCheckbox />
 ```
 
+It must be inside the `<AnnotationProvider>` of `@waveform-playlist/annotations` and throws without it, as `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` do.
+
 ### AutomaticScrollCheckbox
 
 Toggle for auto-scrolling during playback. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
@@ -605,13 +600,9 @@ Toggle for auto-scrolling during playback. While it is on, a drag on the wavefor
 
 ## Track Controls
 
-### TrackControls
+### The default panel
 
-Built-in control panel for a track.
-
-```tsx
-<TrackControls trackIndex={0} />
-```
+The built-in control panel of a track is not exported as a component of its own: `<WaveformTrackControls />` draws one per track.
 
 **Includes:**
 - Track name
@@ -619,6 +610,10 @@ Built-in control panel for a track.
 - Solo button
 - Volume slider
 - Pan slider
+- A close button, when `onRemoveTrack` is given
+- A drag grip and move up/down buttons, with `trackReordering`
+
+Pass `renderTrackControls` to draw your own panel instead.
 
 ### SortableTrackControls
 
@@ -759,7 +754,6 @@ import {
   MasterVolumeControl,
   AudioPosition,
   TimeFormatSelect,
-  ContinuousPlayCheckbox,
   AutomaticScrollCheckbox,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useAudioTracks } from '@waveform-playlist/browser/tone';
@@ -805,7 +799,6 @@ function FullFeaturedPlaylist() {
 
       {/* Options */}
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        <ContinuousPlayCheckbox />
         <AutomaticScrollCheckbox />
       </div>
 
