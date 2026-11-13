@@ -456,12 +456,17 @@ describe('fades are the clip’s', () => {
     );
     const clipBefore = trackValue.peaksDataArray[0][0];
     const arrayBefore = trackValue.peaksDataArray;
+    const fadeInBefore = trackValue.fadeIn;
+    const valueBefore = trackValue;
 
     await act(async () => {
       view.rerender(ui(inline()));
     });
     await act(async () => {});
     expect(trackValue.peaksDataArray).toBe(arrayBefore);
+    // The hook's value does not change either, and hands out the first objects.
+    expect(trackValue.fadeIn).toBe(fadeInBefore);
+    expect(trackValue).toBe(valueBefore);
     expect(trackValue.peaksDataArray[0][0]).toBe(clipBefore);
     expect(created).toHaveBeenCalledTimes(1);
     expect(fake.dispose).not.toHaveBeenCalled();

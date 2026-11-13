@@ -93,7 +93,6 @@ import {
   WaveformPlayhead,
   useRecordingSession,
   useSelectedTrackId,
-  useMediaElementTrack,
   WaveformAnnotationBoxes,
   MediaElementAnnotationBoxes,
   useEditorControls,
@@ -259,10 +258,8 @@ const ME_TRACK = {
 const ME_FADED = { ...ME_TRACK, fadeIn: { duration: 1 }, fadeOut: { duration: 1 } };
 
 let mediaControls: ReturnType<typeof usePlaybackControls>;
-let mediaTrack: ReturnType<typeof useMediaElementTrack>;
 const MediaProbe: React.FC = () => {
   mediaControls = usePlaybackControls();
-  mediaTrack = useMediaElementTrack();
   return null;
 };
 
