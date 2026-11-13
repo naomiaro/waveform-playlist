@@ -290,9 +290,9 @@ describe('TimeScale', () => {
     const data = tickData(TICKS);
     const scale = (timeScaleHeight: number, timeColor: string) => (
       <ThemeProvider theme={{ ...defaultTheme, timeColor }}>
-        <PlaylistInfoContext.Provider value={{ ...playlistInfoDefaults, timeScaleHeight }}>
+        <PlaylistInfoContext value={{ ...playlistInfoDefaults, timeScaleHeight }}>
           <StyledTimeScale tickData={data} />
-        </PlaylistInfoContext.Provider>
+        </PlaylistInfoContext>
       </ThemeProvider>
     );
     const { rerender } = render(scale(15, '#000'));

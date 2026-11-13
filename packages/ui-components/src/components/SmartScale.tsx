@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useContext, useMemo, type ReactNode } from 'react';
+import React, { FunctionComponent, use, useMemo, type ReactNode } from 'react';
 import styled from 'styled-components';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { useBeatsAndBars } from '../contexts/BeatsAndBars';
@@ -102,7 +102,7 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({
   durationMs: duration,
   renderTick,
 }) => {
-  const { samplesPerPixel, sampleRate, timeScaleHeight } = useContext(PlaylistInfoContext);
+  const { samplesPerPixel, sampleRate, timeScaleHeight } = use(PlaylistInfoContext);
   const beatsAndBars = useBeatsAndBars();
 
   // Pre-compute tick data for beats & bars mode using integer PPQN math.

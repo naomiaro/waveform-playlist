@@ -215,8 +215,8 @@ async function mountMultitrack(
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter as unknown as PlayoutAdapter;
   const ui = () => (
-    <AnnotationIntegrationContext.Provider value={annotations ? ANNOTATION_INTEGRATION : null}>
-      <SpectrogramIntegrationContext.Provider value={spectrogram ?? null}>
+    <AnnotationIntegrationContext value={annotations ? ANNOTATION_INTEGRATION : null}>
+      <SpectrogramIntegrationContext value={spectrogram ?? null}>
         <WaveformPlaylistProvider
           tracks={tracks}
           sampleRate={SAMPLE_RATE}
@@ -226,8 +226,8 @@ async function mountMultitrack(
           <Probe />
           {tree()}
         </WaveformPlaylistProvider>
-      </SpectrogramIntegrationContext.Provider>
-    </AnnotationIntegrationContext.Provider>
+      </SpectrogramIntegrationContext>
+    </AnnotationIntegrationContext>
   );
   const view = render(ui());
   await waitFor(() => expect(probe.isReady).toBe(true));
@@ -312,7 +312,7 @@ async function mountMediaElement(
   };
   const createPlayout = () => fake as unknown as MediaElementPlayout;
   const ui = () => (
-    <AnnotationIntegrationContext.Provider value={annotations ? ANNOTATION_INTEGRATION : null}>
+    <AnnotationIntegrationContext value={annotations ? ANNOTATION_INTEGRATION : null}>
       <MediaElementPlaylistProvider
         track={ME_FADED}
         samplesPerPixel={1000}
@@ -322,7 +322,7 @@ async function mountMediaElement(
         {typeof tree === 'function' ? tree() : tree}
         <MediaProbe />
       </MediaElementPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   const view = render(ui());
   await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());

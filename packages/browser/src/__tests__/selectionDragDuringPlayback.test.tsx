@@ -73,13 +73,13 @@ interface Scene {
 
 function mount(initial: Scene) {
   const ui = ({ isPlaying, isAutomaticScroll = false }: Scene) => (
-    <PlaybackControlsContext.Provider value={CONTROLS}>
-      <PlaylistSettingsContext.Provider value={{ timeFormat: 'hh:mm:ss.uuu', isAutomaticScroll }}>
-        <IsPlayingContext.Provider value={{ isPlaying }}>
+    <PlaybackControlsContext value={CONTROLS}>
+      <PlaylistSettingsContext value={{ timeFormat: 'hh:mm:ss.uuu', isAutomaticScroll }}>
+        <IsPlayingContext value={{ isPlaying }}>
           <Surface />
-        </IsPlayingContext.Provider>
-      </PlaylistSettingsContext.Provider>
-    </PlaybackControlsContext.Provider>
+        </IsPlayingContext>
+      </PlaylistSettingsContext>
+    </PlaybackControlsContext>
   );
   const utils = render(ui(initial));
   return { set: (scene: Scene) => utils.rerender(ui(scene)) };
@@ -386,15 +386,15 @@ describe('the selection highlight shows the preview in place of the selection', 
     const handle = createValueSource<SelectionRange | null>(null);
     render(
       <ThemeProvider theme={defaultTheme}>
-        <PlaylistViewContext.Provider value={VIEW}>
-          <PlaylistZoomContext.Provider value={ZOOM}>
-            <SelectionContext.Provider value={{ selectionStart: 10, selectionEnd: 30 }}>
-              <SelectionPreviewContext.Provider value={handle.source}>
+        <PlaylistViewContext value={VIEW}>
+          <PlaylistZoomContext value={ZOOM}>
+            <SelectionContext value={{ selectionStart: 10, selectionEnd: 30 }}>
+              <SelectionPreviewContext value={handle.source}>
                 <WaveformSelection />
-              </SelectionPreviewContext.Provider>
-            </SelectionContext.Provider>
-          </PlaylistZoomContext.Provider>
-        </PlaylistViewContext.Provider>
+              </SelectionPreviewContext>
+            </SelectionContext>
+          </PlaylistZoomContext>
+        </PlaylistViewContext>
       </ThemeProvider>
     );
     expect(highlight()).toEqual({ left: '10px', width: '20px' });
@@ -414,13 +414,13 @@ describe('the selection highlight shows the preview in place of the selection', 
   it('with no preview source above (no view around it) it draws the selection', () => {
     render(
       <ThemeProvider theme={defaultTheme}>
-        <PlaylistViewContext.Provider value={VIEW}>
-          <PlaylistZoomContext.Provider value={ZOOM}>
-            <SelectionContext.Provider value={{ selectionStart: 10, selectionEnd: 30 }}>
+        <PlaylistViewContext value={VIEW}>
+          <PlaylistZoomContext value={ZOOM}>
+            <SelectionContext value={{ selectionStart: 10, selectionEnd: 30 }}>
               <WaveformSelection />
-            </SelectionContext.Provider>
-          </PlaylistZoomContext.Provider>
-        </PlaylistViewContext.Provider>
+            </SelectionContext>
+          </PlaylistZoomContext>
+        </PlaylistViewContext>
       </ThemeProvider>
     );
     expect(highlight()).toEqual({ left: '10px', width: '20px' });

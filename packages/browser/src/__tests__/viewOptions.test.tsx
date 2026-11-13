@@ -792,13 +792,13 @@ describe('WaveformViewOptions (#689)', () => {
     } as unknown as SpectrogramIntegration;
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     await mountMultitrack(() => (
-      <SpectrogramIntegrationContext.Provider value={spectrogram}>
+      <SpectrogramIntegrationContext value={spectrogram}>
         <WaveformViewOptions waveHeight={64}>
           <WaveformRoot>
             <WaveformTracks />
           </WaveformRoot>
         </WaveformViewOptions>
-      </SpectrogramIntegrationContext.Provider>
+      </SpectrogramIntegrationContext>
     ));
     // The labels canvas is the one 72 px wide; the channels' canvases are as
     // wide as their clip.

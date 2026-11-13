@@ -67,9 +67,9 @@ const meta: Meta<typeof Track> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <PlaylistInfoContext.Provider value={playlistInfo}>
+      <PlaylistInfoContext value={playlistInfo}>
         <Story />
-      </PlaylistInfoContext.Provider>
+      </PlaylistInfoContext>
     ),
   ],
 };

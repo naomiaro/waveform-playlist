@@ -665,9 +665,9 @@ The context value no longer has a `duration` field. Every channel and track read
 </PlaylistInfoContext.Provider>
 
 // After
-<PlaylistInfoContext.Provider value={info}>
+<PlaylistInfoContext value={info}>
   <SmartScale durationMs={durationSeconds * 1000} />
-</PlaylistInfoContext.Provider>
+</PlaylistInfoContext>
 ```
 
 In TypeScript both are compile errors (an unknown `duration` property, a missing `durationMs` prop). In plain JavaScript a `<SmartScale>` without `durationMs` renders the timescale with no ticks and no labels and throws nothing, so check every `<SmartScale` by hand. A component of your own that read `duration` from the context takes it as a prop instead.
@@ -2352,7 +2352,7 @@ Outside a root `usePlaylistInfo()` returns its defaults, not the options of a `<
 >
 
 // After
-<PlaylistInfoContext.Provider
+<PlaylistInfoContext
   value={{
     sampleRate,
     samplesPerPixel,

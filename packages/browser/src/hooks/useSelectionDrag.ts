@@ -47,7 +47,7 @@ export interface SelectionDrag {
   isSelecting: boolean;
   /** For the `mousedown` of the element the drag starts on (the click overlay). */
   handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
-  /** For `SelectionPreviewContext.Provider`. The same object for the life of the component. */
+  /** For `<SelectionPreviewContext value>`. The same object for the life of the component. */
   preview: ValueSource<SelectionRange | null>;
   /** For `<AutomaticScrollFlag flagRef>`, which the caller must render (`useWaveformFrame` does). */
   automaticScrollRef: React.RefObject<boolean>;

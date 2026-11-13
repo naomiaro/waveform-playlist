@@ -219,7 +219,7 @@ async function mount(reset = true) {
   const ui = () => (
     // The annotation components: without them the box part draws nothing
     // (#686), and "the boxes did not render" below would say nothing.
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <WaveformPlaylistProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
@@ -229,7 +229,7 @@ async function mount(reset = true) {
         <ProbeChild />
         <ComposedWaveform />
       </WaveformPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   const utils = render(ui());
   await waitFor(() => expect(probe.isReady).toBe(true));
@@ -404,18 +404,18 @@ describe('AudioPosition registers under its own id (#685)', () => {
     };
 
     render(
-      <PlaybackRefsContext.Provider value={refs}>
-        <IsPlayingContext.Provider value={{ isPlaying: true }}>
-          <CurrentTimeContext.Provider value={{ currentTime: 0 }}>
-            <PlaylistSettingsContext.Provider
+      <PlaybackRefsContext value={refs}>
+        <IsPlayingContext value={{ isPlaying: true }}>
+          <CurrentTimeContext value={{ currentTime: 0 }}>
+            <PlaylistSettingsContext
               value={{ timeFormat: 'hh:mm:ss.uuu', isAutomaticScroll: false }}
             >
               <AudioPosition />
               <AudioPosition />
-            </PlaylistSettingsContext.Provider>
-          </CurrentTimeContext.Provider>
-        </IsPlayingContext.Provider>
-      </PlaybackRefsContext.Provider>
+            </PlaylistSettingsContext>
+          </CurrentTimeContext>
+        </IsPlayingContext>
+      </PlaybackRefsContext>
     );
 
     expect(registered.size).toBe(2);

@@ -83,7 +83,7 @@ const {
 }: PlaylistInfo = usePlaylistInfo();
 ```
 
-If you render `PlaylistInfoContext.Provider` yourself, give it every field of `PlaylistInfo` (`roundedBars` and `progressBarWidth` are required; `controls` and `zoomLevels` are no longer part of it). `DEFAULT_WAVE_HEIGHT` (80), `DEFAULT_BAR_WIDTH` (1) and `DEFAULT_BAR_GAP` (0) are exported.
+If you render `<PlaylistInfoContext value={…}>` yourself, give it every field of `PlaylistInfo` (`roundedBars` and `progressBarWidth` are required; `controls` and `zoomLevels` are no longer part of it). `DEFAULT_WAVE_HEIGHT` (80), `DEFAULT_BAR_WIDTH` (1) and `DEFAULT_BAR_GAP` (0) are exported.
 
 `Channel` never steps less than one pixel from one bar to the next: a `barWidth + barGap` under 1 is drawn with a step of 1.
 

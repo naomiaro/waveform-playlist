@@ -140,7 +140,7 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   render(
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <WaveformPlaylistProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
@@ -148,11 +148,11 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
         annotationList={ANNOTATION_LIST}
       >
         <ProbeChild />
-        <WaveformExtentContext.Provider value={EXTENT}>
+        <WaveformExtentContext value={EXTENT}>
           <WaveformAnnotationBoxes getLabel={getLabel} />
-        </WaveformExtentContext.Provider>
+        </WaveformExtentContext>
       </WaveformPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   await waitFor(() => expect(probe.data.isReady).toBe(true));
   await act(async () => {});

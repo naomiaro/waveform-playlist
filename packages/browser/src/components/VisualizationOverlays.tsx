@@ -8,7 +8,7 @@
  * rendered under both providers (#688). The loop region is multitrack only.
  * (The annotation boxes are `WaveformAnnotationBoxes.tsx`, for both providers.)
  */
-import React, { useContext, useSyncExternalStore } from 'react';
+import React, { use, useSyncExternalStore } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
@@ -49,7 +49,7 @@ export const WaveformSelection: React.FC = React.memo(function WaveformSelection
   // The range a drag is drawing during playback (see useSelectionDrag). It is
   // not the selection yet, and it is shown in its place until the release.
   // Called as methods (not detached), so a source written as a class works.
-  const previewSource = useContext(SelectionPreviewContext);
+  const previewSource = use(SelectionPreviewContext);
   const preview = useSyncExternalStore(
     previewSource ? (onChange) => previewSource.subscribe(onChange) : subscribeToNothing,
     previewSource ? () => previewSource.getSnapshot() : noPreview,
@@ -138,7 +138,7 @@ export const WaveformPlayhead: React.FC<WaveformPlayheadProps> = ({ renderPlayhe
  */
 export const WaveformLoopRegion = React.memo(function WaveformLoopRegion() {
   const { tracksFullWidth: maxPosition } = useWaveformExtent('The loop region');
-  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+  if (use(WaveformPartPlaceContext) !== 'timescale') {
     warnMisplacedPart(
       '<WaveformLoopRegion> is drawn among the tracks, not in the timescale strip: the root ' +
         'recognises a part by its element type, so it must be a child of the root (a fragment ' +

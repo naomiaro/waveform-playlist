@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 
 /**
  * What the drawing primitives (`Track`, `SmartChannel`, `SmartScale`,
@@ -37,4 +37,4 @@ export const PlaylistInfoContext = createContext<PlaylistInfo>({
   progressBarWidth: DEFAULT_BAR_WIDTH + DEFAULT_BAR_GAP,
 });
 
-export const usePlaylistInfo = () => useContext(PlaylistInfoContext);
+export const usePlaylistInfo = () => use(PlaylistInfoContext);

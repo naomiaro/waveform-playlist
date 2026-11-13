@@ -1,4 +1,4 @@
-import { useContext, useEffect } from 'react';
+import { use, useEffect } from 'react';
 import { useSortable } from '@dnd-kit/react/sortable';
 import { RestrictToVerticalAxis } from '@dnd-kit/abstract/modifiers';
 import { Feedback } from '@dnd-kit/dom';
@@ -33,7 +33,7 @@ const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEED
  */
 export function useTrackReorderHandle(): TrackReorderHandle {
   const { id, index } = useTrack();
-  const wiring = useContext(TrackSlotWiringContext);
+  const wiring = use(TrackSlotWiringContext);
   const { ref, handleRef, isDragSource } = useSortable({
     id: `track-reorder-${id}`,
     index,

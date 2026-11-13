@@ -95,16 +95,16 @@ export function useWaveformParts(children: ReactNode): WaveformPartsByPlace {
       // by kind (`keyedByKind`).
       timescale:
         sorted.timescale.length > 0 ? (
-          <WaveformPartPlaceContext.Provider value="timescale">
+          <WaveformPartPlaceContext value="timescale">
             {keyedByKind(sorted.timescale)}
-          </WaveformPartPlaceContext.Provider>
+          </WaveformPartPlaceContext>
         ) : null,
       controls:
         sorted.controls.length > 0
           ? [
-              <WaveformPartPlaceContext.Provider key="controls" value="controls">
+              <WaveformPartPlaceContext key="controls" value="controls">
                 {createElement(Fragment, null, ...sorted.controls)}
-              </WaveformPartPlaceContext.Provider>,
+              </WaveformPartPlaceContext>,
             ]
           : undefined,
       content: createElement(Fragment, null, ...sorted.content),
@@ -218,13 +218,13 @@ export function useWaveformFrame({
   return (
     <>
       <AutomaticScrollFlag flagRef={automaticScrollRef} />
-      <PlaylistInfoContext.Provider value={playlistInfo}>
-        <WaveformExtentContext.Provider value={extent}>
-          <WaveformRowsContext.Provider value={rows}>
-            <RootSeesRecordingPreviewContext.Provider
+      <PlaylistInfoContext value={playlistInfo}>
+        <WaveformExtentContext value={extent}>
+          <WaveformRowsContext value={rows}>
+            <RootSeesRecordingPreviewContext
               value={parts.tracksOptions.recordingState !== undefined}
             >
-              <SelectionPreviewContext.Provider value={selectionPreview}>
+              <SelectionPreviewContext value={selectionPreview}>
                 <Playlist
                   className={className}
                   theme={theme}
@@ -245,11 +245,11 @@ export function useWaveformFrame({
                 >
                   {parts.content}
                 </Playlist>
-              </SelectionPreviewContext.Provider>
-            </RootSeesRecordingPreviewContext.Provider>
-          </WaveformRowsContext.Provider>
-        </WaveformExtentContext.Provider>
-      </PlaylistInfoContext.Provider>
+              </SelectionPreviewContext>
+            </RootSeesRecordingPreviewContext>
+          </WaveformRowsContext>
+        </WaveformExtentContext>
+      </PlaylistInfoContext>
     </>
   );
 }

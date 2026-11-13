@@ -8,7 +8,7 @@
  *
  * This file imports no provider and no engine.
  */
-import { createContext, useContext, type RefObject } from 'react';
+import { createContext, use, type RefObject } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
 
@@ -74,7 +74,7 @@ export const TrackContext = createContext<TrackContextValue | null>(null);
  * children of `<WaveformTrackControls>`, which renders them once per track.
  */
 export function useTrack(): TrackContextValue {
-  const value = useContext(TrackContext);
+  const value = use(TrackContext);
   if (value === null) {
     throw new Error(
       'useTrack must be used within <WaveformTrackControls>: it reads the track whose control ' +

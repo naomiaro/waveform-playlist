@@ -185,7 +185,7 @@ async function mount({ playlist, provider, notReady = false }: MountOptions = {}
   const fake = createFakePlayout();
   const createPlayout = () => fake as unknown as MediaElementPlayout;
   const view = render(
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <MediaElementPlaylistProvider
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -195,7 +195,7 @@ async function mount({ playlist, provider, notReady = false }: MountOptions = {}
         {playlist ?? <ComposedMediaElementWaveform />}
         <Probe />
       </MediaElementPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
   if (!notReady) {

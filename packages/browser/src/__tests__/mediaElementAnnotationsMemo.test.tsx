@@ -168,7 +168,7 @@ async function mount(
   const createPlayout = () => playout as unknown as MediaElementPlayout;
   const onAnnotationsChange = () => {};
   const tree = (content: React.ReactNode) => (
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <MediaElementPlaylistProvider
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -179,7 +179,7 @@ async function mount(
         <ProbeChild />
         {content}
       </MediaElementPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   const { rerender } = render(tree(children));
   await waitFor(() => expect(probe.data.duration).toBe(SECONDS));

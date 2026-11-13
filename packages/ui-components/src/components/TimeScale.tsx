@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useLayoutEffect, useContext, useMemo } from 'react';
+import React, { FunctionComponent, useLayoutEffect, use, useMemo } from 'react';
 import styled, { withTheme, DefaultTheme } from 'styled-components';
 import { PlaylistInfoContext } from '../contexts/PlaylistInfo';
 import { useDevicePixelRatio } from '../contexts/DevicePixelRatio';
@@ -72,7 +72,7 @@ export const TimeScale: FunctionComponent<TimeScalePropsWithTheme> = (props) => 
     tickData,
   } = props;
   const { canvasRef, canvasMapRef } = useChunkedCanvasRefs();
-  const { timeScaleHeight } = useContext(PlaylistInfoContext);
+  const { timeScaleHeight } = use(PlaylistInfoContext);
   const devicePixelRatio = useDevicePixelRatio();
 
   const { widthX, canvasInfo, timeMarkersWithPositions } = tickData;

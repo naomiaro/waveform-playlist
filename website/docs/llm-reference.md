@@ -2181,14 +2181,14 @@ type PlaylistInfo = {
   /** Width in pixels of the playhead line. Default: barWidth + barGap. */
   progressBarWidth: number;
 };
-const usePlaylistInfo: () => PlaylistInfo;      // useContext(PlaylistInfoContext)
+const usePlaylistInfo: () => PlaylistInfo;      // use(PlaylistInfoContext)
 const DEFAULT_WAVE_HEIGHT = 80;
 const DEFAULT_BAR_WIDTH = 1;
 const DEFAULT_BAR_GAP = 0;
 // Without a root above, PlaylistInfoContext's default applies: sampleRate 48000,
 // samplesPerPixel 1000, waveHeight 80, timeScaleHeight 15, barWidth 1, barGap 0,
 // roundedBars false, progressBarWidth 1.
-// Removed (#689): controls, zoomLevels. A PlaylistInfoContext.Provider of your own must give this shape.
+// Removed (#689): controls, zoomLevels. A <PlaylistInfoContext value={…}> of your own must give this shape.
 // Theme key spectrogramBackgroundColor (optional, '#000' without it): the background of the area a
 // spectrogram is drawn in; it shows until the spectrogram has been drawn and where a chunk is not mounted.
 ```

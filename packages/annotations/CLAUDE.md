@@ -6,8 +6,8 @@
 
 **Flow:** Browser defines `AnnotationIntegrationContext` → this package creates `AnnotationProvider` that supplies components/functions → browser components read the context. What each does without `<AnnotationProvider>`:
 
-- `WaveformAnnotationBoxes` (through the internal `AnnotationBoxes`, plain `useContext`): draws nothing, silently. Also nothing when there are no annotations.
-- `AnnotationList` (plain `useContext`): returns `null` first when there are no annotations; with annotations and no provider it returns `null` and writes one development warning (`warnOnce`).
+- `WaveformAnnotationBoxes` (through the internal `AnnotationBoxes`, plain `use`): draws nothing, silently. Also nothing when there are no annotations.
+- `AnnotationList` (plain `use`): returns `null` first when there are no annotations; with annotations and no provider it returns `null` and writes one development warning (`warnOnce`).
 - `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` (`src/components/AnnotationCheckboxes.tsx`) and `DownloadAnnotationsButton`: work. They live in THIS package (#770), are not in the integration, and read browser's `useAnnotationOptions()`, `usePlaybackControls()` and `useAnnotations()`; without a playlist provider those hooks throw. They have no controlled form. The integration (`AnnotationIntegration`) is `parseAeneas`, `serializeAeneas`, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper`: what browser's own views draw.
 
 **Throwing Context Hooks (Kent C. Dodds Pattern):**
@@ -18,8 +18,8 @@
 const integration = useAnnotationIntegration();
 
 // The parts of a view that must render with or without annotations
-// (AnnotationBoxes, AnnotationList) use useContext directly and get null when absent
-const annotationIntegration = useContext(AnnotationIntegrationContext);
+// (AnnotationBoxes, AnnotationList) read the context with use() directly and get null when absent
+const annotationIntegration = use(AnnotationIntegrationContext);
 ```
 
 **Location:** `packages/browser/src/AnnotationIntegrationContext.tsx`

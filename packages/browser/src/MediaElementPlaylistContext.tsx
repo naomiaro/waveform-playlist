@@ -949,55 +949,51 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // WebAudio provider further out. Outermost: what changes least.
   return (
     <ThemeProvider theme={mergedTheme}>
-      <EditorControlsContext.Provider value={BLOCKED}>
-        <EngineRefsContext.Provider value={BLOCKED}>
-          <AnnotationOptionsContext.Provider value={annotationOptionsValue}>
-            <LoopContext.Provider value={BLOCKED}>
-              <SelectedTrackIdContext.Provider value={BLOCKED}>
-                <UndoRedoContext.Provider value={BLOCKED}>
-                  <PlaylistTimelineContext.Provider value={BLOCKED}>
-                    <PlaylistMixerContext.Provider value={BLOCKED}>
-                      <TrackReorderPreviewContext.Provider value={BLOCKED}>
-                        <PlaybackRefsContext.Provider value={refsValue}>
-                          <PlaybackControlsContext.Provider value={controlsValue}>
-                            <PlaylistViewContext.Provider value={viewValue}>
-                              <PlaylistZoomContext.Provider value={zoomValue}>
-                                <PlaylistSettingsContext.Provider value={settingsValue}>
-                                  <MediaElementTrackContext.Provider value={trackValue}>
-                                    <PlaybackRateContext.Provider value={playbackRateValue}>
-                                      <AnnotationsContext.Provider value={annotationsValue}>
-                                        <IsPlayingContext.Provider value={isPlayingValue}>
-                                          <ActiveAnnotationContext.Provider
-                                            value={activeAnnotationValue}
-                                          >
-                                            <CurrentTimeContext.Provider value={currentTimeValue}>
-                                              <SelectionContext.Provider value={selection}>
-                                                <SelectedRowContext.Provider
-                                                  value={ONLY_ROW_SELECTED}
-                                                >
+      <EditorControlsContext value={BLOCKED}>
+        <EngineRefsContext value={BLOCKED}>
+          <AnnotationOptionsContext value={annotationOptionsValue}>
+            <LoopContext value={BLOCKED}>
+              <SelectedTrackIdContext value={BLOCKED}>
+                <UndoRedoContext value={BLOCKED}>
+                  <PlaylistTimelineContext value={BLOCKED}>
+                    <PlaylistMixerContext value={BLOCKED}>
+                      <TrackReorderPreviewContext value={BLOCKED}>
+                        <PlaybackRefsContext value={refsValue}>
+                          <PlaybackControlsContext value={controlsValue}>
+                            <PlaylistViewContext value={viewValue}>
+                              <PlaylistZoomContext value={zoomValue}>
+                                <PlaylistSettingsContext value={settingsValue}>
+                                  <MediaElementTrackContext value={trackValue}>
+                                    <PlaybackRateContext value={playbackRateValue}>
+                                      <AnnotationsContext value={annotationsValue}>
+                                        <IsPlayingContext value={isPlayingValue}>
+                                          <ActiveAnnotationContext value={activeAnnotationValue}>
+                                            <CurrentTimeContext value={currentTimeValue}>
+                                              <SelectionContext value={selection}>
+                                                <SelectedRowContext value={ONLY_ROW_SELECTED}>
                                                   {children}
-                                                </SelectedRowContext.Provider>
-                                              </SelectionContext.Provider>
-                                            </CurrentTimeContext.Provider>
-                                          </ActiveAnnotationContext.Provider>
-                                        </IsPlayingContext.Provider>
-                                      </AnnotationsContext.Provider>
-                                    </PlaybackRateContext.Provider>
-                                  </MediaElementTrackContext.Provider>
-                                </PlaylistSettingsContext.Provider>
-                              </PlaylistZoomContext.Provider>
-                            </PlaylistViewContext.Provider>
-                          </PlaybackControlsContext.Provider>
-                        </PlaybackRefsContext.Provider>
-                      </TrackReorderPreviewContext.Provider>
-                    </PlaylistMixerContext.Provider>
-                  </PlaylistTimelineContext.Provider>
-                </UndoRedoContext.Provider>
-              </SelectedTrackIdContext.Provider>
-            </LoopContext.Provider>
-          </AnnotationOptionsContext.Provider>
-        </EngineRefsContext.Provider>
-      </EditorControlsContext.Provider>
+                                                </SelectedRowContext>
+                                              </SelectionContext>
+                                            </CurrentTimeContext>
+                                          </ActiveAnnotationContext>
+                                        </IsPlayingContext>
+                                      </AnnotationsContext>
+                                    </PlaybackRateContext>
+                                  </MediaElementTrackContext>
+                                </PlaylistSettingsContext>
+                              </PlaylistZoomContext>
+                            </PlaylistViewContext>
+                          </PlaybackControlsContext>
+                        </PlaybackRefsContext>
+                      </TrackReorderPreviewContext>
+                    </PlaylistMixerContext>
+                  </PlaylistTimelineContext>
+                </UndoRedoContext>
+              </SelectedTrackIdContext>
+            </LoopContext>
+          </AnnotationOptionsContext>
+        </EngineRefsContext>
+      </EditorControlsContext>
     </ThemeProvider>
   );
 };

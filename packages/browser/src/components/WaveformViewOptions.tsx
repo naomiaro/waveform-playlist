@@ -9,7 +9,7 @@
  * often serves several views: ten players on a page, each under its own
  * provider, are styled by one `<WaveformViewOptions>` above them all.
  */
-import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
+import React, { createContext, use, useMemo, type ReactNode } from 'react';
 import {
   DEFAULT_BAR_GAP,
   DEFAULT_BAR_WIDTH,
@@ -66,7 +66,7 @@ export const WaveformViewOptions: React.FC<WaveformViewOptionsProps> = ({
   progressBarWidth: ownProgressBarWidth,
   fillViewport: ownFillViewport,
 }) => {
-  const above = useContext(WaveformViewOptionsContext);
+  const above = use(WaveformViewOptionsContext);
   const waveHeight = ownWaveHeight ?? above.waveHeight;
   const barWidth = ownBarWidth ?? above.barWidth;
   const barGap = ownBarGap ?? above.barGap;
@@ -79,11 +79,7 @@ export const WaveformViewOptions: React.FC<WaveformViewOptionsProps> = ({
     () => ({ waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport }),
     [waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport]
   );
-  return (
-    <WaveformViewOptionsContext.Provider value={value}>
-      {children}
-    </WaveformViewOptionsContext.Provider>
-  );
+  return <WaveformViewOptionsContext value={value}>{children}</WaveformViewOptionsContext>;
 };
 
 /** INTERNAL: every option with a value, as a root draws with them. */
@@ -110,7 +106,7 @@ const isPositive = (value: number) => value > 0;
  * and a playhead width that is not above 0 becomes the bar and its gap.
  */
 export function useResolvedViewOptions(): ResolvedViewOptions {
-  const options = useContext(WaveformViewOptionsContext);
+  const options = use(WaveformViewOptionsContext);
   let waveHeight = options.waveHeight ?? DEFAULT_WAVE_HEIGHT;
   let barWidth = options.barWidth ?? DEFAULT_BAR_WIDTH;
   let barGap = options.barGap ?? DEFAULT_BAR_GAP;

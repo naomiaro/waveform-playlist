@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, use, useMemo } from 'react';
 import { ticksPerBeat, ticksPerBar } from '@waveform-playlist/core';
 
 /** The grid a drag snaps to under `BeatsAndBarsProvider`. (Core's `SnapTo` is
@@ -49,9 +49,9 @@ export function BeatsAndBarsProvider({
     };
   }, [bpm, numerator, denominator, snapTo, scaleMode]);
 
-  return <BeatsAndBarsContext.Provider value={value}>{children}</BeatsAndBarsContext.Provider>;
+  return <BeatsAndBarsContext value={value}>{children}</BeatsAndBarsContext>;
 }
 
 export function useBeatsAndBars(): BeatsAndBarsContextValue | null {
-  return useContext(BeatsAndBarsContext);
+  return use(BeatsAndBarsContext);
 }

@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.0",
+    "@eslint-react/eslint-plugin": "^5.30.2",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.65.0",
     "@types/node": "^24.0.0",

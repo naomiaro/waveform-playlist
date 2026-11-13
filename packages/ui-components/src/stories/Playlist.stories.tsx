@@ -91,9 +91,9 @@ const meta: Meta<typeof Playlist> = {
   tags: ['autodocs'],
   decorators: [
     (Story) => (
-      <PlaylistInfoContext.Provider value={playlistInfo}>
+      <PlaylistInfoContext value={playlistInfo}>
         <Story />
-      </PlaylistInfoContext.Provider>
+      </PlaylistInfoContext>
     ),
   ],
 };
@@ -189,11 +189,11 @@ export const Scrollable: Story = {
   },
   decorators: [
     (Story) => (
-      <PlaylistInfoContext.Provider value={playlistInfo}>
+      <PlaylistInfoContext value={playlistInfo}>
         <div style={{ width: '600px', overflow: 'hidden' }}>
           <Story />
         </div>
-      </PlaylistInfoContext.Provider>
+      </PlaylistInfoContext>
     ),
   ],
   render: (args) => (

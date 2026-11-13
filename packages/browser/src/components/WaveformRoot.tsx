@@ -1,5 +1,5 @@
 import React, {
-  useContext,
+  use,
   useLayoutEffect,
   useRef,
   useState,
@@ -77,7 +77,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   const { trackDragPreview } = useTrackReorderPreview();
 
   // Optional spectrogram integration (only available when SpectrogramProvider is present)
-  const spectrogram = useContext(SpectrogramIntegrationContext);
+  const spectrogram = use(SpectrogramIntegrationContext);
 
   // The parts by place, and what the tracks part was given.
   const parts = useWaveformParts(children);

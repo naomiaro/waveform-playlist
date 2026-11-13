@@ -17,7 +17,7 @@
  * that composes them usually re-renders with the tracks (it holds them), and
  * a part whose props did not change should not follow.
  */
-import React, { useContext, type ReactNode } from 'react';
+import React, { use, type ReactNode } from 'react';
 import { SmartScale } from '@waveform-playlist/ui-components';
 import {
   WaveformTracks,
@@ -64,7 +64,7 @@ export const WaveformTimescale = React.memo(function WaveformTimescale({
 }: WaveformTimescaleProps) {
   // `height` is read by the root (`sortWaveformParts`), which draws the strip.
   const { displayDuration } = useWaveformExtent('The timescale');
-  if (useContext(WaveformPartPlaceContext) !== 'timescale') {
+  if (use(WaveformPartPlaceContext) !== 'timescale') {
     warnMisplacedPart(
       '<WaveformTimescale> is drawn among the tracks, not in the timescale strip: the root ' +
         'recognises a part by its element type, so it must be a child of the root (a fragment ' +

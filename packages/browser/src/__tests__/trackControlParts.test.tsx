@@ -187,7 +187,7 @@ function mount(props: AppProps) {
   const createAdapter = () => adapter;
   let current = props;
   const App: React.FC<AppProps> = ({ tracks, controls, loading, onTracksChange, spectrogram }) => (
-    <SpectrogramIntegrationContext.Provider value={spectrogram ?? null}>
+    <SpectrogramIntegrationContext value={spectrogram ?? null}>
       <WaveformPlaylistProvider
         tracks={tracks}
         sampleRate={SAMPLE_RATE}
@@ -201,7 +201,7 @@ function mount(props: AppProps) {
           <WaveformTracks />
         </WaveformRoot>
       </WaveformPlaylistProvider>
-    </SpectrogramIntegrationContext.Provider>
+    </SpectrogramIntegrationContext>
   );
   const view = render(<App {...current} />);
   return {

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 import type {
   AnnotationData,
   AnnotationAction,
@@ -83,7 +83,7 @@ export const AnnotationIntegrationProvider = AnnotationIntegrationContext.Provid
  * https://kentcdodds.com/blog/how-to-use-react-context-effectively
  */
 export function useAnnotationIntegration(): AnnotationIntegration {
-  const context = useContext(AnnotationIntegrationContext);
+  const context = use(AnnotationIntegrationContext);
   if (!context) {
     throw new Error(
       'useAnnotationIntegration must be used within <AnnotationProvider>. ' +

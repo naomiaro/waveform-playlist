@@ -10,7 +10,7 @@
  * This file imports no provider and no engine: a MediaElement-only bundle
  * must not pull in the WebAudio provider through it.
  */
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
@@ -458,7 +458,7 @@ export const MediaElementTrackContext = slot<MediaElementTrackContextValue>();
 // ---------------------------------------------------------------------------
 
 function useSlot<T>(context: React.Context<Slot<T>>, hookName: string, needs: string): T {
-  const value = useContext(context);
+  const value = use(context);
   if (value === BLOCKED) {
     const nearest = needs === WEB_AUDIO ? MEDIA_ELEMENT : WEB_AUDIO;
     throw new Error(
@@ -620,7 +620,7 @@ export const useWebAudioProviderOnly = (hookName: string): void => {
  * starts playback under both providers.
  */
 export const useLoopOptional = (): LoopContextValue | null => {
-  const value = useContext(LoopContext);
+  const value = use(LoopContext);
   return value === BLOCKED ? null : value;
 };
 const orNull = <T>(value: T | typeof BLOCKED | null): T | null =>
@@ -631,5 +631,5 @@ const orNull = <T>(value: T | typeof BLOCKED | null): T | null =>
  * {@link usePlaylistZoom} but `null` when there is no provider above. For a
  * hook that may also be called outside one with explicit options.
  */
-export const usePlaylistViewOptional = () => orNull(useContext(PlaylistViewContext));
-export const usePlaylistZoomOptional = () => orNull(useContext(PlaylistZoomContext));
+export const usePlaylistViewOptional = () => orNull(use(PlaylistViewContext));
+export const usePlaylistZoomOptional = () => orNull(use(PlaylistZoomContext));

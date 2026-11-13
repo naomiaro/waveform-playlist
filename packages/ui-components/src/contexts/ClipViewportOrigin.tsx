@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, use, ReactNode } from 'react';
 
 const ClipViewportOriginContext = createContext<number>(0);
 
@@ -20,13 +20,11 @@ export const ClipViewportOriginProvider = ({
   originX,
   children,
 }: ClipViewportOriginProviderProps) => (
-  <ClipViewportOriginContext.Provider value={originX}>
-    {children}
-  </ClipViewportOriginContext.Provider>
+  <ClipViewportOriginContext value={originX}>{children}</ClipViewportOriginContext>
 );
 
 /**
  * Returns the clip's pixel-space left offset within the timeline.
  * Defaults to 0 when used outside a ClipViewportOriginProvider (e.g., TimeScale).
  */
-export const useClipViewportOrigin = (): number => useContext(ClipViewportOriginContext);
+export const useClipViewportOrigin = (): number => use(ClipViewportOriginContext);

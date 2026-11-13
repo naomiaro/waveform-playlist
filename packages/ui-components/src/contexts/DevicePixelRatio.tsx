@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, createContext, use, ReactNode } from 'react';
 
 // Guarded so that importing this module on a server does not throw.
 function getScale(): number {
@@ -34,11 +34,7 @@ export const DevicePixelRatioProvider = ({ children }: Props) => {
     return () => query.removeEventListener('change', handleChange);
   }, [scale]);
 
-  return (
-    <DevicePixelRatioContext.Provider value={Math.ceil(scale)}>
-      {children}
-    </DevicePixelRatioContext.Provider>
-  );
+  return <DevicePixelRatioContext value={Math.ceil(scale)}>{children}</DevicePixelRatioContext>;
 };
 
-export const useDevicePixelRatio = (): number => useContext(DevicePixelRatioContext) ?? getScale();
+export const useDevicePixelRatio = (): number => use(DevicePixelRatioContext) ?? getScale();

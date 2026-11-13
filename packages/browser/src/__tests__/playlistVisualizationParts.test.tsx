@@ -197,7 +197,7 @@ async function mount(
   const createAdapter = () => adapter;
   const view = <ComposedWaveform {...props} />;
   render(
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <WaveformPlaylistProvider
         tracks={tracks}
         sampleRate={SAMPLE_RATE}
@@ -207,7 +207,7 @@ async function mount(
         <ProbeChild />
         {dragProvider ? <ClipInteractionProvider>{view}</ClipInteractionProvider> : view}
       </WaveformPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   // Before the engine is built.
   seen.firstState =

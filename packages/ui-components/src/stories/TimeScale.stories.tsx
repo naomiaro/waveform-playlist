@@ -76,11 +76,11 @@ const meta: Meta<typeof TimeScaleWithTheme> = {
           : { backgroundColor: '#f5f5f5' };
       return (
         <DevicePixelRatioProvider>
-          <PlaylistInfoContext.Provider value={playlistInfo}>
+          <PlaylistInfoContext value={playlistInfo}>
             <div style={{ background: theme.backgroundColor, padding: '1rem' }}>
               <Story />
             </div>
-          </PlaylistInfoContext.Provider>
+          </PlaylistInfoContext>
         </DevicePixelRatioProvider>
       );
     },

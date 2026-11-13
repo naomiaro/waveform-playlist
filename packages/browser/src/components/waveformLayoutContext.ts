@@ -8,7 +8,7 @@
  * annotation row read the extent only, so a trim that leaves the length alone
  * does not render them.
  */
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
 import type { TrackClipPeaks } from '../WaveformPlaylistContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
@@ -84,6 +84,5 @@ function required<T>(value: T | null, part: string): T {
   return value;
 }
 
-export const useWaveformExtent = (part: string) =>
-  required(useContext(WaveformExtentContext), part);
-export const useWaveformRows = (part: string) => required(useContext(WaveformRowsContext), part);
+export const useWaveformExtent = (part: string) => required(use(WaveformExtentContext), part);
+export const useWaveformRows = (part: string) => required(use(WaveformRowsContext), part);
