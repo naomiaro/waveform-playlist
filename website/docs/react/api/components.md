@@ -210,7 +210,7 @@ Under `MediaElementWaveformRoot` it draws nothing.
 | `gainScaled` | `boolean` | `false` | Draw each clip's waveform scaled by its `gain` (clamped to the channel height), so clips levelled with clip gain look the way they sound. Draw-time only: peaks are not regenerated |
 | `children` | `ReactNode` | - | `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview`. Nothing else is rendered from here |
 
-`WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` are markers: `WaveformTracks` and the root read them from its children, and they draw nothing anywhere else. With clip interaction enabled, the header is what a clip is dragged by, and the trim handles come with it. Under `MediaElementPlaylistProvider` the header shows the track's name and nothing can be dragged.
+`WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` are markers: `WaveformTracks` and the root read them from its children, and they draw nothing anywhere else. With clip interaction enabled, the header is what a clip is dragged by, and the trim handles come with it. Under `MediaElementPlaylistProvider` the header shows the track's `name` ("Track" without one), and nothing supports dragging the clip: leave clip interaction off above that provider.
 
 ```tsx
 <WaveformTracks gainScaled>
@@ -238,7 +238,7 @@ Both need the `AnnotationProvider` of `@waveform-playlist/annotations` and draw 
 | `linkEndpoints` | `MediaElementAnnotationBoxes` | `boolean` | `false` | Dragging an edge also moves the edge of the box it touches |
 | `onAnnotationUpdate` | `MediaElementAnnotationBoxes` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after a drag |
 
-Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`), and the edge drag from `ClipInteractionProvider` or your own drag handlers.
+Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`). Dragging an edge needs `useAnnotationDragHandlers` wired into a `DragDropProvider` of your own around the view (see the [Annotations guide](/docs/react/guides/annotations)); `ClipInteractionProvider` handles clips only. `MediaElementAnnotationBoxes` brings its own drag wiring.
 
 #### WaveformPlayhead
 
@@ -807,7 +807,7 @@ function FullFeaturedPlaylist() {
         <ExportWavButton filename="my-mix" />
       </div>
 
-      {/* Waveform: the ready-made view, with a 180 px controls column */}
+      {/* The view: the parts of <Waveform /> without the annotation row, with a 180 px controls column */}
       <WaveformRoot>
         <WaveformTimescale />
         <WaveformLoopRegion />

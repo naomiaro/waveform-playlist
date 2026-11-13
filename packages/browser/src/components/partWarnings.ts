@@ -11,3 +11,8 @@ export function warnMisplacedPart(message: string): void {
   warned.add(message);
   console.warn('[waveform-playlist] ' + message);
 }
+
+/** For tests: forget what has been warned, so each test sees its own warning. */
+export function resetPartWarnings(): void {
+  warned.clear();
+}

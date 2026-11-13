@@ -81,6 +81,18 @@ The two annotation elements belong to a playlist with annotations. `<PlaylistAnn
 An editor with a narrower controls column, a close button on each track, clip headers, fade curves and a playhead with a marker:
 
 ```tsx
+import {
+  ClipInteractionProvider,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformSelection,
+  WaveformPlayhead,
+} from '@waveform-playlist/browser';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 
 <ClipInteractionProvider>
@@ -111,7 +123,7 @@ A bare waveform, with no ruler and no controls:
 What each part does when it is there:
 
 - **`WaveformTimescale`** and **`WaveformLoopRegion`** share a 30 px strip above the tracks. The strip exists when a root has either of them. The loop region draws nothing while looping is off.
-- **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` is read by the root from the element.
+- **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` (a positive number, 200 by default) is read by the root from the element; with `0` no column is drawn.
 - **`WaveformClipHeaders`** adds a header to every clip and to the height of every row. Inside a `ClipInteractionProvider` the header is what a clip is dragged by, and the trim handles come with it.
 - **`WaveformPlayhead`** is shown while playing, and at rest when no range is selected.
 
@@ -222,9 +234,9 @@ The root recognises a part by the type of the element, and so does `<WaveformTra
 ### Which Provider
 
 - `<WaveformRoot>` needs `WaveformPlaylistProvider`; `<MediaElementWaveformRoot>` needs `MediaElementPlaylistProvider`. Each throws under the other.
-- `<WaveformLoopRegion>`, `<WaveformTrackControls>`, `<WaveformRecordingPreview>` and `<WaveformAnnotationBoxes>` need `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` the loop region and the annotation boxes throw ("useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it"), the track controls draw nothing, and the recording preview throws once a take runs into the player's track.
+- `<WaveformLoopRegion>`, `<WaveformTrackControls>`, `<WaveformRecordingPreview>` and `<WaveformAnnotationBoxes>` need `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` the loop region throws ("useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it") and so do the annotation boxes (the same message for `useAnnotationEditing`); the track controls draw nothing as a child of the root, and throw the same kind of message when wrapped in a component; the recording preview throws once a take runs into the player's track.
 - `<MediaElementAnnotationBoxes>` is for `MediaElementPlaylistProvider`. Under `WaveformPlaylistProvider` it draws, but an edge can be dragged past the end of the audio to the end of the drawn timeline: use `<WaveformAnnotationBoxes>` there.
-- `<WaveformClipHeaders>` under `MediaElementPlaylistProvider` shows the track's name in the header; nothing can be dragged.
+- `<WaveformClipHeaders>` under `MediaElementPlaylistProvider` shows the track's `name` in the header ("Track" without one). Nothing under that provider supports dragging the clip: leave clip interaction off above it.
 
 ### Development Warnings
 

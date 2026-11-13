@@ -88,8 +88,9 @@ export function useWaveformParts(children: ReactNode): WaveformPartsByPlace {
   return useMemo(() => {
     const sorted = sortWaveformParts(children);
     return {
-      // One element per place, with the parts as its positional children
-      // (they carry no keys).
+      // One element per place. The tracks-area and controls parts are its
+      // positional children (they carry no keys); the strip's parts are keyed
+      // by kind (`keyedByKind`).
       timescale:
         sorted.timescale.length > 0 ? (
           <WaveformPartPlaceContext.Provider value="timescale">

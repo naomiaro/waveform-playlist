@@ -51,8 +51,8 @@ export interface ClipPeaks {
   midiNotes?: MidiNoteData[];
   sampleRate?: number;
   offsetSamples?: number;
-  /** The clip's linear gain — drawn into the waveform when `<Waveform
-   *  gainScaledWaveforms />` is set. */
+  /** The clip's linear gain — drawn into the waveform when
+   *  `<WaveformTracks gainScaled />` is set. */
   gain?: number;
 }
 

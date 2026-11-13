@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// #685, part 2: `MediaElementPlaylist` is a composition. Its four annotation
-// props must reach the annotation-boxes part as they were given.
+// #685: the MediaElement view is a composition. The four annotation options
+// must reach the annotation-boxes part as they were given (the view here is
+// `ComposedMediaElementWaveform`, testCompositions.tsx).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
@@ -72,7 +73,7 @@ function mount(playlist: React.ReactElement) {
   );
 }
 
-describe('MediaElementPlaylist hands its annotation props to the boxes', () => {
+describe('the annotation options reach the MediaElement boxes', () => {
   it('as given', () => {
     const label = () => 'x';
     const onUpdate = () => {};

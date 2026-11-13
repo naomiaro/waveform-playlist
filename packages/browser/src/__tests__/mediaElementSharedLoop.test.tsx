@@ -372,7 +372,7 @@ describe('MediaElement selection lives in the provider', () => {
     expect(probe.animation.currentTime).toBe(seconds(150));
   });
 
-  it('the selection survives a remount of MediaElementPlaylist', async () => {
+  it('the selection survives a remount of the view', async () => {
     const { show } = await mount();
     const overlay = clickOverlay();
     await press(overlay, 100);

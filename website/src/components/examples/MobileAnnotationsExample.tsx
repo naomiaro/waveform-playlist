@@ -367,7 +367,9 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
           <WaveformSelection />
           <WaveformPlayhead />
         </WaveformRoot>
-        <PlaylistAnnotationList controls={mobileAnnotationActions} height={200} />
+        {annotations.length > 0 ? (
+          <PlaylistAnnotationList controls={mobileAnnotationActions} height={200} />
+        ) : null}
 
         <ActiveAnnotationInfo />
       </Container>

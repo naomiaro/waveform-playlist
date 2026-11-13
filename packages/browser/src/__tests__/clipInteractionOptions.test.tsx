@@ -404,7 +404,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
     expect(sensorOptions[sensorOptions.length - 1]).toEqual({ touchOptimized: true });
   });
 
-  it('PlaylistVisualization used directly reads the same context', async () => {
+  it('a composition written by hand reads the same context', async () => {
     const { container } = await mount((probe) => (
       <ClipInteractionProvider touchOptimized>
         {probe}

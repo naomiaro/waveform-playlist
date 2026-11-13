@@ -8,7 +8,7 @@ The view is composed from parts. Each thing the view draws is an exported compon
 
 - Roots: `WaveformRoot` (under `WaveformPlaylistProvider`), `MediaElementWaveformRoot` (under `MediaElementPlaylistProvider`).
 - Parts: `WaveformTimescale` (`renderTick`), `WaveformLoopRegion`, `WaveformTrackControls` (`width`, `renderTrackControls`, `onRemoveTrack`, `trackReordering`), `WaveformTracks` (`gainScaled`) with the children `WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` (`recordingState`), `WaveformAnnotationBoxes`, `MediaElementAnnotationBoxes`, `WaveformSelection`, `WaveformPlayhead` (`renderPlayhead`).
-- Ready-made: `<Waveform />` (timescale, loop region, 200 px track controls, tracks, annotation boxes, selection, playhead, annotation list), the new `<WaveformEditor />` (the same with clip headers and fades) and `<MediaElementWaveform />`. They take `className` and their annotation options only.
+- Ready-made: `<Waveform />` (timescale, loop region, 200 px track controls, tracks, annotation boxes, selection, playhead, and the annotation list when there are annotations), the new `<WaveformEditor />` (the same with clip headers and fades) and `<MediaElementWaveform />`. They take `className` and their annotation options only.
 - New hook `useRecordingSession({ isRecording, trackId })`, and the type `WaveformRecordingState`.
 
 Removed:

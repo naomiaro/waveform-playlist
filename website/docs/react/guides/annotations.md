@@ -155,7 +155,7 @@ When using the integrated pattern, `<Waveform />` accepts these annotation-relat
 
 ## Browser Hooks
 
-The browser package provides hooks for annotation interactions. These are used internally by `<Waveform />` but can also be used directly for custom UIs.
+The browser package provides hooks for annotation interactions. Use them to wire annotation dragging and keyboard control into your own UI. `<Waveform />` does not call `useAnnotationDragHandlers` itself: dragging an edge under `WaveformPlaylistProvider` needs it in a `DragDropProvider` of your own (`MediaElementAnnotationBoxes` wires its own).
 
 ### useAnnotationDragHandlers
 

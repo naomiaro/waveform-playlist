@@ -249,7 +249,10 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // The take's session: while recording, the provider keeps playback running
   // and mutes what the armed track already holds. The preview part in the
   // view only draws the take.
-  useRecordingSession({ isRecording, trackId: recordingTrackId });
+  useRecordingSession({
+    isRecording: isRecording && recordingTrackId !== null,
+    trackId: recordingTrackId,
+  });
 
   // Sample rate info — flag potential resampling between mic and AudioContext
   const micSampleRate = stream?.getAudioTracks()[0]?.getSettings()?.sampleRate ?? null;

@@ -31,7 +31,15 @@ The Waveform component provides the main visualization and interaction surface f
 To display actual waveforms, use the \`useAudioTracks\` hook to load real audio files.
 
 \`\`\`tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  WaveformRoot,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
+} from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MyPlaylist() {
@@ -120,18 +128,20 @@ export const MultipleEmptyTracks: Story = {
 
 export const WithoutTimescale: Story = {
   render: () => (
-    <WaveformPlaylistProvider
-      tracks={createEmptyTracks(2)}
-      samplesPerPixel={1024}
-      // Note: timescale is not set, so no timescale will be displayed
-    >
+    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <PlayButton />
           <PauseButton />
           <StopButton />
         </div>
-        <Waveform />
+        {/* No <WaveformTimescale />: a part is drawn because it is rendered. */}
+        <WaveformRoot>
+          <WaveformTrackControls />
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
       </div>
     </WaveformPlaylistProvider>
   ),
@@ -139,7 +149,7 @@ export const WithoutTimescale: Story = {
     docs: {
       description: {
         story:
-          'Waveform without the timescale ruler - controlled via the `timescale` prop on WaveformPlaylistProvider. Useful for compact layouts.',
+          'The view composed without the timescale ruler: `<WaveformRoot>` with the track controls, the tracks, the selection and the playhead, and no `<WaveformTimescale />`. Useful for compact layouts. `<Waveform />` is the ready-made composition with the ruler.',
       },
     },
   },

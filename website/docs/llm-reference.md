@@ -1909,7 +1909,7 @@ Rules:
 - `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview` are children of `WaveformTracks` and draw nothing elsewhere. One `WaveformTracks` per root, as the root's own child.
 - The 30 px timescale strip exists when the root has a `WaveformTimescale` or a `WaveformLoopRegion`; the controls column exists when it has a `WaveformTrackControls`.
 - A child of a root that is not a part is drawn in the scrolling tracks area, in order.
-- Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` and `WaveformAnnotationBoxes` throw, `WaveformTrackControls` draws nothing, `WaveformClipHeaders` shows the track name and nothing drags.
+- Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` and `WaveformAnnotationBoxes` throw, `WaveformTrackControls` draws nothing as a child of the root (wrapped in a component it throws), `WaveformClipHeaders` shows the track's `name` ("Track" without one) and nothing supports dragging the clip.
 - `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and both annotation rows throw outside a root. `WaveformSelection` and `WaveformPlayhead` draw wherever they are rendered under a provider.
 - Switch a part with `{flag ? <Part /> : null}`; a list of changing length remounts later parts unless they have keys.
 - The time ruler and the controls column are not provider props and not in `usePlaylistView()`: they exist when their parts are rendered.

@@ -129,10 +129,9 @@ Pass an `AudioContext` to enable Web Audio routing. This routes audio through a 
 Configure fade in/out on the track config. Requires `audioContext`:
 
 ```tsx
-// The provider creates its player again (and stops playback) when `source`,
-// `waveformData` (by identity) or `name` changes, or a fade gets another
-// `duration` or `type`. The fades are compared by value, so they may be
-// written inline.
+// Memoized: a new `source`, `waveformData` (by identity) or `name` makes the
+// provider create its player again, which stops playback. The two fades are
+// compared by value (`duration`, `type`), so new but equal fade objects do not.
 const track = useMemo(
   () => ({
     source: '/audio/track.mp3',

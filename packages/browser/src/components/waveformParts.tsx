@@ -96,9 +96,10 @@ const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([WaveformTrackControls]);
  *
  * The elements are returned as they were given (no clone, no new key), so a
  * render of the root that received the same children hands React the same
- * elements and the parts are skipped. Call it from a `useMemo` on `children`,
- * and render each list as the children of one element (spread, not an array):
- * the elements have no keys.
+ * elements and the parts are skipped. Call it from a `useMemo` on `children`.
+ * The elements have no keys of their own: render the tracks-area and controls
+ * lists as the children of one element (spread, not an array), and give the
+ * strip's parts a key by kind (`useWaveformParts` does both).
  */
 export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
   const sorted: SortedWaveformParts = {

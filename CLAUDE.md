@@ -161,8 +161,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 <WaveformTracks gainScaled />
 <WaveformTrackControls trackReordering />
 
-// ❌ AVOID - default true needs an explicit false
-<WaveformTracks sourceLevel={false} />
+// ❌ AVOID - a (made-up) prop that defaults to true needs an explicit false
+<SomePart shown={false} />
 ```
 
 **Why:** JSX shorthand `<Component prop />` is equivalent to `<Component prop={true} />`. Defaulting to `false` enables this clean opt-in pattern.

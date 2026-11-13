@@ -15,7 +15,7 @@ import type { MediaElementPlayout } from '@waveform-playlist/media-element-playo
 import type { WaveformDataObject, ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { usePlaylistInfo } from '@waveform-playlist/ui-components';
-import { warnMisplacedPart } from '../components/partWarnings';
+import { warnMisplacedPart, resetPartWarnings } from '../components/partWarnings';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
@@ -93,6 +93,9 @@ import {
   WaveformPlayhead,
   useRecordingSession,
   useSelectedTrackId,
+  useMediaElementTrack,
+  WaveformAnnotationBoxes,
+  MediaElementAnnotationBoxes,
   useEditorControls,
   usePlaylistTimeline,
   usePlaylistView,
@@ -256,10 +259,40 @@ const ME_TRACK = {
 const ME_FADED = { ...ME_TRACK, fadeIn: { duration: 1 }, fadeOut: { duration: 1 } };
 
 let mediaControls: ReturnType<typeof usePlaybackControls>;
+let mediaTrack: ReturnType<typeof useMediaElementTrack>;
 const MediaProbe: React.FC = () => {
   mediaControls = usePlaybackControls();
+  mediaTrack = useMediaElementTrack();
   return null;
 };
+
+/** Catches what a part throws, so a test can read the message. */
+class Boundary extends React.Component<
+  { children: React.ReactNode; onError: (message: string) => void },
+  { failed: boolean }
+> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: Error) {
+    this.props.onError(error.message);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/** The message a tree throws when rendered under the given mount, or '' when it renders. */
+async function thrownBy(
+  mount: (tree: () => React.ReactElement) => Promise<unknown>,
+  tree: React.ReactElement
+): Promise<string> {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  let message = '';
+  await mount(() => <Boundary onError={(m) => (message = m)}>{tree}</Boundary>);
+  return message;
+}
 
 async function mountMediaElement(tree: React.ReactElement | (() => React.ReactElement)) {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -299,6 +332,7 @@ afterEach(async () => {
     cleanup();
   });
   vi.restoreAllMocks();
+  resetPartWarnings();
 });
 
 const root = () => document.querySelector('[data-playlist-state]') as HTMLElement;
@@ -381,6 +415,13 @@ describe('the ready-made compositions', () => {
       mediaControls.setSelection(1, 2);
     });
     expect(document.querySelectorAll('[data-selection]')).toHaveLength(1);
+  });
+
+  it('a render of the parent of <WaveformEditor /> does not render the tracks or the controls', async () => {
+    const { rerender } = await mountMultitrack(() => <WaveformEditor />);
+    rerender();
+    await act(async () => {});
+    expect(counts.layout).toBe(0);
   });
 
   it('a render of the parent of <MediaElementWaveform /> does not render the tracks', async () => {
@@ -637,6 +678,178 @@ describe('the options the ready-made compositions keep', () => {
   it('<MediaElementWaveform>: className reaches the root', async () => {
     await mountMediaElement(<MediaElementWaveform className="mine" />);
     expect(root().classList.contains('mine')).toBe(true);
+  });
+});
+
+describe('where a part works and where it throws', () => {
+  const underMedia = (tree: () => React.ReactElement) => mountMediaElement(tree);
+  const underMultitrack = (tree: () => React.ReactElement) => mountMultitrack(tree);
+
+  it('outside a root: the timescale, the tracks, the loop region, the controls and both annotation rows throw', async () => {
+    const outside: Array<[React.ReactElement, string]> = [
+      [<WaveformTimescale />, 'The timescale must be rendered inside the waveform root'],
+      [<WaveformTracks />, 'The tracks must be rendered inside the waveform root'],
+      [<WaveformLoopRegion />, 'The loop region must be rendered inside the waveform root'],
+      [<WaveformTrackControls />, 'The track controls must be rendered inside the waveform root'],
+      [
+        <WaveformAnnotationBoxes />,
+        'The annotation boxes must be rendered inside the waveform root',
+      ],
+    ];
+    for (const [part, message] of outside) {
+      expect(await thrownBy(underMultitrack, part)).toBe(message);
+      await act(async () => {
+        cleanup();
+      });
+    }
+    expect(await thrownBy(underMedia, <MediaElementAnnotationBoxes />)).toBe(
+      'The annotation boxes must be rendered inside the waveform root'
+    );
+  });
+
+  it('outside a root: the selection and the playhead draw', async () => {
+    const message = await thrownBy(
+      underMultitrack,
+      <>
+        <WaveformSelection />
+        <WaveformPlayhead />
+      </>
+    );
+    expect(message).toBe('');
+    expect(document.querySelectorAll('[data-playhead]')).toHaveLength(1);
+  });
+
+  it('under the MediaElement provider: the loop region and the multitrack annotation boxes name the hook they need', async () => {
+    expect(
+      await thrownBy(
+        underMedia,
+        <MediaElementWaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          <WaveformTracks />
+        </MediaElementWaveformRoot>
+      )
+    ).toBe(
+      'useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is ' +
+        'MediaElementPlaylistProvider, which does not provide it'
+    );
+    await act(async () => {
+      cleanup();
+    });
+    expect(
+      await thrownBy(
+        underMedia,
+        <MediaElementWaveformRoot>
+          <WaveformTracks />
+          <WaveformAnnotationBoxes />
+        </MediaElementWaveformRoot>
+      )
+    ).toMatch(/^use(Annotations|AnnotationEditing) needs WaveformPlaylistProvider/);
+  });
+
+  it('under the MediaElement provider: a wrapped controls part is rendered among the tracks and throws', async () => {
+    const Wrapped = () => <WaveformTrackControls />;
+    expect(
+      await thrownBy(
+        underMedia,
+        <MediaElementWaveformRoot>
+          <Wrapped />
+          <WaveformTracks />
+        </MediaElementWaveformRoot>
+      )
+    ).toMatch(
+      /needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider/
+    );
+  });
+
+  it('each root throws under the other provider', async () => {
+    expect(
+      await thrownBy(
+        underMedia,
+        <WaveformRoot>
+          <WaveformTracks />
+        </WaveformRoot>
+      )
+    ).toMatch(/needs WaveformPlaylistProvider/);
+    await act(async () => {
+      cleanup();
+    });
+    expect(
+      await thrownBy(
+        underMultitrack,
+        <MediaElementWaveformRoot>
+          <WaveformTracks />
+        </MediaElementWaveformRoot>
+      )
+    ).toMatch(/needs MediaElementPlaylistProvider/);
+  });
+
+  it('two roots under one provider both draw, each with its own playhead', async () => {
+    await mountMultitrack(() => (
+      <>
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformPlayhead />
+        </WaveformRoot>
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </>
+    ));
+    expect(document.querySelectorAll('[data-playlist-state]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-track-row]')).toHaveLength(4);
+    expect(document.querySelectorAll('[data-playhead]')).toHaveLength(2);
+  });
+
+  it('a list of parts whose length changes remounts the later part, unless the parts have keys', async () => {
+    let mounts = 0;
+    const Mine: React.FC = () => {
+      React.useEffect(() => {
+        mounts++;
+      }, []);
+      return null;
+    };
+    for (const keyed of [false, true]) {
+      mounts = 0;
+      let withSelection = true;
+      const { rerender } = await mountMultitrack(() => (
+        <WaveformRoot>
+          <WaveformTracks />
+          <>
+            {[
+              withSelection ? <WaveformSelection key={keyed ? 'selection' : 0} /> : null,
+              <Mine key={keyed ? 'mine' : withSelection ? 1 : 0} />,
+            ].filter(Boolean)}
+          </>
+        </WaveformRoot>
+      ));
+      expect(mounts).toBe(1);
+      withSelection = false;
+      rerender();
+      await act(async () => {});
+      expect(mounts).toBe(keyed ? 1 : 2);
+      await act(async () => {
+        cleanup();
+      });
+    }
+  });
+
+  it('a loop region without a timescale has the strip to itself', async () => {
+    let info: ReturnType<typeof usePlaylistInfo> | undefined;
+    const Mine: React.FC = () => {
+      info = usePlaylistInfo();
+      return null;
+    };
+    await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformLoopRegion />
+        <WaveformTracks />
+        <Mine />
+      </WaveformRoot>
+    ));
+    expect(info?.timeScaleHeight).toBe(30);
+    expect(hasRuler()).toBe(false);
   });
 });
 

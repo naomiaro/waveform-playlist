@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 //
-// #685, step 1: `PlaylistVisualization` is the default composition of the
-// view's parts. Each of its props must reach the part it configures, and a
-// part that is switched off must not be drawn. `recordingState` is not here:
+// #685: the view is a composition of parts. Each option must reach the part
+// it configures, and a part that is left out must not be drawn. The view here
+// is `ComposedWaveform` (testCompositions.tsx): the parts composed as a
+// consumer would, with one prop per option (until step 3 this file mounted
+// the prop-driven `PlaylistVisualization`, hence its name). `recordingState` is not here:
 // recordingPreviewSubscription.test.tsx mounts the view with it.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -226,7 +228,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('PlaylistVisualization hands each prop to its part (#685)', () => {
+describe('each option reaches its part (#685)', () => {
   it('with no props: rows, panels and a timescale; no headers, fades, gain scaling, close buttons or reorder rails', async () => {
     await mount();
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);

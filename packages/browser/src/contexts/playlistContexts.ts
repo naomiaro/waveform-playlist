@@ -500,8 +500,8 @@ export const usePlaybackControls = () =>
   useSlot(PlaybackControlsContext, 'usePlaybackControls', EITHER);
 
 /**
- * View configuration: `sampleRate`, `waveHeight`, `timeScaleHeight`,
- * `controls`, bar style, `mono`, `indefinitePlayback`, `fillViewport`.
+ * View configuration: `sampleRate`, `waveHeight`, bar style, `mono`,
+ * `indefinitePlayback`, `fillViewport`.
  * Re-renders on a prop change.
  */
 export const usePlaylistView = () => useSlot(PlaylistViewContext, 'usePlaylistView', EITHER);
