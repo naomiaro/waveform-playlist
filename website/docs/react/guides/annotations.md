@@ -182,7 +182,7 @@ The row of annotation boxes. It is a part of the view: a child of `WaveformRoot`
 
 A click on a box makes its annotation the active one and plays it from its start.
 
-The part wires the drag of the edges itself: it has its own `DragDropProvider` around the row. While the `editable` option is on, an edge can be dragged. The boxes and the list follow the drag as it moves, and `onAnnotationsChange` is called once, on release. Escape cancels the drag and puts back every annotation it moved. An edge stops at the end of the audio. You do not call `useAnnotationDragHandlers` for it, and a `DragDropProvider` of your own around the view does not receive the drag of an annotation edge.
+The part wires the drag of the edges itself: it has its own `DragDropProvider` around the row. While the `editable` option is on, an edge can be dragged. The boxes and the list follow the drag as it moves, and `onAnnotationsChange` is called once, on release. Escape cancels the drag and puts back every annotation it moved. An edge can be dragged as far as the timeline is drawn, which can be past the end of the audio (an empty timeline is drawn 60 seconds long; a recording and a view that fills its container draw past the audio too), so annotations can mark what is not recorded yet. You do not call `useAnnotationDragHandlers` for it, and a `DragDropProvider` of your own around the view does not receive the drag of an annotation edge.
 
 By default the drag starts after the pointer has moved 1 px. With `<ClipInteractionOptions touchOptimized>` (or `<ClipInteractionProvider touchOptimized>`) above the view, a touch must be held 250 ms first, so a swipe can scroll the page:
 

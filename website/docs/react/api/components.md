@@ -229,7 +229,7 @@ The row of annotation boxes, under either root. It needs the `AnnotationProvider
 
 A click on a box makes its annotation the active one and plays it from its start; with continuous play off, playback ends where the annotation ends.
 
-The part has its own `DragDropProvider` around the row and wires the drag of the edges itself. An edge can be dragged while the provider's `editable` option is on; whether it takes the edge it touches along is the provider's `linkEndpoints` option. The moves are shown as they happen and `onAnnotationsChange` is called once, on release. An edge stops at the end of the audio. A `DragDropProvider` of your own above the view, `ClipInteractionProvider` included, does not receive the drag of an annotation edge.
+The part has its own `DragDropProvider` around the row and wires the drag of the edges itself. An edge can be dragged while the provider's `editable` option is on; whether it takes the edge it touches along is the provider's `linkEndpoints` option. The moves are shown as they happen and `onAnnotationsChange` is called once, on release. An edge can be dragged as far as the timeline is drawn, which can be past the end of the audio. A `DragDropProvider` of your own above the view, `ClipInteractionProvider` included, does not receive the drag of an annotation edge.
 
 The drag starts after 1 px of pointer travel. With `touchOptimized` on a `ClipInteractionOptions` or `ClipInteractionProvider` above, a touch must be held 250 ms first.
 

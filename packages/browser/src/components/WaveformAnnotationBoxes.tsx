@@ -59,9 +59,11 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   getLabel,
   height = DEFAULT_ANNOTATION_BOXES_HEIGHT,
 }: WaveformAnnotationBoxesProps) {
-  // The audio's length, not the drawn timeline's (which can be longer: an
-  // empty timeline, a view that fills its container, a take being recorded).
-  const { tracksFullWidth: width, audioDuration } = useWaveformExtent('The annotation boxes');
+  // An edge can be dragged as far as the timeline is drawn, not only as far as
+  // there is audio: annotations may mark what is not recorded yet (chords, a
+  // lyric sheet), on an empty timeline or past the end of a take (maintainer's
+  // choice, #686). Under the MediaElement root the two lengths are the same.
+  const { tracksFullWidth: width, displayDuration } = useWaveformExtent('The annotation boxes');
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
@@ -81,7 +83,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
     preview: annotationPreview,
     samplesPerPixel,
     sampleRate,
-    duration: audioDuration,
+    duration: displayDuration,
     linkEndpoints,
   });
 

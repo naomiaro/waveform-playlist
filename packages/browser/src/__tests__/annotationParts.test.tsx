@@ -102,6 +102,7 @@ import {
 import { ClipInteractionOptions } from '../contexts/ClipInteractionContext';
 import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
 import { resetPartWarnings } from '../components/partWarnings';
+import { WaveformExtentContext } from '../components/waveformLayoutContext';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -701,7 +702,7 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(boxProps.n1.editable).toBe(true);
     });
 
-    it('wires the edge drag itself: preview, real sample rate, audio length, link endpoints', async () => {
+    it('wires the edge drag itself: preview, real sample rate, drawn length, link endpoints', async () => {
       await mount(kind, view(kind, <WaveformAnnotationBoxes />), {
         annotationList: { annotations: ANNOTATIONS, linkEndpoints: true },
       });
@@ -848,18 +849,30 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
   }
 );
 
-describe('the edge of an annotation is dragged no further than the audio (#686)', () => {
-  it('multitrack: an empty timeline is drawn 60 s long, and the drag is given 0', async () => {
+describe('how far the edge of an annotation can be dragged (#686)', () => {
+  it('to the end of the drawn timeline, also where that is past the audio', async () => {
+    // Four seconds of audio in a timeline drawn 60 s long (a view that fills
+    // its container, a take being recorded): given through the extent.
+    await mount(
+      'WaveformPlaylistProvider',
+      <WaveformExtentContext.Provider value={{ displayDuration: 60, tracksFullWidth: 3000 }}>
+        <WaveformAnnotationBoxes />
+      </WaveformExtentContext.Provider>
+    );
+    expect(lastWrapper().width).toBe(3000);
+    expect(lastDrag().duration).toBe(60);
+  });
+
+  it('multitrack, no audio: over the 60 s that an empty timeline is drawn', async () => {
     const { container } = await mount(
       'WaveformPlaylistProvider',
       view('WaveformPlaylistProvider', <WaveformAnnotationBoxes />),
       { tracks: [] }
     );
-    // The row is as wide as the drawn timeline: 60 s at 50 px per second.
     expect(container.querySelectorAll('[data-box]')).toHaveLength(3);
     expect(lastWrapper().width).toBe(60 * 50);
-    // The clamp is the audio's length, and there is no audio.
-    expect(lastDrag().duration).toBe(0);
+    // Not 0, which would collapse every dragged edge.
+    expect(lastDrag().duration).toBe(60);
   });
 });
 

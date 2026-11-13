@@ -128,7 +128,7 @@ const ProbeChild: React.FC = () => {
 const ANNOTATION_LIST = { annotations: ANNOTATIONS };
 
 // The row takes its width from the root of the view (#685); there is no root here.
-const EXTENT = { displayDuration: 60, tracksFullWidth: 2000, audioDuration: 4 };
+const EXTENT = { displayDuration: 60, tracksFullWidth: 2000 };
 
 type LabelFn = React.ComponentProps<typeof WaveformAnnotationBoxes>['getLabel'];
 

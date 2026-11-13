@@ -269,7 +269,6 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     className,
     parts,
     displayDuration,
-    audioDuration: duration,
     rows,
     playlistState: isReady ? 'ready' : 'loading',
     controlsWidth: parts.controlsWidth,

@@ -19,12 +19,6 @@ export interface WaveformExtentValue {
   displayDuration: number;
   /** The same length in pixels at the current zoom. */
   tracksFullWidth: number;
-  /**
-   * Length of the audio in seconds: 0 for an empty timeline, and not grown by
-   * a view that fills its container or by a take being recorded. An annotation
-   * edge is dragged no further than this.
-   */
-  audioDuration: number;
 }
 
 /** What the view needs to know of a track to draw its row. */

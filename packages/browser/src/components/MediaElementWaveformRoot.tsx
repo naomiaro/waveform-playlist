@@ -108,7 +108,6 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
     className,
     parts,
     displayDuration: duration,
-    audioDuration: duration,
     rows,
     // The waveform is drawn from the provider's first render: it does not
     // wait for the player (`useMediaElementTrack().isReady` is that).
