@@ -2,19 +2,19 @@ import React, { type ReactNode } from 'react';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type { AnnotationAction } from '@waveform-playlist/core';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
-import type { VisualizationRecordingState } from './visualizationLayout';
+import type { WaveformRecordingState } from './visualizationLayout';
 import { WaveformRoot } from './WaveformRoot';
 import {
-  AnnotationBoxesPart,
-  ClipHeadersPart,
-  FadesPart,
-  LoopRegionPart,
-  PlayheadPart,
-  RecordingPreviewPart,
-  SelectionPart,
-  TimescalePart,
-  TrackControlsPart,
-  TracksPart,
+  WaveformAnnotationBoxes,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformLoopRegion,
+  WaveformPlayhead,
+  WaveformRecordingPreview,
+  WaveformSelection,
+  WaveformTimescale,
+  WaveformTrackControls,
+  WaveformTracks,
 } from './waveformParts';
 
 export interface PlaylistVisualizationProps {
@@ -37,7 +37,7 @@ export interface PlaylistVisualizationProps {
   /** Callback when a track's close button is clicked. Only renders close button when provided. */
   onRemoveTrack?: (trackIndex: number) => void;
   // Live recording state for real-time waveform preview
-  recordingState?: VisualizationRecordingState;
+  recordingState?: WaveformRecordingState;
   /** Enable vertical track reordering: a drag grip + move up/down buttons on
    *  each default track control panel. Drag requires ClipInteractionProvider
    *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
@@ -73,20 +73,20 @@ export const PlaylistVisualization: React.FC<PlaylistVisualizationProps> = ({
   trackReordering,
 }) => (
   <WaveformRoot className={className}>
-    <TimescalePart renderTick={renderTick} />
-    <LoopRegionPart />
-    <TrackControlsPart
+    <WaveformTimescale renderTick={renderTick} />
+    <WaveformLoopRegion />
+    <WaveformTrackControls
       renderTrackControls={renderTrackControls}
       onRemoveTrack={onRemoveTrack}
       trackReordering={trackReordering}
     />
-    <TracksPart gainScaled={gainScaledWaveforms}>
-      {showClipHeaders ? <ClipHeadersPart /> : null}
-      {showFades ? <FadesPart /> : null}
-      {recordingState ? <RecordingPreviewPart recordingState={recordingState} /> : null}
-    </TracksPart>
-    <AnnotationBoxesPart getAnnotationBoxLabel={getAnnotationBoxLabel} />
-    <SelectionPart />
-    <PlayheadPart renderPlayhead={renderPlayhead} />
+    <WaveformTracks gainScaled={gainScaledWaveforms}>
+      {showClipHeaders ? <WaveformClipHeaders /> : null}
+      {showFades ? <WaveformFades /> : null}
+      {recordingState ? <WaveformRecordingPreview recordingState={recordingState} /> : null}
+    </WaveformTracks>
+    <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+    <WaveformSelection />
+    <WaveformPlayhead renderPlayhead={renderPlayhead} />
   </WaveformRoot>
 );

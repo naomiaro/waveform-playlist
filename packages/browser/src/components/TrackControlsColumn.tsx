@@ -15,7 +15,7 @@ import { ControlSlot, TracksLayout } from './visualizationLayout';
 /** Drop-shadow for the floating (fully opaque) drag-source controls row. */
 const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
-export interface TrackControlsPartProps {
+export interface WaveformTrackControlsProps {
   renderTrackControls?: (trackIndex: number) => ReactNode;
   /** The close button is drawn only when this is given. */
   onRemoveTrack?: (trackIndex: number) => void;
@@ -36,11 +36,11 @@ export interface TrackControlsPartProps {
  * state itself (#768), so a volume or pan step renders this column and not the
  * root above it.
  */
-function TrackControlsPartImpl({
+function WaveformTrackControlsImpl({
   renderTrackControls,
   onRemoveTrack,
   trackReordering = false,
-}: TrackControlsPartProps) {
+}: WaveformTrackControlsProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
   const {
     rows: tracks,
@@ -136,4 +136,4 @@ function TrackControlsPartImpl({
   );
 }
 
-export const TrackControlsPart = React.memo(TrackControlsPartImpl);
+export const WaveformTrackControls = React.memo(WaveformTrackControlsImpl);

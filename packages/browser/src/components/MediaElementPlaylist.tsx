@@ -1,10 +1,10 @@
 import React from 'react';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
-import { MediaElementRoot } from './MediaElementRoot';
-import { TracksPart, FadesPart } from './TrackRows';
-import { TimescalePart } from './waveformParts';
+import { MediaElementWaveformRoot } from './MediaElementWaveformRoot';
+import { WaveformTracks, WaveformFades } from './TrackRows';
+import { WaveformTimescale } from './waveformParts';
 import { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
-import { SelectionOverlay, PlayheadOverlay } from './VisualizationOverlays';
+import { WaveformSelection, WaveformPlayhead } from './VisualizationOverlays';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 
 export interface MediaElementPlaylistProps {
@@ -39,10 +39,10 @@ export interface MediaElementPlaylistProps {
  * panels or with custom elements between them).
  *
  * It is the default composition of the view's parts for this provider (#685):
- * `MediaElementRoot` with the parts of the multitrack view, each prop handed
+ * `MediaElementWaveformRoot` with the parts of the multitrack view, each prop handed
  * to the part it configures. It reads no context, so it renders only when its
  * parent does; what follows the player's state is the root and the parts
- * themselves (see MediaElementRoot.tsx and waveformFrame.tsx).
+ * themselves (see MediaElementWaveformRoot.tsx and waveformFrame.tsx).
  */
 export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   getAnnotationBoxLabel,
@@ -53,16 +53,16 @@ export const MediaElementPlaylist: React.FC<MediaElementPlaylistProps> = ({
   showFades = false,
   className,
 }) => (
-  <MediaElementRoot className={className}>
-    <TimescalePart />
-    <TracksPart>{showFades ? <FadesPart /> : null}</TracksPart>
+  <MediaElementWaveformRoot className={className}>
+    <WaveformTimescale />
+    <WaveformTracks>{showFades ? <WaveformFades /> : null}</WaveformTracks>
     <MediaElementAnnotationBoxes
       getAnnotationBoxLabel={getAnnotationBoxLabel}
       editable={editable}
       linkEndpoints={linkEndpoints}
       onAnnotationUpdate={onAnnotationUpdate}
     />
-    <SelectionOverlay />
-    <PlayheadOverlay renderPlayhead={renderPlayhead} />
-  </MediaElementRoot>
+    <WaveformSelection />
+    <WaveformPlayhead renderPlayhead={renderPlayhead} />
+  </MediaElementWaveformRoot>
 );

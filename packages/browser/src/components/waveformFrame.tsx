@@ -1,6 +1,6 @@
 /**
  * What the two roots of the view share (#685): `WaveformRoot` (multitrack) and
- * `MediaElementRoot`. Internal: not exported from the package.
+ * `MediaElementWaveformRoot`. Internal: not exported from the package.
  *
  * A hook and not a component, so that it adds no component to either tree: a
  * root calls `useWaveformParts` on its children, works out what only its
@@ -44,7 +44,7 @@ import {
   type WaveformRowsValue,
 } from './waveformLayoutContext';
 import { sortWaveformParts } from './waveformParts';
-import type { TracksPartOptions } from './TrackRows';
+import type { TracksMarkers } from './TrackRows';
 
 export interface WaveformPartsByPlace {
   /** The parts of the timescale strip in one element, or null when there is none. */
@@ -54,7 +54,7 @@ export interface WaveformPartsByPlace {
   /** Everything drawn in the scrolling tracks area, in order. */
   content: ReactElement;
   /** The per-clip parts the tracks part was given (all off without one). */
-  tracksOptions: TracksPartOptions;
+  tracksOptions: TracksMarkers;
 }
 
 /**

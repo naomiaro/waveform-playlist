@@ -1,7 +1,7 @@
 /**
  * The parts of the view (#685). Internal for now: `PlaylistVisualization`
  * composes them inside `WaveformRoot` and `MediaElementPlaylist` composes the
- * ones its provider can serve inside `MediaElementRoot`; nothing here is
+ * ones its provider can serve inside `MediaElementWaveformRoot`; nothing here is
  * exported from the package yet.
  *
  * A part reads what it draws from the provider's contexts and from the root's
@@ -20,48 +20,43 @@
 import React, { type ReactNode } from 'react';
 import { SmartScale } from '@waveform-playlist/ui-components';
 import {
-  TracksPart,
+  WaveformTracks,
   scanTracksParts,
-  type TracksPartOptions,
-  type TracksPartProps,
+  type TracksMarkers,
+  type WaveformTracksProps,
 } from './TrackRows';
-import { TrackControlsPart } from './TrackControlsColumn';
-import {
-  AnnotationBoxesOverlay,
-  LoopRegionOverlay,
-  PlayheadOverlay,
-  SelectionOverlay,
-} from './VisualizationOverlays';
+import { WaveformTrackControls } from './TrackControlsColumn';
+import { WaveformLoopRegion } from './VisualizationOverlays';
 import { useWaveformExtent } from './waveformLayoutContext';
 
 export {
-  TracksPart,
-  ClipHeadersPart,
-  FadesPart,
-  RecordingPreviewPart,
+  WaveformTracks,
+  WaveformClipHeaders,
+  WaveformFades,
+  WaveformRecordingPreview,
   scanTracksParts,
 } from './TrackRows';
-export { TrackControlsPart } from './TrackControlsColumn';
+export { WaveformTrackControls } from './TrackControlsColumn';
 
-export interface TimescalePartProps {
+export interface WaveformTimescaleProps {
   /** Custom tick label. `label` is already formatted for the scale mode. */
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
 }
 
 /** The time ruler, as long as the root's timeline. */
-export const TimescalePart = React.memo(function TimescalePart({ renderTick }: TimescalePartProps) {
+export const WaveformTimescale = React.memo(function WaveformTimescale({
+  renderTick,
+}: WaveformTimescaleProps) {
   const { displayDuration } = useWaveformExtent('The timescale');
   return <SmartScale durationMs={displayDuration * 1000} renderTick={renderTick} />;
 });
 
-/** The draggable loop region, drawn over the timescale. */
-export const LoopRegionPart = LoopRegionOverlay;
-/** The row of annotation boxes under the tracks. */
-export const AnnotationBoxesPart = AnnotationBoxesOverlay;
-/** The highlighted selection. */
-export const SelectionPart = SelectionOverlay;
-/** The playhead. */
-export const PlayheadPart = PlayheadOverlay;
+export {
+  WaveformAnnotationBoxes,
+  WaveformLoopRegion,
+  WaveformPlayhead,
+  WaveformSelection,
+} from './VisualizationOverlays';
 
 export interface SortedWaveformParts {
   /** Drawn in the timescale strip, in order. */
@@ -74,11 +69,11 @@ export interface SortedWaveformParts {
    */
   content: ReactNode[];
   /** The per-clip parts of the tracks part (all off when there is none). */
-  tracksOptions: TracksPartOptions;
+  tracksOptions: TracksMarkers;
 }
 
-const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([TimescalePart, LoopRegionPart]);
-const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([TrackControlsPart]);
+const TIMESCALE_PARTS: ReadonlySet<unknown> = new Set([WaveformTimescale, WaveformLoopRegion]);
+const CONTROLS_PARTS: ReadonlySet<unknown> = new Set([WaveformTrackControls]);
 
 /**
  * Sorts the root's children into the places a playlist has. Fragments are
@@ -115,8 +110,8 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           sorted.content.push(null);
           return;
         }
-        if (child.type === TracksPart) {
-          sorted.tracksOptions = scanTracksParts((child.props as TracksPartProps).children);
+        if (child.type === WaveformTracks) {
+          sorted.tracksOptions = scanTracksParts((child.props as WaveformTracksProps).children);
         }
       }
       // Every child keeps one position in the tracks area, also one that is

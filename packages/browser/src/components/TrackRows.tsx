@@ -32,7 +32,7 @@ import {
   TrackRowPositioner,
   TracksLayout,
   getTrackChannelCount,
-  type VisualizationRecordingState,
+  type WaveformRecordingState,
 } from './visualizationLayout';
 
 type FrequencyScaleFn = (f: number, minF: number, maxF: number) => number;
@@ -149,7 +149,7 @@ const ClipView = React.memo(function ClipView({
 });
 
 interface RecordingPreviewClipProps {
-  recordingState: VisualizationRecordingState;
+  recordingState: WaveformRecordingState;
   trackId: string;
   trackIndex: number;
   clipIndex: number;
@@ -258,7 +258,7 @@ interface TrackRowProps extends ClipDisplayOptions {
   waveHeight: number;
   mono: boolean;
   /** Set only on the track being recorded into. */
-  recordingState: VisualizationRecordingState | undefined;
+  recordingState: WaveformRecordingState | undefined;
   /** Set only for a spectrogram track whose config asks for labels. */
   spectrogramConfig: SpectrogramConfig | undefined;
   frequencyScaleFn: FrequencyScaleFn | undefined;
@@ -372,33 +372,33 @@ export interface SpectrogramTrackHelpers {
  * height of every row, which is why the root must know of it before anything
  * is drawn: it renders nothing itself.
  */
-export const ClipHeadersPart: React.FC = () => null;
+export const WaveformClipHeaders: React.FC = () => null;
 
 /** Marker: clips show their fade-in and fade-out curves. Renders nothing itself. */
-export const FadesPart: React.FC = () => null;
+export const WaveformFades: React.FC = () => null;
 
-export interface RecordingPreviewPartProps {
-  recordingState: VisualizationRecordingState;
+export interface WaveformRecordingPreviewProps {
+  recordingState: WaveformRecordingState;
 }
 
 /**
  * Marker: the take being recorded is drawn into its track as it grows. The
  * preview clip is drawn by that track's row; this renders nothing itself.
  */
-export const RecordingPreviewPart: React.FC<RecordingPreviewPartProps> = () => null;
+export const WaveformRecordingPreview: React.FC<WaveformRecordingPreviewProps> = () => null;
 
-export interface TracksPartOptions {
+export interface TracksMarkers {
   showClipHeaders: boolean;
   showFades: boolean;
-  recordingState: VisualizationRecordingState | undefined;
+  recordingState: WaveformRecordingState | undefined;
 }
 
 /**
  * Which per-clip parts are among the children of the tracks part. Looks
  * through fragments; a part wrapped in another component is not seen.
  */
-export function scanTracksParts(children: ReactNode): TracksPartOptions {
-  const found: TracksPartOptions = {
+export function scanTracksParts(children: ReactNode): TracksMarkers {
+  const found: TracksMarkers = {
     showClipHeaders: false,
     showFades: false,
     recordingState: undefined,
@@ -406,10 +406,10 @@ export function scanTracksParts(children: ReactNode): TracksPartOptions {
   const visit = (node: ReactNode) => {
     React.Children.forEach(node, (child) => {
       if (!React.isValidElement(child)) return;
-      if (child.type === ClipHeadersPart) found.showClipHeaders = true;
-      else if (child.type === FadesPart) found.showFades = true;
-      else if (child.type === RecordingPreviewPart) {
-        found.recordingState = (child.props as RecordingPreviewPartProps).recordingState;
+      if (child.type === WaveformClipHeaders) found.showClipHeaders = true;
+      else if (child.type === WaveformFades) found.showFades = true;
+      else if (child.type === WaveformRecordingPreview) {
+        found.recordingState = (child.props as WaveformRecordingPreviewProps).recordingState;
       } else if (child.type === React.Fragment) {
         visit((child.props as { children?: ReactNode }).children);
       }
@@ -419,10 +419,10 @@ export function scanTracksParts(children: ReactNode): TracksPartOptions {
   return found;
 }
 
-export interface TracksPartProps {
+export interface WaveformTracksProps {
   /** Draw each clip's waveform scaled by its gain. */
   gainScaled?: boolean;
-  /** `ClipHeadersPart`, `FadesPart`, `RecordingPreviewPart`. */
+  /** `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview`. */
   children?: ReactNode;
 }
 
@@ -443,7 +443,7 @@ export interface TracksPartProps {
  * rows below are memoized and get primitives, stable callbacks and the
  * identity-stable pieces of the peaks.
  */
-export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, children }) => {
+export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = false, children }) => {
   const rows = useWaveformRows('The tracks');
   const { tracksFullWidth: width } = useWaveformExtent('The tracks');
   const { selectedTrackId } = useSelectedRow();

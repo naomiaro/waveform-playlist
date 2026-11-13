@@ -27,7 +27,7 @@ const FILES = [
   'components/waveformParts.tsx',
   'components/waveformLayoutContext.ts',
   'components/waveformFrame.tsx',
-  'components/MediaElementRoot.tsx',
+  'components/MediaElementWaveformRoot.tsx',
   'components/MediaElementPlaylist.tsx',
   'components/TrackRows.tsx',
   'components/TrackControlsColumn.tsx',

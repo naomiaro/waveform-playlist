@@ -3,7 +3,7 @@ import type { RecordingProgressSource } from '@waveform-playlist/core';
 import type { ClipPeaks } from '../WaveformPlaylistContext';
 
 /** Live recording state for the real-time waveform preview. */
-export interface VisualizationRecordingState {
+export interface WaveformRecordingState {
   isRecording: boolean;
   /** Which track is being recorded into. */
   trackId: string;

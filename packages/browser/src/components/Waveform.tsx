@@ -8,7 +8,7 @@ import type {
 import { useAnnotations } from '../contexts/playlistContexts';
 import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import { PlaylistVisualization } from './PlaylistVisualization';
-import type { VisualizationRecordingState } from './visualizationLayout';
+import type { WaveformRecordingState } from './visualizationLayout';
 import { PlaylistAnnotationList, type PlaylistAnnotationListProps } from './PlaylistAnnotationList';
 
 /**
@@ -61,7 +61,7 @@ export interface WaveformProps {
    *  (the ambient DragDropProvider); the buttons work regardless. Default: false. */
   trackReordering?: boolean;
   // Live recording state for real-time waveform preview
-  recordingState?: VisualizationRecordingState;
+  recordingState?: WaveformRecordingState;
 }
 
 /**

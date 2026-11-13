@@ -30,7 +30,7 @@ import {
   SelectionPreviewContext,
   type SelectionRange,
 } from '../hooks/useSelectionDrag';
-import { SelectionOverlay } from '../components/VisualizationOverlays';
+import { WaveformSelection } from '../components/VisualizationOverlays';
 
 const setSelection = vi.fn();
 const onPress = vi.fn();
@@ -390,7 +390,7 @@ describe('the selection highlight shows the preview in place of the selection', 
           <PlaylistZoomContext.Provider value={ZOOM}>
             <SelectionContext.Provider value={{ selectionStart: 10, selectionEnd: 30 }}>
               <SelectionPreviewContext.Provider value={handle.source}>
-                <SelectionOverlay />
+                <WaveformSelection />
               </SelectionPreviewContext.Provider>
             </SelectionContext.Provider>
           </PlaylistZoomContext.Provider>
@@ -417,7 +417,7 @@ describe('the selection highlight shows the preview in place of the selection', 
         <PlaylistViewContext.Provider value={VIEW}>
           <PlaylistZoomContext.Provider value={ZOOM}>
             <SelectionContext.Provider value={{ selectionStart: 10, selectionEnd: 30 }}>
-              <SelectionOverlay />
+              <WaveformSelection />
             </SelectionContext.Provider>
           </PlaylistZoomContext.Provider>
         </PlaylistViewContext.Provider>

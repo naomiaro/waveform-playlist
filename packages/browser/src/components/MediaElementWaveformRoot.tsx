@@ -24,7 +24,7 @@ const NO_RENDER_MODES: ReadonlyMap<string, RenderMode> = new Map();
 const NO_SPECTROGRAM_HELPERS: ReadonlyMap<string, SpectrogramTrackHelpers> = new Map();
 const nothing = () => {};
 
-export interface MediaElementRootProps {
+export interface MediaElementWaveformRootProps {
   className?: string;
   /** The parts, and anything else to draw over the track. */
   children?: ReactNode;
@@ -46,7 +46,10 @@ export interface MediaElementRootProps {
  *
  * No controls column is drawn: there is no controls part for this provider.
  */
-export const MediaElementRoot: React.FC<MediaElementRootProps> = ({ className, children }) => {
+export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> = ({
+  className,
+  children,
+}) => {
   const { setSelection } = usePlaybackControls();
   const { duration, peaksDataArray } = useMediaElementTrack();
   const { waveHeight } = usePlaylistView();
