@@ -320,6 +320,55 @@ describe('the root renders alone (#685)', () => {
   });
 });
 
+describe('only the root reads the timeline (#685)', () => {
+  it('a new onTracksChange function renders the root; the tracks part does not follow and the track controls render once, for the mixer', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const adapter = createFakeAdapter();
+    const createAdapter = () => adapter;
+    const renderTrackControls = vi.fn((index: number) => <i data-custom-panel={index} />);
+    // One element for the whole test: the component that composes the view
+    // does not render, only the provider gets a new function.
+    const view = <PlaylistVisualization renderTrackControls={renderTrackControls} />;
+    const ui = () => (
+      <WaveformPlaylistProvider
+        tracks={TRACKS}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={createAdapter}
+        onTracksChange={() => {}}
+        controls={CONTROLS}
+        timescale
+      >
+        <ProbeChild />
+        {view}
+      </WaveformPlaylistProvider>
+    );
+    const utils = render(ui());
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    await act(async () => {});
+    expect(document.querySelectorAll('[data-custom-panel]').length).toBe(3);
+    resetCounts();
+    const calls = renderTrackControls.mock.calls.length;
+
+    await act(async () => {
+      utils.rerender(ui());
+    });
+
+    // The timeline value is a new object (it carries the function), so its
+    // one reader renders.
+    expect(counts.shell).toBeGreaterThan(0);
+    // The provider answers a new `onTracksChange` by loading again, which
+    // publishes the mixer state once more: the track controls read that and
+    // render ONCE, as they did before the view had parts. Reading the
+    // timeline value themselves, both parts rendered with every one of the
+    // root's renders here (three).
+    expect(counts.layout).toBe(1);
+    expect(renderTrackControls.mock.calls.length - calls).toBe(TRACKS.length);
+    expect(counts.track).toBe(0);
+    expect(counts.scale).toBe(0);
+  });
+});
+
 describe('AudioPosition registers under its own id (#685)', () => {
   it('two readouts under one provider keep one frame callback each', () => {
     const registered = new Map<string, unknown>();

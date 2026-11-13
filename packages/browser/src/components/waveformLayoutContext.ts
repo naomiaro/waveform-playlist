@@ -3,13 +3,14 @@
  * (#685). Internal: not exported from the package.
  *
  * Two values, by what changes them. The extent changes with the timeline's
- * length and the zoom; the row layout changes with every clip edit (the peaks
- * are part of the row heights). The timescale, the loop region and the
+ * length and the zoom; the rows value changes with every clip edit (it holds
+ * the tracks and their peaks, and the row heights follow from them). The timescale, the loop region and the
  * annotation row read the extent only, so a trim that leaves the length alone
  * does not render them.
  */
 import { createContext, useContext } from 'react';
-import type { RenderMode } from '@waveform-playlist/core';
+import type { ClipTrack, RenderMode } from '@waveform-playlist/core';
+import type { TrackClipPeaks } from '../WaveformPlaylistContext';
 import type { TrackLayout } from '../utils/trackOrderPreview';
 import type { SpectrogramTrackHelpers } from './TrackRows';
 
@@ -21,6 +22,14 @@ export interface WaveformExtentValue {
 }
 
 export interface WaveformRowsValue {
+  /**
+   * The tracks and their peaks, as the root read them. The parts take them
+   * from here and do not read the provider's timeline value themselves: that
+   * value also changes with things no part draws (`isReady`, the identity of
+   * `onTracksChange`), and a part that read it would render for those too.
+   */
+  tracks: ClipTrack[];
+  peaksDataArray: TrackClipPeaks[];
   showClipHeaders: boolean;
   trackHeightById: ReadonlyMap<string, number>;
   trackLayout: TrackLayout;

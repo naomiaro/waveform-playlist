@@ -20,7 +20,6 @@ import {
   useEngineRefs,
   usePlaylistView,
   usePlaylistZoom,
-  usePlaylistTimeline,
   useSelectedTrackId,
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
@@ -432,7 +431,9 @@ export interface TracksPartProps {
 /**
  * All track rows: the tracks part of the view (#685).
  *
- * It reads the timeline, the layout and the selected track itself, and is
+ * It takes the tracks, their peaks and the layout from the root's rows value
+ * (not from the provider's timeline value, see waveformLayoutContext.ts),
+ * reads the selected track itself, and is
  * deliberately free of the time selection, the cursor and the annotation
  * state: those change on every pointer move of a selection drag and
  * throughout playback, and nothing in a track row depends on them. Read one
@@ -446,7 +447,6 @@ export interface TracksPartProps {
 export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, children }) => {
   const rows = useWaveformRows('The tracks');
   const { tracksFullWidth: width } = useWaveformExtent('The tracks');
-  const { tracks, peaksDataArray } = usePlaylistTimeline();
   const { selectedTrackId } = useSelectedTrackId();
   const { trackDragPreview } = useTrackReorderPreview();
   const { sampleRate, waveHeight, mono } = usePlaylistView();
@@ -454,7 +454,14 @@ export const TracksPart: React.FC<TracksPartProps> = ({ gainScaled = false, chil
   const spectrogram = useContext(SpectrogramIntegrationContext);
   const { showFades, recordingState } = scanTracksParts(children);
   const dragSourceTrackId = trackDragPreview?.trackId ?? null;
-  const { trackLayout, renderModeById, spectrogramHelpersById, recordingChannelCount } = rows;
+  const {
+    tracks,
+    peaksDataArray,
+    trackLayout,
+    renderModeById,
+    spectrogramHelpersById,
+    recordingChannelCount,
+  } = rows;
 
   return (
     <TracksLayout $height={trackLayout.totalHeight}>

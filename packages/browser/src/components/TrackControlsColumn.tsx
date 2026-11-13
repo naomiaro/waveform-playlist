@@ -4,7 +4,6 @@ import { trackKind } from '@waveform-playlist/core';
 import {
   usePlaylistMixer,
   useEditorControls,
-  usePlaylistTimeline,
   useSelectedTrackId,
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
@@ -30,8 +29,9 @@ export interface TrackControlsPartProps {
  * ControlsColumn outside the scroll area: the track-controls part of the view
  * (#685).
  *
- * Memoized (#693), with only its own three options as props: it reads the
- * tracks, the layout and the selected track itself, and no time selection,
+ * Memoized (#693), with only its own three options as props: it takes the
+ * tracks and the layout from the root's rows value, reads the selected track
+ * itself, and no time selection,
  * cursor or annotation state, so a selection drag or an active-annotation
  * change during playback does not re-render the panels. It reads the mixer
  * state itself (#768), so a volume or pan step renders this column and not the
@@ -44,6 +44,7 @@ function TrackControlsPartImpl({
 }: TrackControlsPartProps) {
   const theme = useTheme() as WaveformPlaylistTheme;
   const {
+    tracks,
     renderModeById,
     trackLayout,
     trackHeightById,
@@ -51,7 +52,6 @@ function TrackControlsPartImpl({
     selectTrack,
     setSettingsModalTrackId,
   } = useWaveformRows('The track controls');
-  const { tracks } = usePlaylistTimeline();
   const { selectedTrackId } = useSelectedTrackId();
   const { trackReorderEpoch } = useTrackReorderPreview();
   const spectrogram = useContext(SpectrogramIntegrationContext);

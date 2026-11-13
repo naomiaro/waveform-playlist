@@ -422,6 +422,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
 
   const rows = useMemo<WaveformRowsValue>(
     () => ({
+      tracks,
+      peaksDataArray,
       showClipHeaders,
       trackHeightById,
       trackLayout,
@@ -433,6 +435,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
       recordingChannelCount,
     }),
     [
+      tracks,
+      peaksDataArray,
       showClipHeaders,
       trackHeightById,
       trackLayout,
