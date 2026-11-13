@@ -82,7 +82,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 ## Docusaurus Native Examples
 
-**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source: `@waveform-playlist/browser`, `core`, `playout`, `ui-components` → source. `annotations`, `recording` → dist/ (have build artifacts like worklets). **Rebuild these after pulling/merging source changes** (`pnpm --filter @waveform-playlist/recording build`) — the website serves their `dist`, so stale `dist` makes examples show `X does not exist in type` errors and run old behaviour despite correct source.
+**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source (aliased to `packages/<name>/src`): `@waveform-playlist/browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `midi`, `recording`. A source change in one of these needs no rebuild for the website. `worklets`, `webaudio-peaks` and the `@dawcore/*` family are NOT aliased: the website uses their built `dist` through node_modules. **Rebuild those after pulling/merging source changes** (`pnpm --filter @waveform-playlist/worklets build`, `pnpm --filter @dawcore/components build`) — a stale `dist` runs old behaviour despite correct source.
 
 **SSR/SSG pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use `createLazyExample` from `BrowserOnlyWrapper`:
 
@@ -103,7 +103,7 @@ const LazyExample = createLazyExample(() =>
 - Export components as functions (no `createRoot()`).
 - Styled components use CSS variables: `var(--ifm-background-surface-color, #fallback)`.
 
-**Rebuild requirement:** When ui-components changes affect recording, rebuild both packages.
+**Rebuild requirement:** `ui-components` and `recording` are source-aliased for the website, so a change in either needs no rebuild here. Package builds, typecheck and unit tests still resolve workspace packages through `dist` (root `CLAUDE.md`, "Type Migration Gotcha").
 
 ## Embedding dawcore Web Components
 

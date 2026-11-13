@@ -104,12 +104,24 @@ export interface ActiveAnnotationContextValue {
 }
 
 /**
- * The annotations and whether playback runs on past the end of one. Changes
- * on an annotation edit and on the continuous-play toggle; an edge drag that
- * uses the preview source changes it once, on release.
+ * The annotations. Changes on an annotation edit; an edge drag changes it
+ * once, on release (its moves go through the preview source).
  */
 export interface AnnotationsContextValue {
   annotations: AnnotationData[];
+}
+
+/**
+ * The three annotation options, under both providers (#686): whether
+ * annotations can be edited, whether an edge takes the edge it touches along,
+ * and whether playback runs on past the end of an annotation. They start from
+ * the provider's `annotationList` prop and are set with
+ * `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` of
+ * `usePlaybackControls()`.
+ */
+export interface AnnotationOptionsContextValue {
+  editable: boolean;
+  linkEndpoints: boolean;
   continuousPlay: boolean;
 }
 
@@ -140,6 +152,8 @@ export interface PlaybackControlsContextValue {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
@@ -148,6 +162,20 @@ export interface PlaybackControlsContextValue {
    */
   annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
+  /**
+   * What a click on an annotation does (its box, or its row in the list): the
+   * annotation becomes the active one and is played from its start. With
+   * continuous play off, playback ends where the annotation ends. Call it
+   * from a box or a row of your own. Each provider plays an annotation its
+   * own way: `WaveformPlaylistProvider` starts a play of the annotation's
+   * length, `MediaElementPlaylistProvider` starts an open-ended play that its
+   * loop ends with the active annotation. Left alone, both end at the
+   * annotation's end. They differ when something changes during the play:
+   * under MediaElement the play follows an end that is moved, and continuous
+   * play switched on lets it run on; under WebAudio the first keeps the end
+   * it started with. A start that fails is logged as a warning.
+   */
+  playAnnotation: (annotation: AnnotationData) => void;
 }
 
 /**
@@ -243,10 +271,6 @@ export interface EditorControlsContextValue {
   // Master volume
   setMasterVolume: (volume: number) => void;
 
-  // Annotation editing
-  setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotationsEditable: (enabled: boolean) => void;
-
   // Loop controls
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;
@@ -298,12 +322,6 @@ export interface EngineRefsContextValue {
   /** Ref set by useClipDragHandlers during boundary trim drags.
    *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
   isDraggingRef: React.MutableRefObject<boolean>;
-}
-
-/** Whether annotations can be edited, and how their edges behave (#688). */
-export interface AnnotationEditingContextValue {
-  annotationsEditable: boolean;
-  linkEndpoints: boolean;
 }
 
 /** Loop region (separate from selection), Audacity-style loop points (#768). */
@@ -404,6 +422,7 @@ export const SelectionContext = slot<SelectionContextValue>();
 export const CurrentTimeContext = slot<CurrentTimeContextValue>();
 export const ActiveAnnotationContext = slot<ActiveAnnotationContextValue>();
 export const AnnotationsContext = slot<AnnotationsContextValue>();
+export const AnnotationOptionsContext = slot<AnnotationOptionsContextValue>();
 export const PlaybackControlsContext = slot<PlaybackControlsContextValue>();
 export const PlaylistViewContext = slot<PlaylistViewContextValue>();
 export const PlaylistSettingsContext = slot<PlaylistSettingsContextValue>();
@@ -420,7 +439,6 @@ export const SelectedRowContext = slot<SelectedTrackIdContextValue>();
 // WaveformPlaylistProvider only
 export const EditorControlsContext = slot<EditorControlsContextValue>();
 export const EngineRefsContext = slot<EngineRefsContextValue>();
-export const AnnotationEditingContext = slot<AnnotationEditingContextValue>();
 export const LoopContext = slot<LoopContextValue>();
 export const SelectedTrackIdContext = slot<SelectedTrackIdContextValue>();
 export const UndoRedoContext = slot<UndoRedoContextValue>();
@@ -490,8 +508,15 @@ export const useCurrentTime = () => useSlot(CurrentTimeContext, 'useCurrentTime'
 export const useActiveAnnotation = () =>
   useSlot(ActiveAnnotationContext, 'useActiveAnnotation', EITHER);
 
-/** `{ annotations, continuousPlay }`. Re-renders on an annotation edit and on the toggle. */
+/** `{ annotations }`. Re-renders on an annotation edit. */
 export const useAnnotations = () => useSlot(AnnotationsContext, 'useAnnotations', EITHER);
+
+/**
+ * `{ editable, linkEndpoints, continuousPlay }`: the one home of the three
+ * annotation options, under both providers. Re-renders when one is toggled.
+ */
+export const useAnnotationOptions = () =>
+  useSlot(AnnotationOptionsContext, 'useAnnotationOptions', EITHER);
 
 /**
  * The actions both providers have: `play`, `pause`, `stop`, `seekTo`,
@@ -529,10 +554,6 @@ export const useEditorControls = () =>
  * value never changes.
  */
 export const useEngineRefs = () => useSlot(EngineRefsContext, 'useEngineRefs', WEB_AUDIO);
-
-/** `{ annotationsEditable, linkEndpoints }`. WaveformPlaylistProvider only. */
-export const useAnnotationEditing = () =>
-  useSlot(AnnotationEditingContext, 'useAnnotationEditing', WEB_AUDIO);
 
 /** `{ isLoopEnabled, loopStart, loopEnd }`. Re-renders on a loop change. */
 export const useLoop = () => useSlot(LoopContext, 'useLoop', WEB_AUDIO);

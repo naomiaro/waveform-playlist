@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// #740: `PlaylistAnnotationList` renders at every annotation boundary during
+// #740: the annotation list (`AnnotationList` since #686) renders at every annotation boundary during
 // playback. What it hands to the list must keep its identity across that
 // render, or every memoized row of the list renders again: the options object
 // in particular is a dependency of a handler each row holds.
@@ -9,17 +9,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import {
-  usePlaybackControls,
-  useEditorControls,
-  usePlaylistTimeline,
-} from '../contexts/playlistContexts';
+import { usePlaybackControls, usePlaylistTimeline } from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
   type AnnotationTextIntegrationProps,
 } from '../AnnotationIntegrationContext';
-import { PlaylistAnnotationList } from '../components/PlaylistAnnotationList';
+import { AnnotationList } from '../components/AnnotationList';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -99,14 +95,12 @@ const INTEGRATION = { AnnotationText: FakeAnnotationText } as unknown as Annotat
 
 let probe: {
   controls: ReturnType<typeof usePlaybackControls>;
-  editor: ReturnType<typeof useEditorControls>;
   data: ReturnType<typeof usePlaylistTimeline>;
 };
 
 const ProbeChild: React.FC = () => {
   probe = {
     controls: usePlaybackControls(),
-    editor: useEditorControls(),
     data: usePlaylistTimeline(),
   };
   return null;
@@ -127,7 +121,7 @@ async function mount() {
         annotationList={ANNOTATION_LIST}
       >
         <ProbeChild />
-        <PlaylistAnnotationList />
+        <AnnotationList />
       </WaveformPlaylistProvider>
     </AnnotationIntegrationContext.Provider>
   );
@@ -144,7 +138,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('PlaylistAnnotationList (#740)', () => {
+describe('AnnotationList under WaveformPlaylistProvider (#740)', () => {
   it('an active-annotation change reaches the list and changes nothing else it is given', async () => {
     await mount();
     const before = last();
@@ -170,7 +164,7 @@ describe('PlaylistAnnotationList (#740)', () => {
     const before = last().annotationListConfig;
 
     await act(async () => {
-      probe.editor.setLinkEndpoints(true);
+      probe.controls.setLinkEndpoints(true);
     });
     expect(last().annotationListConfig).toEqual({ linkEndpoints: true, continuousPlay: false });
     expect(last().annotationListConfig).not.toBe(before);

@@ -1,8 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import * as Tone from 'tone';
 import {
   createTrack,
@@ -29,18 +27,21 @@ import {
   DownloadAnnotationsButton,
   EditableCheckbox,
   AudioPosition,
-  Waveform,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformLoopRegion,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+  AnnotationList,
   usePlaybackControls,
-  useAnnotationDragHandlers,
-  useDragSensors,
   KeyboardShortcuts,
   ClearAllButton,
-  usePlaylistView,
-  usePlaylistZoom,
   usePlaylistTimeline,
   usePlaybackRefs,
   useAnnotations,
-  useAnnotationEditing,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -219,31 +220,15 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   defaultAnnotationDuration = 3.0,
   minAnnotationDuration = 0.5,
 }) => {
-  const { sampleRate } = usePlaylistView();
-  const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
   const { annotations } = useAnnotations();
-  const { linkEndpoints } = useAnnotationEditing();
-  const { setAnnotations, play, annotationPreview } = usePlaybackControls();
+  const { setAnnotations } = usePlaybackControls();
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
   const { currentTimeRef } = usePlaybackRefs();
 
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
-
-  const sensors = useDragSensors();
-  const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
-    annotations,
-    onAnnotationsChange: setAnnotations,
-    // The drag is shown through the preview and reported once, on release,
-    // so this component does not re-render on every pointer move.
-    preview: annotationPreview,
-    samplesPerPixel,
-    sampleRate,
-    duration,
-    linkEndpoints,
-  });
 
   // Find the next available gap for an annotation starting from a given time
   const findNextAvailableGap = useCallback((startFrom: number): { start: number; maxEnd: number } | null => {
@@ -397,13 +382,6 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   );
 
   return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[RestrictToHorizontalAxis]}
-    >
       <Container>
         <KeyboardShortcuts playback annotations />
         {/* Drop Zone for Audio */}
@@ -470,10 +448,18 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           </ControlGroup>
         </TopBar>
 
-        <Waveform
-          annotationControls={annotationActions}
-          annotationTextHeight={300}
-        />
+        {/* The annotation boxes wire the drag of their edges themselves;
+            the list takes its options (height, action buttons) as props. */}
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformLoopRegion />
+          <WaveformTrackControls />
+          <WaveformTracks />
+          <WaveformAnnotationBoxes />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+        <AnnotationList actions={annotationActions} height={300} />
 
         <TimeControlsBar>
           <ControlGroup>
@@ -493,7 +479,6 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           </ControlGroup>
         </TimeControlsBar>
       </Container>
-    </DragDropProvider>
   );
 };
 

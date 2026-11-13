@@ -117,6 +117,8 @@ export default function AnnotationsExamplePage(): React.ReactElement {
         <div style={{ marginTop: '2rem' }}>
           <h2>Features</h2>
           <ul>
+            <li><strong>Click to play:</strong> Click an annotation box, or a row of the list below the
+                waveform, to play that annotation</li>
             <li><strong>Editable mode:</strong> Toggle to enable/disable annotation editing</li>
             <li><strong>Link endpoints:</strong> When enabled, moving one annotation's edge automatically
                 adjusts the adjacent annotation</li>

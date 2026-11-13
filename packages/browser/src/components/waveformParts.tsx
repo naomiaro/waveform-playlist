@@ -63,12 +63,7 @@ export const WaveformTimescale = React.memo(function WaveformTimescale({
   return <SmartScale durationMs={displayDuration * 1000} renderTick={renderTick} />;
 });
 
-export {
-  WaveformAnnotationBoxes,
-  WaveformLoopRegion,
-  WaveformPlayhead,
-  WaveformSelection,
-} from './VisualizationOverlays';
+export { WaveformLoopRegion, WaveformPlayhead, WaveformSelection } from './VisualizationOverlays';
 
 export interface SortedWaveformParts {
   /** Drawn in the timescale strip, in order. */

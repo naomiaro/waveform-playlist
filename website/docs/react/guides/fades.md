@@ -275,8 +275,8 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function FadesDemo() {
   const { tracks, loading, error } = useAudioTracks([

@@ -1,14 +1,6 @@
-import React, { ReactNode } from 'react';
-import type {
-  AnnotationAction,
-  AnnotationActionOptions,
-  RenderAnnotationItemProps,
-} from '@waveform-playlist/core';
-import { useAnnotations } from '../contexts/playlistContexts';
-import type { GetAnnotationBoxLabelFn } from '../types/annotations';
+import React from 'react';
 import { WaveformRoot } from './WaveformRoot';
 import {
-  WaveformAnnotationBoxes,
   WaveformClipHeaders,
   WaveformFades,
   WaveformLoopRegion,
@@ -18,44 +10,17 @@ import {
   WaveformTrackControls,
   WaveformTracks,
 } from './waveformParts';
-import { PlaylistAnnotationList, type PlaylistAnnotationListProps } from './PlaylistAnnotationList';
+import { WaveformAnnotationBoxes } from './WaveformAnnotationBoxes';
+import { AnnotationList } from './AnnotationList';
 
 /**
- * The text list, only when there are annotations. It reads the annotations so
- * that Waveform does not: Waveform then renders only when its own props change
- * (#768), as MediaElementWaveform does (#744).
- */
-const AnnotationListWhenPresent: React.FC<PlaylistAnnotationListProps> = (props) => {
-  const { annotations } = useAnnotations();
-  if (annotations.length === 0) return null;
-  return <PlaylistAnnotationList {...props} />;
-};
-
-/**
- * The props of the two ready-made multitrack views. They are the annotation
- * options (until #686 gives the annotation parts their own) and `className`:
- * what the view is made of is not an option here. For anything else, compose
- * the parts inside `WaveformRoot`.
+ * The props of the two ready-made multitrack views: `className`. What the
+ * view is made of is not an option here, and neither are the options of its
+ * parts (#686 moved the annotation ones onto `WaveformAnnotationBoxes` and
+ * `AnnotationList`). For anything else, compose the parts inside
+ * `WaveformRoot`.
  */
 export interface WaveformProps {
-  annotationControls?: AnnotationAction[];
-  annotationListConfig?: AnnotationActionOptions;
-  annotationTextHeight?: number; // Height in pixels for the annotation text list
-  /**
-   * Custom render function for annotation items in the text list.
-   * Use this to completely customize how each annotation is displayed.
-   */
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
-  /**
-   * Custom function to generate the label shown on annotation boxes in the waveform.
-   * Receives the annotation data and its index, returns a string label.
-   * Default: annotation.id
-   */
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  /** Where to position the active annotation when auto-scrolling: 'center', 'start', 'end', or 'nearest'. Defaults to 'center'. */
-  scrollActivePosition?: ScrollLogicalPosition;
-  /** Which scrollable containers to scroll: 'nearest' (only the annotation list) or 'all' (including viewport). Defaults to 'nearest'. */
-  scrollActiveContainer?: 'nearest' | 'all';
   className?: string;
 }
 
@@ -77,23 +42,16 @@ const TRACKS_WITH_HEADERS_AND_FADES = (
 );
 const SELECTION = <WaveformSelection />;
 const PLAYHEAD = <WaveformPlayhead />;
+const ANNOTATION_BOXES = <WaveformAnnotationBoxes />;
+// Draws nothing while there are no annotations.
+const ANNOTATION_LIST = <AnnotationList />;
 
 interface CompositionProps extends WaveformProps {
   tracks: React.ReactElement;
 }
 
 /** Not a component: called by the two below, so neither gains a layer. */
-function composeWaveform({
-  tracks,
-  annotationControls,
-  annotationListConfig,
-  annotationTextHeight,
-  renderAnnotationItem,
-  getAnnotationBoxLabel,
-  scrollActivePosition = 'center',
-  scrollActiveContainer = 'nearest',
-  className,
-}: CompositionProps) {
+function composeWaveform({ tracks, className }: CompositionProps) {
   return (
     <>
       <WaveformRoot className={className}>
@@ -101,18 +59,11 @@ function composeWaveform({
         {LOOP_REGION}
         {TRACK_CONTROLS}
         {tracks}
-        <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+        {ANNOTATION_BOXES}
         {SELECTION}
         {PLAYHEAD}
       </WaveformRoot>
-      <AnnotationListWhenPresent
-        height={annotationTextHeight}
-        renderAnnotationItem={renderAnnotationItem}
-        controls={annotationControls}
-        annotationListConfig={annotationListConfig}
-        scrollActivePosition={scrollActivePosition}
-        scrollActiveContainer={scrollActiveContainer}
-      />
+      {ANNOTATION_LIST}
     </>
   );
 }
@@ -123,7 +74,8 @@ function composeWaveform({
  * playhead, with the annotation text list below when there are annotations.
  *
  * It is a composition of the public parts with no options for them. To leave
- * a part out, give one an option (`renderTick`, a column width), compose the
+ * a part out, give one an option (`renderTick`, a column width, a label for
+ * the annotation boxes, a height or actions for the annotation list), compose the
  * panel of a track (a remove button, a reorder grip, your own control) or
  * add your own element, write the composition yourself:
  *
@@ -137,7 +89,7 @@ function composeWaveform({
  *   <WaveformSelection />
  *   <WaveformPlayhead />
  * </WaveformRoot>
- * <PlaylistAnnotationList />
+ * <AnnotationList />
  * ```
  */
 export const Waveform: React.FC<WaveformProps> = (props) =>

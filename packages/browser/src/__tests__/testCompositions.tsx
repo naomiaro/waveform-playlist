@@ -4,15 +4,14 @@
 // `MediaElementPlaylist` stood before the parts were public.
 import React, { type ReactNode } from 'react';
 import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
-import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
+import type { GetAnnotationBoxLabelFn } from '../types/annotations';
 import type { WaveformRecordingState } from '../components/visualizationLayout';
 import { WaveformRoot } from '../components/WaveformRoot';
 import { DefaultTrackControls } from '../components/DefaultTrackControls';
 import { TrackRemoveButton, TrackReorderGrip } from '../components/TrackControlPieces';
 import { MediaElementWaveformRoot } from '../components/MediaElementWaveformRoot';
-import { MediaElementAnnotationBoxes } from '../components/MediaElementAnnotationBoxes';
+import { WaveformAnnotationBoxes } from '../components/WaveformAnnotationBoxes';
 import {
-  WaveformAnnotationBoxes,
   WaveformClipHeaders,
   WaveformFades,
   WaveformLoopRegion,
@@ -29,7 +28,8 @@ export interface ComposedWaveformProps {
   trackControls?: ReactNode;
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
   renderPlayhead?: RenderPlayheadFunction;
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+  /** The label of an annotation box (the box part's `getLabel`). */
+  getLabel?: GetAnnotationBoxLabelFn;
   className?: string;
   showClipHeaders?: boolean;
   gainScaledWaveforms?: boolean;
@@ -50,7 +50,7 @@ export const ComposedWaveform: React.FC<ComposedWaveformProps> = ({
   trackControls,
   renderTick,
   renderPlayhead,
-  getAnnotationBoxLabel,
+  getLabel,
   className,
   showClipHeaders = false,
   gainScaledWaveforms,
@@ -82,17 +82,15 @@ export const ComposedWaveform: React.FC<ComposedWaveformProps> = ({
       {showFades ? <WaveformFades /> : null}
       {recordingState ? <WaveformRecordingPreview recordingState={recordingState} /> : null}
     </WaveformTracks>
-    <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+    <WaveformAnnotationBoxes getLabel={getLabel} />
     <WaveformSelection />
     <WaveformPlayhead renderPlayhead={renderPlayhead} />
   </WaveformRoot>
 );
 
 export interface ComposedMediaElementWaveformProps {
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  editable?: boolean;
-  linkEndpoints?: boolean;
-  onAnnotationUpdate?: OnAnnotationUpdateFn;
+  /** The label of an annotation box (the box part's `getLabel`). */
+  getLabel?: GetAnnotationBoxLabelFn;
   renderPlayhead?: RenderPlayheadFunction;
   showFades?: boolean;
   className?: string;
@@ -101,10 +99,7 @@ export interface ComposedMediaElementWaveformProps {
 }
 
 export const ComposedMediaElementWaveform: React.FC<ComposedMediaElementWaveformProps> = ({
-  getAnnotationBoxLabel,
-  editable = false,
-  linkEndpoints = false,
-  onAnnotationUpdate,
+  getLabel,
   renderPlayhead,
   showFades = false,
   className,
@@ -113,12 +108,7 @@ export const ComposedMediaElementWaveform: React.FC<ComposedMediaElementWaveform
   <MediaElementWaveformRoot className={className}>
     {noTimescale ? null : <WaveformTimescale />}
     <WaveformTracks>{showFades ? <WaveformFades /> : null}</WaveformTracks>
-    <MediaElementAnnotationBoxes
-      getAnnotationBoxLabel={getAnnotationBoxLabel}
-      editable={editable}
-      linkEndpoints={linkEndpoints}
-      onAnnotationUpdate={onAnnotationUpdate}
-    />
+    <WaveformAnnotationBoxes getLabel={getLabel} />
     <WaveformSelection />
     <WaveformPlayhead renderPlayhead={renderPlayhead} />
   </MediaElementWaveformRoot>

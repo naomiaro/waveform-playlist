@@ -5,9 +5,6 @@ import {
 } from '../AnnotationIntegrationContext';
 import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 
-const BOX_ROW_HEIGHT = 30;
-const BOX_COLOR = '#ff9800';
-
 interface AnnotationBoxItemProps {
   AnnotationBox: React.ComponentType<AnnotationBoxIntegrationProps>;
   annotation: AnnotationData;
@@ -15,6 +12,7 @@ interface AnnotationBoxItemProps {
   startPosition: number;
   endPosition: number;
   label: string;
+  color: string | undefined;
   isActive: boolean;
   editable: boolean;
   onSelect: (annotation: AnnotationData) => void;
@@ -32,6 +30,7 @@ const AnnotationBoxItem = React.memo(function AnnotationBoxItem({
   startPosition,
   endPosition,
   label,
+  color,
   isActive,
   editable,
   onSelect,
@@ -43,7 +42,7 @@ const AnnotationBoxItem = React.memo(function AnnotationBoxItem({
       startPosition={startPosition}
       endPosition={endPosition}
       label={label}
-      color={BOX_COLOR}
+      color={color}
       isActive={isActive}
       onClick={() => onSelect(annotation)}
       editable={editable}
@@ -58,10 +57,14 @@ export interface AnnotationBoxesProps {
   editable: boolean;
   /** Width of the row in pixels (the full timeline width). */
   width: number;
+  /** Height of the row in pixels. */
+  height: number;
+  /** Border colour of a box that is not active. Without it, the box's own default. */
+  color: string | undefined;
   sampleRate: number;
   samplesPerPixel: number;
   /** Label for a box. Default: the annotation's id. */
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+  getLabel?: GetAnnotationBoxLabelFn;
   /**
    * Called with the annotation of a clicked box. It is a prop of every
    * memoized box, so it must keep its identity across renders in which only
@@ -71,9 +74,9 @@ export interface AnnotationBoxesProps {
 }
 
 /**
- * The row of annotation boxes under the waveform, for both players (#744).
- * The caller reads its provider and passes the values in; drag-and-drop
- * (`DragDropProvider`) is the caller's too. Renders nothing without the
+ * The row of annotation boxes under the waveform (#744). The caller
+ * (`WaveformAnnotationBoxes`) reads the provider and passes the values in;
+ * drag-and-drop (`DragDropProvider`) is the caller's too. Renders nothing without the
  * annotation integration or without annotations.
  */
 export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
@@ -81,9 +84,11 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
   activeAnnotationId,
   editable,
   width,
+  height,
+  color,
   sampleRate,
   samplesPerPixel,
-  getAnnotationBoxLabel,
+  getLabel,
   onSelect,
 }) => {
   const annotationIntegration = useContext(AnnotationIntegrationContext);
@@ -93,7 +98,7 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
   const { AnnotationBox, AnnotationBoxesWrapper } = annotationIntegration;
 
   return (
-    <AnnotationBoxesWrapper height={BOX_ROW_HEIGHT} width={width}>
+    <AnnotationBoxesWrapper height={height} width={width}>
       {annotations.map((annotation, index) => (
         <AnnotationBoxItem
           key={annotation.id}
@@ -102,7 +107,8 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
           index={index}
           startPosition={(annotation.start * sampleRate) / samplesPerPixel}
           endPosition={(annotation.end * sampleRate) / samplesPerPixel}
-          label={getAnnotationBoxLabel ? getAnnotationBoxLabel(annotation, index) : annotation.id}
+          label={getLabel ? getLabel(annotation, index) : annotation.id}
+          color={color}
           isActive={annotation.id === activeAnnotationId}
           editable={editable}
           onSelect={onSelect}

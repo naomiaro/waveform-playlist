@@ -16,6 +16,7 @@ export {
   useSelection,
   useActiveAnnotation,
   useAnnotations,
+  useAnnotationOptions,
   usePlaybackControls,
   usePlaybackRefs,
   usePlaylistView,
@@ -24,7 +25,6 @@ export {
   // WaveformPlaylistProvider only:
   useEditorControls,
   useEngineRefs,
-  useAnnotationEditing,
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
@@ -49,7 +49,7 @@ export type {
   PlaylistZoomContextValue,
   EditorControlsContextValue,
   EngineRefsContextValue,
-  AnnotationEditingContextValue,
+  AnnotationOptionsContextValue,
   PlaylistTimelineContextValue,
   PlaylistMixerContextValue,
   TrackReorderPreviewContextValue,
@@ -109,8 +109,7 @@ export {
   Waveform,
   WaveformEditor,
   MediaElementWaveform,
-  MediaElementAnnotationList,
-  PlaylistAnnotationList,
+  AnnotationList,
   WaveformRoot,
   MediaElementWaveformRoot,
   WaveformTimescale,
@@ -121,7 +120,6 @@ export {
   WaveformFades,
   WaveformRecordingPreview,
   WaveformAnnotationBoxes,
-  MediaElementAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
   KeyboardShortcuts,
@@ -151,17 +149,14 @@ export type { MediaElementWaveformRootProps } from './components/MediaElementWav
 export type { WaveformTimescaleProps } from './components/waveformParts';
 export type { WaveformTracksProps, WaveformRecordingPreviewProps } from './components/TrackRows';
 export type { WaveformTrackControlsProps } from './components/TrackControlsColumn';
-export type {
-  WaveformAnnotationBoxesProps,
-  WaveformPlayheadProps,
-} from './components/VisualizationOverlays';
-export type { MediaElementAnnotationBoxesProps } from './components/MediaElementAnnotationBoxes';
+export type { WaveformPlayheadProps } from './components/VisualizationOverlays';
+export type { WaveformAnnotationBoxesProps } from './components/WaveformAnnotationBoxes';
 export type { WaveformRecordingState } from './components/visualizationLayout';
 export { useRecordingSession } from './hooks/useRecordingSession';
 export type { RecordingSessionOptions } from './hooks/useRecordingSession';
 export type { MediaElementWaveformProps } from './components/MediaElementWaveform';
-export type { MediaElementAnnotationListProps } from './components/MediaElementAnnotationList';
-export type { PlaylistAnnotationListProps } from './components/PlaylistAnnotationList';
+export type { AnnotationListProps } from './components/AnnotationList';
+export type { AnnotationListProp } from './providerInternals/useAnnotationState';
 
 // Re-export TimeFormat type from ui-components for convenience
 export type { TimeFormat } from '@waveform-playlist/ui-components';
@@ -170,7 +165,7 @@ export type { TimeFormat } from '@waveform-playlist/ui-components';
 export type { ClipTrack, AudioClip, Fade, AnnotationData } from '@waveform-playlist/core';
 
 // Export annotation callback types for Waveform components
-export type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from './types/annotations';
+export type { GetAnnotationBoxLabelFn } from './types/annotations';
 
 // Annotation integration context (for optional annotation support)
 export {

@@ -47,12 +47,16 @@ For time-synchronized annotations:
 npm install @waveform-playlist/annotations
 ```
 
-Wrap your playlist with `AnnotationProvider` to enable annotation rendering:
+Render `AnnotationProvider` above the view. Without it the annotation boxes and the annotation list draw nothing:
 
 ```tsx
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 
-<WaveformPlaylistProvider tracks={tracks} annotationList={{ annotations, editable: true }}>
+<WaveformPlaylistProvider
+  tracks={tracks}
+  annotationList={{ annotations, editable: true }}
+  onAnnotationsChange={setAnnotations}
+>
   <AnnotationProvider>
     <Waveform />
   </AnnotationProvider>

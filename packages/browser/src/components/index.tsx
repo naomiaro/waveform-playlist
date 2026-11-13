@@ -4,7 +4,6 @@ export * from './ContextualControls';
 export * from './AnnotationControls';
 export * from './Waveform';
 export * from './MediaElementWaveform';
-export * from './MediaElementAnnotationList';
 export { WaveformRoot } from './WaveformRoot';
 export type { WaveformRootProps } from './WaveformRoot';
 export { MediaElementWaveformRoot } from './MediaElementWaveformRoot';
@@ -17,12 +16,11 @@ export {
   WaveformClipHeaders,
   WaveformFades,
   WaveformRecordingPreview,
-  WaveformAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
 } from './waveformParts';
-export { MediaElementAnnotationBoxes } from './MediaElementAnnotationBoxes';
-export * from './PlaylistAnnotationList';
+export { WaveformAnnotationBoxes } from './WaveformAnnotationBoxes';
+export { AnnotationList } from './AnnotationList';
 export { KeyboardShortcuts } from './KeyboardShortcuts';
 export type { KeyboardShortcutsProps } from './KeyboardShortcuts';
 // The control panel of a track: the default one and the pieces it is made of (#687).

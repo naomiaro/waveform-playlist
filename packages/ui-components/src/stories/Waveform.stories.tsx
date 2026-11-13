@@ -10,6 +10,12 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  WaveformTimescale,
+  WaveformAnnotationBoxes,
+  AnnotationList,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  LinkEndpointsCheckbox,
   DefaultTrackControls,
   TrackName,
   TrackMuteButton,
@@ -23,6 +29,8 @@ import {
   StopButton,
   AudioPosition,
 } from '@waveform-playlist/browser';
+import { AnnotationProvider } from '@waveform-playlist/annotations';
+import type { AnnotationData, RenderAnnotationItemProps } from '@waveform-playlist/core';
 
 const meta: Meta<typeof Waveform> = {
   title: 'Browser/Waveform',
@@ -269,6 +277,72 @@ export const TrackControlsFromPieces: Story = {
       description: {
         story:
           'A panel composed from the pieces, in a 140 px column: name, mute, solo and volume, and no pan slider. Each piece is bound to the track it is drawn for. The slot is as wide as the column and as tall as the row; the panel fills it with `height: 100%`.',
+      },
+    },
+  },
+};
+
+const STORY_ANNOTATIONS: AnnotationData[] = [
+  { id: 'intro', start: 0, end: 4, lines: ['Intro'] },
+  { id: 'verse', start: 4, end: 11, lines: ['First verse'] },
+  { id: 'chorus', start: 11, end: 16, lines: ['Chorus'] },
+];
+// Defined outside the story: a new function or object would render every box and row.
+const STORY_ANNOTATION_LIST = { annotations: STORY_ANNOTATIONS, linkEndpoints: true };
+const numberedLabel = (_annotation: AnnotationData, index: number) => String(index + 1);
+const compactRow = ({ annotation, isActive, onClick, formatTime }: RenderAnnotationItemProps) => (
+  <div
+    onClick={onClick}
+    style={{
+      padding: '6px 8px',
+      cursor: 'pointer',
+      borderLeft: isActive ? '3px solid #ff9800' : '3px solid transparent',
+    }}
+  >
+    <strong>{annotation.lines.join(' ')}</strong> {formatTime(annotation.start)}
+  </div>
+);
+
+export const AnnotationParts: Story = {
+  render: () => (
+    <AnnotationProvider>
+      <WaveformPlaylistProvider
+        tracks={createEmptyTracks(1)}
+        samplesPerPixel={1024}
+        annotationList={STORY_ANNOTATION_LIST}
+        onAnnotationsChange={() => {}}
+      >
+        <div style={{ padding: '1rem' }}>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <ContinuousPlayCheckbox />
+            <EditableCheckbox />
+            <LinkEndpointsCheckbox />
+          </div>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <WaveformRoot>
+                <WaveformTimescale />
+                <WaveformTracks />
+                <WaveformAnnotationBoxes getLabel={numberedLabel} height={40} />
+                <WaveformSelection />
+                <WaveformPlayhead />
+              </WaveformRoot>
+            </div>
+            <div style={{ width: 260, flexShrink: 0 }}>
+              <AnnotationList height={220} scrollActivePosition="nearest">
+                {compactRow}
+              </AnnotationList>
+            </div>
+          </div>
+        </div>
+      </WaveformPlaylistProvider>
+    </AnnotationProvider>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The annotation parts composed by hand: the row of boxes (`getLabel`, 40 px high) inside the root, and the list in a sidebar with a row of its own. The three checkboxes show and set the provider's annotation options; the boxes and the list read them. The annotations here are fixed (the story keeps no state), so an edit is not kept.",
       },
     },
   },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   BaseCheckboxWrapper,
   BaseCheckbox,
@@ -16,15 +16,17 @@ export const EditableCheckbox: React.FC<EditableCheckboxProps> = ({
   onChange,
   className,
 }) => {
+  // Generated: two of this checkbox on one page must not share an id.
+  const id = useId();
   return (
     <BaseCheckboxWrapper className={className}>
       <BaseCheckbox
         type="checkbox"
-        id="editable-annotations"
+        id={id}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <BaseCheckboxLabel htmlFor="editable-annotations">Editable Annotations</BaseCheckboxLabel>
+      <BaseCheckboxLabel htmlFor={id}>Editable Annotations</BaseCheckboxLabel>
     </BaseCheckboxWrapper>
   );
 };

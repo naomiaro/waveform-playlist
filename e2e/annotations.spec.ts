@@ -23,6 +23,28 @@ test.describe('Annotations Example', () => {
     await page.waitForSelector('text=f000001', { timeout: 30000 });
   });
 
+  // #686: a row of the list did nothing when clicked.
+  test('a click on a row plays its annotation; a click in a field being edited does not', async ({
+    page,
+  }) => {
+    await page.getByRole('checkbox', { name: 'Continuous Play', exact: true }).uncheck();
+    const play = page.getByRole('button', { name: 'Play', exact: true });
+    const pause = page.getByRole('button', { name: 'Pause', exact: true });
+    await expect(pause).toBeDisabled();
+
+    // The page starts with Editable on: the text of a row is a field.
+    await page.getByText('But as the riper should by time decease,').click();
+    await page.waitForTimeout(500);
+    await expect(pause).toBeDisabled();
+    await page.keyboard.press('Escape');
+
+    // The time range of annotation 4 is not a field.
+    await page.getByText('0:09.240 - 0:11.920').click();
+    await expect(pause).toBeEnabled();
+    // Continuous play is off: playback ends with the annotation (2.68 s long).
+    await expect(play).toBeEnabled({ timeout: 10000 });
+  });
+
   test.describe('Page Structure', () => {
     test('displays annotations with text content', async ({ page }) => {
       // Check for annotation text content (Shakespeare sonnet lines)
@@ -334,7 +356,8 @@ test.describe('Annotations Example', () => {
 
     test('A key adds annotation at playhead', async ({ page }) => {
       // Count annotations before
-      const annotationsBefore = await page.locator('[aria-roledescription="draggable"]').count() / 2;
+      const annotationsBefore =
+        (await page.locator('[aria-roledescription="draggable"]').count()) / 2;
 
       // Move playhead to a position with space for new annotation
       await page.getByRole('button', { name: 'Play' }).click();
@@ -346,7 +369,8 @@ test.describe('Annotations Example', () => {
       await page.waitForTimeout(100);
 
       // Should have one more annotation
-      const annotationsAfter = await page.locator('[aria-roledescription="draggable"]').count() / 2;
+      const annotationsAfter =
+        (await page.locator('[aria-roledescription="draggable"]').count()) / 2;
       expect(annotationsAfter).toBeGreaterThanOrEqual(annotationsBefore);
     });
   });

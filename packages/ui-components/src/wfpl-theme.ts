@@ -130,6 +130,12 @@ export interface WaveformPlaylistTheme {
   annotationResizeHandleColor: string;
   annotationResizeHandleActiveColor: string;
   annotationTextItemHoverBackground: string;
+  /**
+   * The active row of the annotation list (its edge, tint and glow) and the
+   * list's focus rings. Optional, so a complete theme object written before
+   * the key existed still type-checks; without it the colour is `#ff9800`.
+   */
+  annotationTextItemActiveColor?: string;
 
   // Playlist container background (falls back to waveOutlineColor when unset)
   playlistBackgroundColor?: string;
@@ -205,6 +211,7 @@ export const defaultTheme: WaveformPlaylistTheme = {
   annotationResizeHandleColor: 'rgba(0, 0, 0, 0.4)',
   annotationResizeHandleActiveColor: 'rgba(0, 0, 0, 0.8)',
   annotationTextItemHoverBackground: 'rgba(0, 0, 0, 0.03)',
+  annotationTextItemActiveColor: '#ff9800',
 
   // Piano roll colors
   pianoRollNoteColor: '#2a7070',
@@ -273,12 +280,13 @@ export const darkTheme: WaveformPlaylistTheme = {
   annotationBoxBackground: 'rgba(40, 32, 24, 0.9)',
   annotationBoxActiveBackground: 'rgba(50, 40, 30, 0.95)',
   annotationBoxHoverBackground: 'rgba(60, 48, 36, 0.98)',
-  annotationBoxBorder: '#c49a6c',
+  annotationBoxBorder: '#ff9800',
   annotationBoxActiveBorder: '#d4a87c',
   annotationLabelColor: '#d8c0a8',
   annotationResizeHandleColor: 'rgba(200, 160, 120, 0.5)',
   annotationResizeHandleActiveColor: 'rgba(220, 180, 140, 0.8)',
   annotationTextItemHoverBackground: 'rgba(200, 160, 120, 0.08)',
+  annotationTextItemActiveColor: '#ff9800',
 
   // Piano roll colors
   pianoRollNoteColor: '#c49a6c',

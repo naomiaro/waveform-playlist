@@ -2,47 +2,44 @@ import React from 'react';
 import { useAnnotationIntegration } from '../AnnotationIntegrationContext';
 import {
   usePlaybackControls,
-  useEditorControls,
   useAnnotations,
-  useAnnotationEditing,
+  useAnnotationOptions,
 } from '../contexts/playlistContexts';
 
 /**
- * Continuous play checkbox that uses the playlist context.
- * Must be used within <AnnotationProvider>.
+ * Continuous play checkbox: shows and sets the provider's `continuousPlay`
+ * option. Works under both providers. Must be used within <AnnotationProvider>.
  */
 export const ContinuousPlayCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { ContinuousPlayCheckbox: Base } = useAnnotationIntegration();
-  const { continuousPlay } = useAnnotations();
+  const { continuousPlay } = useAnnotationOptions();
   const { setContinuousPlay } = usePlaybackControls();
 
   return <Base checked={continuousPlay} onChange={setContinuousPlay} className={className} />;
 };
 
 /**
- * Link endpoints checkbox that uses the playlist context.
- * Must be used within <AnnotationProvider>.
+ * Link endpoints checkbox: shows and sets the provider's `linkEndpoints`
+ * option. Works under both providers. Must be used within <AnnotationProvider>.
  */
 export const LinkEndpointsCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { LinkEndpointsCheckbox: Base } = useAnnotationIntegration();
-  const { linkEndpoints } = useAnnotationEditing();
-  const { setLinkEndpoints } = useEditorControls();
+  const { linkEndpoints } = useAnnotationOptions();
+  const { setLinkEndpoints } = usePlaybackControls();
 
   return <Base checked={linkEndpoints} onChange={setLinkEndpoints} className={className} />;
 };
 
 /**
- * Editable annotations checkbox that uses the playlist context.
- * Must be used within <AnnotationProvider>.
+ * Editable annotations checkbox: shows and sets the provider's `editable`
+ * option. Works under both providers. Must be used within <AnnotationProvider>.
  */
 export const EditableCheckbox: React.FC<{ className?: string }> = ({ className }) => {
   const { EditableCheckbox: Base } = useAnnotationIntegration();
-  const { annotationsEditable } = useAnnotationEditing();
-  const { setAnnotationsEditable } = useEditorControls();
+  const { editable } = useAnnotationOptions();
+  const { setAnnotationsEditable } = usePlaybackControls();
 
-  return (
-    <Base checked={annotationsEditable} onChange={setAnnotationsEditable} className={className} />
-  );
+  return <Base checked={editable} onChange={setAnnotationsEditable} className={className} />;
 };
 
 /**

@@ -49,6 +49,7 @@ import {
   usePlaybackControls,
   useMediaElementTrack,
   useAnnotations,
+  useAnnotationOptions,
   useActiveAnnotation,
 } from '../contexts/playlistContexts';
 import {
@@ -58,7 +59,9 @@ import {
   type AnnotationTextIntegrationProps,
 } from '../AnnotationIntegrationContext';
 import { MediaElementWaveform } from '../components/MediaElementWaveform';
-import { MediaElementAnnotationList } from '../components/MediaElementAnnotationList';
+import { AnnotationList } from '../components/AnnotationList';
+import type { AnnotationListProp } from '../providerInternals/useAnnotationState';
+import { ComposedMediaElementWaveform } from './testCompositions';
 
 // Not 48000: that is the default the drag handlers fall back to, and the
 // track's own rate must reach them.
@@ -137,6 +140,7 @@ let probe: {
   controls: ReturnType<typeof usePlaybackControls>;
   data: ReturnType<typeof useMediaElementTrack>;
   state: ReturnType<typeof useAnnotations> & ReturnType<typeof useActiveAnnotation>;
+  options: ReturnType<typeof useAnnotationOptions>;
 };
 
 const ProbeChild: React.FC = () => {
@@ -144,11 +148,17 @@ const ProbeChild: React.FC = () => {
     controls: usePlaybackControls(),
     data: useMediaElementTrack(),
     state: { ...useAnnotations(), ...useActiveAnnotation() },
+    options: useAnnotationOptions(),
   };
   return null;
 };
 
-async function mount(children: React.ReactNode) {
+// The options are the provider's (#686): a test that needs one on gives it
+// through the provider's `annotationList` prop.
+async function mount(
+  children: React.ReactNode,
+  annotationList: AnnotationListProp = ANNOTATION_LIST
+) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   boxRenders = {};
   boxProps = {};
@@ -163,7 +173,7 @@ async function mount(children: React.ReactNode) {
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={createPlayout}
-        annotationList={ANNOTATION_LIST}
+        annotationList={annotationList}
         onAnnotationsChange={onAnnotationsChange}
       >
         <ProbeChild />
@@ -275,7 +285,11 @@ describe('MediaElement annotation boxes (#744)', () => {
   });
 
   it('boundary drags are converted with the rate of the track', async () => {
-    await mount(<MediaElementWaveform editable linkEndpoints />);
+    await mount(<MediaElementWaveform />, {
+      annotations: ANNOTATIONS,
+      editable: true,
+      linkEndpoints: true,
+    });
 
     const options = dragOptions[dragOptions.length - 1];
     expect(options.sampleRate).toBe(SAMPLE_RATE);
@@ -285,13 +299,13 @@ describe('MediaElement annotation boxes (#744)', () => {
   // #704 close-out: the built-in boxes drag with the provider's preview, so
   // onAnnotationsChange is called once per drag and not once per move.
   it('boundary drags publish to the provider preview', async () => {
-    await mount(<MediaElementWaveform editable />);
+    await mount(<MediaElementWaveform />, { annotations: ANNOTATIONS, editable: true });
 
     expect(dragOptions[dragOptions.length - 1].preview).toBe(probe.controls.annotationPreview);
   });
 
   it('a previewed move renders the box it moves, and the list is given the previewed annotations', async () => {
-    await mount(<MediaElementWaveform editable />);
+    await mount(<MediaElementWaveform />, { annotations: ANNOTATIONS, editable: true });
     const committed = probe.state.annotations;
     const previewed = committed.map((a, i) => (i === 1 ? { ...a, end: a.end - 0.25 } : a));
     boxRenders = {};
@@ -310,10 +324,12 @@ describe('MediaElement annotation boxes (#744)', () => {
     expect(lastList().annotations).toBe(committed);
   });
 
-  it('the boxes follow the editable prop and the label function', async () => {
-    await mount(
-      <MediaElementWaveform editable getAnnotationBoxLabel={(a, index) => index + ':' + a.id} />
-    );
+  it("the boxes follow the provider's editable option and the label function", async () => {
+    // The ready-made composition takes no label function (#686): the box part does.
+    await mount(<ComposedMediaElementWaveform getLabel={(a, index) => index + ':' + a.id} />, {
+      annotations: ANNOTATIONS,
+      editable: true,
+    });
 
     expect(boxProps.n1.editable).toBe(true);
     expect(boxProps.n4.label).toBe('3:n4');
@@ -322,7 +338,7 @@ describe('MediaElement annotation boxes (#744)', () => {
 
 describe('MediaElement annotation list (#744)', () => {
   it('through MediaElementWaveform, an active-annotation change changes nothing else the list is given', async () => {
-    await mount(<MediaElementWaveform linkEndpoints />);
+    await mount(<MediaElementWaveform />, { annotations: ANNOTATIONS, linkEndpoints: true });
     const before = lastList();
     expect(before.annotationListConfig).toEqual({ linkEndpoints: true, continuousPlay: false });
 
@@ -337,19 +353,33 @@ describe('MediaElement annotation list (#744)', () => {
   });
 
   it('through MediaElementWaveform, a render of the parent keeps the options object', async () => {
-    const { rerender } = await mount(<MediaElementWaveform linkEndpoints />);
+    const list = { annotations: ANNOTATIONS, linkEndpoints: true };
+    const { rerender } = await mount(<MediaElementWaveform />, list);
     const before = lastList();
 
     await act(async () => {
-      rerender(<MediaElementWaveform linkEndpoints />);
+      rerender(<MediaElementWaveform />);
     });
 
+    expect(lastList().annotationListConfig).toBe(before.annotationListConfig);
+  });
+
+  it('standalone, a render of the list keeps the options object', async () => {
+    const list = { annotations: ANNOTATIONS, linkEndpoints: true };
+    const { rerender } = await mount(<AnnotationList />, list);
+    const before = lastList();
+
+    await act(async () => {
+      rerender(<AnnotationList />);
+    });
+
+    // A new element: the list did render.
     expect(lastList()).not.toBe(before);
     expect(lastList().annotationListConfig).toBe(before.annotationListConfig);
   });
 
   it('standalone, an active-annotation change changes nothing else the list is given', async () => {
-    await mount(<MediaElementAnnotationList />);
+    await mount(<AnnotationList />);
     const before = lastList();
 
     await act(async () => {
@@ -361,8 +391,8 @@ describe('MediaElement annotation list (#744)', () => {
     expect(changedListProps(before, after)).toEqual(['activeAnnotationId']);
   });
 
-  it('the default options never link endpoints and follow continuous play', async () => {
-    await mount(<MediaElementAnnotationList />);
+  it('the list gets link endpoints and continuous play of the provider', async () => {
+    await mount(<AnnotationList />);
     expect(lastList().annotationListConfig).toEqual({
       linkEndpoints: false,
       continuousPlay: false,
@@ -371,19 +401,24 @@ describe('MediaElement annotation list (#744)', () => {
     await act(async () => {
       probe.controls.setContinuousPlay(true);
     });
-
     expect(lastList().annotationListConfig).toEqual({ linkEndpoints: false, continuousPlay: true });
+
+    await act(async () => {
+      probe.controls.setLinkEndpoints(true);
+    });
+    expect(lastList().annotationListConfig).toEqual({ linkEndpoints: true, continuousPlay: true });
+    expect(probe.options).toEqual({ editable: false, linkEndpoints: true, continuousPlay: true });
   });
 
-  it('controls are handed to the list only when editable', async () => {
-    const controls = [{ text: 'x', title: 'Delete', action: () => {} }];
-    await mount(<MediaElementAnnotationList controls={controls} />);
+  it('actions are handed to the list only when editable', async () => {
+    const actions = [{ text: 'x', title: 'Delete', action: () => {} }];
+    await mount(<AnnotationList actions={actions} />);
     expect(lastList().editable).toBe(false);
     expect(lastList().controls).toBeUndefined();
 
     cleanup();
-    await mount(<MediaElementAnnotationList controls={controls} editable />);
+    await mount(<AnnotationList actions={actions} />, { annotations: ANNOTATIONS, editable: true });
     expect(lastList().editable).toBe(true);
-    expect(lastList().controls).toBe(controls);
+    expect(lastList().controls).toBe(actions);
   });
 });

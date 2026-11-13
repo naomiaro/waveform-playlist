@@ -28,13 +28,7 @@ interface WaveformPlaylistProviderProps {
   zoomLevels?: number[];
   automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
-  annotationList?: {
-    annotations?: AnnotationData[];
-    editable?: boolean;
-    isContinuousPlay?: boolean;
-    linkEndpoints?: boolean;
-    controls?: AnnotationAction[];
-  };
+  annotationList?: AnnotationListProp;
   effects?: EffectsFunction;
   /** A track's effects function by track id (`getTrackEffectsFunction` from
    *  `useTrackDynamicEffects()`). Tracks carry no `effects` field. Called when a
@@ -92,10 +86,7 @@ interface MediaElementPlaylistProviderProps {
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
-  annotationList?: {
-    annotations?: any[];
-    isContinuousPlay?: boolean;
-  };
+  annotationList?: AnnotationListProp;      // the same prop as on WaveformPlaylistProvider
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   onReady?: () => void;                  // the media element has loaded its metadata; once per player. Pass a stable function
   onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); the provider adds no URL to the message. Pass a stable function
@@ -177,13 +168,46 @@ interface ActiveAnnotationContextValue {
 
 ```typescript
 /**
- * The annotations and whether playback runs on past the end of one. Changes
- * on an annotation edit and on the continuous-play toggle; an edge drag that
- * uses the preview source changes it once, on release.
+ * The annotations. Changes on an annotation edit; an edge drag changes it
+ * once, on release (its moves go through the preview source).
  */
 interface AnnotationsContextValue {
   annotations: AnnotationData[];
+}
+```
+
+### useAnnotationOptions()
+
+```typescript
+/**
+ * The three annotation options, under both providers (#686): whether
+ * annotations can be edited, whether an edge takes the edge it touches along,
+ * and whether playback runs on past the end of an annotation. They start from
+ * the provider's `annotationList` prop and are set with
+ * `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` of
+ * `usePlaybackControls()`.
+ */
+interface AnnotationOptionsContextValue {
+  editable: boolean;
+  linkEndpoints: boolean;
   continuousPlay: boolean;
+}
+
+/**
+ * The `annotationList` prop of both providers. The provider holds the three
+ * options as state (`useAnnotationOptions()`, and the three setters of
+ * `usePlaybackControls()`), and that state follows the prop: when the value
+ * of a field changes, the option takes it. Between two changes of the prop a
+ * setter (or one of the checkboxes) changes the option; the prop is not told.
+ */
+interface AnnotationListProp {
+  annotations?: AnnotationData[];
+  /** Whether annotations can be edited (text, ids, edges). Default: false. */
+  editable?: boolean;
+  /** Whether a dragged edge takes the edge it touches along. Default: false. */
+  linkEndpoints?: boolean;
+  /** Whether playback runs on past the end of an annotation. Default: false. */
+  isContinuousPlay?: boolean;
 }
 ```
 
@@ -217,6 +241,8 @@ interface PlaybackControlsContextValue {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
@@ -225,6 +251,20 @@ interface PlaybackControlsContextValue {
    */
   annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
+  /**
+   * What a click on an annotation does (its box, or its row in the list): the
+   * annotation becomes the active one and is played from its start. With
+   * continuous play off, playback ends where the annotation ends. Call it
+   * from a box or a row of your own. Each provider plays an annotation its
+   * own way: `WaveformPlaylistProvider` starts a play of the annotation's
+   * length, `MediaElementPlaylistProvider` starts an open-ended play that its
+   * loop ends with the active annotation. Left alone, both end at the
+   * annotation's end. They differ when something changes during the play:
+   * under MediaElement the play follows an end that is moved, and continuous
+   * play switched on lets it run on; under WebAudio the first keeps the end
+   * it started with. A start that fails is logged as a warning.
+   */
+  playAnnotation: (annotation: AnnotationData) => void;
 }
 ```
 
@@ -374,10 +414,6 @@ interface EditorControlsContextValue {
   // Master volume
   setMasterVolume: (volume: number) => void;
 
-  // Annotation editing
-  setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotationsEditable: (enabled: boolean) => void;
-
   // Loop controls
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;
@@ -433,16 +469,6 @@ interface EngineRefsContextValue {
   /** Ref set by useClipDragHandlers during boundary trim drags.
    *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
   isDraggingRef: React.MutableRefObject<boolean>;
-}
-```
-
-### useAnnotationEditing()
-
-```typescript
-/** Whether annotations can be edited, and how their edges behave (#688). */
-interface AnnotationEditingContextValue {
-  annotationsEditable: boolean;
-  linkEndpoints: boolean;
 }
 ```
 
@@ -1167,7 +1193,7 @@ function useAnnotationsWithPreview(
 ): AnnotationData[];
 ```
 
-With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way a cancelled drag (Escape) restores every annotation the drag moved. `MediaElementWaveform`'s built-in boxes always drag with the preview.
+With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way a cancelled drag (Escape) restores every annotation the drag moved. `WaveformAnnotationBoxes` calls this hook itself, with the preview, inside its own `DragDropProvider`: call it only for a row of boxes you draw yourself.
 
 ### useClipDragHandlers
 
@@ -1772,11 +1798,11 @@ The view is composed. A part is drawn because it is rendered inside a root; ther
   <WaveformLoopRegion />
   <WaveformTrackControls />          {/* a 200 px column */}
   <WaveformTracks />
-  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformAnnotationBoxes />
   <WaveformSelection />
   <WaveformPlayhead />
 </WaveformRoot>
-{/* plus <PlaylistAnnotationList> when there are annotations */}
+<AnnotationList />                   {/* draws nothing while there are no annotations */}
 
 // <WaveformEditor />: the same, with
 <WaveformTracks>
@@ -1788,36 +1814,21 @@ The view is composed. A part is drawn because it is rendered inside a root; ther
 <MediaElementWaveformRoot className={className}>
   <WaveformTimescale />
   <WaveformTracks />
-  <MediaElementAnnotationBoxes getAnnotationBoxLabel={…} editable={…} linkEndpoints={…} onAnnotationUpdate={…} />
+  <WaveformAnnotationBoxes />
   <WaveformSelection />
   <WaveformPlayhead />
 </MediaElementWaveformRoot>
-{/* plus <MediaElementAnnotationList> when there are annotations */}
+<AnnotationList />
 ```
 
 ```typescript
-// The ready-made compositions take className and annotation options only.
+// The ready-made compositions take className only.
 interface WaveformProps {
-  annotationControls?: AnnotationAction[];
-  annotationListConfig?: AnnotationActionOptions;
-  annotationTextHeight?: number;
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => ReactNode;
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn; // Default label: annotation.id
-  scrollActivePosition?: ScrollLogicalPosition;    // Default: 'center'
-  scrollActiveContainer?: 'nearest' | 'all';       // Default: 'nearest'
   className?: string;
 }
 type WaveformEditorProps = WaveformProps;
 
 interface MediaElementWaveformProps {
-  annotationTextHeight?: number;
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
-  editable?: boolean;                              // Default: false
-  linkEndpoints?: boolean;                         // Default: false
-  onAnnotationUpdate?: OnAnnotationUpdateFn;
-  scrollActivePosition?: ScrollLogicalPosition;    // Default: 'center'
-  scrollActiveContainer?: 'nearest' | 'all';       // Default: 'nearest'
   className?: string;
 }
 
@@ -1997,17 +2008,72 @@ interface WaveformRecordingState {
   latencyOffset?: number;
 }
 
-interface WaveformAnnotationBoxesProps {   // WaveformPlaylistProvider only
-  /** Label of an annotation box. Default: annotation.id */
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
+interface WaveformAnnotationBoxesProps {   // either provider
+  /**
+   * The label of a box, from the annotation and its index. Default: the
+   * annotation's id. Pass a function that keeps its identity (defined outside
+   * the component, or memoized): a new one renders every box.
+   */
+  getLabel?: GetAnnotationBoxLabelFn;
+  /** Height of the row in pixels. Default: 30. */
+  height?: number;
 }
-interface MediaElementAnnotationBoxesProps {   // MediaElementPlaylistProvider
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  /** Whether the edges of a box can be dragged. Default: false. */
-  editable?: boolean;
-  /** Whether dragging an edge also moves the edge of the box it touches. Default: false. */
+type GetAnnotationBoxLabelFn = (annotation: AnnotationData, index: number) => string;
+
+// Not a part: the annotation text list, anywhere under either provider.
+interface AnnotationListProps {
+  /** Height of the list in pixels. Without it the list is at most 200 px high. */
+  height?: number;
+  /**
+   * Buttons shown on each row while the provider's `editable` option is on
+   * (delete, split, …). An action is called with the annotation, its index,
+   * the annotations and `{ linkEndpoints, continuousPlay }` as the provider
+   * has them. Pass an array that keeps its identity: a new one renders every
+   * row.
+   */
+  actions?: AnnotationAction[];
+  /**
+   * Where the active annotation is put when the list scrolls to it during
+   * playback, or `'none'` for a list that does not follow. Default: `'center'`.
+   */
+  scrollActivePosition?: ScrollLogicalPosition | 'none';
+  /** Which containers scroll: only the list (`'nearest'`), or the page too (`'all'`). Default: `'nearest'`. */
+  scrollActiveContainer?: 'nearest' | 'all';
+  /**
+   * Draws a row, in place of the default one: called with
+   * `{ annotation, index, isActive, onClick, formatTime }`. Define the
+   * function outside the component (or memoize it): one written inline is a
+   * new function on every render of your component and renders every row.
+   */
+  children?: (item: RenderAnnotationItemProps) => React.ReactNode;
+}
+
+// From @waveform-playlist/core:
+interface AnnotationActionOptions {
+  /** Whether annotation endpoints are linked (moving one endpoint moves the other) */
   linkEndpoints?: boolean;
-  onAnnotationUpdate?: OnAnnotationUpdateFn;
+  /** Whether to continue playing after an annotation ends */
+  continuousPlay?: boolean;
+  /** Additional custom properties */
+  [key: string]: unknown;
+}
+interface AnnotationAction {
+  class?: string;
+  text?: string;
+  title: string;
+  action: (
+    annotation: AnnotationData,
+    index: number,
+    annotations: AnnotationData[],
+    opts: AnnotationActionOptions
+  ) => void;
+}
+interface RenderAnnotationItemProps {
+  annotation: AnnotationData;
+  index: number;
+  isActive: boolean;
+  onClick: () => void;
+  formatTime: (seconds: number) => string;
 }
 // WaveformSelection: no props. Either provider.
 interface WaveformPlayheadProps {   // either provider
@@ -2033,8 +2099,8 @@ Rules:
 - `WaveformClipHeaders`, `WaveformFades`, `WaveformRecordingPreview` are children of `WaveformTracks` and draw nothing elsewhere. One `WaveformTracks` per root, as the root's own child.
 - The 30 px timescale strip exists when the root has a `WaveformTimescale` or a `WaveformLoopRegion`; the controls column exists when it has a `WaveformTrackControls`.
 - A child of a root that is not a part is drawn in the scrolling tracks area, in order.
-- Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` and `WaveformAnnotationBoxes` throw, `WaveformTrackControls` draws nothing as a child of the root (wrapped in a component it throws), `WaveformClipHeaders` shows the track's `name` ("Track" without one) and nothing supports dragging the clip.
-- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and both annotation rows throw outside a root. `WaveformSelection` and `WaveformPlayhead` draw wherever they are rendered under a provider.
+- Under `MediaElementPlaylistProvider`: `WaveformLoopRegion` throws, `WaveformTrackControls` draws nothing as a child of the root (wrapped in a component it throws), `WaveformClipHeaders` shows the track's `name` ("Track" without one) and nothing supports dragging the clip.
+- `WaveformTimescale`, `WaveformLoopRegion`, `WaveformTrackControls`, `WaveformTracks` and `WaveformAnnotationBoxes` throw outside a root. `WaveformSelection` and `WaveformPlayhead` draw wherever they are rendered under a provider.
 - Switch a part with `{flag ? <Part /> : null}`; a list of changing length remounts later parts unless they have keys.
 - The time ruler and the controls column are not provider props and not in `usePlaylistView()`: they exist when their parts are rendered.
 
@@ -2047,12 +2113,13 @@ Under either provider (from @waveform-playlist/browser):
          PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton,
          SkipBackwardButton, SkipForwardButton, ClearAllButton,
          AudioPosition, TimeFormatSelect, SelectionTimeInputs, AutomaticScrollCheckbox,
-         ContinuousPlayCheckbox, DownloadAnnotationsButton (these two inside <AnnotationProvider>)
+         AnnotationList, ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox,
+         DownloadAnnotationsButton (these five inside <AnnotationProvider>)
 MediaElementPlaylistProvider only (from @waveform-playlist/browser):
          PlaybackRateSelect
 WaveformPlaylistProvider only (from @waveform-playlist/browser):
          LoopButton, SetLoopRegionButton, ZoomInButton, ZoomOutButton, MasterVolumeControl,
-         LinkEndpointsCheckbox, EditableCheckbox (these two inside <AnnotationProvider>), KeyboardShortcuts
+         KeyboardShortcuts
 WaveformPlaylistProvider only (from @waveform-playlist/browser/tone):
          ExportWavButton
 Playheads: Playhead, PlayheadWithMarker (from @waveform-playlist/ui-components)

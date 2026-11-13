@@ -341,8 +341,8 @@ describe('each option reaches its part (#685)', () => {
     expect(seen.rails).toBeGreaterThanOrEqual(2);
   });
 
-  it('getAnnotationBoxLabel labels the annotation boxes', async () => {
-    await mount({ getAnnotationBoxLabel: (annotation) => `label-${annotation.id}` });
+  it('getLabel labels the annotation boxes', async () => {
+    await mount({ getLabel: (annotation) => `label-${annotation.id}` });
     expect(document.querySelector('[data-box="n1"]')?.textContent).toBe('label-n1');
   });
 

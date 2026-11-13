@@ -182,8 +182,8 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
-  useAudioTracks,
 } from '@waveform-playlist/browser';
+import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 const oceanTheme = {
   // Waveform
@@ -296,12 +296,13 @@ interface WaveformPlaylistTheme {
   annotationBoxBackground: string;
   annotationBoxActiveBackground: string;
   annotationBoxHoverBackground: string;
-  annotationBoxBorder: string;
+  annotationBoxBorder: string; // border of a box that is not active, and the glow of the active one
   annotationBoxActiveBorder: string;
   annotationLabelColor: string;
   annotationResizeHandleColor: string;
   annotationResizeHandleActiveColor: string;
   annotationTextItemHoverBackground: string;
+  annotationTextItemActiveColor?: string; // optional (default '#ff9800'): the active row of the annotation list and the list's focus rings
 
   // Spacing and sizing
   borderRadius: string;

@@ -307,7 +307,7 @@ const clip = createClipFromSeconds({
   │   ├── playlistContexts.ts           # The context objects, value types and hooks of both providers (imports no provider and no engine)
   │   └── ClipInteractionContext.tsx    # Clip interaction options (ClipInteractionOptions)
   ├── providerInternals/                # What both providers are built from (internal; only the FrameData type is exported)
-  │   ├── useAnnotationState.ts         # annotations, setAnnotations, preview, active id, continuous play
+  │   ├── useAnnotationState.ts         # annotations, setAnnotations, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
@@ -317,6 +317,7 @@ const clip = createClipFromSeconds({
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
   │   ├── useAnnotationDragHandlers.ts  # Annotation drag logic
   │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
+  │   ├── useAnnotationsWithPreview.ts  # The annotations to draw while an edge drag is in progress
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useAudioTracks.ts             # Track loading and management
   │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine)
@@ -351,7 +352,7 @@ const clip = createClipFromSeconds({
   │   ├── trackContext.ts               # The per-track context of the controls part: useTrack(), TrackContextValue; internal shared and slot-wiring contexts
   │   ├── TrackControlPieces.tsx        # The pieces of a panel: TrackName, TrackMuteButton, TrackSoloButton, TrackVolumeSlider, TrackPanSlider, TrackMenuButton, TrackRemoveButton, TrackReorderGrip
   │   ├── DefaultTrackControls.tsx      # Default track control panel, composed from the pieces (memoized; children drawn below the pan slider)
-  │   ├── VisualizationOverlays.tsx     # Selection, playhead, annotation boxes, loop region
+  │   ├── VisualizationOverlays.tsx     # Selection, playhead, loop region
   │   ├── visualizationLayout.tsx       # Shared row/slot styled components and channel-count helper
   │   ├── Waveform.tsx                  # Ready-made compositions: Waveform, WaveformEditor (clip headers + fades)
   │   ├── ClipInteractionProvider.tsx   # Declarative clip drag/trim/snap/collision
@@ -359,14 +360,12 @@ const clip = createClipFromSeconds({
   │   ├── PlaybackControls.tsx          # Play/Pause/Stop/Rewind/FastForward buttons
   │   ├── ZoomControls.tsx              # Zoom in/out buttons
   │   ├── ExportControls.tsx            # WAV export controls
-  │   ├── AnnotationControls.tsx        # Annotation list + editing UI
+  │   ├── AnnotationControls.tsx        # The three option checkboxes and the download button, bound to the provider (both providers)
   │   ├── ChannelWithProgress.tsx       # Waveform channel with playback progress overlay (both providers)
   │   ├── AnimatedPlayhead.tsx          # Smooth 60fps playhead (both providers)
-  │   ├── AnnotationListView.tsx        # The annotation list both providers render (shared)
-  │   ├── AnnotationBoxes.tsx           # The row of annotation boxes both providers render (shared)
-  │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider
-  │   ├── MediaElementAnnotationList.tsx # Annotation list for MediaElement provider
-  │   ├── MediaElementAnnotationBoxes.tsx # MediaElement boxes: provider state + boundary drag wiring
+  │   ├── WaveformAnnotationBoxes.tsx   # Annotation boxes part (both providers): provider state, its own DragDropProvider + edge drag wiring
+  │   ├── AnnotationBoxes.tsx           # The row of boxes it draws (internal; values as props)
+  │   ├── AnnotationList.tsx            # The annotation text list (both providers); not a part of a root
   │   ├── MediaElementWaveformRoot.tsx  # Root of the MediaElement view: one row, as long as the audio
   │   ├── waveformFrame.tsx             # What both roots share (internal): parts by place, scrolling frame, layout values, selection drag
   │   ├── MediaElementWaveform.tsx      # Ready-made composition for the MediaElement provider
@@ -497,6 +496,8 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   │   ├── AnnotationsTrack.tsx
   │   ├── AnnotationText.tsx
   │   ├── ContinuousPlayCheckbox.tsx
+  │   ├── DownloadAnnotationsButton.tsx
+  │   ├── EditableCheckbox.tsx
   │   └── LinkEndpointsCheckbox.tsx
   ├── hooks/             # Custom hooks
   │   └── useAnnotationControls.ts
@@ -506,16 +507,12 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   │   └── aeneas.ts
   └── index.ts           # Public exports
   ```
-- **Key Hook:** `useAnnotationControls`
-  - Manages `continuousPlay` and `linkEndpoints` state
-  - Provides `updateAnnotationBoundaries()` with complex logic:
-    - Linked endpoints (boundaries move together when touching)
-    - Collision detection (prevents overlap)
-    - Cascading updates (multiple annotations adjust together)
+- **Entry point:** `AnnotationProvider` (`AnnotationProvider.tsx`) puts the package's components into the browser package's `AnnotationIntegrationContext`; `WaveformAnnotationBoxes`, `AnnotationList` and the browser's checkbox wrappers read them from there
+- **Hook:** `useAnnotationControls` holds `continuousPlay` and `linkEndpoints` as local state and wraps `updateAnnotationBoundaries()` of `@waveform-playlist/core` (linked endpoints, collision push-back, cascading updates). Nothing in the repo calls it: under a provider the options are the provider's (`useAnnotationOptions()`)
 - **Components:**
   - Visual: AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack
   - Text: Annotation, AnnotationText
-  - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox
+  - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox, DownloadAnnotationsButton
 - **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
@@ -754,8 +751,10 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     │   └─→ isPlaying
     ├─→ PlaybackRefsContext (never changes; refs and frame callbacks for 60fps)
     │   └─→ currentTimeRef, registerFrameCallback(), playoutRef, isDraggingRef, etc.
-    ├─→ PlaylistAnnotationsContext (annotation edits and settings)
-    │   └─→ annotations, annotationsEditable, linkEndpoints, continuousPlay
+    ├─→ AnnotationsContext (annotation edits)
+    │   └─→ annotations
+    ├─→ AnnotationOptionsContext (the three annotation options)
+    │   └─→ editable, linkEndpoints, continuousPlay
     ├─→ LoopContext (loop changes)
     │   └─→ isLoopEnabled, loopStart, loopEnd
     ├─→ SelectedTrackIdContext (track selection)
@@ -817,7 +816,7 @@ Provider's statechange handler:
 
 `packages/browser/src/contexts/playlistContexts.ts` defines **22 contexts** (21 public and the internal `SelectedRowContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
 
-Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (10 public, plus the internal `SelectedRowContext`):
+Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (11 public, plus the internal `SelectedRowContext`):
 
 1. **IsPlayingContext** (`useIsPlaying()`) - Changes on play, pause and stop
 
@@ -835,28 +834,29 @@ Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (
 5. **ActiveAnnotationContext** (`useActiveAnnotation()`) - The active annotation
    - Changes at every annotation boundary during playback
 
-6. **AnnotationsContext** (`useAnnotations()`) - The annotations and continuous play
+6. **AnnotationsContext** (`useAnnotations()`) - The annotations
 
-7. **PlaybackControlsContext** (`usePlaybackControls()`) - The actions both providers have
+7. **AnnotationOptionsContext** (`useAnnotationOptions()`) - `editable`, `linkEndpoints`, `continuousPlay`
+   - State that follows the provider's `annotationList` prop; set through `usePlaybackControls()`
+
+8. **PlaybackControlsContext** (`usePlaybackControls()`) - The actions both providers have
    - The value never changes
 
-8. **PlaylistViewContext** (`usePlaylistView()`) - What the provider was configured with
+9. **PlaylistViewContext** (`usePlaylistView()`) - What the provider was configured with
    - Sample rate, sizes, bar style, `mono`, `indefinitePlayback`, `fillViewport` (the last three always false under the MediaElement provider)
    - Changes on a prop change, not on a settings click
 
-9. **PlaylistSettingsContext** (`usePlaylistSettings()`) - The two settings a user toggles
+10. **PlaylistSettingsContext** (`usePlaylistSettings()`) - The two settings a user toggles
    - `timeFormat`, `isAutomaticScroll`
    - Apart from the view value because every clip's progress overlay and the visualization read that one
 
-10. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (fixed under the MediaElement provider)
+11. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (fixed under the MediaElement provider)
 
-Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (9):
+Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (8):
 
-11. **EditorControlsContext** (`useEditorControls()`) - The actions only the multitrack editor has; the value never changes
+12. **EditorControlsContext** (`useEditorControls()`) - The actions only the multitrack editor has; the value never changes
 
-12. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, `isDraggingRef`, the engine's clock refs and functions; the value never changes
-
-13. **AnnotationEditingContext** (`useAnnotationEditing()`) - `annotationsEditable`, `linkEndpoints`
+13. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, `isDraggingRef`, the engine's clock refs and functions; the value never changes
 
 14. **LoopContext** (`useLoop()`) - Loop enabled flag and loop region
 
@@ -930,12 +930,12 @@ export interface EngineRefsContextValue {
 // 2. User interaction state, one context per group that changes together
 export interface AnnotationsContextValue {            // both providers
   annotations: AnnotationData[];
-  continuousPlay: boolean;
 }
 
-export interface AnnotationEditingContextValue {      // WaveformPlaylistProvider only
-  annotationsEditable: boolean;
+export interface AnnotationOptionsContextValue {      // both providers
+  editable: boolean;
   linkEndpoints: boolean;
+  continuousPlay: boolean;
 }
 
 export interface LoopContextValue {
@@ -983,9 +983,12 @@ export interface PlaybackControlsContextValue {
   setScrollContainer: (element: HTMLDivElement | null) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   annotationPreview: AnnotationPreviewHandle;
   setActiveAnnotationId: (id: string | null) => void;
+  playAnnotation: (annotation: AnnotationData) => void; // a click on a box or a list row
 }
 
 // 3b. The actions only the multitrack editor has (WaveformPlaylistProvider only)
@@ -1005,9 +1008,6 @@ export interface EditorControlsContextValue {
   zoomOut: () => void;
   // Master volume
   setMasterVolume: (volume: number) => void;
-  // Annotation editing
-  setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotationsEditable: (enabled: boolean) => void;
   // Loop
   setLoopEnabled: (enabled: boolean) => void;
   setLoopRegion: (start: number, end: number) => void;
@@ -1103,7 +1103,7 @@ export const Playhead = () => {
 
 // Control component subscribes to state and controls only
 export const ContinuousPlayCheckbox = () => {
-  const { continuousPlay } = useAnnotations(); // User interactions
+  const { continuousPlay } = useAnnotationOptions(); // User interactions
   const { setContinuousPlay } = usePlaybackControls(); // Stable functions
   // NO re-renders during 60fps animation!
 };
@@ -1128,7 +1128,7 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useAudioTracks` - Declarative track loading (configs-driven)
 - `useClipDragHandlers` - Clip drag-to-move and boundary trimming (delegates to engine, wraps drags in transactions for undo)
 - `useClipSplitting` - Split clips at playhead (delegates to engine)
-- `useAnnotationDragHandlers` - Annotation drag logic
+- `useAnnotationDragHandlers` - Annotation edge drag logic (called by `WaveformAnnotationBoxes`; exported for a custom row of boxes)
 - `useAnnotationKeyboardControls` - Annotation navigation & editing
 - `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
@@ -1171,9 +1171,11 @@ const [currentTime, setCurrentTime] = useState(0);
 // ActiveAnnotationContext
 const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
-// PlaylistAnnotationsContext
-const [continuousPlay, setContinuousPlay] = useState(false);
-const [annotations, setAnnotations] = useState<AnnotationData[]>([]);
+// AnnotationsContext: the annotations come from the `annotationList` prop, not from state
+// AnnotationOptionsContext (providerInternals/useAnnotationState.ts): state that follows the prop
+const [editable, setAnnotationsEditable] = useFollowedOption(annotationList?.editable);
+const [linkEndpoints, setLinkEndpoints] = useFollowedOption(annotationList?.linkEndpoints);
+const [continuousPlay, setContinuousPlay] = useFollowedOption(annotationList?.isContinuousPlay);
 
 // SelectionContext (mirrored from the engine by useSelectionState)
 const [selectionStart, setSelectionStart] = useState(0);
@@ -1189,7 +1191,8 @@ Access contexts using specialized hooks:
 ```typescript
 const { isPlaying } = useIsPlaying();
 const { currentTimeRef } = usePlaybackRefs();
-const { continuousPlay, annotations } = useAnnotations();
+const { annotations } = useAnnotations();
+const { continuousPlay } = useAnnotationOptions();
 const { selectionStart, selectionEnd } = useSelection();
 const { currentTime } = useCurrentTime();
 const { activeAnnotationId } = useActiveAnnotation();

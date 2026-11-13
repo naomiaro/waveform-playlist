@@ -1,15 +1,15 @@
 # @waveform-playlist/annotations
 
-Time-synchronized text annotations for waveform-playlist — mark up an audio timeline with draggable, editable regions for transcripts, podcast chapters, cue points, or music markers.
+Time-synchronized text annotations for waveform-playlist — mark up an audio timeline with editable regions for transcripts, podcast chapters, cue points, or music markers.
 
-Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform-playlist/browser): wrap your playlist in `AnnotationProvider` and pass `annotationList` to `WaveformPlaylistProvider` — `<Waveform />` then renders annotation boxes and text automatically.
+Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform-playlist/browser): render `AnnotationProvider` above the view and pass `annotationList` to `WaveformPlaylistProvider` or `MediaElementPlaylistProvider`. `<Waveform />` and `<MediaElementWaveform />` then render the annotation boxes and the annotation text list. To give either one an option, compose the view with `<WaveformAnnotationBoxes>` and `<AnnotationList>` from `@waveform-playlist/browser`.
 
 ## Features
 
-- **Timeline annotation boxes** — draggable regions overlaid on the waveform, with boundary resize handles
-- **Editable text list** — a scrollable, auto-scrolling list of annotation text synced to playback
-- **Drag-to-edit boundaries** — resize annotation start/end by dragging, with optional linked endpoints so adjacent segments stay contiguous
-- **Continuous play mode** — automatically advance to the next annotation during playback
+- **Timeline annotation boxes** — a row of boxes under the waveform, with a drag handle on each edge while annotations are editable. A click on a box plays its annotation
+- **Editable text list** — a scrollable list of annotation text that follows playback. A click on a row plays its annotation
+- **Drag-to-edit boundaries** — move an annotation's start or end by dragging the edge of its box, with optional linked endpoints so adjacent segments stay contiguous. `<WaveformAnnotationBoxes>` wires the drag itself
+- **Continuous play mode** — off: playing an annotation stops at its end; on: playback runs on through the following annotations
 - **Aeneas import/export** — `parseAeneas` / `serializeAeneas` for the Aeneas forced-alignment JSON format
 - **Prebuilt controls** — checkboxes for continuous play, linked endpoints, editable mode, and a JSON download button
 - **Composable building blocks** — use `AnnotationsTrack`, `AnnotationBox`, `AnnotationBoxesWrapper`, and `AnnotationText` directly for custom annotation UIs
@@ -44,11 +44,7 @@ function AnnotatedPlaylist() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
-      annotationList={{
-        annotations,
-        editable: true,
-        linkEndpoints: false,
-      }}
+      annotationList={{ annotations, editable: true }}
       onAnnotationsChange={setAnnotations} // required for edits to persist
     >
       <AnnotationProvider>
@@ -71,20 +67,44 @@ interface AnnotationData {
 }
 ```
 
-For building a custom UI outside the integrated `<Waveform />` pattern, use `useAnnotationControls` plus the standalone components directly:
+`annotationList` also takes `linkEndpoints` and `isContinuousPlay`. The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop. Read them with `useAnnotationOptions()` and change them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from `usePlaybackControls()`, or render the checkboxes that `@waveform-playlist/browser` exports:
 
 ```tsx
 import {
-  useAnnotationControls,
+  WaveformRoot,
+  WaveformTimescale,
+  WaveformTracks,
+  WaveformAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+  AnnotationList,
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
   EditableCheckbox,
   DownloadAnnotationsButton,
-} from '@waveform-playlist/annotations';
+} from '@waveform-playlist/browser';
 
-const { continuousPlay, linkEndpoints, setContinuousPlay, setLinkEndpoints } =
-  useAnnotationControls();
+// Under either provider, inside <AnnotationProvider>:
+<ContinuousPlayCheckbox />
+<LinkEndpointsCheckbox />
+<EditableCheckbox />
+<DownloadAnnotationsButton />
+
+<WaveformRoot>
+  <WaveformTimescale />
+  <WaveformTracks />
+  <WaveformAnnotationBoxes height={30} />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
+<AnnotationList height={300} />
 ```
+
+Without `AnnotationProvider` the boxes and the list draw nothing, and the checkboxes and the download button throw.
+
+The components this package exports under the same names (`ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `DownloadAnnotationsButton`) are the controlled forms, with `checked` / `onChange` or `annotations` props. They, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper` and `useAnnotationControls` (two booleans of state and the boundary function of `@waveform-playlist/core`; not connected to the provider) are for an annotation UI that does not go through a playlist provider.
+
+`parseAeneas(fragment)` converts one Aeneas fragment to one annotation, and `serializeAeneas(annotation)` converts one back: `fragments.map(parseAeneas)`.
 
 ## Examples & Documentation
 

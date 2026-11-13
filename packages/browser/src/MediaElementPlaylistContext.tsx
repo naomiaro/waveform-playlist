@@ -19,7 +19,10 @@ import type { PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
 import { followAnnotations } from './providerInternals/followAnnotations';
-import { useAnnotationState } from './providerInternals/useAnnotationState';
+import {
+  useAnnotationState,
+  type AnnotationListProp,
+} from './providerInternals/useAnnotationState';
 import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useViewDefaults } from './providerInternals/useViewDefaults';
@@ -28,7 +31,7 @@ import { useShallowStable } from './hooks/useShallowStable';
 import {
   BLOCKED,
   ActiveAnnotationContext,
-  AnnotationEditingContext,
+  AnnotationOptionsContext,
   AnnotationsContext,
   CurrentTimeContext,
   EditorControlsContext,
@@ -51,7 +54,6 @@ import {
   TrackReorderPreviewContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
-  type AnnotationsContextValue,
   type CurrentTimeContextValue,
   type IsPlayingContextValue,
   type MediaElementTrackContextValue,
@@ -101,11 +103,13 @@ export interface MediaElementPlaylistProviderProps {
   automaticScroll?: boolean;
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
-  /** Annotations */
-  annotationList?: {
-    annotations?: AnnotationData[];
-    isContinuousPlay?: boolean;
-  };
+  /**
+   * The annotations and the three annotation options (`editable`,
+   * `linkEndpoints`, `isContinuousPlay`). The provider follows all four: an
+   * option takes a new value of its field, and a setter or checkbox changes
+   * it in between.
+   */
+  annotationList?: AnnotationListProp;
   /** Width of waveform bars */
   barWidth?: number;
   /** Gap between waveform bars */
@@ -229,7 +233,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
-    annotations,
     annotationsRef,
     annotationLookup,
     setAnnotations,
@@ -237,9 +240,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     activeAnnotationId,
     activeAnnotationIdRef,
     setActiveAnnotationId,
-    continuousPlay,
     continuousPlayRef,
     setContinuousPlay,
+    setAnnotationsEditable,
+    setLinkEndpoints,
+    annotationsValue,
+    annotationOptionsValue,
   } = useAnnotationState({
     annotationList,
     onAnnotationsChange,
@@ -854,10 +860,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     () => ({ activeAnnotationId }),
     [activeAnnotationId]
   );
-  const annotationsValue: AnnotationsContextValue = useMemo(
-    () => ({ annotations, continuousPlay }),
-    [annotations, continuousPlay]
-  );
   const settingsValue: PlaylistSettingsContextValue = useMemo(
     () => ({ timeFormat, isAutomaticScroll }),
     [timeFormat, isAutomaticScroll]
@@ -875,6 +877,25 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [registerFrameCallback, unregisterFrameCallback]
   );
 
+  // What a click on an annotation does (#686). An open-ended play: where it
+  // ends (the annotation's end, or not at all with continuous play) is the
+  // animation loop's job, which follows the option and the annotation as they
+  // are at that moment. Never changes.
+  const playAnnotation = useCallback(
+    (annotation: AnnotationData) => {
+      setActiveAnnotationId(annotation.id);
+      play(annotation.start).catch((err) => {
+        console.warn(
+          '[waveform-playlist] Failed to start playback for annotation ' +
+            annotation.id +
+            ': ' +
+            String(err)
+        );
+      });
+    },
+    [play, setActiveAnnotationId]
+  );
+
   // Never changes.
   const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
@@ -888,9 +909,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setScrollContainer,
       scrollContainerRef,
       setContinuousPlay,
+      setAnnotationsEditable,
+      setLinkEndpoints,
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     }),
     [
       play,
@@ -903,9 +927,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setScrollContainer,
       scrollContainerRef,
       setContinuousPlay,
+      setAnnotationsEditable,
+      setLinkEndpoints,
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
+      playAnnotation,
     ]
   );
 
@@ -954,7 +981,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     <ThemeProvider theme={mergedTheme}>
       <EditorControlsContext.Provider value={BLOCKED}>
         <EngineRefsContext.Provider value={BLOCKED}>
-          <AnnotationEditingContext.Provider value={BLOCKED}>
+          <AnnotationOptionsContext.Provider value={annotationOptionsValue}>
             <LoopContext.Provider value={BLOCKED}>
               <SelectedTrackIdContext.Provider value={BLOCKED}>
                 <UndoRedoContext.Provider value={BLOCKED}>
@@ -998,7 +1025,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
                 </UndoRedoContext.Provider>
               </SelectedTrackIdContext.Provider>
             </LoopContext.Provider>
-          </AnnotationEditingContext.Provider>
+          </AnnotationOptionsContext.Provider>
         </EngineRefsContext.Provider>
       </EditorControlsContext.Provider>
     </ThemeProvider>

@@ -75,6 +75,10 @@ vi.mock('../components/AnnotationBoxes', async (importOriginal) => {
   };
 });
 
+import {
+  AnnotationIntegrationContext,
+  type AnnotationIntegration,
+} from '../AnnotationIntegrationContext';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
   useEditorControls,
@@ -200,6 +204,11 @@ function resetCounts() {
   counts.layout = 0;
 }
 
+const INTEGRATION = {
+  AnnotationBox: () => null,
+  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+} as unknown as AnnotationIntegration;
+
 async function mount(reset = true) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -208,15 +217,19 @@ async function mount(reset = true) {
   // A new `<ComposedWaveform />` element on every call, with the same
   // (no) props: what a parent's re-render hands it.
   const ui = () => (
-    <WaveformPlaylistProvider
-      tracks={TRACKS}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-      annotationList={ANNOTATION_LIST}
-    >
-      <ProbeChild />
-      <ComposedWaveform />
-    </WaveformPlaylistProvider>
+    // The annotation components: without them the box part draws nothing
+    // (#686), and "the boxes did not render" below would say nothing.
+    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+      <WaveformPlaylistProvider
+        tracks={TRACKS}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={createAdapter}
+        annotationList={ANNOTATION_LIST}
+      >
+        <ProbeChild />
+        <ComposedWaveform />
+      </WaveformPlaylistProvider>
+    </AnnotationIntegrationContext.Provider>
   );
   const utils = render(ui());
   await waitFor(() => expect(probe.isReady).toBe(true));
