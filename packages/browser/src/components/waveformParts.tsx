@@ -121,7 +121,8 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
       // Every child keeps one position in the tracks area, also one that is
       // drawn elsewhere or not at all (`{flag && <Part />}`): the parts after
       // it are then not remounted when it comes or goes.
-      sorted.content.push(typeof child === 'boolean' ? null : child);
+      // (`Children.forEach` already hands over `null` for `false` and `undefined`.)
+      sorted.content.push(child);
     });
   };
   visit(children);

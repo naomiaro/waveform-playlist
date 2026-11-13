@@ -459,7 +459,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
               scrollContainerRef={handleScrollContainerRef}
               isSelecting={isSelecting}
               data-playlist-state={isReady ? 'ready' : 'loading'}
-              trackControlsSlots={controls.show ? parts.controls : undefined}
+              trackControlsSlots={parts.controls}
               timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
               timescale={timeScaleHeight > 0 && parts.timescale ? parts.timescale : undefined}
             >
