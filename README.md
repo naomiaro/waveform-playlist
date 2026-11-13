@@ -84,9 +84,9 @@ function App() {
 ## Documentation
 
 - [**Live Examples**](https://naomiaro.github.io/waveform-playlist/examples/stem-tracks) - Interactive demos
-- [**Getting Started**](https://naomiaro.github.io/waveform-playlist/docs/getting-started/installation) - Installation and basic usage
-- [**Guides**](https://naomiaro.github.io/waveform-playlist/docs/guides/loading-audio) - In-depth tutorials
-- [**API Reference**](https://naomiaro.github.io/waveform-playlist/docs/api/provider) - Component and hook documentation
+- [**Getting Started**](https://naomiaro.github.io/waveform-playlist/docs/react/getting-started/installation) - Installation and basic usage
+- [**Guides**](https://naomiaro.github.io/waveform-playlist/docs/react/guides/loading-audio) - In-depth tutorials
+- [**API Reference**](https://naomiaro.github.io/waveform-playlist/docs/react/api/components) - Component and hook documentation
 
 ## Community
 
@@ -133,7 +133,7 @@ function App() {
 |---------|-------------|
 | `@waveform-playlist/midi` | React `useMidiTracks` hook + piano roll visualization with SoundFont/PolySynth playback. Re-exports the parser from `@dawcore/midi`. |
 | `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
-| `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/docs/guides/recording#audioworklet-setup)) |
+| `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/docs/react/guides/recording#audioworklet-setup)) |
 | `@waveform-playlist/worklets` | Shared AudioWorklet processors for metering and recording (auto-installed with recording) |
 | `@waveform-playlist/spectrogram` | React `SpectrogramProvider` + UI (menu items, settings modal). Computation/worker/orchestrator are imported from `@dawcore/spectrogram`. |
 | `@waveform-playlist/media-element-playout` | HTMLMediaElement-based playout with pitch-preserving playback rate |
