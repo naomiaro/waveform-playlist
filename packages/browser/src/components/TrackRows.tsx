@@ -1,7 +1,7 @@
 import React, {
   createContext,
   useCallback,
-  useContext,
+  use,
   useMemo,
   useSyncExternalStore,
   type ReactNode,
@@ -110,7 +110,7 @@ const ClipView = React.memo(function ClipView({
     selectTrack,
     registerSpectrogramCanvas,
     unregisterSpectrogramCanvas,
-  } = useContext(ClipDisplayContext) as ClipDisplayValue;
+  } = use(ClipDisplayContext) as ClipDisplayValue;
   // The one source of both options (#690): set by `ClipInteractionProvider`
   // or `ClipInteractionOptions` above, never passed down as props.
   const { enabled: interactiveClips, touchOptimized } = useClipInteraction();
@@ -506,8 +506,8 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
   // Published by the root from `<WaveformViewOptions>` (#689).
   const { waveHeight } = usePlaylistInfo();
   const { samplesPerPixel } = usePlaylistZoom();
-  const spectrogram = useContext(SpectrogramIntegrationContext);
-  const rootSeesRecordingPreview = useContext(RootSeesRecordingPreviewContext);
+  const spectrogram = use(SpectrogramIntegrationContext);
+  const rootSeesRecordingPreview = use(RootSeesRecordingPreviewContext);
   const scanned = scanTracksParts(children);
   const { showFades, recordingState } = scanned;
   const {
@@ -551,7 +551,7 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
   );
 
   return (
-    <ClipDisplayContext.Provider value={clipDisplay}>
+    <ClipDisplayContext value={clipDisplay}>
       <TracksLayout $height={trackLayout.totalHeight}>
         {peaksDataArray.map((trackClipPeaks, trackIndex) => {
           const track = rowList[trackIndex];
@@ -588,6 +588,6 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
           );
         })}
       </TracksLayout>
-    </ClipDisplayContext.Provider>
+    </ClipDisplayContext>
   );
 };

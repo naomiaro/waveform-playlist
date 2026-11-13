@@ -1918,57 +1918,51 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // `usePlaybackRate()` must not reach a MediaElement provider further out.
   return (
     <ThemeProvider theme={mergedTheme}>
-      <PlaybackRateContext.Provider value={BLOCKED}>
-        <MediaElementTrackContext.Provider value={BLOCKED}>
-          <PlaybackRefsContext.Provider value={refsValue}>
-            <EngineRefsContext.Provider value={engineRefsValue}>
-              <PlaybackControlsContext.Provider value={controlsValue}>
-                <EditorControlsContext.Provider value={editorControlsValue}>
-                  <PlaylistViewContext.Provider value={viewValue}>
-                    <PlaylistSettingsContext.Provider value={settingsValue}>
-                      <PlaylistZoomContext.Provider value={zoomValue}>
-                        <UndoRedoContext.Provider value={undoRedoValue}>
-                          <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
-                            <SelectedRowContext.Provider value={selectedTrackIdValue}>
-                              <LoopContext.Provider value={loopValue}>
-                                <AnnotationOptionsContext.Provider value={annotationOptionsValue}>
-                                  <AnnotationsContext.Provider value={annotationsValue}>
-                                    <IsPlayingContext.Provider value={isPlayingValue}>
-                                      <ActiveAnnotationContext.Provider
-                                        value={activeAnnotationValue}
-                                      >
-                                        <CurrentTimeContext.Provider value={currentTimeValue}>
-                                          <SelectionContext.Provider value={selectionValue}>
-                                            <TrackReorderPreviewContext.Provider
-                                              value={reorderPreviewValue}
-                                            >
-                                              <PlaylistMixerContext.Provider value={mixerValue}>
-                                                <PlaylistTimelineContext.Provider
-                                                  value={timelineValue}
-                                                >
+      <PlaybackRateContext value={BLOCKED}>
+        <MediaElementTrackContext value={BLOCKED}>
+          <PlaybackRefsContext value={refsValue}>
+            <EngineRefsContext value={engineRefsValue}>
+              <PlaybackControlsContext value={controlsValue}>
+                <EditorControlsContext value={editorControlsValue}>
+                  <PlaylistViewContext value={viewValue}>
+                    <PlaylistSettingsContext value={settingsValue}>
+                      <PlaylistZoomContext value={zoomValue}>
+                        <UndoRedoContext value={undoRedoValue}>
+                          <SelectedTrackIdContext value={selectedTrackIdValue}>
+                            <SelectedRowContext value={selectedTrackIdValue}>
+                              <LoopContext value={loopValue}>
+                                <AnnotationOptionsContext value={annotationOptionsValue}>
+                                  <AnnotationsContext value={annotationsValue}>
+                                    <IsPlayingContext value={isPlayingValue}>
+                                      <ActiveAnnotationContext value={activeAnnotationValue}>
+                                        <CurrentTimeContext value={currentTimeValue}>
+                                          <SelectionContext value={selectionValue}>
+                                            <TrackReorderPreviewContext value={reorderPreviewValue}>
+                                              <PlaylistMixerContext value={mixerValue}>
+                                                <PlaylistTimelineContext value={timelineValue}>
                                                   {children}
-                                                </PlaylistTimelineContext.Provider>
-                                              </PlaylistMixerContext.Provider>
-                                            </TrackReorderPreviewContext.Provider>
-                                          </SelectionContext.Provider>
-                                        </CurrentTimeContext.Provider>
-                                      </ActiveAnnotationContext.Provider>
-                                    </IsPlayingContext.Provider>
-                                  </AnnotationsContext.Provider>
-                                </AnnotationOptionsContext.Provider>
-                              </LoopContext.Provider>
-                            </SelectedRowContext.Provider>
-                          </SelectedTrackIdContext.Provider>
-                        </UndoRedoContext.Provider>
-                      </PlaylistZoomContext.Provider>
-                    </PlaylistSettingsContext.Provider>
-                  </PlaylistViewContext.Provider>
-                </EditorControlsContext.Provider>
-              </PlaybackControlsContext.Provider>
-            </EngineRefsContext.Provider>
-          </PlaybackRefsContext.Provider>
-        </MediaElementTrackContext.Provider>
-      </PlaybackRateContext.Provider>
+                                                </PlaylistTimelineContext>
+                                              </PlaylistMixerContext>
+                                            </TrackReorderPreviewContext>
+                                          </SelectionContext>
+                                        </CurrentTimeContext>
+                                      </ActiveAnnotationContext>
+                                    </IsPlayingContext>
+                                  </AnnotationsContext>
+                                </AnnotationOptionsContext>
+                              </LoopContext>
+                            </SelectedRowContext>
+                          </SelectedTrackIdContext>
+                        </UndoRedoContext>
+                      </PlaylistZoomContext>
+                    </PlaylistSettingsContext>
+                  </PlaylistViewContext>
+                </EditorControlsContext>
+              </PlaybackControlsContext>
+            </EngineRefsContext>
+          </PlaybackRefsContext>
+        </MediaElementTrackContext>
+      </PlaybackRateContext>
     </ThemeProvider>
   );
 };

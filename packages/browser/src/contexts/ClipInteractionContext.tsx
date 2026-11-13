@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo } from 'react';
+import React, { createContext, use, useMemo } from 'react';
 
 /** What the clips below are told about interaction. */
 export interface ClipInteractionContextValue {
@@ -41,23 +41,21 @@ export const ClipInteractionOptions: React.FC<ClipInteractionOptionsProps> = ({
   touchOptimized: touchOptimizedProp,
   children,
 }) => {
-  const inherited = useContext(ClipInteractionContext);
+  const inherited = use(ClipInteractionContext);
   const enabled = enabledProp ?? inherited.enabled;
   const touchOptimized = touchOptimizedProp ?? inherited.touchOptimized;
   // Two booleans in, one object out: the value changes only when one of them
   // does, however often the parent renders.
   const value = useMemo(() => ({ enabled, touchOptimized }), [enabled, touchOptimized]);
-  return (
-    <ClipInteractionContext.Provider value={value}>{children}</ClipInteractionContext.Provider>
-  );
+  return <ClipInteractionContext value={value}>{children}</ClipInteractionContext>;
 };
 
 /** The options for the clip that calls it. */
 export function useClipInteraction(): ClipInteractionContextValue {
-  return useContext(ClipInteractionContext);
+  return use(ClipInteractionContext);
 }
 
 /** True when clips here can be dragged and trimmed. */
 export function useClipInteractionEnabled(): boolean {
-  return useContext(ClipInteractionContext).enabled;
+  return use(ClipInteractionContext).enabled;
 }

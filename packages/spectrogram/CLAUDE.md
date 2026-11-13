@@ -22,8 +22,8 @@
 const integration = useSpectrogramIntegration();
 
 // Internal components that render with or without spectrograms
-// use useContext(SpectrogramIntegrationContext) directly to get null when absent
-const spectrogram = useContext(SpectrogramIntegrationContext);
+// read use(SpectrogramIntegrationContext) directly to get null when absent
+const spectrogram = use(SpectrogramIntegrationContext);
 ```
 
 **Location:** `packages/browser/src/SpectrogramIntegrationContext.tsx`

@@ -45,11 +45,11 @@ const Slot: React.FC = () => {
   }).current;
   return (
     <div ref={elementRef} data-slot="">
-      <TrackSlotWiringContext.Provider value={wiring}>
-        <TrackContext.Provider value={TRACK}>
+      <TrackSlotWiringContext value={wiring}>
+        <TrackContext value={TRACK}>
           <Grip />
-        </TrackContext.Provider>
-      </TrackSlotWiringContext.Provider>
+        </TrackContext>
+      </TrackSlotWiringContext>
     </div>
   );
 };

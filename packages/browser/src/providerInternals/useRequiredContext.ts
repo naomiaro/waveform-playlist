@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { use } from 'react';
 
 /** The value of a provider's context, or a throw that names the hook and the provider. */
 export function useRequiredContext<T>(
@@ -6,7 +6,7 @@ export function useRequiredContext<T>(
   hookName: string,
   providerName: string
 ): T {
-  const value = useContext(context);
+  const value = use(context);
   if (!value) {
     throw new Error(`${hookName} must be used within ${providerName}`);
   }

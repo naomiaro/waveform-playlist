@@ -1,6 +1,6 @@
 import React, {
   createContext,
-  useContext,
+  use,
   useEffect,
   useLayoutEffect,
   useCallback,
@@ -164,7 +164,7 @@ export const ScrollViewportProvider = ({ containerRef, children }: ScrollViewpor
     };
   }, [containerRef, scheduleUpdate, store]);
 
-  return <ViewportStoreContext.Provider value={store}>{children}</ViewportStoreContext.Provider>;
+  return <ViewportStoreContext value={store}>{children}</ViewportStoreContext>;
 };
 
 /**
@@ -172,7 +172,7 @@ export const ScrollViewportProvider = ({ containerRef, children }: ScrollViewpor
  * Use useScrollViewportSelector() instead when you only need derived state.
  */
 export const useScrollViewport = (): ScrollViewport | null => {
-  const store = useContext(ViewportStoreContext);
+  const store = use(ViewportStoreContext);
   return useSyncExternalStore(
     store ? store.subscribe : EMPTY_SUBSCRIBE,
     store ? store.getSnapshot : NULL_SNAPSHOT,
@@ -189,7 +189,7 @@ export const useScrollViewport = (): ScrollViewport | null => {
  * the set of visible chunks actually changes, not on every scroll update.
  */
 export function useScrollViewportSelector<T>(selector: (viewport: ScrollViewport | null) => T): T {
-  const store = useContext(ViewportStoreContext);
+  const store = use(ViewportStoreContext);
   return useSyncExternalStore(
     store ? store.subscribe : EMPTY_SUBSCRIBE,
     () => selector(store ? store.getSnapshot() : null),

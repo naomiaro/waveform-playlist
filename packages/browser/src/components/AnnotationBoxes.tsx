@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { use } from 'react';
 import {
   AnnotationIntegrationContext,
   type AnnotationBoxIntegrationProps,
@@ -92,7 +92,7 @@ export const AnnotationBoxes: React.FC<AnnotationBoxesProps> = ({
   getLabel,
   onSelect,
 }) => {
-  const annotationIntegration = useContext(AnnotationIntegrationContext);
+  const annotationIntegration = use(AnnotationIntegrationContext);
 
   if (annotations.length === 0 || !annotationIntegration) return null;
 

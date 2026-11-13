@@ -113,7 +113,7 @@ async function mount() {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   render(
-    <AnnotationIntegrationContext.Provider value={INTEGRATION}>
+    <AnnotationIntegrationContext value={INTEGRATION}>
       <WaveformPlaylistProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
@@ -123,7 +123,7 @@ async function mount() {
         <ProbeChild />
         <AnnotationList />
       </WaveformPlaylistProvider>
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   await waitFor(() => expect(probe.data.isReady).toBe(true));
   await act(async () => {});

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 import type {
   SpectrogramConfig,
   ColorMapValue,
@@ -54,7 +54,7 @@ export const SpectrogramIntegrationProvider = SpectrogramIntegrationContext.Prov
  * https://kentcdodds.com/blog/how-to-use-react-context-effectively
  */
 export function useSpectrogramIntegration(): SpectrogramIntegration {
-  const context = useContext(SpectrogramIntegrationContext);
+  const context = use(SpectrogramIntegrationContext);
   if (!context) {
     throw new Error(
       'useSpectrogramIntegration must be used within <SpectrogramProvider>. ' +

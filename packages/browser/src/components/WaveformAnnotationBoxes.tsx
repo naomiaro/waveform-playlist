@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { use } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
@@ -64,7 +64,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   // lyric sheet), on an empty timeline or past the end of a take (maintainer's
   // choice, #686). Under the MediaElement root the two lengths are the same.
   const { tracksFullWidth: width, displayDuration } = useWaveformExtent('The annotation boxes');
-  const integration = useContext(AnnotationIntegrationContext);
+  const integration = use(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();

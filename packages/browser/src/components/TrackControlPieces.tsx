@@ -4,7 +4,7 @@
  * and is drawn by being rendered among the children of
  * `<WaveformTrackControls>`.
  */
-import React, { useContext } from 'react';
+import React, { use } from 'react';
 import {
   Button,
   CloseButton,
@@ -114,7 +114,7 @@ export const TrackPanSlider: React.FC = () => {
  */
 export const TrackMenuButton: React.FC = () => {
   const { renderMode, hasSpectrogram, setRenderMode, openSpectrogramSettings } = useTrack();
-  const shared = useContext(TrackControlsSharedContext);
+  const shared = use(TrackControlsSharedContext);
   if (!shared || !shared.menuAvailable || !hasSpectrogram) return null;
   return (
     <TrackMenu

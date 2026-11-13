@@ -290,7 +290,7 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
     ready = true;
   };
   const tree = (content: React.ReactNode, annotationList: AnnotationListProp = firstList) => (
-    <AnnotationIntegrationContext.Provider value={integration}>
+    <AnnotationIntegrationContext value={integration}>
       {kind === 'WaveformPlaylistProvider' ? (
         <WaveformPlaylistProvider
           tracks={options.tracks ?? TRACKS}
@@ -318,7 +318,7 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
           {content}
         </MediaElementPlaylistProvider>
       )}
-    </AnnotationIntegrationContext.Provider>
+    </AnnotationIntegrationContext>
   );
   const view = render(tree(children));
   await waitFor(() =>
@@ -831,9 +831,9 @@ describe('how far the edge of an annotation can be dragged (#686)', () => {
     // its container, a take being recorded): given through the extent.
     await mount(
       'WaveformPlaylistProvider',
-      <WaveformExtentContext.Provider value={{ displayDuration: 60, tracksFullWidth: 3000 }}>
+      <WaveformExtentContext value={{ displayDuration: 60, tracksFullWidth: 3000 }}>
         <WaveformAnnotationBoxes />
-      </WaveformExtentContext.Provider>
+      </WaveformExtentContext>
     );
     expect(lastWrapper().width).toBe(3000);
     expect(lastDrag().duration).toBe(60);

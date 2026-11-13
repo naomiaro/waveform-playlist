@@ -1,4 +1,4 @@
-import React, { useContext, useMemo } from 'react';
+import React, { use, useMemo } from 'react';
 import type { AnnotationAction, RenderAnnotationItemProps } from '@waveform-playlist/core';
 import { AnnotationIntegrationContext } from '../AnnotationIntegrationContext';
 import {
@@ -60,7 +60,7 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
   scrollActiveContainer = 'nearest',
   children,
 }) => {
-  const integration = useContext(AnnotationIntegrationContext);
+  const integration = use(AnnotationIntegrationContext);
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();

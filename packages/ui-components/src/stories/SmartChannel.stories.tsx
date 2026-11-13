@@ -42,9 +42,9 @@ const meta: Meta<typeof SmartChannel> = {
   decorators: [
     (Story) => (
       <DevicePixelRatioProvider>
-        <PlaylistInfoContext.Provider value={playlistInfo}>
+        <PlaylistInfoContext value={playlistInfo}>
           <Story />
-        </PlaylistInfoContext.Provider>
+        </PlaylistInfoContext>
       </DevicePixelRatioProvider>
     ),
   ],

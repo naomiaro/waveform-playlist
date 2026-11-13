@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import React, { use, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
 import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { warnMisplacedPart } from './partWarnings';
@@ -112,7 +112,7 @@ function TrackControlsSlotImpl({
     setSelectedTrackId,
   } = useEditorControls();
   const theme = useTheme() as WaveformPlaylistTheme;
-  const shared = useContext(TrackControlsSharedContext);
+  const shared = use(TrackControlsSharedContext);
 
   // The position is read when an action runs, so the actions do not change
   // with it.
@@ -214,9 +214,9 @@ function TrackControlsSlotImpl({
             : SLOT_BODY_STYLE
         }
       >
-        <TrackSlotWiringContext.Provider value={wiring}>
-          <TrackContext.Provider value={value}>{template}</TrackContext.Provider>
-        </TrackSlotWiringContext.Provider>
+        <TrackSlotWiringContext value={wiring}>
+          <TrackContext value={value}>{template}</TrackContext>
+        </TrackSlotWiringContext>
       </div>
     </ControlSlot>
   );
@@ -247,7 +247,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
     animateTrackLayout,
     setSettingsModalTrackId,
   } = useWaveformRows('The track controls');
-  if (useContext(WaveformPartPlaceContext) !== 'controls') {
+  if (use(WaveformPartPlaceContext) !== 'controls') {
     warnMisplacedPart(
       '<WaveformTrackControls> is drawn among the tracks, not in the controls column: the root ' +
         'recognises a part by its element type, so it must be a child of the root (a fragment ' +
@@ -256,7 +256,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   }
   const { selectedTrackId } = useSelectedTrackId();
   const { trackReorderEpoch } = useTrackReorderPreview();
-  const spectrogram = useContext(SpectrogramIntegrationContext);
+  const spectrogram = use(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
 
   // `null` and `undefined` both mean "not given".
@@ -282,7 +282,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   );
 
   return (
-    <TrackControlsSharedContext.Provider value={shared}>
+    <TrackControlsSharedContext value={shared}>
       <TracksLayout $height={trackLayout.totalHeight}>
         {tracks.map((track, trackIndex) => {
           // No mixer state yet means the provider is still loading this
@@ -319,7 +319,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
           );
         })}
       </TracksLayout>
-    </TrackControlsSharedContext.Provider>
+    </TrackControlsSharedContext>
   );
 }
 
