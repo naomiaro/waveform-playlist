@@ -29,7 +29,7 @@ export interface TrackControlsPartProps {
  * (#685).
  *
  * Memoized (#693), with only its own three options as props: it takes the
- * tracks and the layout from the root's rows value, reads the selected track
+ * rows and the layout from the root's rows value, reads the selected track
  * itself, and no time selection,
  * cursor or annotation state, so a selection drag or an active-annotation
  * change during playback does not re-render the panels. It reads the mixer

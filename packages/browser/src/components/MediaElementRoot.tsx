@@ -38,8 +38,8 @@ export interface MediaElementRootProps {
  * audio; there is one row, empty when its peaks could not be extracted) and hands it to
  * the shared frame. The parts are the multitrack view's.
  *
- * It renders on what the frame follows (a drag in progress, play and stop, the
- * view settings, the theme), when the track or its peaks change, when the
+ * It renders on what the frame follows (a drag in progress, play and stop, a
+ * zoom, the view settings, the theme), when the track or its peaks change, when the
  * player becomes ready, and whenever the component that composes it renders.
  * The root's render never renders a part; a part renders when a value it
  * reads changes. See `WaveformRoot`.

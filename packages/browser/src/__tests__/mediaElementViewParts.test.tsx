@@ -540,7 +540,7 @@ describe('the root renders alone', () => {
     expect(calls).toBe(0);
   });
 
-  it('an edge drag of an annotation is bounded by the length of the audio', async () => {
+  it('the annotation drag handlers are given the length of the audio as their bound', async () => {
     dragOptions.durations = [];
     await mount({
       provider: {

@@ -4,7 +4,7 @@
  *
  * Two values, by what changes them. The extent changes with the timeline's
  * length and the zoom; the rows value changes with every clip edit (it holds
- * the tracks and their peaks, and the row heights follow from them). The timescale, the loop region and the
+ * one `{ id, kind }` per track and their peaks, and the row heights follow from them). The timescale, the loop region and the
  * annotation row read the extent only, so a trim that leaves the length alone
  * does not render them.
  */
