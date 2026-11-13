@@ -1548,7 +1548,19 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 Without it a punch-in plays the armed track's old audio under the take, and a take on an empty timeline stops playback at once. The type of the `recordingState` prop is exported as `WaveformRecordingState`.
 
-**7. `usePlaylistView()`.** Delete reads of `timeScaleHeight` and `controls`. The ruler's strip is 30 px tall when a root has a `<WaveformTimescale>` or a `<WaveformLoopRegion>`; the width of the controls column is the `width` you gave `<WaveformTrackControls>`.
+**7. `usePlaylistView()`.** Search for `controls` and `timeScaleHeight` next to `usePlaylistView()` (also a destructuring: `const { sampleRate, controls } = usePlaylistView()`), and replace each read. The fields are `undefined` now, so `controls.show` throws at the moment the code runs, which may be inside an effect or a handler and not on first render.
+
+- The width of the controls column is the `width` you gave `<WaveformTrackControls>` (200 without one). Code that needs the number (scroll arithmetic, a layout beside the playlist) keeps it in a constant and passes the same constant to the part:
+
+  ```tsx
+  const TRACK_CONTROLS_WIDTH = 200;
+
+  <WaveformTrackControls width={TRACK_CONTROLS_WIDTH} />;
+  // was: const controlWidth = controls.show ? controls.width : 0;
+  const controlWidth = TRACK_CONTROLS_WIDTH;
+  ```
+
+- The ruler's strip is 30 px tall when a root has a `<WaveformTimescale>` or a `<WaveformLoopRegion>`, and absent otherwise.
 
 ### Where a part must be
 
