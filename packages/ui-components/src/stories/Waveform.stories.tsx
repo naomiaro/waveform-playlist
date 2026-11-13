@@ -152,6 +152,29 @@ export const WithoutTimescale: Story = {
   },
 };
 
+export const Bare: Story = {
+  render: () => (
+    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
+      <div style={{ padding: '1rem' }}>
+        {/* Only the tracks, the selection and the playhead: no ruler, no controls column. */}
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </div>
+    </WaveformPlaylistProvider>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'The bare view: `<WaveformRoot>` with the tracks, the selection and the playhead, and neither `<WaveformTimescale />` nor `<WaveformTrackControls />`. A part is drawn because it is rendered.',
+      },
+    },
+  },
+};
+
 export const CustomTrackNames: Story = {
   render: () => {
     const tracks: ClipTrack[] = [
