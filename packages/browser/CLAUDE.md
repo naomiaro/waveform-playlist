@@ -674,7 +674,7 @@ Why: `setSelection` restarts a running play under both providers, so writing it 
 - **Readers of the selection see the OLD selection during a playing drag** (`SelectionTimeInputs`, `PlayButton`, `SetLoopRegionButton`): only the highlight previews.
 - **When playback stops or ends under the drag** the next move clears the preview and writes the selection live; the release then follows the stopped rules.
 - **`onEnd(null)`** (window blur, lost `mouseup`): the preview is dropped and nothing is committed; while stopped the selection stays as the last move left it.
-- The multitrack press still selects the row under the pointer during playback; it moves the cursor only while stopped.
+- The multitrack press still selects the row under the pointer during playback. It does not call `setCurrentTime` itself any more: while stopped the hook's `setSelection(t, t)` already writes the cursor (refs and state), which is all `setCurrentTime` does (a mutation run showed the extra call changed nothing).
 
 Tests: `selectionDragDuringPlayback.test.tsx` (the hook under hand-built contexts, 50 px per second; the highlight showing the preview), the drag cases in `mediaElementPlaybackSemantics.test.tsx` and `mediaElementSharedLoop.test.tsx`, and "Pressing and dragging on the tracks during playback" in `e2e/multi-clip.spec.ts` plus the two "during playback" tests in `e2e/media-element.spec.ts`. `probes/pressrelease793.cjs <port> <route> [auto]` prints where playback is at the press, while held, after a drag and after the release.
 

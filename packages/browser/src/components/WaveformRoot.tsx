@@ -301,8 +301,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   );
 
   // The selection drag (shared with the MediaElement view). The multitrack
-  // extras: a press selects the row under the pointer, and while stopped it
-  // also moves the cursor; a click while stopped moves the cursor only.
+  // extras: a press selects the row under the pointer, and a click while
+  // stopped moves the cursor only (the selection the press collapsed stays).
   const {
     isSelecting,
     handleMouseDown,
@@ -311,7 +311,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   } = useSelectionDrag({
     samplesPerPixel,
     sampleRate,
-    onPress: ({ time, offsetY, isPlaying: playing }) => {
+    onPress: ({ offsetY }) => {
       // The row under the pointer, from the layout the rows are positioned with.
       const clickedTrackId = trackIdAtOffset(
         displayOrderIds,
@@ -322,7 +322,6 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
       if (clickedTrackId !== null) {
         setSelectedTrackId(clickedTrackId);
       }
-      if (!playing) setCurrentTime(time);
     },
     onClickWhileStopped: setCurrentTime,
   });
