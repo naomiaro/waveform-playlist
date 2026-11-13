@@ -57,7 +57,9 @@ import type { PlayheadProps } from '@waveform-playlist/ui-components';
 
 const INTEGRATION = {
   AnnotationBox: ({ label }: { label: string }) => <span data-box>{label}</span>,
-  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AnnotationBoxesWrapper: ({ children, width }: { children?: React.ReactNode; width?: number }) => (
+    <div data-boxes-width={width}>{children}</div>
+  ),
   AnnotationText: () => null,
 } as unknown as AnnotationIntegration;
 
@@ -224,6 +226,9 @@ describe('the MediaElement view has the root of the multitrack view', () => {
     expect(row.getAttribute('data-track-id')).toBe('media-element-track-0');
     expect(row.getAttribute('data-track-kind')).toBe('audio');
     expect(row.getAttribute('data-selected')).toBe('true');
+    expect(row.hasAttribute('data-track-drag-source')).toBe(false);
+    // As tall as one channel: no clip header is drawn.
+    expect((row.parentElement as HTMLElement).style.height).toBe('100px');
     // The clip keeps the id it had.
     const clip = row.querySelector('[data-clip-container]') as HTMLElement;
     expect(clip.getAttribute('data-track-id')).toBe('media-element-track-0');
@@ -453,6 +458,9 @@ describe('the root renders alone', () => {
     // the root's timeline.
     expect(calls).toBeGreaterThan(0);
     expect(document.querySelector('[data-box]')!.textContent).toBe('x');
+    expect(document.querySelector('[data-boxes-width]')!.getAttribute('data-boxes-width')).toBe(
+      String(CLIP_WIDTH)
+    );
     calls = 0;
     await pressAndRelease(0);
     expect(calls).toBe(0);
