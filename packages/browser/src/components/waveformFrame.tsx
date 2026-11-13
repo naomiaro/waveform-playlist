@@ -117,7 +117,7 @@ export function useWaveformParts(children: ReactNode): WaveformPartsByPlace {
 
 export interface WaveformFrameOptions {
   className: string | undefined;
-  /** From `useResolvedViewOptions()`: memoized, published here for everything drawn. */
+  /** From `useResolvedViewOptions()`; published here, memoized on its values, for everything drawn. */
   viewOptions: ResolvedViewOptions;
   parts: WaveformPartsByPlace;
   /** Length of the drawn timeline in seconds. */

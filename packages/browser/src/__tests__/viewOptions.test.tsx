@@ -14,6 +14,11 @@ import type { WaveformDataObject, ClipTrack, AudioClip } from '@waveform-playlis
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { usePlaylistInfo } from '@waveform-playlist/ui-components';
 import { resetPartWarnings } from '../components/partWarnings';
+import { useResolvedViewOptions } from '../components/WaveformViewOptions';
+import {
+  SpectrogramIntegrationContext,
+  type SpectrogramIntegration,
+} from '../SpectrogramIntegrationContext';
 import * as api from '../index';
 import {
   WaveformPlaylistProvider,
@@ -326,6 +331,31 @@ describe('WaveformViewOptions (#689)', () => {
       });
     });
 
+    it('options that say nothing about a value pass it on from above', async () => {
+      await mount(() => (
+        <WaveformViewOptions
+          waveHeight={50}
+          barWidth={4}
+          barGap={2}
+          roundedBars
+          progressBarWidth={7}
+        >
+          <WaveformViewOptions>
+            <Root>
+              <InfoProbe />
+            </Root>
+          </WaveformViewOptions>
+        </WaveformViewOptions>
+      ));
+      expect(drawn(seen.view)).toEqual({
+        waveHeight: 50,
+        barWidth: 4,
+        barGap: 2,
+        roundedBars: true,
+        progressBarWidth: 7,
+      });
+    });
+
     it('each of the options can be overridden below', async () => {
       await mount(() => (
         <WaveformViewOptions waveHeight={50} barWidth={4} barGap={2} progressBarWidth={7}>
@@ -438,6 +468,46 @@ describe('WaveformViewOptions (#689)', () => {
       expect(viewReaderRenders).toBe(before);
     });
 
+    it.each([
+      ['barWidth', { barWidth: 3 }, { barWidth: 5 }],
+      ['barGap', { barGap: 1 }, { barGap: 3 }],
+      ['roundedBars', { roundedBars: false }, { roundedBars: true }],
+      ['progressBarWidth', { progressBarWidth: 2 }, { progressBarWidth: 6 }],
+    ] as const)('a change of %s alone reaches what is drawn', async (name, first, second) => {
+      let options: Record<string, unknown> = first;
+      const { rerender } = await mount(() => (
+        <WaveformViewOptions {...options}>
+          <Root>
+            <InfoProbe />
+          </Root>
+        </WaveformViewOptions>
+      ));
+      expect(seen.view[name]).toBe(first[name as keyof typeof first]);
+      options = second;
+      await act(async () => rerender());
+      expect(seen.view[name]).toBe(second[name as keyof typeof second]);
+    });
+
+    it('the same options again are the same value: a root given as the same element does not render', async () => {
+      // Stands where a root stands: it reads the options as a root does.
+      let reads = 0;
+      const RootLike = () => {
+        useResolvedViewOptions();
+        reads++;
+        return null;
+      };
+      const VIEW = <RootLike />;
+      const { rerender } = await mount(() => (
+        <WaveformViewOptions waveHeight={70} barWidth={2} fillViewport={false}>
+          {VIEW}
+        </WaveformViewOptions>
+      ));
+      await act(async () => {});
+      reads = 0;
+      await act(async () => rerender());
+      expect(reads).toBe(0);
+    });
+
     it('the same options again publish the same value: a parent render does not render a reader', async () => {
       const INFO = <InfoProbe />;
       const { rerender } = await mount(() => (
@@ -465,6 +535,11 @@ describe('WaveformViewOptions (#689)', () => {
               <InfoProbe name="negative" />
             </Root>
           </WaveformViewOptions>
+          <WaveformViewOptions barWidth={1} barGap={-1}>
+            <Root>
+              <InfoProbe name="none" />
+            </Root>
+          </WaveformViewOptions>
           <WaveformViewOptions waveHeight={0}>
             <Root>
               <InfoProbe name="flat" />
@@ -476,10 +551,13 @@ describe('WaveformViewOptions (#689)', () => {
       expect([seen.zero.barWidth, seen.zero.barGap]).toEqual([1, 0]);
       // The step from one bar to the next is at least one pixel.
       expect([seen.negative.barWidth, seen.negative.barGap]).toEqual([2, -1]);
+      // Also a step of exactly 0.
+      expect([seen.none.barWidth, seen.none.barGap]).toEqual([1, 0]);
       expect(seen.flat.waveHeight).toBe(80);
       const messages = warn.mock.calls.map((call) => String(call[0]));
       expect(messages.filter((m) => m.includes('barWidth')).length).toBe(1);
-      expect(messages.filter((m) => m.includes('barGap')).length).toBe(1);
+      // One per message: the two gaps that were raised are two messages.
+      expect(messages.filter((m) => m.includes('barGap')).length).toBe(2);
       expect(messages.filter((m) => m.includes('waveHeight')).length).toBe(1);
     });
   });
@@ -556,6 +634,97 @@ describe('WaveformViewOptions (#689)', () => {
     // Eight seconds at 44100 Hz and 1000 samples per pixel.
     expect(tracksWidth()).toBe('352px');
     width.mockRestore();
+  });
+
+  it('`fillViewport` switched on later widens the timeline', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.hasAttribute('data-scroll-container') ? 1200 : 0;
+    });
+    let fill = false;
+    const { rerender } = await mountMultitrack(() => (
+      <WaveformViewOptions fillViewport={fill}>
+        <WaveformRoot>
+          <WaveformTracks />
+        </WaveformRoot>
+      </WaveformViewOptions>
+    ));
+    expect(tracksWidth()).toBe('46px');
+    fill = true;
+    await act(async () => rerender());
+    expect(tracksWidth()).toBe('1200px');
+  });
+
+  it('the rows of a multitrack view are laid out with the row height', async () => {
+    await mountMultitrack(() => (
+      <WaveformViewOptions waveHeight={50}>
+        <WaveformRoot>
+          <WaveformTrackControls />
+          <WaveformTracks />
+        </WaveformRoot>
+      </WaveformViewOptions>
+    ));
+    const rows = [...document.querySelectorAll('[data-track-row]')] as HTMLElement[];
+    expect(rows.map((row) => row.style.top)).toEqual(['0px', '50px']);
+  });
+
+  it('the frequency labels of a spectrogram track are as tall as the row', async () => {
+    const spectrogram = {
+      trackSpectrogramOverrides: new Map([['t1', { renderMode: 'spectrogram' }]]),
+      spectrogramConfig: { labels: true },
+      setTrackRenderMode: () => {},
+      setTrackSpectrogramConfig: () => {},
+      registerSpectrogramCanvas: () => {},
+      unregisterSpectrogramCanvas: () => {},
+      getColorMap: () => new Uint8Array(0),
+      getFrequencyScale: () => (f: number) => f,
+    } as unknown as SpectrogramIntegration;
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    await mountMultitrack(() => (
+      <SpectrogramIntegrationContext.Provider value={spectrogram}>
+        <WaveformViewOptions waveHeight={64}>
+          <WaveformRoot>
+            <WaveformTracks />
+          </WaveformRoot>
+        </WaveformViewOptions>
+      </SpectrogramIntegrationContext.Provider>
+    ));
+    // The labels canvas is the one 72 px wide; the channels' canvases are as
+    // wide as their clip.
+    const labels = [...document.querySelectorAll('canvas')].filter(
+      (canvas) => canvas.style.width === '72px'
+    );
+    expect(labels.map((canvas) => canvas.style.height)).toEqual(['64px']);
+  });
+
+  it('the view value follows `mono` and `indefinitePlayback` on the provider', async () => {
+    let props: Record<string, unknown> = { mono: true, indefinitePlayback: false };
+    const adapter = createFakeAdapter();
+    const createAdapter = () => adapter as unknown as PlayoutAdapter;
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ui = () => (
+      <WaveformPlaylistProvider
+        tracks={TRACKS}
+        sampleRate={SAMPLE_RATE}
+        createAdapter={createAdapter}
+        {...props}
+      >
+        <ProviderProbe />
+        <ViewReader />
+      </WaveformPlaylistProvider>
+    );
+    ready = false;
+    const result = render(ui());
+    await waitFor(() => expect(ready).toBe(true));
+    expect([view.mono, view.indefinitePlayback]).toEqual([true, false]);
+    props = { mono: true, indefinitePlayback: true };
+    await act(async () => result.rerender(ui()));
+    expect([view.mono, view.indefinitePlayback]).toEqual([true, true]);
+    props = { mono: false, indefinitePlayback: true };
+    await act(async () => result.rerender(ui()));
+    expect([view.mono, view.indefinitePlayback]).toEqual([false, true]);
   });
 
   it('`indefinitePlayback` on the provider still implies the filled layout', async () => {

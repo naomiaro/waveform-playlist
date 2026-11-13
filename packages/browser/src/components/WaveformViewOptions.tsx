@@ -97,7 +97,7 @@ const isPositive = (value: number) => value > 0;
 /**
  * INTERNAL: the options a root draws with. Called by the two roots only; what
  * is drawn below a root reads the resolved values from ui-components'
- * `PlaylistInfoContext`, where the root publishes them once.
+ * `PlaylistInfoContext`, where the root publishes them once (memoized there).
  *
  * Values that cannot be drawn are replaced, with one development warning per
  * message: a row height or a bar width that is not above 0 becomes the
@@ -136,8 +136,7 @@ export function useResolvedViewOptions(): ResolvedViewOptions {
   }
   const progressBarWidth = options.progressBarWidth ?? barWidth + barGap;
 
-  return useMemo(
-    () => ({ waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport }),
-    [waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport]
-  );
+  // A new object on every call: the roots read its fields, and the frame
+  // memoizes what it publishes on those values, so nothing follows its identity.
+  return { waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport };
 }
