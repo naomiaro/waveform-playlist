@@ -19,9 +19,7 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import {
   WaveformPlaylistProvider,
-  // PlayButton,
-  PauseButton,
-  StopButton omitted — recording example uses
+  // PlayButton, PauseButton, StopButton omitted — recording example uses
   // custom versions that are disabled during recording
   AudioPosition,
   ClipInteractionProvider,
