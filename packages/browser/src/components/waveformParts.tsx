@@ -33,6 +33,7 @@ import {
 import { WaveformLoopRegion } from './VisualizationOverlays';
 import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
 import { warnMisplacedPart } from './partWarnings';
+import { WaveformViewOptions } from './WaveformViewOptions';
 
 export {
   WaveformTracks,
@@ -170,6 +171,14 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           sorted.controls.push(child);
           sorted.content.push(null);
           return;
+        }
+        if (child.type === WaveformViewOptions) {
+          // A root reads the options above itself: these do nothing for it,
+          // and the parts inside them are wrapped, so not recognised either.
+          warnMisplacedPart(
+            '<WaveformViewOptions> inside a waveform root does nothing for that root: a root ' +
+              'reads the options above it. Put <WaveformViewOptions> around the root.'
+          );
         }
         if (child.type === WaveformTracks) {
           tracksParts++;

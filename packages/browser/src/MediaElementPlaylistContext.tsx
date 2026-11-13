@@ -916,7 +916,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ]
   );
 
-  // A single track at a fixed zoom level: the three layout modes and both
+  // A single track at a fixed zoom level: the two provider modes and both
   // zoom directions are always off.
   const viewValue: PlaylistViewContextValue = useMemo(
     () => ({ sampleRate, mono: false, indefinitePlayback: false }),

@@ -248,7 +248,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
       {/* Background layer - color depends on draw mode */}
       {isBothMode ? (
         <>
-          {/* Spectrogram portion: black background */}
+          {/* Spectrogram portion: the theme's spectrogram background */}
           <Background
             $color={spectrogramBackground}
             $height={halfHeight}

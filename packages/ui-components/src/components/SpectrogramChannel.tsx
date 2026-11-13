@@ -23,7 +23,8 @@ const Wrapper = styled.div.attrs<WrapperProps>((props) => ({
   },
 }))<WrapperProps>`
   position: absolute;
-  background: #000;
+  /* Shown until the worker has drawn, and where a chunk is not mounted. */
+  background: ${(props) => props.theme?.spectrogramBackgroundColor ?? '#000'};
   transform: translateZ(0);
   backface-visibility: hidden;
 `;

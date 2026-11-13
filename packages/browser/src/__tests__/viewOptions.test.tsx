@@ -554,11 +554,121 @@ describe('WaveformViewOptions (#689)', () => {
       // Also a step of exactly 0.
       expect([seen.none.barWidth, seen.none.barGap]).toEqual([1, 0]);
       expect(seen.flat.waveHeight).toBe(80);
+      // The playhead default is worked out from the corrected bar and gap.
+      expect(seen.zero.progressBarWidth).toBe(1);
+      expect(seen.negative.progressBarWidth).toBe(1);
+      expect(seen.none.progressBarWidth).toBe(1);
       const messages = warn.mock.calls.map((call) => String(call[0]));
       expect(messages.filter((m) => m.includes('barWidth')).length).toBe(1);
       // One per message: the two gaps that were raised are two messages.
       expect(messages.filter((m) => m.includes('barGap')).length).toBe(2);
       expect(messages.filter((m) => m.includes('waveHeight')).length).toBe(1);
+    });
+  });
+
+  describe.each(MOUNTS)('values that are no size, under %s', (_name, mount, Root) => {
+    it.each([
+      ['waveHeight', Number.NaN, 80],
+      ['waveHeight', -5, 80],
+      ['barWidth', Number.NaN, 1],
+      ['barWidth', -2, 1],
+      ['barGap', Number.NaN, 0],
+    ] as const)('%s of %s becomes the default, with a warning', async (name, value, expected) => {
+      const { warn } = await mount(() => (
+        <WaveformViewOptions {...{ [name]: value }}>
+          <Root>
+            <InfoProbe />
+          </Root>
+        </WaveformViewOptions>
+      ));
+      expect(seen.view[name]).toBe(expected);
+      const messages = warn.mock.calls.map((call) => String(call[0]));
+      expect(messages.filter((m) => m.includes(`<WaveformViewOptions ${name}>`)).length).toBe(1);
+    });
+
+    it('the playhead default is worked out from the corrected bar, not the one given', async () => {
+      await mount(() => (
+        <WaveformViewOptions barWidth={-2} barGap={5}>
+          <Root>
+            <InfoProbe />
+          </Root>
+        </WaveformViewOptions>
+      ));
+      expect([seen.view.barWidth, seen.view.barGap, seen.view.progressBarWidth]).toEqual([1, 5, 6]);
+    });
+
+    it('a gap that is no number is 0, not a gap worked out from the bar', async () => {
+      await mount(() => (
+        <WaveformViewOptions barWidth={4} barGap={Number.NaN}>
+          <Root>
+            <InfoProbe />
+          </Root>
+        </WaveformViewOptions>
+      ));
+      expect([seen.view.barWidth, seen.view.barGap, seen.view.progressBarWidth]).toEqual([4, 0, 4]);
+    });
+
+    it.each([0, -3, Number.NaN])(
+      'a playhead width of %s becomes the bar and its gap, with a warning',
+      async (width) => {
+        const { warn } = await mount(() => (
+          <WaveformViewOptions barWidth={3} barGap={2} progressBarWidth={width}>
+            <Root>
+              <WaveformPlayhead />
+              <InfoProbe />
+            </Root>
+          </WaveformViewOptions>
+        ));
+        expect(seen.view.progressBarWidth).toBe(5);
+        expect(playheadWidth()).toBe('5px');
+        const messages = warn.mock.calls.map((call) => String(call[0]));
+        expect(
+          messages.filter((m) => m.includes('<WaveformViewOptions progressBarWidth>')).length
+        ).toBe(1);
+      }
+    );
+
+    it('`null` for an option (plain JavaScript) means not given: no warning, the default', async () => {
+      const { warn } = await mount(() => (
+        <WaveformViewOptions
+          {...({
+            waveHeight: null,
+            barWidth: null,
+            barGap: null,
+            progressBarWidth: null,
+          } as object)}
+        >
+          <Root>
+            <InfoProbe />
+          </Root>
+        </WaveformViewOptions>
+      ));
+      expect(drawn(seen.view)).toEqual({
+        waveHeight: 80,
+        barWidth: 1,
+        barGap: 0,
+        roundedBars: false,
+        progressBarWidth: 1,
+      });
+      expect(
+        warn.mock.calls.filter((call) => String(call[0]).includes('<WaveformViewOptions')).length
+      ).toBe(0);
+    });
+
+    it('options written inside a root do nothing for it, and say so once', async () => {
+      const { warn } = await mount(() => (
+        <Root>
+          <WaveformViewOptions waveHeight={120}>
+            <WaveformTracks />
+          </WaveformViewOptions>
+          <InfoProbe />
+        </Root>
+      ));
+      expect(seen.view.waveHeight).toBe(80);
+      const messages = warn.mock.calls.map((call) => String(call[0]));
+      expect(
+        messages.filter((m) => m.includes('<WaveformViewOptions> inside a waveform root')).length
+      ).toBe(1);
     });
   });
 
@@ -794,10 +904,10 @@ describe('the timescale strip has a height option (#689)', () => {
     expect(stripHeight()).toBe(20);
   });
 
-  it('a height that is not a positive number warns once and draws the default strip', async () => {
+  it('`null` for the height (plain JavaScript) means not given', async () => {
     const { warn } = await mountMultitrack(() => (
       <WaveformRoot>
-        <WaveformTimescale height={0} />
+        <WaveformTimescale {...({ height: null } as object)} />
         <WaveformTracks />
         <InfoProbe />
       </WaveformRoot>
@@ -806,8 +916,26 @@ describe('the timescale strip has a height option (#689)', () => {
     expect(
       warn.mock.calls.filter((call) => String(call[0]).includes('<WaveformTimescale height>'))
         .length
-    ).toBe(1);
+    ).toBe(0);
   });
+
+  it.each([0, -10, Number.NaN])(
+    'a height of %s warns once and draws the default strip',
+    async (height) => {
+      const { warn } = await mountMultitrack(() => (
+        <WaveformRoot>
+          <WaveformTimescale height={height} />
+          <WaveformTracks />
+          <InfoProbe />
+        </WaveformRoot>
+      ));
+      expect(stripHeight()).toBe(30);
+      expect(
+        warn.mock.calls.filter((call) => String(call[0]).includes('<WaveformTimescale height>'))
+          .length
+      ).toBe(1);
+    }
+  );
 
   it('the first timescale part says how tall the strip is, also after a loop region', async () => {
     await mountMultitrack(() => (

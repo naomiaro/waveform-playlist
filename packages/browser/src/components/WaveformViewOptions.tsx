@@ -51,7 +51,11 @@ const WaveformViewOptionsContext = createContext<WaveformViewOptionsValue>(NO_OP
  *
  * A prop that is left out is taken from the `<WaveformViewOptions>` above
  * (`??`, so `0` and `false` are values), and from the defaults when there is
- * none: nest one to change a single option for part of the tree.
+ * none: nest one to change a single option for part of the tree. A nested one
+ * cannot return an option to its default: write the value.
+ *
+ * It goes ABOVE a root. A root reads the options above itself, so one written
+ * among a root's children does nothing for that root (and warns).
  */
 export const WaveformViewOptions: React.FC<WaveformViewOptionsProps> = ({
   children,
@@ -101,8 +105,9 @@ const isPositive = (value: number) => value > 0;
  *
  * Values that cannot be drawn are replaced, with one development warning per
  * message: a row height or a bar width that is not above 0 becomes the
- * default, and a gap that would put the next bar less than one pixel on is
- * raised until the step is one pixel.
+ * default, a gap that is no number becomes the default, a gap that would put
+ * the next bar less than one pixel on is raised until the step is one pixel,
+ * and a playhead width that is not above 0 becomes the bar and its gap.
  */
 export function useResolvedViewOptions(): ResolvedViewOptions {
   const options = useContext(WaveformViewOptionsContext);
@@ -126,6 +131,13 @@ export function useResolvedViewOptions(): ResolvedViewOptions {
     );
     barWidth = DEFAULT_BAR_WIDTH;
   }
+  if (Number.isNaN(barGap)) {
+    warnOnce(
+      `<WaveformViewOptions barGap> must be a number of pixels: ${String(barGap)} is replaced by ` +
+        `${DEFAULT_BAR_GAP}.`
+    );
+    barGap = DEFAULT_BAR_GAP;
+  }
   if (!(barWidth + barGap >= 1)) {
     const raised = 1 - barWidth;
     warnOnce(
@@ -134,7 +146,16 @@ export function useResolvedViewOptions(): ResolvedViewOptions {
     );
     barGap = raised;
   }
-  const progressBarWidth = options.progressBarWidth ?? barWidth + barGap;
+  // As wide as a bar and its gap unless a width is given.
+  let progressBarWidth = options.progressBarWidth ?? barWidth + barGap;
+  if (!isPositive(progressBarWidth)) {
+    warnOnce(
+      `<WaveformViewOptions progressBarWidth> must be a positive number of pixels: ` +
+        `${String(progressBarWidth)} is replaced by the bar and its gap, ${barWidth + barGap}. ` +
+        'Leave <WaveformPlayhead> out to draw no playhead.'
+    );
+    progressBarWidth = barWidth + barGap;
+  }
 
   // A new object on every call: the roots read its fields, and the frame
   // memoizes what it publishes on those values, so nothing follows its identity.
