@@ -162,3 +162,13 @@ export function calculateFirstBarPosition(
 ): number {
   return Math.floor((canvasStartGlobal - barWidth + step) / step) * step;
 }
+
+/**
+ * The distance in pixels from one bar to the next. A step under one pixel
+ * (or one that is not a number) cannot be drawn: the loop over the bars would
+ * not advance, so it is one pixel then.
+ */
+export function barStep(barWidth: number, barGap: number): number {
+  const step = barWidth + barGap;
+  return step >= 1 ? step : 1;
+}

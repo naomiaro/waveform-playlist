@@ -193,7 +193,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
 
     return (
       <SpectrogramCanvas
-        key={`${length}-${i}`}
+        // The height is in the key: a transferred canvas cannot be resized from
+        // here, and the provider renders at the height a canvas registered with.
+        key={`${length}-${waveHeight}-${i}`}
         $cssWidth={currentWidth}
         $left={chunkLeft}
         width={currentWidth * devicePixelRatio}

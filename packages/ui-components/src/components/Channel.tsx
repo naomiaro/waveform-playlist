@@ -18,6 +18,7 @@ import {
   scalePeakByGain,
   calculateBarRects,
   calculateFirstBarPosition,
+  barStep,
 } from '../utils/peakRendering';
 
 // Re-export WaveformColor for consumers
@@ -172,7 +173,7 @@ export const Channel: FunctionComponent<ChannelProps> = (props) => {
     `-${waveformColorToCss(waveOutlineColor)}-${waveformColorToCss(waveFillColor)}`;
 
   useLayoutEffect(() => {
-    const step = barWidth + barGap;
+    const step = barStep(barWidth, barGap);
 
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
       // Skip chunks already drawn with the current parameters.

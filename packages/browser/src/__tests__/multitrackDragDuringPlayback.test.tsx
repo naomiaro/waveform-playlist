@@ -21,6 +21,7 @@ import {
   useEngineRefs,
 } from '../contexts/playlistContexts';
 import { Waveform } from '../components/Waveform';
+import { WaveformViewOptions } from '../components/WaveformViewOptions';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
@@ -139,11 +140,12 @@ async function mount({ automaticScroll = false } = {}) {
       samplesPerPixel={SAMPLES_PER_PIXEL}
       zoomLevels={ZOOM_LEVELS}
       createAdapter={createAdapter}
-      waveHeight={WAVE_HEIGHT}
       automaticScroll={automaticScroll}
     >
       <Probe />
-      <Waveform />
+      <WaveformViewOptions waveHeight={WAVE_HEIGHT}>
+        <Waveform />
+      </WaveformViewOptions>
     </WaveformPlaylistProvider>
   );
   await waitFor(() => {

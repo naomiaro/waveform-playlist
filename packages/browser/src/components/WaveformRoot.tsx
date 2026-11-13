@@ -30,6 +30,7 @@ import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
 import { useWaveformFrame, useWaveformParts } from './waveformFrame';
+import { useResolvedViewOptions } from './WaveformViewOptions';
 
 // Default duration in seconds for empty tracks (used for recording workflow)
 const DEFAULT_EMPTY_TRACK_DURATION = 60;
@@ -68,7 +69,9 @@ export interface WaveformRootProps {
  */
 export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children }) => {
   const { setSelectedTrackId, setCurrentTime } = useEditorControls();
-  const { sampleRate, waveHeight, mono, indefinitePlayback, fillViewport } = usePlaylistView();
+  const { sampleRate, mono, indefinitePlayback } = usePlaylistView();
+  const viewOptions = useResolvedViewOptions();
+  const { waveHeight, fillViewport } = viewOptions;
   const { samplesPerPixel } = usePlaylistZoom();
   const { peaksDataArray, tracks, duration, isReady } = usePlaylistTimeline();
   const { trackDragPreview } = useTrackReorderPreview();
@@ -267,6 +270,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   // cursor only (the selection the press collapsed stays).
   const frame = useWaveformFrame({
     className,
+    viewOptions,
     parts,
     displayDuration,
     rows,

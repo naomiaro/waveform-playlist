@@ -20,6 +20,7 @@ export {
   WaveformPlayhead,
 } from './waveformParts';
 export { WaveformAnnotationBoxes } from './WaveformAnnotationBoxes';
+export { WaveformViewOptions } from './WaveformViewOptions';
 export { AnnotationList } from './AnnotationList';
 export { KeyboardShortcuts } from './KeyboardShortcuts';
 export type { KeyboardShortcutsProps } from './KeyboardShortcuts';

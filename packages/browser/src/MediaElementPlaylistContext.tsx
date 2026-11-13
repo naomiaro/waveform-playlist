@@ -25,7 +25,7 @@ import {
 } from './providerInternals/useAnnotationState';
 import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
-import { useViewDefaults } from './providerInternals/useViewDefaults';
+import { useMergedTheme } from './providerInternals/useMergedTheme';
 import { useTimeFormat } from './hooks/useTimeFormat';
 import { useShallowStable } from './hooks/useShallowStable';
 import {
@@ -89,8 +89,6 @@ export interface MediaElementPlaylistProviderProps {
   track: MediaElementTrackConfig;
   /** Initial samples per pixel (zoom level) */
   samplesPerPixel?: number;
-  /** Height of each waveform track */
-  waveHeight?: number;
   /** Playback rate (default 1). Not clamped by the provider: the bundled
    *  engine is created at it as given, while `setPlaybackRate` clamps to
    *  0.5–2. The user's `setPlaybackRate` overrides it; a later change of this
@@ -110,14 +108,6 @@ export interface MediaElementPlaylistProviderProps {
    * it in between.
    */
   annotationList?: AnnotationListProp;
-  /** Width of waveform bars */
-  barWidth?: number;
-  /** Gap between waveform bars */
-  barGap?: number;
-  /** Draw bars with pill-shaped rounded caps (radius barWidth/2). Default: false */
-  roundedBars?: boolean;
-  /** Width of progress bars */
-  progressBarWidth?: number;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /**
@@ -165,16 +155,11 @@ export interface MediaElementPlaylistProviderProps {
 export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProviderProps> = ({
   track,
   samplesPerPixel: initialSamplesPerPixel = 1024,
-  waveHeight = 100,
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
   theme: userThemeProp,
   annotationList,
-  barWidth = 1,
-  barGap = 0,
-  roundedBars = false,
-  progressBarWidth: progressBarWidthProp,
   audioContext,
   onAnnotationsChange,
   onReady,
@@ -182,12 +167,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   createPlayout,
   children,
 }) => {
-  const { mergedTheme, progressBarWidth } = useViewDefaults({
-    theme: userThemeProp,
-    barWidth,
-    barGap,
-    progressBarWidth: progressBarWidthProp,
-  });
+  const mergedTheme = useMergedTheme(userThemeProp);
 
   // State
   const [isPlaying, setIsPlayingState] = useState(false);
@@ -939,18 +919,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // A single track at a fixed zoom level: the three layout modes and both
   // zoom directions are always off.
   const viewValue: PlaylistViewContextValue = useMemo(
-    () => ({
-      sampleRate,
-      waveHeight,
-      barWidth,
-      barGap,
-      roundedBars,
-      progressBarWidth,
-      mono: false,
-      indefinitePlayback: false,
-      fillViewport: false,
-    }),
-    [sampleRate, waveHeight, barWidth, barGap, roundedBars, progressBarWidth]
+    () => ({ sampleRate, mono: false, indefinitePlayback: false }),
+    [sampleRate]
   );
   const zoomValue: PlaylistZoomContextValue = useMemo(
     () => ({ samplesPerPixel, canZoomIn: false, canZoomOut: false }),

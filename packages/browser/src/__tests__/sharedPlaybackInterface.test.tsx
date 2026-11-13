@@ -223,17 +223,7 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
     'stop',
   ],
   refs: ['currentTimeRef', 'registerFrameCallback', 'unregisterFrameCallback', 'visualTimeRef'],
-  view: [
-    'barGap',
-    'barWidth',
-    'fillViewport',
-    'indefinitePlayback',
-    'mono',
-    'progressBarWidth',
-    'roundedBars',
-    'sampleRate',
-    'waveHeight',
-  ],
+  view: ['indefinitePlayback', 'mono', 'sampleRate'],
   settings: ['isAutomaticScroll', 'timeFormat'],
   zoom: ['canZoomIn', 'canZoomOut', 'samplesPerPixel'],
 };
@@ -392,7 +382,6 @@ describe('the shared hooks under MediaElementPlaylistProvider', () => {
     await mountMediaElement(readers.children);
     expect(readers.values.view.mono).toBe(false);
     expect(readers.values.view.indefinitePlayback).toBe(false);
-    expect(readers.values.view.fillViewport).toBe(false);
     expect(readers.values.view.sampleRate).toBe(SAMPLE_RATE);
     expect(readers.values.zoom).toEqual({
       samplesPerPixel: 882,

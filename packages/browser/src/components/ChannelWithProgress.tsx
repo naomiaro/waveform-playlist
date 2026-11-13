@@ -225,8 +225,9 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
     !isPianoRollMode &&
     (smartChannelProps.renderMode === 'spectrogram' || smartChannelProps.renderMode === 'both');
   const isBothMode = !isPianoRollMode && smartChannelProps.renderMode === 'both';
+  const spectrogramBackground = theme?.spectrogramBackgroundColor ?? '#000';
   const backgroundCss = isSpectrogramMode
-    ? '#000'
+    ? spectrogramBackground
     : isPianoRollMode
       ? theme?.pianoRollBackgroundColor || '#1a1a2e'
       : waveformColorToCss(backgroundColor);
@@ -249,7 +250,7 @@ export const ChannelWithProgress: React.FC<ChannelWithProgressProps> = ({
         <>
           {/* Spectrogram portion: black background */}
           <Background
-            $color="#000"
+            $color={spectrogramBackground}
             $height={halfHeight}
             $top={effectiveTop}
             $width={smartChannelProps.length}

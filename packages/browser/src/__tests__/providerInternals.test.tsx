@@ -12,7 +12,7 @@ import { centrePlayhead } from '../providerInternals/useScrollFollow';
 import { useScrollFollow } from '../providerInternals/useScrollFollow';
 import { useFrameCallbacks } from '../providerInternals/useFrameCallbacks';
 import { useAnnotationState } from '../providerInternals/useAnnotationState';
-import { useViewDefaults } from '../providerInternals/useViewDefaults';
+import { useMergedTheme } from '../providerInternals/useMergedTheme';
 
 const ANNOTATIONS: AnnotationData[] = [
   { id: 'a', start: 0, end: 1, lines: ['a'] },
@@ -342,31 +342,24 @@ describe('useAnnotationState', () => {
   });
 });
 
-describe('useViewDefaults', () => {
-  const base = { barWidth: 2, barGap: 1 } as const;
-
-  it('fills the defaults', () => {
-    const { result } = renderHook(() =>
-      useViewDefaults({ ...base, theme: undefined, progressBarWidth: undefined })
-    );
-    expect(result.current.progressBarWidth).toBe(3);
-    expect(result.current.mergedTheme.playheadColor).toBeDefined();
+describe('useMergedTheme', () => {
+  it('merges the theme over the default one', () => {
+    const { result } = renderHook(() => useMergedTheme(undefined));
+    expect(result.current.playheadColor).toBeDefined();
   });
 
-  it('keeps identities across renders with equal inline objects', () => {
+  it('keeps its identity across renders with an equal inline object', () => {
     const { result, rerender } = renderHook(
-      ({ color }) =>
-        useViewDefaults({ ...base, theme: { playheadColor: color }, progressBarWidth: 7 }),
+      ({ color }) => useMergedTheme({ playheadColor: color }),
       { initialProps: { color: 'red' } }
     );
     const first = result.current;
-    expect(first.progressBarWidth).toBe(7);
-    expect(first.mergedTheme.playheadColor).toBe('red');
+    expect(first.playheadColor).toBe('red');
 
     rerender({ color: 'red' });
-    expect(result.current.mergedTheme).toBe(first.mergedTheme);
+    expect(result.current).toBe(first);
 
     rerender({ color: 'blue' });
-    expect(result.current.mergedTheme.playheadColor).toBe('blue');
+    expect(result.current.playheadColor).toBe('blue');
   });
 });
