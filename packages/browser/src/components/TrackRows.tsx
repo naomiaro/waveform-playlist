@@ -520,6 +520,14 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
         'last one when there are several.'
     );
   }
+  if ((recordingState !== undefined) !== rows.hasRecordingPreview) {
+    warnMisplacedPart(
+      '<WaveformTracks> and its root disagree about <WaveformRecordingPreview>, so the timeline ' +
+        'does not grow with the take: the root reads the per-clip parts from a <WaveformTracks> ' +
+        'that is its own child (a fragment is fine), not one wrapped in another component, and ' +
+        'from the last one when there are several.'
+    );
+  }
   const { selectTrack } = rows;
   const registerSpectrogramCanvas = spectrogram?.registerSpectrogramCanvas;
   const unregisterSpectrogramCanvas = spectrogram?.unregisterSpectrogramCanvas;

@@ -123,7 +123,7 @@ A bare waveform, with no ruler and no controls:
 What each part does when it is there:
 
 - **`WaveformTimescale`** and **`WaveformLoopRegion`** share a 30 px strip above the tracks. The strip exists when a root has either of them. The loop region draws nothing while looping is off.
-- **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` (a positive number, 200 by default) is read by the root from the element; with `0` no column is drawn.
+- **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` (a positive number, 200 by default) is read by the root from the element; with `0`, a negative number or `NaN` no column is drawn and a development warning says so.
 - **`WaveformClipHeaders`** adds a header to every clip and to the height of every row. Inside a `ClipInteractionProvider` the header is what a clip is dragged by, and the trim handles come with it.
 - **`WaveformPlayhead`** is shown while playing, and at rest when no range is selected.
 
@@ -245,7 +245,8 @@ In development a part that is not where it can work says so once in the console,
 - `<WaveformTimescale>`, `<WaveformLoopRegion>` or `<WaveformTrackControls>` drawn among the tracks (it was wrapped in another component).
 - `<WaveformClipHeaders>`, `<WaveformFades>` or `<WaveformRecordingPreview>` rendered outside `<WaveformTracks>`.
 - A child of `<WaveformTracks>` that is not one of those three.
-- More than one `<WaveformTracks>` in a root, or a `<WaveformTracks>` that the root cannot see (wrapped in another component) while it holds `<WaveformClipHeaders>`.
+- More than one `<WaveformTracks>` in a root, or a `<WaveformTracks>` that the root cannot see (wrapped in another component) while it holds `<WaveformClipHeaders>` or `<WaveformRecordingPreview>`.
+- More than one `<WaveformTrackControls>` in a root (each draws a panel per track in the one column), or one whose `width` is not a positive number (no column is drawn).
 - `<WaveformTrackControls>` inside `<MediaElementWaveformRoot>`.
 
 ## Recording

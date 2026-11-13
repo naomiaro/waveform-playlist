@@ -125,8 +125,15 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
         if (CONTROLS_PARTS.has(child.type)) {
           // The first controls part says how wide the column is.
           if (sorted.controls.length === 0) {
-            sorted.controlsWidth =
-              (child.props as WaveformTrackControlsProps).width ?? DEFAULT_TRACK_CONTROLS_WIDTH;
+            const { width } = child.props as WaveformTrackControlsProps;
+            if (width !== undefined && !(width > 0)) {
+              warnMisplacedPart(
+                '<WaveformTrackControls width> must be a positive number of pixels: with ' +
+                  String(width) +
+                  ' no controls column is drawn. Leave the part out to have none.'
+              );
+            }
+            sorted.controlsWidth = width ?? DEFAULT_TRACK_CONTROLS_WIDTH;
           }
           sorted.controls.push(child);
           sorted.content.push(null);
@@ -145,6 +152,12 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
     });
   };
   visit(children);
+  if (sorted.controls.length > 1) {
+    warnMisplacedPart(
+      'A waveform root has more than one <WaveformTrackControls>: each draws a panel for every ' +
+        'track in the one controls column, which is as wide as the first says.'
+    );
+  }
   if (tracksParts > 1) {
     warnMisplacedPart(
       'A waveform root has more than one <WaveformTracks>: each draws every row, and the row ' +

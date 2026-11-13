@@ -63,6 +63,7 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
     );
   }
   const { showClipHeaders } = parts.tracksOptions;
+  const hasRecordingPreview = parts.tracksOptions.recordingState !== undefined;
 
   const rows = useMemo<WaveformRowsValue>(() => {
     // No peaks: they could not be extracted (the provider logged it). The row
@@ -82,6 +83,7 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
       rows: rowList,
       peaksDataArray: rowPeaks,
       showClipHeaders,
+      hasRecordingPreview,
       trackHeightById,
       trackLayout: computeTrackLayout(
         rowList.map((row) => row.id),
@@ -95,7 +97,7 @@ export const MediaElementWaveformRoot: React.FC<MediaElementWaveformRootProps> =
       recordingChannelCount: 0,
       dragSourceTrackId: null,
     };
-  }, [peaksDataArray, waveHeight, showClipHeaders]);
+  }, [peaksDataArray, waveHeight, showClipHeaders, hasRecordingPreview]);
 
   // A click while stopped collapses the selection at its time, which moves
   // the cursor.

@@ -231,12 +231,14 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     [tracks]
   );
   const dragSourceTrackId = trackDragPreview?.trackId ?? null;
+  const hasRecordingPreview = recordingState !== undefined;
 
   const rows = useMemo<WaveformRowsValue>(
     () => ({
       rows: rowList,
       peaksDataArray,
       showClipHeaders,
+      hasRecordingPreview,
       trackHeightById,
       trackLayout,
       animateTrackLayout,
@@ -251,6 +253,7 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
       rowList,
       peaksDataArray,
       showClipHeaders,
+      hasRecordingPreview,
       trackHeightById,
       trackLayout,
       animateTrackLayout,

@@ -39,6 +39,12 @@ export interface WaveformRowsValue {
   rows: ReadonlyArray<WaveformRow>;
   peaksDataArray: TrackClipPeaks[];
   showClipHeaders: boolean;
+  /**
+   * Whether the root found a recording-preview marker in its tracks part.
+   * Read only for the development warning of a tracks part the root cannot
+   * see into (one wrapped in another component).
+   */
+  hasRecordingPreview: boolean;
   trackHeightById: ReadonlyMap<string, number>;
   trackLayout: TrackLayout;
   animateTrackLayout: boolean;

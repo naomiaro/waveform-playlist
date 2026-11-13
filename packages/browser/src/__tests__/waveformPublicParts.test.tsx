@@ -1041,6 +1041,79 @@ describe('development warnings for a part that is not where it can work', () => 
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
+  it('two controls parts in one root', async () => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTrackControls />
+        <WaveformTrackControls />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, 'more than one <WaveformTrackControls>')).toBe(true);
+  });
+
+  it.each([0, -20, Number.NaN])('a controls column of width %s', async (width) => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTrackControls width={width} />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformTrackControls width>')).toBe(true);
+  });
+
+  it('a positive width is not warned about', async () => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTrackControls width={120} />
+        <WaveformTracks />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, '<WaveformTrackControls width>')).toBe(false);
+  });
+
+  it('a tracks part wrapped in another component, with a recording preview the root cannot see', async () => {
+    const Wrapped = () => (
+      <WaveformTracks>
+        <WaveformRecordingPreview
+          recordingState={{ isRecording: false } as WaveformRecordingState}
+        />
+      </WaveformTracks>
+    );
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <Wrapped />
+      </WaveformRoot>
+    ));
+    expect(warned(warn, 'disagree about <WaveformRecordingPreview>')).toBe(true);
+  });
+
+  it("a recording preview in a tracks part that is the root's own child is not warned about", async () => {
+    const { warn } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTracks>
+          <WaveformRecordingPreview
+            recordingState={{ isRecording: false } as WaveformRecordingState}
+          />
+        </WaveformTracks>
+      </WaveformRoot>
+    ));
+    expect(warned(warn, 'disagree')).toBe(false);
+  });
+
+  it("a recording preview in the MediaElement root's own tracks part is not warned about", async () => {
+    const { warn } = await mountMediaElement(
+      <MediaElementWaveformRoot>
+        <WaveformTracks>
+          <WaveformRecordingPreview
+            recordingState={{ isRecording: false } as WaveformRecordingState}
+          />
+        </WaveformTracks>
+      </MediaElementWaveformRoot>
+    );
+    expect(warned(warn, 'disagree')).toBe(false);
+  });
+
   it('two tracks parts in one root', async () => {
     const { warn } = await mountMultitrack(() => (
       <WaveformRoot>

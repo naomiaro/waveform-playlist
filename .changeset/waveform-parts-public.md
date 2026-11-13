@@ -22,7 +22,7 @@ Behaviour:
 
 - `<Waveform />` always has a timescale and a 200 px controls column, and `<MediaElementWaveform />` a timescale; a page that had none composes the parts it wants.
 - The view no longer tells the provider that a take is being recorded. Without `useRecordingSession` the armed track is not muted during a take and playback does not run past the end of the audio.
-- A part that is not where it can work (wrapped in another component, a per-clip part outside `<WaveformTracks>`, track controls under the MediaElement root) warns once in the console in development.
+- A part that is not where it can work (wrapped in another component, a per-clip part outside `<WaveformTracks>`, track controls under the MediaElement root, a second `<WaveformTracks>` or `<WaveformTrackControls>`, a controls `width` that is not a positive number) warns once in the console in development.
 - `MediaElementPlaylistProvider` compares the track's `fadeIn` / `fadeOut` by value. A fade object written inline used to dispose and re-create the player on every render of the provider's parent.
 
 The upgrade guide has the find-and-replace for each removed name.
