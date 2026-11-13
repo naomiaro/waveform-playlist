@@ -1,15 +1,14 @@
 // #771: the lint rules for React 19 context code, run through the real root
 // config. Two parts.
 //
-// 1. `react-hooks/rules-of-hooks` reports a conditional `useContext()` and
-// not a conditional `use()`. The `no-restricted-syntax` rule in the root
+// 1. `react-hooks/rules-of-hooks` does not report a conditional `use()` (the
+// first REPORTED case checks that it stays silent). The `no-restricted-syntax` rule in the root
 // `eslint.config.mjs` reports the forms below. This runs the real config over
 // each snippet as if it were a file of this package.
 //
 // What the rule cannot see is listed above it in `eslint.config.mjs`; the main
 // one is a `use()` inside a callback, which the first two NOT REPORTED cases
-// below record (no lint rule reports it). It also reports any function named
-// `use`, and a read inside a component that is itself defined in a branch.
+// below record (no lint rule reports it).
 //
 // 2. `@eslint-react/eslint-plugin` reports the old spellings. What it does not
 // report is recorded in the last block, so that a plugin update that changes
@@ -27,7 +26,11 @@ async function reportsOf(ruleId: string, source: string): Promise<number> {
   const [result] = await eslint.lintText(source, {
     filePath: join(repoRoot, 'packages', 'browser', 'src', 'lintSnippet.tsx'),
   });
-  return result.messages.filter((message) => message.ruleId === ruleId).length;
+  // A snippet that does not parse must fail the test, not count as "no report".
+  expect(result.messages.filter((message) => message.fatal)).toEqual([]);
+  // Errors only: a rule turned down to a warning no longer fails `pnpm lint`.
+  return result.messages.filter((message) => message.ruleId === ruleId && message.severity === 2)
+    .length;
 }
 
 const conditionalUseReports = (body: string) => reportsOf('no-restricted-syntax', HEADER + body);
@@ -96,6 +99,12 @@ const NOT_REPORTED: Record<string, string> = {
 };
 
 describe('lint: every use() at the top level (#771)', () => {
+  it('rules-of-hooks itself says nothing about a conditional use()', async () => {
+    const body = Object.values(REPORTED)[0];
+    expect(await reportsOf('react-hooks/rules-of-hooks', HEADER + body)).toBe(0);
+    expect(await conditionalUseReports(body)).toBe(1);
+  });
+
   for (const [name, body] of Object.entries(REPORTED)) {
     it(`reports use() in ${name}`, async () => {
       expect(await conditionalUseReports(body)).toBe(1);
@@ -148,7 +157,20 @@ describe('lint: React 19 spellings (#771)', () => {
       'export const B = () => React.createElement(FooContext.Provider, { value: 1 });\n' +
       'export const C = () => <FooContext.Consumer>{(v) => <i>{v}</i>}</FooContext.Consumer>;\n' +
       'export const D = () => <Slot.Provider value={1} />;\n' +
-      'export const E = [useContext, forwardRef];';
-    expect(await reportsOf('@eslint-react/no-context-provider', OLD_HEADER + body)).toBe(0);
+      'export const E = [useContext, forwardRef];\n' +
+      'export const Control = () => <FooContext.Provider value={1} />;';
+    // Exactly the control at the end: the rule is on and the five forms above it are not seen.
+    expect(await reportsOf('@eslint-react/no-context-provider', OLD_HEADER + body)).toBe(1);
+  });
+
+  it('does not see useContext or forwardRef under another name', async () => {
+    const source =
+      "import React, { createContext, forwardRef as wrap, useContext as read } from 'react';\n" +
+      'const FooContext = createContext(0);\n' +
+      'export const A = () => <i>{read(FooContext)}</i>;\n' +
+      'export const B = wrap<HTMLDivElement>((_props, ref) => <div ref={ref} />);\n' +
+      'export const Control = () => <i>{React.useContext(FooContext)}</i>;';
+    expect(await reportsOf('@eslint-react/no-use-context', source)).toBe(1);
+    expect(await reportsOf('@eslint-react/no-forward-ref', source)).toBe(0);
   });
 });

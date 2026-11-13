@@ -18,10 +18,12 @@ import globals from 'globals';
 // Not reported (review these by hand): a `use()` in a callback (`rows.map(() =>
 // use(X))`, which `rules-of-hooks` does not report either), in `a ||= use(X)`,
 // as an argument of an optional call, as a default value, after a `throw` or a
-// return inside a preceding loop or `switch`, `React.use()`, and an alias.
+// return inside a preceding loop, `switch`, `try` or nested block,
+// `React.use()`, and an alias.
 // Reported although it may be fine: any function named `use`; a component
 // defined inside a branch or a loop; a `use()` after an `if` whose only
-// `return` is inside a callback; `for (const x of use(X))`.
+// `return` is inside a callback; a read that runs once in a loop or `switch`
+// head (`for (const x of use(X))`, `switch (use(X))`).
 const CONDITIONAL_USE_MESSAGE =
   'use() must be called at the top level of the component or hook, before any early return: ' +
   'a context read in a condition or a loop subscribes only sometimes (#771).';
@@ -96,10 +98,16 @@ export default [
     // prop. Of the plugin only these three rules are on. `no-context-provider`
     // reports `<FooContext.Provider>` in JSX, for a name ending in `Context`: not
     // a provider held in a variable or passed to `createElement`, and not
-    // `<X.Consumer>`. The aliases `AnnotationIntegrationProvider` and
+    // `<X.Consumer>`. The other two match a call by its name: an aliased import
+    // (`useContext as read`) is not reported. The React version is set here
+    // because the plugin otherwise looks `react` up from the working directory
+    // and turns these rules off for a version below 19. The aliases `AnnotationIntegrationProvider` and
     // `SpectrogramIntegrationProvider` are public names and stay.
     plugins: {
       '@eslint-react': eslintReact,
+    },
+    settings: {
+      'react-x': { version: '19.0.0' },
     },
     rules: {
       'no-restricted-syntax': noConditionalUse,
