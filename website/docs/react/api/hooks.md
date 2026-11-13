@@ -85,11 +85,6 @@ import {
 
 // Throttled React state from a meter or any other value source
 import { useMeterLevels, useThrottledValue } from '@waveform-playlist/ui-components';
-
-// Annotation hooks
-import {
-  useAnnotationControls,
-} from '@waveform-playlist/annotations';
 ```
 
 ---
@@ -303,7 +298,7 @@ interface AnnotationOptionsContextValue {
 }
 ```
 
-The options are provider state. Each starts from its field of the provider's `annotationList` prop (`editable`, `linkEndpoints`, `isContinuousPlay`; a field left out is `false`) and takes the field's new value when that value changes. Set them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from [`usePlaybackControls()`](#useplaybackcontrols), or render `<EditableCheckbox />`, `<LinkEndpointsCheckbox />` and `<ContinuousPlayCheckbox />`. A setter does not change the prop; the prop's next change wins for the field that changed.
+The options are provider state. Each starts from its field of the provider's `annotationList` prop (`editable`, `linkEndpoints`, `isContinuousPlay`; a field left out is `false`) and takes the field's new value when that value changes. Set them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from [`usePlaybackControls()`](#useplaybackcontrols), or render `<EditableCheckbox />`, `<LinkEndpointsCheckbox />` and `<ContinuousPlayCheckbox />` from `@waveform-playlist/annotations`. A setter does not change the prop; the prop's next change wins for the field that changed.
 
 ### useLoop
 
@@ -1770,7 +1765,8 @@ function useActiveEffects(effects: ValueSource<ActiveEffect[]>): ActiveEffect[];
 ```
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 import {
   useDynamicEffects,
   useTrackDynamicEffects,
@@ -2230,43 +2226,6 @@ function ExportButton() {
 
 ---
 
-## Annotations Hooks
-
-From `@waveform-playlist/annotations`:
-
-### useAnnotationControls
-
-A small state hook for an annotation UI that has no playlist provider. It holds two booleans and wraps the boundary function of `@waveform-playlist/core`. It does not hold annotations, and it is not connected to the provider: under a provider, read the options with [`useAnnotationOptions()`](#useannotationoptions).
-
-```typescript
-function useAnnotationControls(options?: UseAnnotationControlsOptions): UseAnnotationControlsReturn;
-
-interface UseAnnotationControlsOptions {
-  initialContinuousPlay?: boolean; // default false
-  initialLinkEndpoints?: boolean;  // default true
-}
-
-interface UseAnnotationControlsReturn {
-  continuousPlay: boolean;
-  linkEndpoints: boolean;
-  setContinuousPlay: (value: boolean) => void;
-  setLinkEndpoints: (value: boolean) => void;
-  /** Returns a new array with one edge moved; does not change its input. */
-  updateAnnotationBoundaries: (params: AnnotationUpdateParams) => AnnotationData[];
-}
-
-interface AnnotationUpdateParams {
-  annotationIndex: number;
-  newTime: number;
-  isDraggingStart: boolean;
-  annotations: AnnotationData[];
-  duration: number;
-  linkEndpoints: boolean;
-}
-```
-
----
-
 ## Keyboard Shortcuts
 
 ### usePlaybackShortcuts
@@ -2379,17 +2338,31 @@ useKeyboardShortcuts({
 });
 ```
 
-#### getShortcutLabel
+#### A label for a shortcut
 
-Get a human-readable label for a shortcut:
+The library draws no text for a shortcut and exports no label function. Build the label from the shortcut's own fields (`key`, `metaKey`, `ctrlKey`, `altKey`, `shiftKey`), with your app's names for the keys and the modifiers:
 
 ```tsx
-import { getShortcutLabel } from '@waveform-playlist/browser';
+import type { KeyboardShortcut } from '@waveform-playlist/core';
 
-const shortcut = { key: 's', metaKey: true, shiftKey: true };
-const label = getShortcutLabel(shortcut);
-// On Mac: "Cmd+Shift+S"
-// On Windows: "Ctrl+Shift+S"
+// Your own names for the keys that need one, in your own language.
+const KEY_NAMES: Record<string, string> = { ' ': 'Space' };
+
+const shortcutLabel = (shortcut: KeyboardShortcut): string =>
+  [
+    shortcut.metaKey ? 'Cmd' : null,
+    shortcut.ctrlKey ? 'Ctrl' : null,
+    shortcut.altKey ? 'Alt' : null,
+    shortcut.shiftKey ? 'Shift' : null,
+    KEY_NAMES[shortcut.key] ?? shortcut.key.toUpperCase(),
+  ]
+    .filter(Boolean)
+    .join('+');
+```
+
+```tsx
+shortcutLabel({ key: 's', metaKey: true, shiftKey: true, action: save }); // "Cmd+Shift+S"
+shortcutLabel({ key: ' ', action: togglePlay }); // "Space"
 ```
 
 ---

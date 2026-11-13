@@ -7,13 +7,24 @@ description: "Install Waveform Playlist packages via npm or pnpm for React multi
 
 ## Package Manager
 
-Install the main package and its required peer dependencies:
+Install the main package, the Tone.js engine it plays through by default, and the packages your own code imports from:
 
 ```bash npm2yarn
-npm install @waveform-playlist/browser tone @dnd-kit/react
+npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-playlist/core tone @dnd-kit/react
 ```
 
 If you already have React and styled-components in your project, you're ready to go!
+
+### Types and helpers come from `@waveform-playlist/core`
+
+`@waveform-playlist/browser` exports its own components, hooks and types and re-exports nothing from the other packages. The types of the data you pass in (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`) and the helpers that build it (`createTrack`, `createClipFromSeconds`) are exports of `@waveform-playlist/core`, and the pages of this documentation import them from there:
+
+```tsx
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import { createTrack, type ClipTrack } from '@waveform-playlist/core';
+```
+
+`@waveform-playlist/core` is a dependency of `@waveform-playlist/browser`, so it is always installed with it. An import of it in your own code resolves under a package manager with a flat `node_modules` (npm) even when your project does not list it; under a strict one (pnpm) it does not. The install line above therefore names it. The same holds for `@waveform-playlist/ui-components`, also a dependency of browser, when you import from it (for example the `TimeFormat` type or `usePlaylistInfo`): add it to your project then. Keep all `@waveform-playlist/*` packages on the versions of one release, so that a single copy of each is installed.
 
 ## Peer Dependencies
 
@@ -24,7 +35,8 @@ Waveform Playlist requires the following peer dependencies:
 | `react` | ^19.0.0 | UI framework |
 | `react-dom` | ^19.0.0 | React DOM rendering |
 | `styled-components` | ^6.0.0 | CSS-in-JS styling |
-| `tone` | ^15.0.0 | Web Audio framework |
+| `tone` | ^15.0.0 | Web Audio framework. An optional peer: needed for `WaveformPlaylistProvider`'s default engine, not for `MediaElementPlaylistProvider` or an adapter of your own |
+| `@waveform-playlist/playout` | the range `browser` declares as its peer (the two packages have their own version numbers) | The Tone.js engine `WaveformPlaylistProvider` loads by default. An optional peer, so a package manager does not install it for you |
 | `@dnd-kit/react` | ^0.5.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 
 ### Which Tone.js version?
@@ -123,16 +135,6 @@ import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 ## TypeScript
 
 All packages include TypeScript definitions. No additional `@types` packages are needed.
-
-## CDN Usage
-
-For quick prototyping, you can use the UMD build from a CDN:
-
-```html
-<script src="https://unpkg.com/@waveform-playlist/browser/dist/index.umd.js"></script>
-```
-
-Note: CDN usage is not recommended for production applications.
 
 ## Next Steps
 

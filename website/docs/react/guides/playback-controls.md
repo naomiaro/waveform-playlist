@@ -37,11 +37,11 @@ These buttons automatically connect to the playlist context and update their sta
 
 ### Which controls work under which provider
 
-The controls read the nearest playlist provider.
+The controls read the nearest playlist provider. They are exports of `@waveform-playlist/browser`, except where the table names another package.
 
 | Works under | Components |
 | --- | --- |
-| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
+| Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, from `@waveform-playlist/annotations`, `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` and `DownloadAnnotationsButton` |
 | `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
 | `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `KeyboardShortcuts`, `ExportWavButton` (from `@waveform-playlist/browser/tone`) |
 
@@ -159,21 +159,21 @@ function FormatSelector() {
 ```
 
 Available formats:
-- `seconds` - 0.000
-- `thousandths` - 0:00.000
-- `hh:mm:ss` - 0:00:00
-- `hh:mm:ss.u` - 0:00:00.0
-- `hh:mm:ss.uu` - 0:00:00.00
-- `hh:mm:ss.uuu` - 0:00:00.000
+- `seconds` - whole seconds: `3726`
+- `thousandths` - seconds with three decimals: `3725.500`
+- `hh:mm:ss` - `01:02:06`
+- `hh:mm:ss.u` - `01:02:05.5`
+- `hh:mm:ss.uu` - `01:02:05.50`
+- `hh:mm:ss.uuu` - `01:02:05.500`
 
 ## Continuous Play
 
 Continuous play is an annotation option, not a loop. Off: playing an annotation stops at that annotation's end. On: playback runs on through the following annotations. For looping see `LoopButton`.
 
-The checkbox needs the `<AnnotationProvider>` of `@waveform-playlist/annotations` above it and throws without it:
+The checkbox is an export of `@waveform-playlist/annotations`. It needs a playlist provider above it (either one) and does not need `<AnnotationProvider>`:
 
 ```tsx
-import { ContinuousPlayCheckbox } from '@waveform-playlist/browser';
+import { ContinuousPlayCheckbox } from '@waveform-playlist/annotations';
 
 function ContinuousPlayControl() {
   return <ContinuousPlayCheckbox />;

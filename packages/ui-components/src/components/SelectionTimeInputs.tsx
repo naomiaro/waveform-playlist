@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useId } from 'react';
 import { TimeInput } from './TimeInput';
 import { type TimeFormat } from '../utils/timeFormat';
 
@@ -6,6 +6,8 @@ export interface SelectionTimeInputsProps {
   selectionStart: number; // Time in seconds
   selectionEnd: number; // Time in seconds
   onSelectionChange?: (start: number, end: number) => void;
+  /** How the two times are shown and parsed. Default: `hh:mm:ss.uuu`. */
+  format?: TimeFormat;
   className?: string;
 }
 
@@ -13,31 +15,11 @@ export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
   selectionStart,
   selectionEnd,
   onSelectionChange,
+  format = 'hh:mm:ss.uuu',
   className,
 }) => {
-  const [timeFormat, setTimeFormat] = useState<TimeFormat>('hh:mm:ss.uuu');
-
-  // Listen to the external time-format dropdown
-  useEffect(() => {
-    const timeFormatSelect = document.querySelector('.time-format') as HTMLSelectElement;
-
-    const handleFormatChange = () => {
-      if (timeFormatSelect) {
-        setTimeFormat(timeFormatSelect.value as TimeFormat);
-      }
-    };
-
-    // Set initial value
-    if (timeFormatSelect) {
-      setTimeFormat(timeFormatSelect.value as TimeFormat);
-      timeFormatSelect.addEventListener('change', handleFormatChange);
-    }
-
-    return () => {
-      timeFormatSelect?.removeEventListener('change', handleFormatChange);
-    };
-  }, []);
-
+  // Generated: two of this component on one page must not share ids.
+  const id = useId();
   const handleStartChange = (value: number) => {
     if (onSelectionChange) {
       onSelectionChange(value, selectionEnd);
@@ -53,18 +35,18 @@ export const SelectionTimeInputs: React.FC<SelectionTimeInputsProps> = ({
   return (
     <div className={className}>
       <TimeInput
-        id="audio_start"
+        id={`${id}-start`}
         label="Start of audio selection"
         value={selectionStart}
-        format={timeFormat}
+        format={format}
         className="audio-start form-control mr-sm-2"
         onChange={handleStartChange}
       />
       <TimeInput
-        id="audio_end"
+        id={`${id}-end`}
         label="End of audio selection"
         value={selectionEnd}
-        format={timeFormat}
+        format={format}
         className="audio-end form-control mr-sm-2"
         onChange={handleEndChange}
       />

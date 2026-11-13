@@ -11,11 +11,11 @@ import {
   samplesToTicks,
   snapToGrid,
 } from '@waveform-playlist/core';
-import type { SnapTo } from '@waveform-playlist/ui-components';
+import type { BeatsAndBarsSnapTo } from '@waveform-playlist/ui-components';
 
 interface SnapToGridBeatsOptions {
   mode: 'beats';
-  snapTo: SnapTo;
+  snapTo: BeatsAndBarsSnapTo;
   bpm: number;
   timeSignature: [number, number];
   samplesPerPixel: number;

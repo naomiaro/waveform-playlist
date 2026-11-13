@@ -23,7 +23,7 @@ import {
   BaseSelectSmall,
   BaseInputSmall,
   InlineLabel,
-  type SnapTo,
+  type BeatsAndBarsSnapTo,
   type ScaleMode,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -147,7 +147,7 @@ export function BeatsAndBarsExample() {
   const [scaleMode, setScaleMode] = useState<ScaleMode>('beats');
   const [bpm, setBpm] = useState(126);
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
-  const [snapTo, setSnapTo] = useState<SnapTo>('beat');
+  const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
   const [temporalSnap, setTemporalSnap] = useState(true);
 
   // Load audio files in parallel — each file updates loadedFiles independently
@@ -313,7 +313,7 @@ export function BeatsAndBarsExample() {
                     Snap{' '}
                     <BaseSelectSmall
                       value={snapTo}
-                      onChange={(e) => setSnapTo(e.target.value as SnapTo)}
+                      onChange={(e) => setSnapTo(e.target.value as BeatsAndBarsSnapTo)}
                     >
                       <option value="bar">Bar</option>
                       <option value="beat">Beat</option>

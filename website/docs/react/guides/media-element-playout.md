@@ -120,7 +120,7 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
 </MediaElementWaveformRoot>
 ```
 
-Leave `<WaveformTimescale />` out for a player without a time ruler. With annotations, add `<WaveformAnnotationBoxes />` after the tracks and `<AnnotationList />` below the root: the same two components as under `WaveformPlaylistProvider`. Whether annotations can be edited is the provider's option (`annotationList={{ annotations, editable: true }}`, or `<EditableCheckbox />`); see the [Annotations guide](/docs/react/guides/annotations). See [Composing the View](/docs/react/guides/composing-the-view).
+Leave `<WaveformTimescale />` out for a player without a time ruler. With annotations, add `<WaveformAnnotationBoxes />` after the tracks and `<AnnotationList />` below the root: the same two components as under `WaveformPlaylistProvider`. Whether annotations can be edited is the provider's option (`annotationList={{ annotations, editable: true }}`, or `<EditableCheckbox />` from `@waveform-playlist/annotations`); see the [Annotations guide](/docs/react/guides/annotations). See [Composing the View](/docs/react/guides/composing-the-view).
 
 `PlayheadWithMarker` adds a triangle marker above the playhead line. You can also write your own — the render function receives `PlayheadProps` (see [API reference](/docs/llm-reference)). The props are the same as under `WaveformPlaylistProvider`; read `visualTimeRef.current` to animate (here it is the same ref as `currentTimeRef`). The playhead is hidden while a range is highlighted and playback is stopped or paused.
 

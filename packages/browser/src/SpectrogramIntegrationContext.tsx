@@ -4,26 +4,9 @@ import type {
   ColorMapValue,
   RenderMode,
   TrackSpectrogramOverrides,
+  SpectrogramCanvasRegistration,
 } from '@waveform-playlist/core';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
-
-/**
- * Single-call canvas registration shape. Consolidates the OffscreenCanvas
- * transfer and per-canvas metadata that earlier required two separate
- * registration paths.
- *
- * Provider/orchestrator look up trackId from clipId and derive
- * globalPixelOffset = chunkIndex * MAX_CANVAS_WIDTH.
- */
-export interface SpectrogramCanvasRegistration {
-  canvasId: string;
-  canvas: OffscreenCanvas;
-  clipId: string;
-  channelIndex: number;
-  chunkIndex: number;
-  widthPx: number;
-  heightPx: number;
-}
 
 export interface SpectrogramIntegration {
   trackSpectrogramOverrides: Map<string, TrackSpectrogramOverrides>;

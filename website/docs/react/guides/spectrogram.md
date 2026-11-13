@@ -87,7 +87,7 @@ See [The Panel of a Track](/docs/react/guides/track-management#the-panel-of-a-tr
 
 The package also exports the two pieces the provider builds that UI from, for a menu or dialog of your own:
 
-- `SpectrogramMenuItems(props)` is a function, not a component: it takes `{ renderMode, onRenderModeChange, onOpenSettings, onClose? }` and returns an array of `TrackMenuItem` (the render-mode radios and the settings entry) for the `items` of `TrackMenu` from `@waveform-playlist/ui-components`. It has no colour-map items; the colour map is chosen in the settings dialog.
+- `SpectrogramMenuItems(props)` is a function, not a component: it takes `{ renderMode, onRenderModeChange, onOpenSettings, onClose? }` and returns an array of `TrackMenuItem` (the render-mode radios and the settings entry) for the `items` of `TrackMenu`. Both `TrackMenu` and the `TrackMenuItem` type are exports of `@waveform-playlist/ui-components`; the spectrogram package does not export the type. It has no colour-map items; the colour map is chosen in the settings dialog.
 - `<SpectrogramSettingsModal open onClose config colorMap onApply />` is the settings dialog (FFT size, frequency scale, gain, range and the rest). It reads no context: you pass the current `config` and `colorMap` and get the new ones in `onApply`.
 
 ## Web Components

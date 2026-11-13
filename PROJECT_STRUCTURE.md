@@ -11,7 +11,7 @@ Waveform-playlist is a **monorepo** organized with pnpm workspaces. It's a multi
 ```
 waveform-playlist/
 ├── packages/              # Workspace packages (modular architecture)
-│   ├── annotations/       # 📦 OPTIONAL: Annotation components & hooks
+│   ├── annotations/       # 📦 OPTIONAL: Annotation components
 │   ├── browser/           # Main React package (provider, hooks, components)
 │   ├── core/              # Core types and interfaces
 │   ├── dawcore/           # Web Components (Lit) — framework-agnostic DAW UI (@dawcore/components)
@@ -94,8 +94,8 @@ waveform-playlist/
   - `valueSource.ts` — `ValueSource<T>` (`subscribe` + `getSnapshot`), `createValueSource()`, `MeterLevels`/`MeterSource`, `RecordingProgress`/`RecordingProgressSource`, `silentMeterLevels()` (values that change ~60 times a second and are kept out of UI state)
   - `utils/meterLevels.ts` — `readMeterMessage()` (one meter-worklet message → `MeterLevels`; shared by `useOutputMeter` and `useMicrophoneLevel`)
   - `beatsAndBars.ts` — `PPQN` (192), `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid`, `ticksToBarBeatLabel`
-  - `keyboard.ts` — `KeyboardShortcut` type, `handleKeyboardEvent()` (matches event to shortcut array), `getShortcutLabel()` (human-readable label from shortcut definition)
-  - `spectrogramCanvasId.ts` — `buildSpectrogramCanvasId()`/`parseSpectrogramCanvasId()`: the canonical `${clipId}-ch${channelIndex}-chunk${chunkIndex}` canvas-ID contract, single-sourced here (zero-dependency, already a dependency of every producer/consumer) so `@waveform-playlist/spectrogram`, `@dawcore/spectrogram`, and the `<daw-spectrogram>` element can't drift on the format (#560)
+  - `keyboard.ts` — `KeyboardShortcut` type, `handleKeyboardEvent()` (matches event to shortcut array)
+  - `spectrogramCanvasId.ts` — the `SpectrogramCanvasRegistration` type (what a spectrogram canvas registers with; declared here once, for ui-components, browser and spectrogram) and `buildSpectrogramCanvasId()`/`parseSpectrogramCanvasId()`: the canonical `${clipId}-ch${channelIndex}-chunk${chunkIndex}` canvas-ID contract, single-sourced here (zero-dependency, already a dependency of every producer/consumer) so `@waveform-playlist/spectrogram`, `@dawcore/spectrogram`, and the `<daw-spectrogram>` element can't drift on the format (#560)
 
 **Important Architectural Decision: Sample-Based Representation**
 
@@ -186,7 +186,6 @@ const clip = createClipFromSeconds({
   │   ├── FadeOverlay.tsx        # Fade in/out visualization
   │   ├── SegmentedVUMeter.tsx   # LED-style VU meter (multi-channel; `meter` source or `levels` props)
   │   ├── ErrorBoundary.tsx      # PlaylistErrorBoundary (plain CSS)
-  │   ├── AudioPosition.tsx      # Current time display
   │   ├── TimeInput.tsx          # Time value input
   │   ├── SelectionTimeInputs.tsx # Selection start/end inputs
   │   ├── TimeScale.tsx          # Timeline ruler
@@ -217,22 +216,23 @@ const clip = createClipFromSeconds({
   │   ├── ScrollViewport.tsx    # Virtual scrolling: viewport state, chunk visibility
   │   ├── ClipViewportOrigin.tsx # Clip pixel offset for correct chunk culling
   │   ├── BeatsAndBars.tsx      # BPM, time signature, snap config, scale mode
-  │   └── ...                   # Theme, playlist info, playout contexts
-  ├── utils/             # Utilities (time formatting, conversions)
+  │   └── ...                   # Theme, playlist info, device pixel ratio contexts
+  ├── utils/             # Utilities (time formatting, peak rendering); the unit conversions are core's
   ├── styled/            # Shared styled components
-  │   ├── CheckboxStyles.tsx  # Checkbox, label, wrapper
-  │   └── ButtonStyles.tsx    # ControlButton with variants
+  │   ├── BaseCheckbox.tsx    # BaseCheckboxWrapper, BaseCheckbox, BaseCheckboxLabel
+  │   ├── BaseControlButton.tsx # BaseControlButton
+  │   └── ...                 # BaseButton, BaseInput, BaseLabel, BaseSelect, BaseSlider
   ├── wfpl-theme.ts      # Theme interface and default theme
   ├── styled.d.ts        # styled-components type augmentation
   └── index.tsx          # Public API
   ```
 - **Shared Styled Components:**
   - **Pattern:** Extract commonly duplicated styled components into `styled/` directory
-  - **CheckboxStyles:** Shared checkbox components used across all checkbox controls
-    - `CheckboxWrapper`, `StyledCheckbox`, `CheckboxLabel`
+  - **BaseCheckbox:** Shared checkbox components used across all checkbox controls
+    - `BaseCheckboxWrapper`, `BaseCheckbox`, `BaseCheckboxLabel`
     - ~60% code reduction in checkbox components
-  - **ButtonStyles:** Shared button component with color variants
-    - `ControlButton` - Large control button (primary/success/info variants)
+  - **BaseControlButton:** Shared control button
+    - `BaseControlButton` - Large control button
     - Separate from `TrackControls/Button` (compact UI button)
   - **Benefits:** DRY principle, consistent styling, easier maintenance
 - **Theming System:**
@@ -278,7 +278,6 @@ const clip = createClipFromSeconds({
   - `PlaybackRateSelect` - Playback speed dropdown (base component; the browser package's wrapper reads `usePlaybackRate()`)
   - `Playhead` - Playback position indicator
   - `Selection` - Selection overlay
-  - `AudioPosition` - Current time display
   - `MasterVolumeControl` - Volume slider
   - `AutomaticScrollCheckbox` - Auto-scroll toggle
   - `TrackMenu` - Per-track dropdown menu
@@ -360,7 +359,6 @@ const clip = createClipFromSeconds({
   │   ├── PlaybackControls.tsx          # Play/Pause/Stop/Rewind/FastForward buttons
   │   ├── ZoomControls.tsx              # Zoom in/out buttons
   │   ├── ExportControls.tsx            # WAV export controls
-  │   ├── AnnotationControls.tsx        # The three option checkboxes and the download button, bound to the provider (both providers)
   │   ├── ChannelWithProgress.tsx       # Waveform channel with playback progress overlay (both providers)
   │   ├── AnimatedPlayhead.tsx          # Smooth 60fps playhead (both providers)
   │   ├── WaveformAnnotationBoxes.tsx   # Annotation boxes part (both providers): provider state, its own DragDropProvider + edge drag wiring
@@ -485,39 +483,32 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 
 - **Type:** Optional package (install separately)
 - **Purpose:** Complete annotation support for time-synchronized text segments
-- **Tech:** React, styled-components, custom hooks
+- **Tech:** React, styled-components
 - **Install:** `npm install @waveform-playlist/annotations`
 - **Structure:**
   ```
   src/
   ├── components/        # React components
-  │   ├── Annotation.tsx
   │   ├── AnnotationBox.tsx
   │   ├── AnnotationBoxesWrapper.tsx
-  │   ├── AnnotationsTrack.tsx
   │   ├── AnnotationText.tsx
-  │   ├── ContinuousPlayCheckbox.tsx
-  │   ├── DownloadAnnotationsButton.tsx
-  │   ├── EditableCheckbox.tsx
-  │   └── LinkEndpointsCheckbox.tsx
-  ├── hooks/             # Custom hooks
-  │   └── useAnnotationControls.ts
-  ├── types/             # TypeScript types
-  │   └── index.ts
+  │   ├── AnnotationCheckboxes.tsx      # ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox (bound to the playlist provider)
+  │   └── DownloadAnnotationsButton.tsx # Bound to the playlist provider
   ├── parsers/           # Import/export (Aeneas JSON)
   │   └── aeneas.ts
+  ├── AnnotationProvider.tsx
   └── index.ts           # Public exports
   ```
-- **Entry point:** `AnnotationProvider` (`AnnotationProvider.tsx`) puts the package's components into the browser package's `AnnotationIntegrationContext`; `WaveformAnnotationBoxes`, `AnnotationList` and the browser's checkbox wrappers read them from there
-- **Hook:** `useAnnotationControls` holds `continuousPlay` and `linkEndpoints` as local state and wraps `updateAnnotationBoundaries()` of `@waveform-playlist/core` (linked endpoints, collision push-back, cascading updates). Nothing in the repo calls it: under a provider the options are the provider's (`useAnnotationOptions()`)
+- **Entry point:** `AnnotationProvider` (`AnnotationProvider.tsx`) puts the package's components into the browser package's `AnnotationIntegrationContext`; `WaveformAnnotationBoxes` and `AnnotationList` read them from there. The integration holds the parser functions, `AnnotationText`, `AnnotationBox` and `AnnotationBoxesWrapper`
+- **Controls:** the three checkboxes and the download button are owned by this package and bound to the playlist provider: they read the browser package's `useAnnotationOptions()`, `usePlaybackControls()` and `useAnnotations()`, under either provider, and do not go through the integration context. The package has no hooks of its own; the boundary math is `updateAnnotationBoundaries()` of `@waveform-playlist/core`
 - **Components:**
-  - Visual: AnnotationBox, AnnotationBoxesWrapper, AnnotationsTrack
-  - Text: Annotation, AnnotationText
+  - Visual: AnnotationBox, AnnotationBoxesWrapper
+  - Text: AnnotationText
   - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox, DownloadAnnotationsButton
-- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0
+- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0, `@waveform-playlist/browser` (the controls read its hooks; the provider fills its integration context), `@dnd-kit/react` and `@dnd-kit/dom` (the edge handles of `AnnotationBox`)
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
-- **Documentation:** See `website/docs/getting-started/installation.md`
+- **Documentation:** See `website/docs/react/getting-started/installation.md`
 
 #### `@waveform-playlist/recording`
 
@@ -1097,6 +1088,7 @@ export const Playhead = () => {
 };
 
 // Control component subscribes to state and controls only
+// (`@waveform-playlist/annotations`, `components/AnnotationCheckboxes.tsx`)
 export const ContinuousPlayCheckbox = () => {
   const { continuousPlay } = useAnnotationOptions(); // User interactions
   const { setContinuousPlay } = usePlaybackControls(); // Stable functions

@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
+import { useAnnotations } from '@waveform-playlist/browser';
 import { serializeAeneas } from '../parsers/aeneas';
-import type { AnnotationData } from '../types';
 
 const StyledButton = styled.button`
   padding: 0.5rem 1rem;
@@ -32,25 +32,32 @@ const StyledButton = styled.button`
 `;
 
 export interface DownloadAnnotationsButtonProps {
-  annotations: AnnotationData[];
+  /** Name of the downloaded file. Default: `annotations.json`. */
   filename?: string;
   disabled?: boolean;
   className?: string;
+  /** The label. Default: `Download JSON`. */
   children?: React.ReactNode;
+  /**
+   * The tooltip. Default: an English sentence, a different one when there is
+   * nothing to download. Given, it is used in both cases.
+   */
+  title?: string;
 }
 
+/**
+ * Downloads the provider's annotations as an array of Aeneas fragments.
+ * Under either playlist provider.
+ */
 export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps> = ({
-  annotations,
   filename = 'annotations.json',
   disabled = false,
   className,
   children = 'Download JSON',
+  title,
 }) => {
+  const { annotations } = useAnnotations();
   const handleDownload = () => {
-    if (annotations.length === 0) {
-      return;
-    }
-
     // Serialize annotations to Aeneas JSON format
     const jsonData = annotations.map((annotation) => serializeAeneas(annotation));
     const jsonString = JSON.stringify(jsonData, null, 2);
@@ -77,7 +84,10 @@ export const DownloadAnnotationsButton: React.FC<DownloadAnnotationsButtonProps>
       disabled={disabled || annotations.length === 0}
       className={className}
       title={
-        annotations.length === 0 ? 'No annotations to download' : 'Download the annotations as JSON'
+        title ??
+        (annotations.length === 0
+          ? 'No annotations to download'
+          : 'Download the annotations as JSON')
       }
     >
       {children}

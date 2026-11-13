@@ -22,8 +22,6 @@ import {
   ZoomInButton,
   ZoomOutButton,
   AudioPosition,
-  ContinuousPlayCheckbox,
-  LinkEndpointsCheckbox,
   useActiveAnnotation,
   useAnnotations,
   ClipInteractionOptions,
@@ -37,7 +35,12 @@ import {
   AnnotationList,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
+import {
+  AnnotationProvider,
+  parseAeneas,
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+} from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Full annotation data - Shakespeare's Sonnet 1

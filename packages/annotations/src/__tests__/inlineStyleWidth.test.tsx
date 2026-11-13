@@ -7,15 +7,11 @@ import './jsdom-polyfills'; // must be first
 import React from 'react';
 import { render, cleanup } from '@testing-library/react';
 import { describe, it, expect, afterEach } from 'vitest';
-import { AnnotationBoxesWrapper } from '../components/AnnotationBoxesWrapper';
-import { AnnotationsTrack } from '../components/AnnotationsTrack';
+import { AnnotationBoxesWrapper as Component } from '../components/AnnotationBoxesWrapper';
 
 afterEach(cleanup);
 
-describe.each([
-  ['AnnotationBoxesWrapper', AnnotationBoxesWrapper],
-  ['AnnotationsTrack', AnnotationsTrack],
-] as const)('%s width', (_name, Component) => {
+describe('AnnotationBoxesWrapper width', () => {
   it('is an inline style, so a new width reuses the same CSS class', () => {
     const { container, rerender } = render(<Component width={1000} />);
     const el = container.firstElementChild as HTMLElement;

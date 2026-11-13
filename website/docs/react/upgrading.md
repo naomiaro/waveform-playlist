@@ -1184,7 +1184,7 @@ function Info() {
 
 ### Which controls work where
 
-Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton`.
+Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton`. (Later entries change the annotation controls: all four work under either provider, are imported from `@waveform-playlist/annotations` and do not need `<AnnotationProvider>`; see [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed).)
 
 `MediaElementPlaylistProvider` only: `PlaybackRateSelect`.
 
@@ -1993,7 +1993,7 @@ const boxLabel = (annotation: AnnotationData, index: number) => String(index + 1
 <AnnotationList height={300} actions={annotationActions} scrollActivePosition="center" />
 ```
 
-Whether annotations can be edited, whether a dragged edge takes its neighbour along, and whether playback runs on past the end of an annotation are **provider state under both providers**. They start from the provider's `annotationList` prop and follow it; `useAnnotationOptions()` reads them; three setters of `usePlaybackControls()` and the three checkboxes change them.
+Whether annotations can be edited, whether a dragged edge takes its neighbour along, and whether playback runs on past the end of an annotation are **provider state under both providers**. They start from the provider's `annotationList` prop and follow it; `useAnnotationOptions()` reads them; three setters of `usePlaybackControls()` and the three checkboxes change them (the checkboxes are imported from `@waveform-playlist/annotations`: [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed)).
 
 The row of boxes wires the drag of its edges itself. `<Waveform />`, `<WaveformEditor />` and `<MediaElementWaveform />` take `className` only.
 
@@ -2085,7 +2085,7 @@ const annotationList = useMemo(
 </MediaElementPlaylistProvider>
 ```
 
-Or drop your own state and render `<EditableCheckbox />` and `<LinkEndpointsCheckbox />`, which now work under `MediaElementPlaylistProvider`.
+Or drop your own state and render `<EditableCheckbox />` and `<LinkEndpointsCheckbox />`, which now work under `MediaElementPlaylistProvider` (import them from `@waveform-playlist/annotations`: [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed)).
 
 **Find:** `onAnnotationUpdate`.
 
@@ -2200,7 +2200,7 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | The ids of the three checkboxes | `continuous-play`, `link-endpoints`, `editable-annotations` | generated (two of one checkbox no longer share an id) |
 | Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | the same: the part gained its `DragDropProvider` and the list lost a wrapper. A view with boxes and no list renders one component more per move and per boundary |
 
-Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls`, `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />`, the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
+Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls`, `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />` (not changed by this entry; [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed) moves the four controls to `@waveform-playlist/annotations`), the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
 
 ## The options that only affect how a view draws are `<WaveformViewOptions>`; they leave the providers
 
@@ -2402,6 +2402,336 @@ Not changed: `theme`, `samplesPerPixel` and `automaticScroll` on both providers;
 1. Search the whole project (examples and tests too) for `waveHeight=`, `barWidth=`, `barGap=`, `roundedBars`, `progressBarWidth=` and `fillViewport`: each remaining match must be on a `<WaveformViewOptions>`.
 2. Every MediaElement player whose provider had no `waveHeight`: each channel is drawn 80 px tall where it was 100.
 3. Every destructuring of `usePlaylistView()`: only `sampleRate`, `mono` and `indefinitePlayback` exist.
+
+## One owner per exported name: the annotation controls move to the annotations package; re-exports and unused exports are removed
+
+**Packages:** `@waveform-playlist/annotations` (major), `@waveform-playlist/browser` (major), `@waveform-playlist/ui-components` (major), `@waveform-playlist/spectrogram` (major), `@waveform-playlist/core` (major: `getShortcutLabel` is removed; one type added). Both providers.
+
+Apply this entry after the ones above (#770).
+
+It replaces names that earlier entries on this page send you to. Where an earlier entry imports `ClipTrack`, `AudioClip`, `Fade` or `AnnotationData` from `@waveform-playlist/browser`, tells you to render `<ContinuousPlayCheckbox />`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` or `<DownloadAnnotationsButton />` of `@waveform-playlist/browser`, or says they need `<AnnotationProvider>`, go straight to what this entry says.
+
+Among the React packages a name is now exported by one package. `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package: import a name from the package that owns it. Five names remain in two entry points, on purpose: `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`. The one in `@waveform-playlist/ui-components` is driven by props; the one in `@waveform-playlist/browser` reads the provider and renders it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) This holds for the main entries of those five packages, for `@waveform-playlist/browser/tone` and for `@waveform-playlist/core`, which a test compares. One pair is left and tracked: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and another in `@waveform-playlist/core`. The other packages (`midi`, `engine`, `playout`, `media-element-playout`, the web components) are not covered.
+
+The four annotation controls are owned by `@waveform-playlist/annotations` and are bound to the playlist provider there:
+
+```tsx
+import {
+  ContinuousPlayCheckbox,
+  LinkEndpointsCheckbox,
+  EditableCheckbox,
+  DownloadAnnotationsButton,
+} from '@waveform-playlist/annotations';
+
+// Under WaveformPlaylistProvider or MediaElementPlaylistProvider. No <AnnotationProvider> needed.
+<ContinuousPlayCheckbox />
+<LinkEndpointsCheckbox />
+<EditableCheckbox>Allow editing</EditableCheckbox>
+<DownloadAnnotationsButton filename="chapters.json">Save chapters</DownloadAnnotationsButton>
+```
+
+The checkboxes take `className`, `disabled` and `children` (the label). The button takes `filename`, `disabled`, `className`, `children` (the label) and `title` (the tooltip). Every string the four controls draw can be supplied by your app: `children` on all four, `title` on the button. They read `useAnnotationOptions()`, `usePlaybackControls()` and `useAnnotations()`, so they show and change the provider's options and download the provider's annotations.
+
+If your project uses a strict package manager (pnpm), a package you import from must be in your own `package.json`: after this entry that can include `@waveform-playlist/core`, `@waveform-playlist/ui-components` and `@waveform-playlist/playout`, which were reachable through `@waveform-playlist/browser` before.
+
+### Moved: import from the owner
+
+| Name | Was imported from | Import from |
+| --- | --- | --- |
+| `ContinuousPlayCheckbox` | `@waveform-playlist/browser` | `@waveform-playlist/annotations` |
+| `LinkEndpointsCheckbox` | `@waveform-playlist/browser` | `@waveform-playlist/annotations` |
+| `EditableCheckbox` | `@waveform-playlist/browser` | `@waveform-playlist/annotations` |
+| `DownloadAnnotationsButton` | `@waveform-playlist/browser` | `@waveform-playlist/annotations` |
+| `ClipTrack` (type) | `@waveform-playlist/browser` | `@waveform-playlist/core` |
+| `AudioClip` (type) | `@waveform-playlist/browser` | `@waveform-playlist/core` |
+| `Fade` (type) | `@waveform-playlist/browser` | `@waveform-playlist/core` |
+| `AnnotationData` (type) | `@waveform-playlist/browser` | `@waveform-playlist/core` |
+| `TimeFormat` (type) | `@waveform-playlist/browser` | `@waveform-playlist/ui-components` |
+| `EffectsFunction` (type) | `@waveform-playlist/browser` | `@waveform-playlist/playout` |
+| `TrackEffectsFunction` (type) | `@waveform-playlist/browser` | `@waveform-playlist/playout` |
+| `SpectrogramCanvasRegistration` (type) | `@waveform-playlist/browser` or `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `TrackMenuItem` (type) | `@waveform-playlist/spectrogram` | `@waveform-playlist/ui-components` (the `items` of `TrackMenu`) |
+| `samplesToSeconds` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `secondsToSamples` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `samplesToPixels` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `pixelsToSamples` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `pixelsToSeconds` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+| `secondsToPixels` | `@waveform-playlist/ui-components` | `@waveform-playlist/core` |
+
+The six conversion functions in `@waveform-playlist/ui-components` were copies of core's with the same arithmetic, so the results do not change.
+
+### Renamed
+
+| Was | Is |
+| --- | --- |
+| `SnapTo` of `@waveform-playlist/ui-components` (`'bar' \| 'beat' \| 'off'`) | `BeatsAndBarsSnapTo` of `@waveform-playlist/ui-components`, the same three values. `SnapTo` of `@waveform-playlist/core` is another type (a longer list, used by the web components) and is unchanged: do not replace one with the other |
+| `ContinuousPlayCheckboxProps`, `LinkEndpointsCheckboxProps`, `EditableCheckboxProps` of `@waveform-playlist/annotations` (`checked`, `onChange`, `className`; `disabled` on the first two) | `AnnotationCheckboxProps` of `@waveform-playlist/annotations` (`className`, `disabled`, `children`): one type for the three, and not the same shape |
+
+### Removed
+
+| Removed | Use |
+| --- | --- |
+| The controlled `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` of `@waveform-playlist/annotations` (props `checked`, `onChange`, and `disabled` on the first two) | under a playlist provider: the bound component of the same name, without `checked` and `onChange`; `disabled` is still taken, now by all three. Without a provider: a checkbox of your own from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components` (below) |
+| The controlled `DownloadAnnotationsButton` of `@waveform-playlist/annotations` (prop `annotations`) | under a playlist provider: the bound component of the same name, without the prop. Without a provider: `annotations.map(serializeAeneas)` and a download of your own (below) |
+| `AnnotationsTrack`, `AnnotationsTrackProps` (`@waveform-playlist/annotations`) | `AnnotationBoxesWrapper` with `height={100}` (its default is 30; `AnnotationsTrack`'s was 100). The other props are the same: `className`, `children`, `offset`, `width` |
+| `useAnnotationControls`, `UseAnnotationControlsOptions`, `UseAnnotationControlsReturn` (`@waveform-playlist/annotations`) | under a playlist provider: `useAnnotationOptions()` and `setContinuousPlay`, `setLinkEndpoints`, `setAnnotationsEditable` of `usePlaybackControls()`. Without one: two `useState`s and `updateAnnotationBoundaries` of `@waveform-playlist/core` (below) |
+| `AnnotationUpdateParams` (`@waveform-playlist/annotations`) | `AnnotationBoundaryUpdate` of `@waveform-playlist/core`, the same six fields |
+| `Annotation`, `AnnotationProps` (`@waveform-playlist/annotations`) | no one-to-one replacement. It drew one annotation as an overlay with its text edited inside the box. `AnnotationBox` draws a box; `AnnotationList` of `@waveform-playlist/browser` draws and edits the text |
+| `AnnotationIntegration.ContinuousPlayCheckbox`, `.LinkEndpointsCheckbox`, `.EditableCheckbox`, `.DownloadAnnotationsButton` (`@waveform-playlist/browser`) | nothing: no component reads them. The integration is `parseAeneas`, `serializeAeneas`, `AnnotationText`, `AnnotationBox`, `AnnotationBoxesWrapper` |
+| `TrackControlsContext`, `useTrackControls` (`@waveform-playlist/ui-components`) | nothing: no component provided or read the context. A track control panel reads its track with `useTrack()` of `@waveform-playlist/browser` |
+| `getShortcutLabel` (`@waveform-playlist/browser` and `@waveform-playlist/core`) | a function of your own that builds the label from the shortcut's fields (below). The `KeyboardShortcut` type and `handleKeyboardEvent` stay in `@waveform-playlist/core` (browser's entry never had those two) |
+| `AudioPosition`, `AudioPositionProps` of `@waveform-playlist/ui-components` (prop `formattedTime`) | `AudioPosition` of `@waveform-playlist/browser`, which reads the provider and takes no time. Without a provider: a `<span>` of your own with the text from `formatTime` of `@waveform-playlist/ui-components` |
+
+Removed names do not throw and have no shim. TypeScript reports each leftover import of a removed or moved name. Without TypeScript it depends on the bundler and the kind of module that imports the name. Either the build fails on the missing export (Rollup and Vite; webpack when the importing file is a strict ES module, such as an `.mjs` file or a package with `"type": "module"`; native ES modules fail when the module is loaded), or the name is `undefined` at runtime (CommonJS; webpack for other files, with a warning): then React reports "Element type is invalid" when it is rendered as a component, and calling it is a `TypeError`. Which of the two webpack does was read in its source; the others are how those tools are known to behave and were not tried here.
+
+### Find and replace
+
+**Find:** `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` or `DownloadAnnotationsButton` in an import from `@waveform-playlist/browser`.
+
+**Replace with:** the same names from `@waveform-playlist/annotations`. The JSX does not change.
+
+```tsx
+// Before
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  DownloadAnnotationsButton,
+} from '@waveform-playlist/browser';
+import { AnnotationProvider } from '@waveform-playlist/annotations';
+
+// After
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import {
+  AnnotationProvider,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  DownloadAnnotationsButton,
+} from '@waveform-playlist/annotations';
+```
+
+**Find:** `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox` or `EditableCheckbox` imported from `@waveform-playlist/annotations` and rendered with `checked` and `onChange`.
+
+**Replace with:** under a playlist provider, delete the two props and the state behind them; the provider holds the option. To start it from a value, or to keep driving it from your own state, pass the value in the provider's `annotationList` (`editable`, `linkEndpoints`, `isContinuousPlay`).
+
+```tsx
+// Before
+const [linkEndpoints, setLinkEndpoints] = useState(true);
+<LinkEndpointsCheckbox checked={linkEndpoints} onChange={setLinkEndpoints} />
+
+// After
+<WaveformPlaylistProvider tracks={tracks} annotationList={{ annotations, linkEndpoints: true }}>
+  <LinkEndpointsCheckbox />
+</WaveformPlaylistProvider>
+```
+
+Without a playlist provider, build the checkbox:
+
+```tsx
+import { useId } from 'react';
+import {
+  BaseCheckboxWrapper,
+  BaseCheckbox,
+  BaseCheckboxLabel,
+} from '@waveform-playlist/ui-components';
+
+function LinkEndpointsToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  const id = useId();
+  return (
+    <BaseCheckboxWrapper>
+      <BaseCheckbox
+        type="checkbox"
+        id={id}
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <BaseCheckboxLabel htmlFor={id}>Link Endpoints</BaseCheckboxLabel>
+    </BaseCheckboxWrapper>
+  );
+}
+```
+
+**Find:** `<DownloadAnnotationsButton` with an `annotations` prop.
+
+**Replace with:** under a playlist provider, delete the prop: the button downloads the provider's annotations. Without one, write the file yourself:
+
+```tsx
+import { serializeAeneas } from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
+
+function downloadAnnotations(annotations: AnnotationData[], filename = 'annotations.json') {
+  const json = JSON.stringify(annotations.map(serializeAeneas), null, 2);
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+```
+
+**Find:** `ContinuousPlayCheckboxProps`, `LinkEndpointsCheckboxProps`, `EditableCheckboxProps`.
+
+**Replace with:** `AnnotationCheckboxProps` where the type described the library's checkbox. It has no `checked` and no `onChange`: a wrapper of yours that forwarded those two needs its own props type.
+
+**Find:** `AnnotationsTrack`.
+
+**Replace with:** `AnnotationBoxesWrapper`, with the height written out.
+
+```tsx
+// Before
+<AnnotationsTrack width={timelineWidth}>{boxes}</AnnotationsTrack>
+
+// After
+<AnnotationBoxesWrapper height={100} width={timelineWidth}>{boxes}</AnnotationBoxesWrapper>
+```
+
+**Find:** `useAnnotationControls`.
+
+**Replace with:** under a playlist provider, the provider's options:
+
+```tsx
+// Before
+const { continuousPlay, linkEndpoints, setContinuousPlay, setLinkEndpoints } = useAnnotationControls();
+
+// After
+const { continuousPlay, linkEndpoints } = useAnnotationOptions();
+const { setContinuousPlay, setLinkEndpoints } = usePlaybackControls();
+```
+
+Without a provider, your own state and core's function. The hook started `linkEndpoints` at `true`; keep that default if you relied on it:
+
+```tsx
+// Before
+const { continuousPlay, linkEndpoints, setContinuousPlay, setLinkEndpoints, updateAnnotationBoundaries } =
+  useAnnotationControls();
+
+// After
+import { updateAnnotationBoundaries } from '@waveform-playlist/core';
+
+const [continuousPlay, setContinuousPlay] = useState(false);
+const [linkEndpoints, setLinkEndpoints] = useState(true);
+```
+
+`updateAnnotationBoundaries({ annotationIndex, newTime, isDraggingStart, annotations, duration, linkEndpoints })` takes the same object and returns a new array, as the hook's function did (the hook called it).
+
+**Find:** `<Annotation ` and `Annotation,` or `{ Annotation }` in an import from `@waveform-playlist/annotations`. Match the whole word: `AnnotationBox`, `AnnotationText`, `AnnotationProvider` and `AnnotationData` are other names and stay.
+
+**Replace with:** `AnnotationBox` for the box, and `AnnotationList` (`@waveform-playlist/browser`) or `AnnotationText` for the text. There is no component that edits the text inside the box.
+
+**Find:** `getShortcutLabel`, imported from `@waveform-playlist/browser` or from `@waveform-playlist/core`.
+
+**Replace with:** a function of your own. The removed one returned English words joined with `+`: for `metaKey`, `Cmd` on a Mac and `Ctrl` elsewhere; `Ctrl` for `ctrlKey`, left out whenever `metaKey` was also set (so on a Mac a shortcut with both showed `Cmd` only); for `altKey`, `Option` on a Mac and `Alt` elsewhere; `Shift` for `shiftKey`; then `key.toUpperCase()`, so the Space key came out as a blank. Nothing in the library called it. Name the keys and the modifiers in your own words:
+
+```tsx
+import type { KeyboardShortcut } from '@waveform-playlist/core';
+
+// Your own names for the keys that need one, in your own language.
+const KEY_NAMES: Record<string, string> = { ' ': 'Space' };
+
+const shortcutLabel = (shortcut: KeyboardShortcut): string =>
+  [
+    shortcut.metaKey ? 'Cmd' : null,
+    shortcut.ctrlKey ? 'Ctrl' : null,
+    shortcut.altKey ? 'Alt' : null,
+    shortcut.shiftKey ? 'Shift' : null,
+    KEY_NAMES[shortcut.key] ?? shortcut.key.toUpperCase(),
+  ]
+    .filter(Boolean)
+    .join('+');
+```
+
+**Find:** `ClipTrack`, `AudioClip`, `Fade` or `AnnotationData` in an import from `@waveform-playlist/browser`; `TimeFormat` in one; `EffectsFunction` or `TrackEffectsFunction` in one.
+
+**Replace with:** an import from the owner (the table above).
+
+```tsx
+// Before
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  type ClipTrack,
+  type AnnotationData,
+  type TimeFormat,
+  type EffectsFunction,
+} from '@waveform-playlist/browser';
+
+// After
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
+import type { TimeFormat } from '@waveform-playlist/ui-components';
+import type { EffectsFunction } from '@waveform-playlist/playout';
+```
+
+**Find:** `samplesToSeconds`, `secondsToSamples`, `samplesToPixels`, `pixelsToSamples`, `pixelsToSeconds` or `secondsToPixels` in an import from `@waveform-playlist/ui-components`.
+
+**Replace with:** the same names from `@waveform-playlist/core`.
+
+**Find:** `SnapTo` in an import from `@waveform-playlist/ui-components`.
+
+**Replace with:** `BeatsAndBarsSnapTo`. Leave a `SnapTo` imported from `@waveform-playlist/core` alone.
+
+```tsx
+// Before
+import { BeatsAndBarsProvider, type SnapTo } from '@waveform-playlist/ui-components';
+const [snapTo, setSnapTo] = useState<SnapTo>('beat');
+
+// After
+import { BeatsAndBarsProvider, type BeatsAndBarsSnapTo } from '@waveform-playlist/ui-components';
+const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
+```
+
+**Find:** `SpectrogramCanvasRegistration` in an import from `@waveform-playlist/browser` or `@waveform-playlist/ui-components`; `TrackMenuItem` in an import from `@waveform-playlist/spectrogram`.
+
+**Replace with:** `SpectrogramCanvasRegistration` from `@waveform-playlist/core`; `TrackMenuItem` from `@waveform-playlist/ui-components`. Both types have the fields they had.
+
+**Find:** `TrackControlsContext`, `useTrackControls`.
+
+**Replace with:** delete them. The context was never provided by the library, so `useTrackControls()` returned its default, an empty fragment.
+
+**Find:** `AudioPosition` in an import from `@waveform-playlist/ui-components`.
+
+**Replace with:** `AudioPosition` from `@waveform-playlist/browser` under a playlist provider (no `formattedTime` prop), or an element of your own.
+
+**Find:** an object given to `AnnotationIntegrationProvider` (or typed `AnnotationIntegration`) with the entries `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` or `DownloadAnnotationsButton`.
+
+**Replace with:** delete the four entries, and render your own controls where you rendered the library's.
+
+### Behaviour changes
+
+| Tree or code | Before | After |
+| --- | --- | --- |
+| The four controls under a playlist provider, without `<AnnotationProvider>` | threw: `useAnnotationIntegration must be used within <AnnotationProvider>. …` | work: they read the playlist provider only |
+| The four controls without a playlist provider | browser's threw (with or without `<AnnotationProvider>`); the controlled ones of the annotations package worked | throw the playlist hook's message (it names `WaveformPlaylistProvider or MediaElementPlaylistProvider`) |
+| One of the four still imported from `@waveform-playlist/browser` | the bound control | a TypeScript error. Without TypeScript: a failed build, or `undefined` at runtime (React reports "Element type is invalid" where it is rendered), depending on the bundler (see above) |
+| `<ContinuousPlayCheckbox checked={…} onChange={…} />` (also the other two) imported from `@waveform-playlist/annotations`, under a playlist provider | showed `checked`, called `onChange`; the provider's option was not touched | `checked` and `onChange` are ignored: the box shows the provider's option and a click sets it; your `onChange` is not called. No error in plain JavaScript; a TypeScript error |
+| The same code without a playlist provider | worked | throws the playlist hook's message |
+| `<DownloadAnnotationsButton annotations={…} />` imported from `@waveform-playlist/annotations` | downloaded the array it was given | under a playlist provider the prop is ignored and the provider's annotations are downloaded; without one it throws the playlist hook's message |
+| A custom object passed to `AnnotationIntegrationProvider` with its own four control entries | browser's four controls rendered your components | the four entries are not read by anything. In TypeScript an object literal written where the `AnnotationIntegration` type is expected is an excess-property error when it has them (an object built in an untyped variable first is not) |
+| `children` of `DownloadAnnotationsButton` | browser's button did not pass it on: the label was always "Download JSON" | the label (default "Download JSON") |
+| `title` on `DownloadAnnotationsButton` | not taken: the tooltip was "No annotations to download" without annotations and "Download the annotations as JSON" with them | given, it is the tooltip in both cases; left out, the same two sentences |
+| `disabled` on `DownloadAnnotationsButton` | browser's button did not take it: disabled only while there were no annotations | disables the button; it is also disabled while there are no annotations |
+| `children` of the three checkboxes | not taken: the labels were fixed | the label (defaults "Continuous Play", "Link Endpoints", "Editable Annotations") |
+| `disabled` on the three checkboxes | the controlled `ContinuousPlayCheckbox` and `LinkEndpointsCheckbox` of `@waveform-playlist/annotations` took it; `EditableCheckbox` and browser's three did not | all three take it: the input is disabled and a click changes nothing |
+| `children={null}` on a checkbox | not taken | counts as not given, like leaving it out: the default label is drawn. Only `null` and `undefined` do: `false` or `''` (as from `{condition && 'Label'}`) draws an empty label, and the input then has no accessible name. On `DownloadAnnotationsButton` only `undefined` is "not given": `null` draws an empty button |
+| `useAnnotationIntegration().ContinuousPlayCheckbox` (or one of the other three control entries) read in your own code | the component | `undefined`: the integration no longer carries the controls. Import them from `@waveform-playlist/annotations` |
+| The bound `SelectionTimeInputs` when the automatic-scroll setting changes | did not render | renders once per change: it reads `usePlaylistSettings()`, whose value holds the time format and the automatic-scroll setting. (Seen once with a throwaway test; no test in the repository counts it) |
+| `className` on the four controls, the input classes `continuous-play` and `link-endpoints`, the generated ids | | unchanged |
+| `AutomaticScrollCheckbox`, `MasterVolumeControl`, `SelectionTimeInputs` (the controlled ones of `@waveform-playlist/ui-components` and the bound ones of `@waveform-playlist/browser`, which render them) | the inputs had the fixed ids `automatic-scroll`, `master-gain`, `audio_start` and `audio_end`, so two of one control on a page shared an id and a label reached the first one's input | each input has a generated id (`useId()`); the input classes `automatic-scroll`, `audio-start` and `audio-end` are unchanged. A selector such as `#master-gain` in your own CSS or tests no longer matches: use the class, the label or the accessible name |
+| `SelectionTimeInputs`: the format the two times are shown and parsed in | the component looked in the page for the first element with the class `time-format` when it mounted and followed that element's `change` events. So it stayed on `hh:mm:ss.uuu` when no `TimeFormatSelect` was on the page or one was mounted later, did not follow `setTimeFormat()` called from code, and on a page with two players followed the first player's select | the bound one of `@waveform-playlist/browser` shows the provider's `timeFormat` under both providers, whatever is on the page. The controlled one of `@waveform-playlist/ui-components` takes `format` (default `hh:mm:ss.uuu`) and reads nothing from the page: pass it the format your own select holds |
+| `AnnotationsTrack` replaced by `AnnotationBoxesWrapper` | a positioned container, default height 100, no `z-index` | the wrapper has `z-index: 110` and a default height of 30: write `height={100}`, and check what it now covers or is covered by |
+| `useAnnotationControls()` replaced by your own state | `linkEndpoints` started `true`, `continuousPlay` `false` | whatever your `useState` starts with. The provider's options (`useAnnotationOptions()`) start `false` unless `annotationList` says otherwise |
+| `SnapTo` imported from `@waveform-playlist/ui-components` | `'bar' \| 'beat' \| 'off'` | a TypeScript error (types only: nothing changes at runtime). The type is `BeatsAndBarsSnapTo` |
+| A removed function called in plain JavaScript (`useAnnotationControls()`, `useTrackControls()`, a conversion imported from `@waveform-playlist/ui-components`, `getShortcutLabel` imported from either package) | ran | a TypeScript error. Without TypeScript: a failed build, or a `TypeError` where the import is `undefined`, depending on the bundler (see above) |
+
+Not changed: `AnnotationProvider`, `AnnotationBox`, `AnnotationBoxesWrapper`, `AnnotationText`, `parseAeneas` and `serializeAeneas` of `@waveform-playlist/annotations`; `WaveformAnnotationBoxes` and `AnnotationList` of `@waveform-playlist/browser`, which still draw nothing without `<AnnotationProvider>`; `useAnnotationIntegration()` and `AnnotationIntegrationProvider`, still exported by `@waveform-playlist/browser`; `AudioPosition` of `@waveform-playlist/browser`; `SnapTo` and the conversion functions of `@waveform-playlist/core`; the five controls that `@waveform-playlist/ui-components` and `@waveform-playlist/browser` both export.
+
+### What to check after the replacement
+
+1. Search every import from `@waveform-playlist/browser` for the names in the "Moved" table, and the whole project for `getShortcutLabel`: none may remain.
+2. Search for `checked=` and `onChange=` on the three annotation checkboxes and for `annotations=` on `DownloadAnnotationsButton`: none may remain.
+3. With a strict package manager, every `@waveform-playlist/*` package you now import from is in your `package.json`.
 
 ## Keyboard shortcuts yield to the focused control
 
@@ -2689,7 +3019,8 @@ const activeEffects = useActiveEffects(effects);
 Both versions are lines from the body of one component. That is the smallest change, and that component re-renders on every chain change as it did before. Keep a single `useDynamicEffects()` call per master chain, the one whose `masterEffects` is given to `<WaveformPlaylistProvider effects={…}>`: a second call creates a second, empty chain. To stop the page re-rendering, move the `useActiveEffects()` call into the rack component:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, type ClipTrack } from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
+import type { ClipTrack } from '@waveform-playlist/core';
 import {
   useDynamicEffects,
   useActiveEffects,

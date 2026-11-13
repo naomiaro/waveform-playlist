@@ -2,7 +2,6 @@
  * Shared annotation types used across Waveform components
  */
 import type { AnnotationData } from '@waveform-playlist/core';
-export type { AnnotationData } from '@waveform-playlist/core';
 
 /**
  * Custom function to generate the label shown on annotation boxes in the waveform.

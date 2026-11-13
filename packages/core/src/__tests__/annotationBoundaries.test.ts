@@ -198,8 +198,8 @@ describe('updateAnnotationBoundaries', () => {
     });
     expect(result[0].end).toBeCloseTo(4.5);
     expect(result[1].start).toBeCloseTo(4.5); // pushed
-    // Hand-traced against useAnnotationControls.ts:154-169: after the push, b becomes
-    // (start: 4.5, end: 4.2) — the hook does NOT reconcile start > end in the unlinked
+    // Hand-traced against the unlinked push branch of boundaries.ts: after the push, b becomes
+    // (start: 4.5, end: 4.2) — the function does NOT reconcile start > end in the unlinked
     // push branch. The cascade re-check uses `current.end > next.start`, i.e.
     // b.end (4.2, UNCHANGED — only b.start was reassigned) vs c.start (4.2).
     // 4.2 > 4.2 is false (strict), so the cascade loop breaks immediately and c is

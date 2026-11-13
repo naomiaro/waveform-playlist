@@ -1,5 +1,4 @@
 // Playlist components
-export * from './AudioPosition';
 export * from './AutomaticScrollCheckbox';
 export * from './Channel';
 export * from './ErrorBoundary';

@@ -2,8 +2,8 @@
 //
 // #686: nothing on the annotation path is a fixed value. A click on a default
 // row chooses the annotation (not while a field of it is being edited, not on
-// an action button); the colour of the active row is a theme key; and the
-// three checkboxes generate their ids, so two of one checkbox can share a page.
+// an action button); and the colour of the active row is a theme key. (The
+// checkboxes are in annotationControls.test.tsx.)
 import './jsdom-polyfills'; // must be first
 import React from 'react';
 import { render, cleanup, fireEvent } from '@testing-library/react';
@@ -13,9 +13,6 @@ import type { AnnotationData } from '@waveform-playlist/core';
 import { AnnotationText } from '../components/AnnotationText';
 import { DragDropProvider } from '@dnd-kit/react';
 import { AnnotationBox } from '../components/AnnotationBox';
-import { ContinuousPlayCheckbox } from '../components/ContinuousPlayCheckbox';
-import { LinkEndpointsCheckbox } from '../components/LinkEndpointsCheckbox';
-import { EditableCheckbox } from '../components/EditableCheckbox';
 
 const ANNOTATIONS: AnnotationData[] = [
   { id: 'a', start: 0, end: 1, lines: ['first'] },
@@ -124,44 +121,6 @@ describe('the colours of a box come from its colour prop (#686)', () => {
     expect(css).toContain('color-mix(in srgb, rgb(4, 5, 6) 40%, transparent)');
     expect(css).toContain('color-mix(in srgb, rgb(4, 5, 6) 20%, transparent)');
     expect(css).toMatch(/border:\s*2px solid rgb\(4, 5, 6\)/);
-  });
-});
-
-describe('the annotation checkboxes (#686)', () => {
-  it.each([
-    ['Continuous Play', ContinuousPlayCheckbox],
-    ['Link Endpoints', LinkEndpointsCheckbox],
-    ['Editable Annotations', EditableCheckbox],
-  ] as const)(
-    '%s: two on one page do not share an id, and each label ticks its own box',
-    (label, Checkbox) => {
-      const first = vi.fn();
-      const second = vi.fn();
-      const { container, getAllByText } = render(
-        <>
-          <Checkbox checked={false} onChange={first} />
-          <Checkbox checked={false} onChange={second} />
-        </>
-      );
-      const ids = [...container.querySelectorAll('input')].map((input) => input.id);
-      expect(ids).toHaveLength(2);
-      expect(ids[0]).not.toBe('');
-      expect(new Set(ids).size).toBe(2);
-      fireEvent.click(getAllByText(label)[1]);
-      expect(second).toHaveBeenCalledWith(true);
-      expect(first).not.toHaveBeenCalled();
-    }
-  );
-
-  it.each([
-    ['Continuous Play', ContinuousPlayCheckbox],
-    ['Link Endpoints', LinkEndpointsCheckbox],
-    ['Editable Annotations', EditableCheckbox],
-  ] as const)('%s: the label belongs to the checkbox', (label, Checkbox) => {
-    const onChange = vi.fn();
-    const { getByLabelText } = render(<Checkbox checked={false} onChange={onChange} />);
-    fireEvent.click(getByLabelText(label));
-    expect(onChange).toHaveBeenCalledWith(true);
   });
 });
 

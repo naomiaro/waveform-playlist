@@ -14,6 +14,8 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 **Upgrading from an earlier major:** see the [upgrade guide](./react/upgrading.md) — one Find / Replace-with entry per breaking change.
 
+**One owner per name (#770):** among the React packages a name is exported by one package, and `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package. Import data types and helpers (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`, `createTrack`, `KeyboardShortcut`, `handleKeyboardEvent`, the sample/pixel/second conversions, `SpectrogramCanvasRegistration`) from `@waveform-playlist/core`; `TimeFormat`, `TrackMenuItem` and `BeatsAndBarsSnapTo` from `@waveform-playlist/ui-components`; `EffectsFunction` and `TrackEffectsFunction` from `@waveform-playlist/playout`; the annotation checkboxes and `DownloadAnnotationsButton` from `@waveform-playlist/annotations`. Among the main entries of those five packages, `@waveform-playlist/browser/tone` and `@waveform-playlist/core`, the names two entry points share on purpose are `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`: the one in `ui-components` is driven by props, the one in `browser` reads the provider and wraps it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) One more pair is left: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and a different one in `@waveform-playlist/core`.
+
 ---
 
 ## Provider Props (WaveformPlaylistProvider)
@@ -1255,10 +1257,13 @@ Collision detection modifier for clip moves — constrains horizontal drag to pr
 ### SnapToGridModifier
 
 ```typescript
-type SnapTo = 'bar' | 'beat' | 'off';
+// From @waveform-playlist/ui-components (named `SnapTo` there before #770).
+// `SnapTo` of @waveform-playlist/core is another, longer list: the grid values
+// of the web components.
+type BeatsAndBarsSnapTo = 'bar' | 'beat' | 'off';
 
 type SnapToGridOptions =
-  | { mode: 'beats'; snapTo: SnapTo; bpm: number; timeSignature: [number, number]; samplesPerPixel: number; sampleRate: number }
+  | { mode: 'beats'; snapTo: BeatsAndBarsSnapTo; bpm: number; timeSignature: [number, number]; samplesPerPixel: number; sampleRate: number }
   | { mode: 'timescale'; gridSamples: number; samplesPerPixel: number };
 
 class SnapToGridModifier extends Modifier {
@@ -2197,8 +2202,18 @@ Under either provider (from @waveform-playlist/browser):
          PlayButton, PauseButton, StopButton, RewindButton, FastForwardButton,
          SkipBackwardButton, SkipForwardButton, ClearAllButton,
          AudioPosition, TimeFormatSelect, SelectionTimeInputs, AutomaticScrollCheckbox,
-         AnnotationList, ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox,
-         DownloadAnnotationsButton (these five inside <AnnotationProvider>)
+         AnnotationList (draws nothing without <AnnotationProvider>)
+Under either provider (from @waveform-playlist/annotations; no <AnnotationProvider> needed,
+a playlist provider is; NOT exported by @waveform-playlist/browser since #770):
+         ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox
+           props { className?, disabled?, children? }  (children = the label; type AnnotationCheckboxProps)
+         DownloadAnnotationsButton
+           props { filename?, disabled?, className?, children?, title? }  (children = the label,
+           default "Download JSON"; filename default "annotations.json"; title = the tooltip,
+           default one of two English sentences)
+         Every string the four draw can be supplied: children on all four, title on the button.
+         They read useAnnotationOptions() / usePlaybackControls() / useAnnotations() and have no
+         controlled form: `checked`, `onChange` and `annotations` props are ignored.
 MediaElementPlaylistProvider only (from @waveform-playlist/browser):
          PlaybackRateSelect
 WaveformPlaylistProvider only (from @waveform-playlist/browser):
@@ -2333,19 +2348,23 @@ Catches render errors in child components. Uses plain CSS (works without ThemePr
 ## Beats & Bars (@waveform-playlist/ui-components)
 
 ```typescript
-type SnapTo = 'bar' | 'beat' | 'off';
+// Named `SnapTo` before #770. Core's `SnapTo` is a different, longer list.
+type BeatsAndBarsSnapTo = 'bar' | 'beat' | 'off';
+type ScaleMode = 'beats' | 'temporal';
 
 interface BeatsAndBarsProviderProps {
   bpm: number;
   timeSignature: [number, number];     // [numerator, denominator]
-  snapTo: SnapTo;
+  snapTo: BeatsAndBarsSnapTo;
+  scaleMode?: ScaleMode;               // which timescale is drawn; default 'beats'
   children: React.ReactNode;
 }
 
 interface BeatsAndBarsContextValue {
   bpm: number;
   timeSignature: [number, number];
-  snapTo: SnapTo;
+  snapTo: BeatsAndBarsSnapTo;
+  scaleMode: ScaleMode;
   ticksPerBeat: number;                // Derived from timeSignature + PPQN
   ticksPerBar: number;                 // Derived from timeSignature + PPQN
 }
@@ -2499,7 +2518,12 @@ export { SpectrogramProvider, SpectrogramMenuItems, SpectrogramSettingsModal } f
 
 // Integration context (from @waveform-playlist/browser)
 export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@waveform-playlist/browser';
-export type { SpectrogramIntegration, SpectrogramWorkerApi } from '@waveform-playlist/browser';
+export type { SpectrogramIntegration } from '@waveform-playlist/browser';
+// SpectrogramWorkerApi (above) is a type of @dawcore/spectrogram; browser does not export it.
+// SpectrogramCanvasRegistration (what a spectrogram canvas registers with) is declared once,
+// in @waveform-playlist/core; browser and ui-components do not export it.
+// TrackMenuItem (what SpectrogramMenuItems returns an array of) is from
+// @waveform-playlist/ui-components; the spectrogram package does not export it.
 ```
 
 ---
@@ -2550,7 +2574,8 @@ panMatrix(pan: number, sourceChannelCount: number): PanMatrix;
 createPanStage(context: PanStageContext, pan: number, sourceChannelCount: number): PanStage;
 trackChannelCount(track: { clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }> }): number;
 
-// Keyboard
-getShortcutLabel(shortcut: KeyboardShortcut): string;
-// Returns e.g. "Cmd+Shift+S" on Mac, "Ctrl+Shift+S" on Windows
+// Keyboard: the `KeyboardShortcut` type and `handleKeyboardEvent` are from
+// `@waveform-playlist/core` (not exported by `@waveform-playlist/browser`).
+// `getShortcutLabel` is removed from both packages (#770): build a label from the
+// shortcut's fields (key, metaKey, ctrlKey, altKey, shiftKey) with the app's own strings.
 ```

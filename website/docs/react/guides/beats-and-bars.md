@@ -30,7 +30,8 @@ import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 |------|------|---------|-------------|
 | `bpm` | `number` | — | Beats per minute |
 | `timeSignature` | `[number, number]` | — | Time signature as `[beats, noteValue]`, e.g., `[4, 4]` |
-| `snapTo` | `'bar' \| 'beat' \| 'off'` | `'off'` | Grid resolution for snap-to-grid |
+| `snapTo` | `'bar' \| 'beat' \| 'off'` (type `BeatsAndBarsSnapTo`) | — | Grid resolution for snap-to-grid. Required |
+| `scaleMode` | `'beats' \| 'temporal'` | `'beats'` | Which timescale is drawn |
 
 ## Snap-to-Grid
 

@@ -55,40 +55,20 @@ export interface AnnotationBoxesWrapperIntegrationProps {
 /**
  * Interface for annotation integration provided by @waveform-playlist/annotations.
  *
- * The browser package defines what it needs, and the optional annotations package
- * provides it via <AnnotationProvider>.
+ * The browser package defines what its views need, and the optional annotations
+ * package provides it via <AnnotationProvider>.
  */
 export interface AnnotationIntegration {
   // Parser functions
   parseAeneas: (data: unknown) => AnnotationData;
   serializeAeneas: (annotation: AnnotationData) => unknown;
 
-  // Visualization components (typed with the props the browser package actually passes)
+  // The components browser's own views draw (typed with the props it passes).
+  // The checkboxes and the download button are not here: the app renders
+  // those itself, from @waveform-playlist/annotations.
   AnnotationText: React.ComponentType<AnnotationTextIntegrationProps>;
   AnnotationBox: React.ComponentType<AnnotationBoxIntegrationProps>;
   AnnotationBoxesWrapper: React.ComponentType<AnnotationBoxesWrapperIntegrationProps>;
-
-  // Control components
-  ContinuousPlayCheckbox: React.ComponentType<{
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    className?: string;
-  }>;
-  LinkEndpointsCheckbox: React.ComponentType<{
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    className?: string;
-  }>;
-  EditableCheckbox: React.ComponentType<{
-    checked: boolean;
-    onChange: (checked: boolean) => void;
-    className?: string;
-  }>;
-  DownloadAnnotationsButton: React.ComponentType<{
-    annotations: AnnotationData[];
-    filename?: string;
-    className?: string;
-  }>;
 }
 
 export const AnnotationIntegrationContext = createContext<AnnotationIntegration | null>(null);

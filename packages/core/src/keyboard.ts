@@ -214,36 +214,3 @@ export function handleKeyboardEvent(
     matchingShortcut.action();
   }
 }
-
-/**
- * Get a human-readable string representation of a keyboard shortcut.
- *
- * @param shortcut - The keyboard shortcut
- * @returns Human-readable string (e.g., "Cmd+Shift+S")
- */
-export const getShortcutLabel = (shortcut: KeyboardShortcut): string => {
-  const parts: string[] = [];
-
-  // Use Cmd on Mac, Ctrl on other platforms
-  const isMac = typeof navigator !== 'undefined' && navigator.platform.includes('Mac');
-
-  if (shortcut.metaKey) {
-    parts.push(isMac ? 'Cmd' : 'Ctrl');
-  }
-
-  if (shortcut.ctrlKey && !shortcut.metaKey) {
-    parts.push('Ctrl');
-  }
-
-  if (shortcut.altKey) {
-    parts.push(isMac ? 'Option' : 'Alt');
-  }
-
-  if (shortcut.shiftKey) {
-    parts.push('Shift');
-  }
-
-  parts.push(shortcut.key.toUpperCase());
-
-  return parts.join('+');
-};

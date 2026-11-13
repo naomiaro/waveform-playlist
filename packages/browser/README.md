@@ -17,7 +17,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 ## Installation
 
 ```bash
-npm install @waveform-playlist/browser tone @dnd-kit/react
+npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-playlist/core tone @dnd-kit/react
 ```
 
 `@waveform-playlist/browser` requires these peer dependencies:

@@ -8,6 +8,7 @@ import {
   buildSpectrogramCanvasId,
   parseSpectrogramCanvasId,
 } from '@waveform-playlist/core';
+import type { SpectrogramCanvasRegistration } from '@waveform-playlist/core';
 
 interface WrapperProps {
   readonly $index: number;
@@ -47,16 +48,6 @@ const SpectrogramCanvas = styled.canvas.attrs<CanvasProps>((props) => ({
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 `;
-
-export interface SpectrogramCanvasRegistration {
-  canvasId: string;
-  canvas: OffscreenCanvas;
-  clipId: string;
-  channelIndex: number;
-  chunkIndex: number;
-  widthPx: number;
-  heightPx: number;
-}
 
 export interface SpectrogramChannelProps {
   /** Visual position index — used for CSS positioning (top offset). */

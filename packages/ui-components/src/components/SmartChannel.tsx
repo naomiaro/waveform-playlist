@@ -2,8 +2,12 @@ import React, { FunctionComponent } from 'react';
 import { useDevicePixelRatio, usePlaylistInfo, useTheme } from '../contexts';
 import { Channel } from './Channel';
 import { PianoRollChannel } from './PianoRollChannel';
-import { SpectrogramChannel, type SpectrogramCanvasRegistration } from './SpectrogramChannel';
-import type { RenderMode, MidiNoteData } from '@waveform-playlist/core';
+import { SpectrogramChannel } from './SpectrogramChannel';
+import type {
+  RenderMode,
+  MidiNoteData,
+  SpectrogramCanvasRegistration,
+} from '@waveform-playlist/core';
 
 export interface SmartChannelProps {
   className?: string;
