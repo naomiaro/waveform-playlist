@@ -222,7 +222,7 @@ Array of zoom levels in samples per pixel.
 **Type:** `boolean`
 **Default:** `false`
 
-Auto-scroll to keep playhead visible.
+Auto-scroll to keep playhead visible. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 #### `fillViewport`
 
@@ -397,7 +397,9 @@ interface PlaybackControlsContextValue {
   stop: () => void;
   /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
   seekTo: (time: number) => void;
-  /** Sets the selected range and moves the cursor to its start. */
+  /** Sets the selected range and moves the cursor to its start. During playback, playback
+   *  restarts: a range is played start to end (open-ended under WaveformPlaylistProvider with
+   *  looping on), a collapsed one carries on from there. */
   setSelection: (start: number, end: number) => void;
   setTimeFormat: (format: TimeFormat) => void;
   setAutomaticScroll: (enabled: boolean) => void;

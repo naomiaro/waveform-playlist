@@ -747,14 +747,14 @@ The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow t
 No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the time selection that `MediaElementPlaylist` used to keep in its own state, and its animation loop draws the playhead and the progress overlay, which used to run a `requestAnimationFrame` loop each. Seven things behave differently:
 
 1. **The selection survives a remount of `MediaElementPlaylist`** (or `MediaElementWaveform`). Before, unmounting the component dropped the highlighted range. It is now kept for as long as the provider is mounted.
-2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own. A press on either one (a click to seek, or the start of a drag) therefore clears the range highlighted in both.
+2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own. A press on either one while stopped (a click to seek, or the start of a drag) therefore clears the range highlighted in both; during playback the release does.
 3. **A custom `renderPlayhead` is not called on each pointer move of a selection drag.** A move re-renders the highlighted range only; the rest of `MediaElementPlaylist` (timescale, waveform, annotation boxes, your playhead) renders on the press and on the release, not in between. Once the waveform is shown, the function is still called each time `MediaElementPlaylist` renders for another reason, among them: playback starting, pausing, stopping or ending, a seek, the press and the release of a click or drag, and the track's data arriving.
 4. **Automatic scroll positions are whole pixels**, as under `WaveformPlaylistProvider`.
 5. **When the provider replaces its player during playback, `isPlaying` becomes `false`.** The player is replaced when the track's `source`, `waveformData`, `name`, `fadeIn` or `fadeOut` changes, when the `audioContext`, `playbackRate` or `preservesPitch` prop changes, and when `onReady`, `onError` or `createPlayout` gets a new identity. The audio always stopped at that moment; `isPlaying` used to stay `true`, so a Play button stayed disabled and nothing played. Playback does not resume by itself.
 6. **New audio starts at 0.** When the track's `source` or `waveformData` changes, playing or not, the cursor goes to 0 and the active annotation is cleared; before, both were kept, so the old position was applied to the new audio. When the player is replaced for the same audio (any other reason in item 5), both are kept, `currentTime` is brought up to the position playback had reached, and the next `play()` continues from there. `waveformData` is compared by identity, so pass the same object while the audio is the same. The selection is kept either way. To start new audio somewhere else (a saved position per file), call `seekTo` or `setActiveAnnotationId` from a `useEffect` keyed on the source in a component under the provider, or from `onReady`: both run after the reset. A `useLayoutEffect` runs before it and is overwritten.
 7. **`seekTo` clamps to the length of the current track (`track.waveformData.duration`), not to the `duration` value.** `duration` is 0 until the first player is ready and stays at the previous file's length while the next one loads, so a `seekTo` made before the player was ready went to 0, and a position restored for a longer file was cut off at the old file's length. Both now go where they were asked to: the position is shown at once, the player is moved to it when it is ready, and `play()` starts there. (At the time of that change `duration` still went from 0 to the length when the player was ready; it is the track's length from the first render since the next entry.)
 
-What a click, a drag and Play do was not changed by this step; the next entry changes it (the cursor follows the start of a dragged range, a press during playback moves playback at once, and a range can be played).
+What a click, a drag and Play do was not changed by this step; the next entry changes it (the cursor follows the start of a dragged range, and a range can be played).
 
 **Find:** `onReady`, `onError` or `createPlayout` passed to `MediaElementPlaylistProvider` as inline functions (`onReady={() => …}`), or a `track` built with inline `fadeIn` / `fadeOut` objects (`fadeIn: { duration: 1 }`), by a component that re-renders during playback: each render replaces the player, and playback now visibly stops. Also a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
 
@@ -779,7 +779,7 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 | `play()` before the player exists | did nothing | queued: starts when the player arrives, also when it was called from a mount effect. `stop()`, `pause()`, new audio and a player that fails to arrive cancel it; a replacement of the player for the same audio keeps it. `isPlaying` stays `false` until the player has arrived and been started. The cursor ref (`currentTimeRef`) is at the queued start position from the moment of the call; the `currentTime` state follows when the play is cancelled or a seek is made (not when it starts: during playback only the ref advances), and the cursor stays there if the play is cancelled |
 | `seekTo(t)` during playback | moved the media element | restarts playback at `t`, so the track's fades are scheduled again; a range that was playing becomes an open-ended play |
 | A drag on the waveform while stopped | highlighted a range, the cursor stayed | highlights a range and moves the cursor to its start |
-| A press on the waveform during playback | playback moved on release | playback moves on the press; a drag made meanwhile selects nothing |
+| A press on the waveform during playback | playback moved on release | still on the release; a drag made meanwhile can now select a range when automatic scroll is off (see "During playback, a press on the waveform waits for the release, and a drag selects a range", below) |
 | `duration` from `useMediaElementData()` | 0 until the player was created | the length from `track.waveformData`, from the first render |
 | The waveform | "Loading waveform…" until the peaks effect ran | drawn on the first render |
 | `onReady` | called when the player object was created | called when the media element has loaded its metadata (it knows its length and can be played and seeked) |
@@ -789,7 +789,7 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 | `stop()` while already stopped | cursor to 0 | the cursor does not move, unless playback is paused (then it returns to where playback started; a pause followed by a replacement of the player for the same audio counts as stopped) |
 | `createPlayout` | any object with the playout's methods | must also implement `on()` and emit `loadedmetadata`; without `on()` the provider calls `onError` |
 
-**Where playback started** is the `startTime` of the last `play()`, or the cursor when it was called without one; for selection playback it is the start of the selection. A `seekTo` or a press on the waveform replaces it with the new position, during playback as well as while stopped. Wherever playback comes to rest by itself (the end of a range, of an annotation or of the audio, an error) is the new starting point too, so a `stop()` while stopped does not move the cursor. A `stop()` while a play is queued cancels it and leaves the cursor at that play's starting point (the start of the selection for a queued selection playback). To go back to the beginning, call `seekTo(0)`.
+**Where playback started** is the `startTime` of the last `play()`, or the cursor when it was called without one; for selection playback it is the start of the selection. A `seekTo` or a click on the waveform replaces it with the new position, during playback as well as while stopped. Wherever playback comes to rest by itself (the end of a range, of an annotation or of the audio, an error) is the new starting point too, so a `stop()` while stopped does not move the cursor. A `stop()` while a play is queued cancels it and leaves the cursor at that play's starting point (the start of the selection for a queued selection playback). To go back to the beginning, call `seekTo(0)`.
 
 **Ranges.** A range rests at its own end, with two exceptions. (1) When an annotation is active and continuous play is off, playback stops at that annotation's end if it comes first, and the cursor returns to where playback started. The annotation keyboard controls (`useAnnotationKeyboardControls` with `onPlay: play`) now play a real range for this reason: their duration argument used to be ignored. (2) Selection playback: a `play(start, duration)` that starts inside the highlighted range and ends at its end stops there and returns the cursor to the START of the selection, also when it was resumed part-way after a pause, and continuous play has no effect on it. The selection cannot be read from outside the built-in components yet, and no built-in control passes a duration, so in this step selection playback is reached only by code that knows the range it highlighted; the shared Play button of the next step uses it. `play()` without a duration is open-ended from the cursor, selection or not.
 
@@ -1310,6 +1310,41 @@ The props object is a plain object: reading a removed prop gives `undefined`, wi
 
 - Under `MediaElementPlaylistProvider`, a custom `renderPlayhead` is not called at all while a range is highlighted at rest, and one small extra component (the playhead overlay) renders per pointer move of a rightward selection drag and whenever the waveform shell renders (play, pause, stop, a click).
 - Under `WaveformPlaylistProvider` the selection highlight no longer renders when the visualization around it does (play, pause); it renders when the selection, the zoom, the theme or a view setting (`usePlaylistView()`) changes.
+
+## During playback, a press on the waveform waits for the release, and a drag selects a range
+
+**Packages:** `@waveform-playlist/browser`. Both providers.
+
+Nothing is committed while the mouse button is down during playback. In the last release a press under `WaveformPlaylistProvider` moved playback at once and the release moved it there a second time, a press under `MediaElementPlaylistProvider` moved it on the release, and under both a drag made while playing selected nothing.
+
+What the release does now depends on automatic scroll (the provider's `automaticScroll` prop, `setAutomaticScroll`, `<AutomaticScrollCheckbox />`):
+
+| During playback | Automatic scroll off | Automatic scroll on |
+| --- | --- | --- |
+| Press | nothing changes; under `WaveformPlaylistProvider` the track under the pointer is still selected | the same |
+| Drag | once it is at least 0.1 s long, the range is highlighted as it is drawn, in place of the current selection's highlight (only in the view being dragged, when two views share a provider); playback carries on undisturbed | nothing is drawn |
+| Release after a drag | the range becomes the selection and is played from its start to its end; playback stops there and the cursor returns to the start of the range. Under `WaveformPlaylistProvider` with looping on, playback carries on open-ended from the range's start instead (`MediaElementPlaylistProvider` has no loop) | playback moves to where the press landed and carries on: the same as a click |
+| Release after a click (a range shorter than 0.1 s) | playback moves to where the press landed and carries on | the same |
+| The window loses focus before the release | the drawn range is dropped; the selection and playback are untouched | nothing happens |
+
+With automatic scroll on, the waveform scrolls to keep the playhead in sight, so the audio moves under a still pointer and the position under it at the release is not the one that was pressed. That is why no range can be drawn there.
+
+While playback is stopped nothing changes: the selection follows the pointer on every move.
+
+**Find:** nothing in code. Check anything that relies on the old timing:
+
+- A test or a script that presses on the waveform during playback and expects playback to have moved before the release.
+- `useSelection()` readers (`SelectionTimeInputs`, your own): during a drag made while playing, `selectionStart` / `selectionEnd` keep the OLD selection until the release. Only the highlight shows the range being drawn. `SetLoopRegionButton` (`WaveformPlaylistProvider`) acts on the old selection until then.
+- A press during playback no longer changes `currentTime` or restarts playback. The release does both, once, through `setSelection`: the engine or the player is restarted, and the `play()` of `usePlaybackControls()` is not called.
+
+Four things that follow from it:
+
+- **A press made while playing whose release comes after playback has stopped** (it reached its end, or Stop was pressed) follows the stopped rules at the release. With the pointer less than 0.1 s from where it was pressed, it is a click at the pressed position: the cursor moves there and the selection collapses. Further away, the range from the press to the release becomes the selection and is not played.
+- **Playback started (with the keyboard) under a drag that began while stopped** follows the playing rules at the release: the range is played, or, with automatic scroll on, playback moves to where the press landed and the range drawn so far is given up.
+- **Automatic scroll switched on under a drag that has already drawn a range** withdraws the drawing at the next move; the release moves playback to where the press landed.
+- **`useEngineRefs()`: `playbackStartTimeRef` and `audioStartPositionRef` are now also written by the restart `setSelection` does during playback.** `play()`, the resume after an engine rebuild and the continuous-play reschedule already wrote them (a loop wrap is not a restart and does not). Before, after `setSelection(start, end)` during playback (from `SelectionTimeInputs`, or your own code) they still described the play that had been replaced, and a readout computed from them kept counting from the old start. Nothing to change in your code.
+
+**To let listeners select a range while a recording plays,** leave automatic scroll off, or give them `<AutomaticScrollCheckbox />` to switch it off.
 
 ## Keyboard shortcuts yield to the focused control
 

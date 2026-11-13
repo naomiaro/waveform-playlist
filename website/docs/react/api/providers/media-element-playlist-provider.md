@@ -135,7 +135,7 @@ Whether to preserve pitch when changing playback rate. When `true`, the browser'
 **Type:** `boolean`
 **Default:** `false`
 
-Auto-scroll to keep the playhead centered during playback.
+Auto-scroll to keep the playhead centered during playback. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 ### Theming
 

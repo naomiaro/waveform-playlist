@@ -326,6 +326,7 @@ const clip = createClipFromSeconds({
   │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts
   │   ├── useRecordingLayout.ts         # Channel count and stepped timeline end of a take in progress
   │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
+  │   ├── useSelectionDrag.ts           # The selection drag of both views; commits on release during playback
   │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects

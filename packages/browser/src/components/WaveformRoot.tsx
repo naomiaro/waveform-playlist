@@ -24,7 +24,6 @@ import {
   usePlaylistZoom,
   usePlaylistTimeline,
   useTrackReorderPreview,
-  useIsPlaying,
   usePlaybackControls,
   useEditorControls,
 } from '../contexts/playlistContexts';
@@ -34,7 +33,11 @@ import {
   trackIdAtOffset,
 } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
-import { useWindowDrag, clampedOffsetX } from '../hooks/useWindowDrag';
+import {
+  useSelectionDrag,
+  AutomaticScrollFlag,
+  SelectionPreviewContext,
+} from '../hooks/useSelectionDrag';
 import { useRecordingLayout } from '../hooks/useRecordingLayout';
 import type { RenderMode, SpectrogramConfig } from '@waveform-playlist/core';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
@@ -72,7 +75,7 @@ export interface WaveformRootProps {
  * drawing primitives and the spectrogram settings modal.
  *
  * It renders on its own state (a drag in progress, the settings modal, the
- * measured container width), on play and stop (its drag handlers read
+ * measured container width), on play and stop (its selection drag reads
  * `isPlaying`), on every change of the timeline, the zoom, the view settings,
  * the reorder preview, the spectrogram integration and the theme, on a
  * recording layout step, and whenever the component that composes it renders.
@@ -86,8 +89,7 @@ export interface WaveformRootProps {
 export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children }) => {
   const theme = useTheme() as import('@waveform-playlist/ui-components').WaveformPlaylistTheme;
 
-  const { isPlaying } = useIsPlaying();
-  const { setSelection, play, setScrollContainer } = usePlaybackControls();
+  const { setScrollContainer } = usePlaybackControls();
   const { setSelectedTrackId, setCurrentTime, setRecordingActive } = useEditorControls();
   const {
     sampleRate,
@@ -200,12 +202,6 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   const [settingsModalTrackId, setSettingsModalTrackId] = useState<string | null>(null);
   const closeSettingsModal = useCallback(() => setSettingsModalTrackId(null), []);
 
-  const [isSelecting, setIsSelecting] = useState(false);
-  const mouseDownTimeRef = useRef<number>(0);
-  // The element the drag began on (the click overlay), for pointer positions
-  // while the pointer is somewhere else.
-  const dragElementRef = useRef<HTMLDivElement | null>(null);
-
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   const [scrollContainerElement, setScrollContainerElement] = useState<HTMLDivElement | null>(null);
@@ -304,88 +300,31 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     [displayOrderIds, trackHeightById]
   );
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Primary button only: a right-click opens the context menu and its
-    // release may never be delivered.
-    if (e.button !== 0) return;
-    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const clickTime = (x * samplesPerPixel) / sampleRate;
-
-    // The row under the pointer, from the layout the rows are positioned with.
-    const clickedTrackId = trackIdAtOffset(
-      displayOrderIds,
-      trackLayout,
-      trackHeightById,
-      e.clientY - rect.top
-    );
-    if (clickedTrackId !== null) {
-      setSelectedTrackId(clickedTrackId);
-    }
-
-    mouseDownTimeRef.current = clickTime;
-    dragElementRef.current = e.currentTarget;
-    setIsSelecting(true);
-    setCurrentTime(clickTime);
-    setSelection(clickTime, clickTime);
-  };
-
-  // The drag is followed on the window, not on the overlay: the pointer may
-  // leave the tracks (a fast drag past either end, or drifting above or below
-  // them) and the button may be released anywhere. Positions outside the
-  // overlay clamp to its ends.
-  const dragTimeAt = (clientX: number): number | null => {
-    const element = dragElementRef.current;
-    const x = element ? clampedOffsetX(element, clientX) : null;
-    return x === null ? null : (x * samplesPerPixel) / sampleRate;
-  };
-
-  const handleDragMove = (e: MouseEvent) => {
-    if (isPlaying) return;
-    const moveTime = dragTimeAt(e.clientX);
-    if (moveTime === null) return;
-
-    // The anchor is where the drag began. It comes from a ref, not from the
-    // selection state: this component does not subscribe to the selection
-    // (#733), and `selectionStart` stops being the anchor as soon as the
-    // pointer passes to the left of it.
-    const anchor = mouseDownTimeRef.current;
-    setSelection(Math.min(anchor, moveTime), Math.max(anchor, moveTime));
-  };
-
-  const handleDragEnd = (e: MouseEvent | null) => {
-    setIsSelecting(false);
-
-    // The window lost focus mid-drag: there is no release position. Keep the
-    // selection as the last move left it.
-    if (e === null) return;
-
-    // During playback, use the time captured at mouseDown — auto-scroll shifts the
-    // overlay between mouseDown and mouseUp, so recomputing from getBoundingClientRect()
-    // would produce a wrong (shifted) position.
-    if (isPlaying) {
-      const clickTime = Math.max(0, mouseDownTimeRef.current);
-      setCurrentTime(clickTime);
-      setSelection(clickTime, clickTime);
-      play(clickTime);
-      return;
-    }
-
-    const endTime = dragTimeAt(e.clientX);
-    if (endTime === null) return;
-
-    const anchor = mouseDownTimeRef.current;
-    const start = Math.min(anchor, endTime);
-    const end = Math.max(anchor, endTime);
-
-    if (Math.abs(end - start) < 0.1) {
-      setCurrentTime(start);
-    } else {
-      setSelection(start, end);
-    }
-  };
-
-  useWindowDrag(isSelecting, handleDragMove, handleDragEnd);
+  // The selection drag (shared with the MediaElement view). The multitrack
+  // extras: a press selects the row under the pointer, and a click while
+  // stopped moves the cursor only (the selection the press collapsed stays).
+  const {
+    isSelecting,
+    handleMouseDown,
+    preview: selectionPreview,
+    automaticScrollRef,
+  } = useSelectionDrag({
+    samplesPerPixel,
+    sampleRate,
+    onPress: ({ offsetY }) => {
+      // The row under the pointer, from the layout the rows are positioned with.
+      const clickedTrackId = trackIdAtOffset(
+        displayOrderIds,
+        trackLayout,
+        trackHeightById,
+        offsetY
+      );
+      if (clickedTrackId !== null) {
+        setSelectedTrackId(clickedTrackId);
+      }
+    },
+    onClickWhileStopped: setCurrentTime,
+  });
 
   const animateTrackLayout = useTrailingActive(trackDragPreview !== null, 200);
 
@@ -450,29 +389,32 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
 
   return (
     <DevicePixelRatioProvider>
+      <AutomaticScrollFlag flagRef={automaticScrollRef} />
       <PlaylistInfoContext.Provider value={playlistInfo}>
         <WaveformExtentContext.Provider value={extent}>
           <WaveformRowsContext.Provider value={rows}>
-            <Playlist
-              className={className}
-              theme={theme}
-              backgroundColor={
-                theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
-              }
-              timescaleBackgroundColor={theme.timescaleBackgroundColor}
-              timescaleWidth={tracksFullWidth}
-              tracksWidth={tracksFullWidth}
-              controlsWidth={controls.show ? controls.width : 0}
-              onTracksMouseDown={handleMouseDown}
-              scrollContainerRef={handleScrollContainerRef}
-              isSelecting={isSelecting}
-              data-playlist-state={isReady ? 'ready' : 'loading'}
-              trackControlsSlots={parts.controls}
-              timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
-              timescale={timeScaleHeight > 0 && parts.timescale ? parts.timescale : undefined}
-            >
-              {parts.content}
-            </Playlist>
+            <SelectionPreviewContext.Provider value={selectionPreview}>
+              <Playlist
+                className={className}
+                theme={theme}
+                backgroundColor={
+                  theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
+                }
+                timescaleBackgroundColor={theme.timescaleBackgroundColor}
+                timescaleWidth={tracksFullWidth}
+                tracksWidth={tracksFullWidth}
+                controlsWidth={controls.show ? controls.width : 0}
+                onTracksMouseDown={handleMouseDown}
+                scrollContainerRef={handleScrollContainerRef}
+                isSelecting={isSelecting}
+                data-playlist-state={isReady ? 'ready' : 'loading'}
+                trackControlsSlots={parts.controls}
+                timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
+                timescale={timeScaleHeight > 0 && parts.timescale ? parts.timescale : undefined}
+              >
+                {parts.content}
+              </Playlist>
+            </SelectionPreviewContext.Provider>
           </WaveformRowsContext.Provider>
         </WaveformExtentContext.Provider>
       </PlaylistInfoContext.Provider>

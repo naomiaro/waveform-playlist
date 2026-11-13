@@ -164,6 +164,7 @@ const ANNOTATIONS = [
 ];
 
 interface MountOptions {
+  automaticScroll?: boolean;
   annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
   onReady?: () => void;
   onError?: (err: Error) => void;
@@ -195,6 +196,7 @@ async function mount(options: MountOptions = {}) {
       onReady={options.onReady}
       onError={options.onError}
       annotationList={options.annotationList}
+      automaticScroll={options.automaticScroll}
     >
       <ProbeChild />
       {options.playlist ? <MediaElementPlaylist /> : null}
@@ -484,18 +486,62 @@ describe('the drag in MediaElementPlaylist', () => {
     expect(probe.animation.currentTime).toBe(2);
   });
 
-  it('while playing: the press moves playback there, moves are ignored, the release selects nothing', async () => {
+  it('while playing: the press changes nothing, the drag is previewed, the release selects the range and plays it', async () => {
     const { playout } = await mount({ playlist: true });
     await playing(playout(), 0, 1);
+    const playsBefore = playout().play.mock.calls.length;
+    const selectionBefore = probe.selection;
+    const highlights = () => document.querySelectorAll('[data-selection]').length;
 
     await press(250);
-    expect(playout().play).toHaveBeenLastCalledWith(undefined, 5);
+    expect(playout().play.mock.calls.length).toBe(playsBefore);
+    expect(probe.selection).toEqual(selectionBefore);
+    expect(highlights()).toBe(0);
+
     await moveTo(350);
+    // Drawn, and not the selection yet: playback has not been touched.
+    expect(highlights()).toBe(1);
+    expect(probe.selection).toEqual(selectionBefore);
+    expect(playout().play.mock.calls.length).toBe(playsBefore);
+
+    await release(350);
+    expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 7 });
+    expect(highlights()).toBe(1);
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(playout().play.mock.calls.length).toBe(playsBefore + 1);
+    expect(playout().play).toHaveBeenLastCalledWith(undefined, 5);
+  });
+
+  it('while playing: a click moves playback there on the release, not on the press', async () => {
+    const { playout } = await mount({ playlist: true });
+    await playing(playout(), 0, 1);
+    const playsBefore = playout().play.mock.calls.length;
+
+    await press(250);
+    expect(playout().play.mock.calls.length).toBe(playsBefore);
+    await release(250);
     expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
+    expect(playout().play.mock.calls.length).toBe(playsBefore + 1);
+    expect(playout().play).toHaveBeenLastCalledWith(undefined, 5);
+    expect(probe.animation.isPlaying).toBe(true);
+  });
+
+  it('while playing with automatic scroll on: no range is drawn, and the release seeks once to the press', async () => {
+    const { playout } = await mount({ playlist: true, automaticScroll: true });
+    await playing(playout(), 0, 1);
+    const playsBefore = playout().play.mock.calls.length;
+
+    await press(250);
+    await moveTo(350);
+    expect(document.querySelectorAll('[data-selection]').length).toBe(0);
+    expect(playout().play.mock.calls.length).toBe(playsBefore);
+
     await release(350);
     expect(probe.selection).toEqual({ selectionStart: 5, selectionEnd: 5 });
-    expect(probe.animation.isPlaying).toBe(true);
+    expect(document.querySelectorAll('[data-selection]').length).toBe(0);
+    expect(playout().play.mock.calls.length).toBe(playsBefore + 1);
     expect(playout().play).toHaveBeenLastCalledWith(undefined, 5);
+    expect(probe.animation.isPlaying).toBe(true);
   });
 });
 

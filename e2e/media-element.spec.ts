@@ -333,7 +333,67 @@ test.describe('Media Element Example', () => {
       await stop.click();
     });
 
-    test('a press during playback moves playback there at once, and a drag selects nothing', async ({
+    // Until 2026-11 the press moved playback at once and no range could be
+    // drawn while playing. Nothing is committed before the release now.
+    test('during playback a drag draws a range without disturbing playback, and the release plays it until playback stops at its end', async ({
+      page,
+    }) => {
+      const player = page.locator('[data-scroll-container]').first();
+      await expect(player.locator('canvas').first()).toBeVisible({ timeout: 30000 });
+      const playhead = player.locator('[data-playhead]');
+      const selection = player.locator('[data-selection]');
+      const play = page.getByRole('button', { name: /Play/ }).first();
+      const pause = page.getByRole('button', { name: /Pause/ }).first();
+      const playheadX = () =>
+        playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(5);
+      }).toPass({ timeout: 10000 });
+      // Measured after Play was clicked: clicking it may scroll the page.
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await player.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const y = box!.y + box!.height / 2;
+
+      // Press far ahead and hold: playback stays where it was.
+      await page.mouse.move(box!.x + 300, y);
+      await page.mouse.down();
+      await page.waitForTimeout(400);
+      expect(await playheadX()).toBeLessThan(250);
+      await expect(selection).toHaveCount(0);
+
+      // The drag is drawn; playback is still the old play.
+      await page.mouse.move(box!.x + 420, y, { steps: 4 });
+      await page.mouse.move(box!.x + 540, y, { steps: 4 });
+      await expect(async () => {
+        const selectionBox = await selection.boundingBox();
+        expect(selectionBox).toBeTruthy();
+        expect(Math.abs(selectionBox!.width - 240)).toBeLessThanOrEqual(2);
+      }).toPass({ timeout: 5000 });
+      expect(await playheadX()).toBeLessThan(250);
+
+      // The release makes it the selection and plays it from its start...
+      await page.mouse.up();
+      await expect(async () => {
+        const x = await playheadX();
+        expect(x).toBeGreaterThanOrEqual(299);
+        expect(x).toBeLessThanOrEqual(541);
+      }).toPass({ timeout: 3000 });
+      await expect(selection).toHaveCount(1);
+      // It is playing, not resting at the range's start: the playhead moves on.
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(340);
+      }).toPass({ timeout: 3000 });
+      // ...to its end, where playback stops.
+      await expect(play).toBeEnabled({ timeout: 8000 });
+      await expect(pause).toBeDisabled();
+    });
+
+    test('during playback a click moves playback there on the release, and Stop returns to it', async ({
       page,
     }) => {
       const player = page.locator('[data-scroll-container]').first();
@@ -344,6 +404,11 @@ test.describe('Media Element Example', () => {
       const stop = page.getByRole('button', { name: /Stop/ }).first();
       const playheadX = () =>
         playhead.evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41);
+
+      await play.click();
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThan(5);
+      }).toPass({ timeout: 10000 });
       let box: { x: number; y: number; width: number; height: number } | null = null;
       await expect(async () => {
         box = await player.boundingBox();
@@ -351,26 +416,19 @@ test.describe('Media Element Example', () => {
       }).toPass({ timeout: 5000 });
       const y = box!.y + box!.height / 2;
 
-      await play.click();
-      await expect(async () => {
-        expect(await playheadX()).toBeGreaterThan(5);
-      }).toPass({ timeout: 10000 });
-
-      // Press far ahead and hold: playback is already there before the release.
       await page.mouse.move(box!.x + 300, y);
       await page.mouse.down();
-      await expect(async () => {
-        expect(await playheadX()).toBeGreaterThanOrEqual(300);
-      }).toPass({ timeout: 5000 });
-      await page.mouse.move(box!.x + 200, y, { steps: 5 });
-      await expect(page.locator('[data-selection]')).toHaveCount(0);
+      await page.waitForTimeout(500);
+      expect(await playheadX()).toBeLessThan(250);
       await page.mouse.up();
 
+      await expect(async () => {
+        expect(await playheadX()).toBeGreaterThanOrEqual(300);
+      }).toPass({ timeout: 3000 });
       await expect(page.locator('[data-selection]')).toHaveCount(0);
       await expect(pause).toBeEnabled();
-      expect(await playheadX()).toBeGreaterThanOrEqual(300);
 
-      // Stop returns to where this play began: the press.
+      // Stop returns to where this play began: the click.
       await stop.click();
       await expect(async () => {
         expect(Math.abs((await playheadX()) - 300)).toBeLessThanOrEqual(1);

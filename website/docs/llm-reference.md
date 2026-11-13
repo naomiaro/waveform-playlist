@@ -27,7 +27,7 @@ interface WaveformPlaylistProviderProps {
   waveHeight?: number;                    // Default: 80
   samplesPerPixel?: number;               // Default: 1024
   zoomLevels?: number[];
-  automaticScroll?: boolean;              // Default: false
+  automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
   controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }
   annotationList?: {
@@ -93,7 +93,7 @@ interface MediaElementPlaylistProviderProps {
   timescale?: boolean;                   // Default: false
   playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
-  automaticScroll?: boolean;             // Default: false
+  automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
   controls?: { show: boolean; width: number }; // Default: { show: false, width: 0 }
   annotationList?: {
@@ -209,7 +209,9 @@ interface PlaybackControlsContextValue {
   stop: () => void;
   /** Moves the cursor, clamped to the audio. During playback, playback restarts there. */
   seekTo: (time: number) => void;
-  /** Sets the selected range and moves the cursor to its start. */
+  /** Sets the selected range and moves the cursor to its start. During playback, playback
+   *  restarts: a range is played start to end (open-ended under WaveformPlaylistProvider with
+   *  looping on), a collapsed one carries on from there. */
   setSelection: (start: number, end: number) => void;
 
   setTimeFormat: (format: TimeFormat) => void;
@@ -1741,6 +1743,8 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 // Space starts playback exactly as <PlayButton> does: the highlighted selection (looping off), else from the cursor.
 // With the cursor inside the selection (e.g. paused there) both resume from the cursor to the selection's end.
 // setSelection(start, end) during playback: a range restarts and plays start -> end; a collapsed selection continues open-ended.
+// Pointer on the waveform during playback: nothing before the release. Automatic scroll off: a drag is previewed, then becomes the selection (played);
+// a click seeks to the press. Automatic scroll on: press + release = one seek to the press, no range.
 // A shortcut is skipped when the focused control uses the key itself, however it got focus:
 //   - input (every type, incl. range and checkbox), textarea, select, contenteditable: every key
 //   - Escape while a modal <dialog> or [aria-modal="true"] is open

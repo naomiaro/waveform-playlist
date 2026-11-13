@@ -251,6 +251,16 @@ describe('the MediaElement waveform shell does not follow the cursor', () => {
     expect(counts.selection).toBe(1);
   });
 
+  it('an automatic-scroll toggle renders no track, clip or channel (the drag reads the setting through a ref)', async () => {
+    const { reset } = await mount();
+    reset();
+    act(() => controls.setAutomaticScroll(true));
+    act(() => controls.setAutomaticScroll(false));
+    expect(counts.track).toBe(0);
+    expect(counts.clip).toBe(0);
+    expect(counts.channel).toBe(0);
+  });
+
   it('play and pause render the shell and not the selection highlight', async () => {
     const { reset } = await mount();
     act(() => controls.setSelection(2, 4));

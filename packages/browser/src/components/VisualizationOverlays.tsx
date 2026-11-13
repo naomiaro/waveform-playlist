@@ -8,7 +8,7 @@
  * rendered by both views (`PlaylistVisualization` and `MediaElementPlaylist`,
  * #688). The annotation boxes and the loop region are multitrack only.
  */
-import React, { useCallback } from 'react';
+import React, { useCallback, useContext, useSyncExternalStore } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
@@ -35,9 +35,14 @@ import { AnimatedPlayhead } from './AnimatedPlayhead';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { AnnotationBoxes } from './AnnotationBoxes';
 import { useWaveformExtent } from './waveformLayoutContext';
+import { SelectionPreviewContext, type SelectionRange } from '../hooks/useSelectionDrag';
+
+const subscribeToNothing = () => () => {};
+const noPreview = (): SelectionRange | null => null;
 
 /**
  * The highlighted selection range. Renders nothing for a collapsed selection.
+ * While a drag is drawing a range during playback it shows that range.
  * Memoized (it takes no props): a render of the view around it (play, pause,
  * a press) is not its concern, only the selection, the zoom, the view settings
  * and the theme are.
@@ -47,13 +52,24 @@ export const SelectionOverlay: React.FC = React.memo(function SelectionOverlay()
   const { selectionStart, selectionEnd } = useSelection();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
+  // The range a drag is drawing during playback (see useSelectionDrag). It is
+  // not the selection yet, and it is shown in its place until the release.
+  // Called as methods (not detached), so a source written as a class works.
+  const previewSource = useContext(SelectionPreviewContext);
+  const preview = useSyncExternalStore(
+    previewSource ? (onChange) => previewSource.subscribe(onChange) : subscribeToNothing,
+    previewSource ? () => previewSource.getSnapshot() : noPreview,
+    previewSource ? () => previewSource.getSnapshot() : noPreview
+  );
 
-  if (selectionStart === selectionEnd) return null;
+  const start = preview ? preview.start : Math.min(selectionStart, selectionEnd);
+  const end = preview ? preview.end : Math.max(selectionStart, selectionEnd);
+  if (start === end) return null;
 
   return (
     <Selection
-      startPosition={(Math.min(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
-      endPosition={(Math.max(selectionStart, selectionEnd) * sampleRate) / samplesPerPixel}
+      startPosition={(start * sampleRate) / samplesPerPixel}
+      endPosition={(end * sampleRate) / samplesPerPixel}
       color={theme.selectionColor}
     />
   );

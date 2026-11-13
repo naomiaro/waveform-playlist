@@ -79,7 +79,13 @@ function CustomControls() {
 
 ### Click-to-Seek
 
-By default, clicking on the waveform seeks to that position.
+By default, clicking on the waveform seeks to that position, and dragging selects a range.
+
+During playback nothing happens until the mouse button is released:
+
+- A click moves playback to the clicked position.
+- A drag is highlighted as it is drawn while playback carries on; on release the range becomes the selection and is played from its start to its end (with looping on under `WaveformPlaylistProvider`: open-ended from its start).
+- With automatic scroll on, no range can be drawn during playback (the waveform moves under the pointer): a press and its release are one seek, to where the press landed. Switch automatic scroll off to select a range while playing.
 
 ### Programmatic Seeking
 
@@ -196,7 +202,7 @@ function ContinuousPlayToggle() {
 
 ## Automatic Scroll
 
-Keep the playhead visible during playback:
+Keep the playhead visible during playback. While it is on, a drag on the waveform during playback does not select a range (see [Click-to-Seek](#click-to-seek)):
 
 ```tsx
 import { AutomaticScrollCheckbox } from '@waveform-playlist/browser';
