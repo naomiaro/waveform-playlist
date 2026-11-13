@@ -251,6 +251,8 @@ The playhead is shown while playing, and at rest when no range is selected.
 
 Sets the options that only affect how a view draws, for every root below it, under either provider. It draws nothing itself. It may sit below the provider, above it, or above several providers; the roots, the parts and the ready-made compositions take none of these options.
 
+It goes above a root, not inside one. A root reads the options above itself: a `<WaveformViewOptions>` among a root's children does nothing for that root, the parts inside it are not recognised (they count as wrapped in a component), and a development build warns once.
+
 ```tsx
 import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
 
@@ -273,7 +275,7 @@ import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@wavefo
 
 The type is `WaveformViewOptionsProps`.
 
-**Inheritance.** A prop that is left out is taken from the `<WaveformViewOptions>` above, and from the defaults when there is none. `0` and `false` are values, not "left out". Nest one to change a single option for part of the tree:
+**Inheritance.** A prop that is left out is taken from the `<WaveformViewOptions>` above, and from the defaults when there is none. `0` and `false` are values, not "left out". Nest one to change a single option for part of the tree. A nested one cannot return an option to its default or to its derived value, because a prop left out inherits: with `progressBarWidth={7}` outside and `barWidth={4}` inside, the playhead stays 7 px wide. Write the value you want.
 
 ```tsx
 <WaveformViewOptions waveHeight={100} barWidth={2} barGap={1}>
@@ -291,8 +293,12 @@ The type is `WaveformViewOptionsProps`.
 
 **Values that cannot be drawn** are corrected by the root, with one warning per message in development:
 
-- a `waveHeight` or a `barWidth` that is not above 0 is replaced by the default (80, 1);
-- a `barGap` that makes `barWidth + barGap` less than 1 is raised until the next bar is one pixel on (the gap becomes `1 - barWidth`).
+- a `waveHeight` or a `barWidth` that is not above 0 (0, a negative number, `NaN`) is replaced by the default (80, 1);
+- a `barGap` that is `NaN` is replaced by 0;
+- a `barGap` that, with the bar width as corrected, makes `barWidth + barGap` less than 1 is raised until the next bar is one pixel on (the gap becomes `1 - barWidth`);
+- a `progressBarWidth` that is not above 0 is replaced by `barWidth + barGap` (as corrected). To draw no playhead, leave `<WaveformPlayhead>` out.
+
+`null` for an option means "left out".
 
 **Reading the values.** A component drawn inside a root reads the resolved `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` with `usePlaylistInfo()` from `@waveform-playlist/ui-components`. `usePlaylistView()` does not have them, and `fillViewport` has no reader.
 

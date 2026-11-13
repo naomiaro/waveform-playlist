@@ -72,7 +72,7 @@ function PlaybackControls() {
 }
 ```
 
-The row height, the bar style and the playhead width are not provider props: they are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), which sets them for every view below it. It may sit above the provider, so one element can style several players on a page. Without it the row is 80 px tall.
+The row height, the bar style and the playhead width are not provider props: they are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), which sets them for every view below it. It may sit above the provider, so one element can style several players on a page. Without it each channel of the row is 80 px tall.
 
 The transport buttons, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs` and `AutomaticScrollCheckbox` are the same components `WaveformPlaylistProvider` uses; each reads the nearest provider, so several players on one page each get their own set. `PlaybackRateSelect` works under `MediaElementPlaylistProvider` only: a `<select>` of speeds (`rates`, default 0.5, 0.75, 1, 1.25, 1.5, 2). See [Playback Controls](./playback-controls.md#which-controls-work-under-which-provider) for the full list.
 

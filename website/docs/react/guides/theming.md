@@ -321,7 +321,7 @@ function OceanThemedPlaylist() {
 
 ## Full Theme Type Definition
 
-From `packages/ui-components/src/wfpl-theme.ts`. `WaveformColor` is a string or a gradient (see [Gradient Colors](#gradient-colors)). The optional keys have a fallback in the component that reads them: `spectrogramBackgroundColor`, the background behind a spectrogram, is `#000` in both built-in themes and when the key is missing.
+From `packages/ui-components/src/wfpl-theme.ts`. `WaveformColor` is a string or a gradient (see [Gradient Colors](#gradient-colors)). The optional keys have a fallback in the component that reads them: `spectrogramBackgroundColor` is the background of the area a spectrogram is drawn in. It is what shows until the spectrogram has been drawn and where a part of it is not mounted; a drawn spectrogram is opaque and covers it. It is `#000` in both built-in themes and when the key is missing.
 
 ```typescript
 interface WaveformPlaylistTheme {
@@ -424,7 +424,8 @@ interface WaveformPlaylistTheme {
   fontFamily: string;
   fontSize: string;
   fontSizeSmall: string;
-}```
+}
+```
 
 ## Playback Progress Styling
 

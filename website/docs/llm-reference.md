@@ -2152,10 +2152,11 @@ interface WaveformViewOptionsProps {
 </WaveformViewOptions>
 ```
 
-- A prop left out is inherited from the `<WaveformViewOptions>` above (`??`, so `0` and `false` are values), then from the defaults.
-- Corrected by the root, one development warning per message: `waveHeight` or `barWidth` not above 0 becomes the default; a `barGap` that makes `barWidth + barGap` less than 1 becomes `1 - barWidth`.
+- A prop left out is inherited from the `<WaveformViewOptions>` above (`??`, so `0` and `false` are values), then from the defaults. A nested one cannot return an option to its default: write the value (`progressBarWidth={7}` outside and `barWidth={4}` inside leaves the playhead 7 px).
+- It goes ABOVE a root. A root reads the options above itself, so one written among a root's children does nothing for that root, the parts inside it are not recognised, and a development build warns once.
+- Corrected by the root, one development warning per message: `waveHeight` or `barWidth` not above 0 becomes the default; a `barGap` that is `NaN` becomes 0; a `barGap` that makes `barWidth + barGap` less than 1 becomes `1 - barWidth`; a `progressBarWidth` not above 0 becomes `barWidth + barGap` (leave `<WaveformPlayhead>` out to draw no playhead). `null` means not given.
 - Inside a root, the resolved values are read with `usePlaylistInfo()` from `@waveform-playlist/ui-components`. `fillViewport` has no reader.
-- Two roots under one provider share zoom, selection and playback and may differ in view options. Limits (issue #803): automatic scroll moves only the root mounted last; a spectrogram track is drawn in only one of them. Another zoom level needs another provider.
+- Two roots under one provider share zoom, selection and playback and may differ in view options. Limits (issue #803): automatic scroll moves only the root mounted last; a spectrogram track is drawn in only one of them. Another zoom level: under `MediaElementPlaylistProvider`, another provider (each is independent); under `WaveformPlaylistProvider` with the default Tone.js engine, not available by adding a provider (one instance per page, shared Tone.js transport; issue #805).
 
 ```typescript
 // packages/ui-components/src/contexts/PlaylistInfo.tsx
@@ -2183,6 +2184,8 @@ const DEFAULT_BAR_GAP = 0;
 // samplesPerPixel 1000, waveHeight 80, timeScaleHeight 15, barWidth 1, barGap 0,
 // roundedBars false, progressBarWidth 1.
 // Removed (#689): controls, zoomLevels. A PlaylistInfoContext.Provider of your own must give this shape.
+// Theme key spectrogramBackgroundColor (optional, '#000' without it): the background of the area a
+// spectrogram is drawn in; it shows until the spectrogram has been drawn and where a chunk is not mounted.
 ```
 
 ---

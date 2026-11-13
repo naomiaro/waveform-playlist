@@ -211,8 +211,9 @@ import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@wavefo
 | `fillViewport` | `false` | the timeline is drawn at least as wide as its scroll container when the audio is shorter. `WaveformRoot` only; `MediaElementWaveformRoot` ignores it |
 
 - It works under either provider, and it may sit **above** the provider, also above several: one element styles every player on a page.
-- A prop that is left out is taken from the `<WaveformViewOptions>` above, then from the defaults. `0` and `false` count as values. Nest one to change a single option for part of the tree.
-- A `waveHeight` or `barWidth` that is not above 0 is replaced by the default, and a `barGap` that would put the next bar less than one pixel on is raised until the step is one pixel; each with one warning in development.
+- It goes above a root, not inside one: a root reads the options above itself. Written among a root's children it does nothing for that root (and the parts inside it are not recognised), with one warning in development.
+- A prop that is left out is taken from the `<WaveformViewOptions>` above, then from the defaults. `0` and `false` count as values. Nest one to change a single option for part of the tree. A nested one cannot return an option to its default: write the value.
+- Values that cannot be drawn are corrected, each with one warning in development: a `waveHeight` or `barWidth` that is not above 0 is replaced by the default; a `barGap` that is `NaN` is replaced by 0; a `barGap` that would put the next bar less than one pixel on is raised until the step is one pixel; a `progressBarWidth` that is not above 0 is replaced by `barWidth + barGap`.
 - `mono`, `indefinitePlayback` and `theme` are provider props. The provider computes the peaks with `mono`; its animation loop and `seekTo` follow `indefinitePlayback` (and `WaveformRoot` then draws the timeline as wide as its container, as `fillViewport` does); the theme is also read by controls outside a view.
 
 The props are in the [Components reference](/docs/react/api/components#waveformviewoptions).
@@ -239,7 +240,7 @@ Two roots under one provider draw the same playlist. They share what the provide
 </WaveformPlaylistProvider>
 ```
 
-Views that share a provider share its zoom: a second view at another zoom level (an overview) needs a second provider.
+Views that share a provider share its zoom. Under `MediaElementPlaylistProvider` a view at another zoom level is another provider: each provider is independent. Under `WaveformPlaylistProvider` with the default Tone.js engine that is not available by adding a provider today: only one such provider should be mounted on a page, because they share one Tone.js transport. Tracked in [#805](https://github.com/naomiaro/waveform-playlist/issues/805).
 
 Two limits of two views under one provider, tracked in [#803](https://github.com/naomiaro/waveform-playlist/issues/803):
 
