@@ -22,6 +22,21 @@ const dragOptions = vi.hoisted(
     }[]
 );
 const sensorOptions = vi.hoisted(() => [] as ({ touchOptimized?: boolean } | undefined)[]);
+// What the sensors hook returned, and what each DragDropProvider was given.
+const sensorResults = vi.hoisted(() => [] as unknown[]);
+const dragProviderProps = vi.hoisted(() => [] as { sensors?: unknown; modifiers?: unknown[] }[]);
+
+vi.mock('@dnd-kit/react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dnd-kit/react')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    DragDropProvider: (props: React.ComponentProps<typeof actual.DragDropProvider>) => {
+      dragProviderProps.push(props as { sensors?: unknown; modifiers?: unknown[] });
+      return createElement(actual.DragDropProvider, props);
+    },
+  };
+});
 
 vi.mock('../hooks/useAnnotationDragHandlers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../hooks/useAnnotationDragHandlers')>();
@@ -42,12 +57,15 @@ vi.mock('../hooks/useDragSensors', async (importOriginal) => {
     ...actual,
     useDragSensors: (options?: Parameters<typeof actual.useDragSensors>[0]) => {
       sensorOptions.push(options);
-      return actual.useDragSensors(options);
+      const sensors = actual.useDragSensors(options);
+      sensorResults.push(sensors);
+      return sensors;
     },
   };
 });
 
 import WaveformData from 'waveform-data';
+import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -82,6 +100,7 @@ import {
   LinkEndpointsCheckbox,
 } from '../components/AnnotationControls';
 import { ClipInteractionOptions } from '../contexts/ClipInteractionContext';
+import { KeyboardShortcuts } from '../components/KeyboardShortcuts';
 import { resetPartWarnings } from '../components/partWarnings';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -273,6 +292,8 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
   listProps = [];
   dragOptions.length = 0;
   sensorOptions.length = 0;
+  sensorResults.length = 0;
+  dragProviderProps.length = 0;
   const firstList = options.annotationList ?? DEFAULT_LIST;
   const integration = options.integration === undefined ? INTEGRATION : options.integration;
   const onAnnotationsChange = options.onAnnotationsChange ?? (() => {});
@@ -483,13 +504,17 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
         </>,
         { annotationList: { annotations: ANNOTATIONS, linkEndpoints: true } }
       );
-      expect((getByLabelText('continuous') as HTMLInputElement).checked).toBe(false);
-      expect((getByLabelText('link') as HTMLInputElement).checked).toBe(true);
-      expect((getByLabelText('editable') as HTMLInputElement).checked).toBe(false);
+      const checked = () =>
+        ['continuous', 'link', 'editable'].map(
+          (name) => (getByLabelText(name) as HTMLInputElement).checked
+        );
+      expect(checked()).toEqual([false, true, false]);
       fireEvent.click(getByLabelText('continuous'));
       fireEvent.click(getByLabelText('link'));
       fireEvent.click(getByLabelText('editable'));
       expect(probe.options).toEqual({ editable: true, linkEndpoints: false, continuousPlay: true });
+      // Each box shows its own option, also when the option is on.
+      expect(checked()).toEqual([true, false, true]);
     });
   }
 );
@@ -711,6 +736,13 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(probe.active.activeAnnotationId).toBe('n2');
     });
 
+    it('gives its drag provider those sensors and restricts the drag to the time axis', async () => {
+      await mount(kind, view(kind, <WaveformAnnotationBoxes />));
+      const given = dragProviderProps[dragProviderProps.length - 1];
+      expect(given.sensors).toBe(sensorResults[sensorResults.length - 1]);
+      expect(given.modifiers).toEqual([RestrictToHorizontalAxis]);
+    });
+
     it('a toggle of continuous play or link endpoints renders no box', async () => {
       await mount(kind, view(kind, <WaveformAnnotationBoxes />));
       const before = { ...boxProps };
@@ -828,5 +860,28 @@ describe('the edge of an annotation is dragged no further than the audio (#686)'
     expect(lastWrapper().width).toBe(60 * 50);
     // The clamp is the audio's length, and there is no audio.
     expect(lastDrag().duration).toBe(0);
+  });
+});
+
+describe('the annotation shortcuts read the options of the provider (#686)', () => {
+  it('Shift+{ moves the end of the active annotation, and the next start with link endpoints on', async () => {
+    const onAnnotationsChange = vi.fn();
+    await mount('WaveformPlaylistProvider', <KeyboardShortcuts annotations />, {
+      annotationList: { annotations: ANNOTATIONS, linkEndpoints: true },
+      onAnnotationsChange,
+    });
+    act(() => probe.controls.setActiveAnnotationId('n1'));
+
+    fireEvent.keyDown(window, { key: '{', shiftKey: true });
+    expect(onAnnotationsChange).toHaveBeenCalledTimes(1);
+    const linked = onAnnotationsChange.mock.lastCall![0] as AnnotationData[];
+    expect(linked[0].end).toBeCloseTo(0.99, 5);
+    expect(linked[1].start).toBeCloseTo(0.99, 5);
+
+    act(() => probe.controls.setLinkEndpoints(false));
+    fireEvent.keyDown(window, { key: '{', shiftKey: true });
+    const unlinked = onAnnotationsChange.mock.lastCall![0] as AnnotationData[];
+    expect(unlinked[0].end).toBeCloseTo(0.99, 5);
+    expect(unlinked[1].start).toBe(1);
   });
 });

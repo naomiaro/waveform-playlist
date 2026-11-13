@@ -248,6 +248,7 @@ async function mount(options: MountOptions = {}) {
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
   const Wrapper = options.strict ? React.StrictMode : React.Fragment;
+  let annotationList = options.annotationList;
   const tree = (showPlaylist: boolean, playlists = 1, track = TRACK) => (
     <Wrapper>
       <MediaElementPlaylistProvider
@@ -256,7 +257,7 @@ async function mount(options: MountOptions = {}) {
         createPlayout={createPlayout}
         onReady={options.onReady}
         automaticScroll={options.automaticScroll}
-        annotationList={options.annotationList}
+        annotationList={annotationList}
       >
         <ProbeChild />
         {options.restoreOnSource ? <RestoreOnSource source={track.source} /> : null}
@@ -275,6 +276,11 @@ async function mount(options: MountOptions = {}) {
   return {
     playout,
     show: (showPlaylist: boolean, playlists = 1) => view.rerender(tree(showPlaylist, playlists)),
+    /** Renders the provider again with another `annotationList` prop. */
+    setAnnotationList: (list: MountOptions['annotationList']) => {
+      annotationList = list;
+      view.rerender(tree(true));
+    },
     /** Another track object: the provider creates its player again. */
     changeTrack: (change: Partial<typeof TRACK>) =>
       view.rerender(tree(true, 1, { ...TRACK, ...change })),
@@ -769,6 +775,25 @@ describe('MediaElement annotation playback goes through the shared loop step', (
     expect(probe.state.activeAnnotationId).toBeNull();
     expect(probe.animation.isPlaying).toBe(true);
     expect(frames.size).toBe(1);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('continuous play taken from the annotationList prop reaches the loop (#686)', async () => {
+    const { playout, setAnnotationList } = await mount({
+      annotationList: { annotations: ANNOTATIONS },
+    });
+    // The prop changes after mount: the option follows it, and so must the
+    // ref the loop reads.
+    setAnnotationList({ annotations: ANNOTATIONS, isContinuousPlay: true });
+    await act(async () => {
+      probe.controls.setActiveAnnotationId('n1');
+      probe.controls.play(0);
+    });
+
+    playout.time = 2.5; // past the end of n1
+    await runFrame();
+    expect(probe.animation.isPlaying).toBe(true);
+    expect(probe.state.activeAnnotationId).toBe('n2');
     await act(async () => probe.controls.stop());
   });
 
