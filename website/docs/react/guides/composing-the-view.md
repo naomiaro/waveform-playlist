@@ -35,7 +35,7 @@ import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 | `MediaElementWaveformRoot` | the same for the MediaElement player | `className` | `MediaElementPlaylistProvider` |
 | `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
 | `WaveformLoopRegion` | the draggable loop region, in the same strip | none | `WaveformPlaylistProvider` |
-| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200), `renderTrackControls`, `onRemoveTrack`, `trackReordering` | `WaveformPlaylistProvider` |
+| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200); children: the control panel of one track | `WaveformPlaylistProvider` |
 | `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three below | either |
 | `WaveformClipHeaders` | a header on every clip | none | either |
 | `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
@@ -87,6 +87,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
   WaveformTracks,
   WaveformClipHeaders,
   WaveformFades,
@@ -99,7 +101,10 @@ import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
   <WaveformRoot className="my-editor">
     <WaveformTimescale />
     <WaveformLoopRegion />
-    <WaveformTrackControls width={160} onRemoveTrack={removeTrack} />
+    <WaveformTrackControls width={160}>
+      <DefaultTrackControls />
+      <TrackRemoveButton onRemove={removeTrack} />
+    </WaveformTrackControls>
     <WaveformTracks gainScaled>
       <WaveformClipHeaders />
       <WaveformFades />
@@ -124,8 +129,23 @@ What each part does when it is there:
 
 - **`WaveformTimescale`** and **`WaveformLoopRegion`** share a 30 px strip above the tracks. The strip exists when a root has either of them. The loop region draws nothing while looping is off.
 - **`WaveformTrackControls`** makes the controls column exist. Without it there is no column. Its `width` (a positive number, 200 by default) is read by the root from the element; with `0`, a negative number or `NaN` no column is drawn and a development warning says so.
+- The children of **`WaveformTrackControls`** are the control panel of one track; the part renders them once per track. Without children it draws `<DefaultTrackControls />`. See [The Panel of a Track](#the-panel-of-a-track).
 - **`WaveformClipHeaders`** adds a header to every clip and to the height of every row. Inside a `ClipInteractionProvider` the header is what a clip is dragged by, and the trim handles come with it.
 - **`WaveformPlayhead`** is shown while playing, and at rest when no range is selected.
+
+### The Panel of a Track
+
+What is drawn for a track in the controls column is what you write between `<WaveformTrackControls>` and `</WaveformTrackControls>`. It is written once and rendered for every track, and the components in it are bound to the track they are drawn for:
+
+```tsx
+<WaveformTrackControls width={160}>
+  <DefaultTrackControls />
+  <TrackRemoveButton onRemove={removeTrack} />
+  <TrackReorderGrip />
+</WaveformTrackControls>
+```
+
+`<DefaultTrackControls />` is the built-in panel. `<TrackRemoveButton>` and `<TrackReorderGrip />` are drawn because they are rendered, like every other part, and place themselves at the edges of the track's slot. `onRemove` gets the track's id. The panel can also be composed from the pieces of the default one (`<TrackName />`, `<TrackMuteButton />`, `<TrackVolumeSlider />` and the others), or be a component of your own that reads its track with `useTrack()`. The [Track Management guide](/docs/react/guides/track-management#the-panel-of-a-track) has each of these, the size of the slot a panel gets, and what keeps the panels from rendering with your component.
 
 ### MediaElement Player
 

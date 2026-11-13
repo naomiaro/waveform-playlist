@@ -7,13 +7,13 @@
 The view is composed from parts. Each thing the view draws is an exported component that is drawn because it is rendered inside a root:
 
 - Roots: `WaveformRoot` (under `WaveformPlaylistProvider`), `MediaElementWaveformRoot` (under `MediaElementPlaylistProvider`).
-- Parts: `WaveformTimescale` (`renderTick`), `WaveformLoopRegion`, `WaveformTrackControls` (`width`, `renderTrackControls`, `onRemoveTrack`, `trackReordering`), `WaveformTracks` (`gainScaled`) with the children `WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` (`recordingState`), `WaveformAnnotationBoxes`, `MediaElementAnnotationBoxes`, `WaveformSelection`, `WaveformPlayhead` (`renderPlayhead`).
+- Parts: `WaveformTimescale` (`renderTick`), `WaveformLoopRegion`, `WaveformTrackControls` (`width`, `renderTrackControls`, `onRemoveTrack`, `trackReordering`; the last three are removed again by the track-control pieces change: see that entry), `WaveformTracks` (`gainScaled`) with the children `WaveformClipHeaders`, `WaveformFades` and `WaveformRecordingPreview` (`recordingState`), `WaveformAnnotationBoxes`, `MediaElementAnnotationBoxes`, `WaveformSelection`, `WaveformPlayhead` (`renderPlayhead`).
 - Ready-made: `<Waveform />` (timescale, loop region, 200 px track controls, tracks, annotation boxes, selection, playhead, and the annotation list when there are annotations), the new `<WaveformEditor />` (the same with clip headers and fades) and `<MediaElementWaveform />`. They take `className` and their annotation options only.
 - New hook `useRecordingSession({ isRecording, trackId })`, and the type `WaveformRecordingState`.
 
 Removed:
 
-- From `<Waveform>`: `showClipHeaders`, `showFades`, `gainScaledWaveforms`, `trackReordering`, `onRemoveTrack`, `recordingState`, `renderTrackControls`, `renderTick`, `renderPlayhead`. From `<MediaElementWaveform>`: `renderPlayhead`, `showFades`. Each is an option of a part, or a part.
+- From `<Waveform>`: `showClipHeaders`, `showFades`, `gainScaledWaveforms`, `trackReordering`, `onRemoveTrack`, `recordingState`, `renderTrackControls`, `renderTick`, `renderPlayhead`. From `<MediaElementWaveform>`: `renderPlayhead`, `showFades`. Each is an option of a part, or a part (`renderTrackControls`, `onRemoveTrack` and `trackReordering` became the children of `<WaveformTrackControls>` in the track-control pieces change: see that entry).
 - From both providers: `timescale` and `controls`. The timescale is there when `<WaveformTimescale />` is rendered; the controls column when `<WaveformTrackControls />` is, as wide as its `width`.
 - From the value of `usePlaylistView()`: `timeScaleHeight` and `controls`.
 - `PlaylistVisualization` and `MediaElementPlaylist`, with their props types: compose the parts inside the root.

@@ -166,14 +166,23 @@ export function useExportWav(): UseExportWavReturn {
         const duration = totalDurationSamples / sampleRate;
 
         // Determine which tracks to render
+        // A track that is still loading has no entry in `trackStates`
+        // (`undefined` at its position): it is rendered with its own fields.
+        const stateOf = (index: number): TrackState =>
+          trackStates[index] ?? {
+            muted: tracks[index].muted,
+            soloed: tracks[index].soloed,
+            volume: tracks[index].volume,
+            pan: tracks[index].pan,
+          };
         const tracksToRender =
           mode === 'individual'
-            ? [{ track: tracks[trackIndex!], state: trackStates[trackIndex!], index: trackIndex! }]
-            : tracks.map((track, index) => ({ track, state: trackStates[index], index }));
+            ? [{ track: tracks[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]
+            : tracks.map((track, index) => ({ track, state: stateOf(index), index }));
 
         // Check for solo - if any track is soloed, only play soloed tracks.
         // Skip solo logic for individual export — the user explicitly chose the track.
-        const hasSolo = mode === 'master' && trackStates.some((state) => state.soloed);
+        const hasSolo = mode === 'master' && tracks.some((_, index) => stateOf(index).soloed);
 
         const reportProgress = (p: number) => {
           setProgress(p);

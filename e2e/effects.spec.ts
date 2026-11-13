@@ -102,7 +102,7 @@ test.describe('Effects Example', () => {
     });
 
     test('effect has remove button', async ({ page }) => {
-      const removeButton = page.getByRole('button', { name: 'Remove' }).first();
+      const removeButton = page.getByRole('button', { name: 'Remove', exact: true }).first();
       await expect(removeButton).toBeVisible();
     });
 
@@ -152,7 +152,9 @@ test.describe('Effects Example', () => {
       await expect(page.getByRole('heading', { name: 'Tremolo' })).toBeVisible();
 
       // Find and click remove for Tremolo (it's the last Remove button since we just added it)
-      const removeButtons = page.getByRole('button', { name: 'Remove' });
+      // Exact: the track panels have a "Remove track" button each since #687
+      // (the page's own close button was titled "Delete track" before).
+      const removeButtons = page.getByRole('button', { name: 'Remove', exact: true });
       await removeButtons.last().click();
 
       // Tremolo should be gone

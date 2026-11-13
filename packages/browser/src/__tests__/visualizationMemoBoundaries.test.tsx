@@ -44,9 +44,12 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
       counts.track[id] = (counts.track[id] ?? 0) + 1;
       return createElement(actual.Track, props);
     },
-    Controls: (props: React.ComponentProps<typeof actual.Controls>) => {
+    // Two per panel (volume, pan): the pieces of a track render when its
+    // state changes. The panel's frame does not (#687), so it cannot be the
+    // proxy for "this panel rendered" any more.
+    Slider: (props: React.ComponentProps<typeof actual.Slider>) => {
       counts.controls++;
-      return createElement(actual.Controls, props);
+      return createElement(actual.Slider, props);
     },
     // Rendered unconditionally by the view's root (`WaveformRoot`), so this counts the
     // shell's own renders (#733).
@@ -241,12 +244,12 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
     await mount(threeTracks().tracks);
 
     await act(async () => {
-      probe.editor.setTrackVolume(1, 0.5);
+      probe.editor.setTrackVolume('t2', 0.5);
       probe.editor.setMasterVolume(0.5);
     });
 
     expect(probe.data.trackStates[1].volume).toBe(0.5);
-    expect(counts.controls).toBe(1);
+    expect(counts.controls).toBe(2);
     expect(counts.shell).toBe(0);
     expect(counts.scale).toBe(0);
   });
@@ -445,11 +448,11 @@ describe('visualization memo boundaries (#693)', () => {
     await mount(threeTracks().tracks);
 
     await act(async () => {
-      probe.editor.setTrackVolume(1, 0.5);
+      probe.editor.setTrackVolume('t2', 0.5);
     });
 
     expect(probe.data.trackStates[1].volume).toBe(0.5);
-    expect(counts.controls).toBe(1);
+    expect(counts.controls).toBe(2);
     expect(totalOf(counts.clip)).toBe(0);
     expect(counts.channel).toBe(0);
   });

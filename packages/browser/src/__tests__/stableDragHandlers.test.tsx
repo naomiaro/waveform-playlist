@@ -296,6 +296,57 @@ describe('ClipInteractionProvider', () => {
   });
 });
 
+describe('ClipInteractionProvider: the track-reorder preview', () => {
+  it('follows drag-overs only between the start and the end of a reorder drag', () => {
+    // dnd-kit can send one more dragover after the dragend of a canceled
+    // drag; it must not set the preview again (#687).
+    const previews: unknown[] = [];
+    const setTrackDragPreview = vi.fn((update: unknown) => {
+      previews.push(typeof update === 'function' ? (update as (p: null) => unknown)(null) : update);
+    });
+    playlistData = {
+      samplesPerPixel: 1000,
+      sampleRate: SAMPLE_RATE,
+      playoutRef: { current: null },
+      isDraggingRef: { current: false },
+      onTracksChange: () => {},
+      tracks: makeTracks(),
+    };
+    playlistControls.setTrackDragPreview.mockImplementation(setTrackDragPreview);
+    render(
+      <ClipInteractionProvider>
+        <div />
+      </ClipInteractionProvider>
+    );
+    const event = (index: number, canceled = false) => ({
+      canceled,
+      operation: {
+        source: {
+          data: { kind: 'track-reorder', trackId: 't1' },
+          sortable: { index, initialIndex: 0 },
+        },
+      },
+    });
+    const over = dndProps.onDragOver as (e: unknown) => void;
+    const start = dndProps.onDragStart as (e: unknown) => void;
+    const end = dndProps.onDragEnd as (e: unknown) => void;
+
+    over(event(1));
+    expect(previews).toEqual([]);
+
+    start(event(0));
+    over(event(1));
+    expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }]);
+
+    end(event(1, true));
+    expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }, null]);
+
+    // The late one.
+    over(event(0));
+    expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }, null]);
+  });
+});
+
 describe('useKeyboardShortcuts', () => {
   const keydownRegistrations = (spy: { mock: { calls: unknown[][] } }) =>
     spy.mock.calls.filter(([type]) => type === 'keydown').length;

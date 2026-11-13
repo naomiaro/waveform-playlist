@@ -10,7 +10,7 @@ Wraps [`@dawcore/spectrogram`](https://www.npmjs.com/package/@dawcore/spectrogra
 - **Render-mode switching** per track — `'waveform'`, `'spectrogram'`, or `'both'` (waveform on top, spectrogram below)
 - **Six built-in color maps** (`viridis`, `magma`, `inferno`, `grayscale`, `igray`, `roseus`) plus custom `[r, g, b]` palettes
 - **Five frequency scales** — linear, logarithmic, mel, bark, erb
-- **Drop-in settings UI** — `<SpectrogramSettingsModal>` (FFT size, hop size, window function, gain/range, frequency bounds) and `<SpectrogramMenuItems>` for a track context menu
+- **Drop-in settings UI** — `<SpectrogramSettingsModal>` (FFT size, hop size, window function, gain/range, frequency bounds) and `SpectrogramMenuItems()`, a function that returns the render-mode and settings items for a `TrackMenu` (`@waveform-playlist/ui-components`). Under the provider, the default track controls of `@waveform-playlist/browser` show that menu already (`<TrackMenuButton />` in a panel you compose; `useTrack().setRenderMode()` and `.openSpectrogramSettings()` in your own)
 - **Viewport-aware rendering** — a Web Worker pool computes the visible chunks first, then a scroll buffer, then the rest in the background, so long timelines stay responsive
 
 ## Installation

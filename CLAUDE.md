@@ -161,7 +161,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 ```typescript
 // ✅ GOOD - an option of the component that takes it, off by default
 <WaveformTracks gainScaled />
-<WaveformTrackControls trackReordering />
+<ClipInteractionOptions touchOptimized>
 
 // ❌ AVOID - a (made-up) prop that defaults to true needs an explicit false
 <SomePart shown={false} />
@@ -301,6 +301,20 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 **An e2e test that finds its elements through a new attribute fails on the old code for the attribute, not for the behaviour in its title.** Say which of the two the old-code run proved.
 
 **The mutation runner over the full browser suite takes about 35 s per mutant** (54 mutants, 30 minutes, in the background). Nothing else may edit source or run e2e against a dev server meanwhile: the server hot-reloads the mutated file. A mutant reported as REFUSED means prettier re-wrapped the line; fix the string and rerun it.
+
+**A probe or test that finds a control by a loose accessible name can press another control.** `probes/split768.cjs` matched `name: 'Volume'` and pressed "Master Volume": the "track volume" baselines of two sessions (16 and 33) were the master slider (real: 32 and 63; `probes/track687.cjs`). On #687 a new "Remove track" title made `getByRole('button', { name: 'Remove' }).last()` in `effects.spec.ts` remove a track. Use `exact: true`.
+
+**A child's layout effect runs before React attaches its parent's ref.** `useTrackReorderHandle` hands the slot's element (owned by the controls part) to dnd-kit; in a layout effect the element was still null and no drag started. Register a parent-owned element from a child in a passive effect.
+
+**dnd-kit can send a `dragover` after the `dragend` of a canceled drag.** It set the reorder preview again for good (Escape mid-drag, 6 of 6 e2e runs on #687). A handler that publishes drag state checks that a drag is in progress (#796 tracks the dnd-kit workarounds).
+
+**A panel that fills its box hides a sibling in the flow.** The #687 design said "the default panel plus your own control beside it"; only a control that positions itself is visible there. Render a composition claim in a browser before it goes into a design.
+
+**A change to the shape of a public value goes to the maintainer before it is built, also when it follows from an approved fix.** Keeping mixer state by id made `trackStates` hold `undefined` in place for a loading track; a side agent reported it first. The same for an oddity seen in a test (the empty timeline running a second, full build).
+
+**Mutation runs: give each mutant only the test files that can see its source file** (40 s per mutant with 16 files, 3 s with the right 2 to 8; `probes/mutate687.py`, `BY_FILE`). Stop a run with `pkill -INT -f mutate…` so the `finally` restores the file; a background command is killed after 10 minutes without that.
+
+**`git diff --name-only main -- 'packages/*/src'` lists nothing** (the pathspec is not a shell glob). Use `-- packages` and filter with grep.
 
 **`revise-claude-md` runs before the merge is asked for**, so the learnings go in the PR that produced them (#782 was merged without it and needed a docs PR afterwards).
 

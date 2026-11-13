@@ -16,6 +16,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackReorderGrip,
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
@@ -178,7 +180,10 @@ export function StemTracksExample() {
           <WaveformRoot>
             <WaveformTimescale />
             <WaveformLoopRegion />
-            <WaveformTrackControls trackReordering />
+            <WaveformTrackControls>
+              <DefaultTrackControls />
+              <TrackReorderGrip />
+            </WaveformTrackControls>
             <WaveformTracks />
             <WaveformSelection />
             <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />

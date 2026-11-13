@@ -4,7 +4,7 @@ React components, hooks, and context providers for building a multitrack Web Aud
 
 ## Features
 
-- **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks. It is a ready-made composition of exported parts (`WaveformRoot`, `WaveformTimescale`, `WaveformTrackControls`, `WaveformTracks`, `WaveformClipHeaders`, `WaveformFades`, `WaveformPlayhead` and more): compose them yourself to choose what is drawn
+- **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks. It is a ready-made composition of exported parts (`WaveformRoot`, `WaveformTimescale`, `WaveformTrackControls`, `WaveformTracks`, `WaveformClipHeaders`, `WaveformFades`, `WaveformPlayhead` and more): compose them yourself to choose what is drawn. The control panel of a track is composed too: the children of `<WaveformTrackControls>` are rendered once per track, from the default panel (`DefaultTrackControls`), its pieces (`TrackName`, `TrackMuteButton`, `TrackSoloButton`, `TrackVolumeSlider`, `TrackPanSlider`, `TrackMenuButton`, `TrackRemoveButton`, `TrackReorderGrip`) or your own component, which reads its track with `useTrack()`
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
 - **Focused context hooks** — one hook per group of fields that change together (`useIsPlaying`, `useCurrentTime`, `useSelection`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistTimeline`, `usePlaylistMixer`, `useLoop`, `useEditorControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
@@ -101,11 +101,12 @@ Under either provider:
 
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
-| `useEditorControls` | Actions — track mute/solo/volume/pan, track order, zoom, loop, undo/redo, annotation editing settings, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
+| `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo, annotation editing settings, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
 | `useEngineRefs` | `playoutRef` (the engine), `isDraggingRef`, `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
 | `useAnnotationEditing` | `annotationsEditable`, `linkEndpoints` | either setting being toggled |
 | `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
-| `usePlaylistMixer` | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
+| `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`; `undefined` for a track that is still loading), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
+| `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isLoading`, `isSelected`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |
 | `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
 | `useLoop` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | `useSelectedTrackId` | `selectedTrackId` | another track being selected |

@@ -125,8 +125,24 @@ export {
   WaveformSelection,
   WaveformPlayhead,
   KeyboardShortcuts,
-  SortableTrackControls,
+  DefaultTrackControls,
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+  TrackPanSlider,
+  TrackMenuButton,
+  TrackReorderGrip,
+  TrackRemoveButton,
+  useTrack,
 } from './components';
+export type {
+  DefaultTrackControlsProps,
+  TrackContextValue,
+  TrackRemoveButtonProps,
+} from './components';
+export { useTrackReorderHandle } from './hooks/useTrackReorderHandle';
+export type { TrackReorderHandle } from './hooks/useTrackReorderHandle';
 export type { KeyboardShortcutsProps } from './components/KeyboardShortcuts';
 export type { ClearAllButtonProps } from './components/PlaybackControls';
 export type { WaveformProps, WaveformEditorProps } from './components/Waveform';
@@ -146,10 +162,6 @@ export type { RecordingSessionOptions } from './hooks/useRecordingSession';
 export type { MediaElementWaveformProps } from './components/MediaElementWaveform';
 export type { MediaElementAnnotationListProps } from './components/MediaElementAnnotationList';
 export type { PlaylistAnnotationListProps } from './components/PlaylistAnnotationList';
-export type {
-  SortableTrackControlsProps,
-  SortableTrackControlsRenderProps,
-} from './components/SortableTrackControls';
 
 // Re-export TimeFormat type from ui-components for convenience
 export type { TimeFormat } from '@waveform-playlist/ui-components';

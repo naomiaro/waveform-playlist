@@ -3,12 +3,21 @@ import React from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
+  ClipInteractionProvider,
   Waveform,
   WaveformRoot,
   WaveformTrackControls,
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  DefaultTrackControls,
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+  TrackReorderGrip,
+  TrackRemoveButton,
+  useTrack,
   PlayButton,
   PauseButton,
   StopButton,
@@ -170,6 +179,96 @@ export const Bare: Story = {
       description: {
         story:
           'The bare view: `<WaveformRoot>` with the tracks, the selection and the playhead, and neither `<WaveformTimescale />` nor `<WaveformTrackControls />`. A part is drawn because it is rendered.',
+      },
+    },
+  },
+};
+
+/** A control of the story's own: `useTrack()` is the track whose panel it is in. */
+const TrackSummary: React.FC = () => {
+  const { index, muted, volume } = useTrack();
+  return (
+    <small style={{ display: 'block', opacity: 0.7 }}>
+      #{index + 1} · {muted ? 'muted' : `${Math.round(volume * 100)}%`}
+    </small>
+  );
+};
+
+const TracksThatCanBeRemoved: React.FC<{
+  children: (remove: (id: string) => void) => React.ReactNode;
+}> = ({ children }) => {
+  const [tracks, setTracks] = React.useState(() => createEmptyTracks(3));
+  const remove = React.useCallback(
+    (trackId: string) => setTracks((current) => current.filter((track) => track.id !== trackId)),
+    []
+  );
+  return (
+    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} samplesPerPixel={1024}>
+      {/* Handles a drag by the reorder grip. */}
+      <ClipInteractionProvider>
+        <div style={{ padding: '1rem' }}>{children(remove)}</div>
+      </ClipInteractionProvider>
+    </WaveformPlaylistProvider>
+  );
+};
+
+export const TrackControlsWithRemoveAndReorder: Story = {
+  render: () => (
+    <TracksThatCanBeRemoved>
+      {(remove) => (
+        <WaveformRoot>
+          {/* The children are the panel of ONE track; the part renders them once per track. */}
+          <WaveformTrackControls>
+            <DefaultTrackControls>
+              <TrackSummary />
+            </DefaultTrackControls>
+            <TrackRemoveButton onRemove={remove} />
+            <TrackReorderGrip />
+          </WaveformTrackControls>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      )}
+    </TracksThatCanBeRemoved>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "The default panel with one control of the story's own inside it (`useTrack()`), a remove button and a reorder grip beside it. A remove button and a grip are drawn by being rendered. The move buttons need nothing else; dragging by the grip is handled by the `ClipInteractionProvider` around the view.",
+      },
+    },
+  },
+};
+
+export const TrackControlsFromPieces: Story = {
+  render: () => (
+    <WaveformPlaylistProvider tracks={createEmptyTracks(3)} samplesPerPixel={1024}>
+      <div style={{ padding: '1rem' }}>
+        <WaveformRoot>
+          <WaveformTrackControls width={140}>
+            <div style={{ height: '100%', padding: 6, boxSizing: 'border-box' }}>
+              <TrackName />
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 4, margin: '4px 0' }}>
+                <TrackMuteButton />
+                <TrackSoloButton />
+              </div>
+              <TrackVolumeSlider />
+            </div>
+          </WaveformTrackControls>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </div>
+    </WaveformPlaylistProvider>
+  ),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'A panel composed from the pieces, in a 140 px column: name, mute, solo and volume, and no pan slider. Each piece is bound to the track it is drawn for. The slot is as wide as the column and as tall as the row; the panel fills it with `height: 100%`.',
       },
     },
   },

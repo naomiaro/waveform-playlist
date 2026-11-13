@@ -27,7 +27,7 @@ The controls on this page read the nearest playlist provider.
 | --- | --- |
 | Either provider | `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton` |
 | `MediaElementPlaylistProvider` only | `PlaybackRateSelect` |
-| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton` |
+| `WaveformPlaylistProvider` only | `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, `ExportWavButton`, and, among the children of `<WaveformTrackControls>`, `DefaultTrackControls` and the [track control pieces](#track-controls) |
 
 A control under a provider that does not serve it throws when it renders, also when a provider of the right kind is further out. The message names the hook and both providers, for example: "useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it".
 
@@ -174,7 +174,7 @@ A press on the tracks area starts the selection drag; under `WaveformRoot` it al
 | --- | --- | --- | --- |
 | `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
 | `WaveformLoopRegion` | the draggable loop region, in the same strip; nothing while looping is off | none | `WaveformPlaylistProvider` |
-| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width`, `renderTrackControls`, `onRemoveTrack`, `trackReordering` | `WaveformPlaylistProvider` |
+| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width`; children: the control panel of one track | `WaveformPlaylistProvider` |
 | `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three parts below | either |
 | `WaveformClipHeaders` | a header on every clip | none | either |
 | `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
@@ -197,9 +197,19 @@ The strip is 30 px tall and exists when a root has a `WaveformTimescale` or a `W
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `width` | `number` | `200` | Width of the controls column in pixels. The root reads it from the element, so it must be on the part itself |
-| `renderTrackControls` | `(trackIndex: number) => ReactNode` | - | Custom control panel for a track |
-| `onRemoveTrack` | `(trackIndex: number) => void` | - | The close button of the default panel is drawn only when this is given |
-| `trackReordering` | `boolean` | `false` | A drag grip and move up/down buttons on each default panel. The drag requires `ClipInteractionProvider` (or another `@dnd-kit/react` `DragDropProvider`); the buttons work regardless |
+| `children` | `ReactNode` | `<DefaultTrackControls />` | The control panel of ONE track. The part renders it once per track, each copy inside that track's context, which `useTrack()` and the [pieces](#track-controls) read |
+
+```tsx
+<WaveformTrackControls width={180}>
+  <DefaultTrackControls />
+  <TrackRemoveButton onRemove={removeTrack} />
+  <TrackReorderGrip />
+</WaveformTrackControls>
+```
+
+Each track has a slot in the column: as wide as the column and as tall as the track's row, with `overflow: hidden`. A click anywhere in a slot selects the track. Inside the slot, the element that holds the panel has `data-track-controls="<track id>"`.
+
+The part compares its children with the ones of the previous render (element types, keys and props; `children` recursively, `style` one level deep) and keeps the previous ones while they are equal. Children written inline therefore do not render the panels when the composing component renders, as long as their props keep their identity. A function or an object written inline as a prop (other than `style`) makes every panel render each time.
 
 Under `MediaElementWaveformRoot` it draws nothing.
 
@@ -509,11 +519,11 @@ Slider for overall output volume.
 <MasterVolumeControl />
 ```
 
-**Range:** 0 (silent) to 1 (full)
+The master volume is a number from 0 (silent) to 1 (full): that is what `usePlaylistMixer().masterVolume` holds and what the control passes to `setMasterVolume`. The `<input type="range">` it draws runs from 0 to 100, and the control divides by 100.
 
 ### Track volume
 
-There is no exported per-track volume component. The volume slider of a track is part of the default control panel that `<WaveformTrackControls />` draws. For your own slider, read the value from `usePlaylistMixer().trackStates[trackIndex].volume` and set it with `useEditorControls().setTrackVolume(trackIndex, volume)`, in a panel you pass as `renderTrackControls`.
+`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i]?.volume` (the entry of `tracks[i]`; `undefined` while that track is loading) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume)`.
 
 ---
 
@@ -600,44 +610,97 @@ Toggle for auto-scrolling during playback. While it is on, a drag on the wavefor
 
 ## Track Controls
 
-### The default panel
-
-The built-in control panel of a track is not exported as a component of its own: `<WaveformTrackControls />` draws one per track.
-
-**Includes:**
-- Track name
-- Mute button
-- Solo button
-- Volume slider
-- Pan slider
-- A close button, when `onRemoveTrack` is given
-- A drag grip and move up/down buttons, with `trackReordering`
-
-Pass `renderTrackControls` to draw your own panel instead.
-
-### SortableTrackControls
-
-Registers a custom track-controls row as a vertical drag source for reordering. Use this when rendering your own track control panel (via `renderTrackControls` on `<WaveformTrackControls>`) instead of the default one — the default panel already wires this up internally when `trackReordering` is set on `<WaveformTrackControls>`.
+The control panel of a track is composed from pieces. Each piece is bound to the track whose panel it is rendered in: it takes no prop for the track and works only among the children of [`<WaveformTrackControls>`](#waveformtrackcontrols), which renders them once per track. Elsewhere a piece throws the message of [`useTrack()`](/docs/react/api/hooks#usetrack). The guide is [Track Management](/docs/react/guides/track-management).
 
 ```tsx
-<SortableTrackControls trackId={track.id} index={trackIndex}>
-  {({ ref, handleRef, isDragSource }) => (
-    <div ref={ref} style={{ opacity: isDragSource ? 0.5 : 1 }}>
-      <button ref={handleRef}>Drag</button>
-      {/* rest of your custom track controls */}
-    </div>
-  )}
-</SortableTrackControls>
+import {
+  DefaultTrackControls,
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+  TrackPanSlider,
+  TrackMenuButton,
+  TrackRemoveButton,
+  TrackReorderGrip,
+} from '@waveform-playlist/browser';
 ```
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `trackId` | `string` | - | The track's id |
-| `index` | `number` | - | The track's current position |
-| `disabled` | `boolean` | `false` | Disable the drag source |
-| `children` | `(props: SortableTrackControlsRenderProps) => ReactNode` | - | Render prop receiving `ref` (sortable item wrapper), `handleRef` (drag grip), and `isDragSource` |
+While a track is loading (the provider has no mixer state for it yet), the mute and solo buttons, the two sliders and the two move buttons are disabled, and the name is "Track N".
 
-Requires `ClipInteractionProvider` (or another ambient `@dnd-kit/react` `DragDropProvider`) — drags are committed by calling `useEditorControls().reorderTrack(trackId, toIndex)` from the shared `onDragEnd` handler.
+### DefaultTrackControls
+
+The default panel: the name, the track menu, mute, solo, volume and pan. It is what `<WaveformTrackControls />` draws when it has no children. It has no remove button and no reorder grip: render `<TrackRemoveButton>` or `<TrackReorderGrip />` beside it.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `children` | `ReactNode` | Drawn inside the panel, below the pan slider |
+
+```tsx
+<WaveformTrackControls>
+  <DefaultTrackControls>
+    <MyTrackColorPicker />
+  </DefaultTrackControls>
+  <TrackRemoveButton onRemove={removeTrack} />
+</WaveformTrackControls>
+```
+
+The panel fills the slot. An element rendered beside it in the normal flow is therefore outside the visible slot; a control of your own goes inside, as a child, unless it positions itself as the remove button and the grip do.
+
+### TrackName
+
+The track's name on one line, cut off with an ellipsis; "Track N" (N is the position, from 1) for a track without a name. No props. The element has the attribute `data-track-name`.
+
+### TrackMuteButton and TrackSoloButton
+
+Toggle buttons labelled "Mute" and "Solo", with `aria-pressed`. No props. Disabled while the track is loading.
+
+### TrackVolumeSlider
+
+The track's volume, 0 to 1 in steps of 0.01, between two speaker icons. The input is labelled "Volume". No props. Disabled while the track is loading.
+
+### TrackPanSlider
+
+The track's pan, -1 (left) to 1 (right) in steps of 0.01, between "L" and "R". The input is labelled "Pan". No props. Disabled while the track is loading.
+
+### TrackMenuButton
+
+The track's menu: how the track is drawn (waveform, spectrogram, both) and its spectrogram settings. No props. It draws nothing without a `SpectrogramProvider` above the view, and nothing for a MIDI track. A click on the button does not select the track.
+
+### TrackRemoveButton
+
+A close button at the top left corner of the track's slot (it positions itself; put it anywhere among the children). A click calls `onRemove` and does not select the track.
+
+| Prop | Type | Description |
+|------|------|-------------|
+| `onRemove` | `(trackId: string) => void` | Called with the track's id. Removing the track from your `tracks` is yours to do |
+
+Pass a function that keeps its identity (`useCallback`, or a hook's stable function): a new function on every render of your component renders every panel each time.
+
+### TrackReorderGrip
+
+A drag grip with a move-up and a move-down button, at the right edge of the track's slot (it positions itself). No props. The default panel makes room for it on both sides when the grip is rendered beside the panel, as a sibling (CSS `:has()`). The buttons work with no other setup; dragging needs a `ClipInteractionProvider` above the view. The up button is disabled for the first track, the down button for the last, both while the track is loading. Neither the grip nor the buttons select the track. The element around them has the attribute `data-track-reorder-grip`.
+
+A reorder is committed with `useEditorControls().reorderTrack(trackId, toIndex)`; the new order arrives through the provider's `onTracksChange`.
+
+For a grip element of your own, see [`useTrackReorderHandle()`](/docs/react/api/hooks#usetrackreorderhandle).
+
+### A panel of your own
+
+Any component among the children can read its track with [`useTrack()`](/docs/react/api/hooks#usetrack):
+
+```tsx
+function TrackGainReadout() {
+  const { volume } = useTrack();
+  return <span>{Math.round(volume * 100)}%</span>;
+}
+
+<WaveformTrackControls>
+  <DefaultTrackControls>
+    <TrackGainReadout />
+  </DefaultTrackControls>
+</WaveformTrackControls>
+```
 
 ---
 

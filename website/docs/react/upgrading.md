@@ -642,7 +642,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
 
-4. **A custom `renderTrackControls` that mounts `SortableTrackControls` itself** reads `trackReorderEpoch` (folded into the panel's `key`) and `trackDragPreview` from `useTrackReorderPreview()`, not from `usePlaylistData()`.
+4. **`trackReorderEpoch` and `trackDragPreview`** are in `useTrackReorderPreview()`, not in `usePlaylistData()`. A custom track panel does not need either: `renderTrackControls` and `SortableTrackControls` are removed later in this major, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
 
 5. **A small timing difference, nothing to migrate.** A `play()` called while the engine is being rebuilt (the tracks just changed) is queued. The playhead, the clip progress overlays and `AudioPosition` now move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier. If the queued play never starts (the rebuild fails), they now stay where they were until the next seek or stop.
 
@@ -1400,7 +1400,7 @@ import {
 <WaveformRoot className="my-playlist">
   <WaveformTimescale renderTick={renderTick} />
   <WaveformLoopRegion />
-  <WaveformTrackControls width={180} onRemoveTrack={removeTrack} />
+  <WaveformTrackControls width={180} />
   <WaveformTracks gainScaled>
     <WaveformClipHeaders />
     <WaveformFades />
@@ -1418,7 +1418,7 @@ import {
 | `MediaElementWaveformRoot` | the same for the MediaElement player | `className` | `MediaElementPlaylistProvider` |
 | `WaveformTimescale` | the time ruler, in a strip above the tracks | `renderTick` | either |
 | `WaveformLoopRegion` | the draggable loop region, in the same strip | none | `WaveformPlaylistProvider` |
-| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200), `renderTrackControls`, `onRemoveTrack`, `trackReordering` | `WaveformPlaylistProvider` |
+| `WaveformTrackControls` | the column of track controls, left of the scrolling area | `width` (pixels, default 200); children: the panel of one track (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id), which removed the `renderTrackControls`, `onRemoveTrack` and `trackReordering` options this part had at first) | `WaveformPlaylistProvider` |
 | `WaveformTracks` | the track rows with their clips | `gainScaled`; children: the three below | either |
 | `WaveformClipHeaders` | a header on every clip; inside a `ClipInteractionProvider` it is what a clip is dragged by, and the trim handles come with it | none | either (under the MediaElement provider the header shows the track's `name`, or "Track" without one; nothing there supports dragging the clip, so leave clip interaction off above that provider) |
 | `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
@@ -1449,7 +1449,7 @@ For anything else (a part left out, an option on a part, a narrower column, your
 | `PlaylistVisualization`, `PlaylistVisualizationProps` | exports |
 | `MediaElementPlaylist`, `MediaElementPlaylistProps` | exports |
 
-A removed prop that is still passed is ignored (TypeScript reports it; plain JavaScript does not): no headers and so no drag handles for a leftover `showClipHeaders`, no close button for `onRemoveTrack`, no preview for `recordingState`, the default playhead for `renderPlayhead`. A leftover read of `usePlaylistView().controls` is `undefined`, so `usePlaylistView().controls.show` throws a `TypeError`.
+A removed prop that is still passed is ignored (TypeScript reports it; plain JavaScript does not): no headers and so no drag handles for a leftover `showClipHeaders`, no close button for `onRemoveTrack`, the default panel for `renderTrackControls`, no grip for `trackReordering`, no preview for `recordingState`, the default playhead for `renderPlayhead`. A leftover read of `usePlaylistView().controls` is `undefined`, so `usePlaylistView().controls.show` throws a `TypeError`.
 
 ### Find and replace
 
@@ -1491,9 +1491,9 @@ then apply each row that matches. The two annotation elements belong to a playli
 | the provider had no `controls`, or `controls.show` was `false` | delete `<WaveformTrackControls />` |
 | `controls={{ show: true, width: N }}`, N not 200 | `<WaveformTrackControls width={N} />` |
 | `renderTick={f}` | `<WaveformTimescale renderTick={f} />` |
-| `renderTrackControls={f}` | `<WaveformTrackControls renderTrackControls={f} />` |
-| `onRemoveTrack={f}` | `<WaveformTrackControls onRemoveTrack={f} />` |
-| `trackReordering` | `<WaveformTrackControls trackReordering />` |
+| `renderTrackControls={f}` | the panel as children of `<WaveformTrackControls>`: step 3 of [the next entry](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id) |
+| `onRemoveTrack={f}` | `<WaveformTrackControls><DefaultTrackControls /><TrackRemoveButton onRemove={f} /></WaveformTrackControls>`; `f` gets the track id (step 2 of the next entry) |
+| `trackReordering` | `<WaveformTrackControls><DefaultTrackControls /><TrackReorderGrip /></WaveformTrackControls>` (step 1 of the next entry) |
 | `gainScaledWaveforms` | `<WaveformTracks gainScaled>` |
 | `showClipHeaders` | `<WaveformClipHeaders />` as a child of `<WaveformTracks>` |
 | `showFades` | `<WaveformFades />` as a child of `<WaveformTracks>` |
@@ -1601,6 +1601,360 @@ In development a part that is not where it can work says so once in the console 
 - Every page that had no ruler or no controls column and still renders `<Waveform />` or `<MediaElementWaveform />`: it has them now.
 - A recording: mute state of the armed track during a take, and that playback continues on an empty timeline.
 - Code that wrapped `<Waveform>` to add its own props for the removed ones: it can render the composition directly.
+
+## Track controls are composed from pieces bound to a track; the mixer setters take a track id
+
+**Packages:** `@waveform-playlist/browser`. `WaveformPlaylistProvider` only.
+
+Apply this entry after the one above: it replaces the three options that entry put on `<WaveformTrackControls>` (#687).
+
+The control panel of a track is no longer described by props of `<WaveformTrackControls>`. The **children** of the part are the panel of ONE track. The part renders them once per track, each copy inside that track's context, and a component in the panel reads its track with `useTrack()`. The built-in pieces do that already and take no prop for the track:
+
+```tsx
+import {
+  WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
+  TrackReorderGrip,
+} from '@waveform-playlist/browser';
+
+// The default panel, with a remove button and a reorder grip
+<WaveformTrackControls width={200}>
+  <DefaultTrackControls />
+  <TrackRemoveButton onRemove={removeTrack} />
+  <TrackReorderGrip />
+</WaveformTrackControls>
+```
+
+`<WaveformTrackControls />` without children draws `<DefaultTrackControls />`, as before. Its props are now `width` and `children`.
+
+At the same time the four mixer setters of `useEditorControls()` take a track **id** where they took an index, and the provider keeps mixer state (mute, solo, volume, pan) by track id.
+
+### New exports
+
+| Export | Is |
+| --- | --- |
+| `useTrack()` | the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isLoading`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, and the actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`. Type: `TrackContextValue` |
+| `<DefaultTrackControls>` | the default panel: name, track menu, mute, solo, volume, pan. Its `children` are drawn inside the panel, below the pan slider. Type: `DefaultTrackControlsProps` |
+| `<TrackName />` | the track's name on one line |
+| `<TrackMuteButton />`, `<TrackSoloButton />` | the two toggle buttons |
+| `<TrackVolumeSlider />`, `<TrackPanSlider />` | the two sliders (0 to 1, and -1 to 1) |
+| `<TrackMenuButton />` | the track menu (render mode, spectrogram settings); draws nothing without a `SpectrogramProvider` and nothing for a MIDI track |
+| `<TrackRemoveButton onRemove>` | a close button at the top left of the track's slot. Type: `TrackRemoveButtonProps` |
+| `<TrackReorderGrip />` | a drag grip with move-up and move-down buttons at the right edge of the slot |
+| `useTrackReorderHandle()` | `{ handleRef, isDragSource }` for a drag grip of your own. Type: `TrackReorderHandle` |
+
+All of them work only among the children of `<WaveformTrackControls>`.
+
+### Removed
+
+| Removed | Replacement |
+| --- | --- |
+| `renderTrackControls` prop of `<WaveformTrackControls>` | the panel as children; a component in it calls `useTrack()` |
+| `onRemoveTrack` prop | `<TrackRemoveButton onRemove={f} />` among the children. `f` gets the track **id**, not the index |
+| `trackReordering` prop | `<TrackReorderGrip />` among the children |
+| `SortableTrackControls`, `SortableTrackControlsProps`, `SortableTrackControlsRenderProps` | `<TrackReorderGrip />`, or `useTrackReorderHandle()` for your own grip element |
+| `setTrackMute(trackIndex, muted)`, `setTrackSolo(trackIndex, soloed)`, `setTrackVolume(trackIndex, volume)`, `setTrackPan(trackIndex, pan)` | the same names with a track id: `setTrackMute(trackId, muted)` and so on; inside a panel, `useTrack().setMuted(muted)` and so on |
+
+Nothing throws for a removed name. A removed prop that is still passed in plain JavaScript is ignored: the part draws the default panel, with no remove button and no grip. A setter called with an index does nothing (see the behaviour table). An import of `SortableTrackControls` is `undefined` (or fails when the module is linked, in native ES modules). TypeScript reports all of them.
+
+### Find and replace
+
+**Find:** `renderTrackControls`, `onRemoveTrack`, `trackReordering`, `SortableTrackControls`, `setTrackMute(`, `setTrackSolo(`, `setTrackVolume(`, `setTrackPan(`, `trackStates`, `trackReorderEpoch`.
+
+**1. `trackReordering`**
+
+```tsx
+// Before
+<WaveformTrackControls trackReordering />
+
+// After
+<WaveformTrackControls>
+  <DefaultTrackControls />
+  <TrackReorderGrip />
+</WaveformTrackControls>
+```
+
+The move buttons work with no other setup. Dragging by the grip needs a `ClipInteractionProvider` above the view, as before.
+
+**2. `onRemoveTrack`**
+
+```tsx
+// Before: the callback got the index
+const removeTrack = useCallback((trackIndex: number) => {
+  setTracks((prev) => prev.filter((_, i) => i !== trackIndex));
+}, []);
+
+<WaveformTrackControls onRemoveTrack={removeTrack} />
+
+// After: the callback gets the id
+const removeTrack = useCallback((trackId: string) => {
+  setTracks((prev) => prev.filter((track) => track.id !== trackId));
+}, []);
+
+<WaveformTrackControls>
+  <DefaultTrackControls />
+  <TrackRemoveButton onRemove={removeTrack} />
+</WaveformTrackControls>
+```
+
+**3. A `renderTrackControls` panel**
+
+```tsx
+// Before
+import { Button, ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
+
+function MyTrackPanel({ trackIndex }: { trackIndex: number }) {
+  const { trackStates } = usePlaylistMixer();
+  const { setTrackMute, setTrackVolume } = useEditorControls();
+  const state = trackStates[trackIndex];
+  if (!state) return null;
+  return (
+    <Controls>
+      <Header>{state.name || `Track ${trackIndex + 1}`}</Header>
+      <ButtonGroup>
+        <Button onClick={() => setTrackMute(trackIndex, !state.muted)}>
+          {state.muted ? 'Unmute' : 'Mute'}
+        </Button>
+      </ButtonGroup>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={state.volume}
+        onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
+      />
+    </Controls>
+  );
+}
+
+<WaveformTrackControls
+  width={180}
+  renderTrackControls={(trackIndex) => <MyTrackPanel trackIndex={trackIndex} />}
+/>
+```
+
+```tsx
+// After
+import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
+import { Button, ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
+
+function MyTrackPanel() {
+  const { name, muted, volume, isLoading, setMuted, setVolume } = useTrack();
+  return (
+    <Controls>
+      <Header>{name}</Header>
+      <ButtonGroup>
+        <Button disabled={isLoading} onClick={() => setMuted(!muted)}>
+          {muted ? 'Unmute' : 'Mute'}
+        </Button>
+      </ButtonGroup>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        value={volume}
+        disabled={isLoading}
+        onChange={(e) => setVolume(parseFloat(e.target.value))}
+      />
+    </Controls>
+  );
+}
+
+<WaveformTrackControls width={180}>
+  <MyTrackPanel />
+</WaveformTrackControls>
+```
+
+`useTrack()` always returns a value: `name` is "Track N" (N is the position, from 1) for a track without a name, and while the track is loading `isLoading` is true and `muted`, `soloed`, `volume` and `pan` are `false`, `false`, `1` and `0`. A panel that returned `null` for a missing `trackStates[trackIndex]` can return `null` for `isLoading`. The props a panel took from the closure of `renderTrackControls` (a callback, a manager object) are props of the element among the children now; keep them stable (see the behaviour table).
+
+Where the panel was the default one rebuilt by hand with one change, compose it from the pieces:
+
+```tsx
+import {
+  WaveformTrackControls,
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+} from '@waveform-playlist/browser';
+import { ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
+
+// The default panel without the pan slider
+<WaveformTrackControls>
+  <Controls>
+    <Header style={{ justifyContent: 'center' }}>
+      <TrackName />
+    </Header>
+    <ButtonGroup>
+      <TrackMuteButton />
+      <TrackSoloButton />
+    </ButtonGroup>
+    <TrackVolumeSlider />
+  </Controls>
+</WaveformTrackControls>
+```
+
+**4. The default panel plus one control of your own**
+
+```tsx
+// Before: the whole default panel copied into renderTrackControls, with one more element
+
+// After
+function TrackColorDot() {
+  const { id } = useTrack();
+  return <span className="track-dot" data-track={id} />;
+}
+
+<WaveformTrackControls>
+  <DefaultTrackControls>
+    <TrackColorDot />
+  </DefaultTrackControls>
+</WaveformTrackControls>
+```
+
+The children of `<DefaultTrackControls>` are drawn inside the panel, below the pan slider. An element written BESIDE `<DefaultTrackControls />` is outside the panel, and the panel fills the slot, so that element is below the visible area unless it positions itself (`position: absolute`), as `<TrackRemoveButton>` and `<TrackReorderGrip>` do.
+
+**5. A mixer setter called outside a panel**
+
+```tsx
+// Before
+const { setTrackMute, setTrackVolume } = useEditorControls();
+setTrackMute(0, true);
+tracks.forEach((_, i) => setTrackVolume(i, 0.8));
+
+// After
+const { tracks } = usePlaylistTimeline();
+const { setTrackMute, setTrackVolume } = useEditorControls();
+setTrackMute(tracks[0].id, true);
+tracks.forEach((track) => setTrackVolume(track.id, 0.8));
+```
+
+Replace every `setTrackMute(i, v)`, `setTrackSolo(i, v)`, `setTrackVolume(i, v)` and `setTrackPan(i, v)` with the id of that track, `tracks[i].id`. `tracks` is your own state or `usePlaylistTimeline().tracks`. `usePlaylistMixer().trackStates` stays an array in the order of `tracks`, so `trackStates[i]` still belongs to `tracks[i]`.
+
+**6. `SortableTrackControls`**
+
+```tsx
+// Before
+function MyPanel({ trackIndex }: { trackIndex: number }) {
+  const { tracks } = usePlaylistTimeline();
+  const { trackReorderEpoch } = useTrackReorderPreview();
+  const track = tracks[trackIndex];
+  return (
+    <SortableTrackControls
+      key={`${track.id}-${trackReorderEpoch}`}
+      trackId={track.id}
+      index={trackIndex}
+    >
+      {({ ref, handleRef, isDragSource }) => (
+        <div ref={ref} style={{ opacity: isDragSource ? 0.9 : 1 }}>
+          <button ref={handleRef} aria-label="Drag to reorder">⠿</button>
+          {/* the rest of the panel */}
+        </div>
+      )}
+    </SortableTrackControls>
+  );
+}
+
+// After, with the built-in grip
+<WaveformTrackControls>
+  <MyPanel />
+  <TrackReorderGrip />
+</WaveformTrackControls>
+
+// After, with your own grip element
+function MyGrip() {
+  const { handleRef, isDragSource } = useTrackReorderHandle();
+  return (
+    <button
+      ref={handleRef}
+      aria-label="Drag to reorder"
+      onClick={(e) => e.stopPropagation()}
+      style={{ opacity: isDragSource ? 0.6 : 1 }}
+    >
+      ⠿
+    </button>
+  );
+}
+
+<WaveformTrackControls>
+  <MyPanel />
+  <MyGrip />
+</WaveformTrackControls>
+```
+
+There is no `ref` for the item any more: the element that moves is the slot the part draws around the panel, not an element of yours, and the part draws it lifted (opaque, with a shadow) while it is dragged. Delete the `key` with `trackReorderEpoch`: the part keys its slots itself, and it did so before as well, so that key was never needed. Call `useTrackReorderHandle()` once per panel (so not together with `<TrackReorderGrip />`). In the example `MyGrip` is written beside `MyPanel`: when the panel fills the slot (`height: 100%`), a grip beside it is below the visible area unless it positions itself (`position: absolute`, as `<TrackReorderGrip />` does) or is rendered inside the panel. For move buttons of your own use `useTrack().moveUp()` and `.moveDown()` with `isFirst` and `isLast`. The `disabled` prop has no replacement: leave the grip out.
+
+### Behaviour
+
+| | Before | Now |
+| --- | --- | --- |
+| `renderTrackControls`, `onRemoveTrack` or `trackReordering` left on `<WaveformTrackControls>` in plain JavaScript | the custom panel, a close button, a grip | ignored: the default panel, no remove button, no grip |
+| `setTrackMute(0, true)` (an index; the same for the other three) | muted the first track | does nothing. In development each of the four setters warns once in the console (`[waveform-playlist] setTrackMute() takes a track id…`). A string that is no track's id is ignored without a warning |
+| A track is removed, or one is added in front of the others (the number of tracks changes and the provider rebuilds) | the panels showed every remaining track back at the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack`, and the rebuilt engine took its values from the old list by position, so a track could sound with a neighbour's values (read from the code, not reproduced as audio) | the other tracks keep what the user set |
+| The list is replaced by one of the same length with other tracks, or the same tracks in another order | state stayed at its position | a track keeps its mixer state for as long as its id is in `tracks`; a new id starts from the fields of its `ClipTrack` |
+| `usePlaylistMixer().trackStates` while tracks are loading (`deferEngineRebuild`, or tracks appended to a running playlist) | filled by position: shorter than `tracks` | one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` **at its own position**, which can be in the middle. `trackStates.length` equals `tracks.length` |
+| The identity of the `trackStates` array | a new array with new state objects whenever the provider loaded `tracks` again (also when only `onTracksChange` was a new function) | the same array while no entry changed: a move of a trim, a clip edit or a re-load for a new `onTracksChange` does not change it, and a mute changes the object of that track only |
+| A click in a panel of your own | selected nothing (only the default panel selected its track) | a click anywhere in a track's slot selects the track. `<TrackRemoveButton>`, the button of `<TrackMenuButton>` and the grip and buttons of `<TrackReorderGrip>` do not select. A render-mode choice in the open track menu selects the track, as it did in the default panel |
+| The remove callback | `onRemoveTrack(trackIndex)` | `onRemove(trackId)` |
+| The element a reorder drag moves | the element you gave `ref` from `SortableTrackControls` | the slot the part draws; your grip only starts the drag |
+| Children written inline | (the equivalent: an unstable `renderTrackControls` or `onRemoveTrack` rendered every panel on each render of your component) | the part compares the children with the previous ones (element types, keys and props, `children` recursively, `style` one level deep) and keeps the previous ones while they are equal, so inline children cost nothing while their props are stable. A function or an object written inline as a prop (other than `style`) makes every panel render on each render of the component that composes the view |
+| `useTrack()` outside the children of `<WaveformTrackControls>` | (new) | throws `useTrack must be used within <WaveformTrackControls>…`. For a mixer strip elsewhere on the page use `usePlaylistMixer()` and the id setters of `useEditorControls()`. Under `MediaElementPlaylistProvider` those two throw as well: it has one track and no mixer |
+| A track that is still loading | the default panel's controls were disabled | the pieces: mute, solo, volume, pan and the two move buttons are disabled, the name is "Track N", `useTrack().isLoading` is true. The remove button and the track menu stay enabled |
+| `<DefaultTrackControls>` | drew the close button and the grip itself, from props of the part | has neither. `<TrackRemoveButton>` places itself at the top left of the slot and `<TrackReorderGrip>` at its right edge; the default panel makes room for the grip on both sides (CSS `:has()`) |
+| The size of a custom panel | the slot, as now | the slot is as wide as the column (`width` of the part) and as tall as the track's row, with `overflow: hidden`. Fill it with `height: 100%`; do not compute the row height |
+| Selecting a track | changed the background of the two slots concerned without rendering their default panels, and called `renderTrackControls` for every track | renders the pieces of the two panels concerned (the one that stops being selected and the one that becomes selected): `isSelected` is in the value of `useTrack()` |
+| A mute, solo, volume or pan change | called `renderTrackControls` for every track | renders the components of that track's panel that call `useTrack()` |
+| `exportWav` (`useExportWav`) with a track that is still loading | failed with a `TypeError` (the track had no state) | the track is rendered with the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack` (its `soloed` counts for the solo rule like any other) |
+| Children that are `false`, `0` or `''` (`{flag && <Panel />}` with a false flag) | (new) | empty panels. Only `null` and `undefined` mean "the default panel": write `{flag ? <Panel /> : undefined}` |
+| Two reorder handles in one panel (two `<TrackReorderGrip />`, or the grip and `useTrackReorderHandle()`) | (new) | both register the track as the same sortable item; a warning in the console in development. Render one |
+| `<TrackReorderGrip />` as a child of `<DefaultTrackControls>`, or alone inside an element of yours | (new) | the default panel makes room for the grip only when the two are siblings; elsewhere the grip lies over the sliders |
+| A browser without CSS `:has()` | the room for the grip was an inline style | no room is made: the grip lies over the edges of the sliders |
+| `<TrackRemoveButton>` without `onRemove`, in plain JavaScript | (the close button was drawn only with `onRemoveTrack`) | the button is drawn and a click throws |
+| Markup of the default panel | the close button was inside the panel's `<header>`, the reorder rail inside the panel, and the panel handled the click that selects | every slot has a `div` (`[data-track-controls]`) around the panel (before, only with `trackReordering`, and without the attribute); the remove button and the grip are siblings of the panel inside it; the slot handles the click. A selector such as `header button[title="Remove track"]` no longer matches |
+| A reorder (`reorderTrack`, the move buttons, a drag) under a provider without `onTracksChange` | the mixer states were put in the new order while `tracks` stayed as it was, so the panels between the old and the new position showed another track's values | nothing changes on screen (the console warning about the missing `onTracksChange` is as before) |
+| The same ids with other `muted`, `soloed`, `volume` or `pan` fields on the `ClipTrack`, in a list with another number of tracks | the fields were applied (every state was re-created) | the fields of a known id are ignored: the user's values stay. Set them with the setters |
+| Tracks re-created with new ids on each change (`createTrack()` makes an id) | a list of the same length kept the mixer state by position | a new id starts from its `ClipTrack` fields: keep the ids of tracks that are the same track |
+| An id removed while `deferEngineRebuild` is true and added again | (by position) | gets the state it had: entries are dropped at the next full build |
+| Two tracks with the same id | two states, by position | one state for both |
+
+### `trackStates` may hold `undefined`
+
+The TypeScript type is still `TrackState[]`, so the compiler does not point at these. Search for every read of `trackStates`:
+
+```tsx
+// Before
+const anySolo = trackStates.some((s) => s.soloed);
+const volumes = trackStates.map((s) => s.volume);
+const loadedCount = trackStates.length;
+
+// After
+const anySolo = trackStates.some((s) => s?.soloed);
+const volumes = trackStates.map((s) => s?.volume ?? 1);
+const loadedCount = trackStates.filter(Boolean).length;
+```
+
+Code that waited for `trackStates.length === tracks.length` to know that loading had finished is now always true: use `trackStates.every(Boolean)`, or `usePlaylistTimeline().isReady` (which says the engine is built for the current tracks).
+
+### New attributes
+
+| Attribute | On |
+| --- | --- |
+| `data-track-controls="<track id>"` | the element inside each track's slot that holds the panel (the element a reorder drag moves) |
+| `data-track-name` | the element of `<TrackName />` |
+| `data-track-reorder-grip` | the element around the grip and buttons of `<TrackReorderGrip />` |
+
+### What to check after the replacement
+
+- Every remove callback: it gets an id. One that still filters by index (`i !== trackIndex`) removes nothing.
+- Every call of the four setters outside a panel, in plain JavaScript: watch the console in development for the one-time warning.
+- A saved session that restores mixer values by position: map positions to ids first (`tracks[i].id`).
+- Removing a track with other tracks muted or turned down: they stay as they are.
+- Tracks built again on every change: keep their ids, or the mixer starts over for them.
+- CSS or test selectors that reached the remove button or the reorder rail through the panel's markup.
+- A custom panel: click on its background and see the track become selected. A control of yours that must not select calls `event.stopPropagation()` in its click handler.
 
 ## Keyboard shortcuts yield to the focused control
 

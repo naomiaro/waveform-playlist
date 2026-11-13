@@ -209,11 +209,13 @@ export interface EditorControlsContextValue {
    */
   setCurrentTime: (time: number) => void;
 
-  // Track controls
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id (#687; by index until then). An id no track has
+  // is ignored. Inside a track's control panel, `useTrack()` has the same
+  // actions already bound to that track.
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. The reordered tracks
@@ -347,8 +349,8 @@ export interface PlaylistMixerContextValue {
 export interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Both playlist columns derive their display
-   *  layout from it; custom renderTrackControls consumers can read it to
-   *  mirror the preview in their own UI. */
+   *  layout from it; a track's panel can read it to mirror the preview in
+   *  its own UI. */
   trackDragPreview: TrackDragPreview | null;
   /** Internal: incremented after every track-reorder drag interaction ends.
    *  The view's track-controls part folds this into each slot's `key` to

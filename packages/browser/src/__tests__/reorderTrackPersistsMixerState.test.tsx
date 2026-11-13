@@ -140,7 +140,7 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     expect(probe.trackStates.map((s) => s.name)).toEqual(['track-1', 'track-2', 'track-3']);
 
     // Move track-1 (index 0) down to index 1 — matches the "Move track down"
-    // button's call shape (SortableTrackControls drag commits the same way).
+    // button's call shape (a drag by the reorder grip commits the same way).
     await act(async () => {
       probe.reorderTrack('track-1', 1);
     });

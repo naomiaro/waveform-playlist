@@ -19,10 +19,15 @@ import {
   AudioPosition,
   ZoomInButton,
   ZoomOutButton,
-  useEditorControls,
   KeyboardShortcuts,
   usePlaylistTimeline,
   usePlaylistMixer,
+  useTrack,
+  TrackName,
+  TrackMuteButton,
+  TrackSoloButton,
+  TrackVolumeSlider,
+  TrackRemoveButton,
   WaveformRoot,
   WaveformTimescale,
   WaveformLoopRegion,
@@ -41,14 +46,8 @@ import {
 import {
   Controls,
   Header,
-  Button,
   ButtonGroup,
-  Slider,
-  SliderWrapper,
-  VolumeDownIcon,
-  VolumeUpIcon,
   BaseControlButton,
-  CloseButton,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
@@ -157,10 +156,6 @@ const StyledDropZone = styled(FileDropZone)`
   margin-top: 1rem;
 `;
 
-
-const ControlsWrapper = styled.div`
-  position: relative;
-`;
 
 // Frequency visualizer component that polls for Tone.js analyser
 interface FrequencyVisualizerProps {
@@ -343,73 +338,14 @@ const FrequencyVisualizer: React.FC<FrequencyVisualizerProps> = ({ analyserRef, 
   return <VisualizerCanvas ref={canvasRef} width={1000} height={120} />;
 };
 
-// Custom track controls component that includes effects
-interface CustomTrackControlsProps {
-  trackIndex: number;
-  trackEffectsManager: UseTrackDynamicEffectsReturn;
-  onDeleteTrack: (trackIndex: number) => void;
-}
-
-const CustomTrackControls: React.FC<CustomTrackControlsProps> = ({
-  trackIndex,
-  trackEffectsManager,
-  onDeleteTrack,
+// The one control of this page's own in a track's panel: the effects of
+// that track. It is rendered among the children of <WaveformTrackControls>,
+// so useTrack() gives it the track.
+const TrackEffectsButton: React.FC<{ effectsManager: UseTrackDynamicEffectsReturn }> = ({
+  effectsManager,
 }) => {
-  const { tracks } = usePlaylistTimeline();
-  const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackSolo, setTrackVolume } = useEditorControls();
-
-  const trackState = trackStates[trackIndex] || {
-    name: `Track ${trackIndex + 1}`,
-    muted: false,
-    soloed: false,
-    volume: 1.0,
-    pan: 0,
-  };
-
-  const track = tracks[trackIndex];
-  const trackId = track?.id || `track-${trackIndex}`;
-
-  return (
-    <ControlsWrapper>
-      <CloseButton onClick={() => onDeleteTrack(trackIndex)} title="Delete track" />
-      <Controls>
-        <Header style={{ justifyContent: 'center' }}>
-          {trackState.name || `Track ${trackIndex + 1}`}
-        </Header>
-        <ButtonGroup>
-          <Button
-            $variant={trackState.muted ? 'danger' : 'outline'}
-            onClick={() => setTrackMute(trackIndex, !trackState.muted)}
-          >
-            Mute
-          </Button>
-          <Button
-            $variant={trackState.soloed ? 'info' : 'outline'}
-            onClick={() => setTrackSolo(trackIndex, !trackState.soloed)}
-          >
-            Solo
-          </Button>
-        </ButtonGroup>
-        <SliderWrapper>
-          <VolumeDownIcon />
-          <Slider
-            min="0"
-            max="1"
-            step="0.01"
-            value={trackState.volume}
-            onChange={(e) => setTrackVolume(trackIndex, parseFloat(e.target.value))}
-          />
-          <VolumeUpIcon />
-        </SliderWrapper>
-        <TrackEffectControls
-          trackId={trackId}
-          trackName={trackState.name || `Track ${trackIndex + 1}`}
-          effectsManager={trackEffectsManager}
-        />
-      </Controls>
-    </ControlsWrapper>
-  );
+  const { id, name } = useTrack();
+  return <TrackEffectControls trackId={id} trackName={name} effectsManager={effectsManager} />;
 };
 
 // Inner component that renders controls and waveform
@@ -417,7 +353,7 @@ interface EffectsControlsProps {
   analyserRef: React.RefObject<any>;
   trackEffectsManager: UseTrackDynamicEffectsReturn;
   isDarkMode: boolean;
-  onDeleteTrack: (trackIndex: number) => void;
+  onDeleteTrack: (trackId: string) => void;
   onAddTracks: (newTracks: ClipTrack[]) => void;
   masterEffectsFunction: any;
   trackCount: number;
@@ -506,20 +442,6 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     }
   }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
-  // Render custom track controls using the track effects manager
-  // Stable, so the track control panels are not re-rendered by this
-  // component's own renders.
-  const renderTrackControls = useCallback(
-    (trackIndex: number) => (
-      <CustomTrackControls
-        trackIndex={trackIndex}
-        trackEffectsManager={trackEffectsManager}
-        onDeleteTrack={onDeleteTrack}
-      />
-    ),
-    [trackEffectsManager, onDeleteTrack]
-  );
-
   // Handle dropped/selected audio files
   const handleFiles = useCallback(async (files: File[]) => {
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
@@ -552,7 +474,23 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
       <WaveformRoot>
         <WaveformTimescale />
         <WaveformLoopRegion />
-        <WaveformTrackControls width={150} renderTrackControls={renderTrackControls} />
+        {/* The panel of a track, written once: the pieces are bound to the
+            track they are drawn for. The props are stable, so the panels do
+            not render with this component. */}
+        <WaveformTrackControls width={150}>
+          <TrackRemoveButton onRemove={onDeleteTrack} />
+          <Controls>
+            <Header style={{ justifyContent: 'center' }}>
+              <TrackName />
+            </Header>
+            <ButtonGroup>
+              <TrackMuteButton />
+              <TrackSoloButton />
+            </ButtonGroup>
+            <TrackVolumeSlider />
+            <TrackEffectsButton effectsManager={trackEffectsManager} />
+          </Controls>
+        </WaveformTrackControls>
         <WaveformTracks />
         <WaveformSelection />
         <WaveformPlayhead />
@@ -594,7 +532,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
             >
               {trackStates.map((state, index) => (
                 <option key={index} value={index}>
-                  {state.name || `Track ${index + 1}`}
+                  {/* No entry yet for a track that is still loading. */}
+                  {state?.name || `Track ${index + 1}`}
                 </option>
               ))}
             </ExportSelect>
@@ -725,14 +664,11 @@ export function EffectsExample() {
   }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
 
   // Handle delete track
-  const handleDeleteTrack = useCallback((trackIndex: number) => {
-    const trackToDelete = tracks[trackIndex];
-    if (trackToDelete) {
-      // Clear effects for this track
-      clearTrackEffects(trackToDelete.id);
-    }
-    setTracks(prevTracks => prevTracks.filter((_, index) => index !== trackIndex));
-  }, [tracks, clearTrackEffects]);
+  const handleDeleteTrack = useCallback((trackId: string) => {
+    // Clear effects for this track
+    clearTrackEffects(trackId);
+    setTracks(prevTracks => prevTracks.filter((track) => track.id !== trackId));
+  }, [clearTrackEffects]);
 
   // Handle add tracks
   const handleAddTracks = useCallback((newTracks: ClipTrack[]) => {

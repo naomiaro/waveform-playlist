@@ -396,10 +396,12 @@ interface PlaybackControlsContextValue {
 interface EditorControlsContextValue {
   /** Moves the cursor without touching playback. Use seekTo from a control. */
   setCurrentTime: (time: number) => void;
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id. A first argument that is not a string, or an
+  // id no track has, is ignored.
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
   /** Internal: call after every track-reorder drag interaction ends. */
   bumpTrackReorderEpoch: () => void;
@@ -493,6 +495,8 @@ interface PlaylistMixerContextValue {
   masterVolume: number;
 }
 ```
+
+`trackStates` has one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` at that track's position (the type does not say so: read `trackStates[i]?.muted`). The provider keeps this state by track id, so a track keeps its mute, solo, volume and pan when other tracks are removed, added or moved; a track with a new id starts from the fields of its `ClipTrack`. Details: [`usePlaylistMixer`](/docs/react/api/hooks#useplaylistmixer). Inside a track's control panel, [`useTrack()`](/docs/react/api/hooks#usetrack) has the state and the setters of that track.
 
 ### Track reorder preview (useTrackReorderPreview)
 

@@ -120,6 +120,13 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     snapSamplePosition,
   });
 
+  // True from the start of a track-reorder drag to its end. dnd-kit can send
+  // one more dragover AFTER the dragend of a canceled drag (the sorting
+  // plugin putting the item back): seen with Escape mid-drag once the slot's
+  // element was registered from the reorder handle's effect (#687), where it
+  // set the preview again for good. A preview without a drag is never wanted.
+  const trackReorderDragActiveRef = React.useRef(false);
+
   // Wrap onDragStart to auto-select track
   const onDragStart = React.useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
@@ -127,6 +134,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         | { kind?: string; trackId?: string; trackIndex?: number }
         | undefined;
       if (data?.kind === 'track-reorder') {
+        trackReorderDragActiveRef.current = true;
         if (data.trackId) setSelectedTrackId(data.trackId);
         return; // clip handler guards also skip this kind
       }
@@ -148,6 +156,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: { operation: { source?: { data?: unknown } | null } }) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind !== 'track-reorder' || !data.trackId) return;
+      if (!trackReorderDragActiveRef.current) return;
       const sortable = (
         event.operation.source as unknown as {
           sortable?: { index: number; initialIndex: number };
@@ -169,6 +178,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: Parameters<typeof onDragEnd>[0]) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind === 'track-reorder') {
+        trackReorderDragActiveRef.current = false;
         // Unconditional, regardless of canceled/committed: @dnd-kit/react's
         // sortable plugins can splice React-owned DOM nodes (Feedback's
         // placeholder, OptimisticSortingPlugin's reorder()) during the drag

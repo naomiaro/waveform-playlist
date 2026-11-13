@@ -62,12 +62,33 @@ Each track has a `renderMode` field:
 
 ### Optional UI
 
-The package also exports drop-in UI components for tweaking spectrogram settings at runtime:
+Under a `SpectrogramProvider` the default track controls show a track menu on every audio track (not on MIDI tracks): radio buttons for the render mode (Waveform, Spectrogram, Both) and a "Spectrogram Settings..." entry that opens the settings dialog of that track. In a control panel you compose yourself, the menu is the piece `<TrackMenuButton />` from `@waveform-playlist/browser`, and a component of your own reaches the same two things through `useTrack()`:
 
-- `<SpectrogramMenuItems />` — render mode + color map menu items, easily slotted into a `TrackContextMenu`
-- `<SpectrogramSettingsModal />` — full settings panel covering FFT size, frequency scale, gain, range, etc.
+```tsx
+import { useTrack } from '@waveform-playlist/browser';
 
-Both are framework-aware: they read selection state from `WaveformPlaylistProvider` and update the per-track overrides via the integration context.
+// Among the children of <WaveformTrackControls>
+function SpectrogramButtons() {
+  const { hasSpectrogram, renderMode, setRenderMode, openSpectrogramSettings } = useTrack();
+  // false for a MIDI track, and without a SpectrogramProvider
+  if (!hasSpectrogram) return null;
+  return (
+    <>
+      <button onClick={() => setRenderMode(renderMode === 'both' ? 'waveform' : 'both')}>
+        Spectrogram
+      </button>
+      <button onClick={openSpectrogramSettings}>Settings</button>
+    </>
+  );
+}
+```
+
+See [The Panel of a Track](/docs/react/guides/track-management#the-panel-of-a-track).
+
+The package also exports the two pieces the provider builds that UI from, for a menu or dialog of your own:
+
+- `SpectrogramMenuItems(props)` is a function, not a component: it takes `{ renderMode, onRenderModeChange, onOpenSettings, onClose? }` and returns an array of `TrackMenuItem` (the render-mode radios and the settings entry) for the `items` of `TrackMenu` from `@waveform-playlist/ui-components`. It has no colour-map items; the colour map is chosen in the settings dialog.
+- `<SpectrogramSettingsModal open onClose config colorMap onApply />` is the settings dialog (FFT size, frequency scale, gain, range and the rest). It reads no context: you pass the current `config` and `colorMap` and get the new ones in `onApply`.
 
 ## Web Components
 

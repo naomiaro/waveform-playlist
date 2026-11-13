@@ -38,9 +38,11 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
       counts.scale++;
       return createElement(actual.SmartScale, props);
     },
-    Controls: (props: React.ComponentProps<typeof actual.Controls>) => {
+    // The pieces of a panel (two sliders each) stand for "this panel rendered":
+    // its frame takes no props and does not render again (#687).
+    Slider: (props: React.ComponentProps<typeof actual.Slider>) => {
       counts.controls++;
-      return createElement(actual.Controls, props);
+      return createElement(actual.Slider, props);
     },
     Track: (props: React.ComponentProps<typeof actual.Track>) => {
       counts.track++;
@@ -84,6 +86,7 @@ import {
   PlaylistSettingsContext,
   type PlaybackRefsContextValue,
 } from '../contexts/playlistContexts';
+import { useTrack } from '../components/trackContext';
 import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -264,8 +267,11 @@ describe('the root renders alone (#685)', () => {
     expect(probe.selectedTrackId).toBe('t2');
     expect(counts.track).toBeGreaterThan(0);
     expect(counts.track).toBeLessThanOrEqual(2);
-    // The slot's background follows the selection; the memoized panel in it does not render.
-    expect(counts.controls).toBe(0);
+    // The slot's background follows the selection, and so does `isSelected`
+    // in the track's context (#687): the pieces of the panel that becomes
+    // selected render (two sliders each), and of the one that stops being so.
+    expect(counts.controls).toBeLessThanOrEqual(4);
+    expect(counts.controls).toBeGreaterThan(0);
     expect(counts.shell).toBe(0);
     expect(counts.scale).toBe(0);
     expect(counts.boxes).toBe(0);
@@ -318,15 +324,19 @@ describe('the root renders alone (#685)', () => {
 });
 
 describe('only the root reads the timeline (#685)', () => {
-  it('a new onTracksChange function renders the root; the tracks part does not follow and the track controls render once, for the mixer', async () => {
+  it('a new onTracksChange function renders the root; neither the tracks part nor the track controls follow', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const adapter = createFakeAdapter();
     const createAdapter = () => adapter;
-    const renderTrackControls = vi.fn((index: number) => <i data-custom-panel={index} />);
+    let panelRenders = 0;
+    const Panel: React.FC = () => {
+      panelRenders++;
+      return <i data-custom-panel={useTrack().id} />;
+    };
     // One element for the whole test: the component that composes the view
     // does not render, only the provider gets a new function.
-    const view = <ComposedWaveform renderTrackControls={renderTrackControls} />;
+    const view = <ComposedWaveform trackControls={<Panel />} />;
     const ui = () => (
       <WaveformPlaylistProvider
         tracks={TRACKS}
@@ -343,7 +353,7 @@ describe('only the root reads the timeline (#685)', () => {
     await act(async () => {});
     expect(document.querySelectorAll('[data-custom-panel]').length).toBe(3);
     resetCounts();
-    const calls = renderTrackControls.mock.calls.length;
+    const calls = panelRenders;
 
     await act(async () => {
       utils.rerender(ui());
@@ -352,13 +362,15 @@ describe('only the root reads the timeline (#685)', () => {
     // The timeline value is a new object (it carries the function), so its
     // one reader renders.
     expect(counts.shell).toBeGreaterThan(0);
-    // The provider answers a new `onTracksChange` by loading again, which
-    // publishes the mixer state once more: the track controls read that and
-    // render ONCE, as they did before the view had parts. Reading the
-    // timeline value themselves, both parts rendered with every one of the
-    // root's renders here (three).
-    expect(counts.layout).toBe(1);
-    expect(renderTrackControls.mock.calls.length - calls).toBe(TRACKS.length);
+    // The provider answers a new `onTracksChange` by loading again. Until
+    // #687 that published the mixer state once more (a new array of new
+    // objects) and the track controls rendered once; the mixer state is now
+    // kept by track id and stays the same object when no track changed, so
+    // the controls part does not render at all. Reading the timeline value
+    // themselves, both parts rendered with every one of the root's renders
+    // here (three).
+    expect(counts.layout).toBe(0);
+    expect(panelRenders - calls).toBe(0);
     expect(counts.track).toBe(0);
     expect(counts.scale).toBe(0);
   });

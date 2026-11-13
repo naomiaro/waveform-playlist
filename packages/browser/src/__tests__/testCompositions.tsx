@@ -7,6 +7,8 @@ import type { RenderPlayheadFunction } from '@waveform-playlist/ui-components';
 import type { GetAnnotationBoxLabelFn, OnAnnotationUpdateFn } from '../types/annotations';
 import type { WaveformRecordingState } from '../components/visualizationLayout';
 import { WaveformRoot } from '../components/WaveformRoot';
+import { DefaultTrackControls } from '../components/DefaultTrackControls';
+import { TrackRemoveButton, TrackReorderGrip } from '../components/TrackControlPieces';
 import { MediaElementWaveformRoot } from '../components/MediaElementWaveformRoot';
 import { MediaElementAnnotationBoxes } from '../components/MediaElementAnnotationBoxes';
 import {
@@ -23,7 +25,8 @@ import {
 } from '../components/waveformParts';
 
 export interface ComposedWaveformProps {
-  renderTrackControls?: (trackIndex: number) => ReactNode;
+  /** The panel of a track (the children of the controls part). */
+  trackControls?: ReactNode;
   renderTick?: (label: string, pixelPosition: number) => ReactNode;
   renderPlayhead?: RenderPlayheadFunction;
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
@@ -31,8 +34,10 @@ export interface ComposedWaveformProps {
   showClipHeaders?: boolean;
   gainScaledWaveforms?: boolean;
   showFades?: boolean;
-  onRemoveTrack?: (trackIndex: number) => void;
+  /** A remove button beside the default panel. */
+  onRemoveTrack?: (trackId: string) => void;
   recordingState?: WaveformRecordingState;
+  /** A reorder grip beside the default panel. */
   trackReordering?: boolean;
   /** Leave the timescale part out. */
   noTimescale?: boolean;
@@ -42,7 +47,7 @@ export interface ComposedWaveformProps {
 }
 
 export const ComposedWaveform: React.FC<ComposedWaveformProps> = ({
-  renderTrackControls,
+  trackControls,
   renderTick,
   renderPlayhead,
   getAnnotationBoxLabel,
@@ -61,12 +66,16 @@ export const ComposedWaveform: React.FC<ComposedWaveformProps> = ({
     {noTimescale ? null : <WaveformTimescale renderTick={renderTick} />}
     <WaveformLoopRegion />
     {noControls ? null : (
-      <WaveformTrackControls
-        width={controlsWidth}
-        renderTrackControls={renderTrackControls}
-        onRemoveTrack={onRemoveTrack}
-        trackReordering={trackReordering}
-      />
+      <WaveformTrackControls width={controlsWidth}>
+        {trackControls ??
+          (onRemoveTrack || trackReordering ? (
+            <>
+              <DefaultTrackControls />
+              {onRemoveTrack ? <TrackRemoveButton onRemove={onRemoveTrack} /> : null}
+              {trackReordering ? <TrackReorderGrip /> : null}
+            </>
+          ) : undefined)}
+      </WaveformTrackControls>
     )}
     <WaveformTracks gainScaled={gainScaledWaveforms}>
       {showClipHeaders ? <WaveformClipHeaders /> : null}

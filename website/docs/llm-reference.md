@@ -339,11 +339,14 @@ interface EditorControlsContextValue {
    */
   setCurrentTime: (time: number) => void;
 
-  // Track controls
-  setTrackMute: (trackIndex: number, muted: boolean) => void;
-  setTrackSolo: (trackIndex: number, soloed: boolean) => void;
-  setTrackVolume: (trackIndex: number, volume: number) => void;
-  setTrackPan: (trackIndex: number, pan: number) => void;
+  // Track mixer, by track id (by index until #687). An id no track has
+  // is ignored; a first argument that is not a string is ignored with one
+  // development warning per setter. Inside a track's control panel,
+  // `useTrack()` has the same actions already bound to that track.
+  setTrackMute: (trackId: string, muted: boolean) => void;
+  setTrackSolo: (trackId: string, soloed: boolean) => void;
+  setTrackVolume: (trackId: string, volume: number) => void;
+  setTrackPan: (trackId: string, pan: number) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. The reordered tracks
@@ -467,6 +470,13 @@ interface PlaylistTimelineContextValue {
 ```typescript
 /** Mixer state (#768). Changes on every mute, solo, volume or pan change. */
 interface PlaylistMixerContextValue {
+  /** One entry per track, in the order of `tracks`: trackStates[i] belongs to
+   *  tracks[i], and the length equals tracks.length. The entry of a track that
+   *  is still loading is `undefined` AT ITS OWN POSITION (the type does not say
+   *  so: read `trackStates[i]?.muted`, count with `.filter(Boolean).length`).
+   *  Kept by track id: a track keeps its state while its id is in `tracks`
+   *  (tracks removed, added in front, reordered); a new id starts from its
+   *  ClipTrack fields. The array keeps its identity while no entry changed. */
   trackStates: TrackState[];
   masterVolume: number;
 }
@@ -479,13 +489,13 @@ interface PlaylistMixerContextValue {
 interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Both playlist columns derive their display
-   *  layout from it; a custom `renderTrackControls` (on WaveformTrackControls) can read it to
-   *  mirror the preview in their own UI. */
+   *  layout from it. A control panel does not need it. */
   trackDragPreview: TrackDragPreview | null;
   /** Internal: incremented after every track-reorder drag interaction ends.
    *  The view's track-controls part folds this into each slot's `key` to
    *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
-   *  (see bumpTrackReorderEpoch in EditorControlsContextValue). */
+   *  (see bumpTrackReorderEpoch in EditorControlsContextValue). Do not add it
+   *  to keys of your own: the slot around every panel is keyed already. */
   trackReorderEpoch: number;
 }
 ```
@@ -1835,13 +1845,127 @@ interface WaveformTrackControlsProps {   // WaveformPlaylistProvider only
   /** Width of the controls column in pixels. Default 200. The root reads it
    *  from the element, so it must be on the part itself. */
   width?: number;
-  renderTrackControls?: (trackIndex: number) => ReactNode;
-  /** The close button is drawn only when this is given. */
-  onRemoveTrack?: (trackIndex: number) => void;
-  /** A drag grip and move up/down buttons on each default panel. The drag
-   *  requires ClipInteractionProvider; the buttons work regardless. */
-  trackReordering?: boolean;
+  /** The control panel of a track, as a template: it is rendered once per
+   *  track, inside that track's context, which `useTrack()` and the built-in
+   *  pieces (`<TrackName />`, `<TrackMuteButton />`, …) read. Default:
+   *  `<DefaultTrackControls />`. */
+  children?: ReactNode;
 }
+// Removed (#687): renderTrackControls, onRemoveTrack, trackReordering, SortableTrackControls.
+
+// The control panel of a track. Everything below works ONLY among the children of
+// <WaveformTrackControls>; elsewhere useTrack() (and so every piece) throws
+// "useTrack must be used within <WaveformTrackControls>…".
+
+/** What `useTrack()` returns: one track's identity, mixer state and bound actions. */
+interface TrackContextValue {
+  /** The track's id. */
+  id: string;
+  /** `'audio'` or `'midi'`. */
+  kind: TrackKind;
+  /** The track's position in the list of tracks, from 0. Changes on a reorder. */
+  index: number;
+
+  /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
+  name: string;
+  muted: boolean;
+  soloed: boolean;
+  /** 0 to 1. */
+  volume: number;
+  /** -1 (left) to 1 (right). */
+  pan: number;
+  /** How the track is drawn. Always `'waveform'` for a MIDI track. */
+  renderMode: RenderMode;
+
+  /** True while the provider has no mixer state for the track (it is still
+   *  loading): the engine does not know it yet, so a value set with the mixer
+   *  actions is not kept and a reorder does nothing. The built-in pieces are
+   *  disabled then.
+   *  muted/soloed/volume/pan read false/false/1/0 and name "Track N". */
+  isLoading: boolean;
+  /** Whether this is the selected track. */
+  isSelected: boolean;
+  isFirst: boolean;
+  isLast: boolean;
+  /** True for an audio track under a `<SpectrogramProvider>`: `setRenderMode`
+   *  and `openSpectrogramSettings` then do something. */
+  hasSpectrogram: boolean;
+
+  // Actions. Each keeps its identity while the track's slot is mounted and a
+  // track menu neither becomes available nor stops being so.
+  setMuted: (muted: boolean) => void;
+  setSoloed: (soloed: boolean) => void;
+  setVolume: (volume: number) => void;
+  setPan: (pan: number) => void;
+  /** Makes this the selected track. */
+  select: () => void;
+  /** Moves the track one position up. Nothing happens for the first track. */
+  moveUp: () => void;
+  /** Moves the track one position down. Nothing happens for the last track. */
+  moveDown: () => void;
+  /** Nothing happens without a `<SpectrogramProvider>`. */
+  setRenderMode: (mode: RenderMode) => void;
+  /** Opens the spectrogram settings of this track. Nothing happens without a `<SpectrogramProvider>`. */
+  openSpectrogramSettings: () => void;
+}
+function useTrack(): TrackContextValue;
+
+/** The default panel: name, track menu, mute, solo, volume, pan. No remove
+ *  button and no reorder grip. */
+interface DefaultTrackControlsProps {
+  /** Drawn inside the panel, below the pan slider. */
+  children?: ReactNode;
+}
+
+// Pieces without props, each bound to the track whose panel it is rendered in:
+//   TrackName          the name on one line ("Track N" without one); attribute data-track-name
+//   TrackMuteButton    "Mute", aria-pressed; disabled while the track is loading
+//   TrackSoloButton    "Solo", aria-pressed; disabled while the track is loading
+//   TrackVolumeSlider  0 to 1, aria-label "Volume"; disabled while loading
+//   TrackPanSlider     -1 to 1, aria-label "Pan"; disabled while loading
+//   TrackMenuButton    render mode + spectrogram settings; draws nothing without a
+//                      SpectrogramProvider and nothing for a MIDI track
+//   TrackReorderGrip   drag grip + move up/down buttons; buttons work with no setup, the
+//                      drag needs ClipInteractionProvider; attribute data-track-reorder-grip
+
+interface TrackRemoveButtonProps {
+  /** Called with the track's id. Removing the track from your `tracks` is yours to do. */
+  onRemove: (trackId: string) => void;
+}
+
+/** `useTrackReorderHandle()`: for a drag grip of your own. Once per panel. */
+interface TrackReorderHandle {
+  /** Attach to the element the track is dragged by (a grip). */
+  handleRef: (element: Element | null) => void;
+  /** True while this track is the one being dragged. */
+  isDragSource: boolean;
+}
+function useTrackReorderHandle(): TrackReorderHandle;
+
+// Placement and cost:
+// - Each track has a slot in the column: as wide as the column, as tall as the track's
+//   row, overflow hidden. A custom panel fills it with height: 100%. The element inside
+//   the slot that holds the panel has data-track-controls="<track id>"; it is the element
+//   a reorder drag moves.
+// - A click anywhere in a slot selects the track. TrackRemoveButton, the button of
+//   TrackMenuButton and the grip and buttons of TrackReorderGrip do not select; a
+//   render-mode choice in the open track menu does.
+// - Children that are false, 0 or '' draw empty panels; only null and undefined mean
+//   "the default panel". One reorder handle per panel.
+// - TrackRemoveButton places itself at the slot's top left, TrackReorderGrip at its right
+//   edge (the default panel makes room for the grip). DefaultTrackControls fills the
+//   slot: an element rendered BESIDE it in the flow is outside the visible slot, so a
+//   control of your own goes INSIDE, as a child of <DefaultTrackControls>.
+// - The part keeps its previous children while the new ones are equal (element types,
+//   keys, props by Object.is; `children` recursively; `style` one level deep). Inline
+//   children cost nothing while their props are stable; an inline function or object as
+//   a prop renders every panel on each render of the composing component.
+//
+//   <WaveformTrackControls width={180}>
+//     <DefaultTrackControls />
+//     <TrackRemoveButton onRemove={removeTrack} />   // removeTrack(trackId), stable
+//     <TrackReorderGrip />
+//   </WaveformTrackControls>
 
 interface WaveformTracksProps {
   /** Draw each clip's waveform scaled by its gain (clamped). Default: false. */

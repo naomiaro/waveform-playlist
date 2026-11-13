@@ -373,6 +373,28 @@ function TrackRack({ trackId, trackFx }: { trackId: string; trackFx: UseTrackDyn
 }
 ```
 
+To put a track's effects control into that track's panel in the controls column, render it among the children of `<WaveformTrackControls>` and take the track from `useTrack()`. The hook's return value is a stable object, so passing it as a prop does not make the panels render with your component:
+
+```tsx
+import { WaveformTrackControls, DefaultTrackControls, useTrack } from '@waveform-playlist/browser';
+
+function TrackEffectsButton({ trackFx }: { trackFx: UseTrackDynamicEffectsReturn }) {
+  const { id } = useTrack();
+  const entries = useActiveEffects(trackFx.getTrackEffects(id));
+  return (
+    <button onClick={() => trackFx.addEffectToTrack(id, 'reverb').catch(console.error)}>
+      FX ({entries.length})
+    </button>
+  );
+}
+
+<WaveformTrackControls>
+  <DefaultTrackControls>
+    <TrackEffectsButton trackFx={trackFx} />
+  </DefaultTrackControls>
+</WaveformTrackControls>
+```
+
 ### Bypass
 
 `toggleBypass` takes an effect out of the signal without removing it from the list.

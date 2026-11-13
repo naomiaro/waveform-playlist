@@ -22,6 +22,8 @@ import {
   WaveformTimescale,
   WaveformLoopRegion,
   WaveformTrackControls,
+  DefaultTrackControls,
+  TrackRemoveButton,
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
@@ -339,13 +341,10 @@ export function MidiExample() {
   );
 
   const handleRemoveTrack = React.useCallback(
-    (index: number) => {
-      const track = filteredTracks[index];
-      if (track) {
-        setRemovedTrackIds((prev) => new Set([...prev, track.id]));
-      }
+    (trackId: string) => {
+      setRemovedTrackIds((prev) => new Set([...prev, trackId]));
     },
-    [filteredTracks]
+    []
   );
 
   const handleClearAll = React.useCallback(() => {
@@ -436,7 +435,10 @@ export function MidiExample() {
           <WaveformRoot>
             <WaveformTimescale />
             <WaveformLoopRegion />
-            <WaveformTrackControls onRemoveTrack={handleRemoveTrack} />
+            <WaveformTrackControls>
+              <DefaultTrackControls />
+              <TrackRemoveButton onRemove={handleRemoveTrack} />
+            </WaveformTrackControls>
             <WaveformTracks />
             <WaveformSelection />
             <WaveformPlayhead />
