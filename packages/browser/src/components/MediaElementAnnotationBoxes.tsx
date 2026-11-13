@@ -25,8 +25,8 @@ const NO_MODIFIERS: never[] = [];
 
 export interface MediaElementAnnotationBoxesProps {
   getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-  editable?: boolean;
-  linkEndpoints?: boolean;
+  editable: boolean;
+  linkEndpoints: boolean;
   onAnnotationUpdate?: OnAnnotationUpdateFn;
 }
 
@@ -41,8 +41,8 @@ export interface MediaElementAnnotationBoxesProps {
  */
 export const MediaElementAnnotationBoxes = React.memo(function MediaElementAnnotationBoxes({
   getAnnotationBoxLabel,
-  editable = false,
-  linkEndpoints = false,
+  editable,
+  linkEndpoints,
   onAnnotationUpdate,
 }: MediaElementAnnotationBoxesProps) {
   const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');

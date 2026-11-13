@@ -12,7 +12,7 @@ import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { WaveformDataObject } from '@waveform-playlist/core';
 
-const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0, frame: 0, scale: 0 }));
+const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0, frame: 0, scale: 0, layout: 0 }));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -38,6 +38,19 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
     SmartScale: (props: React.ComponentProps<typeof actual.SmartScale>) => {
       counts.scale++;
       return createElement(actual.SmartScale, props);
+    },
+  };
+});
+
+vi.mock('../components/visualizationLayout', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../components/visualizationLayout')>();
+  const { createElement } = await import('react');
+  return {
+    ...actual,
+    // Rendered once per render of the tracks part.
+    TracksLayout: (props: React.ComponentProps<typeof actual.TracksLayout>) => {
+      counts.layout++;
+      return createElement(actual.TracksLayout, props);
     },
   };
 });
@@ -129,6 +142,7 @@ const resetCounts = () => {
   counts.track = 0;
   counts.frame = 0;
   counts.scale = 0;
+  counts.layout = 0;
 };
 
 beforeEach(() => {
@@ -398,7 +412,8 @@ describe('the root renders alone', () => {
     await mount();
     await pressAndRelease(100);
     expect(counts.frame).toBeGreaterThan(0);
-    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+    // Not even the tracks part: the rows value kept its identity.
+    expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0, layout: 0 });
     // The click did its work: the cursor is where the press landed.
     const playhead = document.querySelector('[data-playhead]') as HTMLElement;
     expect(playhead.style.transform).toBe('translate3d(100px, 0, 0)');
@@ -425,6 +440,22 @@ describe('the root renders alone', () => {
     });
     expect(root()!.getAttribute('data-playlist-state')).toBe('ready');
     expect(counts).toMatchObject({ track: 0, clip: 0, channel: 0 });
+  });
+
+  it('an automatic-scroll toggle does not render the frame', async () => {
+    await mount();
+    act(() => controls.setAutomaticScroll(true));
+    act(() => controls.setAutomaticScroll(false));
+    expect(counts.frame).toBe(0);
+    expect(counts.layout).toBe(0);
+  });
+
+  it('a seek and a selection change do not render the frame', async () => {
+    await mount();
+    act(() => controls.seekTo(2));
+    act(() => controls.setSelection(3, 4));
+    expect(counts.frame).toBe(0);
+    expect(counts.layout).toBe(0);
   });
 
   it('a custom playhead is not called for a press and its release at the cursor', async () => {

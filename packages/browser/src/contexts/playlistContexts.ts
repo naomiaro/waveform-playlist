@@ -383,6 +383,7 @@ export interface MediaElementTrackContextValue {
    * replaced player loads. Use this, not `duration`, as "the player can be used".
    */
   isReady: boolean;
+  /** One track with one clip (empty when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
   fadeIn?: FadeConfig;
   fadeOut?: FadeConfig;

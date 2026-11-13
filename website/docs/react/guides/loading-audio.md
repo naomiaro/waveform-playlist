@@ -328,7 +328,7 @@ function LoadingIndicator() {
 
 ### Data Attribute (CSS/Testing)
 
-The playlist container has a `data-playlist-state` attribute:
+The playlist container has a `data-playlist-state` attribute. Under `WaveformPlaylistProvider` it is `"ready"` once the tracks are loaded and the engine is built; under `MediaElementPlaylistProvider` once the media element has loaded its metadata (the waveform is drawn before that):
 
 ```css
 /* Dim the playlist while loading */

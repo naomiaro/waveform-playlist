@@ -335,7 +335,7 @@ const clip = createClipFromSeconds({
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
   │   ├── PlaylistVisualization.tsx      # Default composition: WaveformRoot with one part per thing drawn
-  │   ├── WaveformRoot.tsx              # Root of the view: sizes, row layout, selection-drag handlers, part sorting
+  │   ├── WaveformRoot.tsx              # Root of the multitrack view: timeline length, row layout, row selection on press, spectrogram modal
   │   ├── waveformParts.tsx             # The parts by name, the timescale part, sortWaveformParts
   │   ├── waveformLayoutContext.ts      # The root's two layout values (extent, rows) read by the parts
   │   ├── TrackRows.tsx                 # Tracks part: memoized rows, clips, recording preview; per-clip markers
@@ -357,7 +357,9 @@ const clip = createClipFromSeconds({
   │   ├── PlaylistAnnotationList.tsx    # Annotation list for Tone.js provider
   │   ├── MediaElementAnnotationList.tsx # Annotation list for MediaElement provider
   │   ├── MediaElementAnnotationBoxes.tsx # MediaElement boxes: provider state + boundary drag wiring
-  │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement)
+  │   ├── MediaElementPlaylist.tsx      # Single-track waveform (MediaElement): default composition of MediaElementRoot and the view's parts
+  │   ├── MediaElementRoot.tsx          # Root of the MediaElement view (internal): one row, as long as the audio
+  │   ├── waveformFrame.tsx             # What both roots share (internal): part sorting, scrolling frame, layout values, selection drag
   │   ├── MediaElementWaveform.tsx      # Public MediaElement waveform component
   │   ├── ContextualControls.tsx        # Context-aware wrappers
   │   └── index.tsx                     # Component exports

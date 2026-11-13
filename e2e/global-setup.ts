@@ -17,6 +17,7 @@ const ROUTES = [
   '/examples/annotations',
   '/examples/custom-drag-setup',
   '/examples/effects',
+  '/examples/fades',
   '/examples/flexible-api',
   '/examples/media-element',
   '/examples/media-element-annotations',
