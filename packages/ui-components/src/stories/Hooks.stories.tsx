@@ -255,7 +255,8 @@ These stories demonstrate how to test and visualize custom React hooks.
 - \`useAudioTracks\` - Load audio files
 - \`useClipDragHandlers\` - Drag-to-move and boundary trimming
 - \`useClipSplitting\` - Split clips at cursor position
-- \`useAnnotationDragHandlers\` - Drag annotation boundaries
+- \`useAnnotationDragHandlers\` - Drag annotation boundaries (the \`WaveformAnnotationBoxes\` part calls it for you)
+- \`useAnnotationOptions\` - The annotation options of the provider: editable, link endpoints, continuous play
 - \`useAnnotationKeyboardControls\` - Keyboard navigation for annotations
 - \`useDragSensors\` - Configure @dnd-kit sensors
 - \`useIntegratedRecording\` - Recording with auto-add to playlist

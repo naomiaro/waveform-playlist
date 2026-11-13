@@ -94,7 +94,7 @@ import {
   useRecordingSession,
   useSelectedTrackId,
   WaveformAnnotationBoxes,
-  MediaElementAnnotationBoxes,
+  AnnotationList,
   useEditorControls,
   usePlaylistTimeline,
   usePlaylistView,
@@ -291,7 +291,10 @@ async function thrownBy(
   return message;
 }
 
-async function mountMediaElement(tree: React.ReactElement | (() => React.ReactElement)) {
+async function mountMediaElement(
+  tree: React.ReactElement | (() => React.ReactElement),
+  { annotations = false }: { annotations?: boolean } = {}
+) {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const fake = {
     addTrack: vi.fn(),
@@ -309,14 +312,17 @@ async function mountMediaElement(tree: React.ReactElement | (() => React.ReactEl
   };
   const createPlayout = () => fake as unknown as MediaElementPlayout;
   const ui = () => (
-    <MediaElementPlaylistProvider
-      track={ME_FADED}
-      samplesPerPixel={1000}
-      createPlayout={createPlayout}
-    >
-      {typeof tree === 'function' ? tree() : tree}
-      <MediaProbe />
-    </MediaElementPlaylistProvider>
+    <AnnotationIntegrationContext.Provider value={annotations ? ANNOTATION_INTEGRATION : null}>
+      <MediaElementPlaylistProvider
+        track={ME_FADED}
+        samplesPerPixel={1000}
+        createPlayout={createPlayout}
+        annotationList={annotations ? ANNOTATION_LIST : undefined}
+      >
+        {typeof tree === 'function' ? tree() : tree}
+        <MediaProbe />
+      </MediaElementPlaylistProvider>
+    </AnnotationIntegrationContext.Provider>
   );
   const view = render(ui());
   await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
@@ -354,7 +360,7 @@ describe('the package exports', () => {
       'WaveformFades',
       'WaveformRecordingPreview',
       'WaveformAnnotationBoxes',
-      'MediaElementAnnotationBoxes',
+      'AnnotationList',
       'WaveformSelection',
       'WaveformPlayhead',
       'Waveform',
@@ -369,6 +375,17 @@ describe('the package exports', () => {
   it('no longer has the two prop-driven views', () => {
     expect('PlaylistVisualization' in api).toBe(false);
     expect('MediaElementPlaylist' in api).toBe(false);
+  });
+
+  // #686: one box part and one list for both providers.
+  it('no longer has the per-provider annotation parts', () => {
+    for (const name of [
+      'MediaElementAnnotationBoxes',
+      'PlaylistAnnotationList',
+      'MediaElementAnnotationList',
+    ]) {
+      expect(name in api, name).toBe(false);
+    }
   });
 
   it('keeps the internals internal', () => {
@@ -669,15 +686,29 @@ describe('what the tracks part hands every clip', () => {
 });
 
 describe('the options the ready-made compositions keep', () => {
-  it('<Waveform>: className reaches the root, and getAnnotationBoxLabel the annotation boxes', async () => {
-    await mountMultitrack(
-      () => <Waveform className="mine" getAnnotationBoxLabel={() => 'my label'} />,
-      { annotations: true }
-    );
+  // #686: className is the one option left; the annotation options are on the
+  // two annotation parts (and the provider).
+  it('<Waveform>: className reaches the root, and the boxes and the list are drawn with their defaults', async () => {
+    await mountMultitrack(() => <Waveform className="mine" />, { annotations: true });
     expect(root().classList.contains('mine')).toBe(true);
-    expect(document.querySelector('[data-box]')?.textContent).toBe('my label');
+    // The default label of a box is the annotation's id.
+    expect(document.querySelector('[data-box]')?.textContent).toBe('n1');
     // The text list is there because there are annotations.
     expect(document.querySelector('[data-annotation-list]')).not.toBeNull();
+  });
+
+  it('a label function goes to the annotation boxes part: getLabel', async () => {
+    const getLabel = () => 'my label';
+    await mountMultitrack(
+      () => (
+        <WaveformRoot>
+          <WaveformTracks />
+          <WaveformAnnotationBoxes getLabel={getLabel} />
+        </WaveformRoot>
+      ),
+      { annotations: true }
+    );
+    expect(document.querySelector('[data-box]')?.textContent).toBe('my label');
   });
 
   it('<Waveform> without annotations renders no annotation list', async () => {
@@ -696,7 +727,7 @@ describe('where a part works and where it throws', () => {
   const underMedia = (tree: () => React.ReactElement) => mountMediaElement(tree);
   const underMultitrack = (tree: () => React.ReactElement) => mountMultitrack(tree);
 
-  it('outside a root: the timescale, the tracks, the loop region, the controls and both annotation rows throw', async () => {
+  it('outside a root: the timescale, the tracks, the loop region, the controls and the annotation row (under either provider) throw', async () => {
     const outside: Array<[React.ReactElement, string]> = [
       [<WaveformTimescale />, 'The timescale must be rendered inside the waveform root'],
       [<WaveformTracks />, 'The tracks must be rendered inside the waveform root'],
@@ -713,7 +744,7 @@ describe('where a part works and where it throws', () => {
         cleanup();
       });
     }
-    expect(await thrownBy(underMedia, <MediaElementAnnotationBoxes />)).toBe(
+    expect(await thrownBy(underMedia, <WaveformAnnotationBoxes />)).toBe(
       'The annotation boxes must be rendered inside the waveform root'
     );
   });
@@ -730,7 +761,7 @@ describe('where a part works and where it throws', () => {
     expect(document.querySelectorAll('[data-playhead]')).toHaveLength(1);
   });
 
-  it('under the MediaElement provider: the loop region and the multitrack annotation boxes name the hook they need', async () => {
+  it('under the MediaElement provider: the loop region names the hook it needs', async () => {
     expect(
       await thrownBy(
         underMedia,
@@ -744,18 +775,23 @@ describe('where a part works and where it throws', () => {
       'useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is ' +
         'MediaElementPlaylistProvider, which does not provide it'
     );
-    await act(async () => {
-      cleanup();
-    });
-    expect(
-      await thrownBy(
-        underMedia,
+  });
+
+  // #686: one box part and one list for both providers.
+  it('under the MediaElement provider: the annotation boxes and the annotation list draw', async () => {
+    const message = await thrownBy(
+      (tree) => mountMediaElement(tree, { annotations: true }),
+      <>
         <MediaElementWaveformRoot>
           <WaveformTracks />
           <WaveformAnnotationBoxes />
         </MediaElementWaveformRoot>
-      )
-    ).toMatch(/^use(Annotations|AnnotationEditing) needs WaveformPlaylistProvider/);
+        <AnnotationList />
+      </>
+    );
+    expect(message).toBe('');
+    expect(document.querySelector('[data-box]')?.textContent).toBe('n1');
+    expect(document.querySelector('[data-annotation-list]')).not.toBeNull();
   });
 
   it('under the MediaElement provider: a wrapped controls part is rendered among the tracks and throws', async () => {

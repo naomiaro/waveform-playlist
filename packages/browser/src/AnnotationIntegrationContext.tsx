@@ -8,7 +8,7 @@ import type {
 
 /**
  * Props the browser package passes to the AnnotationText component.
- * Mirrors what PlaylistAnnotationList and MediaElementAnnotationList actually use.
+ * Mirrors what `AnnotationList` actually uses.
  */
 export interface AnnotationTextIntegrationProps {
   annotations: AnnotationData[];
@@ -20,13 +20,15 @@ export interface AnnotationTextIntegrationProps {
   controls?: AnnotationAction[];
   annotationListConfig?: AnnotationActionOptions;
   height?: number;
+  /** A click on a row (not in a field being edited, not on an action button). */
+  onAnnotationClick?: (annotation: AnnotationData) => void;
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
   renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
 }
 
 /**
  * Props the browser package passes to the AnnotationBox component.
- * Mirrors what the two views' annotation-box parts actually use.
+ * Mirrors what `WaveformAnnotationBoxes` actually uses.
  */
 export interface AnnotationBoxIntegrationProps {
   annotationId: string;
@@ -42,7 +44,7 @@ export interface AnnotationBoxIntegrationProps {
 
 /**
  * Props the browser package passes to the AnnotationBoxesWrapper component.
- * Mirrors what the two views' annotation-box parts actually use.
+ * Mirrors what `WaveformAnnotationBoxes` actually uses.
  */
 export interface AnnotationBoxesWrapperIntegrationProps {
   children?: React.ReactNode;

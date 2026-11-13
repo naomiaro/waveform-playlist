@@ -17,7 +17,7 @@ import {
   useEditorControls,
   useEngineRefs,
   useAnnotations,
-  useAnnotationEditing,
+  useAnnotationOptions,
   usePlaylistView,
   usePlaylistSettings,
   usePlaylistZoom,
@@ -103,7 +103,7 @@ const HOOKS = {
   mixer: usePlaylistMixer,
   reorder: useTrackReorderPreview,
   annotations: useAnnotations,
-  annotationEditing: useAnnotationEditing,
+  annotationOptions: useAnnotationOptions,
   loop: useLoop,
   selectedTrack: useSelectedTrackId,
   undo: useUndoRedo,
@@ -123,6 +123,7 @@ const SHARED_HOOKS: HookName[] = [
   'settings',
   'zoom',
   'annotations',
+  'annotationOptions',
   'isPlaying',
   'refs',
   'selection',
@@ -235,8 +236,8 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('mixer')).toEqual(['masterVolume', 'trackStates']);
     expect(keys('reorder')).toEqual(['trackDragPreview', 'trackReorderEpoch']);
-    expect(keys('annotations')).toEqual(['annotations', 'continuousPlay']);
-    expect(keys('annotationEditing')).toEqual(['annotationsEditable', 'linkEndpoints']);
+    expect(keys('annotations')).toEqual(['annotations']);
+    expect(keys('annotationOptions')).toEqual(['continuousPlay', 'editable', 'linkEndpoints']);
     expect(keys('loop')).toEqual(['isLoopEnabled', 'loopEnd', 'loopStart']);
     expect(keys('selectedTrack')).toEqual(['selectedTrackId']);
     expect(keys('undo')).toEqual(['canRedo', 'canUndo']);
@@ -268,6 +269,8 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setScrollContainer',
         'scrollContainerRef',
         'setContinuousPlay',
+        'setAnnotationsEditable',
+        'setLinkEndpoints',
         'setAnnotations',
         'annotationPreview',
         'setActiveAnnotationId',
@@ -287,8 +290,6 @@ describe('each hook returns its own group of fields (#768)', () => {
         'zoomIn',
         'zoomOut',
         'setMasterVolume',
-        'setLinkEndpoints',
-        'setAnnotationsEditable',
         'setLoopEnabled',
         'setLoopRegion',
         'setLoopRegionFromSelection',
@@ -377,25 +378,37 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     expect(values.selectedTrack.selectedTrackId).toBe('track-2');
   });
 
-  // #688: continuous play is with the annotations (both providers have it);
-  // the two editing settings are WebAudio only and have their own value.
-  it('continuous play and annotation edits: the annotations; link endpoints and editable: the annotation editing', async () => {
+  // #686: the three annotation options have one value of their own, under
+  // both providers, and their setters are in the shared controls. The
+  // annotations value holds the annotations only, so its readers do not render
+  // for a toggle, and the options' readers do not render for an edit.
+  it('continuous play, link endpoints and editable: the annotation options, not the annotations; an annotation edit: the annotations, not the options', async () => {
     const { setAnnotations } = await mount();
-    expect(await rendered(() => values.controls.setContinuousPlay(true))).toEqual(['annotations']);
-    expect(values.annotations.continuousPlay).toBe(true);
-    expect(await rendered(() => values.editorControls.setLinkEndpoints(true))).toEqual([
-      'annotationEditing',
+    const annotationsBefore = values.annotations;
+    expect(await rendered(() => values.controls.setContinuousPlay(true))).toEqual([
+      'annotationOptions',
     ]);
-    expect(await rendered(() => values.editorControls.setAnnotationsEditable(true))).toEqual([
-      'annotationEditing',
+    expect(values.annotationOptions.continuousPlay).toBe(true);
+    expect(await rendered(() => values.controls.setLinkEndpoints(true))).toEqual([
+      'annotationOptions',
     ]);
-    expect(values.annotationEditing).toEqual({ annotationsEditable: true, linkEndpoints: true });
+    expect(await rendered(() => values.controls.setAnnotationsEditable(true))).toEqual([
+      'annotationOptions',
+    ]);
+    expect(values.annotationOptions).toEqual({
+      editable: true,
+      linkEndpoints: true,
+      continuousPlay: true,
+    });
+    expect(values.annotations).toBe(annotationsBefore);
+    const optionsBefore = values.annotationOptions;
     expect(
       await rendered(() =>
         setAnnotations([{ ...ANNOTATIONS[0], lines: ['changed'] }, ANNOTATIONS[1]])
       )
     ).toEqual(['annotations']);
     expect(values.annotations.annotations[0].lines).toEqual(['changed']);
+    expect(values.annotationOptions).toBe(optionsBefore);
   });
 
   it('an edit and its undo: the undo state (and nothing that is not about tracks)', async () => {
@@ -408,7 +421,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'loop',
       'selectedTrack',
       'annotations',
-      'annotationEditing',
+      'annotationOptions',
     ];
 
     const afterEdit = await rendered(() => {
@@ -473,7 +486,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'loop',
       'selectedTrack',
       'annotations',
-      'annotationEditing',
+      'annotationOptions',
       'reorder',
       'isPlaying',
       'refs',
@@ -529,6 +542,8 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'usePlaylistDataOptional',
     'usePlaylistState',
     'usePlaybackAnimation',
+    // #686: replaced by useAnnotationOptions(), which both providers serve.
+    'useAnnotationEditing',
   ])('%s is not exported', (name) => {
     expect(name in contextModule).toBe(false);
     expect(name in publicApi).toBe(false);
@@ -542,6 +557,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'usePlaylistMixer',
     'useTrackReorderPreview',
     'useAnnotations',
+    'useAnnotationOptions',
     'useLoop',
     'useSelectedTrackId',
     'useUndoRedo',

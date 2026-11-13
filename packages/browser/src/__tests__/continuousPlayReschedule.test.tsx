@@ -15,7 +15,7 @@ import {
   useActiveAnnotation,
   usePlaybackControls,
   usePlaylistTimeline,
-  useAnnotations,
+  useAnnotationOptions,
   useIsPlaying,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
@@ -120,7 +120,7 @@ const ProbeChild: React.FC = () => {
   const { currentTime } = useCurrentTime();
   const { play, setContinuousPlay, setSelection, stop } = usePlaybackControls();
   const { isReady, duration } = usePlaylistTimeline();
-  const { continuousPlay } = useAnnotations();
+  const { continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
   probe = {
     isReady,

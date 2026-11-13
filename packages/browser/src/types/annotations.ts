@@ -13,9 +13,3 @@ export type { AnnotationData } from '@waveform-playlist/core';
  * same string for an unchanged annotation, so that its box can skip the render.
  */
 export type GetAnnotationBoxLabelFn = (annotation: AnnotationData, index: number) => string;
-
-/**
- * Callback when annotations are updated (e.g., boundaries dragged).
- * Called with the full updated annotations array.
- */
-export type OnAnnotationUpdateFn = (annotations: AnnotationData[]) => void;

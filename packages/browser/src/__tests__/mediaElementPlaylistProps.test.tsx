@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
 //
-// #685: the MediaElement view is a composition. The four annotation options
-// must reach the annotation-boxes part as they were given (the view here is
-// `ComposedMediaElementWaveform`, testCompositions.tsx).
+// #685: the MediaElement view is a composition (the view here is
+// `ComposedMediaElementWaveform`, testCompositions.tsx). Since #686 the
+// annotation-boxes part is `WaveformAnnotationBoxes` under both providers: the
+// label function reaches it as a prop (`getLabel`), and `editable` and
+// `linkEndpoints` are no props of any part: they are the provider's options,
+// given through its `annotationList` prop.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
@@ -10,18 +13,20 @@ import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { WaveformDataObject } from '@waveform-playlist/core';
-import type { MediaElementAnnotationBoxesProps } from '../components/MediaElementAnnotationBoxes';
+import type { WaveformAnnotationBoxesProps } from '../components/WaveformAnnotationBoxes';
 
 const seen = vi.hoisted(() => ({ props: [] as unknown[] }));
 
-vi.mock('../components/MediaElementAnnotationBoxes', () => ({
-  MediaElementAnnotationBoxes: (props: unknown) => {
+vi.mock('../components/WaveformAnnotationBoxes', () => ({
+  WaveformAnnotationBoxes: (props: unknown) => {
     seen.props.push(props);
     return null;
   },
 }));
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
+import { useAnnotationOptions } from '../contexts/playlistContexts';
+import type { AnnotationListProp } from '../providerInternals/useAnnotationState';
 import { ComposedMediaElementWaveform } from './testCompositions';
 
 const WAVEFORM_DATA = WaveformData.create({
@@ -57,9 +62,15 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-const lastProps = () => seen.props[seen.props.length - 1] as MediaElementAnnotationBoxesProps;
+const lastProps = () => seen.props[seen.props.length - 1] as WaveformAnnotationBoxesProps;
 
-function mount(playlist: React.ReactElement) {
+let options: ReturnType<typeof useAnnotationOptions>;
+const OptionsProbe: React.FC = () => {
+  options = useAnnotationOptions();
+  return null;
+};
+
+function mount(playlist: React.ReactElement, annotationList?: AnnotationListProp) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   seen.props = [];
   render(
@@ -67,39 +78,30 @@ function mount(playlist: React.ReactElement) {
       track={{ source: 'x.mp3', waveformData: WAVEFORM_DATA }}
       samplesPerPixel={882}
       createPlayout={fakePlayout}
+      annotationList={annotationList}
     >
+      <OptionsProbe />
       {playlist}
     </MediaElementPlaylistProvider>
   );
 }
 
 describe('the annotation options reach the MediaElement boxes', () => {
-  it('as given', () => {
+  it('the label function as given, as a prop of the part; editable and linkEndpoints through the provider', () => {
     const label = () => 'x';
-    const onUpdate = () => {};
-    mount(
-      <ComposedMediaElementWaveform
-        getAnnotationBoxLabel={label}
-        editable
-        linkEndpoints
-        onAnnotationUpdate={onUpdate}
-      />
-    );
-    expect(lastProps()).toEqual({
-      getAnnotationBoxLabel: label,
+    mount(<ComposedMediaElementWaveform getLabel={label} />, {
       editable: true,
       linkEndpoints: true,
-      onAnnotationUpdate: onUpdate,
     });
+    expect(lastProps()).toEqual({ getLabel: label });
+    expect(options.editable).toBe(true);
+    expect(options.linkEndpoints).toBe(true);
   });
 
   it('editable and linkEndpoints are false when left out', () => {
     mount(<ComposedMediaElementWaveform />);
-    expect(lastProps()).toEqual({
-      getAnnotationBoxLabel: undefined,
-      editable: false,
-      linkEndpoints: false,
-      onAnnotationUpdate: undefined,
-    });
+    expect(lastProps()).toEqual({ getLabel: undefined });
+    expect(options.editable).toBe(false);
+    expect(options.linkEndpoints).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import {
   usePlaylistTimeline,
   useEngineRefs,
   useAnnotations,
-  useAnnotationEditing,
+  useAnnotationOptions,
   usePlaybackControls,
   useEditorControls,
 } from '../contexts/playlistContexts';
@@ -50,8 +50,8 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, duration } = usePlaylistTimeline();
   const { playoutRef } = useEngineRefs();
-  const { annotations: annotationList, continuousPlay } = useAnnotations();
-  const { linkEndpoints } = useAnnotationEditing();
+  const { annotations: annotationList } = useAnnotations();
+  const { linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } = usePlaybackControls();
   const { undo, redo } = useEditorControls();

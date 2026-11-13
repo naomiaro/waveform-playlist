@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   BaseCheckboxWrapper,
   BaseCheckbox,
@@ -22,6 +22,8 @@ export const ContinuousPlayCheckbox: React.FC<ContinuousPlayCheckboxProps> = ({
   disabled = false,
   className,
 }) => {
+  // Generated: two of this checkbox on one page must not share an id.
+  const id = useId();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.checked);
   };
@@ -30,13 +32,13 @@ export const ContinuousPlayCheckbox: React.FC<ContinuousPlayCheckboxProps> = ({
     <BaseCheckboxWrapper className={className}>
       <BaseCheckbox
         type="checkbox"
-        id="continuous-play"
+        id={id}
         className="continuous-play"
         checked={checked}
         onChange={handleChange}
         disabled={disabled}
       />
-      <BaseCheckboxLabel htmlFor="continuous-play">Continuous Play</BaseCheckboxLabel>
+      <BaseCheckboxLabel htmlFor={id}>Continuous Play</BaseCheckboxLabel>
     </BaseCheckboxWrapper>
   );
 };

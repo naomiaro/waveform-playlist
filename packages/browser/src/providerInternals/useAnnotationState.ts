@@ -3,9 +3,30 @@ import { createValueSource } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import { createAnnotationLookup, type AnnotationLookup } from '../utils/annotationLookup';
+import type {
+  AnnotationOptionsContextValue,
+  AnnotationsContextValue,
+} from '../contexts/playlistContexts';
+
+/**
+ * The `annotationList` prop of both providers. The provider holds the three
+ * options as state (`useAnnotationOptions()`, and the three setters of
+ * `usePlaybackControls()`), and that state follows the prop: when the value
+ * of a field changes, the option takes it. Between two changes of the prop a
+ * setter (or one of the checkboxes) changes the option; the prop is not told.
+ */
+export interface AnnotationListProp {
+  annotations?: AnnotationData[];
+  /** Whether annotations can be edited (text, ids, edges). Default: false. */
+  editable?: boolean;
+  /** Whether a dragged edge takes the edge it touches along. Default: false. */
+  linkEndpoints?: boolean;
+  /** Whether playback runs on past the end of an annotation. Default: false. */
+  isContinuousPlay?: boolean;
+}
 
 export interface UseAnnotationStateOptions {
-  annotationList: { annotations?: AnnotationData[]; isContinuousPlay?: boolean } | undefined;
+  annotationList: AnnotationListProp | undefined;
   onAnnotationsChange: ((annotations: AnnotationData[]) => void) | undefined;
   /** Named in the warning for a `setAnnotations` call with no `onAnnotationsChange`. */
   providerName: string;
@@ -27,6 +48,34 @@ export interface AnnotationState {
   continuousPlay: boolean;
   continuousPlayRef: React.RefObject<boolean>;
   setContinuousPlay: (enabled: boolean) => void;
+  setAnnotationsEditable: (enabled: boolean) => void;
+  setLinkEndpoints: (enabled: boolean) => void;
+  /** `{ annotations }`, memoized: the public annotations value. */
+  annotationsValue: AnnotationsContextValue;
+  /** The three options, memoized: the public options value. */
+  annotationOptionsValue: AnnotationOptionsContextValue;
+}
+
+/**
+ * A boolean option held as state that follows a prop (#686): it starts from
+ * the prop (false when absent), a setter changes it, and when the prop's
+ * value changes the option takes the new value. The comparison is made during
+ * render against the last prop value seen, kept as state: no effect, so a
+ * StrictMode remount or a revealed `<Activity>` does not put an unchanged
+ * prop back over a value the user chose. The setter keeps its identity.
+ */
+function useFollowedOption(prop: boolean | undefined): [boolean, (value: boolean) => void] {
+  // A field that is left out says false: leaving it out and writing `false`
+  // are the same value, not a change.
+  const wanted = prop ?? false;
+  const [value, setValue] = useState(wanted);
+  const [seen, setSeen] = useState(wanted);
+  if (seen !== wanted) {
+    setSeen(wanted);
+    setValue(wanted);
+    return [wanted, setValue];
+  }
+  return [value, setValue];
 }
 
 /**
@@ -70,14 +119,31 @@ export function useAnnotationState({
     setActiveAnnotationIdState(value);
   }, []);
 
-  const [continuousPlay, setContinuousPlayState] = useState(
-    annotationList?.isContinuousPlay ?? false
+  const [continuousPlay, setContinuousPlayState] = useFollowedOption(
+    annotationList?.isContinuousPlay
   );
+  // Written during render as well as by the setter, so that a value taken
+  // from the prop reaches the animation loop too. The setter writes it first:
+  // a running loop reads the new value on its next frame, before React has
+  // rendered.
   const continuousPlayRef = useRef<boolean>(continuousPlay);
-  const setContinuousPlay = useCallback((value: boolean) => {
-    continuousPlayRef.current = value;
-    setContinuousPlayState(value);
-  }, []);
+  continuousPlayRef.current = continuousPlay;
+  const setContinuousPlay = useCallback(
+    (value: boolean) => {
+      continuousPlayRef.current = value;
+      setContinuousPlayState(value);
+    },
+    [setContinuousPlayState]
+  );
+
+  const [editable, setAnnotationsEditable] = useFollowedOption(annotationList?.editable);
+  const [linkEndpoints, setLinkEndpoints] = useFollowedOption(annotationList?.linkEndpoints);
+
+  const annotationsValue = useMemo(() => ({ annotations }), [annotations]);
+  const annotationOptionsValue = useMemo(
+    () => ({ editable, linkEndpoints, continuousPlay }),
+    [editable, linkEndpoints, continuousPlay]
+  );
 
   const [annotationPreview] = useState<AnnotationPreviewHandle>(() =>
     createValueSource<AnnotationData[] | null>(null)
@@ -118,5 +184,9 @@ export function useAnnotationState({
     continuousPlay,
     continuousPlayRef,
     setContinuousPlay,
+    setAnnotationsEditable,
+    setLinkEndpoints,
+    annotationsValue,
+    annotationOptionsValue,
   };
 }

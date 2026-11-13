@@ -1,10 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
   MediaElementPlaylistProvider,
-  MediaElementWaveform,
-  useAnnotations,
-  usePlaybackControls,
+  MediaElementWaveformRoot,
+  WaveformTimescale,
+  WaveformTracks,
+  WaveformAnnotationBoxes,
+  WaveformSelection,
+  WaveformPlayhead,
+  AnnotationList,
+  ContinuousPlayCheckbox,
+  EditableCheckbox,
+  LinkEndpointsCheckbox,
   PlayButton,
   PauseButton,
   StopButton,
@@ -38,63 +45,23 @@ const Controls = styled.div`
   flex-wrap: wrap;
 `;
 
-const CheckboxLabel = styled.label`
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-  font-size: 0.875rem;
-  cursor: pointer;
-`;
-
-interface TransportProps {
-  editable: boolean;
-  onEditableChange: (editable: boolean) => void;
-  linkEndpoints: boolean;
-  onLinkEndpointsChange: (linked: boolean) => void;
-}
-
-function Transport({
-  editable,
-  onEditableChange,
-  linkEndpoints,
-  onLinkEndpointsChange,
-}: TransportProps) {
-  const { continuousPlay } = useAnnotations();
-  const { setContinuousPlay } = usePlaybackControls();
-
+// The three annotation options are the provider's: the checkboxes show and
+// set them, and the boxes and the list read them.
+function Transport() {
   return (
     <Controls>
       <PlayButton />
       <PauseButton />
       <StopButton />
-      <CheckboxLabel>
-        <input
-          type="checkbox"
-          checked={continuousPlay}
-          onChange={(e) => setContinuousPlay(e.target.checked)}
-        />
-        Continuous play
-      </CheckboxLabel>
-      <CheckboxLabel>
-        <input
-          type="checkbox"
-          checked={editable}
-          onChange={(e) => onEditableChange(e.target.checked)}
-        />
-        Editable
-      </CheckboxLabel>
-      <CheckboxLabel>
-        <input
-          type="checkbox"
-          checked={linkEndpoints}
-          disabled={!editable}
-          onChange={(e) => onLinkEndpointsChange(e.target.checked)}
-        />
-        Link endpoints
-      </CheckboxLabel>
+      <ContinuousPlayCheckbox />
+      <EditableCheckbox />
+      <LinkEndpointsCheckbox />
     </Controls>
   );
 }
+
+// Defined outside the component: a new function would render every box.
+const getLabel = (_annotation: Annotation, index: number) => String(index + 1);
 
 /**
  * MediaElementAnnotationsExample
@@ -109,8 +76,6 @@ export function MediaElementAnnotationsExample() {
   const [annotations, setAnnotations] = useState<Annotation[]>(() =>
     sonnetNotes.map(parseAeneas)
   );
-  const [editable, setEditable] = useState(false);
-  const [linkEndpoints, setLinkEndpoints] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,7 +97,6 @@ export function MediaElementAnnotationsExample() {
     [waveformData]
   );
   const annotationList = useMemo(() => ({ annotations, isContinuousPlay: true }), [annotations]);
-  const getLabel = useCallback((_annotation: Annotation, index: number) => String(index + 1), []);
 
   if (error) {
     return <Container style={{ padding: '2rem', color: 'red' }}>Error: {error}</Container>;
@@ -158,18 +122,15 @@ export function MediaElementAnnotationsExample() {
           annotationList={annotationList}
           onAnnotationsChange={setAnnotations}
         >
-          <Transport
-            editable={editable}
-            onEditableChange={setEditable}
-            linkEndpoints={linkEndpoints}
-            onLinkEndpointsChange={setLinkEndpoints}
-          />
-          <MediaElementWaveform
-            annotationTextHeight={300}
-            getAnnotationBoxLabel={getLabel}
-            editable={editable}
-            linkEndpoints={linkEndpoints}
-          />
+          <Transport />
+          <MediaElementWaveformRoot>
+            <WaveformTimescale />
+            <WaveformTracks />
+            <WaveformAnnotationBoxes getLabel={getLabel} />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </MediaElementWaveformRoot>
+          <AnnotationList height={300} />
         </MediaElementPlaylistProvider>
       </AnnotationProvider>
     </Container>

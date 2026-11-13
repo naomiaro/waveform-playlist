@@ -11,6 +11,13 @@ interface ContainerProps {
   $height?: number;
 }
 
+/** The colour of the active row and of the focus rings (theme: `annotationTextItemActiveColor`). */
+const activeColor = (props: { theme?: { annotationTextItemActiveColor?: string } }) =>
+  props.theme?.annotationTextItemActiveColor || '#ff9800';
+/** That colour at an opacity, as the tints and glows of the active row use it. */
+const activeTint = (percent: number) => (props: Parameters<typeof activeColor>[0]) =>
+  `color-mix(in srgb, ${activeColor(props)} ${percent}%, transparent)`;
+
 const Container = styled.div<ContainerProps>`
   background: ${(props) => props.theme?.backgroundColor || '#fff'};
   ${(props) => (props.$height ? `height: ${props.$height}px;` : 'max-height: 200px;')}
@@ -21,27 +28,27 @@ const Container = styled.div<ContainerProps>`
 const AnnotationItem = styled.div<{ $isActive?: boolean }>`
   padding: 12px;
   margin-bottom: 6px;
-  border-left: 4px solid ${(props) => (props.$isActive ? '#ff9800' : 'transparent')};
-  background: ${(props) => (props.$isActive ? 'rgba(255, 152, 0, 0.15)' : 'transparent')};
+  border-left: 4px solid ${(props) => (props.$isActive ? activeColor(props) : 'transparent')};
+  background: ${(props) => (props.$isActive ? activeTint(15)(props) : 'transparent')};
   border-radius: 4px;
   transition: all 0.2s;
   cursor: pointer;
   box-shadow: ${(props) =>
     props.$isActive
-      ? '0 2px 8px rgba(255, 152, 0, 0.25), inset 0 0 0 1px rgba(255, 152, 0, 0.3)'
+      ? `0 2px 8px ${activeTint(25)(props)}, inset 0 0 0 1px ${activeTint(30)(props)}`
       : 'none'};
 
   &:hover {
     background: ${(props) =>
       props.$isActive
-        ? 'rgba(255, 152, 0, 0.2)'
+        ? activeTint(20)(props)
         : props.theme?.annotationTextItemHoverBackground || 'rgba(0, 0, 0, 0.05)'};
     border-left-color: ${(props) =>
-      props.$isActive ? '#ff9800' : props.theme?.borderColor || '#ddd'};
+      props.$isActive ? activeColor(props) : props.theme?.borderColor || '#ddd'};
   }
 
   &:focus-visible {
-    outline: 2px solid #ff9800;
+    outline: 2px solid ${activeColor};
     outline-offset: 2px;
   }
 `;
@@ -71,8 +78,8 @@ const AnnotationIdLabel = styled.span<{ $isEditable?: boolean }>`
     props.$isEditable ? `1px dashed ${props.theme?.borderColor || '#ddd'}` : 'none'};
 
   &[contenteditable='true']:focus {
-    outline: 2px solid #ff9800;
-    background: rgba(255, 152, 0, 0.1);
+    outline: 2px solid ${activeColor};
+    background: ${activeTint(10)};
   }
 `;
 
@@ -123,8 +130,8 @@ const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
   min-height: 20px;
 
   &[contenteditable='true']:focus {
-    outline: 2px solid #ff9800;
-    background: rgba(255, 152, 0, 0.1);
+    outline: 2px solid ${activeColor};
+    background: ${activeTint(10)};
   }
 `;
 
@@ -211,6 +218,14 @@ const AnnotationListItem = React.memo(function AnnotationListItem({
   renderAnnotationItem,
 }: AnnotationListItemProps) {
   const handleClick = () => onAnnotationClick?.(annotation);
+  // The default row: a click in a field that is being edited places the
+  // caret, it does not choose the annotation. (The action buttons stop their
+  // own clicks.)
+  const handleRowClick = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as Element | null;
+    if (target?.closest?.('[contenteditable="true"]')) return;
+    handleClick();
+  };
 
   // Use custom render function if provided
   if (renderAnnotationItem) {
@@ -229,7 +244,7 @@ const AnnotationListItem = React.memo(function AnnotationListItem({
 
   // Default rendering
   return (
-    <AnnotationItem ref={itemRef} $isActive={isActive} onClick={handleClick}>
+    <AnnotationItem ref={itemRef} $isActive={isActive} onClick={handleRowClick}>
       <AnnotationHeader>
         <AnnotationInfo>
           <AnnotationIdLabel

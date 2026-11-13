@@ -36,7 +36,7 @@ test.describe('Media Element Annotations Example', () => {
   });
 
   test('with continuous play off, a clicked box plays to its end and stops', async ({ page }) => {
-    await page.getByRole('checkbox', { name: 'Continuous play' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Continuous Play', exact: true }).uncheck();
     const play = page.getByRole('button', { name: 'Play', exact: true });
     const pause = page.getByRole('button', { name: 'Pause', exact: true });
 
@@ -66,7 +66,7 @@ test.describe('Media Element Annotations Example', () => {
   });
 
   test('with continuous play on, a clicked box keeps playing past its end', async ({ page }) => {
-    const continuousPlay = page.getByRole('checkbox', { name: 'Continuous play' });
+    const continuousPlay = page.getByRole('checkbox', { name: 'Continuous Play', exact: true });
     await expect(continuousPlay).toBeChecked();
     const play = page.getByRole('button', { name: 'Play', exact: true });
     const pause = page.getByRole('button', { name: 'Pause', exact: true });
@@ -91,21 +91,18 @@ test.describe('Media Element Annotations Example', () => {
 
   test('Editable adds drag handles to both edges of every box', async ({ page }) => {
     const handles = page.locator('[data-scroll-container] [aria-roledescription="draggable"]');
-    const linkEndpoints = page.getByRole('checkbox', { name: 'Link endpoints' });
-    await expect(linkEndpoints).toBeDisabled();
     // The clip itself is a draggable too.
     await expect(handles).toHaveCount(1);
 
-    await page.getByRole('checkbox', { name: 'Editable' }).check();
+    await page.getByRole('checkbox', { name: 'Editable Annotations', exact: true }).check();
 
     await expect(handles).toHaveCount(31);
-    await expect(linkEndpoints).toBeEnabled();
   });
 
   // The file is 44100 Hz. The drag once converted pixels to seconds with
   // 48000 Hz, so the edge moved about 8% less than the pointer.
   test('a dragged box edge follows the pointer', async ({ page }) => {
-    await page.getByRole('checkbox', { name: 'Editable' }).check();
+    await page.getByRole('checkbox', { name: 'Editable Annotations', exact: true }).check();
     const container = page.locator('[data-scroll-container]');
     const handles = container.locator('[aria-roledescription="draggable"]');
     await expect(handles).toHaveCount(31);
@@ -150,7 +147,7 @@ test.describe('Media Element Annotations Example', () => {
   test('with Link endpoints on, annotations dragged into each other share one time', async ({
     page,
   }) => {
-    await page.getByRole('checkbox', { name: 'Editable' }).check();
+    await page.getByRole('checkbox', { name: 'Editable Annotations', exact: true }).check();
     const container = page.locator('[data-scroll-container]');
     const handles = container.locator('[aria-roledescription="draggable"]');
     await expect(handles).toHaveCount(31);
@@ -202,7 +199,7 @@ test.describe('Media Element Annotations Example', () => {
     }).toPass({ timeout: 5000 });
 
     // Linked: drag it back into 5 and beyond, one pixel at a time.
-    await page.getByRole('checkbox', { name: 'Link endpoints' }).check();
+    await page.getByRole('checkbox', { name: 'Link Endpoints', exact: true }).check();
     const separated = await rightEdgeOfBox4();
     await drag(separated, 55, 1);
 

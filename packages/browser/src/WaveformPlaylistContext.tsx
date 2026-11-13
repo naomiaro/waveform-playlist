@@ -7,12 +7,7 @@ import type {
 } from '@waveform-playlist/playout';
 import { resolvePlayoutAdapter } from './playout/resolvePlayoutAdapter';
 import { PlaylistEngine, type EngineState, type PlayoutAdapter } from '@waveform-playlist/engine';
-import {
-  type ClipTrack,
-  type Fade,
-  type AnnotationAction,
-  type MidiNoteData,
-} from '@waveform-playlist/core';
+import { type ClipTrack, type Fade, type MidiNoteData } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
@@ -31,7 +26,10 @@ import {
   useWaveformDataCache,
 } from './hooks';
 import { followAnnotations } from './providerInternals/followAnnotations';
-import { useAnnotationState } from './providerInternals/useAnnotationState';
+import {
+  useAnnotationState,
+  type AnnotationListProp,
+} from './providerInternals/useAnnotationState';
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useViewDefaults } from './providerInternals/useViewDefaults';
@@ -80,7 +78,7 @@ export interface TrackState {
 import {
   BLOCKED,
   ActiveAnnotationContext,
-  AnnotationEditingContext,
+  AnnotationOptionsContext,
   AnnotationsContext,
   CurrentTimeContext,
   EditorControlsContext,
@@ -102,8 +100,6 @@ import {
   TrackReorderPreviewContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
-  type AnnotationEditingContextValue,
-  type AnnotationsContextValue,
   type CurrentTimeContextValue,
   type EditorControlsContextValue,
   type EngineRefsContextValue,
@@ -130,13 +126,11 @@ export interface WaveformPlaylistProviderProps {
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
-  annotationList?: {
-    annotations?: AnnotationData[];
-    editable?: boolean;
-    isContinuousPlay?: boolean;
-    linkEndpoints?: boolean;
-    controls?: AnnotationAction[];
-  };
+  /**
+   * The annotations (followed) and the initial values of the three annotation
+   * options: `editable`, `linkEndpoints`, `isContinuousPlay`.
+   */
+  annotationList?: AnnotationListProp;
   /** Master effects chain (default Tone.js adapter only). */
   effects?: EffectsFunction;
   /**
@@ -156,8 +150,6 @@ export interface WaveformPlaylistProviderProps {
    *  a throwing `createAdapter`, or an invalid `zoomLevels`/`samplesPerPixel`). The
    *  provider already logs the error; use this to surface it in your UI. */
   onError?: (err: Error) => void;
-  /** @deprecated Use onAnnotationsChange instead */
-  onAnnotationUpdate?: (annotations: AnnotationData[]) => void;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** Width in pixels of waveform bars. Default: 1 */
@@ -222,7 +214,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   trackEffects,
   onReady,
   onError,
-  onAnnotationUpdate: _onAnnotationUpdate,
   onAnnotationsChange,
   barWidth = 1,
   barGap = 0,
@@ -256,7 +247,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the MediaElement provider (#769).
   const {
-    annotations,
     annotationsRef,
     annotationLookup,
     setAnnotations,
@@ -267,6 +257,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     continuousPlay,
     continuousPlayRef,
     setContinuousPlay,
+    setAnnotationsEditable,
+    setLinkEndpoints,
+    annotationsValue,
+    annotationOptionsValue,
   } = useAnnotationState({
     annotationList,
     onAnnotationsChange,
@@ -299,8 +293,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // The mixer state of the tracks, by track id (#687). The public
   // `trackStates` array is derived from it and `tracks` below.
   const [trackMixer, setTrackMixer] = useState<TrackMixer>(EMPTY_TRACK_MIXER);
-  const [linkEndpoints, setLinkEndpoints] = useState(annotationList?.linkEndpoints ?? false);
-  const [annotationsEditable, setAnnotationsEditable] = useState(annotationList?.editable ?? false);
   const [isReady, setIsReady] = useState(false);
   // Bumped after every track-reorder DRAG interaction (committed or not) —
   // see bumpTrackReorderEpoch below for the full rationale.
@@ -1740,16 +1732,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     ]
   );
 
-  const annotationsValue: AnnotationsContextValue = useMemo(
-    () => ({ annotations, continuousPlay }),
-    [annotations, continuousPlay]
-  );
-
-  const annotationEditingValue: AnnotationEditingContextValue = useMemo(
-    () => ({ annotationsEditable, linkEndpoints }),
-    [annotationsEditable, linkEndpoints]
-  );
-
   const loopValue: LoopContextValue = useMemo(
     () => ({ isLoopEnabled, loopStart, loopEnd }),
     [isLoopEnabled, loopStart, loopEnd]
@@ -1802,6 +1784,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setScrollContainer,
       scrollContainerRef,
       setContinuousPlay,
+      setAnnotationsEditable,
+      setLinkEndpoints,
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
@@ -1817,6 +1801,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setScrollContainer,
       scrollContainerRef,
       setContinuousPlay,
+      setAnnotationsEditable,
+      setLinkEndpoints,
       setAnnotations,
       annotationPreview,
       setActiveAnnotationId,
@@ -1845,10 +1831,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // Master volume
       setMasterVolume,
 
-      // Annotation editing
-      setLinkEndpoints,
-      setAnnotationsEditable,
-
       // Loop controls
       setLoopEnabled,
       setLoopRegion,
@@ -1875,8 +1857,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       zoom.zoomIn,
       zoom.zoomOut,
       setMasterVolume,
-      setLinkEndpoints,
-      setAnnotationsEditable,
       setLoopEnabled,
       setLoopRegion,
       setLoopRegionFromSelection,
@@ -1960,7 +1940,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
                           <SelectedTrackIdContext.Provider value={selectedTrackIdValue}>
                             <SelectedRowContext.Provider value={selectedTrackIdValue}>
                               <LoopContext.Provider value={loopValue}>
-                                <AnnotationEditingContext.Provider value={annotationEditingValue}>
+                                <AnnotationOptionsContext.Provider value={annotationOptionsValue}>
                                   <AnnotationsContext.Provider value={annotationsValue}>
                                     <IsPlayingContext.Provider value={isPlayingValue}>
                                       <ActiveAnnotationContext.Provider
@@ -1984,7 +1964,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
                                       </ActiveAnnotationContext.Provider>
                                     </IsPlayingContext.Provider>
                                   </AnnotationsContext.Provider>
-                                </AnnotationEditingContext.Provider>
+                                </AnnotationOptionsContext.Provider>
                               </LoopContext.Provider>
                             </SelectedRowContext.Provider>
                           </SelectedTrackIdContext.Provider>

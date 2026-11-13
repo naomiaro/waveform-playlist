@@ -584,14 +584,14 @@ describe('the root renders alone', () => {
     expect(calls).toBe(0);
   });
 
-  it('getAnnotationBoxLabel is not called for a press and its release', async () => {
+  it('getLabel is not called for a press and its release', async () => {
     let calls = 0;
     const label = () => {
       calls++;
       return 'x';
     };
     await mount({
-      playlist: <ComposedMediaElementWaveform getAnnotationBoxLabel={label} />,
+      playlist: <ComposedMediaElementWaveform getLabel={label} />,
       provider: {
         annotationList: {
           annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
@@ -622,7 +622,7 @@ describe('the root renders alone', () => {
     expect(new Set(dragOptions.durations)).toEqual(new Set([SECONDS]));
   });
 
-  it('getAnnotationBoxLabel is not called when the player becomes ready, nor on play, pause and stop', async () => {
+  it('getLabel is not called when the player becomes ready, nor on play, pause and stop', async () => {
     let calls = 0;
     const label = () => {
       calls++;
@@ -631,7 +631,7 @@ describe('the root renders alone', () => {
     // The annotation lies after the positions played here, so it never
     // becomes the active one (that would render the boxes, rightly).
     const { fake } = await mount({
-      playlist: <ComposedMediaElementWaveform getAnnotationBoxLabel={label} />,
+      playlist: <ComposedMediaElementWaveform getLabel={label} />,
       provider: {
         annotationList: {
           annotations: [{ id: 'a', start: 6, end: 7, lines: ['a'] }],

@@ -6,8 +6,8 @@
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect } from 'vitest';
 import React from 'react';
+import { WaveformAnnotationBoxes } from '../components/WaveformAnnotationBoxes';
 import {
-  WaveformAnnotationBoxes,
   WaveformClipHeaders,
   WaveformFades,
   WaveformLoopRegion,

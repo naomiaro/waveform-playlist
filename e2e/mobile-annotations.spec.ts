@@ -26,8 +26,8 @@ test.describe('Mobile Annotations Example', () => {
     });
 
     test('displays implementation code example', async ({ page }) => {
-      await expect(page.getByText('touchOptimized: true')).toBeVisible();
-      await expect(page.getByText('useDragSensors')).toBeVisible();
+      await expect(page.getByText('<ClipInteractionOptions touchOptimized>')).toBeVisible();
+      await expect(page.getByText('<AnnotationList actions=')).toBeVisible();
     });
 
     test('has fewer annotations than desktop example', async ({ page }) => {
@@ -93,7 +93,7 @@ test.describe('Mobile Annotations Example', () => {
   test.describe('Touch Optimization', () => {
     test('uses touch-optimized drag sensors', async ({ page }) => {
       // This is verified by the code example on the page
-      await expect(page.getByText('touchOptimized: true')).toBeVisible();
+      await expect(page.getByText('<ClipInteractionOptions touchOptimized>')).toBeVisible();
     });
 
     test('buttons have minimum touch target size', async ({ page }) => {

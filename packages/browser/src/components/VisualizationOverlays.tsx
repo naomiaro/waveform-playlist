@@ -5,9 +5,10 @@
  * active-annotation change during playback, and the rows do not.
  *
  * `WaveformSelection` and `WaveformPlayhead` read shared hooks only and are
- * rendered under both providers (#688). The annotation boxes and the loop region are multitrack only.
+ * rendered under both providers (#688). The loop region is multitrack only.
+ * (The annotation boxes are `WaveformAnnotationBoxes.tsx`, for both providers.)
  */
-import React, { useCallback, useContext, useSyncExternalStore } from 'react';
+import React, { useContext, useSyncExternalStore } from 'react';
 import {
   Selection,
   TimescaleLoopRegion,
@@ -16,7 +17,6 @@ import {
   type WaveformPlaylistTheme,
 } from '@waveform-playlist/ui-components';
 import {
-  useActiveAnnotation,
   useCurrentTime,
   useSelection,
   usePlaylistView,
@@ -24,15 +24,9 @@ import {
   usePlaybackRefs,
   useLoop,
   useIsPlaying,
-  usePlaybackControls,
   useEditorControls,
-  useAnnotations,
-  useAnnotationEditing,
 } from '../contexts/playlistContexts';
-import type { AnnotationData, GetAnnotationBoxLabelFn } from '../types/annotations';
 import { AnimatedPlayhead } from './AnimatedPlayhead';
-import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
-import { AnnotationBoxes } from './AnnotationBoxes';
 import { useWaveformExtent, WaveformPartPlaceContext } from './waveformLayoutContext';
 import { warnMisplacedPart } from './partWarnings';
 import { SelectionPreviewContext, type SelectionRange } from '../hooks/useSelectionDrag';
@@ -137,67 +131,6 @@ export const WaveformPlayhead: React.FC<WaveformPlayheadProps> = ({ renderPlayhe
     <AnimatedPlayhead color={theme.playheadColor} />
   );
 };
-
-export interface WaveformAnnotationBoxesProps {
-  /**
-   * Custom function to generate the label shown on annotation boxes in the waveform.
-   * Receives the annotation data and its index, returns a string label.
-   * Default: annotation.id
-   */
-  getAnnotationBoxLabel?: GetAnnotationBoxLabelFn;
-}
-
-/**
- * The row of annotation boxes under the tracks. Needs the annotation
- * integration. Memoized, and as wide as the root's timeline: a render of the
- * component that composes the view does not render it while
- * `getAnnotationBoxLabel` keeps its identity.
- */
-export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBoxes({
-  getAnnotationBoxLabel,
-}: WaveformAnnotationBoxesProps) {
-  const { tracksFullWidth: width } = useWaveformExtent('The annotation boxes');
-  const { annotations, continuousPlay } = useAnnotations();
-  const { annotationsEditable } = useAnnotationEditing();
-  const { activeAnnotationId } = useActiveAnnotation();
-  const { setActiveAnnotationId, play, annotationPreview } = usePlaybackControls();
-  const { sampleRate } = usePlaylistView();
-  const { samplesPerPixel } = usePlaylistZoom();
-  // While an edge is dragged with the preview, the boxes follow the drag.
-  const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
-
-  // A prop of every memoized box: its dependencies do not change when only
-  // the active annotation does.
-  const handleAnnotationClick = useCallback(
-    async (annotation: AnnotationData) => {
-      setActiveAnnotationId(annotation.id);
-      const playDuration = !continuousPlay ? annotation.end - annotation.start : undefined;
-      try {
-        await play(annotation.start, playDuration);
-      } catch (err) {
-        console.error(
-          'waveform-playlist: Failed to start playback for annotation',
-          annotation.id,
-          err
-        );
-      }
-    },
-    [continuousPlay, play, setActiveAnnotationId]
-  );
-
-  return (
-    <AnnotationBoxes
-      annotations={shownAnnotations}
-      activeAnnotationId={activeAnnotationId}
-      editable={annotationsEditable}
-      width={width}
-      sampleRate={sampleRate}
-      samplesPerPixel={samplesPerPixel}
-      getAnnotationBoxLabel={getAnnotationBoxLabel}
-      onSelect={handleAnnotationClick}
-    />
-  );
-});
 
 /**
  * The draggable loop region in the timescale, bounded by the root's timeline.

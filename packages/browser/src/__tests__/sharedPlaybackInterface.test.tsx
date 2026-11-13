@@ -27,7 +27,7 @@ import {
   usePlaylistZoom,
   useEditorControls,
   useEngineRefs,
-  useAnnotationEditing,
+  useAnnotationOptions,
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
@@ -175,6 +175,7 @@ const SHARED = {
   selection: useSelection,
   activeAnnotation: useActiveAnnotation,
   annotations: useAnnotations,
+  annotationOptions: useAnnotationOptions,
   controls: usePlaybackControls,
   refs: usePlaybackRefs,
   view: usePlaylistView,
@@ -184,7 +185,6 @@ const SHARED = {
 const WEB_AUDIO_ONLY = {
   editorControls: useEditorControls,
   engineRefs: useEngineRefs,
-  annotationEditing: useAnnotationEditing,
   loop: useLoop,
   selectedTrack: useSelectedTrackId,
   undo: useUndoRedo,
@@ -202,7 +202,8 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
   currentTime: ['currentTime'],
   selection: ['selectionEnd', 'selectionStart'],
   activeAnnotation: ['activeAnnotationId'],
-  annotations: ['annotations', 'continuousPlay'],
+  annotations: ['annotations'],
+  annotationOptions: ['continuousPlay', 'editable', 'linkEndpoints'],
   controls: [
     'annotationPreview',
     'pause',
@@ -211,8 +212,10 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
     'seekTo',
     'setActiveAnnotationId',
     'setAnnotations',
+    'setAnnotationsEditable',
     'setAutomaticScroll',
     'setContinuousPlay',
+    'setLinkEndpoints',
     'setScrollContainer',
     'setSelection',
     'setTimeFormat',
@@ -494,12 +497,23 @@ describe('the shared hooks under MediaElementPlaylistProvider', () => {
       expect(readers.rendered()).toEqual(['settings']);
     });
 
-    it('continuous play: annotations only; the active annotation: its own reader', async () => {
+    it('continuous play, link endpoints and editable: the annotation options only; the active annotation: its own reader', async () => {
       const readers = makeReaders(ALL);
       await mountMediaElement(readers.children);
       readers.reset();
       act(() => readers.values.controls.setContinuousPlay(true));
-      expect(readers.rendered()).toEqual(['annotations']);
+      expect(readers.rendered()).toEqual(['annotationOptions']);
+      readers.reset();
+      act(() => readers.values.controls.setLinkEndpoints(true));
+      expect(readers.rendered()).toEqual(['annotationOptions']);
+      readers.reset();
+      act(() => readers.values.controls.setAnnotationsEditable(true));
+      expect(readers.rendered()).toEqual(['annotationOptions']);
+      expect(readers.values.annotationOptions).toEqual({
+        editable: true,
+        linkEndpoints: true,
+        continuousPlay: true,
+      });
       readers.reset();
       act(() => readers.values.controls.setActiveAnnotationId('a2'));
       expect(readers.rendered()).toEqual(['activeAnnotation']);
@@ -604,7 +618,7 @@ describe('the WebAudio provider splits its actions and refs', () => {
       refs: usePlaybackRefs,
       engineRefs: useEngineRefs,
       annotations: useAnnotations,
-      editing: useAnnotationEditing,
+      options: useAnnotationOptions,
       timeline: usePlaylistTimeline,
     });
     render(webAudio(readers.children));
@@ -612,18 +626,13 @@ describe('the WebAudio provider splits its actions and refs', () => {
     expect(Object.keys(readers.values.controls).sort()).toEqual(SHARED_FIELDS.controls);
     expect(Object.keys(readers.values.refs).sort()).toEqual(SHARED_FIELDS.refs);
     expect(Object.keys(readers.values.annotations).sort()).toEqual(SHARED_FIELDS.annotations);
-    expect(Object.keys(readers.values.editing).sort()).toEqual([
-      'annotationsEditable',
-      'linkEndpoints',
-    ]);
+    expect(Object.keys(readers.values.options).sort()).toEqual(SHARED_FIELDS.annotationOptions);
     expect(Object.keys(readers.values.editor).sort()).toEqual([
       'bumpTrackReorderEpoch',
       'clearLoopRegion',
       'redo',
       'reorderTrack',
-      'setAnnotationsEditable',
       'setCurrentTime',
-      'setLinkEndpoints',
       'setLoopEnabled',
       'setLoopRegion',
       'setLoopRegionFromSelection',
@@ -651,23 +660,28 @@ describe('the WebAudio provider splits its actions and refs', () => {
     ]);
   });
 
-  it('continuous play renders the annotations reader and not the editing one, and the reverse', async () => {
+  // #686: the three options have one value, and the annotations another.
+  // (An annotation edit rendering the annotations reader and not the options
+  // one is in contextSplitByChangeRate.test.tsx: annotations are a controlled prop.)
+  it('each of the three options renders the options reader and not the annotations one', async () => {
     installTimerFrames();
     const readers = makeReaders({
       controls: usePlaybackControls,
-      editor: useEditorControls,
       annotations: useAnnotations,
-      editing: useAnnotationEditing,
+      options: useAnnotationOptions,
       timeline: usePlaylistTimeline,
     });
     render(webAudio(readers.children));
     await waitFor(() => expect(readers.values.timeline.isReady).toBe(true));
     readers.reset();
     act(() => readers.values.controls.setContinuousPlay(true));
-    expect(readers.rendered()).toEqual(['annotations']);
+    expect(readers.rendered()).toEqual(['options']);
     readers.reset();
-    act(() => readers.values.editor.setLinkEndpoints(true));
-    expect(readers.rendered()).toEqual(['editing']);
+    act(() => readers.values.controls.setLinkEndpoints(true));
+    expect(readers.rendered()).toEqual(['options']);
+    readers.reset();
+    act(() => readers.values.controls.setAnnotationsEditable(true));
+    expect(readers.rendered()).toEqual(['options']);
   });
 });
 
@@ -678,7 +692,7 @@ describe('the package exports', () => {
       'useEditorControls',
       'useEngineRefs',
       'useAnnotations',
-      'useAnnotationEditing',
+      'useAnnotationOptions',
       'usePlaybackRate',
       'useMediaElementTrack',
       'PlaybackRateSelect',
@@ -691,6 +705,7 @@ describe('the package exports', () => {
     for (const name of [
       'usePlaylistControls',
       'usePlaylistAnnotations',
+      'useAnnotationEditing',
       'useMediaElementAnimation',
       'useMediaElementState',
       'useMediaElementControls',

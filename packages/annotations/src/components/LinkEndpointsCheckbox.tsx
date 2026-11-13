@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import {
   BaseCheckboxWrapper,
   BaseCheckbox,
@@ -22,6 +22,8 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
   disabled = false,
   className,
 }) => {
+  // Generated: two of this checkbox on one page must not share an id.
+  const id = useId();
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.checked);
   };
@@ -30,13 +32,13 @@ export const LinkEndpointsCheckbox: React.FC<LinkEndpointsCheckboxProps> = ({
     <BaseCheckboxWrapper className={className}>
       <BaseCheckbox
         type="checkbox"
-        id="link-endpoints"
+        id={id}
         className="link-endpoints"
         checked={checked}
         onChange={handleChange}
         disabled={disabled}
       />
-      <BaseCheckboxLabel htmlFor="link-endpoints">Link Endpoints</BaseCheckboxLabel>
+      <BaseCheckboxLabel htmlFor={id}>Link Endpoints</BaseCheckboxLabel>
     </BaseCheckboxWrapper>
   );
 };

@@ -118,6 +118,8 @@ export interface WaveformFrameOptions {
   parts: WaveformPartsByPlace;
   /** Length of the drawn timeline in seconds. */
   displayDuration: number;
+  /** Length of the audio in seconds (the extent's `audioDuration`). */
+  audioDuration: number;
   /** Memoized by the root: the tracks part and the controls part follow it. */
   rows: WaveformRowsValue;
   playlistState: 'ready' | 'loading';
@@ -144,6 +146,7 @@ export function useWaveformFrame({
   className,
   parts,
   displayDuration,
+  audioDuration,
   rows,
   playlistState,
   controlsWidth,
@@ -203,8 +206,8 @@ export function useWaveformFrame({
   );
 
   const extent = useMemo<WaveformExtentValue>(
-    () => ({ displayDuration, tracksFullWidth }),
-    [displayDuration, tracksFullWidth]
+    () => ({ displayDuration, tracksFullWidth, audioDuration }),
+    [displayDuration, tracksFullWidth, audioDuration]
   );
 
   return (

@@ -12,8 +12,6 @@
  */
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from 'styled-components';
-import { DragDropProvider } from '@dnd-kit/react';
-import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import * as Tone from 'tone';
 import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
 import {
@@ -26,15 +24,9 @@ import {
   AudioPosition,
   ContinuousPlayCheckbox,
   LinkEndpointsCheckbox,
-  usePlaybackControls,
   useActiveAnnotation,
-  useAnnotationDragHandlers,
-  useDragSensors,
-  usePlaylistView,
-  usePlaylistZoom,
-  usePlaylistTimeline,
   useAnnotations,
-  useAnnotationEditing,
+  ClipInteractionOptions,
   WaveformRoot,
   WaveformTimescale,
   WaveformLoopRegion,
@@ -42,7 +34,7 @@ import {
   WaveformAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
-  PlaylistAnnotationList,
+  AnnotationList,
 } from '@waveform-playlist/browser';
 import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
@@ -285,41 +277,12 @@ const ActiveAnnotationInfo: React.FC = () => {
   );
 };
 
-interface MobileAnnotationsContentProps {
-  tracks: ClipTrack[];
-}
-
-const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tracks }) => {
-  const { sampleRate } = usePlaylistView();
-  const { samplesPerPixel } = usePlaylistZoom();
-  const { duration } = usePlaylistTimeline();
-  const { annotations, continuousPlay } = useAnnotations();
-  const { linkEndpoints } = useAnnotationEditing();
-  const { setAnnotations, setActiveAnnotationId, play, annotationPreview } = usePlaybackControls();
-
-  // Use touch-optimized sensors with 250ms delay
-  const sensors = useDragSensors({ touchOptimized: true });
-
-  const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
-    annotations,
-    onAnnotationsChange: setAnnotations,
-    // The drag is shown through the preview and reported once, on release,
-    // so this component does not re-render on every pointer move.
-    preview: annotationPreview,
-    samplesPerPixel,
-    sampleRate,
-    duration,
-    linkEndpoints,
-  });
-
+const MobileAnnotationsContent: React.FC = () => {
   return (
-    <DragDropProvider
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragMove={onDragMove}
-      onDragEnd={onDragEnd}
-      modifiers={[RestrictToHorizontalAxis]}
-    >
+    // touchOptimized: a touch must be held for 250 ms before it drags an
+    // annotation edge, so a swipe still scrolls the waveform. The annotation
+    // boxes read it from here.
+    <ClipInteractionOptions touchOptimized>
       <Container>
         <Instructions>
           <strong>Touch Controls</strong>
@@ -367,13 +330,11 @@ const MobileAnnotationsContent: React.FC<MobileAnnotationsContentProps> = ({ tra
           <WaveformSelection />
           <WaveformPlayhead />
         </WaveformRoot>
-        {annotations.length > 0 ? (
-          <PlaylistAnnotationList controls={mobileAnnotationActions} height={200} />
-        ) : null}
+        <AnnotationList actions={mobileAnnotationActions} height={200} />
 
         <ActiveAnnotationInfo />
       </Container>
-    </DragDropProvider>
+    </ClipInteractionOptions>
   );
 };
 
@@ -460,7 +421,7 @@ export function MobileAnnotationsExample() {
       onAnnotationsChange={setAnnotations}
     >
       <AnnotationProvider>
-        <MobileAnnotationsContent tracks={tracks} />
+        <MobileAnnotationsContent />
       </AnnotationProvider>
     </WaveformPlaylistProvider>
   );
