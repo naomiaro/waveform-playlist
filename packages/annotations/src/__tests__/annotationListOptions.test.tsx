@@ -11,6 +11,8 @@ import { ThemeProvider, type DefaultTheme } from 'styled-components';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { AnnotationData } from '@waveform-playlist/core';
 import { AnnotationText } from '../components/AnnotationText';
+import { DragDropProvider } from '@dnd-kit/react';
+import { AnnotationBox } from '../components/AnnotationBox';
 import { ContinuousPlayCheckbox } from '../components/ContinuousPlayCheckbox';
 import { LinkEndpointsCheckbox } from '../components/LinkEndpointsCheckbox';
 import { EditableCheckbox } from '../components/EditableCheckbox';
@@ -87,6 +89,41 @@ describe('the colour of the active row (#686)', () => {
       </ThemeProvider>
     );
     expect(getComputedStyle(activeRow(container)).borderLeftColor).toBe('rgb(1, 2, 3)');
+  });
+});
+
+describe('the colours of a box come from its colour prop (#686)', () => {
+  // jsdom does not compute `color-mix`, so the rule itself is read.
+  const rules = () =>
+    [...document.querySelectorAll('style')].map((style) => style.textContent ?? '').join('\n') +
+    [...document.styleSheets]
+      .flatMap((sheet) => [...sheet.cssRules].map((rule) => rule.cssText))
+      .join('\n');
+
+  it('the border of a box, and the glow of the active one', () => {
+    render(
+      <DragDropProvider>
+        <AnnotationBox
+          annotationId="a"
+          annotationIndex={0}
+          startPosition={0}
+          endPosition={50}
+          color="rgb(4, 5, 6)"
+          isActive
+        />
+        <AnnotationBox
+          annotationId="b"
+          annotationIndex={1}
+          startPosition={50}
+          endPosition={90}
+          color="rgb(4, 5, 6)"
+        />
+      </DragDropProvider>
+    );
+    const css = rules();
+    expect(css).toContain('color-mix(in srgb, rgb(4, 5, 6) 40%, transparent)');
+    expect(css).toContain('color-mix(in srgb, rgb(4, 5, 6) 20%, transparent)');
+    expect(css).toMatch(/border:\s*2px solid rgb\(4, 5, 6\)/);
   });
 });
 

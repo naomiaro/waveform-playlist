@@ -296,7 +296,7 @@ interface WaveformPlaylistTheme {
   annotationBoxBackground: string;
   annotationBoxActiveBackground: string;
   annotationBoxHoverBackground: string;
-  annotationBoxBorder: string; // border of a box that is not active
+  annotationBoxBorder: string; // border of a box that is not active, and the glow of the active one
   annotationBoxActiveBorder: string;
   annotationLabelColor: string;
   annotationResizeHandleColor: string;

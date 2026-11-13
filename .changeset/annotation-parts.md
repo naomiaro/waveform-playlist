@@ -13,6 +13,6 @@ The annotation UI is two parts that own their options, the same under both provi
 
 Removed: the annotation props of the three ready-made views; `MediaElementAnnotationBoxes`, `PlaylistAnnotationList`, `MediaElementAnnotationList`; `annotationListConfig`; every `onAnnotationUpdate` (the provider's `onAnnotationsChange` is the one report) and `OnAnnotationUpdateFn`; `useAnnotationEditing()`; `continuousPlay` in `useAnnotations()`; the two setters on `useEditorControls()`; the unread `annotationList.controls`. See the upgrade guide.
 
-`annotations`: the three checkboxes generate their ids; a click on a default row of `AnnotationText` in a field that is being edited does not choose the annotation; the colour of the active row is the theme's `annotationTextItemActiveColor`.
+`annotations`: the glow of the active box is the box's `color` at 40% and 20% (it was a fixed orange); the three checkboxes generate their ids; a click on a default row of `AnnotationText` in a field that is being edited does not choose the annotation; the colour of the active row is the theme's `annotationTextItemActiveColor`.
 
 `ui-components`: new theme key `annotationTextItemActiveColor` (`#ff9800`); the dark default of `annotationBoxBorder`, which is read now, is `#ff9800`.

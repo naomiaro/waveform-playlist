@@ -527,7 +527,7 @@ const theme = {
   annotationBoxBackground: 'rgba(255, 255, 255, 0.85)',
   annotationBoxActiveBackground: 'rgba(255, 255, 255, 0.95)',
   annotationBoxHoverBackground: 'rgba(255, 255, 255, 0.98)',
-  annotationBoxBorder: '#ff9800',        // border of a box that is not active
+  annotationBoxBorder: '#ff9800',        // border of a box that is not active, glow of the active one
   annotationBoxActiveBorder: '#d67600',  // border of the active box, and of a hovered one
   annotationLabelColor: '#2a2a2a',
 

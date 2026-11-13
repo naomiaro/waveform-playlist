@@ -35,6 +35,22 @@ test.describe('Media Element Annotations Example', () => {
     await expect(pause).toBeDisabled();
   });
 
+  // #686: a row of the list did nothing when clicked.
+  test('a click on a row of the list plays that annotation', async ({ page }) => {
+    await page.getByRole('checkbox', { name: 'Continuous Play', exact: true }).uncheck();
+    const play = page.getByRole('button', { name: 'Play', exact: true });
+    const pause = page.getByRole('button', { name: 'Pause', exact: true });
+    await expect(pause).toBeDisabled();
+
+    // The time range of annotation 4 in its row: not a field that can be edited.
+    await page.getByText('0:09.240 - 0:11.920').click();
+
+    await expect(pause).toBeEnabled();
+    await expect(play).toBeDisabled();
+    // Continuous play is off: playback ends with the annotation (2.68 s long).
+    await expect(play).toBeEnabled({ timeout: 10000 });
+  });
+
   test('with continuous play off, a clicked box plays to its end and stops', async ({ page }) => {
     await page.getByRole('checkbox', { name: 'Continuous Play', exact: true }).uncheck();
     const play = page.getByRole('button', { name: 'Play', exact: true });

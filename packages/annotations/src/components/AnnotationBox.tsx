@@ -55,7 +55,9 @@ const Box = styled.div<BoxProps>`
   transition: all 0.2s ease;
   box-shadow: ${(props) =>
     props.$isActive
-      ? '0 2px 8px rgba(255, 152, 0, 0.4), inset 0 0 0 1px rgba(255, 152, 0, 0.2)'
+      ? // The glow of the active box is the box colour (the theme's
+        // `annotationBoxBorder`, through the `color` prop) at 40% and 20%.
+        `0 2px 8px color-mix(in srgb, ${props.$color} 40%, transparent), inset 0 0 0 1px color-mix(in srgb, ${props.$color} 20%, transparent)`
       : '0 1px 3px rgba(0, 0, 0, 0.1)'};
 
   &:hover {
