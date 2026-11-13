@@ -370,6 +370,20 @@ describe('the package exports', () => {
     expect('PlaylistVisualization' in api).toBe(false);
     expect('MediaElementPlaylist' in api).toBe(false);
   });
+
+  it('keeps the internals internal', () => {
+    for (const name of [
+      'resetPartWarnings',
+      'warnMisplacedPart',
+      'sortWaveformParts',
+      'scanTracksParts',
+      'DEFAULT_TRACK_CONTROLS_WIDTH',
+      'WaveformPartPlaceContext',
+      'RootSeesRecordingPreviewContext',
+    ]) {
+      expect(name in api).toBe(false);
+    }
+  });
 });
 
 describe('the ready-made compositions', () => {
@@ -1049,14 +1063,42 @@ describe('development warnings for a part that is not where it can work', () => 
     expect(warned(warn, 'more than one <WaveformTrackControls>')).toBe(true);
   });
 
-  it.each([0, -20, Number.NaN])('a controls column of width %s', async (width) => {
-    const { warn } = await mountMultitrack(() => (
-      <WaveformRoot>
-        <WaveformTrackControls width={width} />
-        <WaveformTracks />
-      </WaveformRoot>
-    ));
-    expect(warned(warn, '<WaveformTrackControls width>')).toBe(true);
+  it.each([0, -20, Number.NaN])(
+    'a controls column of width %s: warned, not drawn, and 0 for the drawing primitives',
+    async (width) => {
+      let info: ReturnType<typeof usePlaylistInfo> | undefined;
+      const Mine: React.FC = () => {
+        info = usePlaylistInfo();
+        return null;
+      };
+      const { warn } = await mountMultitrack(() => (
+        <WaveformRoot>
+          <WaveformTrackControls width={width} />
+          <WaveformTracks />
+          <Mine />
+        </WaveformRoot>
+      ));
+      expect(warned(warn, '<WaveformTrackControls width>')).toBe(true);
+      expect(controlsColumn()).toBeNull();
+      expect(document.querySelectorAll('input[aria-label="Volume"]')).toHaveLength(0);
+      expect(info?.controls).toEqual({ show: false, width: 0 });
+    }
+  );
+
+  it('a width of null or undefined is the default, without a warning', async () => {
+    for (const width of [null, undefined]) {
+      const { warn } = await mountMultitrack(() => (
+        <WaveformRoot>
+          <WaveformTrackControls width={width as undefined} />
+          <WaveformTracks />
+        </WaveformRoot>
+      ));
+      expect(controlsColumn()?.style.width).toBe('200px');
+      expect(warned(warn, '<WaveformTrackControls width>')).toBe(false);
+      await act(async () => {
+        cleanup();
+      });
+    }
   });
 
   it('a positive width is not warned about', async () => {
@@ -1096,6 +1138,48 @@ describe('development warnings for a part that is not where it can work', () => 
       </WaveformRoot>
     ));
     expect(warned(warn, 'disagree')).toBe(false);
+  });
+
+  it('a recording preview that comes and goes: no warning, and the controls column does not render for it', async () => {
+    let withPreview = false;
+    const { warn, rerender } = await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformTrackControls />
+        <WaveformTracks>
+          {withPreview ? (
+            <WaveformRecordingPreview
+              recordingState={{ isRecording: false } as WaveformRecordingState}
+            />
+          ) : null}
+        </WaveformTracks>
+      </WaveformRoot>
+    ));
+    for (const next of [true, false]) {
+      withPreview = next;
+      counts.layout = 0;
+      rerender();
+      await act(async () => {});
+      // The tracks part renders (its children are new elements); the memoized
+      // controls part, which draws the other `TracksLayout`, does not.
+      expect(counts.layout).toBe(1);
+    }
+    expect(warned(warn, 'disagree')).toBe(false);
+  });
+
+  it('a wrapped tracks part under the MediaElement root, with a recording preview the root cannot see', async () => {
+    const Wrapped = () => (
+      <WaveformTracks>
+        <WaveformRecordingPreview
+          recordingState={{ isRecording: false } as WaveformRecordingState}
+        />
+      </WaveformTracks>
+    );
+    const { warn } = await mountMediaElement(
+      <MediaElementWaveformRoot>
+        <Wrapped />
+      </MediaElementWaveformRoot>
+    );
+    expect(warned(warn, 'disagree about <WaveformRecordingPreview>')).toBe(true);
   });
 
   it("a recording preview in the MediaElement root's own tracks part is not warned about", async () => {

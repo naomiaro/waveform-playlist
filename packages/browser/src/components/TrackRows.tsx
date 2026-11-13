@@ -33,7 +33,11 @@ import {
   SpectrogramIntegrationContext,
   type SpectrogramIntegration,
 } from '../SpectrogramIntegrationContext';
-import { useWaveformExtent, useWaveformRows } from './waveformLayoutContext';
+import {
+  RootSeesRecordingPreviewContext,
+  useWaveformExtent,
+  useWaveformRows,
+} from './waveformLayoutContext';
 import { useClipInteraction } from '../contexts/ClipInteractionContext';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import {
@@ -500,6 +504,7 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
   const { sampleRate, waveHeight, mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const spectrogram = useContext(SpectrogramIntegrationContext);
+  const rootSeesRecordingPreview = useContext(RootSeesRecordingPreviewContext);
   const scanned = scanTracksParts(children);
   const { showFades, recordingState } = scanned;
   const {
@@ -520,7 +525,7 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
         'last one when there are several.'
     );
   }
-  if ((recordingState !== undefined) !== rows.hasRecordingPreview) {
+  if ((recordingState !== undefined) !== rootSeesRecordingPreview) {
     warnMisplacedPart(
       '<WaveformTracks> and its root disagree about <WaveformRecordingPreview>, so the timeline ' +
         'does not grow with the take: the root reads the per-clip parts from a <WaveformTracks> ' +

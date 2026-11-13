@@ -238,7 +238,7 @@ Both need the `AnnotationProvider` of `@waveform-playlist/annotations` and draw 
 | `linkEndpoints` | `MediaElementAnnotationBoxes` | `boolean` | `false` | Dragging an edge also moves the edge of the box it touches |
 | `onAnnotationUpdate` | `MediaElementAnnotationBoxes` | `OnAnnotationUpdateFn` | - | Called with the full annotations array after a drag |
 
-Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`). Dragging an edge needs `useAnnotationDragHandlers` wired into a `DragDropProvider` of your own around the view (see the [Annotations guide](/docs/react/guides/annotations)); `ClipInteractionProvider` handles clips only. `MediaElementAnnotationBoxes` brings its own drag wiring.
+Under `WaveformPlaylistProvider` whether boxes can be edited comes from the provider (`annotationList.editable`, `setAnnotationsEditable`). Dragging an edge needs `useAnnotationDragHandlers` wired into a `DragDropProvider` of your own around the view (see the [Annotations guide](/docs/react/guides/annotations)); `ClipInteractionProvider` handles clip drags and track reordering, not annotation edges. `MediaElementAnnotationBoxes` brings its own drag wiring.
 
 #### WaveformPlayhead
 

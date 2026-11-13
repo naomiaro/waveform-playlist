@@ -55,7 +55,8 @@ export interface IntegratedRecordingOptions {
    * Absolute replacement for the auto-computed `outputLatency + lookAhead` value
    * — use this to apply an externally-measured round-trip latency. `0` disables
    * compensation; when omitted, the auto-computed value is used. Pass the same
-   * value into the provider's `recordingState.latencyOffset` so the live preview
+   * value into the preview's `recordingState.latencyOffset`
+   * (`<WaveformRecordingPreview recordingState>`) so the live preview
    * matches the finalized clip. Negative or non-finite values are treated as 0.
    */
   latencyOffset?: number;

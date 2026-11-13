@@ -39,12 +39,6 @@ export interface WaveformRowsValue {
   rows: ReadonlyArray<WaveformRow>;
   peaksDataArray: TrackClipPeaks[];
   showClipHeaders: boolean;
-  /**
-   * Whether the root found a recording-preview marker in its tracks part.
-   * Read only for the development warning of a tracks part the root cannot
-   * see into (one wrapped in another component).
-   */
-  hasRecordingPreview: boolean;
   trackHeightById: ReadonlyMap<string, number>;
   trackLayout: TrackLayout;
   animateTrackLayout: boolean;
@@ -70,6 +64,15 @@ export interface WaveformRowsValue {
  */
 export type WaveformPartPlace = 'timescale' | 'controls' | 'tracks';
 export const WaveformPartPlaceContext = createContext<WaveformPartPlace>('tracks');
+
+/**
+ * Whether the root found a recording-preview marker in its tracks part. Read
+ * by the tracks part alone, for the development warning of a tracks part the
+ * root cannot see into (one wrapped in another component). A value of its own
+ * and not a field of the rows value: the controls part reads that one, and
+ * must not render because the marker came or went.
+ */
+export const RootSeesRecordingPreviewContext = createContext(false);
 
 export const WaveformExtentContext = createContext<WaveformExtentValue | null>(null);
 export const WaveformRowsContext = createContext<WaveformRowsValue | null>(null);

@@ -39,6 +39,7 @@ import {
 } from '../hooks/useSelectionDrag';
 import {
   WaveformExtentContext,
+  RootSeesRecordingPreviewContext,
   WaveformPartPlaceContext,
   WaveformRowsContext,
   type WaveformExtentValue,
@@ -212,28 +213,32 @@ export function useWaveformFrame({
       <PlaylistInfoContext.Provider value={playlistInfo}>
         <WaveformExtentContext.Provider value={extent}>
           <WaveformRowsContext.Provider value={rows}>
-            <SelectionPreviewContext.Provider value={selectionPreview}>
-              <Playlist
-                className={className}
-                theme={theme}
-                backgroundColor={
-                  theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
-                }
-                timescaleBackgroundColor={theme.timescaleBackgroundColor}
-                timescaleWidth={tracksFullWidth}
-                tracksWidth={tracksFullWidth}
-                controlsWidth={controlsWidth}
-                onTracksMouseDown={handleMouseDown}
-                scrollContainerRef={handleScrollContainerRef}
-                isSelecting={isSelecting}
-                data-playlist-state={playlistState}
-                trackControlsSlots={parts.controls}
-                timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
-                timescale={parts.timescale ?? undefined}
-              >
-                {parts.content}
-              </Playlist>
-            </SelectionPreviewContext.Provider>
+            <RootSeesRecordingPreviewContext.Provider
+              value={parts.tracksOptions.recordingState !== undefined}
+            >
+              <SelectionPreviewContext.Provider value={selectionPreview}>
+                <Playlist
+                  className={className}
+                  theme={theme}
+                  backgroundColor={
+                    theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
+                  }
+                  timescaleBackgroundColor={theme.timescaleBackgroundColor}
+                  timescaleWidth={tracksFullWidth}
+                  tracksWidth={tracksFullWidth}
+                  controlsWidth={controlsWidth}
+                  onTracksMouseDown={handleMouseDown}
+                  scrollContainerRef={handleScrollContainerRef}
+                  isSelecting={isSelecting}
+                  data-playlist-state={playlistState}
+                  trackControlsSlots={parts.controls}
+                  timescaleGapHeight={timeScaleHeight > 0 ? timeScaleHeight + 1 : 0}
+                  timescale={parts.timescale ?? undefined}
+                >
+                  {parts.content}
+                </Playlist>
+              </SelectionPreviewContext.Provider>
+            </RootSeesRecordingPreviewContext.Provider>
           </WaveformRowsContext.Provider>
         </WaveformExtentContext.Provider>
       </PlaylistInfoContext.Provider>

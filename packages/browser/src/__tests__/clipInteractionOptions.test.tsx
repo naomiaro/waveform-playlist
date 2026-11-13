@@ -314,7 +314,7 @@ describe('clip interaction options have one source, the context (#690)', () => {
       <>
         {probe}
         {/* @ts-expect-error interactiveClips was removed in #690 */}
-        <Waveform showClipHeaders interactiveClips />
+        <Waveform interactiveClips />
         {/* @ts-expect-error touchOptimized was removed in #690 */}
         <ComposedWaveform showClipHeaders touchOptimized />
       </>

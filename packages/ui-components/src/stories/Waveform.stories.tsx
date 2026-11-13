@@ -4,6 +4,11 @@ import type { ClipTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   Waveform,
+  WaveformRoot,
+  WaveformTrackControls,
+  WaveformTracks,
+  WaveformSelection,
+  WaveformPlayhead,
   PlayButton,
   PauseButton,
   StopButton,
@@ -31,15 +36,7 @@ The Waveform component provides the main visualization and interaction surface f
 To display actual waveforms, use the \`useAudioTracks\` hook to load real audio files.
 
 \`\`\`tsx
-import {
-  WaveformPlaylistProvider,
-  Waveform,
-  WaveformRoot,
-  WaveformTrackControls,
-  WaveformTracks,
-  WaveformSelection,
-  WaveformPlayhead,
-} from '@waveform-playlist/browser';
+import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 import { useAudioTracks } from '@waveform-playlist/browser/tone';
 
 function MyPlaylist() {

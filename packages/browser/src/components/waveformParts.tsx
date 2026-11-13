@@ -126,14 +126,17 @@ export function sortWaveformParts(children: ReactNode): SortedWaveformParts {
           // The first controls part says how wide the column is.
           if (sorted.controls.length === 0) {
             const { width } = child.props as WaveformTrackControlsProps;
-            if (width !== undefined && !(width > 0)) {
+            // `null` (plain JavaScript) means "not given", like `undefined`.
+            const given = width !== undefined && width !== null;
+            if (given && !(width > 0)) {
               warnMisplacedPart(
                 '<WaveformTrackControls width> must be a positive number of pixels: with ' +
                   String(width) +
                   ' no controls column is drawn. Leave the part out to have none.'
               );
             }
-            sorted.controlsWidth = width ?? DEFAULT_TRACK_CONTROLS_WIDTH;
+            // Not a positive number: no column, and 0 for whoever reads the width.
+            sorted.controlsWidth = !given ? DEFAULT_TRACK_CONTROLS_WIDTH : width > 0 ? width : 0;
           }
           sorted.controls.push(child);
           sorted.content.push(null);
