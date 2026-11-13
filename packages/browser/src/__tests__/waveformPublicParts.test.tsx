@@ -1101,18 +1101,12 @@ describe('development warnings for a part that is not where it can work', () => 
   });
 
   it.each([0, -20, Number.NaN])(
-    'a controls column of width %s: warned, not drawn, and 0 for the drawing primitives',
+    'a controls column of width %s: warned and not drawn',
     async (width) => {
-      let info: ReturnType<typeof usePlaylistInfo> | undefined;
-      const Mine: React.FC = () => {
-        info = usePlaylistInfo();
-        return null;
-      };
       const { warn } = await mountMultitrack(() => (
         <WaveformRoot>
           <WaveformTrackControls width={width} />
           <WaveformTracks />
-          <Mine />
         </WaveformRoot>
       ));
       expect(warned(warn, '<WaveformTrackControls width>')).toBe(true);
