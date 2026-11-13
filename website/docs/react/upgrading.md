@@ -1913,8 +1913,8 @@ There is no `ref` for the item any more: the element that moves is the slot the 
 | `<TrackReorderGrip />` as a child of `<DefaultTrackControls>`, or alone inside an element of yours | (new) | the default panel makes room for the grip only when the two are siblings; elsewhere the grip lies over the sliders |
 | A browser without CSS `:has()` | the room for the grip was an inline style | no room is made: the grip lies over the edges of the sliders |
 | `<TrackRemoveButton>` without `onRemove`, in plain JavaScript | (the close button was drawn only with `onRemoveTrack`) | the button is drawn and a click throws |
-| Markup of the default panel | the close button was inside the panel's `<header>`, the reorder rail inside the panel, and the panel handled the click that selects | every slot has one more `div` (`[data-track-controls]`) around the panel; the remove button and the grip are siblings of the panel inside it; the slot handles the click. A selector such as `header button[title="Remove track"]` no longer matches |
-| A reorder (`reorderTrack`, the move buttons, a drag) under a provider without `onTracksChange` | the mixer states were put in the new order while `tracks` stayed as it was, so each panel showed another track's values | nothing changes on screen (the console warning about the missing `onTracksChange` is as before) |
+| Markup of the default panel | the close button was inside the panel's `<header>`, the reorder rail inside the panel, and the panel handled the click that selects | every slot has a `div` (`[data-track-controls]`) around the panel (before, only with `trackReordering`, and without the attribute); the remove button and the grip are siblings of the panel inside it; the slot handles the click. A selector such as `header button[title="Remove track"]` no longer matches |
+| A reorder (`reorderTrack`, the move buttons, a drag) under a provider without `onTracksChange` | the mixer states were put in the new order while `tracks` stayed as it was, so the panels between the old and the new position showed another track's values | nothing changes on screen (the console warning about the missing `onTracksChange` is as before) |
 | The same ids with other `muted`, `soloed`, `volume` or `pan` fields on the `ClipTrack`, in a list with another number of tracks | the fields were applied (every state was re-created) | the fields of a known id are ignored: the user's values stay. Set them with the setters |
 | Tracks re-created with new ids on each change (`createTrack()` makes an id) | a list of the same length kept the mixer state by position | a new id starts from its `ClipTrack` fields: keep the ids of tracks that are the same track |
 | An id removed while `deferEngineRebuild` is true and added again | (by position) | gets the state it had: entries are dropped at the next full build |
@@ -1936,7 +1936,7 @@ const volumes = trackStates.map((s) => s?.volume ?? 1);
 const loadedCount = trackStates.filter(Boolean).length;
 ```
 
-Code that waited for `trackStates.length === tracks.length` to know that loading had finished is now always true: use `usePlaylistTimeline().isReady`, or `trackStates.every(Boolean)`.
+Code that waited for `trackStates.length === tracks.length` to know that loading had finished is now always true: use `trackStates.every(Boolean)`, or `usePlaylistTimeline().isReady` (which says the engine is built for the current tracks).
 
 ### New attributes
 

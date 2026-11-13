@@ -1878,9 +1878,9 @@ interface TrackContextValue {
   renderMode: RenderMode;
 
   /** True while the provider has no mixer state for the track (it is still
-   *  loading): the engine does not know it yet, so the mixer actions and a
-   *  reorder does nothing; a value set with the mixer actions is not kept. The
-   *  built-in pieces are disabled then.
+   *  loading): the engine does not know it yet, so a value set with the mixer
+   *  actions is not kept and a reorder does nothing. The built-in pieces are
+   *  disabled then.
    *  muted/soloed/volume/pan read false/false/1/0 and name "Track N". */
   isLoading: boolean;
   /** Whether this is the selected track. */

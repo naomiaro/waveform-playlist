@@ -679,7 +679,7 @@ Pass a function that keeps its identity (`useCallback`, or a hook's stable funct
 
 ### TrackReorderGrip
 
-A drag grip with a move-up and a move-down button, at the right edge of the track's slot (it positions itself). No props. The default panel makes room for it on both sides. The buttons work with no other setup; dragging needs a `ClipInteractionProvider` above the view. The up button is disabled for the first track, the down button for the last, both while the track is loading. Neither the grip nor the buttons select the track. The element around them has the attribute `data-track-reorder-grip`.
+A drag grip with a move-up and a move-down button, at the right edge of the track's slot (it positions itself). No props. The default panel makes room for it on both sides when the grip is rendered beside the panel, as a sibling (CSS `:has()`). The buttons work with no other setup; dragging needs a `ClipInteractionProvider` above the view. The up button is disabled for the first track, the down button for the last, both while the track is loading. Neither the grip nor the buttons select the track. The element around them has the attribute `data-track-reorder-grip`.
 
 A reorder is committed with `useEditorControls().reorderTrack(trackId, toIndex)`; the new order arrives through the provider's `onTracksChange`.
 
