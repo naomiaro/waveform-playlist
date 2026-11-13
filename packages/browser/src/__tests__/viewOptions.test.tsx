@@ -303,7 +303,13 @@ describe('WaveformViewOptions (#689)', () => {
 
     it('a prop left out is taken from the options above; one given wins, also `false` and 0', async () => {
       await mount(() => (
-        <WaveformViewOptions waveHeight={50} barWidth={4} barGap={2} roundedBars>
+        <WaveformViewOptions
+          waveHeight={50}
+          barWidth={4}
+          barGap={2}
+          roundedBars
+          progressBarWidth={7}
+        >
           <WaveformViewOptions barGap={0} roundedBars={false}>
             <Root>
               <InfoProbe />
@@ -316,7 +322,32 @@ describe('WaveformViewOptions (#689)', () => {
         barWidth: 4,
         barGap: 0,
         roundedBars: false,
-        progressBarWidth: 4,
+        progressBarWidth: 7,
+      });
+    });
+
+    it('each of the options can be overridden below', async () => {
+      await mount(() => (
+        <WaveformViewOptions waveHeight={50} barWidth={4} barGap={2} progressBarWidth={7}>
+          <WaveformViewOptions
+            waveHeight={60}
+            barWidth={3}
+            barGap={1}
+            roundedBars
+            progressBarWidth={9}
+          >
+            <Root>
+              <InfoProbe />
+            </Root>
+          </WaveformViewOptions>
+        </WaveformViewOptions>
+      ));
+      expect(drawn(seen.view)).toEqual({
+        waveHeight: 60,
+        barWidth: 3,
+        barGap: 1,
+        roundedBars: true,
+        progressBarWidth: 9,
       });
     });
 
@@ -485,6 +516,29 @@ describe('WaveformViewOptions (#689)', () => {
     // One second of audio at 1024 samples per pixel is 46 px; the container is 1200.
     expect(tracksWidth()).toBe('1200px');
     cleanup();
+    // Inherited through options that say nothing about it, and switched off below.
+    await mountMultitrack(() => (
+      <WaveformViewOptions fillViewport>
+        <WaveformViewOptions waveHeight={50}>
+          <WaveformRoot>
+            <WaveformTracks />
+          </WaveformRoot>
+        </WaveformViewOptions>
+      </WaveformViewOptions>
+    ));
+    expect(tracksWidth()).toBe('1200px');
+    cleanup();
+    await mountMultitrack(() => (
+      <WaveformViewOptions fillViewport>
+        <WaveformViewOptions fillViewport={false}>
+          <WaveformRoot>
+            <WaveformTracks />
+          </WaveformRoot>
+        </WaveformViewOptions>
+      </WaveformViewOptions>
+    ));
+    expect(tracksWidth()).toBe('46px');
+    cleanup();
     await mountMultitrack(() => (
       <WaveformRoot>
         <WaveformTracks />
@@ -584,6 +638,19 @@ describe('the timescale strip has a height option (#689)', () => {
       warn.mock.calls.filter((call) => String(call[0]).includes('<WaveformTimescale height>'))
         .length
     ).toBe(1);
+  });
+
+  it('the first timescale part says how tall the strip is, also after a loop region', async () => {
+    await mountMultitrack(() => (
+      <WaveformRoot>
+        <WaveformLoopRegion />
+        <WaveformTimescale height={40} />
+        <WaveformTimescale height={60} />
+        <WaveformTracks />
+        <InfoProbe />
+      </WaveformRoot>
+    ));
+    expect(stripHeight()).toBe(40);
   });
 
   it('no strip without a timescale part', async () => {
