@@ -16,8 +16,23 @@ import type { WaveformDataObject, ClipTrack, AudioClip } from '@waveform-playlis
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { usePlaylistInfo } from '@waveform-playlist/ui-components';
 import { warnMisplacedPart } from '../components/partWarnings';
+import {
+  AnnotationIntegrationContext,
+  type AnnotationIntegration,
+} from '../AnnotationIntegrationContext';
+import {
+  SpectrogramIntegrationContext,
+  type SpectrogramIntegration,
+} from '../SpectrogramIntegrationContext';
 
-const counts = vi.hoisted(() => ({ loopMounts: 0, layout: 0 }));
+const counts = vi.hoisted(() => ({
+  loopMounts: 0,
+  layout: 0,
+  gains: [] as number[],
+  canvasRegister: [] as unknown[],
+  clipMouseDown: [] as Array<(event: unknown) => void>,
+  clipsWithFades: 0,
+}));
 
 vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@waveform-playlist/ui-components')>();
@@ -29,6 +44,18 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
         counts.loopMounts++;
       }, []);
       return createElement(actual.TimescaleLoopRegion, props);
+    },
+    SmartChannel: (props: React.ComponentProps<typeof actual.SmartChannel>) => {
+      counts.gains.push((props as { gain?: number }).gain ?? 1);
+      counts.canvasRegister.push(
+        (props as { spectrogramOnCanvasRegister?: unknown }).spectrogramOnCanvasRegister
+      );
+      return createElement(actual.SmartChannel, props);
+    },
+    Clip: (props: React.ComponentProps<typeof actual.Clip>) => {
+      counts.clipMouseDown.push(props.onMouseDown as (event: unknown) => void);
+      if (props.showFades) counts.clipsWithFades++;
+      return createElement(actual.Clip, props);
     },
   };
 });
@@ -65,6 +92,7 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   useRecordingSession,
+  useSelectedTrackId,
   useEditorControls,
   usePlaylistTimeline,
   usePlaylistView,
@@ -148,6 +176,7 @@ let probe: {
   isReady: boolean;
   view: ReturnType<typeof usePlaylistView>;
   controls: ReturnType<typeof usePlaybackControls>;
+  selectedTrackId: string | null;
 };
 const Probe: React.FC = () => {
   probe = {
@@ -155,30 +184,55 @@ const Probe: React.FC = () => {
     isReady: usePlaylistTimeline().isReady,
     view: usePlaylistView(),
     controls: usePlaybackControls(),
+    selectedTrackId: useSelectedTrackId().selectedTrackId,
   };
   return null;
 };
 
-async function mountMultitrack(tree: () => React.ReactElement) {
+const ANNOTATION_INTEGRATION = {
+  AnnotationBox: ({ label }: { label: string }) => <span data-box>{label}</span>,
+  AnnotationBoxesWrapper: ({ children }: { children?: React.ReactNode }) => (
+    <div data-boxes>{children}</div>
+  ),
+  AnnotationText: () => <div data-annotation-list />,
+} as unknown as AnnotationIntegration;
+const ANNOTATION_LIST = { annotations: [{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }] };
+
+interface MultitrackOptions {
+  tracks?: ClipTrack[];
+  annotations?: boolean;
+  spectrogram?: SpectrogramIntegration;
+}
+
+async function mountMultitrack(
+  tree: () => React.ReactElement,
+  { tracks = TRACKS, annotations = false, spectrogram }: MultitrackOptions = {}
+) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter as unknown as PlayoutAdapter;
   const ui = () => (
-    <WaveformPlaylistProvider
-      tracks={TRACKS}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-    >
-      <Probe />
-      {tree()}
-    </WaveformPlaylistProvider>
+    <AnnotationIntegrationContext.Provider value={annotations ? ANNOTATION_INTEGRATION : null}>
+      <SpectrogramIntegrationContext.Provider value={spectrogram ?? null}>
+        <WaveformPlaylistProvider
+          tracks={tracks}
+          sampleRate={SAMPLE_RATE}
+          createAdapter={createAdapter}
+          annotationList={annotations ? ANNOTATION_LIST : undefined}
+        >
+          <Probe />
+          {tree()}
+        </WaveformPlaylistProvider>
+      </SpectrogramIntegrationContext.Provider>
+    </AnnotationIntegrationContext.Provider>
   );
   const view = render(ui());
   await waitFor(() => expect(probe.isReady).toBe(true));
   await act(async () => {});
   counts.layout = 0;
   counts.loopMounts = 0;
+  counts.gains = [];
   return { adapter, warn, rerender: () => view.rerender(ui()) };
 }
 
@@ -391,10 +445,11 @@ describe('a part is drawn by being rendered', () => {
       return null;
     };
     let withTimescale = true;
+    let width = 150;
     const { rerender } = await mountMultitrack(() => (
       <WaveformRoot>
         {withTimescale ? <WaveformTimescale /> : null}
-        <WaveformTrackControls width={150} />
+        <WaveformTrackControls width={width} />
         <WaveformTracks />
         <Mine />
       </WaveformRoot>
@@ -403,6 +458,12 @@ describe('a part is drawn by being rendered', () => {
     expect(info?.controls).toEqual({ show: true, width: 150 });
     // The spacer above the panels is as tall as the strip and its border.
     expect((controlsColumn()!.firstElementChild as HTMLElement).style.height).toBe('31px');
+
+    width = 180;
+    rerender();
+    await act(async () => {});
+    expect(info?.controls).toEqual({ show: true, width: 180 });
+    expect(controlsColumn()?.style.width).toBe('180px');
 
     withTimescale = false;
     rerender();
@@ -477,6 +538,105 @@ describe('a part is drawn by being rendered', () => {
     rerender();
     await act(async () => {});
     expect(document.querySelectorAll('[data-clip-container] svg')).toHaveLength(2);
+  });
+});
+
+describe('what the tracks part hands every clip', () => {
+  const quiet: ClipTrack = {
+    ...makeTrack('q1'),
+    clips: [
+      {
+        ...makeTrack('q1').clips[0],
+        gain: 0.5,
+        fadeIn: { duration: 0.2 },
+        fadeOut: { duration: 0.2 },
+      } as AudioClip,
+    ],
+  };
+
+  it('gainScaled switched on after the first render scales the drawn waveform', async () => {
+    let gainScaled = false;
+    const { rerender } = await mountMultitrack(
+      () => (
+        <WaveformRoot>
+          <WaveformTracks gainScaled={gainScaled} />
+        </WaveformRoot>
+      ),
+      { tracks: [quiet] }
+    );
+    counts.gains = [];
+    rerender();
+    await act(async () => {});
+    expect(counts.gains).not.toContain(0.5);
+    gainScaled = true;
+    rerender();
+    await act(async () => {});
+    expect(counts.gains).toContain(0.5);
+  });
+
+  it('<WaveformEditor /> draws the fades of a clip, <Waveform /> does not', async () => {
+    counts.clipsWithFades = 0;
+    await mountMultitrack(() => <WaveformEditor />, { tracks: [quiet] });
+    expect(counts.clipsWithFades).toBeGreaterThan(0);
+    await act(async () => {
+      cleanup();
+    });
+    counts.clipsWithFades = 0;
+    await mountMultitrack(() => <Waveform />, { tracks: [quiet] });
+    expect(counts.clipsWithFades).toBe(0);
+  });
+
+  it('a press on a clip selects its track', async () => {
+    counts.clipMouseDown = [];
+    await mountMultitrack(() => <Waveform />);
+    expect(probe.selectedTrackId).not.toBe('t2');
+    // The handler of the last clip rendered: the clip of the second track.
+    const pressSecondClip = counts.clipMouseDown[counts.clipMouseDown.length - 1];
+    await act(async () => {
+      pressSecondClip({ target: document.body });
+    });
+    expect(probe.selectedTrackId).toBe('t2');
+  });
+
+  it("the spectrogram integration's canvas registration reaches the channels", async () => {
+    const registerSpectrogramCanvas = vi.fn();
+    const spectrogram = {
+      trackSpectrogramOverrides: new Map(),
+      setTrackRenderMode: () => {},
+      setTrackSpectrogramConfig: () => {},
+      registerSpectrogramCanvas,
+      unregisterSpectrogramCanvas: () => {},
+      getColorMap: () => new Uint8Array(0),
+      getFrequencyScale: () => (f: number) => f,
+    } as unknown as SpectrogramIntegration;
+    counts.canvasRegister = [];
+    await mountMultitrack(() => <Waveform />, { spectrogram });
+    expect(counts.canvasRegister.length).toBeGreaterThan(0);
+    expect(counts.canvasRegister.every((fn) => fn === registerSpectrogramCanvas)).toBe(true);
+  });
+});
+
+describe('the options the ready-made compositions keep', () => {
+  it('<Waveform>: className reaches the root, and getAnnotationBoxLabel the annotation boxes', async () => {
+    await mountMultitrack(
+      () => <Waveform className="mine" getAnnotationBoxLabel={() => 'my label'} />,
+      { annotations: true }
+    );
+    expect(root().classList.contains('mine')).toBe(true);
+    expect(document.querySelector('[data-box]')?.textContent).toBe('my label');
+    // The text list is there because there are annotations.
+    expect(document.querySelector('[data-annotation-list]')).not.toBeNull();
+  });
+
+  it('<Waveform> without annotations renders no annotation list', async () => {
+    await mountMultitrack(() => <Waveform />, { annotations: false });
+    expect(document.querySelector('[data-annotation-list]')).toBeNull();
+    expect(document.querySelector('[data-box]')).toBeNull();
+  });
+
+  it('<MediaElementWaveform>: className reaches the root', async () => {
+    await mountMediaElement(<MediaElementWaveform className="mine" />);
+    expect(root().classList.contains('mine')).toBe(true);
   });
 });
 

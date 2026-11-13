@@ -447,6 +447,13 @@ describe('fades are the clip’s', () => {
     );
     const view = render(ui(inline()));
     await waitFor(() => expect(fake.addTrack).toHaveBeenCalledTimes(1));
+    // The player is given the fades.
+    expect(fake.addTrack).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fadeIn: { duration: 1, type: 'linear' },
+        fadeOut: { duration: 2, type: 'sCurve' },
+      })
+    );
     const clipBefore = trackValue.peaksDataArray[0][0];
     const arrayBefore = trackValue.peaksDataArray;
 
