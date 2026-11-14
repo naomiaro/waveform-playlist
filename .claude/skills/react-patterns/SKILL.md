@@ -31,3 +31,53 @@ The conventions (React 19, `use()`, one source per option, boolean props) are in
 
 - **dnd-kit can send a `dragover` after the `dragend` of a canceled drag.** It set the reorder preview again for good (Escape mid-drag, 6 of 6 e2e runs on #687). A handler that publishes drag state checks that a drag is in progress (#796 tracks the dnd-kit workarounds).
 - **A function handed to `Array.prototype.map` gets the index as its second argument.** `states.map(apply)` with `apply(tracks, isCurrent = false)` would have read index 1 as `true`. Give such a function one parameter, or return two named functions (`{ current, stored }` in `arrangement/sources.ts`).
+
+## From the browser package
+
+### Derived State Sync: setState During Render, Not useEffect
+
+**Problem:** Syncing `useMemo` output to `useState` via `useEffect` causes a 1-render lag. If another prop (e.g., `deferEngineRebuild`) changes in a separate React batch, downstream consumers see stale state and re-run effects (double engine rebuild).
+
+**Fix:** Use synchronous setState-during-render (React's "getDerivedStateFromProps" pattern):
+
+```typescript
+const derived = useMemo(() => compute(input), [input]);
+const [state, setState] = useState(derived);
+const prevRef = useRef(derived);
+if (derived !== prevRef.current) {
+  prevRef.current = derived;
+  setState(derived);
+}
+```
+
+**When:** Any time derived state feeds into `WaveformPlaylistProvider` props alongside other props that may change in separate batches.
+
+### Hook Isolation for Render Props
+
+**Problem:** Calling a render prop function (e.g., `renderPlayhead({...})`) directly in a conditional branch merges its hooks into the parent's hook count. If the prop toggles, React throws "Rendered more hooks than during the previous render."
+
+**Fix:** Wrap in a dedicated component that always calls the render prop, isolating its hooks in its own component boundary. Applied in `VisualizationOverlays.tsx` (`CustomPlayhead`, inside `WaveformPlayhead`), which both views render.
+
+**No stub refs:** until #688 part 3 the MediaElement view passed `ZERO_REF` placeholders for the engine refs in `PlayheadProps`. Those props are gone; `PlayheadProps` holds only what both providers have.
+
+### Debugging State Changes with console.trace
+
+**Technique:** Wrap `useState` setter with a traced version to pinpoint which code path modifies state. Useful for controlled state like `tracks` where multiple sources (`onTracksChange`, recording hooks, file drops) can call `setTracks`.
+
+```typescript
+const [state, setStateRaw] = useState(initial);
+const setState = useCallback((v) => {
+  console.log('[Component] setState: ' + summarize(v));
+  console.trace('[Component] setState trace');
+  setStateRaw(v);
+}, []);
+```
+
+### React Hook Patterns (cross-cutting)
+
+- **Derive Render Guards from Props, Not Effect State** — Don't use effect-set state (e.g., `isReady`, `trackStates`) in render guards. Effect state lags props by one+ renders, causing content to flash/disappear. Compute values synchronously from props instead.
+- **Copy Refs in useEffect Body** — When accessing a ref in `useEffect` cleanup, copy `.current` to a local variable inside the effect body. ESLint's `react-hooks/exhaustive-deps` rule flags refs that may change between render and cleanup. **Exception:** for `[]` deps effects (mount/unmount only), refs are null at mount — copying captures null forever; read refs directly inside the cleanup function instead.
+- **Refs from Custom Hooks in Dep Arrays** — When a `useRef` is returned from a custom hook, ESLint's `exhaustive-deps` can't trace its stability. Include it in the dep array (harmless, never triggers) rather than `eslint-disable-next-line` which would mask real missing dependencies.
+- **Render-Phase Guards ≠ Effect Dependencies** — Derived booleans computed during render (e.g., `isEngineTracks = tracks === engineTracksRef.current`) that are read inside effect bodies as guards should NOT be in the effect's dep array. They flip between renders, causing spurious re-runs. Read them inside the effect body; depend only on the source data (`tracks`). When the same guard also needs to be visible to the _previous_ effect's cleanup, store it in a ref during render.
+- **Gate Provider Behind Async Readiness** — When multiple async resources must load before rendering (e.g., MIDI tracks + SoundFont), gate the `WaveformPlaylistProvider` mount behind all resources being ready. Prevents double engine rebuilds. Check both the loading flag AND `tracks.length > 0` since hooks can briefly report `loading: false` with empty data.
+- **Provider Child Effects and playoutRef Timing** — React runs child effects before parent effects. A child component's `useEffect` accessing `playoutRef.current` will find `null` on first run. Under the MediaElement provider add `isReady` (from `useMediaElementTrack()`) as a dependency: it turns true when the player exists and its media has loaded. (`duration` was that signal until #688; it no longer changes.)

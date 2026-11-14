@@ -5,7 +5,7 @@ description: Use when writing, changing or debugging a vitest unit test in packa
 
 # Unit tests (vitest)
 
-Run from the package directory, in a subshell: `(cd packages/<pkg> && npx vitest run)`. A test run is its own command, read before any commit (root `CLAUDE.md`). To check that a new test can fail, see the skill `mutation-testing`.
+Run from the package directory, in a subshell: `(cd packages/<pkg> && npx vitest run)`. A test run is its own command, read before any commit (root `CLAUDE.md`). To check that a new test can fail, see the skill `mutation-testing`. Package-specific test notes: `packages/browser/notes/testing.md` (templates for mounting the providers and the view under jsdom), `packages/dawcore/notes/testing.md` (happy-dom and Lit), and the "Testing" paragraphs of the other packages' `CLAUDE.md`.
 
 ## vitest
 

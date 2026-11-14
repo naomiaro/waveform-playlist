@@ -105,7 +105,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 ## Project skills
 
-Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), loaded when the task calls for them. This file keeps what applies to every session. A learning goes into the skill it belongs to; into this file only when it applies whatever the task.
+Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), loaded when the task calls for them. This file keeps what applies to every session. A learning goes into the skill it belongs to, or into the package's notes when it is about one package; into this file only when it applies whatever the task.
 
 | Skill                  | Load it when                                                               |
 | ---------------------- | -------------------------------------------------------------------------- |
@@ -474,7 +474,7 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 
 ## Per-Package Documentation
 
-Package-specific conventions, architecture, and patterns live in each package's own CLAUDE.md:
+Package-specific conventions, architecture, and patterns live in each package's own CLAUDE.md. For `browser` and `dawcore` that file is an index: the notes are in `packages/<pkg>/notes/<topic>.md`, one file per topic, and the index says which file to read before changing which part (it lists every section title, so "see `packages/browser/CLAUDE.md`, 'X'" still finds X). Read the topic file, not the whole folder.
 
 - `packages/engine/CLAUDE.md` — PlaylistEngine, PlayoutAdapter, operations
 - `packages/playout/CLAUDE.md` — Tone.js adapter, AudioContext, ToneTrack internals
