@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { Arrangement } from '../arrangement';
+import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
 import { PlaylistEngine } from '../PlaylistEngine';
 import type { EngineState } from '../types';
 import { recordingAdapter } from './helpers/recordingAdapter';

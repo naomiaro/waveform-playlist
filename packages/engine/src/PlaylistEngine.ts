@@ -9,8 +9,9 @@
  */
 
 import type { ClipTrack } from '@waveform-playlist/core';
-import { Arrangement } from './arrangement';
-import type { ArrangementChange, ArrangementVersions, ClipBounds } from './arrangement';
+import { ArrangementImpl } from './arrangement/Arrangement';
+import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
+import type { ClipBounds } from './arrangement';
 import { freezeTrackInDevelopment, freezeTracksInDevelopment } from './arrangement/devFreeze';
 import { withMixerValues } from './arrangement/mixer';
 import type { TrackMixerValues } from './arrangement/mixer';
@@ -24,8 +25,9 @@ const DEFAULT_ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
 type EventName = keyof EngineEvents;
 
 export class PlaylistEngine {
-  private _arrangement: Arrangement;
+  private _arrangement: ArrangementImpl;
   private _stopFollowingArrangement: () => void;
+  private _detachFromArrangement: () => void;
   /**
    * The `tracksVersion` of each change made with `skipAdapter`. A change is
    * delivered later than it is made when it comes from inside a listener, so
@@ -67,7 +69,6 @@ export class PlaylistEngine {
     this._sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
     this._zoomLevels = [...(options.zoomLevels ?? DEFAULT_ZOOM_LEVELS)];
     this._adapter = options.adapter ?? null;
-    this.undoLimit = options.undoLimit ?? 100;
 
     // Bounded playback (#608): adapters that self-terminate at an endTime
     // report completion here. Deferred via queueMicrotask — the Tone adapter
@@ -100,17 +101,33 @@ export class PlaylistEngine {
     // Adapter is the source of truth for PPQN. Headless mode falls back to options.ppqn or 960.
     this._ppqn = options.adapter?.ppqn ?? options.ppqn ?? 960;
 
-    this._arrangement = new Arrangement({
-      undoLimit: this.undoLimit,
-      timeBase: {
-        sampleRate: this._sampleRate,
-        secondsToTicks: (seconds) => this._secondsToTicks(seconds),
-        ticksToSeconds: (tick) => this._ticksToSeconds(tick),
-      },
-    });
+    const timeBase = {
+      sampleRate: this._sampleRate,
+      secondsToTicks: (seconds: number) => this._secondsToTicks(seconds),
+      ticksToSeconds: (tick: number) => this._ticksToSeconds(tick),
+    };
+    if (options.arrangement) {
+      this._arrangement = asArrangementImpl(options.arrangement);
+      if (options.undoLimit !== undefined) {
+        console.warn(
+          '[waveform-playlist] PlaylistEngine: undoLimit is ignored when an arrangement is ' +
+            'passed. Set it on createArrangement({ undoLimit }).'
+        );
+      }
+    } else {
+      this._arrangement = new ArrangementImpl({ undoLimit: options.undoLimit });
+    }
+    this.undoLimit = this._arrangement.undoLimit;
+
+    // Attach first (clips without a tick get one), then follow, then bring
+    // the adapter in step with the tracks that are already there.
+    this._detachFromArrangement = this._arrangement.attachEngine(timeBase);
     this._stopFollowingArrangement = this._arrangement.onChange((change, at) =>
       this._onArrangementChange(change, at)
     );
+    if (this._arrangement.getTracks().length > 0) {
+      this._adapter?.setTracks(this._tracksForAdapter());
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -560,6 +577,7 @@ export class PlaylistEngine {
     if (this._disposed) return;
     this._disposed = true;
     this._stopFollowingArrangement();
+    this._detachFromArrangement();
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
@@ -766,4 +784,13 @@ export class PlaylistEngine {
   private _emitStateChange(): void {
     this._emit('statechange', this.getState());
   }
+}
+
+/** The object behind an `Arrangement` from `createArrangement()`. */
+function asArrangementImpl(arrangement: unknown): ArrangementImpl {
+  if (arrangement instanceof ArrangementImpl) return arrangement;
+  throw new Error(
+    '[waveform-playlist] PlaylistEngine: the `arrangement` option must be an arrangement ' +
+      'made by createArrangement().'
+  );
 }

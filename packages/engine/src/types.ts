@@ -1,4 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from './arrangement';
 
 /**
  * Interface for pluggable audio playback adapters.
@@ -128,10 +129,20 @@ export interface EngineState {
  */
 export interface PlaylistEngineOptions {
   adapter?: PlayoutAdapter;
+  /**
+   * The arrangement to play, from `createArrangement()`. It outlives the
+   * engine: dispose the engine, build another on the same arrangement, and
+   * the tracks, the mix and the undo history are all still there. Left out,
+   * the engine makes an arrangement of its own. One engine at a time.
+   */
+  arrangement?: Arrangement;
   sampleRate?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[];
-  /** Maximum number of undo steps (default 100). */
+  /**
+   * Maximum number of undo steps (default 100). Only when the engine makes its
+   * own arrangement; an arrangement that is passed in has its own limit.
+   */
   undoLimit?: number;
   /** Initial tempo in BPM (default 120). */
   bpm?: number;

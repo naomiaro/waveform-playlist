@@ -38,6 +38,7 @@ import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
 import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
+import type { Arrangement, ArrangementChangeOptions, ClipBounds } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -64,14 +65,10 @@ export interface ArrangementTimeBase {
 export interface ArrangementOptions {
   /** Maximum number of undo steps (default 100). */
   undoLimit?: number;
-  timeBase: ArrangementTimeBase;
-}
-
-export interface ClipBounds {
-  offsetSamples: number;
-  durationSamples: number;
-  startSample: number;
-  sourceDurationSamples: number;
+  /** Left out: no engine is attached yet (see `attachEngine`). */
+  timeBase?: ArrangementTimeBase;
+  /** The first tracks. Not an undo step. */
+  tracks?: readonly ClipTrack[];
 }
 
 /** The versions the arrangement had right after a change. */
@@ -82,22 +79,24 @@ export interface ArrangementVersions {
 
 type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
 
-export class Arrangement {
+export class ArrangementImpl implements Arrangement {
   private _tracks: readonly ClipTrack[] = [];
   private _tracksVersion = 0;
   private _mixerVersion = 0;
   private _mixer: Mixer = EMPTY_MIXER;
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
-  private _timeBase: ArrangementTimeBase;
+  private _timeBase: ArrangementTimeBase | null;
+  private _subscribers: Set<() => void> = new Set();
   private _listeners: Set<ChangeListener> = new Set();
   private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
   private _delivering = false;
   readonly undoLimit: number;
 
-  constructor(options: ArrangementOptions) {
+  constructor(options: ArrangementOptions = {}) {
     this.undoLimit = options.undoLimit ?? DEFAULT_UNDO_LIMIT;
-    this._timeBase = options.timeBase;
+    this._timeBase = options.timeBase ?? null;
+    if (options.tracks) this.setTracks(options.tracks);
   }
 
   // ---------------------------------------------------------------------------
@@ -128,11 +127,55 @@ export class Arrangement {
     return this._mixerVersion;
   }
 
-  /** Subscribe to changes. The listener is called after the state has changed. */
+  /** Be told after every change. See `Arrangement.subscribe`. */
+  subscribe(listener: () => void): () => void {
+    // Each call gets its own entry, so one function subscribed twice is told twice.
+    const entry = () => listener();
+    this._subscribers.add(entry);
+    return () => {
+      this._subscribers.delete(entry);
+    };
+  }
+
+  /**
+   * Internal, for the engine: be told WHAT changed, before the subscribers
+   * are. A listener here that throws fails the change's caller (an adapter
+   * that fails must fail the call that caused it).
+   */
   onChange(listener: ChangeListener): () => void {
     this._listeners.add(listener);
     return () => {
       this._listeners.delete(listener);
+    };
+  }
+
+  /**
+   * Internal, for the engine: how to convert time, for as long as the engine
+   * lives. Clips that have no `startTick` yet are given one now. Returns the
+   * function that detaches; afterwards clips are given no ticks until the
+   * next engine attaches.
+   */
+  attachEngine(timeBase: ArrangementTimeBase): () => void {
+    if (this._timeBase) {
+      console.warn(
+        '[waveform-playlist] An arrangement plays through one engine at a time: a second ' +
+          'engine was built on an arrangement whose first engine has not been disposed. ' +
+          'Dispose the first engine before building another.'
+      );
+    }
+    this._timeBase = timeBase;
+    const withTicks = this._tracks.map((track) =>
+      withClips(track, (clip) =>
+        clip.startTick !== undefined ? clip : { ...clip, startTick: this._tickAt(clip.startSample) }
+      )
+    );
+    if (withTicks.some((track, i) => track !== this._tracks[i])) {
+      this._tracks = withTicks;
+      this._tracksVersion++;
+      this._emit({ type: 'recompute' });
+    }
+    return () => {
+      if (this._timeBase === timeBase) this._timeBase = null;
     };
   }
 
@@ -227,11 +270,11 @@ export class Arrangement {
     this._emit({ type: 'set' });
   }
 
-  addTrack(track: ClipTrack): void {
+  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void {
     assertTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
-    this._pushUndoSnapshot();
+    this._pushUndoSnapshot(options);
     const enriched = this._withStartTicks(track);
     this._tracks = [...this._tracks, enriched];
     this._mixer = seedMixer(this._mixer, [enriched]);
@@ -239,9 +282,9 @@ export class Arrangement {
     this._emit({ type: 'add', trackId: track.id });
   }
 
-  removeTrack(trackId: string): void {
+  removeTrack(trackId: string, options?: ArrangementChangeOptions): void {
     if (!this._tracks.some((t) => t.id === trackId)) return;
-    this._pushUndoSnapshot();
+    this._pushUndoSnapshot(options);
     this._tracks = this._tracks.filter((t) => t.id !== trackId);
     this._tracksVersion++;
     this._emit({ type: 'remove', trackId });
@@ -265,18 +308,32 @@ export class Arrangement {
   }
 
   /**
-   * Replace a track. The mixer fields of the given track are not read: the
-   * mix is in `getMixer()`. An id no track has does nothing.
+   * Replace a track, with a track or with a function of the current one. The
+   * mixer fields of the new track are not read: the mix is in `getMixer()`.
+   * An id no track has does nothing (a function is not called for it).
+   *
+   * A track object is copied on its way in. A function's result keeps the
+   * clip objects the arrangement already held, so states go on sharing them.
    */
-  updateTrack(trackId: string, track: ClipTrack): void {
+  updateTrack(
+    trackId: string,
+    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
+    options?: ArrangementChangeOptions
+  ): void {
+    const current = this._tracks.find((t) => t.id === trackId);
+    const byFunction = typeof next === 'function';
+    if (byFunction && !current) return;
+    const track = byFunction ? next(current as ClipTrack) : next;
+    if (byFunction && track === current) return;
+
     assertTrackKind(track);
     assertUniqueClipIds(track);
     if (track.id !== trackId && this._tracks.some((t) => t.id === track.id)) {
       throw duplicateTrackId(track.id);
     }
-    if (!this._tracks.some((t) => t.id === trackId)) return;
-    this._pushUndoSnapshot();
-    const enriched = this._withStartTicks(track);
+    if (!current) return;
+    this._pushUndoSnapshot(options);
+    const enriched = this._withStartTicks(track, byFunction ? new Set(current.clips) : undefined);
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
     // Only a track that was given a new id has no entry yet.
     this._mixer = seedMixer(this._mixer, [enriched]);
@@ -318,7 +375,7 @@ export class Arrangement {
     const clip = track.clips[clipIndex];
     const sortedClips = sortClipsByTime(track.clips);
     const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
-    const minDuration = this._minDuration();
+    const minDuration = this._minDuration(clip);
 
     return constrainBoundaryTrim(
       clip,
@@ -395,7 +452,7 @@ export class Arrangement {
     }
 
     const clip = track.clips[clipIndex];
-    const minDuration = this._minDuration();
+    const minDuration = this._minDuration(clip);
 
     if (!canSplitAt(clip, atSample, minDuration)) {
       console.warn(
@@ -451,7 +508,7 @@ export class Arrangement {
     const clip = track.clips[clipIndex];
     const sortedClips = sortClipsByTime(track.clips);
     const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
-    const minDuration = this._minDuration();
+    const minDuration = this._minDuration(clip);
 
     const constrained = constrainBoundaryTrim(
       clip,
@@ -521,6 +578,7 @@ export class Arrangement {
 
   /** Re-derive `startSample` from `startTick` for every clip that has one (after a tempo change). */
   recomputeStartSamples(): void {
+    if (!this._timeBase) return;
     const { ticksToSeconds, sampleRate } = this._timeBase;
     this._tracks = this._tracks.map((track) =>
       withClips(track, (clip) => {
@@ -537,26 +595,36 @@ export class Arrangement {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private _tickAt(startSample: number): number {
+  /**
+   * The tick of a sample position. Without an engine there is no tempo to
+   * convert with, so there is no tick: a clip that is placed, moved or cut
+   * meanwhile has none, and is given one when the next engine attaches.
+   */
+  private _tickAt(startSample: number): number | undefined {
+    if (!this._timeBase) return undefined;
     return this._timeBase.secondsToTicks(startSample / this._timeBase.sampleRate);
   }
 
-  private _minDuration(): number {
-    return Math.floor(DEFAULT_MIN_DURATION_SECONDS * this._timeBase.sampleRate);
+  /** The shortest a clip may be: a tenth of a second, at the engine's rate or else the clip's own. */
+  private _minDuration(clip: AudioClip): number {
+    const sampleRate = this._timeBase?.sampleRate ?? clip.sampleRate;
+    return Math.floor(DEFAULT_MIN_DURATION_SECONDS * sampleRate);
   }
 
   /**
-   * A copy of a track on its way in, with a `startTick` on every clip. The
-   * track and each clip are always copied, so the arrangement holds no
-   * object its caller can still write to.
+   * A copy of a track on its way in, with a `startTick` on every clip (when
+   * an engine is attached). The track and each clip are copied, so the
+   * arrangement holds no object its caller can still write to; a clip in
+   * `held` is one the arrangement already holds and is kept as it is.
    */
-  private _withStartTicks(track: ClipTrack): ClipTrack {
+  private _withStartTicks(track: ClipTrack, held?: ReadonlySet<AudioClip>): ClipTrack {
     return {
       ...track,
-      clips: track.clips.map((clip) => ({
-        ...clip,
-        startTick: clip.startTick ?? this._tickAt(clip.startSample),
-      })),
+      clips: track.clips.map((clip) =>
+        held?.has(clip)
+          ? clip
+          : { ...clip, startTick: clip.startTick ?? this._tickAt(clip.startSample) }
+      ),
     };
   }
 
@@ -578,7 +646,8 @@ export class Arrangement {
   }
 
   /** The state before a change: an undo step, or the mark that an open transaction changed. */
-  private _pushUndoSnapshot(): void {
+  private _pushUndoSnapshot(options?: ArrangementChangeOptions): void {
+    if (options?.undoable === false) return;
     if (this._transaction) {
       if (!this._transaction.changed) {
         this._transaction = { ...this._transaction, changed: true };
@@ -640,6 +709,14 @@ export class Arrangement {
               failed = true;
               firstError = error;
             }
+          }
+        }
+        // The engine has brought its adapter in step; now everyone else.
+        for (const subscriber of [...this._subscribers]) {
+          try {
+            subscriber();
+          } catch (error) {
+            console.warn('[waveform-playlist] Error in an arrangement subscriber:', error);
           }
         }
       }

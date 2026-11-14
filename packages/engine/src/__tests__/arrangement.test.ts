@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
 import type { ClipTrack } from '@waveform-playlist/core';
-import { Arrangement } from '../arrangement';
-import type { ArrangementChange, ArrangementTimeBase } from '../arrangement';
+import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
+import type { ArrangementChange, ArrangementTimeBase } from '../arrangement/Arrangement';
 
 const SAMPLE_RATE = 48000;
 const TICKS_PER_SECOND = 1920; // 960 ppqn at 120 bpm
@@ -513,6 +513,17 @@ describe('Arrangement: recomputeStartSamples', () => {
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(false);
     expect(changes).toEqual([{ type: 'recompute' }]);
+  });
+
+  it('does nothing while no engine is attached (there is no tempo to convert with)', () => {
+    const arrangement = new Arrangement({ tracks: fixture() });
+    const changes: ArrangementChange[] = [];
+    arrangement.onChange((change) => changes.push(change));
+    const tracks = arrangement.getTracks();
+    expect(() => arrangement.recomputeStartSamples()).not.toThrow();
+    expect(arrangement.getTracks()).toBe(tracks);
+    expect(arrangement.tracksVersion).toBe(1);
+    expect(changes).toEqual([]);
   });
 
   it('changes nothing in a clip whose start is already right, and keeps the object', () => {
