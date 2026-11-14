@@ -12,13 +12,26 @@ export type LoadSource = (
   context: { signal: AbortSignal; audioContext: BaseAudioContext }
 ) => Promise<AudioBuffer>;
 
+/**
+ * What an error message calls a source. A URL loses its query string and
+ * fragment (they can hold a token, and messages reach the app's `onError`); a
+ * `data:` or `blob:` URL is not echoed at all.
+ */
 function sourceLabel(src: ClipSource): string {
-  if (typeof src === 'string') return src;
+  if (typeof src === 'string') {
+    if (/^data:/i.test(src)) return 'data: URL';
+    if (/^blob:/i.test(src)) return 'blob: URL';
+    return src.split(/[?#]/)[0];
+  }
   if (typeof File !== 'undefined' && src instanceof File) return src.name;
   return 'Blob';
 }
 
-async function readBytes(src: ClipSource, signal: AbortSignal): Promise<ArrayBuffer> {
+async function readBytes(
+  src: ClipSource,
+  label: string,
+  signal: AbortSignal
+): Promise<ArrayBuffer> {
   if (typeof src !== 'string') {
     const bytes = await src.arrayBuffer();
     signal.throwIfAborted();
@@ -27,7 +40,7 @@ async function readBytes(src: ClipSource, signal: AbortSignal): Promise<ArrayBuf
   const response = await fetch(src, { signal });
   signal.throwIfAborted();
   if (!response.ok) {
-    throw new Error(`Failed to fetch ${src}: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to fetch ${label}: ${response.status} ${response.statusText}`);
   }
   const bytes = await response.arrayBuffer();
   signal.throwIfAborted();
@@ -43,11 +56,12 @@ function isUsable(buffer: AudioBuffer | null | undefined): buffer is AudioBuffer
 export const defaultLoadSource: LoadSource = async (src, { signal, audioContext }) => {
   signal.throwIfAborted();
   const label = sourceLabel(src);
-  const bytes = await readBytes(src, signal);
+  const bytes = await readBytes(src, label, signal);
   let buffer: AudioBuffer;
   try {
     buffer = await audioContext.decodeAudioData(bytes);
   } catch (error) {
+    signal.throwIfAborted();
     if (error instanceof Error) throw error;
     throw new Error('Failed to decode audio: ' + label);
   }
