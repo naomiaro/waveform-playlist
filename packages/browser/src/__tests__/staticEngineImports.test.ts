@@ -48,6 +48,7 @@ const FILES = [
   'providerInternals/useEarlyAdapter.ts',
   'providerInternals/useMergedTracksChange.ts',
   'providerInternals/useDragFlag.ts',
+  'providerInternals/useDisposeEngineOnUnmount.ts',
   'providerInternals/useReportRejectedClips.ts',
   'utils/unappliedClips.ts',
 ];

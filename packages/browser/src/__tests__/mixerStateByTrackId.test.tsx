@@ -15,13 +15,13 @@ import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
   useEditorControls,
+  useEngineRefs,
   usePlaylistTimeline,
   usePlaylistMixer,
   type EditorControlsContextValue,
 } from '../contexts/playlistContexts';
 import type { TrackState } from '../WaveformPlaylistContext';
 import type { ClipTrack, AudioClip, PlaylistTrack } from '@waveform-playlist/core';
-import type { LoadSource } from '../utils/loadSource';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -105,17 +105,19 @@ let probe: {
   trackStates: TrackState[];
   isReady: boolean;
   controls: EditorControlsContextValue;
+  isDraggingRef: React.MutableRefObject<boolean>;
 };
 
 const ProbeChild: React.FC = () => {
   const { tracks, isReady } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
   const controls = useEditorControls();
-  probe = { tracks, trackStates, isReady, controls };
+  const { isDraggingRef } = useEngineRefs();
+  probe = { tracks, trackStates, isReady, controls, isDraggingRef };
   return null;
 };
 
-function mount(initial: PlaylistTrack[], props: { loadSource?: LoadSource } = {}) {
+function mount(initial: PlaylistTrack[], props: Record<string, never> = {}) {
   const adapter = createFakeAdapter();
   let externalTracks = initial;
   let extra = props;
@@ -351,43 +353,37 @@ describe('a track keeps its mixer state when the list of tracks changes', () => 
     expect(probe.trackStates).toBe(before);
   });
 
-  // Until #812 this test put a new track in FRONT of a loaded one while the
-  // engine rebuild was deferred (`deferEngineRebuild`), and saw `undefined`
-  // beside the loaded track's own state. That mix cannot be reached through
-  // the provider any more: after the first build nothing waits, and a new
-  // track gets its state in the commit that brings it. (The pure function
-  // still covers it: "leaves a track without state undefined, wherever it
-  // is" in trackMixerState.test.ts.) What can be reached is the first load:
-  // while a source the provider was mounted with is held back, no track has
-  // an entry, each at its own position.
+  // A track the app has put in `tracks` while a trim drag is on is not handed
+  // to the engine until the release, so it has no mixer state yet, beside a
+  // loaded track that has state the user set. (Until #812 the test reached
+  // this with `deferEngineRebuild`.)
   it('a track the provider has not loaded yet has no entry, wherever it is in the list', async () => {
-    const pending: Array<(buffer: AudioBuffer) => void> = [];
-    const loadSource: LoadSource = () => new Promise((resolve) => pending.push(resolve));
-    const loading = {
-      ...makeTrack('new'),
-      clips: [{ id: 'new-clip', src: '/new.mp3' }],
-    } as PlaylistTrack;
     const a = makeTrack('a');
-    // The loading track is in FRONT of the loaded one.
-    mount([loading, a], { loadSource });
-    await waitFor(() => expect(pending).toHaveLength(1));
-
-    expect(probe.tracks.map((t) => t.id)).toEqual(['new', 'a']);
-    expect(probe.isReady).toBe(false);
-    expect(probe.trackStates).toHaveLength(2);
-    expect(probe.trackStates[0]).toBeUndefined();
-    expect(probe.trackStates[1]).toBeUndefined();
-
-    await act(async () => {
-      pending[0]({
-        sampleRate: SAMPLE_RATE,
-        length: SAMPLE_RATE,
-        duration: 1,
-        numberOfChannels: 1,
-        getChannelData: () => new Float32Array(SAMPLE_RATE),
-      } as unknown as AudioBuffer);
-    });
+    const { setTracks } = mount([a]);
     await waitFor(() => expect(probe.isReady).toBe(true));
-    expect(probe.trackStates.map((s) => s.name)).toEqual(['new', 'a']);
+    act(() => probe.controls.setTrackVolume('a', 0.4));
+
+    // One in FRONT of the loaded track and one after it.
+    probe.isDraggingRef.current = true;
+    await act(async () => {
+      setTracks([makeTrack('front'), a, makeTrack('back')]);
+    });
+
+    expect(probe.tracks.map((t) => t.id)).toEqual(['front', 'a', 'back']);
+    expect(probe.trackStates).toHaveLength(3);
+    expect(probe.trackStates[0]).toBeUndefined();
+    expect(probe.trackStates[1]).toMatchObject({ name: 'a', volume: 0.4 });
+    expect(probe.trackStates[2]).toBeUndefined();
+
+    // After the release the provider applies them and each has its state.
+    await act(async () => {
+      probe.isDraggingRef.current = false;
+    });
+    await waitFor(() => expect(probe.trackStates.filter(Boolean)).toHaveLength(3));
+    expect(probe.trackStates.map((s) => [s.name, s.volume])).toEqual([
+      ['front', 1],
+      ['a', 0.4],
+      ['back', 1],
+    ]);
   });
 });

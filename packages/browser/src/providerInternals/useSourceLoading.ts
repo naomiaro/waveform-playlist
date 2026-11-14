@@ -7,14 +7,21 @@
  *
  * The loader is created once and never cleared by a cleanup: loaded buffers
  * survive a StrictMode remount, Fast Refresh and a hidden `<Activity>`. Two
- * effects talk to it. One runs when the SET of sources changes and has no
- * cleanup, so a new `tracks` array that names the same sources aborts
- * nothing. The other is mount-only: its cleanup suspends the loads in flight
- * and its setup asks for them again.
+ * effects talk to it. One runs when `tracks` changes and has NO cleanup: it
+ * hands over the buffers the tracks carry and declares the whole set of
+ * sources, and the loader starts and drops only what differs, so a new
+ * `tracks` array that names the same sources aborts nothing. The other is
+ * mount-only and is only a cleanup: it suspends the loads in flight. Asking
+ * again is the first effect's: React runs its setup too wherever it runs that
+ * cleanup's counterpart (a StrictMode remount, Fast Refresh, an `<Activity>`
+ * reveal), and `setWanted` restarts what was suspended.
+ *
+ * A MIDI track holds no audio: a loading clip on one is rejected by the
+ * resolution, and its source is neither asked for nor waited for.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { createSourceLoader, isLoadingClip } from '@waveform-playlist/core';
+import { createSourceLoader, isLoadingClip, trackKind } from '@waveform-playlist/core';
 import type { ClipSource, PlaylistTrack, SourceState } from '@waveform-playlist/core';
 import { defaultLoadSource, type LoadSource } from '../utils/loadSource';
 
@@ -59,12 +66,12 @@ export interface UseSourceLoadingReturn {
   hasUnsettledSource: boolean;
 }
 
-const NO_SOURCES: ReadonlySet<ClipSource> = new Set();
+const holdsAudio = (track: PlaylistTrack): boolean => trackKind(track) !== 'midi';
 
 /** The `src` of every loading clip and of every loaded clip that carries one. */
 function namedSources(tracks: PlaylistTrack[]): Set<ClipSource> {
   const named = new Set<ClipSource>();
-  for (const track of tracks) {
+  for (const track of tracks.filter(holdsAudio)) {
     for (const clip of track.clips) {
       if (clip.src !== undefined) named.add(clip.src);
     }
@@ -72,20 +79,12 @@ function namedSources(tracks: PlaylistTrack[]): Set<ClipSource> {
   return named;
 }
 
-function sameMembers(a: ReadonlySet<ClipSource>, b: ReadonlySet<ClipSource>): boolean {
-  if (a.size !== b.size) return false;
-  for (const member of a) {
-    if (!b.has(member)) return false;
-  }
-  return true;
-}
-
 /** Hand the loader every buffer the tracks already carry for a source. */
 function provideCarriedBuffers(
   tracks: PlaylistTrack[],
   provide: (src: ClipSource, buffer: AudioBuffer) => void
 ): void {
-  for (const track of tracks) {
+  for (const track of tracks.filter(holdsAudio)) {
     for (const clip of track.clips) {
       if (!isLoadingClip(clip) && clip.src !== undefined && clip.audioBuffer) {
         provide(clip.src, clip.audioBuffer);
@@ -95,7 +94,7 @@ function provideCarriedBuffers(
 }
 
 function isUnsettled(tracks: PlaylistTrack[], sources: SourceSnapshot): boolean {
-  return tracks.some((track) =>
+  return tracks.filter(holdsAudio).some((track) =>
     track.clips.some((clip) => {
       if (!isLoadingClip(clip)) return false;
       const state = sources.get(clip.src);
@@ -148,8 +147,6 @@ export function useSourceLoading({
   getDecodeContextRef.current = getDecodeContext;
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
-  const tracksRef = useRef(tracks);
-  tracksRef.current = tracks;
 
   const [loader] = useState(() =>
     createSourceLoader<ClipSource, AudioBuffer>({
@@ -163,29 +160,20 @@ export function useSourceLoading({
     })
   );
 
-  // The set of sources, kept as the same object while its members are equal.
-  // The ref only ever stands in for a set equal to the one just computed.
-  const wantedRef = useRef<ReadonlySet<ClipSource>>(NO_SOURCES);
-  const wanted = useMemo(() => {
-    const named = namedSources(tracks);
-    if (!sameMembers(named, wantedRef.current)) wantedRef.current = named;
-    return wantedRef.current;
-  }, [tracks]);
-
-  // (a) The set changed: buffers the tracks carry first, then the whole set.
-  // No cleanup: a change must not abort the loads that are still wanted.
+  // `tracks` changed: the buffers the tracks carry first (a no-op for a
+  // source that is loaded; a pending or failed one becomes loaded and its
+  // load is aborted), then the whole set of sources. No cleanup: a change
+  // must not abort the loads that are still wanted. Both calls publish, so
+  // they are made here and never during render.
   useEffect(() => {
-    provideCarriedBuffers(tracksRef.current, loader.provide);
-    loader.setWanted(wanted);
-  }, [loader, wanted]);
+    provideCarriedBuffers(tracks, loader.provide);
+    loader.setWanted(namedSources(tracks));
+  }, [loader, tracks]);
 
-  // (b) Mount only. The cleanup also runs for a StrictMode remount, Fast
-  // Refresh and a hidden <Activity>: it aborts what is in flight and forgets
-  // nothing, and the setup asks again.
-  useEffect(() => {
-    loader.setWanted(wantedRef.current);
-    return () => loader.suspend();
-  }, [loader]);
+  // Only a cleanup, and it also runs for a StrictMode remount, Fast Refresh
+  // and a hidden <Activity>: it aborts what is in flight and forgets nothing.
+  // The effect above runs again in each of those cases and asks again.
+  useEffect(() => () => loader.suspend(), [loader]);
 
   const sources = useSyncExternalStore(loader.subscribe, loader.getSnapshot, loader.getSnapshot);
 
@@ -193,12 +181,18 @@ export function useSourceLoading({
   const [entries] = useState(() => new WeakMap<SourceState<AudioBuffer>, SourceStatusEntry>());
   const status = useMemo(() => buildStatus(sources, entries, retry), [sources, entries, retry]);
 
-  // Each failure is reported once. A retry that fails again is a new failure.
-  const [reported] = useState(() => new WeakSet<Error>());
+  // Each failure is reported once, per source: the loader makes one state
+  // object per failure, so a source that is retried and fails again (also
+  // with the same Error object) is reported again, and two sources that fail
+  // with one Error object are two reports.
+  const [reported] = useState(() => new Map<ClipSource, SourceState<AudioBuffer>>());
   useEffect(() => {
-    for (const state of sources.values()) {
-      if (state.status !== 'failed' || reported.has(state.error)) continue;
-      reported.add(state.error);
+    for (const src of [...reported.keys()]) {
+      if (sources.get(src)?.status !== 'failed') reported.delete(src);
+    }
+    for (const [src, state] of sources) {
+      if (state.status !== 'failed' || reported.get(src) === state) continue;
+      reported.set(src, state);
       onErrorRef.current?.(state.error);
     }
   }, [sources, reported]);

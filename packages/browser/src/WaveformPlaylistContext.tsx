@@ -42,6 +42,7 @@ import { useSourceLoading } from './providerInternals/useSourceLoading';
 import { useEarlyAdapter } from './providerInternals/useEarlyAdapter';
 import { useMergedTracksChange } from './providerInternals/useMergedTracksChange';
 import { useDragFlag } from './providerInternals/useDragFlag';
+import { useDisposeEngineOnUnmount } from './providerInternals/useDisposeEngineOnUnmount';
 import { useReportRejectedClips } from './providerInternals/useReportRejectedClips';
 import { resolveTracks, EMPTY_RESOLVE_CACHE, type ResolveCache } from './utils/resolveTracks';
 import { hasUnappliedContent, sameElements } from './utils/unappliedClips';
@@ -581,10 +582,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Compared with what the engine last reported, when that is known and it
   // explains the change (a source that settled during a drag and comes back
   // with the trimmed tracks), else with what this provider last applied.
+  const changeSinceEngineReport =
+    engineRef.current !== null && heldByEngine
+      ? incrementalTrackChange(heldByEngine, engineTracks)
+      : null;
   const incrementalChange =
     engineRef.current !== null
-      ? ((heldByEngine && incrementalTrackChange(heldByEngine, engineTracks)) ??
-        incrementalTrackChange(prevTracks, engineTracks))
+      ? (changeSinceEngineReport ?? incrementalTrackChange(prevTracks, engineTracks))
       : null;
   const isIncrementalAdd = incrementalChange !== null;
   // Note: prevTracks may be empty here (e.g. recording's first track on a
@@ -657,6 +661,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     engineRef.current = null;
   }, []);
 
+  // Disposes the engine when the provider goes away, also after the effect
+  // below last ran without a cleanup of its own (an arrival, #811).
+  useDisposeEngineOnUnmount(engineRef, adapterRef, stopAnimationFrameLoop);
+
   // Load audio from clips (only when tracks change)
   useEffect(() => {
     // Guard: skip full rebuild when tracks came from an engine clip operation
@@ -664,7 +672,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // correct tracks — we just need to update duration for the timeline.
     // Also skip during active boundary trim drags — visual updates flow via
     // React state only; engine.trimClip() commits the final delta on drag end.
-    if (isEngineTracks) {
+    // (With no engine there is nothing to keep: a provider that was hidden
+    // in an <Activity> had its engine disposed and builds again below.)
+    if (isEngineTracks && engineRef.current) {
       engineTracksRef.current = null;
       prevTracksRef.current = engineTracks;
       return;
@@ -691,6 +701,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // snapshot as the guard, not from prevTracksRef.current.
         const engine = engineRef.current;
         const { added: addedTracks, filled: filledTracks } = incrementalChange;
+        // The engine's last report is a baseline once: after this the engine
+        // holds something else, and comparing with the report again would
+        // apply the same fill a second time.
+        if (changeSinceEngineReport) engineTracksRef.current = null;
         // The engine rejects a track whose clips do not match its kind (#756).
         // Check the whole batch before applying any of it, so a bad track
         // late in the batch does not leave the earlier ones half applied.

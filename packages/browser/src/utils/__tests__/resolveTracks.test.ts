@@ -490,14 +490,20 @@ describe('resolveTracks', () => {
       expect(r2.viewTracks).toBe(r1.viewTracks);
     });
 
-    it('a new input object for an unchanged track: new track, same clip objects', () => {
+    // Until the #812 review this gave a new track object; the provider then
+    // rebuilt its engine for a parent that re-creates its track objects.
+    it('a new input object for an unchanged track: the same track, same clip objects', () => {
       const buf = fakeBuffer(44100, 44100);
       const lc: LoadingClip = { id: 'c', src: 'a' };
       const sources: Sources = new Map([['a', loaded(buf)]]);
       const r1 = resolveTracks([track('t', [lc])], sources, 48000, EMPTY_RESOLVE_CACHE);
       const r2 = resolveTracks([track('t', [lc])], sources, 48000, r1.cache);
-      expect(r2.engineTracks[0]).not.toBe(r1.engineTracks[0]);
+      expect(r2.engineTracks[0]).toBe(r1.engineTracks[0]);
       expect(r2.engineTracks[0].clips[0]).toBe(r1.engineTracks[0].clips[0]);
+      // A changed field still gives a new one.
+      const renamed = resolveTracks([track('t', [lc], { name: 'x' })], sources, 48000, r2.cache);
+      expect(renamed.engineTracks[0]).not.toBe(r1.engineTracks[0]);
+      expect(renamed.engineTracks[0].name).toBe('x');
     });
 
     it('a new buffer for a source makes a new clip', () => {
@@ -533,6 +539,93 @@ describe('resolveTracks', () => {
       const t = track('t', [lc]);
       resolveTracks([t], new Map(), 48000, EMPTY_RESOLVE_CACHE);
       expect(t.clips).toEqual([{ id: 'c', src: 'a', duration: 1 }]);
+    });
+  });
+
+  // An engine track keeps its object while nothing the engine sees changed
+  // (#812 review): the engine clips are the same objects and every other field
+  // is equal. The provider compares engine tracks by identity, so a new object
+  // for an unchanged track is a full rebuild of the engine.
+  describe('the engine track of a track id keeps its identity across passes', () => {
+    it('a placeholder recomputed at another sample rate: same engine track, same engine array', () => {
+      const buf = fakeBuffer(44100, 44100);
+      const a = track('a', [{ id: 'c', src: 'a' }]);
+      const b = track('b', [{ id: 'd', src: 'b', duration: 3 }]);
+      const sources: Sources = new Map([
+        ['a', loaded(buf)],
+        ['b', failed],
+      ]);
+      const r1 = resolveTracks([a, b], sources, 48000, EMPTY_RESOLVE_CACHE);
+      const r2 = resolveTracks([a, b], sources, 44100, r1.cache);
+      // The placeholder was made again at the new rate...
+      expect(r2.viewTracks[1].clips[0].sampleRate).toBe(44100);
+      expect(r2.viewTracks[1]).not.toBe(r1.viewTracks[1]);
+      // ...and the engine saw nothing of it.
+      expect(r2.engineTracks[1]).toBe(r1.engineTracks[1]);
+      expect(r2.engineTracks).toBe(r1.engineTracks);
+    });
+
+    it('a new input object with the same clips and fields: the previous engine track', () => {
+      const clip = createClip({ audioBuffer: fakeBuffer(48000, 48000), startSample: 0 });
+      const t1 = track('t', [clip]);
+      const r1 = resolveTracks([t1], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const t2 = { ...t1, clips: [clip] };
+      const r2 = resolveTracks([t2], new Map(), 48000, r1.cache);
+      expect(r2.engineTracks[0]).toBe(t1);
+      expect(r2.engineTracks).toBe(r1.engineTracks);
+      expect(r2.viewTracks[0]).toBe(t1);
+      // And again from that pass: the object does not change hands.
+      const r3 = resolveTracks([{ ...t1, clips: [clip] }], new Map(), 48000, r2.cache);
+      expect(r3.engineTracks[0]).toBe(t1);
+    });
+
+    it('a new input object with one field changed: a new engine track', () => {
+      const clip = createClip({ audioBuffer: fakeBuffer(48000, 48000), startSample: 0 });
+      const t1 = track('t', [clip]);
+      const r1 = resolveTracks([t1], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const renamed = { ...t1, name: 'other' };
+      const r2 = resolveTracks([renamed], new Map(), 48000, r1.cache);
+      expect(r2.engineTracks[0]).toBe(renamed);
+      const extra = { ...t1, color: '#f00' } as PlaylistTrack;
+      expect(resolveTracks([extra], new Map(), 48000, r1.cache).engineTracks[0]).toBe(extra);
+    });
+
+    it('a new input object with a clip replaced: a new engine track', () => {
+      const t1 = track('t', [
+        createClip({ audioBuffer: fakeBuffer(48000, 48000), startSample: 0 }),
+      ]);
+      const r1 = resolveTracks([t1], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const t2 = { ...t1, clips: [{ ...t1.clips[0] }] } as PlaylistTrack;
+      expect(resolveTracks([t2], new Map(), 48000, r1.cache).engineTracks[0]).toBe(t2);
+    });
+
+    it('a new input object that gained a pending loading clip: the previous engine track; after the load a new one that keeps the earlier clip objects', () => {
+      const clip = createClip({ audioBuffer: fakeBuffer(48000, 48000), startSample: 0 });
+      const t1 = track('t', [clip]);
+      const r1 = resolveTracks([t1], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const lc: LoadingClip = { id: 'new', src: 'n' };
+      const t2: PlaylistTrack = { ...t1, clips: [...t1.clips, lc] };
+      const r2 = resolveTracks([t2], new Map([['n', pending]]), 48000, r1.cache);
+      expect(r2.engineTracks[0]).toBe(t1);
+      expect(r2.engineTracks).toBe(r1.engineTracks);
+
+      const buf = fakeBuffer(48000, 48000);
+      const r3 = resolveTracks([t2], new Map([['n', loaded(buf)]]), 48000, r2.cache);
+      expect(r3.engineTracks[0]).not.toBe(t1);
+      expect(r3.engineTracks[0].clips).toHaveLength(2);
+      expect(r3.engineTracks[0].clips[0]).toBe(clip);
+      expect(r3.engineTracks[0].clips[1].audioBuffer).toBe(buf);
+    });
+
+    it('a seed that matches still wins over the previous engine track', () => {
+      const clip = createClip({ audioBuffer: fakeBuffer(48000, 48000), startSample: 0 });
+      const t1 = track('t', [clip]);
+      const r1 = resolveTracks([t1], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const fromEngine: ClipTrack = { ...t1, clips: [clip] };
+      const cache = seedResolved(r1.cache, fromEngine, fromEngine);
+      const r2 = resolveTracks([fromEngine], new Map(), 48000, cache);
+      expect(r2.engineTracks[0]).toBe(fromEngine);
+      expect(r2.viewTracks[0]).toBe(fromEngine);
     });
   });
 

@@ -265,6 +265,93 @@ describe('useSourceLoading', () => {
     expect(onError).toHaveBeenCalledTimes(1);
   });
 
+  it('a clip carrying src and audioBuffer that appears while that source is pending is provided', async () => {
+    const { calls, loadSource } = heldLoadSource();
+    const { result, rerender } = mountHook({ tracks: [loadingTrack('a', '/a.mp3')], loadSource });
+    await flush();
+    expect(calls).toHaveLength(1);
+
+    // The set of sources is the same; only the clip changed.
+    const buffer = fakeBuffer();
+    rerender({ tracks: [loadedTrack('a', '/a.mp3', buffer)], loadSource });
+    await flush();
+    expect(result.current.sources.get('/a.mp3')).toEqual({ status: 'loaded', value: buffer });
+    expect(calls[0].signal.aborted).toBe(true);
+
+    // The decode that was in flight arrives late and is ignored.
+    await act(async () => {
+      calls[0].resolve(fakeBuffer());
+    });
+    expect(result.current.sources.get('/a.mp3')).toEqual({ status: 'loaded', value: buffer });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('the same for a source that had failed', async () => {
+    const { calls, loadSource } = heldLoadSource();
+    const { result, rerender } = mountHook({ tracks: [loadingTrack('a', '/a.mp3')], loadSource });
+    await flush();
+    await act(async () => {
+      calls[0].reject(new Error('404'));
+    });
+    const buffer = fakeBuffer();
+    rerender({ tracks: [loadedTrack('a', '/a.mp3', buffer)], loadSource });
+    await flush();
+    expect(result.current.sources.get('/a.mp3')).toEqual({ status: 'loaded', value: buffer });
+    expect(result.current.status.failedCount).toBe(0);
+  });
+
+  it('a loading clip on a MIDI track is not asked for and does not count as unsettled', async () => {
+    const { calls, loadSource } = heldLoadSource();
+    const midi = { ...loadingTrack('m', '/m.mp3'), kind: 'midi' } as PlaylistTrack;
+    const { result } = mountHook({ tracks: [midi], loadSource });
+    await flush();
+    expect(calls).toHaveLength(0);
+    expect(result.current.sources.has('/m.mp3')).toBe(false);
+    expect(result.current.hasUnsettledSource).toBe(false);
+  });
+
+  it('reports per source: two sources that fail with the same Error object are two reports', async () => {
+    const { calls, loadSource } = heldLoadSource();
+    const onError = vi.fn();
+    const { rerender } = mountHook({
+      tracks: [loadingTrack('a', '/a.mp3'), loadingTrack('b', '/b.mp3')],
+      loadSource,
+      onError,
+    });
+    await flush();
+    const shared = new Error('offline');
+    await act(async () => {
+      calls[0].reject(shared);
+    });
+    await act(async () => {
+      calls[1].reject(shared);
+    });
+    rerender({
+      tracks: [loadingTrack('a', '/a.mp3'), loadingTrack('b', '/b.mp3')],
+      loadSource,
+      onError,
+    });
+    expect(onError).toHaveBeenCalledTimes(2);
+  });
+
+  it('a source that is retried and fails again is reported again, also with the same Error object', async () => {
+    const { calls, loadSource } = heldLoadSource();
+    const onError = vi.fn();
+    const { result } = mountHook({ tracks: [loadingTrack('a', '/a.mp3')], loadSource, onError });
+    await flush();
+    const failure = new Error('offline');
+    await act(async () => {
+      calls[0].reject(failure);
+    });
+    expect(onError).toHaveBeenCalledTimes(1);
+    act(() => result.current.status.retry('/a.mp3'));
+    await flush();
+    await act(async () => {
+      calls[1].reject(failure);
+    });
+    expect(onError).toHaveBeenCalledTimes(2);
+  });
+
   it('does not call loadSource when the load was aborted before the decode context arrived', async () => {
     const { calls, loadSource } = heldLoadSource();
     let release: (context: BaseAudioContext) => void = () => {};

@@ -10,7 +10,7 @@
  *    track). The merged tracks are remembered so that the provider recognises
  *    them when they come back as the `tracks` prop: `engineTracksRef` holds
  *    the engine's own array, and the resolution cache is seeded so that each
- *    merged track resolves to the engine's track object.
+ *    track handed to the app resolves to the engine's track object.
  *  - `fromView`: a drag handler sends copies of the view's tracks (every move
  *    of a trim, a cancel). Nothing is remembered: the engine has not changed.
  */
@@ -62,8 +62,11 @@ export function useMergedTracksChange({
         return;
       }
       const merged = mergeLoadingClips(engineTracks, latest.tracks, latest.placeholderIds);
+      // Every track is seeded, also one the merge left alone: the engine's
+      // report is a new object per track, and without a seed a track nothing
+      // changed would resolve to the engine track of the previous pass (see
+      // resolveTracks), which is not the object the engine holds now.
       merged.forEach((track, index) => {
-        if (track === engineTracks[index]) return;
         resolveCacheRef.current = seedResolved(resolveCacheRef.current, track, engineTracks[index]);
       });
       latest.onTracksChange(merged);

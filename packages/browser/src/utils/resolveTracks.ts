@@ -13,6 +13,14 @@
  * input track object and the clips it resolves to; both result arrays when
  * every element equals the previous pass.
  *
+ * The ENGINE track of a track id also keeps its object across passes while
+ * nothing the engine sees changed: its clips are the same objects and every
+ * other field is equal (`Object.is`). That holds for a new input track object
+ * too. The provider compares engine tracks by identity, and a new object for
+ * an unchanged track is a full rebuild of the engine: a placeholder made
+ * again at another sample rate, a pending loading clip added to a track that
+ * has clips, a parent that re-creates its track objects on every render.
+ *
  * The caches are WeakMaps shared by the caches of successive passes. Filling
  * one is the only mutation this file does. It is safe because a WeakMap is
  * keyed by object identity and an entry is checked against its inputs (buffer,
@@ -273,11 +281,35 @@ interface TrackResult {
   rejected: RejectedClip[];
 }
 
+/** True when the two tracks have the same own enumerable fields, `clips` aside. */
+function sameFieldsApartFromClips(a: ClipTrack, b: ClipTrack): boolean {
+  const aKeys = Object.keys(a).filter((key) => key !== 'clips');
+  const bKeys = Object.keys(b).filter((key) => key !== 'clips');
+  if (aKeys.length !== bKeys.length) return false;
+  const left = a as unknown as Record<string, unknown>;
+  const right = b as unknown as Record<string, unknown>;
+  return aKeys.every(
+    (key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(left[key], right[key])
+  );
+}
+
+/** The previous pass's engine track for this id, when the engine would see no difference. */
+function unchangedEngineTrack(
+  previous: ClipTrack | undefined,
+  built: ClipTrack,
+  engineClips: AudioClip[]
+): ClipTrack | undefined {
+  if (!previous || previous === built) return previous;
+  if (!sameElements(previous.clips, engineClips)) return undefined;
+  return sameFieldsApartFromClips(previous, built) ? previous : undefined;
+}
+
 function resolveTrack(
   input: PlaylistTrack,
   sources: ReadonlyMap<ClipSource, SourceState<AudioBuffer>>,
   rate: number,
-  maps: Maps
+  maps: Maps,
+  previousEngineById: ReadonlyMap<string, ClipTrack>
 ): TrackResult {
   const hasLoading = input.clips.some(isLoadingClip);
   const midi = trackKind(input) === 'midi';
@@ -305,12 +337,20 @@ function resolveTrack(
   // A seed counts only while it still describes the built result.
   const seed = maps.seeds.get(input);
   const seedFits = seed !== undefined && sameElements(seed.clips, engineClips);
-  return {
-    view: seedFits && placeholders.length === 0 ? seed : built.view,
-    engine: seedFits ? seed : built.engine,
-    placeholders,
-    rejected,
-  };
+  if (seedFits) {
+    return {
+      view: placeholders.length === 0 ? seed : built.view,
+      engine: seed,
+      placeholders,
+      rejected,
+    };
+  }
+  const engine =
+    unchangedEngineTrack(previousEngineById.get(input.id), built.engine, engineClips) ??
+    built.engine;
+  // Without a placeholder the view track IS the engine track.
+  const view = built.view === built.engine ? engine : built.view;
+  return { view, engine, placeholders, rejected };
 }
 
 function buildTrack(
@@ -364,8 +404,9 @@ export function resolveTracks(
   previous: ResolveCache
 ): ResolvedTracks {
   const maps = mapsOf(previous);
-  const results = tracks.map((t) => resolveTrack(t, sources, sampleRate, maps));
   const last = previous.last;
+  const previousEngineById = new Map((last?.engineTracks ?? []).map((t) => [t.id, t]));
+  const results = tracks.map((t) => resolveTrack(t, sources, sampleRate, maps, previousEngineById));
   const view = results.map((r) => r.view);
   const engine = results.map((r) => r.engine);
   const viewTracks = last && sameElements(last.viewTracks, view) ? last.viewTracks : view;
