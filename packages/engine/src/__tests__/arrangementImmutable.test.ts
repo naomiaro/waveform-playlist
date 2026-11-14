@@ -335,7 +335,7 @@ describe('the engine hands out the arrangement’s array', () => {
 
   it('a state handed to a listener keeps its tracks when the engine changes afterwards', () => {
     const engine = new PlaylistEngine({ sampleRate: SAMPLE_RATE });
-    const states: Array<{ tracks: ClipTrack[] }> = [];
+    const states: Array<{ tracks: readonly ClipTrack[] }> = [];
     engine.on('statechange', (state) => states.push(state));
     engine.setTracks(fixture());
     engine.setTrackVolume('A', 0.3);

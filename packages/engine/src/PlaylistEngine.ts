@@ -10,6 +10,7 @@
 import type { ClipTrack } from '@waveform-playlist/core';
 import { Arrangement } from './arrangement';
 import type { ClipBounds } from './arrangement';
+import { freezeTrackInDevelopment, freezeTracksInDevelopment } from './arrangement/devFreeze';
 import { withMixerValues } from './arrangement/mixer';
 import type { TrackMixerValues } from './arrangement/mixer';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
@@ -23,8 +24,11 @@ type EventName = keyof EngineEvents;
 
 export class PlaylistEngine {
   private _arrangement: Arrangement;
-  private _projection: { tracksVersion: number; mixerVersion: number; tracks: ClipTrack[] } | null =
-    null;
+  private _projection: {
+    tracksVersion: number;
+    mixerVersion: number;
+    tracks: readonly ClipTrack[];
+  } | null = null;
   private _withMixMemo = new WeakMap<
     ClipTrack,
     { values: TrackMixerValues | undefined; merged: ClipTrack }
@@ -173,7 +177,7 @@ export class PlaylistEngine {
   // A track holds audio clips or MIDI clips, never both (#756). The three
   // methods that take a track check it before they change anything, so a
   // throw leaves the engine, the undo history and the adapter untouched.
-  setTracks(tracks: ClipTrack[]): void {
+  setTracks(tracks: readonly ClipTrack[]): void {
     this._arrangement.setTracks(tracks);
     this._adapter?.setTracks(this._tracksForAdapter());
     this._emitStateChange();
@@ -594,13 +598,15 @@ export class PlaylistEngine {
    * written back. The same array until the tracks or the mix change, and the
    * same track object while neither that track nor its mix changed.
    */
-  private _tracksForAdapter(): ClipTrack[] {
+  private _tracksForAdapter(): readonly ClipTrack[] {
     const { tracksVersion, mixerVersion } = this._arrangement;
     const cached = this._projection;
     if (cached && cached.tracksVersion === tracksVersion && cached.mixerVersion === mixerVersion) {
       return cached.tracks;
     }
-    const tracks = this._arrangement.getTracks().map((track) => this._withMix(track));
+    const tracks = freezeTracksInDevelopment(
+      this._arrangement.getTracks().map((track) => this._withMix(track))
+    );
     this._projection = { tracksVersion, mixerVersion, tracks };
     return tracks;
   }
@@ -610,7 +616,7 @@ export class PlaylistEngine {
     const values = this._arrangement.getMixer().get(track.id);
     const memo = this._withMixMemo.get(track);
     if (memo && memo.values === values) return memo.merged;
-    const merged = withMixerValues(track, values);
+    const merged = freezeTrackInDevelopment(withMixerValues(track, values));
     this._withMixMemo.set(track, { values, merged });
     return merged;
   }

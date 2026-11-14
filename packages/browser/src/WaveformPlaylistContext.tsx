@@ -832,12 +832,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             state.tracksVersion !== lastTracksVersionRef.current
           ) {
             lastTracksVersionRef.current = state.tracksVersion;
-            engineTracksRef.current = state.tracks;
+            // `state.tracks` is the engine's own array (readonly, shared with
+            // its undo history). `onTracksChange` hands the app a `ClipTrack[]`
+            // to keep in its state, so it gets an array of its own; the track
+            // objects in it are still the engine's and must not be written to.
+            const mirrored = [...state.tracks];
+            engineTracksRef.current = mirrored;
 
             // A reorder needs nothing for the mixer: its state is kept by
             // track id, and `trackStates` is derived from the new `tracks`.
             if (onTracksChange) {
-              onTracksChange(state.tracks);
+              onTracksChange(mirrored);
             } else {
               console.warn(
                 '[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — ' +

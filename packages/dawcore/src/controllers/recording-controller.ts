@@ -118,7 +118,7 @@ export interface RecordingHost extends ReactiveControllerHost {
    *  hosts without an engine skip the mute. */
   _engine?: {
     setTrackMute(trackId: string, muted: boolean): void;
-    getState(): { tracks: Array<{ id: string; muted: boolean }> };
+    getState(): { tracks: ReadonlyArray<{ id: string; muted: boolean }> };
   } | null;
   play?(startTime?: number): Promise<void>;
   stop?(): void;

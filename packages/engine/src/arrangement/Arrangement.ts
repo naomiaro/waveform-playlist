@@ -6,7 +6,7 @@
  * that `getTracks()` has returned. Tracks are copied on their way in
  * (`setTracks`, `addTrack`, `updateTrack`), so the caller's objects are
  * never the arrangement's; what `getTracks()` returns is NOT a copy and
- * must not be written to. A snapshot of the undo history is
+ * must not be written to (it is frozen outside production builds). A snapshot of the undo history is
  * therefore a reference to an earlier array, and two states share every
  * track that is the same in both (#812).
  *
@@ -28,6 +28,7 @@ import {
   canSplitAt,
   splitClip as splitClipOp,
 } from '../operations/clipOperations';
+import { freezeTracksInDevelopment } from './devFreeze';
 import { EMPTY_HISTORY, beginBase, pushStep, redoStep, undoStep } from './history';
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
@@ -572,6 +573,9 @@ export class Arrangement {
   }
 
   private _emit(change: ArrangementChange): void {
+    // Every change announces itself here, so this is where a new state is
+    // frozen (outside production builds) before anyone can read it.
+    freezeTracksInDevelopment(this._tracks);
     for (const listener of this._listeners) {
       try {
         listener(change);
