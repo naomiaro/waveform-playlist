@@ -9,7 +9,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React, { useMemo, useState } from 'react';
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip, PlaylistTrack } from '@waveform-playlist/core';
 import type { TrackEffectsFunction } from '@waveform-playlist/playout';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 
@@ -80,7 +80,7 @@ function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
 
 let engineRef: React.RefObject<PlaylistEngine | null>;
 let isReady = false;
-let setAppTracks: (update: (tracks: ClipTrack[]) => ClipTrack[]) => void;
+let setAppTracks: (update: (tracks: PlaylistTrack[]) => PlaylistTrack[]) => void;
 
 const Probe: React.FC = () => {
   engineRef = useEngineRefs().playoutRef;
@@ -94,7 +94,7 @@ const App: React.FC<{
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
   copyTracks?: boolean;
 }> = ({ trackEffects, copyTracks = false }) => {
-  const [tracks, setTracks] = useState<ClipTrack[]>(() => [
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() => [
     makeTrack('t1', [makeClip('c1')]),
     makeTrack('t2', [makeClip('c2', SAMPLE_RATE * 8)]),
   ]);

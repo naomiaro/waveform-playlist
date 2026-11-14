@@ -26,7 +26,7 @@ import {
   usePlaylistTimeline,
   usePlaylistMixer,
 } from '../contexts/playlistContexts';
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip, PlaylistTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -115,8 +115,8 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     const t2 = makeTrack('track-2', true, 0.5);
     const t3 = makeTrack('track-3', false, 0.9);
 
-    let externalTracks: ClipTrack[] = [t1, t2, t3];
-    const setExternalTracks = (t: ClipTrack[]) => {
+    let externalTracks: PlaylistTrack[] = [t1, t2, t3];
+    const setExternalTracks = (t: PlaylistTrack[]) => {
       externalTracks = t;
       rerender();
     };
@@ -162,8 +162,8 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     const t1 = makeTrack('track-1', false, 0.2);
     const t2 = makeTrack('track-2', true, 0.5);
 
-    let externalTracks: ClipTrack[] = [t1, t2];
-    const setExternalTracks = (t: ClipTrack[]) => {
+    let externalTracks: PlaylistTrack[] = [t1, t2];
+    const setExternalTracks = (t: PlaylistTrack[]) => {
       externalTracks = t;
       rerender();
     };

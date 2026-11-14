@@ -184,6 +184,18 @@ describe('useSourceLoading', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('a source asked for later is loaded with the loadSource of the latest render', async () => {
+    const first = heldLoadSource();
+    const second = heldLoadSource();
+    const a = loadingTrack('a', '/a.mp3');
+    const { rerender } = mountHook({ tracks: [a], loadSource: first.loadSource });
+    await flush();
+    rerender({ tracks: [a, loadingTrack('b', '/b.mp3')], loadSource: second.loadSource });
+    await flush();
+    expect(first.calls.map((c) => c.src)).toEqual(['/a.mp3']);
+    expect(second.calls.map((c) => c.src)).toEqual(['/b.mp3']);
+  });
+
   it('a source no track names any more is aborted and forgotten', async () => {
     const { calls, loadSource } = heldLoadSource();
     const a = loadingTrack('a', '/a.mp3');

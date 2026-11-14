@@ -286,7 +286,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
       <TracksLayout $height={trackLayout.totalHeight}>
         {tracks.map((track, trackIndex) => {
           // No mixer state yet means the provider is still loading this
-          // track (deferEngineRebuild): the engine does not know it, so a
+          // track (its first load is not finished): the engine does not know it, so a
           // mute/solo/volume/pan change could not take effect.
           const state = trackStates[trackIndex];
           return (

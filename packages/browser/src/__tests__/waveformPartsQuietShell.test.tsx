@@ -337,7 +337,7 @@ describe('the root renders alone (#685)', () => {
 });
 
 describe('only the root reads the timeline (#685)', () => {
-  it('a new onTracksChange function renders the root; neither the tracks part nor the track controls follow', async () => {
+  it('a timeline value that changes for onTracksChange renders the root; neither the tracks part nor the track controls follow', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const adapter = createFakeAdapter();
@@ -350,17 +350,18 @@ describe('only the root reads the timeline (#685)', () => {
     // One element for the whole test: the component that composes the view
     // does not render, only the provider gets a new function.
     const view = <ComposedWaveform trackControls={<Panel />} />;
-    const ui = () => (
+    const ui = (onTracksChange?: () => void) => (
       <WaveformPlaylistProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        onTracksChange={() => {}}
+        onTracksChange={onTracksChange}
       >
         <ProbeChild />
         {view}
       </WaveformPlaylistProvider>
     );
+    // Mounted WITHOUT the callback: the timeline value publishes `undefined`.
     const utils = render(ui());
     await waitFor(() => expect(probe.isReady).toBe(true));
     await act(async () => {});
@@ -368,24 +369,32 @@ describe('only the root reads the timeline (#685)', () => {
     resetCounts();
     const calls = panelRenders;
 
+    // The app starts passing one: the published function goes from undefined
+    // to the provider's own (#812), and nothing else in the value changes.
     await act(async () => {
-      utils.rerender(ui());
+      utils.rerender(ui(() => {}));
     });
 
     // The timeline value is a new object (it carries the function), so its
     // one reader renders.
     expect(counts.shell).toBeGreaterThan(0);
-    // The provider answers a new `onTracksChange` by loading again. Until
-    // #687 that published the mixer state once more (a new array of new
-    // objects) and the track controls rendered once; the mixer state is now
-    // kept by track id and stays the same object when no track changed, so
-    // the controls part does not render at all. Reading the timeline value
-    // themselves, both parts rendered with every one of the root's renders
-    // here (three).
+    // Reading the timeline value themselves, both parts rendered with every
+    // one of the root's renders here.
     expect(counts.layout).toBe(0);
     expect(panelRenders - calls).toBe(0);
     expect(counts.track).toBe(0);
     expect(counts.scale).toBe(0);
+
+    // Since #812 the published function is the provider's own and stable: a
+    // new inline callback on a later render changes nothing in the value (and
+    // the provider does not load again), so not even the root renders.
+    resetCounts();
+    await act(async () => {
+      utils.rerender(ui(() => {}));
+    });
+    expect(counts.shell).toBe(0);
+    expect(counts.layout).toBe(0);
+    expect(panelRenders - calls).toBe(0);
   });
 });
 

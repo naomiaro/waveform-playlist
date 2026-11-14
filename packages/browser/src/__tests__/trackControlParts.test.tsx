@@ -11,7 +11,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { ClipTrack, AudioClip, PlaylistTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { resetPartWarnings } from '../components/partWarnings';
 import {
@@ -175,24 +175,69 @@ const Probe: React.FC = () => {
 };
 
 interface AppProps {
-  tracks: ClipTrack[];
+  tracks: PlaylistTrack[];
   controls: React.ReactElement;
+  /**
+   * Mount with every clip still loading: each is passed as a loading clip
+   * whose source the test's `loadSource` holds back, so the provider has not
+   * built its engine and has no mixer state for the tracks.
+   * `update({ loading: false })` lets every source arrive.
+   */
   loading?: boolean;
-  onTracksChange?: (tracks: ClipTrack[]) => void;
+  onTracksChange?: (tracks: PlaylistTrack[]) => void;
   spectrogram?: SpectrogramIntegration | null;
+}
+
+/** One second of peaks, so a resolved clip needs no peaks worker. */
+const LOADING_PEAKS = WaveformData.create({
+  version: 2,
+  channels: 1,
+  sample_rate: SAMPLE_RATE,
+  samples_per_pixel: 256,
+  bits: 16,
+  length: 188,
+  data: new Array(376).fill(0),
+});
+
+/** The same tracks with each clip named by a source instead of loaded. */
+function asLoading(tracks: PlaylistTrack[]): PlaylistTrack[] {
+  return tracks.map((track) => ({
+    ...track,
+    clips: track.clips.map((clip) => ({
+      id: clip.id,
+      src: `/${clip.id}.mp3`,
+      duration: 1,
+      waveformData: LOADING_PEAKS,
+    })),
+  }));
+}
+
+function oneSecondBuffer(): AudioBuffer {
+  return {
+    sampleRate: SAMPLE_RATE,
+    length: SAMPLE_RATE,
+    duration: 1,
+    numberOfChannels: 1,
+    getChannelData: () => new Float32Array(SAMPLE_RATE),
+  } as unknown as AudioBuffer;
 }
 
 function mount(props: AppProps) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   let current = props;
-  const App: React.FC<AppProps> = ({ tracks, controls, loading, onTracksChange, spectrogram }) => (
+  // Every call is kept until the test lets the sources arrive.
+  const held: Array<(buffer: AudioBuffer) => void> = [];
+  const loadSource = () => new Promise<AudioBuffer>((resolve) => held.push(resolve));
+  // The loading clips are made once: new ones on a re-render would be new clips.
+  const loadingTracks = props.loading ? asLoading(props.tracks) : null;
+  const App: React.FC<AppProps> = ({ tracks, controls, onTracksChange, spectrogram }) => (
     <SpectrogramIntegrationContext value={spectrogram ?? null}>
       <WaveformPlaylistProvider
-        tracks={tracks}
+        tracks={loadingTracks ?? tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        deferEngineRebuild={loading}
+        loadSource={loadSource}
         onTracksChange={onTracksChange}
       >
         <Probe />
@@ -206,9 +251,12 @@ function mount(props: AppProps) {
   const view = render(<App {...current} />);
   return {
     adapter,
+    /** Sources asked for and not yet let through. */
+    pendingSources: () => held.length,
     update: (next: Partial<AppProps>) => {
       current = { ...current, ...next };
       view.rerender(<App {...current} />);
+      if (next.loading === false) held.splice(0).forEach((resolve) => resolve(oneSecondBuffer()));
     },
   };
 }
@@ -491,7 +539,7 @@ describe('the template and useTrack()', () => {
   });
 
   it('moveDown() and moveUp() reorder, and index, isFirst and isLast follow', async () => {
-    let tracks = [A, B, C];
+    let tracks: PlaylistTrack[] = [A, B, C];
     const view = mount({
       tracks,
       onTracksChange: (next) => {
@@ -516,7 +564,7 @@ describe('the template and useTrack()', () => {
 
   it('a track moved twice moves from where it is, not from where it was mounted', async () => {
     const D = makeTrack('d');
-    let tracks = [A, B, C, D];
+    let tracks: PlaylistTrack[] = [A, B, C, D];
     const view = mount({
       tracks,
       onTracksChange: (next) => {
@@ -685,6 +733,8 @@ describe('the pieces', () => {
       controls: PIECES,
     });
     const mute = await screen.findByRole('button', { name: 'Mute' });
+    // Precondition: the source was asked for and is being held back.
+    await waitFor(() => expect(view.pendingSources()).toBe(1));
     expect(probe.trackStateCount).toBe(0);
     expect(seen.get('a')).toMatchObject({ isLoading: true, name: 'Track 1' });
     expect(mute).toHaveProperty('disabled', true);
@@ -778,7 +828,7 @@ describe('<TrackReorderGrip />', () => {
   });
 
   it('the move buttons reorder and do not select', async () => {
-    let tracks = [A, B, C];
+    let tracks: PlaylistTrack[] = [A, B, C];
     const view = mount({
       tracks,
       onTracksChange: (next) => {
@@ -847,8 +897,10 @@ describe('<TrackReorderGrip />', () => {
   });
 
   it('the move buttons are disabled while the track is loading', async () => {
-    mount({ tracks: [A, B], loading: true, controls: WITH_GRIP });
+    const view = mount({ tracks: [A, B], loading: true, controls: WITH_GRIP });
     await screen.findAllByRole('button', { name: 'Mute' });
+    await waitFor(() => expect(view.pendingSources()).toBe(2));
+    expect(probe.trackStateCount).toBe(0);
     expect(within(slotOf('a')).getByRole('button', { name: 'Move track down' })).toHaveProperty(
       'disabled',
       true

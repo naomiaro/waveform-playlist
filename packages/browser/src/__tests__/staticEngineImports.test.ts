@@ -45,6 +45,11 @@ const FILES = [
   'utils/mergeLoadingClips.ts',
   'utils/loadSource.ts',
   'providerInternals/useSourceLoading.ts',
+  'providerInternals/useEarlyAdapter.ts',
+  'providerInternals/useMergedTracksChange.ts',
+  'providerInternals/useDragFlag.ts',
+  'providerInternals/useReportRejectedClips.ts',
+  'utils/unappliedClips.ts',
 ];
 
 const FORBIDDEN = [

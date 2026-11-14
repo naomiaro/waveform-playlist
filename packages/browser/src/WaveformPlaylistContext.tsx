@@ -7,7 +7,12 @@ import type {
 } from '@waveform-playlist/playout';
 import { resolvePlayoutAdapter } from './playout/resolvePlayoutAdapter';
 import { PlaylistEngine, type EngineState, type PlayoutAdapter } from '@waveform-playlist/engine';
-import { type ClipTrack, type Fade, type MidiNoteData } from '@waveform-playlist/core';
+import {
+  type ClipTrack,
+  type Fade,
+  type MidiNoteData,
+  type PlaylistTrack,
+} from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
@@ -33,6 +38,14 @@ import {
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
+import { useSourceLoading } from './providerInternals/useSourceLoading';
+import { useEarlyAdapter } from './providerInternals/useEarlyAdapter';
+import { useMergedTracksChange } from './providerInternals/useMergedTracksChange';
+import { useDragFlag } from './providerInternals/useDragFlag';
+import { useReportRejectedClips } from './providerInternals/useReportRejectedClips';
+import { resolveTracks, EMPTY_RESOLVE_CACHE, type ResolveCache } from './utils/resolveTracks';
+import { hasUnappliedContent, sameElements } from './utils/unappliedClips';
+import type { LoadSource } from './utils/loadSource';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
 import { incrementalTrackChange } from './utils/incrementalTrackChange';
@@ -119,7 +132,18 @@ import {
 } from './contexts/playlistContexts';
 
 export interface WaveformPlaylistProviderProps {
-  tracks: ClipTrack[]; // Updated to use clip-based model
+  /**
+   * The app's tracks. A clip is an `AudioClip`, or a `LoadingClip` that names
+   * its audio (`src`): the provider loads it and never changes this array
+   * because a buffer arrived.
+   */
+  tracks: PlaylistTrack[];
+  /**
+   * Loads one source in place of the default (fetch or `arrayBuffer()`, then
+   * `decodeAudioData`). Called once per source key; read on each call, so an
+   * inline function is fine.
+   */
+  loadSource?: LoadSource;
   /**
    * Draw and analyse every track as one channel. A provider option, not a
    * view option: the provider computes the peaks with it.
@@ -161,18 +185,15 @@ export interface WaveformPlaylistProviderProps {
    * The provider calls this so the parent can update its tracks state without
    * triggering a full engine rebuild.
    *
-   * **Important:** The parent must pass the received `tracks` reference back as
-   * the `tracks` prop (i.e. `setState(tracks)`). The provider uses reference
-   * identity (`tracks === engineTracksRef.current`) to detect engine-originated
-   * updates and skip the expensive `loadAudio` rebuild. */
-  onTracksChange?: (tracks: ClipTrack[]) => void;
+   * **Important:** The parent must pass the received `tracks` back as the
+   * `tracks` prop (i.e. `setState(tracks)`), track objects unchanged. The
+   * provider recognises them by identity and skips the expensive `loadAudio`
+   * rebuild. A clip that is still loading is handed back as the loading clip
+   * the app passed in. */
+  onTracksChange?: (tracks: PlaylistTrack[]) => void;
   /** SoundFont cache for sample-based MIDI playback. When provided, MIDI clips
    *  use SoundFont samples instead of PolySynth synthesis. */
   soundFontCache?: SoundFontCache;
-  /** When true, tracks render visually but the engine build is deferred.
-   *  Use this during progressive loading to avoid rebuilding the engine for
-   *  each track — flip to false when all tracks are ready for a single build. */
-  deferEngineRebuild?: boolean;
   /** Disable the automatic stop when the cursor reaches the end of the
    *  longest track — the transport rolls until an explicit stop/pause
    *  (DAW-style). The multitrack view then draws the timeline as wide as its
@@ -196,7 +217,8 @@ export interface WaveformPlaylistProviderProps {
 }
 
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
-  tracks,
+  tracks: tracksProp,
+  loadSource,
   mono = false,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
@@ -208,9 +230,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onReady,
   onError,
   onAnnotationsChange,
-  onTracksChange,
+  onTracksChange: onTracksChangeProp,
   soundFontCache,
-  deferEngineRebuild = false,
   indefinitePlayback = false,
   sampleRate: sampleRateProp,
   createAdapter,
@@ -260,6 +281,44 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // own rAF loops; the single loop below drives them all.
   const { registerFrameCallback, unregisterFrameCallback, runFrameCallbacks } = useFrameCallbacks();
 
+  // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
+  // React subscribes to engine statechange and mirrors into useState/refs.
+  // Playback timing (currentTime, isPlaying) remains in React for animation loop.
+  const engineRef = useRef<PlaylistEngine | null>(null);
+  const adapterRef = useRef<PlayoutAdapter | null>(null);
+  // Provisional sample rate until the adapter (which owns the AudioContext) is
+  // created in loadAudio. Reconciled from adapter.audioContext.sampleRate there.
+  // (#510: avoids a static @waveform-playlist/playout import at mount.)
+  const [initialSampleRate] = useState<number>(() => sampleRateProp ?? 48000);
+  const sampleRateRef = useRef<number>(initialSampleRate);
+  const sampleRate = sampleRateRef.current;
+
+  // Source loading (#812). The app's `tracks` may hold loading clips; from
+  // here on `tracks` is what is DRAWN (a pending clip as a placeholder) and
+  // `engineTracks` is what the engine gets (no placeholders). Both hold
+  // `AudioClip`s only, and a track nothing touched keeps its identity.
+  const earlyAdapter = useEarlyAdapter(() => (engineRef.current ? adapterRef.current : null));
+  const { sources, hasUnsettledSource } = useSourceLoading({
+    tracks: tracksProp,
+    loadSource,
+    getDecodeContext: earlyAdapter.getDecodeContext,
+    onError,
+  });
+  const resolveCacheRef = useRef<ResolveCache>(EMPTY_RESOLVE_CACHE);
+  const resolved = useMemo(() => {
+    const next = resolveTracks(tracksProp, sources, sampleRate, resolveCacheRef.current);
+    resolveCacheRef.current = next.cache;
+    return next;
+  }, [tracksProp, sources, sampleRate]);
+  const { viewTracks: tracks, engineTracks, placeholderIds, rejected } = resolved;
+  useReportRejectedClips(rejected, tracksProp, onError);
+  // Only the tracks the provider is mounted with wait for every source: until
+  // the first engine build, while one of them is still loading, nothing is
+  // built. A provider mounted with no tracks never waits.
+  const [mountedWithTracks] = useState(() => tracksProp.length > 0);
+  const firstBuildDoneRef = useRef(false);
+  const waitingForFirstLoad = !firstBuildDoneRef.current && mountedWithTracks && hasUnsettledSource;
+
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -287,11 +346,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   const [trackDragPreview, setTrackDragPreview] = useState<TrackDragPreview | null>(null);
 
   // Refs
-  // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
-  // React subscribes to engine statechange and mirrors into useState/refs.
-  // Playback timing (currentTime, isPlaying) remains in React for animation loop.
-  const engineRef = useRef<PlaylistEngine | null>(null);
-  const adapterRef = useRef<PlayoutAdapter | null>(null);
   const audioInitializedRef = useRef<boolean>(false);
 
   // Ref for animation loop access (avoids adding the prop to useCallback deps)
@@ -372,11 +426,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // position/isPlaying=false. Stop paths that don't restart afterward don't
   // need suppression — see the mirror's own comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // Engine clip operations guard: tracks reference from the last engine statechange.
-  // When engine methods (moveClip, trimClip, splitClip) mutate tracks, the statechange
-  // handler stores state.tracks here and calls onTracksChange with the same reference.
-  // loadAudio checks tracks === engineTracksRef.current to skip the full rebuild.
+  // Engine clip operations guard: the tracks of the last engine statechange.
+  // When engine methods (moveClip, trimClip, splitClip) mutate tracks, the
+  // statechange handler stores state.tracks here and hands them to the app
+  // (with its loading clips merged back in). When they return as the prop,
+  // they resolve to these same track objects, and loadAudio skips the rebuild.
   const engineTracksRef = useRef<ClipTrack[] | null>(null);
+  // The app's onTracksChange behind one merge, for the engine's reports and
+  // for the drag handlers (through the timeline value). Both are stable.
+  const { fromEngine: mirrorEngineTracks, fromView: publishViewTracks } = useMergedTracksChange({
+    onTracksChange: onTracksChangeProp,
+    tracks: tracksProp,
+    placeholderIds,
+    resolveCacheRef,
+    engineTracksRef,
+    engineRef,
+  });
   // Monotonic counter from engine.getState().tracksVersion — used to detect
   // track mutations (move/trim/split/add/remove) vs other statechange events.
   const lastTracksVersionRef = useRef(0);
@@ -390,19 +455,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Set by useClipDragHandlers during boundary trim drags. When true,
   // loadAudio skips the full engine rebuild — visual updates flow via React
   // state only. On drag end, engine.trimClip() commits the final delta.
-  const isDraggingRef = useRef(false);
+  // A source that finished loading during the drag is applied after the
+  // release: the effect notes it, and the release makes the effect run again
+  // (a release that trims nothing changes no state by itself).
+  const arrivalDeferredRef = useRef(false);
+  const [deferredArrivals, setDeferredArrivals] = useState(0);
+  const isDraggingRef = useDragFlag(() => {
+    if (!arrivalDeferredRef.current) return;
+    arrivalDeferredRef.current = false;
+    setDeferredArrivals((count) => count + 1);
+  });
   // Snapshot of tracks from the previous loadAudio run, used to detect
   // additive-only changes (new tracks appended, existing unchanged).
   const prevTracksRef = useRef<ClipTrack[]>([]);
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // Provisional sample rate until the adapter (which owns the AudioContext) is
-  // created in loadAudio. Reconciled from adapter.audioContext.sampleRate there.
-  // (#510: avoids a static @waveform-playlist/playout import at mount.)
-  const [initialSampleRate] = useState<number>(() => sampleRateProp ?? 48000);
-  const sampleRateRef = useRef<number>(initialSampleRate);
-
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat } = useTimeFormat();
   const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
@@ -500,15 +568,24 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Must be set before effects run so the previous effect cleanup can skip disposal.
   // Also skip disposal during active boundary trim drags — onDragMove updates React
   // tracks per-frame, triggering effect re-runs whose cleanup would dispose the engine.
-  const isEngineTracks = tracks === engineTracksRef.current;
+  // The prop is recognised through its resolution: each track the engine
+  // reported comes back as that same object (a merged track through the seed).
+  const heldByEngine = engineTracksRef.current;
+  const isEngineTracks = heldByEngine !== null && sameElements(engineTracks, heldByEngine);
 
   // Detect track changes that can be applied to the running engine: new tracks
   // appended, or an empty track that got its clips (a placeholder whose audio
   // arrived). Existing tracks are compared by reference; a changed track that
   // already had clips makes this null and triggers a full rebuild.
   const prevTracks = prevTracksRef.current;
+  // Compared with what the engine last reported, when that is known and it
+  // explains the change (a source that settled during a drag and comes back
+  // with the trimmed tracks), else with what this provider last applied.
   const incrementalChange =
-    engineRef.current !== null ? incrementalTrackChange(prevTracks, tracks) : null;
+    engineRef.current !== null
+      ? ((heldByEngine && incrementalTrackChange(heldByEngine, engineTracks)) ??
+        incrementalTrackChange(prevTracks, engineTracks))
+      : null;
   const isIncrementalAdd = incrementalChange !== null;
   // Note: prevTracks may be empty here (e.g. recording's first track on a
   // persistent empty-timeline engine) — that's a valid 0→1 incremental add, so
@@ -587,12 +664,20 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // correct tracks — we just need to update duration for the timeline.
     // Also skip during active boundary trim drags — visual updates flow via
     // React state only; engine.trimClip() commits the final delta on drag end.
-    if (isEngineTracks || isDraggingRef.current) {
-      if (isEngineTracks) {
-        engineTracksRef.current = null;
+    if (isEngineTracks) {
+      engineTracksRef.current = null;
+      prevTracksRef.current = engineTracks;
+      return;
+    }
+    if (isDraggingRef.current) {
+      // A track or clip that arrived during the drag (a source that finished
+      // loading) is still to be handed to the engine, after the release: such
+      // tracks are NOT recorded as applied.
+      if (engineRef.current && hasUnappliedContent(prevTracksRef.current, engineTracks)) {
+        arrivalDeferredRef.current = true;
+      } else {
+        prevTracksRef.current = engineTracks;
       }
-
-      prevTracksRef.current = tracks;
       return;
     }
 
@@ -651,7 +736,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // take the names of the filled ones ("x (loading...)" becomes "x").
         setTrackMixer((prev) => mixerWithAddedTracks(prev, addedTracks, filledTracks));
 
-        prevTracksRef.current = tracks;
+        prevTracksRef.current = engineTracks;
         return;
       } catch (err) {
         console.warn(
@@ -662,17 +747,32 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       }
     }
 
-    // Defer engine rebuild during progressive loading — tracks render visually
-    // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
-    // When deferEngineRebuild flips to false, this effect re-runs and builds once.
-    if (deferEngineRebuild) {
+    const createPlayoutAdapter = () =>
+      resolvePlayoutAdapter({
+        createAdapter,
+        effects,
+        trackEffects: resolveTrackEffects,
+        soundFontCache: soundFontCacheRef.current,
+        sampleRate: sampleRateProp,
+      });
+
+    // The first load: the tracks render (controls, clip shapes, placeholders)
+    // but no engine is built until every source they name has settled. The
+    // adapter is created now, because the audio is decoded with its context;
+    // the build below takes that same adapter. No build is in flight, so a
+    // play() meanwhile does nothing.
+    if (waitingForFirstLoad) {
+      earlyAdapter.ensure(createPlayoutAdapter, (error) => {
+        console.warn('[waveform-playlist] Error loading audio: ' + String(error));
+        onError?.(error instanceof Error ? error : new Error(String(error)));
+      });
       return;
     }
 
     // Reset ready state for full rebuild
     setIsReady(false);
 
-    if (tracks.length === 0) {
+    if (engineTracks.length === 0) {
       // Clear content state when all tracks are removed.
       setTrackMixer(EMPTY_TRACK_MIXER);
 
@@ -686,7 +786,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       if (engineRef.current) {
         // Keep the existing engine; just clear its tracks.
         engineRef.current.setTracks([]);
-        prevTracksRef.current = tracks;
+        prevTracksRef.current = engineTracks;
         return;
       }
       // No engine yet (initial mount with no tracks): fall through to the
@@ -726,12 +826,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
     const loadAudio = async () => {
       try {
-        const maxDuration = timelineDuration(tracks);
+        const maxDuration = timelineDuration(engineTracks);
 
         // A track the mixer knows keeps what the user set (and takes its
         // current name); a new one starts from its ClipTrack fields; one that
         // is gone is dropped. By id: the count and the order do not matter.
-        setTrackMixer((prev) => mixerForTracks(prev, tracks));
+        setTrackMixer((prev) => mixerForTracks(prev, engineTracks));
 
         // Dispose old engine before creating new one. Clear the ref with it:
         // the new adapter is created asynchronously below, and until the new
@@ -746,13 +846,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // Create engine adapter — custom if provided, else Tone.js (dynamically imported).
         // Reset init flag — new adapter needs AudioContext resume on first play.
         audioInitializedRef.current = false;
-        const adapter = await resolvePlayoutAdapter({
-          createAdapter,
-          effects,
-          trackEffects: resolveTrackEffects,
-          soundFontCache: soundFontCacheRef.current,
-          sampleRate: sampleRateProp,
-        });
+        // The first build takes the adapter that was created for decoding.
+        const adapter = await (earlyAdapter.take() ?? createPlayoutAdapter());
         if (cancelled) {
           // Superseded: the next effect run owns engineBuildInFlightRef now.
           adapter.dispose();
@@ -779,7 +874,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         // Merge current UI state into tracks before passing to engine
         const currentTrackMixer = trackMixerRef.current;
-        const tracksWithState = tracks.map((track) => {
+        const tracksWithState = engineTracks.map((track) => {
           const trackState = currentTrackMixer.get(track.id);
           return {
             ...track,
@@ -821,18 +916,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             state.tracksVersion !== lastTracksVersionRef.current
           ) {
             lastTracksVersionRef.current = state.tracksVersion;
-            engineTracksRef.current = state.tracks;
-
             // A reorder needs nothing for the mixer: its state is kept by
             // track id, and `trackStates` is derived from the new `tracks`.
-            if (onTracksChange) {
-              onTracksChange(state.tracks);
-            } else {
-              console.warn(
-                '[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — ' +
-                  'UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider.'
-              );
-            }
+            // Remembers state.tracks and hands them to the app, merged.
+            mirrorEngineTracks(state.tracks);
           }
         });
 
@@ -882,6 +969,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         lastTracksVersionRef.current = engine.getState().tracksVersion;
         engineRef.current = engine;
         engineBuildInFlightRef.current = false;
+        firstBuildDoneRef.current = true;
+        // Loads that asked for a decode context during the build can go on.
+        earlyAdapter.announce(adapter);
         // Starts any play queued for this engine (see the resume effect).
         setEngineEpoch((epoch) => epoch + 1);
 
@@ -890,13 +980,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         // Dispatch custom event for external listeners
         const event = new CustomEvent('waveform-playlist:ready', {
           detail: {
-            trackCount: tracks.length,
+            trackCount: engineTracks.length,
             duration: maxDuration,
           },
         });
         window.dispatchEvent(event);
 
-        prevTracksRef.current = tracks;
+        prevTracksRef.current = engineTracks;
 
         onReady?.();
       } catch (error) {
@@ -945,7 +1035,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    tracks,
+    engineTracks,
     // isEngineTracks is intentionally excluded — it's a render-phase guard read
     // inside the effect body, not a trigger. Including it causes a spurious re-run
     // when it flips from true→false after engineTracksRef is cleared.
@@ -966,7 +1056,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     onZoomEngineState,
     onVolumeEngineState,
     onUndoEngineState,
-    onTracksChange,
+    mirrorEngineTracks,
+    earlyAdapter,
     masterVolumeRef,
     selectionStartRef,
     selectionEndRef,
@@ -974,7 +1065,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     loopEndRef,
     isLoopEnabledRef,
     stableZoomLevels,
-    deferEngineRebuild,
+    waitingForFirstLoad,
+    deferredArrivals,
   ]);
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
@@ -988,17 +1080,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [soundFontCache]);
 
   // A clip with nothing to draw from is almost always a wiring mistake. Not
-  // while tracks are still streaming in (deferEngineRebuild): then it is expected.
+  // a placeholder: its audio is on the way.
   useEffect(() => {
-    if (deferEngineRebuild) return;
     for (const track of tracks) {
       for (const clip of track.clips) {
+        if (placeholderIds.has(clip.id)) continue;
         if (!clip.audioBuffer && !clip.waveformData && !clip.midiNotes) {
           console.warn(`[waveform-playlist] Clip "${clip.id}" has no audio data or waveform data`);
         }
       }
     }
-  }, [tracks, deferEngineRebuild]);
+  }, [tracks, placeholderIds]);
 
   // Audio clock from the adapter's own AudioContext (#510 — replaces tone's
   // getContext()). Stable; reads a ref so identity never changes.
@@ -1308,7 +1400,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setIsPlaying(false);
       stopAnimationLoop();
     });
-  }, [tracks, engineEpoch, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
+  }, [engineTracks, engineEpoch, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
 
   // Playback controls
   const play = useCallback(
@@ -1669,8 +1761,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     ]
   );
 
-  const sampleRate = sampleRateRef.current;
-
   // Context values, grouped by how often their fields change (#768). A
   // subscription is to a whole value, so a field belongs with the fields that
   // change when it does: a component that reads `sampleRate` must not render
@@ -1895,6 +1985,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Changes on every pointer move of a trim, and on a zoom (the peaks are
   // computed per zoom level).
+  // `onTracksChange` is the merged, stable one (drag handlers call it with
+  // copies of these tracks); undefined when the app passes none.
+  const onTracksChange = onTracksChangeProp ? publishViewTracks : undefined;
   const timelineValue: PlaylistTimelineContextValue = useMemo(
     () => ({ tracks, peaksDataArray, duration, isReady, onTracksChange }),
     [tracks, peaksDataArray, duration, isReady, onTracksChange]
