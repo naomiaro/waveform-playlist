@@ -94,8 +94,8 @@ There is one sensible way (1); the maintainer set its direction in the issue.
   state in an effect: converted in PR 2 like the six pages; the plan reads how
   it positions clips first) and three unit tests, which are rewritten over
   loading clips.
-- Loading into an empty engine waits for every source; `play()` during that
-  wait does nothing (both under "What the engine effect does").
+- `play()` during the first-load wait does nothing (under "What the engine
+  effect does").
 - The loader is declarative (`setWanted` / `suspend` / `provide`), with one owner.
 - `useIntegratedRecording(tracks, setTracks)` in `@waveform-playlist/recording`
   is retyped to `PlaylistTrack[]` in PR 2 (it receives the app's state); a
@@ -263,16 +263,21 @@ Identity rules (tests assert each):
 The effect keeps its structure and depends on `engineTracks` where it depended
 on `tracks`.
 
-- **Loading into an empty engine waits for everything.** While the engine
-  holds no tracks (never built, or built for an empty timeline) and any source
-  named by `tracks` is pending, no tracks are applied (this replaces
-  `deferEngineRebuild`). When all have settled they are applied in one step: a
-  full build when there is no engine yet, the incremental `added` path when an
-  engine for an empty timeline exists. `isReady`, the `waveform-playlist:ready`
-  event and `onReady` come from a full build only, as today, so an app that
-  mounts with no tracks and sets them later gets them before any audio exists,
-  as it does today. A `play()` during the wait does nothing, as today under
-  `deferEngineRebuild` (the effect returns before a build is in flight).
+- **Only the tracks the provider is mounted with wait for everything**
+  (maintainer, 2026-11-13: files dropped on an empty timeline keep playing one
+  by one, as `useDynamicTracks` does today). While the provider has not
+  completed its first build and any source named by `tracks` is pending, no
+  tracks are applied (this replaces `deferEngineRebuild`). When all have
+  settled, one full build. `isReady`, the `waveform-playlist:ready` event and
+  `onReady` come from that build, as today. A `play()` during the wait does
+  nothing, as today under `deferEngineRebuild` (the effect returns before a
+  build is in flight). A provider mounted with NO tracks builds its engine for
+  an empty timeline at once, as today, and has no wait at all: every source
+  named later arrives on its own (next bullets). Consequence: an app that
+  mounts empty and sets a whole song later gets its tracks one by one, each
+  playable as it finishes. There is no timeout: a download that stalls without
+  failing holds back the first build until the app removes the clip or its
+  `loadSource` rejects.
 - **A source that settles during a trim drag** (`isDraggingRef`) is applied
   after the release, not lost: the effect's drag branch must not record the
   new `engineTracks` as already applied. Test: a decode that finishes mid-drag
