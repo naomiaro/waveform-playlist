@@ -134,6 +134,9 @@ export class AdapterSync {
       this.sendAllTracks();
     } else {
       this._sendChange(change);
+      // Clips of other tracks became loaded inside this change: those tracks
+      // too, unless everything was just sent.
+      if (at.switched && this._syncedTracksVersion < at.tracksVersion) this._restore(at.switched);
     }
     this._needsAllTracks = false;
   }

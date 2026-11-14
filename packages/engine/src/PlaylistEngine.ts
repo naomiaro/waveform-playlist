@@ -10,6 +10,7 @@
 
 import type { ClipTrack } from '@waveform-playlist/core';
 import { AdapterSync } from './adapterSync';
+import type { TracksChange } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
 import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
 import type { ClipBounds } from './arrangement';
@@ -618,9 +619,30 @@ export class PlaylistEngine {
         if (change.type === 'remove' || change.type === 'restore' || change.type === 'update') {
           this._clearSelectionIfGone();
         }
-        this._adapterSync.follow(change, at);
+        if (change.type === 'load') {
+          this._followLoad(change, at);
+        } else {
+          this._adapterSync.follow(change, at);
+        }
     }
     this._emitStateChange();
+  }
+
+  /**
+   * Audio arrived by itself: there is no caller to fail when the adapter
+   * throws. The error is reported, the `statechange` is still emitted (the
+   * tracks did change), and the next track change sends the adapter every
+   * track.
+   */
+  private _followLoad(change: TracksChange, at: ArrangementVersions): void {
+    try {
+      this._adapterSync.follow(change, at);
+    } catch (error) {
+      console.error(
+        '[waveform-playlist] The playout adapter failed while loaded audio was applied:',
+        error
+      );
+    }
   }
 
   /** The selected track id names a track; when that track is gone, nothing is selected. */

@@ -689,6 +689,159 @@ describe('a source that settles late (Review Focus 5)', () => {
   });
 });
 
+describe('found by the review of part 4', () => {
+  // A buffer that arrives ON a clip (src + audioBuffer) switches the loading
+  // clips of that source inside the same change. The adapter must hear of
+  // every track that gained a clip, not only of the track the change names.
+  const carriedSetup = async (incremental: boolean) => {
+    const loads = fakeLoads();
+    const arrangement = createArrangement({
+      tracks: [track('A', [loading('L', 'x.opus')]), track('B', [clip('b1', 0)])],
+      loadSource: loads.loadSource,
+    });
+    const adapter = recordingAdapter({ incremental });
+    const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: RATE });
+    const events = vi.fn();
+    engine.on('statechange', events);
+    await flush();
+    adapter.reset();
+    return { arrangement, adapter, engine, events };
+  };
+  /** The clip ids per track an adapter holds, replayed from the calls it received. */
+  const held = (adapter: ReturnType<typeof recordingAdapter>, before: Record<string, string[]>) => {
+    const tracks: Record<string, string[]> = { ...before };
+    for (const call of adapter.calls) {
+      if (call.method === 'setTracks') {
+        for (const key of Object.keys(tracks)) delete tracks[key];
+        for (const sent of call.args[0] as { id: string; clips: string[] }[]) {
+          tracks[sent.id] = sent.clips;
+        }
+      } else if (call.method === 'addTrack') {
+        const sent = call.args[0] as { id: string; clips: string[] };
+        tracks[sent.id] = sent.clips;
+      } else if (call.method === 'updateTrack') {
+        tracks[call.args[0] as string] = (call.args[1] as { clips: string[] }).clips;
+      }
+    }
+    return tracks;
+  };
+
+  for (const incremental of [true, false]) {
+    const kind = incremental ? 'an incremental adapter' : 'an adapter with setTracks only';
+
+    it(`${kind}: addTrack of a clip that carries a pending source's audio also sends the track that was waiting`, async () => {
+      const { arrangement, adapter, engine, events } = await carriedSetup(incremental);
+      arrangement.addTrack(
+        track('C', [clip('c1', 0, { src: 'x.opus', audioBuffer: fakeBuffer() })])
+      );
+
+      expect(isLoaded(clipOf(arrangement, 'A', 'L'))).toBe(true);
+      expect(held(adapter, { A: [], B: ['b1'] })).toEqual({ A: ['L'], B: ['b1'], C: ['c1'] });
+      expect(engine.getState().tracks.map((t) => t.clips.map((c) => c.id))).toEqual([
+        ['L'],
+        ['b1'],
+        ['c1'],
+      ]);
+      // Still one change: one statechange.
+      expect(events).toHaveBeenCalledTimes(1);
+      // An adapter that was sent everything is not sent the waiting track again.
+      if (!incremental) expect(adapter.calls).toHaveLength(1);
+      if (incremental) {
+        expect(
+          adapter.calls.map((call) => [call.method, call.args.length > 1 ? call.args[0] : 'C'])
+        ).toEqual([
+          ['addTrack', 'C'],
+          ['updateTrack', 'A'],
+        ]);
+      }
+      engine.dispose();
+    });
+
+    it(`${kind}: updateTrack that puts such a clip on another track also sends the track that was waiting`, async () => {
+      const { arrangement, adapter, engine, events } = await carriedSetup(incremental);
+      arrangement.updateTrack('B', (current) => ({
+        ...current,
+        clips: [
+          ...current.clips,
+          clip('b2', 2 * SECOND, { src: 'x.opus', audioBuffer: fakeBuffer() }),
+        ],
+      }));
+
+      expect(held(adapter, { A: [], B: ['b1'] })).toEqual({ A: ['L'], B: ['b1', 'b2'] });
+      expect(events).toHaveBeenCalledTimes(1);
+      engine.dispose();
+    });
+  }
+
+  it('an adapter that throws when loaded audio is applied: the error is reported, the statechange is emitted, the next change sends every track', async () => {
+    const loads = fakeLoads();
+    const arrangement = createArrangement({
+      tracks: [track('A', [loading('L', 'x.opus')]), track('B', [clip('b1', 0)])],
+      loadSource: loads.loadSource,
+    });
+    const adapter = recordingAdapter();
+    const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: RATE });
+    const events = vi.fn();
+    engine.on('statechange', events);
+    await flush();
+    const boom = new Error('adapter boom');
+    const updateTrack = adapter.updateTrack;
+    adapter.updateTrack = () => {
+      throw boom;
+    };
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const warned = vi.mocked(console.warn);
+    warned.mockClear();
+
+    loads.calls[0].resolve(fakeBuffer());
+    await flush();
+
+    expect(isLoaded(clipOf(arrangement, 'A', 'L'))).toBe(true);
+    expect(events).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0][0])).toMatch(
+      /\[waveform-playlist\] The playout adapter failed while loaded audio was applied/
+    );
+    expect(error.mock.calls[0][1]).toBe(boom);
+    // Not left to the loader's own catch-all.
+    expect(warned).not.toHaveBeenCalled();
+    expect(arrangement.sources.getSnapshot().sources.get('x.opus')).toEqual({ status: 'loaded' });
+
+    // What the adapter holds is not known now: the next track change sends every track.
+    adapter.updateTrack = updateTrack;
+    adapter.reset();
+    arrangement.moveClip('B', 'b1', SECOND);
+    expect(adapter.calls.map((call) => call.method)).toEqual(['setTracks']);
+    engine.dispose();
+  });
+
+  it("a track taken out for good while only an open transaction's base held it: its source is let go at once", async () => {
+    const { arrangement, loads } = await setup([
+      track('T', [loading('L', 't.opus')]),
+      track('B', [clip('b1', 0)]),
+    ]);
+    arrangement.beginTransaction();
+    arrangement.removeTrack('T');
+    expect(loads.calls[0].signal.aborted).toBe(false);
+
+    arrangement.removeTrack('T', { undoable: false });
+    expect(loads.calls[0].signal.aborted).toBe(true);
+    expect(arrangement.sources.getSnapshot().sources.has('t.opus')).toBe(false);
+  });
+
+  it('beginTransaction over an open transaction lets go of what only the old base named', async () => {
+    const { arrangement, loads } = await setup([
+      track('T', [loading('L', 't.opus')]),
+      track('B', [clip('b1', 0)]),
+    ]);
+    arrangement.beginTransaction();
+    arrangement.removeTrack('T');
+    arrangement.beginTransaction();
+    expect(loads.calls[0].signal.aborted).toBe(true);
+    expect(arrangement.sources.getSnapshot().sources.has('t.opus')).toBe(false);
+  });
+});
+
 describe('`sources` is the same object until a status changes', () => {
   it('across edits of tracks and mix; a new object when a source is added, settles or is dropped', async () => {
     const { arrangement, loads } = await setup([

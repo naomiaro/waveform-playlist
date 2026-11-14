@@ -9,11 +9,13 @@
  * copies the same key.
  *
  * The keys carry a version. An engine that finds the time-base key treats
- * the object as an arrangement of this version: besides the two attach
- * points it calls `onChange(listener)` (with the `ArrangementChange` shapes
- * of this version) and reads `undoLimit`. A change to any of that needs a
- * new key, so that copies which do not agree refuse each other instead of
- * misreading each other.
+ * the object as an arrangement of this version and uses it BY NAME: the
+ * whole public `Arrangement` interface (every track, clip, mixer and history
+ * method it delegates to, `getTracks`, `getMixer`, the two version counters)
+ * and the internal `onChange(listener)` (with the `ArrangementChange` and
+ * `ArrangementVersions` shapes of this version), `recomputeStartSamples()`
+ * and `undoLimit`. A change to any of that needs a new key, so that copies
+ * which do not agree refuse each other instead of misreading each other.
  */
 
 import type { Arrangement } from './types';

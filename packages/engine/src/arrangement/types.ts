@@ -126,9 +126,15 @@ export interface Arrangement {
    * `subscribe()`; the same object until a status changes. When a source is
    * loaded, every loading clip that names it has become a loaded clip, in the
    * current tracks and in every undo and redo state; that is not an undo step.
+   * The tracks change first and are announced first: a `subscribe` listener
+   * told of the loaded clip still reads the source as pending here.
    */
   readonly sources: ValueSource<ArrangementSourcesValue>;
-  /** Start a failed source again. Does nothing for a source that is not failed. */
+  /**
+   * Start a source whose load failed again. Does nothing for any other
+   * source, also one shown as failed because a clip could not be made from
+   * its audio (the audio is loaded; loading it again changes nothing).
+   */
   retry(src: ClipSource): void;
 }
 

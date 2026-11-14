@@ -3,7 +3,7 @@
  * before anything has changed (#756).
  */
 
-import { assertTrackKind } from '@waveform-playlist/core';
+import { assertTrackKind, isLoadingClip } from '@waveform-playlist/core';
 import type { ArrangementTrack, ClipTrack } from '@waveform-playlist/core';
 
 /**
@@ -14,7 +14,12 @@ import type { ArrangementTrack, ClipTrack } from '@waveform-playlist/core';
  * has a loading clip on a MIDI track.
  */
 export function assertClipsOfTrackKind(track: ArrangementTrack): void {
-  assertTrackKind(track as ClipTrack);
+  // Whatever else a loading clip carries (plain JavaScript can give it
+  // `midiNotes`), it is read as an audio clip: that is what it will become.
+  const clips = track.clips.map((clip) =>
+    isLoadingClip(clip) ? { id: clip.id, name: clip.name } : clip
+  );
+  assertTrackKind({ ...track, clips } as ClipTrack);
 }
 
 /** Readers address a clip by its id within its track, so two clips of one id cannot be told apart. */

@@ -38,7 +38,7 @@ export interface ArrangementSourceState {
 
 /** What `arrangement.sources` holds. A new object only when a status changes. */
 export interface ArrangementSourcesValue {
-  /** Every source the arrangement's clips name, in the order they were first named. */
+  /** Every source the arrangement's clips name. The order of the entries means nothing. */
   sources: ReadonlyMap<ClipSource, ArrangementSourceState>;
   pendingCount: number;
   failedCount: number;
@@ -151,7 +151,7 @@ export class ArrangementSources {
     };
   }
 
-  /** Start a failed source again. Does nothing for any other source. */
+  /** Start a source whose load failed again. Does nothing for any other source. */
   retry(src: ClipSource): void {
     this._loader.retry(src);
   }

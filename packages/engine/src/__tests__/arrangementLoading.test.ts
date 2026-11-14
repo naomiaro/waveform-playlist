@@ -285,6 +285,17 @@ describe('a loading clip and the kind of its track', () => {
     expect(arrangement.sources.getSnapshot().sources.size).toBe(0);
   });
 
+  it('a loading clip is an audio clip whatever else it carries: one with midiNotes (plain JavaScript) is refused on a MIDI track', () => {
+    const odd = { ...loading('L'), midiNotes: [] } as unknown as LoadingClip;
+    const arrangement = createArrangement();
+    expect(() => arrangement.setTracks([midiTrack('M', [midiClip('m1'), odd])])).toThrow(
+      /Track "M" is an? midi track but its clip "L" is an audio clip/
+    );
+    // On an audio track it is what any loading clip is.
+    arrangement.setTracks([track('A', [odd])]);
+    expect(arrangement.getTracks()[0].clips).toHaveLength(1);
+  });
+
   it('a track that is given the kind midi while it holds a loading clip is refused', () => {
     const arrangement = createArrangement({ tracks: [track('A', [loading('L')])] });
     expect(() =>

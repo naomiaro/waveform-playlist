@@ -98,6 +98,13 @@ export interface ArrangementOptions {
 export interface ArrangementVersions {
   tracksVersion: number;
   mixerVersion: number;
+  /**
+   * Set when, inside this change, clips of OTHER tracks became loaded clips
+   * (a clip that came in carried the audio of a source they were waiting
+   * for): the tracks from before that switch, so that a listener can tell
+   * which tracks gained a clip besides the one the change names.
+   */
+  switched?: readonly ArrangementTrack[];
 }
 
 type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
@@ -156,7 +163,7 @@ export class ArrangementImpl implements Arrangement {
     return this._sources.value;
   }
 
-  /** Start a failed source again. Does nothing for any other source. */
+  /** Start a source whose LOAD failed again. See `Arrangement.retry`. */
   retry(src: ClipSource): void {
     this._sources.retry(src);
   }
@@ -194,7 +201,9 @@ export class ArrangementImpl implements Arrangement {
   /**
    * Internal, for the engine: be told WHAT changed, before the subscribers
    * are. A listener here that throws fails the change's caller (an adapter
-   * that fails must fail the call that caused it).
+   * that fails must fail the call that caused it). A `'load'` has no caller
+   * (audio arrived by itself): the engine catches its adapter's error for
+   * that change and reports it.
    */
   onChange(listener: ChangeListener): () => void {
     this._listeners.add(listener);
@@ -292,7 +301,10 @@ export class ArrangementImpl implements Arrangement {
           'previous snapshot will be overwritten'
       );
     }
+    const replaced = this._transaction !== null;
     this._transaction = beginBase(this._tracks);
+    // The base that was dropped may have been the last state naming a source.
+    if (replaced) this._resyncSourcesQuietly();
   }
 
   commitTransaction(): void {
@@ -616,6 +628,9 @@ export class ArrangementImpl implements Arrangement {
       this._emit({ type: 'remove', trackId });
     } else if (historyChanged) {
       this._emit({ type: 'history' });
+    } else {
+      // Only an open transaction's base held it.
+      this._resyncSourcesQuietly();
     }
   }
 
@@ -656,9 +671,15 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Declare the sources every state names, and switch the clips whose audio is there. */
-  private _syncSources(): void {
+  private _syncSources(): readonly ArrangementTrack[] | null {
     this._sources.declare(this._heldStates());
-    this._switchLoaded();
+    return this._switchLoaded();
+  }
+
+  /** The stored states changed with nothing to announce: the sources they name may have. */
+  private _resyncSourcesQuietly(): void {
+    this._syncSources();
+    this._sources.finishPass();
   }
 
   /**
@@ -707,7 +728,7 @@ export class ArrangementImpl implements Arrangement {
   private _emit(change: ArrangementChange): void {
     // The states may name other sources now, and a clip that came in may name
     // one that is loaded already: it is a loaded clip before anyone is told.
-    if (change.type !== 'mixer') this._syncSources();
+    const switched = change.type === 'mixer' ? null : this._syncSources();
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
@@ -716,10 +737,13 @@ export class ArrangementImpl implements Arrangement {
     if (change.type === 'remove' || change.type === 'restore') {
       this._mixer = retainMixer(this._mixer, this._heldStates());
     }
-    this._pending.push({
-      change,
-      at: { tracksVersion: this._tracksVersion, mixerVersion: this._mixerVersion },
-    });
+    const at: ArrangementVersions = {
+      tracksVersion: this._tracksVersion,
+      mixerVersion: this._mixerVersion,
+    };
+    // An add or an update names one track; the others that gained a clip go with it.
+    if (switched && (change.type === 'add' || change.type === 'update')) at.switched = switched;
+    this._pending.push({ change, at });
     if (this._delivering) return;
 
     this._delivering = true;

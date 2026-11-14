@@ -269,6 +269,15 @@ describe('defaultLoadSource', () => {
       ['an @ in the query only', 'https://x.example/a.mp3?to=a@b', 'https://x.example/a.mp3'],
       ['a relative URL with an @', 'media/@2x/a.mp3', 'media/@2x/a.mp3'],
       ['a protocol-relative URL', '//alice:pw@x.example/a.mp3', '//x.example/a.mp3'],
+      ['leading white space', '  https://alice:pw@x.example/a.mp3', 'https://x.example/a.mp3'],
+      ['one slash after the scheme', 'https:/alice:pw@x.example/a.mp3', 'https://x.example/a.mp3'],
+      ['one slash and a user name only', 'https:/alice@x.example/a.mp3', 'https://x.example/a.mp3'],
+      ['backslashes for slashes', 'https:\\\\alice:pw@x.example\\a.mp3', 'https://x.example/a.mp3'],
+      [
+        'a port and a path',
+        ' https:/alice:pw@x.example:8443/m/a.mp3?t=1#f',
+        'https://x.example:8443/m/a.mp3',
+      ],
       [
         'a fragment and no query',
         'https://x.example/a.mp3#access_token=T',

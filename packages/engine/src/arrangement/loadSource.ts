@@ -21,11 +21,32 @@ const USERINFO = /^((?:[a-z][a-z0-9+.-]*:)?\/\/)[^/@]*@/i;
  * secret, and messages reach the app); a `data:` or `blob:` URL is not echoed
  * at all.
  */
+function urlLabel(url: string): string {
+  const plain = url.split(/[?#]/)[0];
+  const cut = plain.replace(USERINFO, '$1');
+  if (cut !== plain) return cut;
+  // Forms the pattern does not see but a browser reads as a URL with a user
+  // name (white space in front, one slash, backslashes): ask the URL parser.
+  try {
+    const parsed = new URL(url, 'http://relative.invalid/');
+    if (parsed.username !== '' || parsed.password !== '') {
+      parsed.username = '';
+      parsed.password = '';
+      parsed.search = '';
+      parsed.hash = '';
+      return parsed.href;
+    }
+  } catch {
+    // Not a URL the parser accepts: the text without query and fragment is all there is.
+  }
+  return plain;
+}
+
 function sourceLabel(src: ClipSource): string {
   if (typeof src === 'string') {
     if (/^data:/i.test(src)) return 'data: URL';
     if (/^blob:/i.test(src)) return 'blob: URL';
-    return src.split(/[?#]/)[0].replace(USERINFO, '$1');
+    return urlLabel(src);
   }
   if (typeof File !== 'undefined' && src instanceof File) return src.name;
   return 'Blob';
