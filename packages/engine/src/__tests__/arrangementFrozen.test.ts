@@ -11,6 +11,7 @@ import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
 import { PlaylistEngine } from '../PlaylistEngine';
 import type { EngineState } from '../types';
 import { recordingAdapter } from './helpers/recordingAdapter';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -96,7 +97,7 @@ describe('outside production builds', () => {
     ];
     for (const step of steps) {
       step();
-      expectFrozen(arrangement.getTracks(), true);
+      expectFrozen(loaded(arrangement), true);
     }
   });
 

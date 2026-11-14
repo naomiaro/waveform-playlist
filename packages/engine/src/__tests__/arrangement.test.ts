@@ -7,6 +7,7 @@ import { createClip, createTrack } from '@waveform-playlist/core';
 import type { ClipTrack } from '@waveform-playlist/core';
 import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
 import type { ArrangementChange, ArrangementTimeBase } from '../arrangement/Arrangement';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 const TICKS_PER_SECOND = 1920; // 960 ppqn at 120 bpm
@@ -48,8 +49,7 @@ function setup(options: { undoLimit?: number } = {}) {
   arrangement.onChange((change) => changes.push(change));
   const ids = () => arrangement.getTracks().map((t) => t.id);
   const clipOf = (trackId: string, clipId: string) => {
-    const found = arrangement
-      .getTracks()
+    const found = loaded(arrangement)
       .find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId);
     if (!found) throw new Error(`no clip ${clipId} on ${trackId}`);
@@ -86,7 +86,7 @@ describe('Arrangement: tracks', () => {
 
     expect(arrangement.getTracks()).not.toBe(given);
     expect(arrangement.getTracks()[0]).not.toBe(given[0]);
-    expect(arrangement.getTracks()[0].clips.map((c) => c.startTick)).toEqual([0, 3840]);
+    expect(loaded(arrangement)[0].clips.map((c) => c.startTick)).toEqual([0, 3840]);
     expect(given[0].clips[1].startTick).toBeUndefined();
     expect(arrangement.tracksVersion).toBe(1);
     expect(changes).toEqual([{ type: 'set' }]);
@@ -95,7 +95,7 @@ describe('Arrangement: tracks', () => {
   it('setTracks keeps a startTick a clip already has', () => {
     const arrangement = new Arrangement({ timeBase: timeBase() });
     arrangement.setTracks([track('A', [{ ...clip('a1', 48000), startTick: 7 }])]);
-    expect(arrangement.getTracks()[0].clips[0].startTick).toBe(7);
+    expect(loaded(arrangement)[0].clips[0].startTick).toBe(7);
   });
 
   it('setTracks clears the history', () => {
@@ -118,7 +118,7 @@ describe('Arrangement: tracks', () => {
 
     expect(ids()).toEqual(['A', 'B', 'C']);
     expect(arrangement.getTracks()).not.toBe(before);
-    expect(arrangement.getTracks()[2].clips[0].startTick).toBe(1920);
+    expect(loaded(arrangement)[2].clips[0].startTick).toBe(1920);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
     expect(changes).toEqual([{ type: 'add', trackId: 'C' }]);
@@ -144,9 +144,7 @@ describe('Arrangement: tracks', () => {
   it('updateTrack replaces the track, gives ticks, is an undo step, announces "update"', () => {
     const { arrangement, changes } = setup();
     arrangement.updateTrack('A', track('A', [clip('a3', 48000)]));
-    expect(arrangement.getTracks()[0].clips.map((c) => [c.id, c.startTick])).toEqual([
-      ['a3', 1920],
-    ]);
+    expect(loaded(arrangement)[0].clips.map((c) => [c.id, c.startTick])).toEqual([['a3', 1920]]);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
     expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
@@ -293,7 +291,7 @@ describe('Arrangement: clips', () => {
   it('splitClip replaces the clip with two, each with a tick, and announces "update"', () => {
     const { arrangement, changes } = setup();
     arrangement.splitClip('A', 'a1', 24000);
-    const clips = arrangement.getTracks()[0].clips;
+    const clips = loaded(arrangement)[0].clips;
     expect(clips.map((c) => [c.startSample, c.durationSamples, c.startTick])).toEqual([
       [0, 24000, 0],
       [24000, 24000, 960],
@@ -516,7 +514,7 @@ describe('Arrangement: recomputeStartSamples', () => {
     ticksPerSecond = TICKS_PER_SECOND / 2; // half the tempo
     arrangement.recomputeStartSamples();
 
-    expect(arrangement.getTracks()[0].clips.map((c) => c.startSample)).toEqual([0, 192000]);
+    expect(loaded(arrangement)[0].clips.map((c) => c.startSample)).toEqual([0, 192000]);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(false);
     expect(changes).toEqual([{ type: 'recompute' }]);

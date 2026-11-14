@@ -24,8 +24,8 @@
  * delivered after the one being handled has reached everyone.
  */
 
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { assertTrackKind } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip, LoadingClip } from '@waveform-playlist/core';
+import { isLoadingClip } from '@waveform-playlist/core';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
 import type { ClipEditTime } from './clipEdits';
 import { freezeTracksInDevelopment } from './devFreeze';
@@ -42,8 +42,13 @@ import {
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
-import { clipMapper, rescaleTick, withClips } from './ticks';
-import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
+import { clipMapper, forLoadedClips, rescaleTick, withClips } from './ticks';
+import {
+  assertLoadedClipsOfTrackKind,
+  assertUniqueClipIds,
+  assertUniqueTrackIds,
+  duplicateTrackId,
+} from './validate';
 import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
@@ -56,7 +61,7 @@ export type ArrangementChange =
   | { type: 'remove'; trackId: string }
   | { type: 'update'; trackId: string }
   | { type: 'reorder' }
-  | { type: 'restore'; previous: readonly ClipTrack[] }
+  | { type: 'restore'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
   | { type: 'recompute' }
   | { type: 'history' };
@@ -76,7 +81,7 @@ export interface ArrangementOptions {
   /** Left out: no engine is attached yet (see `attachEngine`). */
   timeBase?: ArrangementTimeBase;
   /** The first tracks. Not an undo step. */
-  tracks?: readonly ClipTrack[];
+  tracks?: readonly ArrangementTrack[];
 }
 
 /** The versions the arrangement had right after a change. */
@@ -88,7 +93,7 @@ export interface ArrangementVersions {
 type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
 
 export class ArrangementImpl implements Arrangement {
-  private _tracks: readonly ClipTrack[] = [];
+  private _tracks: readonly ArrangementTrack[] = [];
   private _tracksVersion = 0;
   private _mixerVersion = 0;
   private _mixer: Mixer = EMPTY_MIXER;
@@ -115,7 +120,7 @@ export class ArrangementImpl implements Arrangement {
   // ---------------------------------------------------------------------------
 
   /** The tracks. The same array until something changes; never written to. */
-  getTracks(): readonly ClipTrack[] {
+  getTracks(): readonly ArrangementTrack[] {
     return this._tracks;
   }
 
@@ -185,15 +190,17 @@ export class ArrangementImpl implements Arrangement {
     // nothing here has changed and the arrangement is not attached.
     const fromPpqn = this._tickPpqn;
     const toPpqn = timeBase.ppqn;
-    const prepare = clipMapper((clip) => {
-      if (clip.startTick === undefined) {
-        const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
-        return { ...clip, startTick };
-      }
-      if (fromPpqn === null || fromPpqn === toPpqn) return clip;
-      const startTick = rescaleTick(clip.startTick, fromPpqn, toPpqn);
-      return startTick === clip.startTick ? clip : { ...clip, startTick };
-    });
+    const prepare = clipMapper(
+      forLoadedClips((clip) => {
+        if (clip.startTick === undefined) {
+          const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
+          return { ...clip, startTick };
+        }
+        if (fromPpqn === null || fromPpqn === toPpqn) return clip;
+        const startTick = rescaleTick(clip.startTick, fromPpqn, toPpqn);
+        return startTick === clip.startTick ? clip : { ...clip, startTick };
+      })
+    );
     const tracks = prepare(this._tracks);
     const history = {
       undo: this._history.undo.map(prepare),
@@ -296,8 +303,8 @@ export class ArrangementImpl implements Arrangement {
   // unique, and so are clip ids within a track. The three methods that take a
   // track check it before they change anything, so a throw leaves the tracks,
   // the undo history, the mixer and every subscriber untouched.
-  setTracks(tracks: readonly ClipTrack[]): void {
-    tracks.forEach(assertTrackKind);
+  setTracks(tracks: readonly ArrangementTrack[]): void {
+    tracks.forEach(assertLoadedClipsOfTrackKind);
     assertUniqueTrackIds(tracks);
     tracks.forEach(assertUniqueClipIds);
     // Everything before is replaced, an open transaction included.
@@ -312,8 +319,8 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'set' });
   }
 
-  addTrack(track: ClipTrack): void {
-    assertTrackKind(track);
+  addTrack(track: ArrangementTrack): void {
+    assertLoadedClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
@@ -367,14 +374,17 @@ export class ArrangementImpl implements Arrangement {
    * A track object is copied on its way in. A function's result keeps the
    * clip objects the arrangement already held, so states go on sharing them.
    */
-  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void {
+  updateTrack(
+    trackId: string,
+    next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
+  ): void {
     const current = this._tracks.find((t) => t.id === trackId);
     const byFunction = typeof next === 'function';
     if (byFunction && !current) return;
-    const track = byFunction ? next(current as ClipTrack) : next;
+    const track = byFunction ? next(current as ArrangementTrack) : next;
     if (byFunction && track === current) return;
 
-    assertTrackKind(track);
+    assertLoadedClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (track.id !== trackId && this._tracks.some((t) => t.id === track.id)) {
       throw duplicateTrackId(track.id);
@@ -468,11 +478,14 @@ export class ArrangementImpl implements Arrangement {
     if (!this._timeBase) return;
     const { ticksToSeconds, sampleRate } = this._timeBase;
     this._tracks = this._tracks.map((track) =>
-      withClips(track, (clip) => {
-        if (clip.startTick === undefined) return clip;
-        const startSample = Math.round(ticksToSeconds(clip.startTick) * sampleRate);
-        return startSample === clip.startSample ? clip : { ...clip, startSample };
-      })
+      withClips(
+        track,
+        forLoadedClips((clip) => {
+          if (clip.startTick === undefined) return clip;
+          const startSample = Math.round(ticksToSeconds(clip.startTick) * sampleRate);
+          return startSample === clip.startSample ? clip : { ...clip, startSample };
+        })
+      )
     );
     this._tracksVersion++;
     this._emit({ type: 'recompute' });
@@ -483,7 +496,7 @@ export class ArrangementImpl implements Arrangement {
   // ---------------------------------------------------------------------------
 
   /** The tracks after an edit of one track: an undo step, the new array, the announcement. */
-  private _replaceTrack(trackId: string, tracks: readonly ClipTrack[]): void {
+  private _replaceTrack(trackId: string, tracks: readonly ArrangementTrack[]): void {
     this._pushUndoSnapshot();
     this._tracks = tracks;
     this._tracksVersion++;
@@ -518,14 +531,18 @@ export class ArrangementImpl implements Arrangement {
    * arrangement holds no object its caller can still write to; a clip in
    * `held` is one the arrangement already holds and is kept as it is.
    */
-  private _ingest(track: ClipTrack, held?: ReadonlySet<AudioClip>): ClipTrack {
+  private _ingest(
+    track: ArrangementTrack,
+    held?: ReadonlySet<AudioClip | LoadingClip>
+  ): ArrangementTrack {
     return {
       ...track,
-      clips: track.clips.map((clip) =>
-        held?.has(clip)
-          ? clip
-          : { ...clip, startTick: clip.startTick ?? this._tickAt(clip.startSample) }
-      ),
+      clips: track.clips.map((clip) => {
+        if (held?.has(clip)) return clip;
+        // A clip that is still loading has no samples to count a tick from.
+        if (isLoadingClip(clip)) return { ...clip };
+        return { ...clip, startTick: clip.startTick ?? this._tickAt(clip.startSample) };
+      }),
     };
   }
 
@@ -540,7 +557,7 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Every tracks array the arrangement can still return to, and the current one. */
-  private _heldStates(): ReadonlyArray<readonly ClipTrack[]> {
+  private _heldStates(): ReadonlyArray<readonly ArrangementTrack[]> {
     return [
       this._tracks,
       ...this._history.undo,
@@ -584,13 +601,13 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Add an undo step. The history may let go of states with it (the redo stack, a step past the limit). */
-  private _pushStep(tracks: readonly ClipTrack[]): void {
+  private _pushStep(tracks: readonly ArrangementTrack[]): void {
     const letsGo = this._history.redo.length > 0 || this._history.undo.length >= this.undoLimit;
     this._history = pushStep(this._history, tracks, this.undoLimit);
     if (letsGo) this._mixer = retainMixer(this._mixer, this._heldStates());
   }
 
-  private _restoreTracks(snapshot: readonly ClipTrack[]): void {
+  private _restoreTracks(snapshot: readonly ArrangementTrack[]): void {
     const previous = this._tracks;
     this._tracks = snapshot;
     this._tracksVersion++;

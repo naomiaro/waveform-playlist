@@ -166,7 +166,7 @@ export class PlaylistEngine {
       tracks: this._adapterSync.tracks(),
       tracksVersion: this._arrangement.tracksVersion,
       mixerVersion: this._arrangement.mixerVersion,
-      duration: calculateDuration(this._arrangement.getTracks()),
+      duration: calculateDuration(this._adapterSync.tracks()),
       currentTime: this._currentTime,
       isPlaying: this._isPlaying,
       samplesPerPixel: this._zoomLevels[this._zoomIndex],

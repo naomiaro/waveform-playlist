@@ -10,6 +10,7 @@ import type { ArrangementChange } from '../arrangement/Arrangement';
 import { PlaylistEngine } from '../PlaylistEngine';
 import type { EngineState } from '../types';
 import { recordingAdapter } from './helpers/recordingAdapter';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -49,8 +50,7 @@ function setup() {
   const changes: ArrangementChange[] = [];
   arrangement.onChange((change) => changes.push(change));
   const startOf = (trackId: string, clipId: string) =>
-    arrangement
-      .getTracks()
+    loaded(arrangement)
       .find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId)?.startSample;
   return { arrangement, changes, startOf };

@@ -9,7 +9,7 @@
  * not read while it has one.
  */
 
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ArrangementTrack } from '@waveform-playlist/core';
 
 export interface TrackMixerValues {
   volume: number;
@@ -26,7 +26,7 @@ const DEFAULT_VOLUME = 1;
 const DEFAULT_PAN = 0;
 
 /** The mixer values a track carries in its own fields (defaults for a field it lacks). */
-export function mixerValuesOf(track: ClipTrack): TrackMixerValues {
+export function mixerValuesOf(track: ArrangementTrack): TrackMixerValues {
   return {
     volume: track.volume ?? DEFAULT_VOLUME,
     muted: track.muted ?? false,
@@ -39,7 +39,7 @@ export function mixerValuesOf(track: ClipTrack): TrackMixerValues {
  * Entries for the tracks that have none yet, from their own fields. An id
  * that already has an entry keeps it. The same Map when nothing was added.
  */
-export function seedMixer(mixer: Mixer, tracks: readonly ClipTrack[]): Mixer {
+export function seedMixer(mixer: Mixer, tracks: readonly ArrangementTrack[]): Mixer {
   let next: Map<string, TrackMixerValues> | null = null;
   for (const track of tracks) {
     if ((next ?? mixer).has(track.id)) continue;
@@ -78,7 +78,7 @@ export function carryMixerEntry(mixer: Mixer, fromId: string, toId: string): Mix
  * Only the entries of tracks that one of `states` holds. The same Map when
  * every entry is still held.
  */
-export function retainMixer(mixer: Mixer, states: Iterable<readonly ClipTrack[]>): Mixer {
+export function retainMixer(mixer: Mixer, states: Iterable<readonly ArrangementTrack[]>): Mixer {
   const held = new Set<string>();
   for (const tracks of states) {
     for (const track of tracks) held.add(track.id);
@@ -91,7 +91,10 @@ export function retainMixer(mixer: Mixer, states: Iterable<readonly ClipTrack[]>
  * The track with the entry's values in its fields: what an adapter is sent.
  * The same track when its fields already hold them.
  */
-export function withMixerValues(track: ClipTrack, values: TrackMixerValues | undefined): ClipTrack {
+export function withMixerValues<T extends ArrangementTrack>(
+  track: T,
+  values: TrackMixerValues | undefined
+): T {
   if (
     !values ||
     (track.volume === values.volume &&
