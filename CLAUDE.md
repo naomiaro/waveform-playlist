@@ -150,6 +150,18 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Every string a component draws can be supplied by the app (translation frameworks).** `children` for a label, `title` for a tooltip; no English-only helper (`getShortcutLabel` was removed for this). The rest of the library is #808.
 
+### One Owner per Piece of State
+
+**Rule (maintainer, 2026-11-13): every piece of state has one owner. Everything else subscribes to it and changes it by asking the owner.** No second stored copy that has to be kept in step.
+
+- A controlled prop with a change callback is two owners when the library also keeps and changes the value: the app's state is one place, the library's copy the other. A callback that hands back a whole array or object is a write computed earlier than it lands, and storing it overwrites whatever was written in between.
+- A guard, a merge or a flag between two owners closes one sequence of events; the next sequence needs another. Name the owner instead.
+- Moving a seam is not removing it. After choosing an owner, list every other object that still stores the value and writes back.
+- A value computed from the owner during render, a cached projection that is never written back and a one-way cache downstream (what an audio adapter holds) are not second owners.
+- Where it came from: #812. The tracks had two owners (the app's `tracks` state and the engine, joined by `onTracksChange`), and one day of work found a loaded clip that stayed "loading" in the app's state, a lost update (a page showing 2, 4 and 3 rows of 4) and an undo that removed a track the app still held; a first redesign moved the same seam between a store and the engine. The issue body is the record.
+
+The project skill `state-ownership` (`.claude/skills/state-ownership/SKILL.md`) is how to apply it: the owner table that opens a design, a plan or a review, what to send the maintainer when a row has two places, and the shapes in this codebase that hold one owner (`ValueSource`, `EffectsRack`, `annotationPreview`).
+
 ### Declarative Over Imperative
 
 **Rule:** Consumer code should read as a declaration of what they want, not how to set it up. When multiple hooks/providers must be wired together, create a higher-level component that reads from context internally and exposes simple boolean props.
