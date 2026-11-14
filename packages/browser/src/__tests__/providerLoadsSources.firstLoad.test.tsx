@@ -19,15 +19,9 @@ vi.mock('../workers/peaksWorker', () => ({
     terminate: () => {},
   }),
 }));
-// The status value has no context yet: see sourceStatusCapture.ts.
-vi.mock('../providerInternals/useSourceLoading', async (importOriginal) => {
-  const { capturing } = await import('./sourceStatusCapture');
-  return capturing(await importOriginal<typeof import('../providerInternals/useSourceLoading')>());
-});
 
 import { act, waitFor } from '@testing-library/react';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import { captured } from './sourceStatusCapture';
 import {
   builtClips,
   createFakeAdapter,
@@ -39,6 +33,7 @@ import {
   mount,
   plainTrack,
   probe,
+  sourceStatus,
   ready,
   readyEvents,
   track,
@@ -276,7 +271,7 @@ describe('the first load', () => {
     expect(m.adapter.setTracks).toHaveBeenCalledTimes(1);
     expect(builtClips(m.adapter).map((clips) => clips.length)).toEqual([0, 1]);
     expect(calls).toHaveLength(1);
-    expect(captured.status?.sources.has('/m.mp3')).toBe(false);
+    expect(sourceStatus?.sources.has('/m.mp3')).toBe(false);
     const rejected = m.onError.mock.calls.filter(([error]) => error.message.includes('"m-clip"'));
     expect(rejected).toHaveLength(1);
     expect(m.onError).toHaveBeenCalledTimes(1);
@@ -320,10 +315,10 @@ describe('the first load', () => {
     m.rerender();
     expect(m.onError).toHaveBeenCalledTimes(1);
     expect(m.onError).toHaveBeenCalledWith(failure);
-    expect(captured.status?.sources.get('/b.mp3')).toEqual({ status: 'failed', error: failure });
-    expect(captured.status?.failedCount).toBe(1);
+    expect(sourceStatus?.sources.get('/b.mp3')).toEqual({ status: 'failed', error: failure });
+    expect(sourceStatus?.failedCount).toBe(1);
 
-    act(() => captured.status?.retry('/b.mp3'));
+    act(() => sourceStatus?.retry('/b.mp3'));
     await waitFor(() => expect(calls).toHaveLength(3));
     await act(async () => {
       calls[2].resolve(fakeBuffer());
@@ -335,7 +330,7 @@ describe('the first load', () => {
     expect(readyEvents).toBe(1);
     expect(m.adapter.setTracks).toHaveBeenCalledTimes(1);
     expect(m.createAdapter).toHaveBeenCalledTimes(1);
-    expect(captured.status?.sources.get('/b.mp3')).toEqual({ status: 'loaded' });
+    expect(sourceStatus?.sources.get('/b.mp3')).toEqual({ status: 'loaded' });
     expect(m.onError).toHaveBeenCalledTimes(1);
   });
 

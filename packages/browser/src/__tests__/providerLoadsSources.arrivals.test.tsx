@@ -19,11 +19,6 @@ vi.mock('../workers/peaksWorker', () => ({
     terminate: () => {},
   }),
 }));
-// The status value has no context yet: see sourceStatusCapture.ts.
-vi.mock('../providerInternals/useSourceLoading', async (importOriginal) => {
-  const { capturing } = await import('./sourceStatusCapture');
-  return capturing(await importOriginal<typeof import('../providerInternals/useSourceLoading')>());
-});
 
 import { render, act, waitFor } from '@testing-library/react';
 import React from 'react';

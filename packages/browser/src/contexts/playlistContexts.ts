@@ -11,7 +11,7 @@
  * must not pull in the WebAudio provider through it.
  */
 import { createContext, use } from 'react';
-import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
+import type { ClipTrack, AnnotationData, ClipSource } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
@@ -379,6 +379,29 @@ export interface TrackReorderPreviewContextValue {
   trackReorderEpoch: number;
 }
 
+/** One source as the status shows it: no buffer, only how far it is. */
+export interface SourceStatusEntry {
+  status: 'pending' | 'loaded' | 'failed';
+  /** Only for a failed source. */
+  error?: Error;
+}
+
+/**
+ * The loading status of the audio sources the provider loads (#812): one entry
+ * per source the app's clips name. The value keeps its identity while no
+ * source changes state; it changes when a source is requested, settles, fails,
+ * is retried or is dropped, and rarely otherwise. Nothing in the view reads it.
+ */
+export interface PlaylistSourcesValue {
+  sources: ReadonlyMap<ClipSource, SourceStatusEntry>;
+  pendingCount: number;
+  failedCount: number;
+  /** `pendingCount > 0` */
+  isLoading: boolean;
+  /** Start a failed source again. A no-op for any other state. Keeps its identity for the life of the provider. */
+  retry: (src: ClipSource) => void;
+}
+
 // ---------------------------------------------------------------------------
 // MediaElementPlaylistProvider only
 // ---------------------------------------------------------------------------
@@ -447,6 +470,7 @@ export const UndoRedoContext = slot<UndoRedoContextValue>();
 export const PlaylistTimelineContext = slot<PlaylistTimelineContextValue>();
 export const PlaylistMixerContext = slot<PlaylistMixerContextValue>();
 export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>();
+export const PlaylistSourcesContext = slot<PlaylistSourcesValue>();
 
 // MediaElementPlaylistProvider only
 export const PlaybackRateContext = slot<PlaybackRateContextValue>();
@@ -593,6 +617,15 @@ export const usePlaylistMixer = () => useSlot(PlaylistMixerContext, 'usePlaylist
  */
 export const useTrackReorderPreview = () =>
   useSlot(TrackReorderPreviewContext, 'useTrackReorderPreview', WEB_AUDIO);
+
+/**
+ * `{ sources, pendingCount, failedCount, isLoading, retry }`: how far each
+ * audio source the provider loads has got. WaveformPlaylistProvider only. A
+ * component that calls this re-renders when a source is requested, settles,
+ * fails, is retried or is dropped.
+ */
+export const usePlaylistSources = () =>
+  useSlot(PlaylistSourcesContext, 'usePlaylistSources', WEB_AUDIO);
 
 /** `{ playbackRate, setPlaybackRate }`. MediaElementPlaylistProvider only. */
 export const usePlaybackRate = () => useSlot(PlaybackRateContext, 'usePlaybackRate', MEDIA_ELEMENT);

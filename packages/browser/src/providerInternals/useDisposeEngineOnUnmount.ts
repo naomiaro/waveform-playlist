@@ -3,12 +3,15 @@
  * loading effect took last: after a track was added or filled in place that
  * effect has no cleanup of its own (#811).
  *
- * React runs this cleanup for a StrictMode remount and Fast Refresh too,
- * where the setup follows at once and the engine must live on: the dispose is
- * deferred by a microtask and the setup cancels it. A hidden `<Activity>` gets
- * no setup, so its engine is disposed and the loading effect builds a new one
- * on reveal. When the loading effect's own cleanup has already disposed the
- * engine, `engineRef` is empty and nothing is done twice.
+ * React runs this cleanup for a real unmount, a StrictMode remount, a hidden
+ * `<Activity>` and Fast Refresh alike, and the engine is disposed in each: it
+ * does not live on. The dispose is deferred to a microtask so that the loading
+ * effect's own cleanup, which runs after this one, disposes first when it
+ * applies; this one then finds `engineRef` empty and does nothing twice.
+ * Where the setup follows at once (a StrictMode remount) it cancels the
+ * deferred dispose. After a Fast Refresh the loading effect finds no change
+ * it can apply incrementally and builds a new engine; a hidden `<Activity>`
+ * gets a new one on reveal.
  */
 
 import { useEffect, useRef, type MutableRefObject } from 'react';

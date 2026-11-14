@@ -24,6 +24,7 @@ import {
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
+  usePlaylistSources,
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
@@ -102,6 +103,7 @@ const HOOKS = {
   timeline: usePlaylistTimeline,
   mixer: usePlaylistMixer,
   reorder: useTrackReorderPreview,
+  sources: usePlaylistSources,
   annotations: useAnnotations,
   annotationOptions: useAnnotationOptions,
   loop: useLoop,
@@ -225,6 +227,9 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('mixer')).toEqual(['masterVolume', 'trackStates']);
     expect(keys('reorder')).toEqual(['trackDragPreview', 'trackReorderEpoch']);
+    expect(keys('sources')).toEqual(
+      ['failedCount', 'isLoading', 'pendingCount', 'retry', 'sources'].sort()
+    );
     expect(keys('annotations')).toEqual(['annotations']);
     expect(keys('annotationOptions')).toEqual(['continuousPlay', 'editable', 'linkEndpoints']);
     expect(keys('loop')).toEqual(['isLoopEnabled', 'loopEnd', 'loopStart']);
@@ -546,6 +551,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'usePlaylistTimeline',
     'usePlaylistMixer',
     'useTrackReorderPreview',
+    'usePlaylistSources',
     'useAnnotations',
     'useAnnotationOptions',
     'useLoop',

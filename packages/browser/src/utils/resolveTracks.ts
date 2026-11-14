@@ -20,6 +20,9 @@
  * an unchanged track is a full rebuild of the engine: a placeholder made
  * again at another sample rate, a pending loading clip added to a track that
  * has clips, a parent that re-creates its track objects on every render.
+ * An object-valued track field re-created on every render (an inline
+ * `spectrogramConfig`) is a changed field, not an equal one: that track is a
+ * new engine track each time, a rebuild per render, as before.
  *
  * The caches are WeakMaps shared by the caches of successive passes. Filling
  * one is the only mutation this file does. It is safe because a WeakMap is
@@ -405,6 +408,8 @@ export function resolveTracks(
 ): ResolvedTracks {
   const maps = mapsOf(previous);
   const last = previous.last;
+  // Tracks with a duplicate id and identical content share one engine track
+  // object (duplicate ids are not supported).
   const previousEngineById = new Map((last?.engineTracks ?? []).map((t) => [t.id, t]));
   const results = tracks.map((t) => resolveTrack(t, sources, sampleRate, maps, previousEngineById));
   const view = results.map((r) => r.view);

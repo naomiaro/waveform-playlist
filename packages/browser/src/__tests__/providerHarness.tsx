@@ -10,14 +10,18 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React, { StrictMode } from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import {
+  useEditorControls,
   useEngineRefs,
   useIsPlaying,
   usePlaybackControls,
   usePlaylistMixer,
+  usePlaylistSources,
   usePlaylistTimeline,
   useUndoRedo,
+  type EditorControlsContextValue,
   type EngineRefsContextValue,
   type PlaybackControlsContextValue,
+  type PlaylistSourcesValue,
   type PlaylistTimelineContextValue,
 } from '../contexts/playlistContexts';
 import type { TrackState } from '../WaveformPlaylistContext';
@@ -30,7 +34,6 @@ import type {
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { LoadSource } from '../utils/loadSource';
-import { captured } from './sourceStatusCapture';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -176,8 +179,18 @@ export let probe: {
   isPlaying: boolean;
   controls: PlaybackControlsContextValue;
   refs: EngineRefsContextValue;
+  editor: EditorControlsContextValue;
 };
 export let probeRenders = 0;
+
+/** The latest loading status of the provider's sources (`usePlaylistSources()`); null before the first render. */
+export let sourceStatus: PlaylistSourcesValue | null = null;
+
+/** Reads the status in a component of its own, so that a settle does not render `Probe`. */
+const StatusProbe: React.FC = () => {
+  sourceStatus = usePlaylistSources();
+  return null;
+};
 
 export const Probe: React.FC = () => {
   probeRenders++;
@@ -188,8 +201,9 @@ export const Probe: React.FC = () => {
     isPlaying: useIsPlaying().isPlaying,
     controls: usePlaybackControls(),
     refs: useEngineRefs(),
+    editor: useEditorControls(),
   };
-  return null;
+  return <StatusProbe />;
 };
 
 /** `waveform-playlist:ready` events on `window` since the test began: one per FULL engine build. */
@@ -210,6 +224,8 @@ export interface MountOptions {
   sampleRate?: number | null;
   /** The rate of the shared fake adapter's AudioContext. */
   adapterSampleRate?: number;
+  /** Rendered inside the provider, after the probe. */
+  children?: React.ReactNode;
 }
 
 export interface Mounted {
@@ -252,6 +268,7 @@ export function mount(initial: PlaylistTrack[], options: MountOptions = {}): Mou
         onError={onError}
       >
         <Probe />
+        {options.children}
       </WaveformPlaylistProvider>
     );
     const wrapped = options.wrap ? options.wrap(provider) : provider;
@@ -297,7 +314,7 @@ export function installProviderHarness(): void {
   beforeEach(() => {
     readyEvents = 0;
     probeRenders = 0;
-    captured.status = null;
+    sourceStatus = null;
     window.addEventListener('waveform-playlist:ready', countReady);
   });
 

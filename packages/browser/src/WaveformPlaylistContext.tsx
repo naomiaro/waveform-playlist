@@ -112,6 +112,7 @@ import {
   SelectedRowContext,
   SelectionContext,
   TrackReorderPreviewContext,
+  PlaylistSourcesContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
   type CurrentTimeContextValue,
@@ -299,7 +300,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // `engineTracks` is what the engine gets (no placeholders). Both hold
   // `AudioClip`s only, and a track nothing touched keeps its identity.
   const earlyAdapter = useEarlyAdapter(() => (engineRef.current ? adapterRef.current : null));
-  const { sources, hasUnsettledSource } = useSourceLoading({
+  const {
+    sources,
+    status: sourcesStatus,
+    hasUnsettledSource,
+  } = useSourceLoading({
     tracks: tracksProp,
     loadSource,
     getDecodeContext: earlyAdapter.getDecodeContext,
@@ -2019,7 +2024,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [trackDragPreview, trackReorderEpoch]
   );
 
-  // Outermost: the values that change least. The order has no effect on
+  // Outermost: the values that change least. The sources' status changes when
+  // a source is requested, settles, fails, is retried or is dropped. The order has no effect on
   // behaviour (every value is committed together); it is for reading.
   // The two MediaElement-only contexts are blocked: inside this provider
   // `usePlaybackRate()` must not reach a MediaElement provider further out.
@@ -2046,9 +2052,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
                                           <SelectionContext value={selectionValue}>
                                             <TrackReorderPreviewContext value={reorderPreviewValue}>
                                               <PlaylistMixerContext value={mixerValue}>
-                                                <PlaylistTimelineContext value={timelineValue}>
-                                                  {children}
-                                                </PlaylistTimelineContext>
+                                                <PlaylistSourcesContext value={sourcesStatus}>
+                                                  <PlaylistTimelineContext value={timelineValue}>
+                                                    {children}
+                                                  </PlaylistTimelineContext>
+                                                </PlaylistSourcesContext>
                                               </PlaylistMixerContext>
                                             </TrackReorderPreviewContext>
                                           </SelectionContext>

@@ -19,18 +19,12 @@ vi.mock('../workers/peaksWorker', () => ({
     terminate: () => {},
   }),
 }));
-// The status value has no context yet: see sourceStatusCapture.ts.
-vi.mock('../providerInternals/useSourceLoading', async (importOriginal) => {
-  const { capturing } = await import('./sourceStatusCapture');
-  return capturing(await importOriginal<typeof import('../providerInternals/useSourceLoading')>());
-});
 
 import { render, act, waitFor } from '@testing-library/react';
 import React from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import type { AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import { captured } from './sourceStatusCapture';
 import {
   SAMPLE_RATE,
   Probe,
@@ -44,6 +38,7 @@ import {
   plainClip,
   plainTrack,
   probe,
+  sourceStatus,
   probeRenders,
   ready,
   readyEvents,
@@ -230,7 +225,7 @@ describe('which sources are requested', () => {
     expect(m.adapter.updateTrack.mock.calls.length).toBe(updatesBefore);
     expect(m.adapter.setTracks.mock.calls.length).toBe(buildsBefore);
     expect(probe.timeline.tracks.map((t) => t.id)).toEqual(['keep']);
-    expect(captured.status?.sources.has('/a.mp3')).toBe(false);
+    expect(sourceStatus?.sources.has('/a.mp3')).toBe(false);
   });
 
   it('12: a clip with src and audioBuffer is not fetched; a later loading clip for that src uses its buffer', async () => {
@@ -246,7 +241,7 @@ describe('which sources are requested', () => {
     await ready();
     await flush();
     expect(calls).toHaveLength(0);
-    expect(captured.status?.sources.get('/a.mp3')).toEqual({ status: 'loaded' });
+    expect(sourceStatus?.sources.get('/a.mp3')).toEqual({ status: 'loaded' });
     expect(readyEvents).toBe(1);
 
     await act(async () => {
@@ -315,7 +310,7 @@ describe('which sources are requested', () => {
       m.setTracks([m.tracks()[0], loadingTrack('b', '/b.mp3')]);
     });
     await waitFor(() => expect(calls).toHaveLength(1));
-    expect(captured.status?.sources.get('/b.mp3')).toEqual({ status: 'pending' });
+    expect(sourceStatus?.sources.get('/b.mp3')).toEqual({ status: 'pending' });
 
     // The app got the audio another way and puts the loaded clip in itself.
     const own = fakeBuffer();
@@ -325,7 +320,7 @@ describe('which sources are requested', () => {
     });
     await flush();
 
-    expect(captured.status?.sources.get('/b.mp3')).toEqual({ status: 'loaded' });
+    expect(sourceStatus?.sources.get('/b.mp3')).toEqual({ status: 'loaded' });
     expect(calls[0].signal.aborted).toBe(true);
     expect(m.adapter.updateTrack.mock.lastCall?.[0]).toBe('b');
     expect(m.adapter.updateTrack.mock.lastCall?.[1].clips[0].audioBuffer).toBe(own);

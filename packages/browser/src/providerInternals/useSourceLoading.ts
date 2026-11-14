@@ -23,25 +23,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createSourceLoader, isLoadingClip, trackKind } from '@waveform-playlist/core';
 import type { ClipSource, PlaylistTrack, SourceState } from '@waveform-playlist/core';
+import type { PlaylistSourcesValue, SourceStatusEntry } from '../contexts/playlistContexts';
 import { defaultLoadSource, type LoadSource } from '../utils/loadSource';
 
 export type SourceSnapshot = ReadonlyMap<ClipSource, SourceState<AudioBuffer>>;
-
-/** One source as the status value shows it: no buffer, only how far it is. */
-export interface SourceStatusEntry {
-  status: 'pending' | 'loaded' | 'failed';
-  error?: Error;
-}
-
-export interface SourceLoadingStatus {
-  sources: ReadonlyMap<ClipSource, SourceStatusEntry>;
-  pendingCount: number;
-  failedCount: number;
-  /** `pendingCount > 0` */
-  isLoading: boolean;
-  /** Start a failed source again. A no-op for any other state. */
-  retry: (src: ClipSource) => void;
-}
 
 export interface UseSourceLoadingOptions {
   tracks: PlaylistTrack[];
@@ -57,7 +42,7 @@ export interface UseSourceLoadingReturn {
   /** The loader's snapshot: the same Map until a source changes state. */
   sources: SourceSnapshot;
   /** Keeps its identity while no source changes state. */
-  status: SourceLoadingStatus;
+  status: PlaylistSourcesValue;
   /**
    * True while a loading clip of `tracks` names a source that has neither
    * loaded nor failed. A source the loader has not been told about yet (the
@@ -120,7 +105,7 @@ function buildStatus(
   sources: SourceSnapshot,
   entries: WeakMap<SourceState<AudioBuffer>, SourceStatusEntry>,
   retry: (src: ClipSource) => void
-): SourceLoadingStatus {
+): PlaylistSourcesValue {
   const shown = new Map<ClipSource, SourceStatusEntry>();
   let pendingCount = 0;
   let failedCount = 0;

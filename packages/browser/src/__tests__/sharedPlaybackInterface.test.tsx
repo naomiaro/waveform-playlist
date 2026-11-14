@@ -34,6 +34,7 @@ import {
   usePlaylistTimeline,
   usePlaylistMixer,
   useTrackReorderPreview,
+  usePlaylistSources,
   usePlaybackRate,
   useMediaElementTrack,
   useLoopOptional,
@@ -191,6 +192,7 @@ const WEB_AUDIO_ONLY = {
   timeline: usePlaylistTimeline,
   mixer: usePlaylistMixer,
   reorder: useTrackReorderPreview,
+  sources: usePlaylistSources,
 } as const;
 const MEDIA_ELEMENT_ONLY = {
   rate: usePlaybackRate,
