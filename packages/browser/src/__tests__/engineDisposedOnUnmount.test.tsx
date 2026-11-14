@@ -312,11 +312,15 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     );
     const view = render(tree('visible', false));
     await waitFor(() => expect(isReady).toBe(true));
-    view.rerender(tree('visible', true));
+    // An incremental run first (no cleanup), so setting the flag leaves the
+    // engine alive: the deferred path is reached with an engine.
     await act(async () => {
       setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
     });
+    view.rerender(tree('visible', true));
     await settle();
+    expect(engineRef.current).not.toBeNull();
+    expect(isReady).toBe(true);
 
     view.rerender(tree('hidden', true));
     await settle();
@@ -329,6 +333,40 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     await waitFor(() => expect(isReady).toBe(true));
     expect(engineRef.current).not.toBeNull();
     expect(adapters).toHaveLength(2);
+    expect(disposeCounts()).toEqual([1, 0]);
+  });
+});
+
+// Maintainer's choice (2026-11-13): no engine means not ready, also when the
+// flag turns true after a load (an app loading a new set of files with
+// `deferEngineRebuild={loading}`). The flag change disposes the engine; until
+// #811 the view stayed ready with nothing for Play to start.
+describe('deferEngineRebuild turned on after a load (#811)', () => {
+  beforeEach(() => {
+    adapters = [];
+    failNextAdapter = false;
+    isReady = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('is not ready while there is no engine, and ready again when the build ends', async () => {
+    const t1 = drums();
+    const view = render(<App initial={[t1]} />);
+    await waitFor(() => expect(isReady).toBe(true));
+
+    view.rerender(<App initial={[t1]} deferEngineRebuild />);
+    await settle();
+    expect(engineRef.current).toBeNull();
+    expect(isReady).toBe(false);
+    expect(disposeCounts()).toEqual([1]);
+
+    view.rerender(<App initial={[t1]} />);
+    await waitFor(() => expect(isReady).toBe(true));
+    expect(engineRef.current).not.toBeNull();
     expect(disposeCounts()).toEqual([1, 0]);
   });
 });
