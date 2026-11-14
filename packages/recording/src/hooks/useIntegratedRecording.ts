@@ -9,11 +9,13 @@ import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import type { MicrophoneDevice } from '../types';
 import {
-  type ClipTrack,
   type AudioClip,
+  type LoadingClip,
   type MeterSource,
+  type PlaylistTrack,
   type RecordingProgressSource,
   carveClipRange,
+  isLoadingClip,
   resolveRecordingOffsetSamples,
   trackKind,
 } from '@waveform-playlist/core';
@@ -106,9 +108,37 @@ export interface UseIntegratedRecordingReturn {
   changeDevice: (deviceId: string) => Promise<void>;
 }
 
+/**
+ * The clips of the armed track once a take that owns
+ * `[rangeStart, rangeEnd)` is added. Loaded clips are carved (punch-in replace,
+ * #579). A loading clip (`LoadingClip`, audio not decoded yet) has no length in
+ * samples, so it is not carved and is passed through as the same object, after
+ * the carved clips and before the take; it may overlap the take once its audio
+ * arrives.
+ */
+function clipsWithTake(
+  clips: readonly (AudioClip | LoadingClip)[],
+  rangeStart: number,
+  rangeEnd: number,
+  take: AudioClip
+): (AudioClip | LoadingClip)[] {
+  const loaded: AudioClip[] = [];
+  const loading: LoadingClip[] = [];
+  for (const clip of clips) {
+    if (isLoadingClip(clip)) loading.push(clip);
+    else loaded.push(clip);
+  }
+  return [...carveClipRange(loaded, rangeStart, rangeEnd), ...loading, take];
+}
+
+/**
+ * `tracks` and `setTracks` are the app's own `tracks` state (the one handed to
+ * `WaveformPlaylistProvider`), loading clips included: the take is added to
+ * the armed track and every other clip and track is handed back as it was.
+ */
 export function useIntegratedRecording(
-  tracks: ClipTrack[],
-  setTracks: (tracks: ClipTrack[]) => void,
+  tracks: PlaylistTrack[],
+  setTracks: (tracks: PlaylistTrack[]) => void,
   selectedTrackId: string | null,
   options: IntegratedRecordingOptions = {}
 ): UseIntegratedRecordingReturn {
@@ -305,10 +335,12 @@ export function useIntegratedRecording(
         if (index === selectedTrackIndex) {
           return {
             ...track,
-            clips: [
-              ...carveClipRange(track.clips, startSample, startSample + effectiveDuration),
-              newClip,
-            ],
+            clips: clipsWithTake(
+              track.clips,
+              startSample,
+              startSample + effectiveDuration,
+              newClip
+            ),
           };
         }
         return track;

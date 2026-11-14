@@ -1,6 +1,6 @@
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { AudioClip, ClipTrack, LoadingClip, PlaylistTrack } from '@waveform-playlist/core';
 
 interface MockNode {
   port: {
@@ -136,12 +136,16 @@ afterEach(async () => {
 });
 
 describe('useIntegratedRecording', () => {
-  async function setupRecording(initialTracks: ClipTrack[], setTracks: (t: ClipTrack[]) => void) {
+  async function setupRecording(
+    initialTracks: PlaylistTrack[],
+    setTracks: (t: PlaylistTrack[]) => void
+  ) {
     const stream = createMockStream('mic');
     getUserMediaMock.mockResolvedValue(stream);
 
     const rendered = renderHook(
-      ({ tracks }: { tracks: ClipTrack[] }) => useIntegratedRecording(tracks, setTracks, 'track-1'),
+      ({ tracks }: { tracks: PlaylistTrack[] }) =>
+        useIntegratedRecording(tracks, setTracks, 'track-1'),
       { initialProps: { tracks: initialTracks } }
     );
 
@@ -476,5 +480,70 @@ describe('useIntegratedRecording', () => {
     // ...and the recorded clip lands on track-1
     const t1 = finalTracks.find((t) => t.id === 'track-1')!;
     expect(t1.clips).toHaveLength(1);
+  });
+  // #812: the app's state holds loading clips (audio not decoded yet, times in
+  // seconds, no samples). A take must pass them through untouched.
+  describe('loading clips in the app state (#812)', () => {
+    const loadingOnArmed: LoadingClip = {
+      id: 'armed-loading',
+      src: 'a.mp3',
+      start: 0,
+      duration: 1,
+    };
+    const loadingElsewhere: LoadingClip = { id: 'other-loading', src: 'b.mp3' };
+
+    async function recordOneChunk(tracks: PlaylistTrack[]) {
+      const setTracks = vi.fn<(t: PlaylistTrack[]) => void>();
+      const rendered = await setupRecording(tracks, setTracks);
+      act(() => {
+        recNode.port.onmessage!({
+          data: { channels: [new Float32Array(1024).fill(0.2)], channelCount: 1 },
+        } as MessageEvent);
+      });
+      await act(async () => {
+        await rendered.result.current.stopRecording();
+      });
+      expect(rendered.result.current.error).toBeNull();
+      expect(setTracks).toHaveBeenCalledTimes(1);
+      return setTracks.mock.calls[0][0];
+    }
+
+    it('adds the take and keeps the loading clips of the armed track and of another track as the same objects', async () => {
+      const armed: PlaylistTrack = { ...makeTrack('track-1'), clips: [loadingOnArmed] };
+      const other: PlaylistTrack = { ...makeTrack('track-2'), clips: [loadingElsewhere] };
+
+      const finalTracks = await recordOneChunk([armed, other]);
+
+      const t1 = finalTracks.find((t) => t.id === 'track-1')!;
+      expect(t1.clips).toHaveLength(2);
+      expect(t1.clips[0]).toBe(loadingOnArmed);
+      const take = t1.clips[1] as AudioClip;
+      expect(take.startSample).toBe(0);
+      expect(take.durationSamples).toBe(1024);
+      // The other track is handed back as it was.
+      expect(finalTracks.find((t) => t.id === 'track-2')).toBe(other);
+    });
+
+    it('carves the loaded clips it overlaps and leaves a loading clip on the same track alone', async () => {
+      const loaded = {
+        id: 'existing',
+        startSample: 0,
+        durationSamples: 2048,
+        offsetSamples: 0,
+        sampleRate: 48000,
+        sourceDurationSamples: 2048,
+        gain: 1,
+      } as AudioClip;
+      const armed: PlaylistTrack = { ...makeTrack('track-1'), clips: [loadingOnArmed, loaded] };
+
+      const finalTracks = await recordOneChunk([armed]);
+
+      const t1 = finalTracks.find((t) => t.id === 'track-1')!;
+      expect(t1.clips.map((c) => c.id)).toEqual(['existing', 'armed-loading', t1.clips[2].id]);
+      expect(t1.clips[1]).toBe(loadingOnArmed);
+      const carved = t1.clips[0] as AudioClip;
+      expect(carved.startSample).toBe(1024);
+      expect(carved.durationSamples).toBe(1024);
+    });
   });
 });
