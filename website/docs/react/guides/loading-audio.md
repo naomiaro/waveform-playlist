@@ -391,6 +391,7 @@ return (
 
 - Each config needs `duration` (or `waveformData` with duration) so clip dimensions are known upfront
 - `deferEngineRebuild={loading}` prevents the engine from rebuilding on every track update — it builds once when all tracks are ready
+- When `loading` turns true again after a load that built the engine (the first load, or a set of tracks that replaced the previous one), the engine is disposed, and the playlist is in its loading state (`isReady` false, `data-playlist-state="loading"`) until the new engine is built. Tracks appended meanwhile are added to the running engine, which stays ready
 - Tracks appear immediately as empty clips, then waveform peaks fill in as audio decodes
 - Progress is available via `loadedCount` and `totalCount` from the hook
 
