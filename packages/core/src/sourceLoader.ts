@@ -36,6 +36,9 @@ function toError(reason: unknown): Error {
  * `setWanted`; a key is loaded once, kept while it stays wanted, and dropped
  * (its load aborted) when it leaves the set. Framework-free: read it with
  * `useSyncExternalStore(loader.subscribe, loader.getSnapshot)`.
+ *
+ * A rejection is ignored only when the loader aborted that load; a load that
+ * rejects with an AbortError of its own is recorded as `failed` (`retry` restarts it).
  */
 export function createSourceLoader<K, V>(options: {
   load: (key: K, signal: AbortSignal) => Promise<V>;
@@ -78,7 +81,8 @@ export function createSourceLoader<K, V>(options: {
     promise.then(
       (value) => settle({ status: 'loaded', value }),
       (err: unknown) => {
-        if ((err as { name?: unknown } | null)?.name === 'AbortError') return;
+        // Only an abort the loader made is ignored; a load's own AbortError is a failure.
+        if (controller.signal.aborted) return;
         settle({ status: 'failed', error: toError(err) });
       }
     );

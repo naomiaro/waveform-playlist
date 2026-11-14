@@ -102,12 +102,54 @@ describe('createSourceLoader', () => {
     expect(before.get('a')).toEqual({ status: 'loaded', value: 'A' });
   });
 
-  it('never records an AbortError as failed', async () => {
+  it('never records an AbortError of a load the loader aborted', async () => {
+    const { calls, loader } = setup();
+    loader.setWanted(['a', 'b']);
+    loader.setWanted(['b']);
+    loader.suspend();
+    calls[0].reject(new DOMException('x', 'AbortError'));
+    calls[1].reject(new DOMException('x', 'AbortError'));
+    await flush();
+    expect(calls[0].signal.aborted).toBe(true);
+    expect(calls[1].signal.aborted).toBe(true);
+    expect(loader.getSnapshot().has('a')).toBe(false);
+    expect(loader.getSnapshot().get('b')).toEqual({ status: 'pending' });
+  });
+
+  it('records an AbortError of a load the loader did not abort as failed, and retry starts it again', async () => {
     const { calls, loader } = setup();
     loader.setWanted(['a']);
-    calls[0].reject(new DOMException('x', 'AbortError'));
+    calls[0].reject(new DOMException('own abort', 'AbortError'));
     await flush();
-    expect(loader.getSnapshot().get('a')?.status).toBe('pending');
+    const state = loader.getSnapshot().get('a');
+    expect(state?.status).toBe('failed');
+    if (state?.status !== 'failed') throw new Error('expected failed');
+    expect(state.error.name).toBe('AbortError');
+    loader.retry('a');
+    expect(calls).toHaveLength(2);
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'pending' });
+  });
+
+  it('ignores a result that arrives after suspend', async () => {
+    const { calls, loader } = setup();
+    loader.setWanted(['a']);
+    loader.suspend();
+    calls[0].resolve('stale');
+    await flush();
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'pending' });
+    loader.setWanted(['a']);
+    expect(calls).toHaveLength(2);
+    calls[1].resolve('fresh');
+    await flush();
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'loaded', value: 'fresh' });
+  });
+
+  it('a provided key is dropped by a setWanted that leaves it out', () => {
+    const { loader } = setup();
+    loader.provide('x', 'v');
+    expect(loader.getSnapshot().get('x')).toEqual({ status: 'loaded', value: 'v' });
+    loader.setWanted([]);
+    expect(loader.getSnapshot().has('x')).toBe(false);
   });
 
   it('ignores the late result of an aborted load', async () => {
