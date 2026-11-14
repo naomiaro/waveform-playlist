@@ -457,8 +457,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // Monotonic counter from engine.getState().tracksVersion — used to detect
   // track mutations (move/trim/split/add/remove) vs other statechange events.
   const lastTracksVersionRef = useRef(0);
-  // Set while this provider applies a `tracks` prop change to the engine track
-  // by track; the statechange it causes must not be mirrored back to the parent.
+  // Set while this provider applies a `tracks` prop change to the running
+  // engine (a track added, filled or the timeline emptied). The statechange
+  // that causes is not mirrored back: the app already holds what it passed
+  // in, and `onTracksChange` is for changes that originate in the engine. An
+  // echo would hand the app an array built from the tracks of the last
+  // render, and an app that stores it with a plain setter loses whatever it
+  // queued in between.
   const suppressTracksMirrorRef = useRef(false);
   // Flag set during render to prevent the previous effect cleanup from disposing the
   // engine when we're skipping the rebuild. React runs previous cleanup before the
@@ -741,28 +746,27 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
             pan: trackState?.pan ?? track.pan,
           };
         };
-        // Fills before adds: an add is mirrored to the parent, and what it
-        // mirrors must already hold the filled tracks.
-        if (filledTracks.length > 0) {
-          // The parent already has these tracks, as on the initial setTracks:
-          // do not echo them back through onTracksChange.
-          suppressTracksMirrorRef.current = true;
-          try {
+        // The parent already has these tracks, as on the initial setTracks:
+        // neither the fills nor the adds are echoed back through
+        // onTracksChange. Fills first: the clearHistory below must not take
+        // the adds' undo steps with it.
+        suppressTracksMirrorRef.current = true;
+        try {
+          if (filledTracks.length > 0) {
             for (const track of filledTracks) {
               engine.updateTrack(track.id, withUiState(track));
             }
-          } finally {
-            suppressTracksMirrorRef.current = false;
+            // As a rebuild did: "the audio arrived" is not a step to undo back
+            // to an empty placeholder.
+            engine.clearHistory();
+            // clearHistory emits nothing; without this `canUndo` stays true.
+            onUndoEngineState(engine.getState());
           }
-          // As a rebuild did: "the audio arrived" is not a step to undo back
-          // to an empty placeholder.
-          engine.clearHistory();
-          // clearHistory emits nothing; without this `canUndo` stays true.
-          onUndoEngineState(engine.getState());
-        }
-
-        for (const track of addedTracks) {
-          engine.addTrack(withUiState(track));
+          for (const track of addedTracks) {
+            engine.addTrack(withUiState(track));
+          }
+        } finally {
+          suppressTracksMirrorRef.current = false;
         }
 
         // Initialize track states for the new tracks (preserve existing), and
@@ -817,8 +821,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       // created via dynamic import (lazy module load preserved, #510); only its
       // lifecycle is eager.
       if (engineRef.current) {
-        // Keep the existing engine; just clear its tracks.
-        engineRef.current.setTracks([]);
+        // Keep the existing engine; just clear its tracks. The app emptied
+        // them: not echoed back.
+        suppressTracksMirrorRef.current = true;
+        try {
+          engineRef.current.setTracks([]);
+        } finally {
+          suppressTracksMirrorRef.current = false;
+        }
         prevTracksRef.current = engineTracks;
         return;
       }

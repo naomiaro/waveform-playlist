@@ -232,7 +232,12 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(adapter.setTracks).toHaveBeenCalledTimes(1);
   });
 
-  it('control: copied track objects rebuild the engine on a clip edit and on an added track', async () => {
+  // Since #812 an added track is not echoed back and an engine track nothing
+  // changed keeps its identity, so copying the tracks no longer rebuilds on an
+  // ADD (until then it did: the echo was stored, copied, and no longer the
+  // engine's). A clip edit still does: what the engine reports is copied
+  // before it comes back, and is not recognised.
+  it('control: copied track objects rebuild the engine on a clip edit, not on an added track', async () => {
     render(<App copyTracks />);
     await waitFor(() => expect(isReady).toBe(true));
     expect(h.createToneAdapter).toHaveBeenCalledTimes(1);
@@ -243,13 +248,15 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     await settle();
     await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(2));
     expect(h.adapters[0].dispose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(isReady).toBe(true));
 
     await act(async () => {
       setAppTracks((tracks) => [...tracks, makeTrack('t3', [makeClip('c3')])]);
     });
     await settle();
-    await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(3));
-    expect(h.adapters[1].dispose).toHaveBeenCalledTimes(1);
+    expect(h.createToneAdapter).toHaveBeenCalledTimes(2);
+    expect(h.adapters[1].addTrack).toHaveBeenCalledTimes(1);
+    expect(h.adapters[1].dispose).not.toHaveBeenCalled();
   });
 
   // Checked by `pnpm typecheck` (vitest does not type-check).

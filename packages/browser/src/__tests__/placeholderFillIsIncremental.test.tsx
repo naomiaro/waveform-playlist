@@ -162,15 +162,20 @@ describe('a placeholder track that gets its clips', () => {
     expect(probe.canUndo).toBe(false);
   });
 
-  // An added track is mirrored to the parent. What is mirrored must already
-  // hold the filled track, or a parent that stores it loses the fill.
-  it('a fill and an add in one change mirror the filled track, not the placeholder', async () => {
+  // Until #812 an added track was echoed to the parent, and what was echoed
+  // had to hold the filled track already. Nothing the provider applies from
+  // its own `tracks` prop is echoed now; the engine still gets the fill
+  // before the add.
+  it('a fill and an add in one change reach the engine, fill first, and nothing is echoed', async () => {
     const loaded = makeTrack('t1', 'Drums', [makeClip('c1')]);
     const placeholder = makeTrack('t2', 'Guitar (loading...)', []);
     const { adapter, onTracksChange, setTracks } = mount([loaded, placeholder]);
     await waitFor(() => expect(probe.isReady).toBe(true));
     adapter.setTracks.mockClear();
     onTracksChange.mockClear();
+    const order: string[] = [];
+    adapter.updateTrack.mockImplementation((id: string) => void order.push('update ' + id));
+    adapter.addTrack.mockImplementation((track: ClipTrack) => void order.push('add ' + track.id));
 
     const filled = { ...placeholder, name: 'Guitar', clips: [makeClip('c2')] } as ClipTrack;
     await act(async () => {
@@ -178,10 +183,12 @@ describe('a placeholder track that gets its clips', () => {
     });
 
     expect(adapter.setTracks).not.toHaveBeenCalled();
-    const mirrored = onTracksChange.mock.lastCall?.[0] as ClipTrack[];
-    expect(mirrored.map((t) => t.id)).toEqual(['t1', 't2', 't3']);
-    expect(mirrored[1].name).toBe('Guitar');
-    expect(mirrored[1].clips).toHaveLength(1);
+    expect(order).toEqual(['update t2', 'add t3']);
+    expect(adapter.updateTrack.mock.calls[0][1].clips).toHaveLength(1);
+    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(probe.trackStates.map((s) => s.name)).toEqual(['Drums', 'Guitar', 'Bass']);
+    // The add is an undo step; the fill before it is not.
+    expect(probe.canUndo).toBe(true);
   });
 
   it('still rebuilds when a track that has clips is replaced', async () => {
