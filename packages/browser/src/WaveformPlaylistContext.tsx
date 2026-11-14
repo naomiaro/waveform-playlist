@@ -578,6 +578,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }
     engine.dispose();
     engineRef.current = null;
+    // The adapter went with the engine. Nothing may reach it either: the
+    // failed-load path disposes `adapterRef.current`, and the soundfont sync
+    // and the clock read it (#811).
+    adapterRef.current = null;
   }, []);
 
   // Load audio from clips (only when tracks change)
@@ -587,7 +591,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // correct tracks — we just need to update duration for the timeline.
     // Also skip during active boundary trim drags — visual updates flow via
     // React state only; engine.trimClip() commits the final delta on drag end.
-    if (isEngineTracks || isDraggingRef.current) {
+    // With no engine, the engine's tracks are built like any others: the
+    // unmount cleanup below disposes it on an <Activity> hide, and on the
+    // reveal React runs this effect again with the latest render's closure,
+    // which is this path when the clip operation and the hide were one commit.
+    if ((isEngineTracks && engineRef.current) || isDraggingRef.current) {
       if (isEngineTracks) {
         engineTracksRef.current = null;
       }
@@ -666,6 +674,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
     // When deferEngineRebuild flips to false, this effect re-runs and builds once.
     if (deferEngineRebuild) {
+      // No engine (an <Activity> hide disposed it, or none was built yet):
+      // not ready until the deferral ends and the build below runs (#811).
+      if (!engineRef.current) setIsReady(false);
       return;
     }
 
@@ -937,11 +948,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         return;
       }
       stopAnimationFrameLoop();
-      if (engineRef.current) {
-        // Never leave a disposed engine reachable (#675).
-        disposeEngineKeepingPlayback();
-        adapterRef.current = null;
-      }
+      // Never leave a disposed engine reachable (#675).
+      disposeEngineKeepingPlayback();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -976,6 +984,18 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     stableZoomLevels,
     deferEngineRebuild,
   ]);
+
+  // Dispose the engine on unmount, whichever path the loading effect took
+  // last (#811). Only the full-build path returns a cleanup that disposes; the
+  // others (an engine clip operation, a drag, an incremental add or fill, the
+  // emptied timeline with the engine kept, a deferred rebuild) return none,
+  // and after one of them an unmount disposed nothing. `skipEngineDisposeRef`
+  // cannot decide here: it describes the next run, and an unmount has none.
+  // The callback is stable, so this cleanup runs only on an unmount, a
+  // StrictMode remount, Fast Refresh or an <Activity> hide. In the last three
+  // the loading effect runs again afterwards and builds a new engine (its
+  // guards check engineRef), and a play that was running resumes on it.
+  useEffect(() => disposeEngineKeepingPlayback, [disposeEngineKeepingPlayback]);
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
   // MIDI tracks upgrade from PolySynth without an engine rebuild. On mount
