@@ -42,6 +42,7 @@ const FILES = [
   'soundFontSync.ts',
   'hooks/useAnnotationDragHandlers.ts',
   'utils/resolveTracks.ts',
+  'utils/mergeLoadingClips.ts',
 ];
 
 const FORBIDDEN = [
