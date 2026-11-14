@@ -9,7 +9,7 @@
 // which needs a single React copy across the workspace (#702).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, act, waitFor, cleanup, screen } from '@testing-library/react';
+import { render, act, waitFor, cleanup, screen, within } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
@@ -148,5 +148,82 @@ describe('default track controls while tracks are loading', () => {
     expect(screen.getByRole('button', { name: 'Solo' })).toHaveProperty('disabled', false);
     expect(screen.getByRole('slider', { name: 'Volume' })).toHaveProperty('disabled', false);
     expect(screen.getByRole('slider', { name: 'Pan' })).toHaveProperty('disabled', false);
+  });
+
+  // #812: after the first build, a track that is added with clips whose audio
+  // is still on the way is in the engine with no clips (it has mixer state),
+  // and is drawn from placeholders. Its controls are disabled as above until
+  // one of its clips is in the engine.
+  it('are disabled for a track whose clips are all placeholders, and enabled once one is in the engine', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const adapter = createFakeAdapter();
+    const createAdapter = () => adapter;
+    const pending: Array<{ src: unknown; resolve: (buffer: AudioBuffer) => void }> = [];
+    const loadSource = (src: unknown) =>
+      new Promise<AudioBuffer>((resolve) => pending.push({ src, resolve }));
+    const loaded = makeLoadingTrack('loaded');
+    let setTracks: (next: PlaylistTrack[]) => void = () => {};
+    const App: React.FC = () => {
+      const [tracks, set] = React.useState<PlaylistTrack[]>([loaded]);
+      setTracks = set;
+      return (
+        <WaveformPlaylistProvider
+          tracks={tracks}
+          sampleRate={SAMPLE_RATE}
+          createAdapter={createAdapter}
+          loadSource={loadSource}
+        >
+          <Probe />
+          <Waveform />
+        </WaveformPlaylistProvider>
+      );
+    };
+    render(<App />);
+    await waitFor(() => expect(pending).toHaveLength(1));
+    await act(async () => {
+      pending[0].resolve(oneSecondBuffer());
+    });
+    await waitFor(() => expect(trackStateCount).toBe(1));
+
+    const twoPending: PlaylistTrack = {
+      ...makeLoadingTrack('later'),
+      clips: [
+        { id: 'later-a', src: '/later-a.mp3', duration: 1 },
+        { id: 'later-b', src: '/later-b.mp3', start: 2, duration: 1 },
+      ],
+    } as PlaylistTrack;
+    act(() => setTracks([loaded, twoPending]));
+    await waitFor(() => expect(pending).toHaveLength(3));
+    // Precondition: the new track has mixer state (it is in the engine, with
+    // no clips) and is drawn from its two placeholders.
+    await waitFor(() => expect(trackStateCount).toBe(2));
+    await waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-track-id="later"][data-clip-container]')
+      ).toHaveLength(2)
+    );
+
+    const panel = (id: string) =>
+      within(document.querySelector(`[data-track-controls="${id}"]`) as HTMLElement);
+    const expectDisabled = (id: string, disabled: boolean) => {
+      expect(panel(id).getByRole('button', { name: 'Mute' })).toHaveProperty('disabled', disabled);
+      expect(panel(id).getByRole('button', { name: 'Solo' })).toHaveProperty('disabled', disabled);
+      expect(panel(id).getByRole('slider', { name: 'Volume' })).toHaveProperty(
+        'disabled',
+        disabled
+      );
+      expect(panel(id).getByRole('slider', { name: 'Pan' })).toHaveProperty('disabled', disabled);
+    };
+    await waitFor(() => expectDisabled('later', true));
+    expectDisabled('loaded', false);
+
+    // One of the two loads: the track has a clip in the engine.
+    const first = pending.find((p) => p.src === '/later-a.mp3')!;
+    await act(async () => {
+      first.resolve(oneSecondBuffer());
+    });
+    await waitFor(() => expectDisabled('later', false));
+    expectDisabled('loaded', false);
   });
 });

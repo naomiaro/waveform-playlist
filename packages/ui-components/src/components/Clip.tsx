@@ -80,6 +80,10 @@ export interface ClipProps {
   showFades?: boolean; // Show fade in/out overlays
   // Mobile optimization
   touchOptimized?: boolean; // Enable larger touch targets for mobile devices
+  /** The clip's audio is not loaded yet: the container carries
+   *  `data-clip-placeholder="true"`. It switches nothing else; pass
+   *  `disableHeaderDrag` as well for a clip that must not be edited. */
+  isPlaceholder?: boolean;
 }
 
 /**
@@ -111,6 +115,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
   sampleRate = 44100,
   showFades = false,
   touchOptimized = false,
+  isPlaceholder = false,
 }) => {
   // Calculate horizontal position based on start sample
   // Use Math.floor to always snap to pixel boundaries
@@ -165,6 +170,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
       $width={width}
       $isOverlay={isOverlay}
       data-clip-container="true"
+      data-clip-placeholder={isPlaceholder ? 'true' : undefined}
       data-track-id={trackId}
       onMouseDown={onMouseDown}
       // Always set tabIndex=-1 so @dnd-kit doesn't add tabindex="0".

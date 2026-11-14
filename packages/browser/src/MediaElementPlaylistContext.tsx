@@ -336,6 +336,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       durationSamples: trackPeaks.durationSamples,
       fadeIn: trackFadeIn,
       fadeOut: trackFadeOut,
+      // The player's audio is the element's own: never a placeholder.
+      isPlaceholder: false,
     };
     return [[clipPeaks]];
   }, [trackPeaks, trackName, trackFadeIn, trackFadeOut]);

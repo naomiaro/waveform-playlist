@@ -16,6 +16,11 @@
  *   B) worker-generated WaveformData for `clip.audioBuffer`
  *   C) empty peaks — the clip is still loading, or is a MIDI clip
  *
+ * `placeholderIds` (#812): the clips the provider draws but the engine does not
+ * hold, whose `ClipPeaks.isPlaceholder` is true. The provider keeps the set's
+ * identity while its contents are unchanged; a clip whose flag is unchanged
+ * keeps its `ClipPeaks` object whatever happens to the set.
+ *
  * The function does not mutate `previous`; the caller keeps the returned cache
  * and passes it to the next call.
  */
@@ -160,9 +165,18 @@ function computePeaks(
   return { peaks: fromWorker ?? emptyPeaks(inputs), usesGenerated: true };
 }
 
-function sameClipPeaks(a: ClipPeaks, clip: AudioClip, trackName: string, peaks: PeakData): boolean {
+const NO_PLACEHOLDERS: ReadonlySet<string> = new Set();
+
+function sameClipPeaks(
+  a: ClipPeaks,
+  clip: AudioClip,
+  trackName: string,
+  peaks: PeakData,
+  isPlaceholder: boolean
+): boolean {
   return (
     a.peaks === peaks &&
+    a.isPlaceholder === isPlaceholder &&
     a.trackName === trackName &&
     a.startSample === clip.startSample &&
     a.durationSamples === clip.durationSamples &&
@@ -178,6 +192,7 @@ function sameClipPeaks(a: ClipPeaks, clip: AudioClip, trackName: string, peaks: 
 function deriveClip(
   clip: AudioClip,
   trackName: string,
+  isPlaceholder: boolean,
   options: DerivePeaksOptions,
   previous: ClipEntry | undefined
 ): ClipEntry {
@@ -198,7 +213,11 @@ function deriveClip(
     ? { peaks: previous.peaks, usesGenerated: previous.usesGenerated }
     : computePeaks(clip, inputs);
 
-  if (previous && reusable && sameClipPeaks(previous.clipPeaks, clip, trackName, peaks)) {
+  if (
+    previous &&
+    reusable &&
+    sameClipPeaks(previous.clipPeaks, clip, trackName, peaks, isPlaceholder)
+  ) {
     return previous;
   }
 
@@ -218,6 +237,7 @@ function deriveClip(
       sampleRate: clip.sampleRate,
       offsetSamples: clip.offsetSamples,
       gain: clip.gain,
+      isPlaceholder,
     },
   };
 }
@@ -229,14 +249,21 @@ function sameItems<T>(a: readonly T[] | undefined, b: readonly T[]): a is T[] {
 export function derivePeaks(
   tracks: ClipTrack[],
   options: DerivePeaksOptions,
-  previous: PeaksCache
+  previous: PeaksCache,
+  placeholderIds: ReadonlySet<string> = NO_PLACEHOLDERS
 ): PeaksCache {
   const clips = new Map<string, ClipEntry>();
   const trackPeaks = new Map<string, TrackClipPeaks>();
 
   const derived = tracks.map((track) => {
     const clipPeaks = track.clips.map((clip) => {
-      const entry = deriveClip(clip, track.name, options, previous.clips.get(clip.id));
+      const entry = deriveClip(
+        clip,
+        track.name,
+        placeholderIds.has(clip.id),
+        options,
+        previous.clips.get(clip.id)
+      );
       clips.set(clip.id, entry);
       return entry.clipPeaks;
     });

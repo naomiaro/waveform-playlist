@@ -3,6 +3,7 @@ import type { ClipTrack } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 import { usePlaylistView, usePlaybackRefs, useSelectedTrackId } from '../contexts/playlistContexts';
+import { isPlaceholderClip } from '../utils/placeholderClip';
 
 export interface UseClipSplittingOptions {
   tracks: ClipTrack[];
@@ -50,6 +51,9 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
   /**
    * Split a specific clip at a given time
    *
+   * A placeholder (a clip whose audio is not loaded, which the engine does not
+   * hold) is never split: false, and the engine is not called.
+   *
    * @param trackIndex - Index of the track containing the clip
    * @param clipIndex - Index of the clip within the track
    * @param splitTime - Timeline position where to split (in seconds)
@@ -65,7 +69,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       if (!track) return false;
 
       const clip = track.clips[clipIndex];
-      if (!clip) return false;
+      if (!clip || isPlaceholderClip(clip)) return false;
 
       // Convert split time to sample position, snapped to pixel boundary
       const splitSample = Math.round(splitTime * sampleRate);
@@ -117,9 +121,11 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     // Use ref for real-time position during playback (state updates are throttled)
     const currentTime = currentTimeRef.current ?? 0;
 
-    // Find clip at current time on the selected track
+    // Find clip at current time on the selected track. A placeholder is
+    // passed over: the engine does not hold it (#812).
     for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
       const clip = track.clips[clipIndex];
+      if (isPlaceholderClip(clip)) continue;
       const clipStartTime = clip.startSample / sampleRate;
       const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
 

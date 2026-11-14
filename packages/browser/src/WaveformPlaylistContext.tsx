@@ -75,6 +75,10 @@ export interface ClipPeaks {
   /** The clip's linear gain — drawn into the waveform when
    *  `<WaveformTracks gainScaled />` is set. */
   gain?: number;
+  /** True while the clip's audio is not loaded and the provider draws it from
+   *  its `duration` or `waveformData` (#812): the engine does not hold it, so
+   *  it cannot be dragged, trimmed or split. */
+  isPlaceholder: boolean;
 }
 
 export type TrackClipPeaks = ClipPeaks[];
@@ -547,12 +551,20 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     const next = derivePeaks(
       tracks,
       { samplesPerPixel, mono, getGeneratedWaveformData },
-      peaksCacheRef.current
+      peaksCacheRef.current,
+      placeholderIds
     );
     peaksCacheRef.current = next;
     return next.result;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- generatedWaveformVersion invalidates the ref-backed lookup
-  }, [tracks, samplesPerPixel, mono, getGeneratedWaveformData, generatedWaveformVersion]);
+  }, [
+    tracks,
+    placeholderIds,
+    samplesPerPixel,
+    mono,
+    getGeneratedWaveformData,
+    generatedWaveformVersion,
+  ]);
 
   // Cross-hook concern: reads selection refs to set loop region
   const setLoopRegionFromSelection = useCallback(() => {

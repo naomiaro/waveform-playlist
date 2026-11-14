@@ -12,6 +12,7 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
+import { isPlaceholderClip } from '../utils/placeholderClip';
 
 /** Function type for per-track effects (same as in @waveform-playlist/core) */
 export type TrackEffectsFunction = (
@@ -151,9 +152,13 @@ export function useExportWav(): UseExportWavReturn {
         // Use AudioContext sample rate — the single source of truth for all audio
         const sampleRate = getGlobalAudioContext().sampleRate;
 
+        // A placeholder (#812: drawn while its audio loads) is left out, of the
+        // length too: a track of placeholders only is exported as an empty one.
+        const exported = tracks.map(withoutPlaceholders);
+
         // Calculate total duration from all clips (in samples)
         let totalDurationSamples = 0;
-        for (const track of tracks) {
+        for (const track of exported) {
           for (const clip of track.clips) {
             const clipEndSample = clip.startSample + clip.durationSamples;
             totalDurationSamples = Math.max(totalDurationSamples, clipEndSample);
@@ -177,8 +182,8 @@ export function useExportWav(): UseExportWavReturn {
           };
         const tracksToRender =
           mode === 'individual'
-            ? [{ track: tracks[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]
-            : tracks.map((track, index) => ({ track, state: stateOf(index), index }));
+            ? [{ track: exported[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]
+            : exported.map((track, index) => ({ track, state: stateOf(index), index }));
 
         // Check for solo - if any track is soloed, only play soloed tracks.
         // Skip solo logic for individual export — the user explicitly chose the track.
@@ -236,6 +241,12 @@ export function useExportWav(): UseExportWavReturn {
     progress,
     error,
   };
+}
+
+/** The track without its placeholder clips; the same object when it has none. */
+function withoutPlaceholders(track: ClipTrack): ClipTrack {
+  if (!track.clips.some(isPlaceholderClip)) return track;
+  return { ...track, clips: track.clips.filter((clip) => !isPlaceholderClip(clip)) };
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
+import type { TrackClipPeaks } from '../WaveformPlaylistContext';
 import { useWaveformRows, WaveformPartPlaceContext } from './waveformLayoutContext';
 import { DefaultTrackControls } from './DefaultTrackControls';
 import { ControlSlot, TracksLayout } from './visualizationLayout';
@@ -224,6 +225,11 @@ function TrackControlsSlotImpl({
 
 const TrackControlsSlot = React.memo(TrackControlsSlotImpl);
 
+/** True for a track that has clips and none of them is in the engine yet. */
+function onlyPlaceholders(clips: TrackClipPeaks | undefined): boolean {
+  return clips !== undefined && clips.length > 0 && clips.every((clip) => clip.isPlaceholder);
+}
+
 /**
  * The control panels of all tracks, one height-synced slot per track, for the
  * ControlsColumn outside the scroll area: the track-controls part of the view
@@ -241,6 +247,7 @@ const TrackControlsSlot = React.memo(TrackControlsSlotImpl);
 function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   const {
     rows: tracks,
+    peaksDataArray,
     renderModeById,
     trackLayout,
     trackHeightById,
@@ -287,8 +294,11 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
         {tracks.map((track, trackIndex) => {
           // No mixer state yet means the provider is still loading this
           // track (its first load is not finished): the engine does not know it, so a
-          // mute/solo/volume/pan change could not take effect.
+          // mute/solo/volume/pan change could not take effect. A track whose
+          // clips are all placeholders (#812: drawn while their audio loads)
+          // is in the engine with no clips, and is disabled the same way.
           const state = trackStates[trackIndex];
+          const isLoading = state === undefined || onlyPlaceholders(peaksDataArray[trackIndex]);
           return (
             // key includes trackReorderEpoch: forces a remount after every
             // track-reorder drag, discarding @dnd-kit sortable-plugin DOM
@@ -305,7 +315,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               soloed={state?.soloed ?? false}
               volume={state?.volume ?? 1.0}
               pan={state?.pan ?? 0}
-              isLoading={state === undefined}
+              isLoading={isLoading}
               isSelected={track.id === selectedTrackId}
               isFirst={trackIndex === 0}
               isLast={trackIndex === tracks.length - 1}

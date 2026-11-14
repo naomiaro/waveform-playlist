@@ -266,4 +266,52 @@ describe('derivePeaks', () => {
     expect(second.result).toBe(first.result);
     expect(warn).toHaveBeenCalledTimes(1);
   });
+
+  describe('isPlaceholder (#812)', () => {
+    const getGeneratedWaveformData = () => undefined;
+    const options = { ...OPTIONS, getGeneratedWaveformData };
+
+    it('is true for a clip whose id is in the set and false otherwise', () => {
+      const tracks = [makeTrack('t1', [makeClip('a'), makeClip('b')])];
+      const { result } = derivePeaks(tracks, options, EMPTY_PEAKS_CACHE, new Set(['b']));
+      expect(result[0][0].isPlaceholder).toBe(false);
+      expect(result[0][1].isPlaceholder).toBe(true);
+    });
+
+    it('is false for every clip when no set is given', () => {
+      const tracks = [makeTrack('t1', [makeClip('a')])];
+      const { result } = derivePeaks(tracks, options, EMPTY_PEAKS_CACHE);
+      expect(result[0][0].isPlaceholder).toBe(false);
+    });
+
+    it('keeps the ClipPeaks object, the track array and the result for an unchanged set and clip', () => {
+      const ids = new Set(['b']);
+      const tracks = [makeTrack('t1', [makeClip('a'), makeClip('b')])];
+      const first = derivePeaks(tracks, options, EMPTY_PEAKS_CACHE, ids);
+      const second = derivePeaks(tracks, options, first, ids);
+      expect(second.result).toBe(first.result);
+      expect(second.result[0][1]).toBe(first.result[0][1]);
+    });
+
+    it('keeps a placeholder object when ANOTHER clip leaves the set', () => {
+      const tracks = [makeTrack('t1', [makeClip('a')]), makeTrack('t2', [makeClip('b')])];
+      const first = derivePeaks(tracks, options, EMPTY_PEAKS_CACHE, new Set(['a', 'b']));
+      const second = derivePeaks(tracks, options, first, new Set(['a']));
+      expect(second.result[0][0]).toBe(first.result[0][0]);
+      expect(second.result[0]).toBe(first.result[0]);
+      expect(second.result[1][0]).not.toBe(first.result[1][0]);
+    });
+
+    it('gives a clip that leaves the set (it loaded) a new ClipPeaks with isPlaceholder false', () => {
+      const tracks = [makeTrack('t1', [makeClip('a')])];
+      const first = derivePeaks(tracks, options, EMPTY_PEAKS_CACHE, new Set(['a']));
+      const second = derivePeaks(tracks, options, first, new Set());
+      expect(second.result[0][0]).not.toBe(first.result[0][0]);
+      expect(second.result[0][0].isPlaceholder).toBe(false);
+      // The peaks did not change, so the typed arrays are kept.
+      expect(second.result[0][0].peaks).toBe(first.result[0][0].peaks);
+      expect(second.result[0]).not.toBe(first.result[0]);
+      expect(second.result).not.toBe(first.result);
+    });
+  });
 });
