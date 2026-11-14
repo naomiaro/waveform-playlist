@@ -89,7 +89,12 @@ function checkAgainstAudio(
   }
 }
 
-function buildLoadingClip(id: string, src: ClipSource, options: AudioTrackOptions): LoadingClip {
+function buildLoadingClip(
+  id: string,
+  src: ClipSource,
+  name: string,
+  options: AudioTrackOptions
+): LoadingClip {
   const given = {
     start: options.start,
     duration: options.duration,
@@ -101,14 +106,14 @@ function buildLoadingClip(id: string, src: ClipSource, options: AudioTrackOption
     waveformData: options.waveformData,
   };
   const present = Object.entries(given).filter(([, value]) => value !== undefined);
-  return { id, src, ...Object.fromEntries(present) };
+  return { id, src, name, ...Object.fromEntries(present) };
 }
 
-function buildClip(options: AudioTrackOptions): AudioClip | LoadingClip {
+function buildClip(options: AudioTrackOptions, name: string): AudioClip | LoadingClip {
   const { audioBuffer, waveformData, start = 0, offset = 0, duration } = options;
   const src = options.src || undefined; // '' counts as none
   const id = options.clipId || generateId();
-  if (src !== undefined && !audioBuffer) return buildLoadingClip(id, src, options);
+  if (src !== undefined && !audioBuffer) return buildLoadingClip(id, src, name, options);
   if (!audioBuffer && !waveformData) {
     throw new Error('audioTrack: give src, audioBuffer or waveformData');
   }
@@ -120,6 +125,7 @@ function buildClip(options: AudioTrackOptions): AudioClip | LoadingClip {
     startTime: start,
     offset,
     duration: duration ?? sourceSeconds - offset,
+    name,
     gain: options.gain,
     fadeIn: options.fadeIn,
     fadeOut: options.fadeOut,
@@ -136,9 +142,10 @@ function buildClip(options: AudioTrackOptions): AudioClip | LoadingClip {
  */
 export function audioTrack(options: AudioTrackOptions): PlaylistTrack {
   checkOptions(options);
-  const clip = buildClip(options);
+  const name = options.name ?? defaultName(options.src);
+  const clip = buildClip(options, name);
   const base = createTrack({
-    name: options.name ?? defaultName(options.src),
+    name,
     muted: options.muted,
     soloed: options.soloed,
     volume: options.volume,

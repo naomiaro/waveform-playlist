@@ -683,7 +683,7 @@ isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip;  // True for 
 //                                       // and createClipFromTicks take `src` and carry it onto the clip.
 
 interface AudioTrackOptions {
-  id?: string; clipId?: string; name?: string;   // '' counts as none; name defaults to the file name of src, else 'Untitled'
+  id?: string; clipId?: string; name?: string;   // '' counts as none; name defaults to the file name of src, else 'Untitled'; the clip gets the same name
   src?: ClipSource; audioBuffer?: AudioBuffer; waveformData?: WaveformDataObject;
   start?: number; duration?: number; offset?: number;   // Seconds
   fadeIn?: Fade; fadeOut?: Fade; gain?: number;

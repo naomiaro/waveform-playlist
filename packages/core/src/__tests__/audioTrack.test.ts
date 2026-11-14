@@ -212,9 +212,9 @@ describe('audioTrack follow-ups', () => {
 
   it('builds a loading clip without undefined keys', () => {
     const clip = audioTrack({ src: 'a.mp3' }).clips[0];
-    expect(Object.keys(clip).sort()).toEqual(['id', 'src']);
+    expect(Object.keys(clip).sort()).toEqual(['id', 'name', 'src']);
     const given = audioTrack({ src: 'a.mp3', start: 1, gain: 0.5 }).clips[0];
-    expect(Object.keys(given).sort()).toEqual(['gain', 'id', 'src', 'start']);
+    expect(Object.keys(given).sort()).toEqual(['gain', 'id', 'name', 'src', 'start']);
   });
 
   it('carries gain, fades and color on the AudioClip', () => {
@@ -243,5 +243,18 @@ describe('audioTrack follow-ups', () => {
     });
     expect(track.spectrogramConfig).toBe(spectrogramConfig);
     expect(track.spectrogramColorMap).toBe('viridis');
+  });
+});
+
+describe('audioTrack clip name', () => {
+  it('is the given name on a loading clip and an AudioClip', () => {
+    expect(audioTrack({ src: 'a.mp3', name: 'Kick' }).clips[0].name).toBe('Kick');
+    expect(audioTrack({ audioBuffer: buffer, name: 'Kick' }).clips[0].name).toBe('Kick');
+  });
+
+  it('is the default name when none is given', () => {
+    expect(audioTrack({ src: '/x/drums.mp3' }).clips[0].name).toBe('drums');
+    expect(audioTrack({ audioBuffer: buffer }).clips[0].name).toBe('Untitled');
+    expect(audioTrack({ src: 'a.mp3', audioBuffer: buffer }).clips[0].name).toBe('a');
   });
 });
