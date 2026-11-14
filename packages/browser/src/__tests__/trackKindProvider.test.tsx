@@ -77,8 +77,8 @@ const Probe: React.FC = () => {
   return null;
 };
 
-function mount(tracks: ClipTrack[], options: { withOnError?: boolean } = {}) {
-  const { withOnError = true } = options;
+function mount(tracks: ClipTrack[], options: { withOnError?: boolean; onReady?: () => void } = {}) {
+  const { withOnError = true, onReady } = options;
   const adapters: ReturnType<typeof createFakeAdapter>[] = [];
   const onError = vi.fn();
   const view = (next: ClipTrack[]) => (
@@ -86,6 +86,7 @@ function mount(tracks: ClipTrack[], options: { withOnError?: boolean } = {}) {
       tracks={next}
       sampleRate={SAMPLE_RATE}
       onError={withOnError ? onError : undefined}
+      onReady={onReady}
       createAdapter={() => {
         const adapter = createFakeAdapter();
         adapters.push(adapter);
@@ -184,6 +185,9 @@ describe('a wrong-kind track in the provider (#756)', () => {
       expect(ours).toHaveLength(1);
       expect(ours[0]).toMatch(/could not be built/);
       expect(ours[0]).toMatch(/stays in its loading state/);
+      // The waveform is drawn from the tracks all the same: only playback is missing.
+      expect(ours[0]).toMatch(/cannot be played/);
+      expect(ours[0]).not.toMatch(/nothing is drawn/);
       expect(ours[0]).toMatch(/Duplicate track id "same"/);
       // With an onError prop the app is handling it: no hint to add one.
       expect(ours[0]).not.toMatch(/onError/);
@@ -217,6 +221,25 @@ describe('a wrong-kind track in the provider (#756)', () => {
         .filter((message) => message.startsWith('[waveform-playlist]'));
       expect(ours).toHaveLength(1);
       expect(ours[0]).toMatch(/could not be built[\s\S]*is an audio track/);
+    });
+
+    it('an onReady callback that throws is reported as that, not as a playlist that could not be built', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { onError } = mount([track('t1', 'audio', [clip('a')])], {
+        onReady: () => {
+          throw new Error('my handler broke');
+        },
+      });
+      await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(isReady).toBe(true);
+      const ours = error.mock.calls
+        .map((call) => String(call[0]))
+        .filter((message) => message.startsWith('[waveform-playlist]'));
+      expect(ours).toHaveLength(1);
+      expect(ours[0]).toMatch(/onReady/);
+      expect(ours[0]).toMatch(/my handler broke/);
+      expect(ours[0]).not.toMatch(/could not be built/);
     });
   });
 });

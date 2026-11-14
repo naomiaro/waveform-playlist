@@ -64,12 +64,13 @@ export function setMixerValues(
 }
 
 /**
- * A track is given a new id: its mix goes with it. The same Map when the old
- * id has no entry or the new id already has one.
+ * A track is given a new id: its mix goes with it, also over an entry the
+ * new id still has from a removed track. The same Map when the old id has no
+ * entry.
  */
 export function carryMixerEntry(mixer: Mixer, fromId: string, toId: string): Mixer {
   const entry = mixer.get(fromId);
-  if (!entry || mixer.has(toId)) return mixer;
+  if (!entry || mixer.get(toId) === entry) return mixer;
   return new Map(mixer).set(toId, entry);
 }
 

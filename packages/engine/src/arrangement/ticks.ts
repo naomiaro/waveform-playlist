@@ -24,26 +24,27 @@ export function withClips(track: ClipTrack, change: (clip: AudioClip) => AudioCl
 }
 
 /**
- * A function that converts the ticks of a tracks array from `fromPpqn` to
- * `toPpqn`, rounding to the nearest tick. It remembers each track it has
- * converted, so states that shared a track object go on sharing one, and it
- * returns the same array when nothing in it changed.
+ * A function that applies `change` to every clip of a tracks array. It
+ * remembers each track it has mapped, so states that shared a track object
+ * go on sharing one, and it returns the same array when nothing in it
+ * changed.
  */
-export function tickConverter(fromPpqn: number, toPpqn: number): (tracks: Tracks) => Tracks {
-  const converted = new Map<ClipTrack, ClipTrack>();
-  const convertTrack = (track: ClipTrack): ClipTrack => {
-    const known = converted.get(track);
+export function clipMapper(change: (clip: AudioClip) => AudioClip): (tracks: Tracks) => Tracks {
+  const mapped = new Map<ClipTrack, ClipTrack>();
+  const mapTrack = (track: ClipTrack): ClipTrack => {
+    const known = mapped.get(track);
     if (known) return known;
-    const next = withClips(track, (clip) => {
-      if (clip.startTick === undefined) return clip;
-      const startTick = Math.round((clip.startTick * toPpqn) / fromPpqn);
-      return startTick === clip.startTick ? clip : { ...clip, startTick };
-    });
-    converted.set(track, next);
+    const next = withClips(track, change);
+    mapped.set(track, next);
     return next;
   };
   return (tracks) => {
-    const next = tracks.map(convertTrack);
+    const next = tracks.map(mapTrack);
     return next.some((track, i) => track !== tracks[i]) ? next : tracks;
   };
+}
+
+/** A tick counted in `fromPpqn`, as the nearest tick in `toPpqn`. */
+export function rescaleTick(tick: number, fromPpqn: number, toPpqn: number): number {
+  return Math.round((tick * toPpqn) / fromPpqn);
 }

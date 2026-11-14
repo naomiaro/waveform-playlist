@@ -163,7 +163,7 @@ The array is yours to keep in state. The track and clip objects in it are the en
 
 **Type:** `() => void`
 
-Called when all tracks finish loading.
+Called when all tracks finish loading. If the callback throws, the provider logs `[waveform-playlist] The onReady callback threw: …` as a console error and calls `onError` with the error; the playlist is ready all the same.
 
 #### `onError`
 

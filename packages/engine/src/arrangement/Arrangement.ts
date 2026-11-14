@@ -25,13 +25,9 @@
  */
 
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { assertTrackKind, sortClipsByTime } from '@waveform-playlist/core';
-import {
-  constrainClipDrag,
-  constrainBoundaryTrim,
-  canSplitAt,
-  splitClip as splitClipOp,
-} from '../operations/clipOperations';
+import { assertTrackKind } from '@waveform-playlist/core';
+import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
+import type { ClipEditTime } from './clipEdits';
 import { freezeTracksInDevelopment } from './devFreeze';
 import {
   EMPTY_HISTORY,
@@ -46,7 +42,7 @@ import {
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
-import { tickConverter, withClips } from './ticks';
+import { clipMapper, rescaleTick, withClips } from './ticks';
 import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
 import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
 
@@ -167,8 +163,9 @@ export class ArrangementImpl implements Arrangement {
 
   /**
    * Internal, for the engine: how to convert time, for as long as the engine
-   * lives. Ticks counted in another engine's ppqn are converted to this
-   * one's, in every state the arrangement holds, and clips that have no
+   * lives. In every state the arrangement holds (the current tracks, the
+   * undo and redo states, an open transaction's base), ticks counted in
+   * another engine's ppqn are converted to this one's and clips that have no
    * `startTick` yet are given one. Returns the function that detaches;
    * afterwards clips are given no ticks until the next engine attaches.
    *
@@ -184,19 +181,35 @@ export class ArrangementImpl implements Arrangement {
           'Dispose the first engine before building another.'
       );
     }
+    // Work everything out first: the engine's tempo map may throw, and then
+    // nothing here has changed and the arrangement is not attached.
+    const fromPpqn = this._tickPpqn;
+    const toPpqn = timeBase.ppqn;
+    const prepare = clipMapper((clip) => {
+      if (clip.startTick === undefined) {
+        const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
+        return { ...clip, startTick };
+      }
+      if (fromPpqn === null || fromPpqn === toPpqn) return clip;
+      const startTick = rescaleTick(clip.startTick, fromPpqn, toPpqn);
+      return startTick === clip.startTick ? clip : { ...clip, startTick };
+    });
+    const tracks = prepare(this._tracks);
+    const history = {
+      undo: this._history.undo.map(prepare),
+      redo: this._history.redo.map(prepare),
+    };
+    const transaction = this._transaction && {
+      ...this._transaction,
+      tracks: prepare(this._transaction.tracks),
+    };
+
     this._timeBase = timeBase;
-    const before = this._tracks;
-    if (this._tickPpqn !== null && this._tickPpqn !== timeBase.ppqn) {
-      this._convertTicks(this._tickPpqn, timeBase.ppqn);
-    }
-    this._tickPpqn = timeBase.ppqn;
-    const withTicks = this._tracks.map((track) =>
-      withClips(track, (clip) =>
-        clip.startTick !== undefined ? clip : { ...clip, startTick: this._tickAt(clip.startSample) }
-      )
-    );
-    if (withTicks.some((track, i) => track !== this._tracks[i])) this._tracks = withTicks;
-    if (this._tracks !== before) {
+    this._tickPpqn = toPpqn;
+    this._history = history;
+    this._transaction = transaction;
+    if (tracks !== this._tracks) {
+      this._tracks = tracks;
       this._tracksVersion++;
       this._emit({ type: 'recompute' });
     }
@@ -377,21 +390,12 @@ export class ArrangementImpl implements Arrangement {
   }
 
   // ---------------------------------------------------------------------------
-  // Clip Queries
+  // Clips (the edits themselves are pure functions in ./clipEdits)
   // ---------------------------------------------------------------------------
 
   /** Get a clip's full bounds for trim constraint computation. Returns null if not found. */
   getClipBounds(trackId: string, clipId: string): ClipBounds | null {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) return null;
-    const clip = track.clips.find((c: AudioClip) => c.id === clipId);
-    if (!clip) return null;
-    return {
-      offsetSamples: clip.offsetSamples,
-      durationSamples: clip.durationSamples,
-      startSample: clip.startSample,
-      sourceDurationSamples: clip.sourceDurationSamples,
-    };
+    return clipBounds(this._tracks, trackId, clipId);
   }
 
   /** Constrain a trim delta using the collision/bounds logic.
@@ -402,122 +406,20 @@ export class ArrangementImpl implements Arrangement {
     boundary: 'left' | 'right',
     deltaSamples: number
   ): number {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) return 0;
-    const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) return 0;
-
-    const clip = track.clips[clipIndex];
-    const sortedClips = sortClipsByTime(track.clips);
-    const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
-    const minDuration = this._minDuration(clip);
-
-    return constrainBoundaryTrim(
-      clip,
-      deltaSamples,
-      boundary,
-      sortedClips,
-      sortedIndex,
-      minDuration
-    );
+    return constrainTrim(this._tracks, trackId, clipId, boundary, deltaSamples, this._clipTime);
   }
-
-  // ---------------------------------------------------------------------------
-  // Clip Editing (delegates to operations/)
-  // ---------------------------------------------------------------------------
 
   /** Move a clip by deltaSamples. Returns the constrained delta actually applied (0 if no-op). */
   moveClip(trackId: string, clipId: string, deltaSamples: number): number {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) {
-      console.warn(`[waveform-playlist/engine] moveClip: track "${trackId}" not found`);
-      return 0;
-    }
-
-    const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) {
-      console.warn(
-        `[waveform-playlist/engine] moveClip: clip "${clipId}" not found in track "${trackId}"`
-      );
-      return 0;
-    }
-
-    const clip = track.clips[clipIndex];
-    const sortedClips = sortClipsByTime(track.clips);
-    const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
-
-    const constrainedDelta = constrainClipDrag(clip, deltaSamples, sortedClips, sortedIndex);
-
-    if (constrainedDelta === 0) return 0;
-
-    this._pushUndoSnapshot();
-
-    this._tracks = this._tracks.map((t) => {
-      if (t.id !== trackId) return t;
-      const newClips = t.clips.map((c: AudioClip, i: number) => {
-        if (i !== clipIndex) return c;
-        const newStartSample = Math.floor(c.startSample + constrainedDelta);
-        return {
-          ...c,
-          startSample: newStartSample,
-          startTick: c.startTick !== undefined ? this._tickAt(newStartSample) : undefined,
-        };
-      });
-      return { ...t, clips: newClips };
-    });
-
-    this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
-    return constrainedDelta;
+    const moved = moveClip(this._tracks, trackId, clipId, deltaSamples, this._clipTime);
+    if (!moved) return 0;
+    this._replaceTrack(trackId, moved.tracks);
+    return moved.delta;
   }
 
   splitClip(trackId: string, clipId: string, atSample: number): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) {
-      console.warn(`[waveform-playlist/engine] splitClip: track "${trackId}" not found`);
-      return;
-    }
-
-    const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) {
-      console.warn(
-        `[waveform-playlist/engine] splitClip: clip "${clipId}" not found in track "${trackId}"`
-      );
-      return;
-    }
-
-    const clip = track.clips[clipIndex];
-    const minDuration = this._minDuration(clip);
-
-    if (!canSplitAt(clip, atSample, minDuration)) {
-      console.warn(
-        `[waveform-playlist/engine] splitClip: cannot split clip "${clipId}" at sample ${atSample} ` +
-          `(clip range: ${clip.startSample}–${clip.startSample + clip.durationSamples}, minDuration: ${minDuration})`
-      );
-      return;
-    }
-
-    this._pushUndoSnapshot();
-
-    const { left, right } = splitClipOp(clip, atSample);
-
-    // Enrich split clips with startTick if the original had one
-    const enrichedLeft =
-      clip.startTick !== undefined ? { ...left, startTick: this._tickAt(left.startSample) } : left;
-    const enrichedRight =
-      clip.startTick !== undefined
-        ? { ...right, startTick: this._tickAt(right.startSample) }
-        : right;
-
-    this._tracks = this._tracks.map((t) => {
-      if (t.id !== trackId) return t;
-      const newClips = [...t.clips];
-      newClips.splice(clipIndex, 1, enrichedLeft, enrichedRight);
-      return { ...t, clips: newClips };
-    });
-
-    this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    const next = splitClip(this._tracks, trackId, clipId, atSample, this._clipTime);
+    if (next) this._replaceTrack(trackId, next);
   }
 
   trimClip(
@@ -526,60 +428,8 @@ export class ArrangementImpl implements Arrangement {
     boundary: 'left' | 'right',
     deltaSamples: number
   ): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (!track) {
-      console.warn(`[waveform-playlist/engine] trimClip: track "${trackId}" not found`);
-      return;
-    }
-
-    const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
-    if (clipIndex === -1) {
-      console.warn(
-        `[waveform-playlist/engine] trimClip: clip "${clipId}" not found in track "${trackId}"`
-      );
-      return;
-    }
-
-    const clip = track.clips[clipIndex];
-    const sortedClips = sortClipsByTime(track.clips);
-    const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
-    const minDuration = this._minDuration(clip);
-
-    const constrained = constrainBoundaryTrim(
-      clip,
-      deltaSamples,
-      boundary,
-      sortedClips,
-      sortedIndex,
-      minDuration
-    );
-
-    if (constrained === 0) return;
-
-    this._pushUndoSnapshot();
-
-    this._tracks = this._tracks.map((t) => {
-      if (t.id !== trackId) return t;
-      const newClips = t.clips.map((c: AudioClip, i: number) => {
-        if (i !== clipIndex) return c;
-        if (boundary === 'left') {
-          const newStartSample = c.startSample + constrained;
-          return {
-            ...c,
-            startSample: newStartSample,
-            startTick: c.startTick !== undefined ? this._tickAt(newStartSample) : undefined,
-            offsetSamples: c.offsetSamples + constrained,
-            durationSamples: c.durationSamples - constrained,
-          };
-        } else {
-          return { ...c, durationSamples: c.durationSamples + constrained };
-        }
-      });
-      return { ...t, clips: newClips };
-    });
-
-    this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    const next = trimClip(this._tracks, trackId, clipId, boundary, deltaSamples, this._clipTime);
+    if (next) this._replaceTrack(trackId, next);
   }
 
   // ---------------------------------------------------------------------------
@@ -629,6 +479,20 @@ export class ArrangementImpl implements Arrangement {
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  /** The tracks after an edit of one track: an undo step, the new array, the announcement. */
+  private _replaceTrack(trackId: string, tracks: readonly ClipTrack[]): void {
+    this._pushUndoSnapshot();
+    this._tracks = tracks;
+    this._tracksVersion++;
+    this._emit({ type: 'update', trackId });
+  }
+
+  /** How the clip edits convert time: through the attached engine, or not at all. */
+  private readonly _clipTime: ClipEditTime = {
+    tickAt: (startSample) => this._tickAt(startSample),
+    minDuration: (clip) => this._minDuration(clip),
+  };
 
   /**
    * The tick of a sample position. Without an engine there is no tempo to
@@ -731,19 +595,6 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'restore', previous });
   }
 
-  /** Every stored tick, from one engine's unit to another's: the current tracks and every state held. */
-  private _convertTicks(fromPpqn: number, toPpqn: number): void {
-    const convert = tickConverter(fromPpqn, toPpqn);
-    this._tracks = convert(this._tracks);
-    this._history = {
-      undo: this._history.undo.map(convert),
-      redo: this._history.redo.map(convert),
-    };
-    if (this._transaction) {
-      this._transaction = { ...this._transaction, tracks: convert(this._transaction.tracks) };
-    }
-  }
-
   /** Ends an open transaction, restoring the tracks it began from if it changed them. */
   private _abortOpenTransaction(): void {
     const transaction = this._transaction;
@@ -770,6 +621,11 @@ export class ArrangementImpl implements Arrangement {
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
+    // A track can have left the last state that held it: its mixer entry goes
+    // with it. (A step that leaves the history is handled where it leaves.)
+    if (change.type === 'remove' || change.type === 'restore') {
+      this._mixer = retainMixer(this._mixer, this._heldStates());
+    }
     this._pending.push({
       change,
       at: { tracksVersion: this._tracksVersion, mixerVersion: this._mixerVersion },

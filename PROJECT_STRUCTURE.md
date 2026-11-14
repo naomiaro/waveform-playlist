@@ -151,10 +151,12 @@ const clip = createClipFromSeconds({
   - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks, mix, history, transactions, ordered delivery of changes
   - `arrangement/mixer.ts` — `TrackMixerValues`; the mix as pure functions over a Map by track id
   - `arrangement/history.ts` — Undo/redo as pure functions over references to earlier tracks arrays
-  - `arrangement/ticks.ts` — Converts clip ticks when an engine with another ppqn takes over
+  - `arrangement/clipEdits.ts` — Move, trim and split as pure functions over a tracks array
+  - `arrangement/ticks.ts` — Clip mapping across states (`clipMapper`) and tick rescaling between ppqn values (`rescaleTick`), used when an engine attaches
   - `arrangement/validate.ts` — Unique track ids, unique clip ids within a track
   - `arrangement/devFreeze.ts` — Freezes handed-out tracks outside production builds
-  - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and keeps the adapter in step
+  - `adapterSync.ts` — `AdapterSync`: the adapter call for each arrangement change, and the tracks-with-current-mix projection that `getState().tracks` and the adapter are given
+  - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and hands each change to its `AdapterSync`
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
@@ -890,6 +892,8 @@ Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistPro
 - `packages/browser/src/hooks/` - Reusable business logic
 - `packages/browser/src/components/` - React components
 - `packages/engine/src/PlaylistEngine.ts` - Stateful timeline engine
+- `packages/engine/src/arrangement/` - The arrangement: tracks, mix, undo history
+- `packages/engine/src/adapterSync.ts` - Keeps the adapter in step with the arrangement
 - `packages/engine/src/operations/` - Pure clip/timeline/viewport operations
 - `packages/ui-components/src/components/Playlist.tsx` - UI container
 - `packages/playout/src/TonePlayout.ts` - Audio playback

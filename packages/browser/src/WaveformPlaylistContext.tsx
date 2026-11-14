@@ -915,7 +915,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
         prevTracksRef.current = tracks;
 
-        onReady?.();
+        // The playlist is built. A callback that throws is the app's own
+        // error, reported as that and not as a playlist that failed to build.
+        try {
+          onReady?.();
+        } catch (callbackError) {
+          const thrown =
+            callbackError instanceof Error ? callbackError : new Error(String(callbackError));
+          console.error('[waveform-playlist] The onReady callback threw: ' + thrown.message);
+          onError?.(thrown);
+        }
       } catch (error) {
         // Dispose an adapter created before the engine failed to build (e.g. invalid
         // zoomLevels make `new PlaylistEngine` throw) — the cleanup skips it because
@@ -936,16 +945,22 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           engineBuildInFlightRef.current = false;
           pendingResumeRef.current = null;
         }
-        // An error, not a warning: nothing is drawn or played until a later
-        // build succeeds, and without an `onError` prop the console is the
-        // only place that says why.
-        const reason = error instanceof Error ? error.message : String(error);
-        console.error(
-          '[waveform-playlist] The playlist could not be built and stays in its loading state ' +
-            '(nothing is drawn or played). Reason: ' +
-            reason +
-            (onError ? '' : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
-        );
+        // An error, not a warning: the playlist cannot be played until a later
+        // build succeeds (its waveforms are still drawn from `tracks`), and
+        // without an `onError` prop the console is the only place that says
+        // why. A build that was superseded or unmounted says nothing here:
+        // the build that replaced it speaks for itself.
+        if (!cancelled) {
+          const reason = error instanceof Error ? error.message : String(error);
+          console.error(
+            '[waveform-playlist] The playlist could not be built and stays in its loading ' +
+              'state (it cannot be played). Reason: ' +
+              reason +
+              (onError
+                ? ''
+                : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
+          );
+        }
         onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     };

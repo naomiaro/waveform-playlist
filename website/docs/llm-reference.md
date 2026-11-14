@@ -702,7 +702,7 @@ audioTrack(options: AudioTrackOptions): ArrangementTrack;
 // src: '' counts as not given.
 ```
 
-A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console error that says the playlist could not be built and why, and the playlist stays in its loading state until `tracks` is valid. The same holds for two tracks with one id, or two clips with one id on a track. Always pass `onError`.
+A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console error that says the playlist could not be built and why, and the playlist stays in its loading state (it cannot be played; its waveforms are still drawn from `tracks`) until `tracks` is valid. An `onReady` callback that throws is reported separately (a console error and `onError`), and the playlist is ready. The same holds for two tracks with one id, or two clips with one id on a track. Always pass `onError`.
 
 ```typescript
 interface TrackState {
@@ -1524,7 +1524,7 @@ interface Arrangement {
   // tracks
   addTrack(track: ClipTrack): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
-  updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw). The mix stays, also for a track given a new id
+  updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw). The mix stays; a track given a new id takes its mix with it
     trackId: string,
     next: ClipTrack | ((track: ClipTrack) => ClipTrack)
   ): void;

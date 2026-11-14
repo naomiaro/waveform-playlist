@@ -95,6 +95,36 @@ describe('an engine constructor that fails', () => {
   });
 });
 
+describe('an engine that cannot attach', () => {
+  it('leaves the arrangement exactly as it was, and unattached', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, ppqn: 192 }).dispose();
+    arrangement.addTrack(track('C', [clip('c1', 48000)])); // no tick: no engine
+    const tracks = arrangement.getTracks();
+    const version = arrangement.tracksVersion;
+    const listener = vi.fn();
+    arrangement.subscribe(listener);
+
+    const broken = recordingAdapter();
+    broken.secondsToTicks = () => {
+      throw new Error('tempo map broke');
+    };
+    expect(
+      () => new PlaylistEngine({ adapter: broken, arrangement, sampleRate: SAMPLE_RATE })
+    ).toThrow('tempo map broke');
+
+    expect(arrangement.getTracks()).toBe(tracks);
+    expect(arrangement.tracksVersion).toBe(version);
+    expect(listener).not.toHaveBeenCalled();
+    expect(arrangement.canUndo).toBe(true);
+    // Not attached: an edit needs no tempo map, and the next engine is the first.
+    expect(() => arrangement.moveClip('A', 'a1', 1000)).not.toThrow();
+    new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, ppqn: 192 });
+    expect(warn).not.toHaveBeenCalled();
+    expect(arrangement.getTracks()[2].clips[0].startTick).toBe(384);
+  });
+});
+
 describe('two engines on one arrangement', () => {
   it('disposing the first after the second attached leaves the second its time base', () => {
     const arrangement = createArrangement();
@@ -158,6 +188,22 @@ describe('changes delivered later than they were made', () => {
         e.addTrack(track('Y', [clip('y1', 0)]));
         e.moveClip('Y', 'y1', 1000);
         e.addTrack(track('Z', []));
+      },
+    ],
+    [
+      'addTrack, its undo, and addTrack again',
+      (e) => {
+        e.addTrack(track('Y', []));
+        e.undo();
+        e.addTrack(track('Y', []));
+      },
+    ],
+    [
+      'removeTrack, its undo, and removeTrack again',
+      (e) => {
+        e.removeTrack('B');
+        e.undo();
+        e.removeTrack('B');
       },
     ],
     [
@@ -233,6 +279,70 @@ describe('changes delivered later than they were made', () => {
       expect((adapter.rawCalls[2].args[0] as ClipTrack[]).map((t) => t.id)).toEqual(expected);
     }
   );
+
+  // Only a change that is followed by ANOTHER track change before it is
+  // delivered costs a full send. One edit from inside a listener is still the
+  // current state when it is delivered, and goes as the small update.
+  const singleEdits: Array<[string, (engine: PlaylistEngine) => void, string[]]> = [
+    ['a move', (e: PlaylistEngine) => void e.moveClip('B', 'b1', 500), ['updateTrack']],
+    ['an addTrack', (e: PlaylistEngine) => e.addTrack(track('Y', [])), ['addTrack']],
+    ['a removeTrack', (e: PlaylistEngine) => e.removeTrack('B'), ['removeTrack']],
+    [
+      'a move and a fader',
+      (e: PlaylistEngine) => {
+        e.moveClip('B', 'b1', 500);
+        e.setTrackPan('B', 0.5);
+      },
+      ['updateTrack', 'setTrackPan'],
+    ],
+  ];
+
+  it.each(singleEdits)(
+    'one track edit from inside a listener (%s) is sent as itself, with no full send',
+    (_, change, expected) => {
+      const { adapter } = fromInsideAListener(change);
+      // [setTracks (the fixture), setTrackVolume (the outer change), ...]
+      expect(adapter.calls.slice(2).map((c) => c.method)).toEqual(expected);
+    }
+  );
+
+  it('a full send that fails is not taken as done: the changes after it still reach the adapter', () => {
+    const adapter = recordingAdapter();
+    const engine = new PlaylistEngine({ adapter, sampleRate: SAMPLE_RATE });
+    engine.setTracks(fixture());
+    const setTracks = adapter.setTracks.bind(adapter);
+    let failures = 1;
+    adapter.setTracks = (tracks) => {
+      if (failures-- > 0) throw new Error('boom');
+      setTracks(tracks);
+    };
+    let done = false;
+    engine.on('statechange', () => {
+      if (done) return;
+      done = true;
+      engine.setTracks([track('X', [])]);
+      engine.addTrack(track('Y', []));
+    });
+    expect(() => engine.setTrackVolume('A', 0.5)).toThrow('boom');
+    expect(replay(adapter).held).toEqual(['X', 'Y']);
+  });
+
+  it('an engine built during a delivery is not told about changes from before it existed', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    const late = recordingAdapter();
+    let built = false;
+    arrangement.subscribe(() => {
+      if (built) return;
+      built = true;
+      arrangement.removeTrack('A');
+      arrangement.removeTrack('B');
+      arrangement.removeTrack('C');
+      new PlaylistEngine({ adapter: late, arrangement, sampleRate: SAMPLE_RATE });
+    });
+    arrangement.addTrack(track('C', []));
+    expect(arrangement.getTracks()).toEqual([]);
+    expect(late.calls).toEqual([]);
+  });
 
   it('each of those changes is still one statechange, in order', () => {
     const adapter = recordingAdapter();
@@ -319,6 +429,33 @@ describe('mixer entries of tracks that are gone', () => {
     expect(arrangement.getMixer().has('B')).toBe(false);
   });
 
+  it('an entry is dropped when an aborted transaction was the only thing that held its track', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.beginTransaction();
+    arrangement.addTrack(track('C', [], { volume: 0.2 }));
+    arrangement.abortTransaction();
+    expect(arrangement.getMixer().has('C')).toBe(false);
+    arrangement.addTrack(track('C', [], { volume: 0.9 }));
+    expect(arrangement.getMixer().get('C')?.volume).toBe(0.9);
+  });
+
+  it('an entry is dropped when its track was added and removed inside one transaction', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.beginTransaction();
+    arrangement.addTrack(track('C', [], { volume: 0.2 }));
+    arrangement.removeTrack('C');
+    arrangement.moveClip('A', 'a1', 100);
+    arrangement.commitTransaction();
+    expect(arrangement.getMixer().has('C')).toBe(false);
+  });
+
+  it('with no undo history at all (undoLimit 0), a removed track’s entry goes at once', () => {
+    const arrangement = createArrangement({ tracks: fixture(), undoLimit: 0 });
+    arrangement.removeTrack('B');
+    expect(arrangement.canUndo).toBe(false);
+    expect(arrangement.getMixer().has('B')).toBe(false);
+  });
+
   it('setTracks keeps the mix of an id that is in the tracks it replaces, and of no other', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     arrangement.setTrackVolume('A', 0.3);
@@ -383,6 +520,15 @@ describe('a track that is given a new id', () => {
     expect(arrangement.getMixer().get('Z')?.volume).toBe(0.3);
   });
 
+  it('takes its mix with it also to an id whose removed track still has an entry', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.setTrackVolume('A', 0.3);
+    arrangement.setTrackVolume('B', 0.2);
+    arrangement.removeTrack('B'); // B's entry is kept for an undo
+    arrangement.updateTrack('A', (current) => ({ ...current, id: 'B' }));
+    expect(arrangement.getMixer().get('B')?.volume).toBe(0.3);
+  });
+
   it('undoing the change gives the old id its mix back', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     arrangement.setTrackVolume('A', 0.3);
@@ -398,6 +544,18 @@ describe('a track that is given a new id', () => {
     engine.selectTrack('A');
     engine.updateTrack('A', track('Z', []));
     expect(engine.getState().selectedTrackId).toBeNull();
+  });
+
+  it('through the engine: setTracks leaves the selected track id alone, as it always has', () => {
+    const engine = new PlaylistEngine({ sampleRate: SAMPLE_RATE });
+    engine.setTracks(fixture());
+    engine.selectTrack('A');
+    // A host empties the tracks and adds them again (the React provider does): the selection stays.
+    engine.setTracks([]);
+    expect(engine.getState().selectedTrackId).toBe('A');
+    engine.addTrack(track('C', []));
+    engine.setTempo(90);
+    expect(engine.getState().selectedTrackId).toBe('A');
   });
 
   it('through the engine: the selected track id stays for an ordinary update', () => {
@@ -514,6 +672,16 @@ describe('an engine with another tick resolution (ppqn) takes over', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('clips without a tick get one in the undo states too, not only in the current tracks', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.moveClip('A', 'a2', 48000); // no engine: the undo state holds a2 at 2 s, no tick
+    const second = engineAt(arrangement, 960);
+    second.undo();
+    expect(tickOf(arrangement, 'A', 'a2')).toBe(3840);
+    second.setTempo(60);
+    expect(sampleOf(arrangement, 'A', 'a2')).toBe(192000);
+  });
+
   it('subscribers are told once, and it is not an undo step', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     engineAt(arrangement, 192).dispose();
@@ -567,5 +735,19 @@ describe('isDevelopmentBuild', () => {
   it('is false, and does not throw, where there is no `process` at all', () => {
     vi.stubGlobal('process', undefined);
     expect(isDevelopmentBuild()).toBe(false);
+  });
+});
+
+describe('a disposed engine', () => {
+  it('does not ask its adapter for a tempo change', () => {
+    const adapter = recordingAdapter({ setTempoResult: true });
+    const arrangement = createArrangement({ tracks: fixture() });
+    const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: SAMPLE_RATE });
+    engine.dispose();
+    adapter.reset();
+    engine.setTempo(90);
+    engine.moveClip('A', 'a1', 1000, true);
+    expect(adapter.calls).toEqual([]);
+    expect(engine.getState().bpm).toBe(120);
   });
 });
