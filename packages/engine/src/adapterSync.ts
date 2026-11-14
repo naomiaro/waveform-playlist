@@ -3,13 +3,14 @@
  *
  * The engine subscribes to its arrangement and hands each change here; this
  * makes the adapter call for it. It also holds the projection the adapter
- * and `getState()` are given: the arrangement's tracks with the current
- * mixer values in their fields. Everything here is derived from the
+ * and `getState()` are given: the arrangement's tracks without the clips
+ * that are still loading and with the current mixer values in their fields. Everything here is derived from the
  * arrangement or is bookkeeping about what the adapter was sent; nothing is
  * written back.
  */
 
-import type { ClipTrack } from '@waveform-playlist/core';
+import { isLoadingClip } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip, ClipTrack } from '@waveform-playlist/core';
 import type {
   ArrangementChange,
   ArrangementImpl,
@@ -50,6 +51,8 @@ export class AdapterSync {
     ClipTrack,
     { values: TrackMixerValues | undefined; merged: ClipTrack }
   >();
+  /** Per track object of the arrangement that holds a loading clip: the track without them. */
+  private _loadedMemo = new WeakMap<ArrangementTrack, ClipTrack>();
 
   constructor(
     private readonly _arrangement: ArrangementImpl,
@@ -57,8 +60,9 @@ export class AdapterSync {
   ) {}
 
   /**
-   * The arrangement's tracks with the current mixer values in their fields:
-   * what every adapter track call and `getState().tracks` use. The same
+   * The arrangement's tracks, each without its loading clips and with the
+   * current mixer values in its fields: what every adapter track call and
+   * `getState().tracks` use. The same
    * array until the tracks or the mix change, and the same track object
    * while neither that track nor its mix changed.
    */
@@ -69,7 +73,7 @@ export class AdapterSync {
       return cached.tracks;
     }
     const tracks = freezeTracksInDevelopment(
-      this._arrangement.getTracks().map((track) => this._withMix(track))
+      this._arrangement.getTracks().map((track) => this._project(track))
     );
     this._projection = { tracksVersion, mixerVersion, tracks };
     return tracks;
@@ -97,7 +101,7 @@ export class AdapterSync {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
     if (!track) return false;
     if (this._adapter?.updateTrack) {
-      this._adapter.updateTrack(trackId, this._withMix(track));
+      this._adapter.updateTrack(trackId, this._project(track));
     } else {
       this.sendAllTracks();
     }
@@ -130,6 +134,9 @@ export class AdapterSync {
       this.sendAllTracks();
     } else {
       this._sendChange(change);
+      // Clips of other tracks became loaded inside this change: those tracks
+      // too, unless everything was just sent.
+      if (at.switched && this._syncedTracksVersion < at.tracksVersion) this._restore(at.switched);
     }
     this._needsAllTracks = false;
   }
@@ -169,10 +176,13 @@ export class AdapterSync {
         }
         break;
       case 'update':
+        if (this._playsTheSame(change.previous, change.trackId)) break;
         // A track that was given a new id is not found under the old one.
         if (!this.sendTrack(change.trackId)) this.sendAllTracks();
         break;
       case 'restore':
+      case 'load':
+        // After a load: each track that gained a clip (the rest plays the same).
         this._restore(change.previous);
         break;
       case 'recompute':
@@ -187,7 +197,7 @@ export class AdapterSync {
   private _addTrack(trackId: string): void {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
     if (track && this._adapter?.addTrack) {
-      this._adapter.addTrack(this._withMix(track));
+      this._adapter.addTrack(this._project(track));
     } else {
       this.sendAllTracks();
     }
@@ -199,19 +209,58 @@ export class AdapterSync {
    * that interrupts playback. A track the restore did not touch is the same
    * object in both states and is skipped; so is a change of order only.
    */
-  private _restore(previous: readonly ClipTrack[]): void {
+  private _restore(previous: readonly ArrangementTrack[]): void {
     const restored = this._arrangement.getTracks();
     const oldById = new Map(previous.map((t) => [t.id, t]));
     const sameSet = previous.length === restored.length && restored.every((t) => oldById.has(t.id));
     if (this._adapter && sameSet) {
       for (const track of restored) {
-        if (oldById.get(track.id) !== track) {
-          this.sendTrack(track.id);
-        }
+        // `sameSet`: every restored track has a track of its id in `previous`.
+        const old = oldById.get(track.id) as ArrangementTrack;
+        if (!this._playsTheSame(old, track.id)) this.sendTrack(track.id);
       }
     } else {
       this.sendAllTracks();
     }
+  }
+
+  /**
+   * True when the arrangement's current track of that id is, for an adapter,
+   * what `previous` was: the same loaded clip objects in the same order and
+   * the same fields. Only its loading clips differ, and an adapter is not
+   * given those, so there is nothing to send.
+   */
+  private _playsTheSame(previous: ArrangementTrack, trackId: string): boolean {
+    const current = this._arrangement.getTracks().find((t) => t.id === trackId);
+    if (!current) return false;
+    if (current === previous) return true;
+    const before = this._loaded(previous);
+    const now = this._loaded(current);
+    if (before.clips.length !== now.clips.length) return false;
+    if (before.clips.some((clip, i) => clip !== now.clips[i])) return false;
+    const keys = new Set([...Object.keys(before), ...Object.keys(now)]) as Set<keyof ClipTrack>;
+    keys.delete('clips');
+    return [...keys].every((key) => Object.is(before[key], now[key]));
+  }
+
+  /** What an adapter and `getState()` are given for one of the arrangement's tracks. */
+  private _project(track: ArrangementTrack): ClipTrack {
+    return this._withMix(this._loaded(track));
+  }
+
+  /**
+   * The track without the clips that are still loading: an adapter plays
+   * loaded clips only. A track that holds none is the arrangement's own
+   * object (memoized per track object otherwise).
+   */
+  private _loaded(track: ArrangementTrack): ClipTrack {
+    const known = this._loadedMemo.get(track);
+    if (known) return known;
+    const clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
+    const loaded: ClipTrack =
+      clips.length === track.clips.length ? (track as ClipTrack) : { ...track, clips };
+    this._loadedMemo.set(track, loaded);
+    return loaded;
   }
 
   /** One track with its current mixer values in its fields (memoized per track object). */

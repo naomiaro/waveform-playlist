@@ -125,7 +125,9 @@ describe('seeding', () => {
     expect(arrangement.getMixer()).toBe(mixer);
     expect(arrangement.getMixer().get('A')).toEqual({ ...DEFAULT_MIX, volume: 0.8, pan: -0.25 });
     expect(arrangement.mixerVersion).toBe(0);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
   });
 
   it('updateTrack with an unknown id seeds nothing', () => {

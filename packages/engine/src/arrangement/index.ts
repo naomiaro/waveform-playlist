@@ -8,6 +8,10 @@ export type {
   RemoveTrackOptions,
 } from './types';
 export type { TrackMixerValues } from './mixer';
+export type { ArrangementSourceState, ArrangementSourcesValue } from './sources';
+export { attachDecodeContext } from './attach';
+export { defaultLoadSource } from './loadSource';
+export type { LoadSource } from './loadSource';
 
 /**
  * Make an arrangement: the owner of the tracks, the mix and the undo

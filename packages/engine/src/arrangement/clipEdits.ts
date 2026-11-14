@@ -5,8 +5,8 @@
  * announcements.
  */
 
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { sortClipsByTime } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip, LoadingClip } from '@waveform-playlist/core';
+import { isLoadingClip, sortClipsByTime } from '@waveform-playlist/core';
 import {
   constrainClipDrag,
   constrainBoundaryTrim,
@@ -15,7 +15,8 @@ import {
 } from '../operations/clipOperations';
 import type { ClipBounds } from './types';
 
-type Tracks = readonly ClipTrack[];
+type Tracks = readonly ArrangementTrack[];
+type AnyClip = AudioClip | LoadingClip;
 
 /** What an edit needs to know about time. */
 export interface ClipEditTime {
@@ -26,9 +27,21 @@ export interface ClipEditTime {
 }
 
 interface Found {
-  track: ClipTrack;
+  track: ArrangementTrack;
   clip: AudioClip;
+  /** Its place among ALL the track's clips, loading ones included. */
   clipIndex: number;
+}
+
+/** The clips an edit can touch or collide with. One that is still loading has no samples yet. */
+function loadedClips(track: ArrangementTrack): AudioClip[] {
+  return track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
+}
+
+/** The loaded clip of that id, or undefined (also for a clip that is still loading). */
+function loadedClip(tracks: Tracks, trackId: string, clipId: string): AudioClip | undefined {
+  const clip = tracks.find((t) => t.id === trackId)?.clips.find((c) => c.id === clipId);
+  return clip && !isLoadingClip(clip) ? clip : undefined;
 }
 
 /** The clip, or null with a warning naming the operation that asked. */
@@ -43,24 +56,32 @@ function findClip(
     console.warn(`[waveform-playlist/engine] ${operation}: track "${trackId}" not found`);
     return null;
   }
-  const clipIndex = track.clips.findIndex((c: AudioClip) => c.id === clipId);
+  const clipIndex = track.clips.findIndex((c) => c.id === clipId);
   if (clipIndex === -1) {
     console.warn(
       `[waveform-playlist/engine] ${operation}: clip "${clipId}" not found in track "${trackId}"`
     );
     return null;
   }
-  return { track, clip: track.clips[clipIndex], clipIndex };
+  const clip = track.clips[clipIndex];
+  if (isLoadingClip(clip)) {
+    console.warn(
+      `[waveform-playlist/engine] ${operation}: clip "${clipId}" in track "${trackId}" is still loading ` +
+        'and cannot be edited until its audio has loaded'
+    );
+    return null;
+  }
+  return { track, clip, clipIndex };
 }
 
 /** `tracks` with the clips of one track replaced. */
-function withTrackClips(tracks: Tracks, trackId: string, clips: AudioClip[]): Tracks {
+function withTrackClips(tracks: Tracks, trackId: string, clips: AnyClip[]): Tracks {
   return tracks.map((t) => (t.id === trackId ? { ...t, clips } : t));
 }
 
 /** A clip's full bounds for trim constraint computation. Null if not found. */
 export function clipBounds(tracks: Tracks, trackId: string, clipId: string): ClipBounds | null {
-  const clip = tracks.find((t) => t.id === trackId)?.clips.find((c: AudioClip) => c.id === clipId);
+  const clip = loadedClip(tracks, trackId, clipId);
   if (!clip) return null;
   return {
     offsetSamples: clip.offsetSamples,
@@ -80,9 +101,9 @@ export function constrainTrim(
   time: ClipEditTime
 ): number {
   const track = tracks.find((t) => t.id === trackId);
-  const clip = track?.clips.find((c: AudioClip) => c.id === clipId);
+  const clip = loadedClip(tracks, trackId, clipId);
   if (!track || !clip) return 0;
-  const sortedClips = sortClipsByTime(track.clips);
+  const sortedClips = sortClipsByTime(loadedClips(track));
   const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
   return constrainBoundaryTrim(
     clip,
@@ -105,7 +126,7 @@ export function moveClip(
   const found = findClip(tracks, trackId, clipId, 'moveClip');
   if (!found) return null;
   const { track, clip, clipIndex } = found;
-  const sortedClips = sortClipsByTime(track.clips);
+  const sortedClips = sortClipsByTime(loadedClips(track));
   const sortedIndex = sortedClips.findIndex((c: AudioClip) => c.id === clipId);
   const delta = constrainClipDrag(clip, deltaSamples, sortedClips, sortedIndex);
   if (delta === 0) return null;
@@ -176,7 +197,7 @@ export function splitClip(
   // Give the halves a startTick if the original had one
   const withTick = (half: AudioClip): AudioClip =>
     clip.startTick !== undefined ? { ...half, startTick: time.tickAt(half.startSample) } : half;
-  const clips = [...track.clips];
+  const clips: AnyClip[] = [...track.clips];
   clips.splice(clipIndex, 1, withTick(left), withTick(right));
   return withTrackClips(tracks, trackId, clips);
 }

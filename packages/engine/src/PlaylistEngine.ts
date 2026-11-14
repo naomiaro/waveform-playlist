@@ -10,9 +10,11 @@
 
 import type { ClipTrack } from '@waveform-playlist/core';
 import { AdapterSync } from './adapterSync';
+import type { TracksChange } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
 import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
 import type { ClipBounds } from './arrangement';
+import { attachDecodeContext, attachTimeBase, isArrangement } from './arrangement/attach';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
 
@@ -26,6 +28,7 @@ export class PlaylistEngine {
   private _arrangement: ArrangementImpl;
   private _stopFollowingArrangement: () => void;
   private _detachFromArrangement: () => void;
+  private _detachDecodeContext: (() => void) | null = null;
   private _adapterSync: AdapterSync;
   private _currentTime = 0;
   private _playStartPosition = 0;
@@ -106,7 +109,7 @@ export class PlaylistEngine {
 
     // Attach first (clips without a tick get one), then follow, then bring
     // the adapter in step with the tracks that are already there.
-    this._detachFromArrangement = this._arrangement.attachEngine(timeBase);
+    this._detachFromArrangement = attachTimeBase(this._arrangement, timeBase);
     this._adapterSync = new AdapterSync(this._arrangement, this._adapter);
     this._stopFollowingArrangement = this._arrangement.onChange((change, at) =>
       this._onArrangementChange(change, at)
@@ -118,6 +121,14 @@ export class PlaylistEngine {
       this._stopFollowingArrangement();
       this._detachFromArrangement();
       throw error;
+    }
+    // The arrangement's sources are decoded with the adapter's context, unless the host attaches one.
+    const adapter = this._adapter;
+    if (adapter && options.attachDecodeContext !== false) {
+      this._detachDecodeContext = attachDecodeContext(
+        this._arrangement,
+        async () => adapter.audioContext
+      );
     }
   }
 
@@ -166,7 +177,7 @@ export class PlaylistEngine {
       tracks: this._adapterSync.tracks(),
       tracksVersion: this._arrangement.tracksVersion,
       mixerVersion: this._arrangement.mixerVersion,
-      duration: calculateDuration(this._arrangement.getTracks()),
+      duration: calculateDuration(this._adapterSync.tracks()),
       currentTime: this._currentTime,
       isPlaying: this._isPlaying,
       samplesPerPixel: this._zoomLevels[this._zoomIndex],
@@ -564,6 +575,8 @@ export class PlaylistEngine {
     this._disposed = true;
     this._stopFollowingArrangement();
     this._detachFromArrangement();
+    this._detachDecodeContext?.();
+    this._detachDecodeContext = null;
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
@@ -606,9 +619,30 @@ export class PlaylistEngine {
         if (change.type === 'remove' || change.type === 'restore' || change.type === 'update') {
           this._clearSelectionIfGone();
         }
-        this._adapterSync.follow(change, at);
+        if (change.type === 'load') {
+          this._followLoad(change, at);
+        } else {
+          this._adapterSync.follow(change, at);
+        }
     }
     this._emitStateChange();
+  }
+
+  /**
+   * Audio arrived by itself: there is no caller to fail when the adapter
+   * throws. The error is reported, the `statechange` is still emitted (the
+   * tracks did change), and the next track change sends the adapter every
+   * track.
+   */
+  private _followLoad(change: TracksChange, at: ArrangementVersions): void {
+    try {
+      this._adapterSync.follow(change, at);
+    } catch (error) {
+      console.error(
+        '[waveform-playlist] The playout adapter failed while loaded audio was applied:',
+        error
+      );
+    }
   }
 
   /** The selected track id names a track; when that track is gone, nothing is selected. */
@@ -667,7 +701,8 @@ export class PlaylistEngine {
 
 /** The object behind an `Arrangement` from `createArrangement()`. */
 function asArrangementImpl(arrangement: unknown): ArrangementImpl {
-  if (arrangement instanceof ArrangementImpl) return arrangement;
+  // By key, not `instanceof`: the arrangement may come from another copy of this package.
+  if (isArrangement(arrangement)) return arrangement as ArrangementImpl;
   throw new Error(
     '[waveform-playlist] PlaylistEngine: the `arrangement` option must be an arrangement ' +
       'made by createArrangement().'

@@ -24,11 +24,23 @@
  * delivered after the one being handled has reached everyone.
  */
 
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import { assertTrackKind } from '@waveform-playlist/core';
+import type {
+  ArrangementTrack,
+  AudioClip,
+  ClipSource,
+  LoadingClip,
+  ValueSource,
+} from '@waveform-playlist/core';
+import { isLoadingClip } from '@waveform-playlist/core';
+import { ARRANGEMENT_ATTACH_DECODE, ARRANGEMENT_ATTACH_TIME_BASE } from './attach';
+import type { ArrangementTimeBase, GetDecodeContext } from './attach';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
 import type { ClipEditTime } from './clipEdits';
 import { freezeTracksInDevelopment } from './devFreeze';
+import { defaultLoadSource } from './loadSource';
+import type { LoadSource } from './loadSource';
+import { ArrangementSources } from './sources';
+import type { ArrangementSourcesValue } from './sources';
 import {
   EMPTY_HISTORY,
   beginBase,
@@ -42,8 +54,13 @@ import {
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
-import { clipMapper, rescaleTick, withClips } from './ticks';
-import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
+import { forLoadedClips, tickPreparer, withClips } from './ticks';
+import {
+  assertClipsOfTrackKind,
+  assertUniqueClipIds,
+  assertUniqueTrackIds,
+  duplicateTrackId,
+} from './validate';
 import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
@@ -54,21 +71,17 @@ export type ArrangementChange =
   | { type: 'set' }
   | { type: 'add'; trackId: string }
   | { type: 'remove'; trackId: string }
-  | { type: 'update'; trackId: string }
+  /** `previous`: the track object that was replaced (for a listener that sends only what differs). */
+  | { type: 'update'; trackId: string; previous: ArrangementTrack }
   | { type: 'reorder' }
-  | { type: 'restore'; previous: readonly ClipTrack[] }
+  | { type: 'restore'; previous: readonly ArrangementTrack[] }
+  /** Audio arrived: loading clips of the current tracks became loaded clips. */
+  | { type: 'load'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
   | { type: 'recompute' }
   | { type: 'history' };
 
-/** How the arrangement converts time. The engine provides it from its adapter and tempo. */
-export interface ArrangementTimeBase {
-  sampleRate: number;
-  /** The unit of the ticks this time base converts to and from: ticks per quarter note. */
-  ppqn: number;
-  secondsToTicks(seconds: number): number;
-  ticksToSeconds(tick: number): number;
-}
+export type { ArrangementTimeBase };
 
 export interface ArrangementOptions {
   /** Maximum number of undo steps (default 100). */
@@ -76,19 +89,28 @@ export interface ArrangementOptions {
   /** Left out: no engine is attached yet (see `attachEngine`). */
   timeBase?: ArrangementTimeBase;
   /** The first tracks. Not an undo step. */
-  tracks?: readonly ClipTrack[];
+  tracks?: readonly ArrangementTrack[];
+  /** How a clip's source becomes an AudioBuffer. Default: fetch (or read) and decode. */
+  loadSource?: LoadSource;
 }
 
 /** The versions the arrangement had right after a change. */
 export interface ArrangementVersions {
   tracksVersion: number;
   mixerVersion: number;
+  /**
+   * Set when, inside this change, clips of OTHER tracks became loaded clips
+   * (a clip that came in carried the audio of a source they were waiting
+   * for): the tracks from before that switch, so that a listener can tell
+   * which tracks gained a clip besides the one the change names.
+   */
+  switched?: readonly ArrangementTrack[];
 }
 
 type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
 
 export class ArrangementImpl implements Arrangement {
-  private _tracks: readonly ClipTrack[] = [];
+  private _tracks: readonly ArrangementTrack[] = [];
   private _tracksVersion = 0;
   private _mixerVersion = 0;
   private _mixer: Mixer = EMPTY_MIXER;
@@ -101,12 +123,16 @@ export class ArrangementImpl implements Arrangement {
   private _listeners: Set<ChangeListener> = new Set();
   private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
   private _delivering = false;
+  private readonly _sources: ArrangementSources;
   readonly undoLimit: number;
 
   constructor(options: ArrangementOptions = {}) {
     this.undoLimit = options.undoLimit ?? DEFAULT_UNDO_LIMIT;
     this._timeBase = options.timeBase ?? null;
     this._tickPpqn = options.timeBase?.ppqn ?? null;
+    this._sources = new ArrangementSources(options.loadSource ?? defaultLoadSource, () =>
+      this._onSourceSettled()
+    );
     if (options.tracks) this.setTracks(options.tracks);
   }
 
@@ -115,7 +141,7 @@ export class ArrangementImpl implements Arrangement {
   // ---------------------------------------------------------------------------
 
   /** The tracks. The same array until something changes; never written to. */
-  getTracks(): readonly ClipTrack[] {
+  getTracks(): readonly ArrangementTrack[] {
     return this._tracks;
   }
 
@@ -127,6 +153,29 @@ export class ArrangementImpl implements Arrangement {
    */
   getMixer(): Mixer {
     return this._mixer;
+  }
+
+  /**
+   * Where each source the clips name is: pending, loaded or failed. The same
+   * object until a status changes.
+   */
+  get sources(): ValueSource<ArrangementSourcesValue> {
+    return this._sources.value;
+  }
+
+  /** Start a source whose LOAD failed again. See `Arrangement.retry`. */
+  retry(src: ClipSource): void {
+    this._sources.retry(src);
+  }
+
+  /** The attach point of `attachDecodeContext()` (./attach.ts): a context to decode with. */
+  [ARRANGEMENT_ATTACH_DECODE](getContext: GetDecodeContext): () => void {
+    return this._sources.attachDecodeContext(getContext);
+  }
+
+  /** The attach point an engine uses (./attach.ts): `attachEngine`. */
+  [ARRANGEMENT_ATTACH_TIME_BASE](timeBase: ArrangementTimeBase): () => void {
+    return this.attachEngine(timeBase);
   }
 
   /** Counts structural changes. */
@@ -152,7 +201,9 @@ export class ArrangementImpl implements Arrangement {
   /**
    * Internal, for the engine: be told WHAT changed, before the subscribers
    * are. A listener here that throws fails the change's caller (an adapter
-   * that fails must fail the call that caused it).
+   * that fails must fail the call that caused it). A `'load'` has no caller
+   * (audio arrived by itself): the engine catches its adapter's error for
+   * that change and reports it.
    */
   onChange(listener: ChangeListener): () => void {
     this._listeners.add(listener);
@@ -183,17 +234,7 @@ export class ArrangementImpl implements Arrangement {
     }
     // Work everything out first: the engine's tempo map may throw, and then
     // nothing here has changed and the arrangement is not attached.
-    const fromPpqn = this._tickPpqn;
-    const toPpqn = timeBase.ppqn;
-    const prepare = clipMapper((clip) => {
-      if (clip.startTick === undefined) {
-        const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
-        return { ...clip, startTick };
-      }
-      if (fromPpqn === null || fromPpqn === toPpqn) return clip;
-      const startTick = rescaleTick(clip.startTick, fromPpqn, toPpqn);
-      return startTick === clip.startTick ? clip : { ...clip, startTick };
-    });
+    const prepare = tickPreparer(timeBase, this._tickPpqn);
     const tracks = prepare(this._tracks);
     const history = {
       undo: this._history.undo.map(prepare),
@@ -205,7 +246,7 @@ export class ArrangementImpl implements Arrangement {
     };
 
     this._timeBase = timeBase;
-    this._tickPpqn = toPpqn;
+    this._tickPpqn = timeBase.ppqn;
     this._history = history;
     this._transaction = transaction;
     if (tracks !== this._tracks) {
@@ -260,7 +301,10 @@ export class ArrangementImpl implements Arrangement {
           'previous snapshot will be overwritten'
       );
     }
+    const replaced = this._transaction !== null;
     this._transaction = beginBase(this._tracks);
+    // The base that was dropped may have been the last state naming a source.
+    if (replaced) this._resyncSourcesQuietly();
   }
 
   commitTransaction(): void {
@@ -296,8 +340,8 @@ export class ArrangementImpl implements Arrangement {
   // unique, and so are clip ids within a track. The three methods that take a
   // track check it before they change anything, so a throw leaves the tracks,
   // the undo history, the mixer and every subscriber untouched.
-  setTracks(tracks: readonly ClipTrack[]): void {
-    tracks.forEach(assertTrackKind);
+  setTracks(tracks: readonly ArrangementTrack[]): void {
+    tracks.forEach(assertClipsOfTrackKind);
     assertUniqueTrackIds(tracks);
     tracks.forEach(assertUniqueClipIds);
     // Everything before is replaced, an open transaction included.
@@ -312,8 +356,8 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'set' });
   }
 
-  addTrack(track: ClipTrack): void {
-    assertTrackKind(track);
+  addTrack(track: ArrangementTrack): void {
+    assertClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
@@ -364,31 +408,37 @@ export class ArrangementImpl implements Arrangement {
    * An id no track has changes nothing (a track object is still checked and
    * may throw; a function is not called for it).
    *
-   * A track object is copied on its way in. A function's result keeps the
-   * clip objects the arrangement already held, so states go on sharing them.
+   * The track is copied on its way in, and so is each clip, except a clip
+   * object this track already holds (one taken from `getTracks()`): that
+   * one is kept as it is, so states go on sharing it and a listener can see
+   * that it did not change.
    */
-  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void {
+  updateTrack(
+    trackId: string,
+    next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
+  ): void {
     const current = this._tracks.find((t) => t.id === trackId);
     const byFunction = typeof next === 'function';
     if (byFunction && !current) return;
-    const track = byFunction ? next(current as ClipTrack) : next;
+    const track = byFunction ? next(current as ArrangementTrack) : next;
     if (byFunction && track === current) return;
 
-    assertTrackKind(track);
+    assertClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (track.id !== trackId && this._tracks.some((t) => t.id === track.id)) {
       throw duplicateTrackId(track.id);
     }
     if (!current) return;
     this._pushUndoSnapshot();
-    const enriched = this._ingest(track, byFunction ? new Set(current.clips) : undefined);
+    // A clip object this track already holds is kept, in either form.
+    const enriched = this._ingest(track, new Set(current.clips));
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
     // A track that is given a new id takes its mix with it; the old id's
     // entry goes unless a stored state still holds a track of that id.
     this._mixer = seedMixer(carryMixerEntry(this._mixer, trackId, enriched.id), [enriched]);
     if (enriched.id !== trackId) this._mixer = retainMixer(this._mixer, this._heldStates());
     this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    this._emit({ type: 'update', trackId, previous: current });
   }
 
   // ---------------------------------------------------------------------------
@@ -468,11 +518,14 @@ export class ArrangementImpl implements Arrangement {
     if (!this._timeBase) return;
     const { ticksToSeconds, sampleRate } = this._timeBase;
     this._tracks = this._tracks.map((track) =>
-      withClips(track, (clip) => {
-        if (clip.startTick === undefined) return clip;
-        const startSample = Math.round(ticksToSeconds(clip.startTick) * sampleRate);
-        return startSample === clip.startSample ? clip : { ...clip, startSample };
-      })
+      withClips(
+        track,
+        forLoadedClips((clip) => {
+          if (clip.startTick === undefined) return clip;
+          const startSample = Math.round(ticksToSeconds(clip.startTick) * sampleRate);
+          return startSample === clip.startSample ? clip : { ...clip, startSample };
+        })
+      )
     );
     this._tracksVersion++;
     this._emit({ type: 'recompute' });
@@ -483,11 +536,13 @@ export class ArrangementImpl implements Arrangement {
   // ---------------------------------------------------------------------------
 
   /** The tracks after an edit of one track: an undo step, the new array, the announcement. */
-  private _replaceTrack(trackId: string, tracks: readonly ClipTrack[]): void {
+  private _replaceTrack(trackId: string, tracks: readonly ArrangementTrack[]): void {
+    // The edit found the track, so it is there.
+    const previous = this._tracks.find((t) => t.id === trackId) as ArrangementTrack;
     this._pushUndoSnapshot();
     this._tracks = tracks;
     this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    this._emit({ type: 'update', trackId, previous });
   }
 
   /** How the clip edits convert time: through the attached engine, or not at all. */
@@ -518,14 +573,18 @@ export class ArrangementImpl implements Arrangement {
    * arrangement holds no object its caller can still write to; a clip in
    * `held` is one the arrangement already holds and is kept as it is.
    */
-  private _ingest(track: ClipTrack, held?: ReadonlySet<AudioClip>): ClipTrack {
+  private _ingest(
+    track: ArrangementTrack,
+    held?: ReadonlySet<AudioClip | LoadingClip>
+  ): ArrangementTrack {
     return {
       ...track,
-      clips: track.clips.map((clip) =>
-        held?.has(clip)
-          ? clip
-          : { ...clip, startTick: clip.startTick ?? this._tickAt(clip.startSample) }
-      ),
+      clips: track.clips.map((clip) => {
+        if (held?.has(clip)) return clip;
+        // A clip that is still loading has no samples to count a tick from.
+        if (isLoadingClip(clip)) return { ...clip };
+        return { ...clip, startTick: clip.startTick ?? this._tickAt(clip.startSample) };
+      }),
     };
   }
 
@@ -540,7 +599,7 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Every tracks array the arrangement can still return to, and the current one. */
-  private _heldStates(): ReadonlyArray<readonly ClipTrack[]> {
+  private _heldStates(): ReadonlyArray<readonly ArrangementTrack[]> {
     return [
       this._tracks,
       ...this._history.undo,
@@ -569,6 +628,9 @@ export class ArrangementImpl implements Arrangement {
       this._emit({ type: 'remove', trackId });
     } else if (historyChanged) {
       this._emit({ type: 'history' });
+    } else {
+      // Only an open transaction's base held it.
+      this._resyncSourcesQuietly();
     }
   }
 
@@ -584,13 +646,13 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Add an undo step. The history may let go of states with it (the redo stack, a step past the limit). */
-  private _pushStep(tracks: readonly ClipTrack[]): void {
+  private _pushStep(tracks: readonly ArrangementTrack[]): void {
     const letsGo = this._history.redo.length > 0 || this._history.undo.length >= this.undoLimit;
     this._history = pushStep(this._history, tracks, this.undoLimit);
     if (letsGo) this._mixer = retainMixer(this._mixer, this._heldStates());
   }
 
-  private _restoreTracks(snapshot: readonly ClipTrack[]): void {
+  private _restoreTracks(snapshot: readonly ArrangementTrack[]): void {
     const previous = this._tracks;
     this._tracks = snapshot;
     this._tracksVersion++;
@@ -608,6 +670,50 @@ export class ArrangementImpl implements Arrangement {
     }
   }
 
+  /** Declare the sources every state names, and switch the clips whose audio is there. */
+  private _syncSources(): readonly ArrangementTrack[] | null {
+    this._sources.declare(this._heldStates());
+    return this._switchLoaded();
+  }
+
+  /** The stored states changed with nothing to announce: the sources they name may have. */
+  private _resyncSourcesQuietly(): void {
+    this._syncSources();
+    this._sources.finishPass();
+  }
+
+  /**
+   * Replace every loading clip whose source is loaded with its loaded clip,
+   * in the current tracks and in every state the arrangement can return to.
+   * The same loading-clip object becomes the same loaded clip everywhere, and
+   * states go on sharing the tracks they shared. Not an undo step. Returns
+   * the current tracks from before, or null when they did not change.
+   */
+  private _switchLoaded(): readonly ArrangementTrack[] | null {
+    const pass = this._sources.beginPass((startSample) => this._tickAt(startSample));
+    const previous = this._tracks;
+    this._tracks = pass.current(previous);
+    this._history = {
+      undo: this._history.undo.map(pass.stored),
+      redo: this._history.redo.map(pass.stored),
+    };
+    if (this._transaction) {
+      this._transaction = { ...this._transaction, tracks: pass.stored(this._transaction.tracks) };
+    }
+    return this._tracks === previous ? null : previous;
+  }
+
+  /** A load finished or failed by itself (not inside one of this arrangement's methods). */
+  private _onSourceSettled(): void {
+    const previous = this._switchLoaded();
+    if (previous) {
+      this._tracksVersion++;
+      this._emit({ type: 'load', previous });
+    } else {
+      this._sources.finishPass();
+    }
+  }
+
   /**
    * Announce a change. Called after the state has changed. When a listener
    * makes a change of its own, that change waits here until the one being
@@ -620,6 +726,9 @@ export class ArrangementImpl implements Arrangement {
    * always received that error).
    */
   private _emit(change: ArrangementChange): void {
+    // The states may name other sources now, and a clip that came in may name
+    // one that is loaded already: it is a loaded clip before anyone is told.
+    const switched = change.type === 'mixer' ? null : this._syncSources();
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
@@ -628,10 +737,13 @@ export class ArrangementImpl implements Arrangement {
     if (change.type === 'remove' || change.type === 'restore') {
       this._mixer = retainMixer(this._mixer, this._heldStates());
     }
-    this._pending.push({
-      change,
-      at: { tracksVersion: this._tracksVersion, mixerVersion: this._mixerVersion },
-    });
+    const at: ArrangementVersions = {
+      tracksVersion: this._tracksVersion,
+      mixerVersion: this._mixerVersion,
+    };
+    // An add or an update names one track; the others that gained a clip go with it.
+    if (switched && (change.type === 'add' || change.type === 'update')) at.switched = switched;
+    this._pending.push({ change, at });
     if (this._delivering) return;
 
     this._delivering = true;
@@ -661,6 +773,9 @@ export class ArrangementImpl implements Arrangement {
     } finally {
       this._delivering = false;
     }
+    // Last: whoever follows `sources` finds the tracks as they are now, and a
+    // change it makes in answer is a call of its own.
+    this._sources.finishPass();
     if (failed) throw firstError;
   }
 }

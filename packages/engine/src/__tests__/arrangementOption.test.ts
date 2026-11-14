@@ -5,10 +5,11 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip, ClipTrack } from '@waveform-playlist/core';
 import { PlaylistEngine, createArrangement } from '../index';
 import type { Arrangement, EngineState, TrackMixerValues } from '../index';
 import { recordingAdapter } from './helpers/recordingAdapter';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -38,8 +39,7 @@ function fixture(): ClipTrack[] {
 
 const ids = (arrangement: Arrangement) => arrangement.getTracks().map((t) => t.id);
 const startOf = (arrangement: Arrangement, trackId: string, clipId: string) =>
-  arrangement
-    .getTracks()
+  loaded(arrangement)
     .find((t) => t.id === trackId)
     ?.clips.find((c) => c.id === clipId)?.startSample;
 
@@ -110,7 +110,7 @@ describe('an arrangement with no engine', () => {
       tracks: [track('A', [clip('a1', 48000), { ...clip('a2', 144000), startTick: 7 }])],
     });
     arrangement.moveClip('A', 'a1', 1000);
-    const [a1, a2] = arrangement.getTracks()[0].clips;
+    const [a1, a2] = loaded(arrangement)[0].clips;
     expect(a1.startTick).toBeUndefined();
     expect(a2.startTick).toBe(7);
   });
@@ -122,8 +122,8 @@ describe('an arrangement with no engine', () => {
     // A tenth of a second: 800 samples at 8 kHz, 9600 at 96 kHz.
     arrangement.trimClip('A', 'slow', 'right', -8000);
     arrangement.trimClip('B', 'fast', 'right', -96000);
-    expect(arrangement.getTracks()[0].clips[0].durationSamples).toBe(800);
-    expect(arrangement.getTracks()[1].clips[0].durationSamples).toBe(9600);
+    expect(loaded(arrangement)[0].clips[0].durationSamples).toBe(800);
+    expect(loaded(arrangement)[1].clips[0].durationSamples).toBe(9600);
     expect(arrangement.constrainTrimDelta('A', 'slow', 'right', -8000)).toBe(0);
   });
 });
@@ -207,7 +207,7 @@ describe('updateTrack with a function, and undoable: false', () => {
   it('a function receives the stored track and its result replaces it', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     const stored = arrangement.getTracks()[0];
-    const received: ClipTrack[] = [];
+    const received: ArrangementTrack[] = [];
     arrangement.updateTrack('A', (current) => {
       received.push(current);
       return { ...current, name: 'renamed', clips: [...current.clips, clip('a3', 240000)] };
@@ -243,7 +243,7 @@ describe('updateTrack with a function, and undoable: false', () => {
 
   it('a function is not called for an unknown id', () => {
     const arrangement = createArrangement({ tracks: fixture() });
-    const update = vi.fn((current: ClipTrack) => current);
+    const update = vi.fn((current: ArrangementTrack) => current);
     arrangement.updateTrack('nope', update);
     expect(update).not.toHaveBeenCalled();
   });
@@ -482,11 +482,11 @@ describe('an engine given an arrangement', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     const listener = vi.fn();
     arrangement.subscribe(listener);
-    expect(arrangement.getTracks()[0].clips[1].startTick).toBeUndefined();
+    expect(loaded(arrangement)[0].clips[1].startTick).toBeUndefined();
 
     new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, bpm: 120, ppqn: 960 });
 
-    expect(arrangement.getTracks()[0].clips.map((c) => c.startTick)).toEqual([0, 3840]);
+    expect(loaded(arrangement)[0].clips.map((c) => c.startTick)).toEqual([0, 3840]);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(arrangement.canUndo).toBe(false);
   });
@@ -574,9 +574,9 @@ describe('an engine given an arrangement', () => {
     const arrangement = createArrangement();
     new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE }).dispose();
     arrangement.addTrack(track('A', [clip('a1', 48000)]));
-    expect(arrangement.getTracks()[0].clips[0].startTick).toBeUndefined();
+    expect(loaded(arrangement)[0].clips[0].startTick).toBeUndefined();
     new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, bpm: 120, ppqn: 960 });
-    expect(arrangement.getTracks()[0].clips[0].startTick).toBe(1920);
+    expect(loaded(arrangement)[0].clips[0].startTick).toBe(1920);
   });
 
   it('a second engine attached while the first is alive warns once', () => {

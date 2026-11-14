@@ -6,9 +6,9 @@
  * reference is a snapshot.
  */
 
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ArrangementTrack } from '@waveform-playlist/core';
 
-export type Tracks = readonly ClipTrack[];
+export type Tracks = readonly ArrangementTrack[];
 
 export interface History {
   /** Earlier states, oldest first. */

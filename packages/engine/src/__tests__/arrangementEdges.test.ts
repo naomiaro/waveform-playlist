@@ -11,6 +11,7 @@ import type { Arrangement } from '../index';
 import { isDevelopmentBuild } from '../arrangement/devFreeze';
 import { recordingAdapter } from './helpers/recordingAdapter';
 import type { RecordingAdapter } from './helpers/recordingAdapter';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -121,7 +122,7 @@ describe('an engine that cannot attach', () => {
     expect(() => arrangement.moveClip('A', 'a1', 1000)).not.toThrow();
     new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, ppqn: 192 });
     expect(warn).not.toHaveBeenCalled();
-    expect(arrangement.getTracks()[2].clips[0].startTick).toBe(384);
+    expect(loaded(arrangement)[2].clips[0].startTick).toBe(384);
   });
 });
 
@@ -132,7 +133,7 @@ describe('two engines on one arrangement', () => {
     new PlaylistEngine({ arrangement, sampleRate: SAMPLE_RATE, bpm: 120, ppqn: 960 });
     first.dispose();
     arrangement.addTrack(track('A', [clip('a1', 48000)]));
-    expect(arrangement.getTracks()[0].clips[0].startTick).toBe(1920);
+    expect(loaded(arrangement)[0].clips[0].startTick).toBe(1920);
   });
 });
 
@@ -627,13 +628,11 @@ describe('a transaction that ends where it began', () => {
 
 describe('an engine with another tick resolution (ppqn) takes over', () => {
   const tickOf = (arrangement: Arrangement, trackId: string, clipId: string) =>
-    arrangement
-      .getTracks()
+    loaded(arrangement)
       .find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId)?.startTick;
   const sampleOf = (arrangement: Arrangement, trackId: string, clipId: string) =>
-    arrangement
-      .getTracks()
+    loaded(arrangement)
       .find((t) => t.id === trackId)
       ?.clips.find((c) => c.id === clipId)?.startSample;
   const engineAt = (arrangement: Arrangement, ppqn: number) =>

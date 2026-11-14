@@ -144,6 +144,14 @@ export interface PlaylistEngineOptions {
    * own arrangement; an arrangement that is passed in has its own limit.
    */
   undoLimit?: number;
+  /**
+   * `false`: the engine does not give its arrangement the adapter's audio
+   * context to decode with, because the host does that itself with
+   * `attachDecodeContext()`. Default `true`: an engine with an adapter
+   * attaches `adapter.audioContext` when it is built and detaches it in
+   * `dispose()`. An engine without an adapter has no context to attach.
+   */
+  attachDecodeContext?: boolean;
   /** Initial tempo in BPM (default 120). */
   bpm?: number;
   /** Pulses per quarter note for headless mode (no adapter). When adapter is provided, adapter.ppqn is used instead. */

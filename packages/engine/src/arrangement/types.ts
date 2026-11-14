@@ -2,7 +2,9 @@
  * The public face of an arrangement.
  */
 
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ArrangementTrack, ClipSource, ValueSource } from '@waveform-playlist/core';
+import type { LoadSource } from './loadSource';
+import type { ArrangementSourcesValue } from './sources';
 import type { TrackMixerValues } from './mixer';
 
 export interface ClipBounds {
@@ -32,8 +34,12 @@ export interface RemoveTrackOptions {
  */
 export interface Arrangement {
   // read
-  /** The tracks and their clips. The same array until they change. */
-  getTracks(): readonly ClipTrack[];
+  /**
+   * The tracks and their clips: loaded clips (`AudioClip`) and clips whose
+   * audio is not loaded yet (`LoadingClip`; tell them apart with
+   * `isLoadingClip`). The same array until they change.
+   */
+  getTracks(): readonly ArrangementTrack[];
   /**
    * The current volume, mute, solo and pan by track id. The same Map until a
    * value changes, a track with a new id enters, or entries of tracks that
@@ -59,10 +65,10 @@ export interface Arrangement {
    * Replace every track. Clears the undo history and ends an open
    * transaction. An id that is in the tracks being replaced keeps its mix.
    */
-  setTracks(tracks: readonly ClipTrack[]): void;
+  setTracks(tracks: readonly ArrangementTrack[]): void;
 
   // tracks
-  addTrack(track: ClipTrack): void;
+  addTrack(track: ArrangementTrack): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   /**
    * Replace a track, with a track or with a function of the current one.
@@ -71,11 +77,15 @@ export interface Arrangement {
    * track are not read: use the setters. A track that is given a new id
    * takes its mix with it.
    */
-  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void;
+  updateTrack(
+    trackId: string,
+    next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
+  ): void;
   /** Move a track to another place in the order. */
   reorderTrack(trackId: string, toIndex: number): void;
 
-  // clips
+  // clips (a clip that is still loading cannot be edited: these treat it as
+  // a clip that is not there, and loaded clips do not collide with it)
   /** Move a clip. Returns the delta actually applied (0 when it cannot move). */
   moveClip(trackId: string, clipId: string, deltaSamples: number): number;
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
@@ -108,11 +118,35 @@ export interface Arrangement {
   commitTransaction(): void;
   /** Put the tracks back as they were when the transaction began. */
   abortTransaction(): void;
+
+  // loading
+  /**
+   * Where each source the clips name is: pending, loaded or failed (also a
+   * source of which a clip in the current tracks could not be made from its
+   * audio). Read it with `getSnapshot()` or
+   * `subscribe()`; the same object until a status changes. When a source is
+   * loaded, every loading clip that names it has become a loaded clip, in the
+   * current tracks and in every undo and redo state; that is not an undo step.
+   * The tracks change first and are announced first: a `subscribe` listener
+   * told of the loaded clip still reads the source as pending here.
+   */
+  readonly sources: ValueSource<ArrangementSourcesValue>;
+  /**
+   * Start a source whose load failed again. Does nothing for any other
+   * source, also one shown as failed because a clip could not be made from
+   * its audio (the audio is loaded; loading it again changes nothing).
+   */
+  retry(src: ClipSource): void;
 }
 
 export interface CreateArrangementOptions {
   /** The first tracks. Not an undo step. */
-  tracks?: readonly ClipTrack[];
+  tracks?: readonly ArrangementTrack[];
   /** Maximum number of undo steps (default 100). */
   undoLimit?: number;
+  /**
+   * How a clip's source becomes an AudioBuffer. Default: `defaultLoadSource`
+   * (fetch a URL or read a Blob, then decode).
+   */
+  loadSource?: LoadSource;
 }

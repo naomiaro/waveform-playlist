@@ -10,6 +10,7 @@ import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
 import { PlaylistEngine } from '../PlaylistEngine';
 import { pushStep, undoStep, redoStep, beginBase, EMPTY_HISTORY } from '../arrangement/history';
 import { recordingAdapter } from './helpers/recordingAdapter';
+import { loaded } from './helpers/loadedTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -180,7 +181,7 @@ describe('a change replaces only what changed', () => {
 
       run(arrangement, given);
 
-      const stored = arrangement.getTracks()[0];
+      const stored = loaded(arrangement)[0];
       expect(stored).not.toBe(given);
       expect(stored.clips).not.toBe(given.clips);
       expect(stored.clips[0]).not.toBe(ticked);
@@ -205,7 +206,7 @@ describe('a snapshot is a reference and is never written to', () => {
     'the array from before %s still holds what it held',
     (_, edit) => {
       const { arrangement } = setup();
-      const before = arrangement.getTracks();
+      const before = loaded(arrangement);
       const asItWas = copyOf(before);
 
       edit(arrangement);
@@ -284,10 +285,10 @@ describe('frozen tracks', () => {
       (a) => a.undo(),
     ];
 
-    deepFreeze(arrangement.getTracks());
+    deepFreeze(loaded(arrangement));
     for (const step of steps) {
       expect(() => step(arrangement)).not.toThrow();
-      deepFreeze(arrangement.getTracks());
+      deepFreeze(loaded(arrangement));
     }
   });
 
