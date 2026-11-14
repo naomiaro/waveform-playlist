@@ -3685,7 +3685,14 @@ Between `beginTransaction()` and `commitTransaction()`, `undo()` and `redo()` no
 
 **Replace with:** nothing, if aborting the drag is what you want and the drag ends there. Otherwise call `commitTransaction()` before `undo()`.
 
-After an `undo()` that aborted the transaction there is no transaction any more. A drag handler that goes on calling `moveClip(…, skipAdapter)` for later pointer moves makes each of them an undo step of its own, and its `commitTransaction()` or `abortTransaction()` at the end logs a console warning and does nothing. A host that offers undo during a drag has to cancel the gesture when undo is pressed (stop handling its pointer moves), or not offer undo while a drag is in progress. This follows from the engine's code and from reading the drag handler of `<daw-editor>`; it was not run.
+After an `undo()` that aborted the transaction there is no transaction any more. A drag handler that goes on calling `moveClip(…, skipAdapter)` for later pointer moves makes each of them an undo step of its own, and its `commitTransaction()` or `abortTransaction()` at the end logs a console warning and does nothing. A host that offers undo during a drag has to cancel the gesture when undo is pressed (stop handling its pointer moves), or not offer undo while a drag is in progress.
+
+Both built-in editors offer undo during a clip drag, and neither cancels the gesture ([#848](https://github.com/naomiaro/waveform-playlist/issues/848)). Run in Chromium with Cmd+Z pressed while the mouse button was held:
+
+- `<daw-editor>` with `<daw-keyboard-shortcuts undo>`: after the key, each further pointer move of a clip move is an undo step of its own, and the release logs the `commitTransaction` warning.
+- `<WaveformEditor />` with `<KeyboardShortcuts undo />`: the move or trim is applied once at the release, as one undo step, and the release logs the same warning.
+
+In both, the clip does not end where the pointer released it: the drag's distance is applied to the position the undo restored. That part is not new in this version; it happens in the version before as well, where the undo after such a drag returned to a state that had already been undone.
 
 ### Also changed in the engine
 
