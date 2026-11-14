@@ -10,8 +10,9 @@ import {
   clipsOverlap,
   sortClipsByTime,
   findGaps,
+  isLoadingClip,
 } from '../types/clip';
-import type { AudioClip, ClipTrack } from '../types/clip';
+import type { AudioClip, ClipTrack, PlaylistTrack } from '../types/clip';
 
 function makeClip(
   overrides: Partial<AudioClip> & {
@@ -744,5 +745,24 @@ describe('findGaps', () => {
     const track = makeTrack([clip1, clip2]);
     const gaps = findGaps(track);
     expect(gaps).toEqual([]);
+  });
+});
+
+describe('loading clips', () => {
+  it('isLoadingClip is true for a clip without sampleRate', () => {
+    expect(isLoadingClip({ id: 'c', src: 'a.mp3' })).toBe(true);
+  });
+
+  it('isLoadingClip is false for an AudioClip, also one that carries src', () => {
+    const clip: AudioClip = {
+      ...makeClip({ id: 'c', startSample: 0, durationSamples: 100 }),
+      src: 'a.mp3',
+    };
+    expect(isLoadingClip(clip)).toBe(false);
+  });
+
+  it('a ClipTrack is assignable to PlaylistTrack', () => {
+    const t: PlaylistTrack = createTrack({ name: 'x', clips: [] });
+    expect(t.clips).toEqual([]);
   });
 });

@@ -132,7 +132,7 @@ export function calculateSplitPoint(splitSample: number, samplesPerPixel: number
  * Split a clip into two clips at the given sample position.
  *
  * The left clip retains the original fadeIn; the right clip retains the original fadeOut.
- * Both clips share the same waveformData reference.
+ * Both clips share the same waveformData reference and the same `src`.
  * If the clip has a name, suffixes " (1)" and " (2)" are appended.
  *
  * @param clip - The clip to split
@@ -177,7 +177,10 @@ export function splitClip(
     waveformData: clip.waveformData,
   });
 
-  return { left, right };
+  // createClip builds a clip field by field; the source it was loaded from
+  // (a string or the same Blob) is carried over to both halves.
+  if (clip.src === undefined) return { left, right };
+  return { left: { ...left, src: clip.src }, right: { ...right, src: clip.src } };
 }
 
 /**

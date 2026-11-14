@@ -129,6 +129,52 @@ export interface AudioClip {
 
   /** MIDI program number (0-127). GM instrument number for SoundFont playback. */
   midiProgram?: number;
+
+  /** The source this clip was loaded from, when the provider loaded it. */
+  src?: ClipSource;
+}
+
+/** What a loading clip names. A string is a URL; a Blob or File is keyed by identity. */
+export type ClipSource = string | Blob;
+
+/**
+ * A clip whose audio is not loaded yet. Times are in seconds; the provider
+ * loads `src` and replaces this with an `AudioClip` (integer samples).
+ */
+export interface LoadingClip {
+  /** Unique identifier for this clip */
+  id: string;
+
+  /** The audio to load */
+  src: ClipSource;
+
+  /** Position on the timeline, in seconds. Default 0. */
+  start?: number;
+
+  /** Duration in seconds. Default: the whole source from `offset`. */
+  duration?: number;
+
+  /** Start within the source, in seconds. Default 0. */
+  offset?: number;
+
+  name?: string;
+  gain?: number;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+  color?: string;
+
+  /** Pre-computed peaks, drawn while the audio loads */
+  waveformData?: WaveformDataObject;
+}
+
+/** What the app's state holds and the provider's `tracks` prop takes. */
+export type PlaylistTrack = Omit<ClipTrack, 'clips'> & {
+  clips: (AudioClip | LoadingClip)[];
+};
+
+/** True for a clip whose audio is not loaded yet (it has no `sampleRate`). */
+export function isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip {
+  return !('sampleRate' in clip) || clip.sampleRate == null;
 }
 
 /** What a track holds: audio clips or MIDI clips. A track never holds both. */
