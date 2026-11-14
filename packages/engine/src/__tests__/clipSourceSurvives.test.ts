@@ -60,9 +60,14 @@ describe('a clip keeps its src through engine operations', () => {
   });
 
   it('trimClip, left and right', () => {
+    const before = engine.getState().tracks[0].clips[0];
     engine.trimClip(trackId, clipId, 'left', 100);
+    const afterLeft = engine.getState().tracks[0].clips[0];
+    expect(afterLeft.startSample).not.toBe(before.startSample);
     expect(firstClipSrc(engine)).toBe('a.mp3');
     engine.trimClip(trackId, clipId, 'right', -100);
+    const afterRight = engine.getState().tracks[0].clips[0];
+    expect(afterRight.durationSamples).not.toBe(afterLeft.durationSamples);
     expect(firstClipSrc(engine)).toBe('a.mp3');
   });
 
@@ -83,6 +88,23 @@ describe('a clip keeps its src through engine operations', () => {
     const clips = e.getState().tracks[0].clips;
     expect(clips[0].src).toBe(blob);
     expect(clips[1].src).toBe(blob);
+  });
+
+  it('splitClip adds no src key when the clip had none', () => {
+    const plain = createTrack({
+      name: 'P',
+      clips: [
+        createClip({
+          startSample: 0,
+          durationSamples: 48000,
+          sampleRate: 48000,
+          sourceDurationSamples: 96000,
+        }),
+      ],
+    });
+    const { left, right } = splitClip(plain.clips[0], 24000);
+    expect('src' in left).toBe(false);
+    expect('src' in right).toBe(false);
   });
 
   it('undo and redo', () => {

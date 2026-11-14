@@ -284,7 +284,8 @@ export interface CreateClipOptions {
   /** MIDI channel (0-indexed). Channel 9 = GM percussion. */
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
-  midiProgram?: number;
+  midiProgram?: number /** The source this clip was loaded from — passed through to the created AudioClip */;
+  src?: ClipSource;
 }
 
 /**
@@ -316,7 +317,8 @@ export interface CreateClipOptionsSeconds {
   /** MIDI channel (0-indexed). Channel 9 = GM percussion. */
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
-  midiProgram?: number;
+  midiProgram?: number /** The source this clip was loaded from — passed through to the created AudioClip */;
+  src?: ClipSource;
 }
 
 /**
@@ -346,6 +348,8 @@ export interface CreateClipOptionsTicks {
   midiNotes?: MidiNoteData[];
   midiChannel?: number;
   midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
+  src?: ClipSource;
 }
 
 export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip {
@@ -391,6 +395,7 @@ export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip 
     midiNotes: options.midiNotes,
     midiChannel: options.midiChannel,
     midiProgram: options.midiProgram,
+    src: options.src,
   });
 }
 
@@ -434,6 +439,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   } = options;
 
   // Determine sample rate: audioBuffer > explicit option > waveformData
@@ -489,6 +495,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
     midiNotes,
     midiChannel,
     midiProgram,
+    ...(src !== undefined ? { src } : {}),
   };
 }
 
@@ -514,6 +521,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   } = options;
 
   // Determine sample rate: audioBuffer > explicit option > waveformData
@@ -555,6 +563,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   });
 }
 

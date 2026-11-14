@@ -13,4 +13,5 @@ export * from './annotations/shortcuts';
 export * from './panStage';
 export * from './valueSource';
 export * from './sourceLoader';
+export * from './audioTrack';
 export * from './effects/registry';

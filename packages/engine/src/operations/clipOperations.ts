@@ -161,6 +161,7 @@ export function splitClip(
     fadeIn: clip.fadeIn,
     audioBuffer: clip.audioBuffer,
     waveformData: clip.waveformData,
+    src: clip.src,
   });
 
   const right = createClip({
@@ -175,12 +176,10 @@ export function splitClip(
     fadeOut: clip.fadeOut,
     audioBuffer: clip.audioBuffer,
     waveformData: clip.waveformData,
+    src: clip.src,
   });
 
-  // createClip builds a clip field by field; the source it was loaded from
-  // (a string or the same Blob) is carried over to both halves.
-  if (clip.src === undefined) return { left, right };
-  return { left: { ...left, src: clip.src }, right: { ...right, src: clip.src } };
+  return { left, right };
 }
 
 /**
