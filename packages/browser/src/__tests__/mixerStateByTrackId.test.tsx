@@ -355,8 +355,7 @@ describe('a track keeps its mixer state when the list of tracks changes', () => 
 
   // A track the app has put in `tracks` while a trim drag is on is not handed
   // to the engine until the release, so it has no mixer state yet, beside a
-  // loaded track that has state the user set. (Until #812 the test reached
-  // this with `deferEngineRebuild`.)
+  // loaded track that has state the user set.
   it('a track the provider has not loaded yet has no entry, wherever it is in the list', async () => {
     const a = makeTrack('a');
     const { setTracks } = mount([a]);

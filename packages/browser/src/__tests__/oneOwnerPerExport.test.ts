@@ -124,7 +124,7 @@ describe('one owner per exported name (#770)', () => {
     for (const pkg of NAME_OWNERS) expect(names.get(pkg)!.size).toBeGreaterThan(5);
     expect(names.get('core')!.has('samplesToPixels')).toBe(true);
     expect(names.get('core')!.has('SnapTo')).toBe(true);
-    expect(names.get('browser/tone')!.has('useAudioTracks')).toBe(true);
+    expect(names.get('browser/tone')!.has('useExportWav')).toBe(true);
     expect(names.get('browser')!.has('WaveformPlaylistProvider')).toBe(true);
     expect(names.get('ui-components')!.has('BaseCheckbox')).toBe(true);
     const shared: string[] = [];

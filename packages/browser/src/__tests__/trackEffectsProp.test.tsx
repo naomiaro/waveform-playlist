@@ -212,7 +212,7 @@ describe('WaveformPlaylistProvider trackEffects', () => {
       setAppTracks((tracks) => [...tracks, makeTrack('t3', [makeClip('c3')])]);
     });
     await settle();
-    // A placeholder, then its audio (useDynamicTracks).
+    // An empty track, then the same track with its audio.
     await act(async () => {
       setAppTracks((tracks) => [...tracks, makeTrack('t4', [])]);
     });

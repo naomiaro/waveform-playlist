@@ -56,9 +56,10 @@ function isFill(previous: ClipTrack, current: ClipTrack): boolean {
  * with clips replaced, renamed or reordered) returns `null`: a full rebuild.
  *
  * The clips a filled track already had are not touched, so replacing it
- * cannot disturb playback of the others. This is what `useDynamicTracks` does
- * for every file that finishes decoding; treated as a rebuild, dropping N
- * files rebuilt the engine N times.
+ * cannot disturb playback of the others. This is what happens for every
+ * source that finishes decoding after the first build (a track whose loading
+ * clips resolve gains them); treated as a rebuild, dropping N files rebuilt
+ * the engine N times.
  */
 export function incrementalTrackChange(
   prevTracks: ClipTrack[],

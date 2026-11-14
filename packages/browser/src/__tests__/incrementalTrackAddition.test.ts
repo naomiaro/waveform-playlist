@@ -4,7 +4,8 @@ import { incrementalTrackChange } from '../utils/incrementalTrackChange';
 
 /**
  * When tracks are appended (file drop, new empty track) or an empty track gets
- * its clips (a `useDynamicTracks` placeholder whose audio finished decoding),
+ * its clips (a track whose loading clip resolved after the first build, or an
+ * empty track the app fills itself),
  * the provider applies the change to the running engine instead of rebuilding
  * it. `incrementalTrackChange` decides which case a `tracks` change is.
  */
@@ -117,8 +118,9 @@ describe('incrementalTrackChange', () => {
     expect(incrementalTrackChange([track1], [makeTrack('3'), track1])).toBeNull();
   });
 
-  // useDynamicTracks: a placeholder with no clips is replaced by the same
-  // track with its decoded clip. The array keeps its length.
+  // A track with no clips (its source still loading, or an empty track the
+  // app fills later) is replaced by the same track with its decoded clip.
+  // The array keeps its length.
   it('detects an empty track that got its clips', () => {
     const loaded = makeTrack('1', [clip('a')]);
     const placeholder = makeTrack('2');

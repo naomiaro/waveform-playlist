@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 //
-// #704 close-out: `useDynamicTracks` appends an empty placeholder per dropped
-// file and replaces it with the decoded track when the decode finishes. The
-// array keeps its length, so the provider took that for a modification and
-// disposed and rebuilt the whole engine once per file.
+// #704 close-out: an app that appends an empty placeholder track per dropped
+// file and replaces it with the decoded track when its own decode finishes.
+// The array keeps its length, so the provider took that for a modification and
+// disposed and rebuilt the whole engine once per file. (The provider's own
+// loading of `LoadingClip`s takes the same path: providerLoadsSources.arrivals.)
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
