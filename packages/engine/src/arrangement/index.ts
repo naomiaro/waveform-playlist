@@ -3,9 +3,9 @@ import type { Arrangement, CreateArrangementOptions } from './types';
 
 export type {
   Arrangement,
-  ArrangementChangeOptions,
   ClipBounds,
   CreateArrangementOptions,
+  RemoveTrackOptions,
 } from './types';
 export type { TrackMixerValues } from './mixer';
 

@@ -260,27 +260,190 @@ describe('updateTrack with a function, and undoable: false', () => {
     expect(arrangement.getTracks()).toBe(tracks);
     expect(arrangement.canUndo).toBe(false);
   });
+});
 
-  it.each([
-    ['addTrack', (a: Arrangement) => a.addTrack(track('C', []), { undoable: false })],
-    ['removeTrack', (a: Arrangement) => a.removeTrack('A', { undoable: false })],
-    ['updateTrack', (a: Arrangement) => a.updateTrack('A', track('A', []), { undoable: false })],
-  ])('%s with undoable: false changes the tracks and adds no undo step', (_, run) => {
+describe('removeTrack with undoable: false', () => {
+  const C = () => track('C', [clip('c1', 0)], { pan: 0.5 });
+
+  it('removes the track with no undo step', () => {
     const arrangement = createArrangement({ tracks: fixture() });
-    const before = arrangement.getTracks();
-    run(arrangement);
-    expect(arrangement.getTracks()).not.toBe(before);
+    const version = arrangement.tracksVersion;
+    arrangement.removeTrack('A', { undoable: false });
+    expect(ids(arrangement)).toEqual(['B']);
+    expect(arrangement.tracksVersion).toBe(version + 1);
     expect(arrangement.canUndo).toBe(false);
   });
 
-  it('undoable: false leaves the steps that are there, and the redo stack', () => {
+  it('no undo brings the track back: a dropped file that failed, after another edit', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.addTrack(C()); // the drop
+    arrangement.moveClip('A', 'a1', 1000); // an unrelated edit while it loads
+    arrangement.removeTrack('C', { undoable: false }); // it failed to decode
+
+    arrangement.undo();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(startOf(arrangement, 'A', 'a1')).toBe(0);
+    // The step that added the track changes nothing any more, so it is gone.
+    expect(arrangement.canUndo).toBe(false);
+
+    arrangement.redo();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(startOf(arrangement, 'A', 'a1')).toBe(1000);
+    expect(arrangement.canRedo).toBe(false);
+  });
+
+  it('steps that only changed the removed track are gone; the others stay', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.addTrack(C());
+    arrangement.moveClip('C', 'c1', 1000);
+    arrangement.moveClip('B', 'b1', 500);
+    arrangement.moveClip('C', 'c1', 1000);
+
+    arrangement.removeTrack('C', { undoable: false });
+
+    let steps = 0;
+    while (arrangement.canUndo) {
+      arrangement.undo();
+      steps++;
+      expect(ids(arrangement)).toEqual(['A', 'B']);
+    }
+    expect(steps).toBe(1);
+    expect(startOf(arrangement, 'B', 'b1')).toBe(0);
+  });
+
+  it('a track that only the redo stack holds is taken out of it', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.addTrack(C());
+    arrangement.undo();
+    const tracks = arrangement.getTracks();
+    const listener = vi.fn();
+    arrangement.subscribe(listener);
+
+    arrangement.removeTrack('C', { undoable: false });
+
+    expect(arrangement.getTracks()).toBe(tracks);
+    expect(arrangement.tracksVersion).toBe(3);
+    expect(arrangement.canRedo).toBe(false);
+    expect(listener).toHaveBeenCalledTimes(1); // the history changed
+  });
+
+  it('the redo steps that remain are redone in the order they were made', () => {
+    const arrangement = createArrangement({ tracks: [...fixture(), C()] });
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.moveClip('B', 'b1', 500);
+    arrangement.undo();
+    arrangement.undo();
+
+    arrangement.removeTrack('C', { undoable: false });
+
+    arrangement.redo();
+    expect([startOf(arrangement, 'A', 'a1'), startOf(arrangement, 'B', 'b1')]).toEqual([1000, 0]);
+    arrangement.redo();
+    expect([startOf(arrangement, 'A', 'a1'), startOf(arrangement, 'B', 'b1')]).toEqual([1000, 500]);
+    expect(arrangement.canRedo).toBe(false);
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+  });
+
+  it('a track that only the redo stack holds keeps its mixer entry when another track is purged', () => {
+    const arrangement = createArrangement({ tracks: [...fixture(), C()] });
+    arrangement.addTrack(track('D', [], { pan: 0.75 }));
+    arrangement.undo(); // D is held by the redo stack only
+    arrangement.removeTrack('C', { undoable: false });
+    expect(arrangement.getMixer().get('D')?.pan).toBe(0.75);
+    arrangement.redo();
+    expect(ids(arrangement)).toEqual(['A', 'B', 'D']);
+  });
+
+  it('a track that only an undo step holds is taken out of it', () => {
+    const arrangement = createArrangement({ tracks: [...fixture(), C()] });
+    arrangement.removeTrack('C'); // an ordinary, undoable removal
+    arrangement.moveClip('A', 'a1', 1000);
+
+    arrangement.removeTrack('C', { undoable: false });
+
+    arrangement.undo();
+    arrangement.undo();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  it('its mixer entry goes with it', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.addTrack(C());
+    arrangement.removeTrack('B'); // an ordinary removal: an undo step still holds B
+    arrangement.removeTrack('C', { undoable: false });
+    expect([...arrangement.getMixer().keys()]).toEqual(['A', 'B']);
+    // The same id entering again is a new track: its own fields seed its mix.
+    arrangement.addTrack(track('C', [], { pan: -1 }));
+    expect(arrangement.getMixer().get('C')?.pan).toBe(-1);
+  });
+
+  it('inside a transaction: an abort restores the other changes and not the track', () => {
+    const arrangement = createArrangement({ tracks: [...fixture(), C()] });
+    arrangement.beginTransaction();
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.removeTrack('C', { undoable: false });
+    arrangement.abortTransaction();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(startOf(arrangement, 'A', 'a1')).toBe(0);
+  });
+
+  it('inside an otherwise empty transaction: the commit adds no step', () => {
+    const arrangement = createArrangement({ tracks: [...fixture(), C()] });
+    arrangement.beginTransaction();
+    arrangement.removeTrack('C', { undoable: false });
+    arrangement.commitTransaction();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  it('an id that nothing holds changes nothing and tells nobody', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     arrangement.moveClip('A', 'a1', 1000);
-    arrangement.moveClip('A', 'a1', 1000);
-    arrangement.undo();
-    arrangement.addTrack(track('C', []), { undoable: false });
+    const listener = vi.fn();
+    arrangement.subscribe(listener);
+    arrangement.removeTrack('nope', { undoable: false });
+    expect(listener).not.toHaveBeenCalled();
     expect(arrangement.canUndo).toBe(true);
-    expect(arrangement.canRedo).toBe(true);
+  });
+
+  it('the states that never held the track are the same arrays as before', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    const first = arrangement.getTracks();
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.addTrack(C());
+    arrangement.removeTrack('C', { undoable: false });
+    arrangement.undo();
+    expect(arrangement.getTracks()).toBe(first);
+  });
+
+  it('under an engine: the adapter is told once, and a later undo sends no such track', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    const adapter = recordingAdapter();
+    new PlaylistEngine({ adapter, arrangement, sampleRate: SAMPLE_RATE });
+    arrangement.addTrack(C());
+    arrangement.moveClip('A', 'a1', 1000);
+    adapter.reset();
+
+    arrangement.removeTrack('C', { undoable: false });
+    expect(adapter.calls).toEqual([{ method: 'removeTrack', args: ['C'] }]);
+
+    adapter.reset();
+    arrangement.undo();
+    expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([['updateTrack', 'A']]);
+  });
+
+  it('addTrack and updateTrack take no such option', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    // @ts-expect-error only removeTrack can be made without an undo step
+    arrangement.addTrack(track('C', []), { undoable: false });
+    // @ts-expect-error only removeTrack can be made without an undo step
+    arrangement.updateTrack('A', track('A', []), { undoable: false });
+    // Both are ordinary undo steps.
+    arrangement.undo();
+    arrangement.undo();
+    expect(ids(arrangement)).toEqual(['A', 'B']);
+    expect(arrangement.canUndo).toBe(false);
   });
 });
 

@@ -33,12 +33,20 @@ import {
   splitClip as splitClipOp,
 } from '../operations/clipOperations';
 import { freezeTracksInDevelopment } from './devFreeze';
-import { EMPTY_HISTORY, beginBase, pushStep, redoStep, undoStep } from './history';
+import {
+  EMPTY_HISTORY,
+  beginBase,
+  purgeTrack,
+  pushStep,
+  redoStep,
+  undoStep,
+  withoutTrack,
+} from './history';
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
 import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
-import type { Arrangement, ArrangementChangeOptions, ClipBounds } from './types';
+import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -270,11 +278,11 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'set' });
   }
 
-  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void {
+  addTrack(track: ClipTrack): void {
     assertTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
-    this._pushUndoSnapshot(options);
+    this._pushUndoSnapshot();
     const enriched = this._withStartTicks(track);
     this._tracks = [...this._tracks, enriched];
     this._mixer = seedMixer(this._mixer, [enriched]);
@@ -282,9 +290,18 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'add', trackId: track.id });
   }
 
-  removeTrack(trackId: string, options?: ArrangementChangeOptions): void {
+  /**
+   * Remove a track: an undo step. With `undoable: false` there is no step,
+   * and the track is also taken out of every undo and redo state, so that no
+   * undo or redo brings it back (a dropped file that could not be decoded).
+   */
+  removeTrack(trackId: string, options?: RemoveTrackOptions): void {
+    if (options?.undoable === false) {
+      this._removeTrackEverywhere(trackId);
+      return;
+    }
     if (!this._tracks.some((t) => t.id === trackId)) return;
-    this._pushUndoSnapshot(options);
+    this._pushUndoSnapshot();
     this._tracks = this._tracks.filter((t) => t.id !== trackId);
     this._tracksVersion++;
     this._emit({ type: 'remove', trackId });
@@ -315,11 +332,7 @@ export class ArrangementImpl implements Arrangement {
    * A track object is copied on its way in. A function's result keeps the
    * clip objects the arrangement already held, so states go on sharing them.
    */
-  updateTrack(
-    trackId: string,
-    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
-    options?: ArrangementChangeOptions
-  ): void {
+  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void {
     const current = this._tracks.find((t) => t.id === trackId);
     const byFunction = typeof next === 'function';
     if (byFunction && !current) return;
@@ -332,7 +345,7 @@ export class ArrangementImpl implements Arrangement {
       throw duplicateTrackId(track.id);
     }
     if (!current) return;
-    this._pushUndoSnapshot(options);
+    this._pushUndoSnapshot();
     const enriched = this._withStartTicks(track, byFunction ? new Set(current.clips) : undefined);
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
     // Only a track that was given a new id has no entry yet.
@@ -636,18 +649,41 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'mixer', trackId, values });
   }
 
-  /**
-   * The tracks arrays the arrangement can still return to once the history
-   * is empty, which is when mixer entries are dropped (`setTracks`,
-   * `clearHistory`): the current one, and the base of an open transaction.
-   */
+  /** Every tracks array the arrangement can still return to, and the current one. */
   private _heldStates(): ReadonlyArray<readonly ClipTrack[]> {
-    return this._transaction ? [this._tracks, this._transaction.tracks] : [this._tracks];
+    return [
+      this._tracks,
+      ...this._history.undo,
+      ...this._history.redo,
+      ...(this._transaction ? [this._transaction.tracks] : []),
+    ];
+  }
+
+  /** `removeTrack` with `undoable: false`: out of the current tracks and out of every stored state. */
+  private _removeTrackEverywhere(trackId: string): void {
+    const wasThere = this._tracks.some((t) => t.id === trackId);
+    const purged = purgeTrack(this._history, this._tracks, trackId);
+    const historyChanged = purged.history !== this._history;
+    this._history = purged.history;
+    if (this._transaction) {
+      // An abort goes back to the base: the track must not be in it either.
+      this._transaction = {
+        ...this._transaction,
+        tracks: withoutTrack(this._transaction.tracks, trackId),
+      };
+    }
+    this._tracks = purged.current;
+    this._mixer = retainMixer(this._mixer, this._heldStates());
+    if (wasThere) {
+      this._tracksVersion++;
+      this._emit({ type: 'remove', trackId });
+    } else if (historyChanged) {
+      this._emit({ type: 'history' });
+    }
   }
 
   /** The state before a change: an undo step, or the mark that an open transaction changed. */
-  private _pushUndoSnapshot(options?: ArrangementChangeOptions): void {
-    if (options?.undoable === false) return;
+  private _pushUndoSnapshot(): void {
     if (this._transaction) {
       if (!this._transaction.changed) {
         this._transaction = { ...this._transaction, changed: true };

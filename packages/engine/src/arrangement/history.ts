@@ -61,3 +61,54 @@ export function redoStep(
 export function beginBase(tracks: Tracks): TransactionBase {
   return { tracks, changed: false };
 }
+
+/** `tracks` without the track of that id; the same array when it holds no such track. */
+export function withoutTrack(tracks: Tracks, trackId: string): Tracks {
+  return tracks.some((track) => track.id === trackId)
+    ? tracks.filter((track) => track.id !== trackId)
+    : tracks;
+}
+
+function sameTracks(a: Tracks, b: Tracks): boolean {
+  return a === b || (a.length === b.length && a.every((track, i) => track === b[i]));
+}
+
+/**
+ * Take a track out of every state: the current tracks and each undo and
+ * redo step, so that no undo or redo brings it back. A step that no longer
+ * differs from the state next to it would do nothing, and is dropped.
+ * A state that never held the track is the same array as before; the same
+ * `history` object comes back when no step changed.
+ */
+export function purgeTrack(
+  history: History,
+  current: Tracks,
+  trackId: string
+): { history: History; current: Tracks } {
+  const nextCurrent = withoutTrack(current, trackId);
+
+  // Oldest first, towards the current state: keep a step only where it differs from the one after it.
+  const undo: Tracks[] = [];
+  for (const step of history.undo) {
+    const stripped = withoutTrack(step, trackId);
+    if (undo.length === 0 || !sameTracks(undo[undo.length - 1], stripped)) undo.push(stripped);
+  }
+  while (undo.length > 0 && sameTracks(undo[undo.length - 1], nextCurrent)) undo.pop();
+
+  // The redo stack is stored with the next state to redo LAST: walk it away from the current state.
+  const redoFromCurrent: Tracks[] = [];
+  for (let i = history.redo.length - 1; i >= 0; i--) {
+    const stripped = withoutTrack(history.redo[i], trackId);
+    const before =
+      redoFromCurrent.length > 0 ? redoFromCurrent[redoFromCurrent.length - 1] : nextCurrent;
+    if (!sameTracks(before, stripped)) redoFromCurrent.push(stripped);
+  }
+  const redo = redoFromCurrent.reverse();
+
+  const unchanged =
+    undo.length === history.undo.length &&
+    redo.length === history.redo.length &&
+    undo.every((step, i) => step === history.undo[i]) &&
+    redo.every((step, i) => step === history.redo[i]);
+  return { history: unchanged ? history : { undo, redo }, current: nextCurrent };
+}

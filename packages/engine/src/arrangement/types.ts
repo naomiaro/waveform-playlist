@@ -12,8 +12,13 @@ export interface ClipBounds {
   sourceDurationSamples: number;
 }
 
-/** `undoable: false` makes the change without an undo step. */
-export interface ArrangementChangeOptions {
+export interface RemoveTrackOptions {
+  /**
+   * `false`: the removal is not an undo step, and the track is also taken
+   * out of every undo and redo state, so no undo or redo brings it back.
+   * For a track that should never have been there (a dropped file that could
+   * not be decoded).
+   */
   undoable?: boolean;
 }
 
@@ -52,18 +57,14 @@ export interface Arrangement {
   setTracks(tracks: readonly ClipTrack[]): void;
 
   // tracks
-  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void;
-  removeTrack(trackId: string, options?: ArrangementChangeOptions): void;
+  addTrack(track: ClipTrack): void;
+  removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   /**
    * Replace a track, with a track or with a function of the current one.
    * Does nothing for an id no track has. The mixer fields of the new track
    * are not read: use the setters.
    */
-  updateTrack(
-    trackId: string,
-    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
-    options?: ArrangementChangeOptions
-  ): void;
+  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void;
   /** Move a track to another place in the order. */
   reorderTrack(trackId: string, toIndex: number): void;
 

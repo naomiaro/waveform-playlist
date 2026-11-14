@@ -8,7 +8,7 @@
 
 **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 
-**Key types:** `Arrangement`, `CreateArrangementOptions`, `ArrangementChangeOptions`, `ClipBounds`, `TrackMixerValues` (the arrangement's public face), `PlayoutAdapter` (pluggable audio backend interface — requires `readonly audioContext: AudioContext`, `readonly ppqn: number`; optional `addWorkletModule`/`createAudioWorkletNode`/`createMediaStreamSource` for cross-context worklet support, `masterOutputNode` for analyzer/recorder tap), `EngineState` (state snapshot; its `tracks` is `readonly ClipTrack[]` and not a copy), `EngineEvents` (statechange, play/pause/stop).
+**Key types:** `Arrangement`, `CreateArrangementOptions`, `RemoveTrackOptions`, `ClipBounds`, `TrackMixerValues` (the arrangement's public face), `PlayoutAdapter` (pluggable audio backend interface — requires `readonly audioContext: AudioContext`, `readonly ppqn: number`; optional `addWorkletModule`/`createAudioWorkletNode`/`createMediaStreamSource` for cross-context worklet support, `masterOutputNode` for analyzer/recorder tap), `EngineState` (state snapshot; its `tracks` is `readonly ClipTrack[]` and not a copy), `EngineEvents` (statechange, play/pause/stop).
 
 **Operations:** `clipOperations.ts` (drag constraints, trim, split), `viewportOperations.ts` (bounds, chunks, scroll threshold), `timelineOperations.ts` (duration, zoom, seek).
 
@@ -62,7 +62,7 @@ One owner per piece of state (#812):
 
 **Files (`src/arrangement/`):**
 
-- `types.ts` — the public `Arrangement` interface, `ClipBounds`, `ArrangementChangeOptions`, `CreateArrangementOptions`
+- `types.ts` — the public `Arrangement` interface, `ClipBounds`, `RemoveTrackOptions`, `CreateArrangementOptions`
 - `index.ts` — `createArrangement(options)` and the public type re-exports; the only arrangement module `src/index.ts` exports from
 - `Arrangement.ts` — `ArrangementImpl` (internal) with the internal types `ArrangementChange`, `ArrangementTimeBase`, `ArrangementOptions`, `ArrangementVersions`
 - `mixer.ts` — `TrackMixerValues` and the pure functions over the mixer Map (`seedMixer`, `setMixerValues`, `retainMixer`, `withMixerValues`, `mixerValuesOf`)
@@ -87,7 +87,7 @@ One owner per piece of state (#812):
 - **`skipAdapter` is marked by the change's `tracksVersion`** — `moveClip`/`trimClip` with `skipAdapter` add `tracksVersion + 1` to `_skipAdapterAt` before calling the arrangement (`_markSkipAdapter`); the `'update'` case of `_onArrangementChange` deletes `at.tracksVersion` from the set and skips the adapter when it was there. The mark travels with the version, not with the call, because a change made from inside a listener is delivered after the call returned. A call that changed nothing removes its mark (`_unmarkIfUnchanged`).
 - **Adapter call per change** (`_onArrangementChange`) — `set`: `setTracks`. `add`: `adapter.addTrack` when defined, else `setTracks`. `remove`: `adapter.removeTrack` when defined, else `setTracks`. `update`: `_updateTrackOnAdapter` (`adapter.updateTrack` when defined, else `setTracks`); a track that was given a new id is not found under the old one and goes as `setTracks`. `restore`: `_restoreOnAdapter`. `mixer`: the one adapter setter. `recompute`: every track through `_updateTrackOnAdapter`. `reorder` and `history`: no adapter call.
 - **The selected track id is cleared when its track is gone** — `_clearSelectionIfGone()` on `remove` and on `restore` (an undo of an `addTrack`, a redo of a `removeTrack`), before the `statechange` of that change.
-- **Arrangement-only API** — `addTrack` / `removeTrack` / `updateTrack` take `{ undoable: false }` (`_pushUndoSnapshot` returns at once: no step, the redo stack stays, an open transaction is not marked changed); `updateTrack` takes a function of the current track (not called for an unknown id; returning the track it was given changes nothing). The engine's methods of the same names do not take these.
+- **Arrangement-only API** — `removeTrack` takes `{ undoable: false }` (maintainer, 2026-11-14: `removeTrack` only). It is not "skip the undo step": a step is a whole earlier tracks array, so a later undo would bring the track back. `_removeTrackEverywhere` takes the track out of the current tracks, every undo and redo state and an open transaction's base (`purgeTrack` / `withoutTrack` in `history.ts`), drops steps that no longer differ from the state next to them, and drops the mixer entry; it announces `remove`, or `history` when only stored states changed. `addTrack` and `updateTrack` have no such option, because applying an add or an update to every earlier state has no clear meaning; `updateTrack` takes a function of the current track (not called for an unknown id; returning the track it was given changes nothing). The engine's methods of the same names do not take these.
 - **Without an engine** — `_tickAt` returns `undefined` (clips get no `startTick`; a clip that came with one keeps it), `recomputeStartSamples` does nothing, and `_minDuration` is 0.1 s at the clip's own `sampleRate` instead of the engine's.
 
 ## Undo/Redo

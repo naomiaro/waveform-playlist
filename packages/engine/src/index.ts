@@ -5,9 +5,9 @@ export * from './operations';
 export { createArrangement } from './arrangement';
 export type {
   Arrangement,
-  ArrangementChangeOptions,
   ClipBounds,
   CreateArrangementOptions,
+  RemoveTrackOptions,
   TrackMixerValues,
 } from './arrangement';
 

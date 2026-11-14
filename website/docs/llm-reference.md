@@ -1468,9 +1468,9 @@ import { PlaylistEngine, createArrangement } from '@waveform-playlist/engine';
 import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions } from '@waveform-playlist/engine';
 import type {
   Arrangement,
-  ArrangementChangeOptions,
   ClipBounds,
   CreateArrangementOptions,
+  RemoveTrackOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
 
@@ -1492,8 +1492,8 @@ interface CreateArrangementOptions {
   undoLimit?: number;             // Maximum number of undo steps (default 100)
 }
 
-interface ArrangementChangeOptions {
-  undoable?: boolean;             // false makes the change without an undo step
+interface RemoveTrackOptions {
+  undoable?: boolean;             // false: no undo step, and the track is taken out of every undo and redo state
 }
 
 interface TrackMixerValues {
@@ -1522,12 +1522,11 @@ interface Arrangement {
   setTracks(tracks: readonly ClipTrack[]): void;        // Replace every track. Clears the undo history. A track id that is already there keeps its mix
 
   // tracks
-  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void;
-  removeTrack(trackId: string, options?: ArrangementChangeOptions): void;
+  addTrack(track: ClipTrack): void;
+  removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   updateTrack(                                          // Does nothing for an id no track has. The new track's mixer fields are not read
     trackId: string,
-    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
-    options?: ArrangementChangeOptions
+    next: ClipTrack | ((track: ClipTrack) => ClipTrack)
   ): void;
   reorderTrack(trackId: string, toIndex: number): void;
 

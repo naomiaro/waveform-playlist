@@ -106,7 +106,7 @@ const next = new PlaylistEngine({ adapter: createToneAdapter(), arrangement });
 
 An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`.
 
-The engine's track, clip, mixer and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `addTrack`, `removeTrack` and `updateTrack` also take `{ undoable: false }` (the change is made without an undo step), and `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
+The engine's track, clip, mixer and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
 
 Rules that hold for the engine and the arrangement alike:
 

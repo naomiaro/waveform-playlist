@@ -147,7 +147,7 @@ const clip = createClipFromSeconds({
   - `operations/viewportOperations.ts` — Bounds, chunks, scroll threshold
   - `operations/timelineOperations.ts` — Duration, zoom, seek
   - `arrangement/index.ts` — `createArrangement()` and the public arrangement types
-  - `arrangement/types.ts` — `Arrangement`, `ClipBounds`, `ArrangementChangeOptions`, `CreateArrangementOptions`
+  - `arrangement/types.ts` — `Arrangement`, `ClipBounds`, `RemoveTrackOptions`, `CreateArrangementOptions`
   - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks, mix, history, transactions, ordered delivery of changes
   - `arrangement/mixer.ts` — `TrackMixerValues`; the mix as pure functions over a Map by track id
   - `arrangement/history.ts` — Undo/redo as pure functions over references to earlier tracks arrays

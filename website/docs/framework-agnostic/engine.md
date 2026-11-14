@@ -374,14 +374,14 @@ The arrangement has the engine's track, clip, mixer and history methods: `setTra
 Two things are on the arrangement only:
 
 ```typescript
-// Make a change without an undo step
-arrangement.addTrack(track, { undoable: false });
+// Remove a track for good: no undo step, and no undo or redo brings it back
 arrangement.removeTrack(trackId, { undoable: false });
-arrangement.updateTrack(trackId, nextTrack, { undoable: false });
 
 // Replace a track with a function of the current one (not called for an unknown ID)
 arrangement.updateTrack(trackId, (track) => ({ ...track, name: 'Bass' }));
 ```
+
+`removeTrack(trackId, { undoable: false })` is for a track that should never have been there, such as a dropped file that could not be decoded. The track is taken out of the current tracks and out of every undo and redo state, and an undo step that no longer changes anything is dropped. Its mixer values go with it.
 
 The arrangement's `moveClip()` and `trimClip()` have no `skipAdapter` argument; that one is the engine's.
 
@@ -722,8 +722,8 @@ import type {
   PlaylistEngineOptions,
   PlayoutAdapter,
   Arrangement,
-  ArrangementChangeOptions,
   CreateArrangementOptions,
+  RemoveTrackOptions,
   ClipBounds,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -789,8 +789,8 @@ interface CreateArrangementOptions {
   undoLimit?: number;            // default 100
 }
 
-interface ArrangementChangeOptions {
-  undoable?: boolean; // false: make the change without an undo step
+interface RemoveTrackOptions {
+  undoable?: boolean; // false: no undo step, and the track leaves every undo and redo state
 }
 
 interface TrackMixerValues {
@@ -819,13 +819,9 @@ interface Arrangement {
   setTracks(tracks: readonly ClipTrack[]): void;
 
   // tracks
-  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void;
-  removeTrack(trackId: string, options?: ArrangementChangeOptions): void;
-  updateTrack(
-    trackId: string,
-    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
-    options?: ArrangementChangeOptions
-  ): void;
+  addTrack(track: ClipTrack): void;
+  removeTrack(trackId: string, options?: RemoveTrackOptions): void;
+  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void;
   reorderTrack(trackId: string, toIndex: number): void;
 
   // clips
