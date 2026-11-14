@@ -54,7 +54,7 @@ import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } 
 import type { Mixer, TrackMixerValues } from './mixer';
 import { clipMapper, forLoadedClips, rescaleTick, withClips } from './ticks';
 import {
-  assertLoadedClipsOfTrackKind,
+  assertClipsOfTrackKind,
   assertUniqueClipIds,
   assertUniqueTrackIds,
   duplicateTrackId,
@@ -345,7 +345,7 @@ export class ArrangementImpl implements Arrangement {
   // track check it before they change anything, so a throw leaves the tracks,
   // the undo history, the mixer and every subscriber untouched.
   setTracks(tracks: readonly ArrangementTrack[]): void {
-    tracks.forEach(assertLoadedClipsOfTrackKind);
+    tracks.forEach(assertClipsOfTrackKind);
     assertUniqueTrackIds(tracks);
     tracks.forEach(assertUniqueClipIds);
     // Everything before is replaced, an open transaction included.
@@ -361,7 +361,7 @@ export class ArrangementImpl implements Arrangement {
   }
 
   addTrack(track: ArrangementTrack): void {
-    assertLoadedClipsOfTrackKind(track);
+    assertClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
@@ -427,7 +427,7 @@ export class ArrangementImpl implements Arrangement {
     const track = byFunction ? next(current as ArrangementTrack) : next;
     if (byFunction && track === current) return;
 
-    assertLoadedClipsOfTrackKind(track);
+    assertClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (track.id !== trackId && this._tracks.some((t) => t.id === track.id)) {
       throw duplicateTrackId(track.id);

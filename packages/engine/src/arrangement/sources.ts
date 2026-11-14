@@ -7,19 +7,14 @@
  * base), so an undo never starts a fetch again and a failed source stays
  * failed until `retry`. A loaded clip that carries both its `src` and its
  * `audioBuffer` gives the loader that buffer, and nothing is fetched for it.
- * A loading clip on a MIDI track is never loaded.
+ * (No state has a loading clip on a MIDI track: the arrangement refuses one.)
  *
  * Nothing here holds tracks. The arrangement hands in its states to declare
  * what is wanted and to have the loaded sources applied; `value` is derived
  * from the loader and from what those passes found.
  */
 
-import {
-  createSourceLoader,
-  createValueSource,
-  isLoadingClip,
-  trackKind,
-} from '@waveform-playlist/core';
+import { createSourceLoader, createValueSource, isLoadingClip } from '@waveform-playlist/core';
 import type {
   ArrangementTrack,
   AudioClip,
@@ -58,14 +53,10 @@ const EMPTY_VALUE: ArrangementSourcesValue = {
   isLoading: false,
 };
 
-const MIDI_TRACK_MESSAGE = 'A loading clip cannot be on a MIDI track';
-
 /** What one track object names. Worked out once per object: tracks are never written to. */
 interface TrackSources {
-  /** The loading clips an audio track holds. */
+  /** The loading clips the track holds. */
   loading: readonly LoadingClip[];
-  /** The loading clips a MIDI track holds: never loaded, reported. */
-  onMidiTrack: readonly LoadingClip[];
   /** Loaded clips that carry their source and its audio. */
   carried: ReadonlyArray<readonly [ClipSource, AudioBuffer]>;
 }
@@ -100,8 +91,6 @@ export class ArrangementSources {
     { buffer: AudioBuffer; result: ResolvedLoadingClip }
   >();
   private _wanted: ReadonlySet<ClipSource> = new Set();
-  /** Sources only loading clips on MIDI tracks name. */
-  private _midiOnly: ReadonlySet<ClipSource> = new Set();
   /** Per source, the reason its clip could not be made (found by the last `apply`). */
   private _unusable: ReadonlyMap<ClipSource, string> = new Map();
   private _getContext: (() => Promise<BaseAudioContext>) | null = null;
@@ -167,19 +156,16 @@ export class ArrangementSources {
    */
   declare(states: Iterable<Tracks>): void {
     const wanted = new Set<ClipSource>();
-    const onMidiTracks = new Set<ClipSource>();
     const carried = new Map<ClipSource, AudioBuffer>();
     for (const tracks of states) {
       for (const track of tracks) {
         const named = this._sourcesOf(track);
         for (const clip of named.loading) wanted.add(clip.src);
-        for (const clip of named.onMidiTrack) onMidiTracks.add(clip.src);
         for (const [src, buffer] of named.carried) if (!carried.has(src)) carried.set(src, buffer);
       }
     }
     // A source a loaded clip carries is kept as loaded for as long as it is named.
     for (const src of carried.keys()) wanted.add(src);
-    this._midiOnly = new Set([...onMidiTracks].filter((src) => !wanted.has(src)));
 
     this._declaring = true;
     try {
@@ -261,7 +247,6 @@ export class ArrangementSources {
   private _sourcesOf(track: ArrangementTrack): TrackSources {
     const known = this._trackSources.get(track);
     if (known) return known;
-    const midi = trackKind(track) === 'midi';
     const loading: LoadingClip[] = [];
     const carried: Array<readonly [ClipSource, AudioBuffer]> = [];
     for (const clip of track.clips) {
@@ -269,9 +254,7 @@ export class ArrangementSources {
       else if (clip.src !== undefined && clip.audioBuffer)
         carried.push([clip.src, clip.audioBuffer]);
     }
-    const named: TrackSources = midi
-      ? { loading: [], onMidiTrack: loading, carried }
-      : { loading, onMidiTrack: [], carried };
+    const named: TrackSources = { loading, carried };
     this._trackSources.set(track, named);
     return named;
   }
@@ -295,9 +278,6 @@ export class ArrangementSources {
       } else {
         sources.set(src, { status: state.status });
       }
-    }
-    for (const src of this._midiOnly) {
-      sources.set(src, { status: 'failed', error: this._failure(src, MIDI_TRACK_MESSAGE) });
     }
     let pendingCount = 0;
     let failedCount = 0;

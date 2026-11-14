@@ -257,27 +257,40 @@ describe('a loading clip and the kind of its track', () => {
     kind: 'midi',
   });
 
-  it('a MIDI track that holds a loading clip is accepted by every way in', () => {
-    const mixed = () => midiTrack('M', [midiClip('m1'), loading('L')]);
-    expect(createArrangement({ tracks: [mixed()] }).getTracks()[0].clips).toHaveLength(2);
+  // A loading clip becomes an audio clip and nothing else, so on a MIDI track
+  // it is the same mistake as a loaded audio clip there (#756).
+  it('a loading clip on a MIDI track is refused by every way in, and nothing changes', () => {
+    const mixed = (id = 'M') => ({ ...midiTrack(id, [midiClip('m1'), loading('L')]) });
+    const refusal = /Track "M" is an? midi track but its clip "L" is an audio clip/;
+    expect(() => createArrangement({ tracks: [mixed()] })).toThrow(refusal);
 
-    const arrangement = createArrangement();
-    arrangement.setTracks([mixed()]);
-    arrangement.addTrack({ ...mixed(), id: 'M2' });
-    arrangement.updateTrack('M', { ...mixed(), name: 'renamed' });
-    arrangement.updateTrack('M2', (current) => ({ ...current, name: 'renamed too' }));
-    expect(arrangement.getTracks().map((t) => t.clips.map((c) => c.id))).toEqual([
-      ['m1', 'L'],
-      ['m1', 'L'],
-    ]);
+    const arrangement = createArrangement({ tracks: [midiTrack('M', [midiClip('m1')])] });
+    const tracks = arrangement.getTracks();
+    const told = vi.fn();
+    arrangement.subscribe(told);
+
+    expect(() => arrangement.setTracks([mixed()])).toThrow(refusal);
+    expect(() => arrangement.addTrack({ ...mixed(), id: 'M2', name: 'M' })).toThrow(refusal);
+    expect(() => arrangement.updateTrack('M', mixed())).toThrow(refusal);
+    expect(() =>
+      arrangement.updateTrack('M', (current) => ({
+        ...current,
+        clips: [...current.clips, loading('L')],
+      }))
+    ).toThrow(refusal);
+
+    expect(arrangement.getTracks()).toBe(tracks);
+    expect(arrangement.canUndo).toBe(false);
+    expect(told).not.toHaveBeenCalled();
+    expect(arrangement.sources.getSnapshot().sources.size).toBe(0);
   });
 
-  it('the loaded clips are still checked: an audio clip on that MIDI track is refused', () => {
-    const arrangement = createArrangement();
-    expect(() => arrangement.setTracks([midiTrack('M', [loading('L'), clip('a1', 0)])])).toThrow(
-      /is an? midi track but its clip "a1" is an audio clip/
-    );
-    expect(arrangement.getTracks()).toEqual([]);
+  it('a track that is given the kind midi while it holds a loading clip is refused', () => {
+    const arrangement = createArrangement({ tracks: [track('A', [loading('L')])] });
+    expect(() =>
+      arrangement.updateTrack('A', (current) => ({ ...current, kind: 'midi' as const }))
+    ).toThrow(/is an? midi track but its clip "L" is an audio clip/);
+    expect(arrangement.getTracks()[0].kind).toBe('audio');
   });
 
   it('a MIDI clip beside a loading clip on an audio track is refused', () => {

@@ -68,8 +68,8 @@ function loading(id: string, src: ClipSource, start = 0, extra: Partial<LoadingC
   return { id, src, start, duration: 1, ...extra } as LoadingClip;
 }
 
-function track(id: string, clips: ArrangementTrack['clips'], kind: 'audio' | 'midi' = 'audio') {
-  return { ...createTrack({ name: id, clips: [] }), id, kind, clips } as ArrangementTrack;
+function track(id: string, clips: ArrangementTrack['clips']) {
+  return { ...createTrack({ name: id, clips: [] }), id, clips } as ArrangementTrack;
 }
 
 interface PendingLoad {
@@ -634,37 +634,6 @@ describe('a clip that cannot be made, and a source that fails', () => {
     arrangement.retry('nope.opus');
     await flush();
     expect(loads.calls).toHaveLength(1);
-  });
-
-  it('a loading clip on a MIDI track is not fetched and is reported as failed', async () => {
-    const { arrangement, loads } = await setup([
-      track('M', [loading('L', 'm.opus')], 'midi'),
-      track('A', [loading('L2', 'a.opus')]),
-    ]);
-    expect(loads.calls.map((call) => call.src)).toEqual(['a.opus']);
-    const state = arrangement.sources.getSnapshot().sources.get('m.opus');
-    expect(state?.status).toBe('failed');
-    expect(state?.error?.message).toBe('A loading clip cannot be on a MIDI track');
-    expect(arrangement.sources.getSnapshot()).toMatchObject({ failedCount: 1, pendingCount: 1 });
-
-    arrangement.retry('m.opus');
-    await flush();
-    expect(loads.calls).toHaveLength(1);
-  });
-
-  it('a source named on a MIDI track and on an audio track loads for the audio track only', async () => {
-    const { arrangement, loads } = await setup([
-      track('M', [loading('L', 'a.opus')], 'midi'),
-      track('A', [loading('L2', 'a.opus')]),
-    ]);
-    const onMidi = clipOf(arrangement, 'M', 'L');
-    // The source is shown as the loader has it, not as failed.
-    expect(arrangement.sources.getSnapshot().sources.get('a.opus')).toEqual({ status: 'pending' });
-    loads.calls[0].resolve(fakeBuffer());
-    await flush();
-    expect(isLoaded(clipOf(arrangement, 'A', 'L2'))).toBe(true);
-    expect(clipOf(arrangement, 'M', 'L')).toBe(onMidi);
-    expect(arrangement.sources.getSnapshot().sources.get('a.opus')).toEqual({ status: 'loaded' });
   });
 });
 

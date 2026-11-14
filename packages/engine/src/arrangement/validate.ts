@@ -3,17 +3,18 @@
  * before anything has changed (#756).
  */
 
-import { assertTrackKind, isLoadingClip } from '@waveform-playlist/core';
-import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
+import { assertTrackKind } from '@waveform-playlist/core';
+import type { ArrangementTrack, ClipTrack } from '@waveform-playlist/core';
 
 /**
  * A track holds audio clips or MIDI clips, never both (#756). A clip that is
- * still loading is neither yet and is not checked: on a MIDI track it is
- * never loaded, and it is reported where the sources are.
+ * still loading is an audio clip (its source becomes an AudioBuffer, and it
+ * has no `midiNotes`), so a MIDI track that holds one is refused like a MIDI
+ * track that holds a loaded audio clip. No state of an arrangement therefore
+ * has a loading clip on a MIDI track.
  */
-export function assertLoadedClipsOfTrackKind(track: ArrangementTrack): void {
-  const loaded = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
-  assertTrackKind({ ...track, clips: loaded });
+export function assertClipsOfTrackKind(track: ArrangementTrack): void {
+  assertTrackKind(track as ClipTrack);
 }
 
 /** Readers address a clip by its id within its track, so two clips of one id cannot be told apart. */
