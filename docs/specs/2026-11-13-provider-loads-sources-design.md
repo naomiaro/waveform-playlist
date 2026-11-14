@@ -205,7 +205,10 @@ Rules, each with a test:
 - `provide(key, value)`: the key becomes `loaded` with that value; a load in
   flight for it is aborted. A no-op for a key that is already loaded. The key
   is still dropped by a later `setWanted` that leaves it out.
-- A rejection with `name === 'AbortError'` is never recorded as `failed`.
+- A rejection with `name === 'AbortError'` of a load the loader itself aborted
+  is never recorded as `failed`. The same rejection from a load whose signal
+  was not aborted (a custom load function's own abort) is a failure: left
+  pending it would hold back the first build for good.
 - A late result of an aborted or dropped load is ignored (compare a per-load
   token, not a flag that must be reset).
 - A failed key stays failed until `retry(key)`.
