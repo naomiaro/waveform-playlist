@@ -135,4 +135,46 @@ describe('mergeLoadingClips', () => {
     expect(result[0].clips[1]).toBe(l1);
     expect(result[0].clips[3]).toBe(l2);
   });
+
+  it('strips placeholders from a track latest does not know', () => {
+    const outgoing = [ctrack('x', [audio('p')])];
+    const result = mergeLoadingClips(outgoing, [], new Set(['p']));
+    expect(result[0].clips).toEqual([]);
+    expect(result[0].id).toBe('x');
+  });
+
+  it('returns the same track and array for an unknown track with no placeholder', () => {
+    const outgoing = [ctrack('x', [audio('p')])];
+    const result = mergeLoadingClips(outgoing, [], none);
+    expect(result).toBe(outgoing);
+    expect(result[0]).toBe(outgoing[0]);
+  });
+
+  it('keeps a clip that has a buffer even when its id is in a stale placeholder set', () => {
+    const resolved = { ...audio('L1'), audioBuffer: { length: 1 } as AudioBuffer };
+    const outgoing = [ctrack('t', [resolved])];
+    const result = mergeLoadingClips(outgoing, [ptrack('t', [loading('L1')])], new Set(['L1']));
+    expect(result).toBe(outgoing);
+    expect(result[0]).toBe(outgoing[0]);
+    expect(result[0].clips[0]).toBe(resolved);
+  });
+
+  it('with two loading clips of one id in latest, the later one is put back (pinned)', () => {
+    const first = loading('d');
+    const second = loading('d');
+    const result = mergeLoadingClips([ctrack('t', [])], [ptrack('t', [first, second])], none);
+    expect(result[0].clips).toHaveLength(1);
+    expect(result[0].clips[0]).toBe(second);
+  });
+
+  it('with two tracks of one id in latest, the later one supplies the loading clips (pinned)', () => {
+    const l1 = loading('l1');
+    const l2 = loading('l2');
+    const result = mergeLoadingClips(
+      [ctrack('t', [])],
+      [ptrack('t', [l1]), ptrack('t', [l2])],
+      none
+    );
+    expect(result[0].clips).toEqual([l2]);
+  });
 });

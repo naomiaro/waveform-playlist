@@ -5,7 +5,10 @@
  * and must not carry a placeholder as if it were real. The engine's tracks
  * never hold loading clips; a drag handler's copy of the view's tracks holds
  * placeholders. This puts each loading clip of the app's latest `tracks` back
- * (by clip id) and removes the placeholders.
+ * (by clip id) and removes the placeholders, also from a track `latest` lacks.
+ * A clip is a placeholder only when its id is in `placeholderIds` AND it has no
+ * `audioBuffer` (a resolved clip has one), so a stale set never replaces a
+ * resolved clip.
  */
 
 import { isLoadingClip } from '@waveform-playlist/core';
@@ -21,6 +24,11 @@ function loadingClipsById(track: PlaylistTrack): Map<string, LoadingClip> {
   return byId;
 }
 
+/** A placeholder has an id in the set and never has an `audioBuffer`; a resolved clip does. */
+function isPlaceholder(clip: AnyClip, placeholderIds: ReadonlySet<string>): boolean {
+  return placeholderIds.has(clip.id) && !('audioBuffer' in clip && clip.audioBuffer);
+}
+
 function mergeClips(
   outgoing: readonly AnyClip[],
   loadingById: ReadonlyMap<string, LoadingClip>,
@@ -29,7 +37,7 @@ function mergeClips(
   const outgoingIds = new Set(outgoing.map((clip) => clip.id));
   const merged: AnyClip[] = [];
   for (const clip of outgoing) {
-    if (!placeholderIds.has(clip.id)) {
+    if (!isPlaceholder(clip, placeholderIds)) {
       merged.push(clip);
       continue;
     }
@@ -51,8 +59,8 @@ function mergeTrack(
   latestTrack: PlaylistTrack | undefined,
   placeholderIds: ReadonlySet<string>
 ): PlaylistTrack {
-  if (!latestTrack) return track;
-  const clips = mergeClips(track.clips, loadingClipsById(latestTrack), placeholderIds);
+  const loadingById = latestTrack ? loadingClipsById(latestTrack) : new Map<string, LoadingClip>();
+  const clips = mergeClips(track.clips, loadingById, placeholderIds);
   return sameClips(clips, track.clips) ? track : { ...track, clips };
 }
 
