@@ -3,9 +3,7 @@ import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 
 import JSZip from 'jszip';
-import { type ClipTrack } from '@waveform-playlist/core';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -41,7 +39,6 @@ import {
   ExportWavButton,
   useDynamicEffects,
   useTrackDynamicEffects,
-  useAudioTracks,
   useExportWav,
 } from '@waveform-playlist/browser/tone';
 import {
@@ -51,6 +48,7 @@ import {
   BaseControlButton,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 import { EffectRack, TrackEffectControls } from '../effects';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 
@@ -355,14 +353,11 @@ interface EffectsControlsProps {
   trackEffectsManager: UseTrackDynamicEffectsReturn;
   isDarkMode: boolean;
   onDeleteTrack: (trackId: string) => void;
-  onAddTracks: (newTracks: ClipTrack[]) => void;
+  onAddTracks: (newTracks: PlaylistTrack[]) => void;
   masterEffectsFunction: any;
   trackCount: number;
   createOfflineMasterEffects: () => any;
-  tracks: ClipTrack[];
-  isLoading?: boolean;
-  loadedCount?: number;
-  totalCount?: number;
+  tracks: PlaylistTrack[];
 }
 
 const EffectsControls: React.FC<EffectsControlsProps> = ({
@@ -375,10 +370,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   trackCount,
   createOfflineMasterEffects,
   tracks,
-  isLoading,
-  loadedCount,
-  totalCount,
 }) => {
+  const { isLoading, settledCount, totalCount, errorMessage } = useLoadingProgress();
   // Export options state
   const [exportMode, setExportMode] = useState<'master' | 'individual' | 'all'>('master');
   const [selectedTrackIndex, setSelectedTrackIndex] = useState<number>(0);
@@ -443,14 +436,12 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     }
   }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
-  // Handle dropped/selected audio files
-  const handleFiles = useCallback(async (files: File[]) => {
+  // Handle dropped/selected audio files: one track per file, loaded by the provider
+  const handleFiles = useCallback((files: File[]) => {
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
     if (audioFiles.length === 0) return;
 
-    const audioContext = getGlobalAudioContext();
-    const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-    if (newTracks.length > 0) onAddTracks(newTracks);
+    onAddTracks(audioFiles.map((file) => audioTrack({ src: file })));
   }, [onAddTracks]);
 
   return (
@@ -465,7 +456,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
-          {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+          {errorMessage && <span style={{ fontSize: '0.875rem', color: 'red' }}>Error loading audio: {errorMessage}</span>}
+          {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {settledCount}/{totalCount}</span>}
         </ControlsRow>
         <VisualizerWrapper>
           <FrequencyVisualizer analyserRef={analyserRef} isDarkMode={isDarkMode} />
@@ -591,10 +583,26 @@ export function EffectsExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const defaultsAddedRef = useRef(false);
 
-  // Mutable tracks state
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Track configurations - Albert Kader "Ubiquitous" minimal techno. The
+  // provider loads them and builds the engine once all have loaded.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() => [
+    audioTrack({
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+      name: 'Kick',
+    }),
+    audioTrack({
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+      name: 'Bass',
+    }),
+    audioTrack({
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
+      name: 'HiHat',
+    }),
+    audioTrack({
+      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+      name: 'Synth',
+    }),
+  ]);
 
   // Create dynamic effects manager for master effects
   const effectsManager = useDynamicEffects(256);
@@ -604,46 +612,10 @@ export function EffectsExample() {
   const trackEffectsManager = useTrackDynamicEffects();
   const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction } = trackEffectsManager;
 
-  // Track configurations - Albert Kader "Ubiquitous" minimal techno
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-      name: 'Kick',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-      name: 'Bass',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
-      name: 'HiHat',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-      name: 'Synth',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-
-  // Update local state as tracks finish loading
+  // Add default effects on mount (only once). The track ids are known from the
+  // first render; each track's chain is attached when the provider builds it.
   useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-      if (!loading) {
-        setIsLoading(false);
-      }
-    }
-    if (error) {
-      setLoadError(error);
-      setIsLoading(false);
-    }
-  }, [loadedTracks, loading, error]);
-
-  // Add default effects on mount (only once)
-  useEffect(() => {
-    if (!isLoading && tracks.length > 0 && !defaultsAddedRef.current) {
+    if (tracks.length > 0 && !defaultsAddedRef.current) {
       defaultsAddedRef.current = true;
 
       // Add a reverb to the master effects chain
@@ -664,7 +636,7 @@ export function EffectsExample() {
       // Synth: Ping Pong Delay
       if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay').catch(report);
     }
-  }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
+  }, [tracks, addMasterEffect, addEffectToTrack]);
 
   // Handle delete track
   const handleDeleteTrack = useCallback((trackId: string) => {
@@ -674,19 +646,9 @@ export function EffectsExample() {
   }, [clearTrackEffects]);
 
   // Handle add tracks
-  const handleAddTracks = useCallback((newTracks: ClipTrack[]) => {
+  const handleAddTracks = useCallback((newTracks: PlaylistTrack[]) => {
     setTracks(prevTracks => [...prevTracks, ...newTracks]);
   }, []);
-
-  if (loadError) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {loadError}
-        </div>
-      </Container>
-    );
-  }
 
   return (
     <Container>
@@ -714,9 +676,6 @@ export function EffectsExample() {
           trackCount={tracks.length}
           createOfflineMasterEffects={createOfflineEffectsFunction}
           tracks={tracks}
-          isLoading={loading}
-          loadedCount={loadedCount}
-          totalCount={totalCount}
         />
       </WaveformPlaylistProvider>
     </Container>

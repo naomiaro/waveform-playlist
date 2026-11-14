@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -23,10 +23,10 @@ import {
   WaveformPlayhead,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
-import { type ClipTrack } from '@waveform-playlist/core';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
 const audioConfigs = [
@@ -109,37 +109,29 @@ const ControlGroup = styled.div`
   }
 `;
 
+// "Loading: 3/12" while the stems load, or the error of one that failed.
+// Inside the provider: it reads the provider's source status.
+function LoadingStatus() {
+  const { isLoading, settledCount, totalCount, errorMessage } = useLoadingProgress();
+  if (errorMessage) {
+    return <span style={{ fontSize: '0.875rem', color: 'red' }}>Error loading audio: {errorMessage}</span>;
+  }
+  if (!isLoading) return null;
+  return <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {settledCount}/{totalCount}</span>;
+}
+
 export function StemTracksExample() {
   const { theme } = useDocusaurusTheme();
 
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Sync local track state as peaks fill in; once loading finishes this stops
-  // firing, so subsequent updates (e.g. track reordering) come from onTracksChange.
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // One track per stem; the provider loads them and builds the engine once
+  // all have loaded.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() => audioConfigs.map((config) => audioTrack(config)));
 
   return (
     <Container>
       <WaveformPlaylistProvider
         tracks={tracks}
         onTracksChange={setTracks}
-        deferEngineRebuild={loading}
         sampleRate={48000}
         samplesPerPixel={512}
         mono
@@ -153,7 +145,7 @@ export function StemTracksExample() {
               <PlayButton />
               <PauseButton />
               <StopButton />
-              {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+              <LoadingStatus />
             </ControlGroup>
 
             <ControlGroup>

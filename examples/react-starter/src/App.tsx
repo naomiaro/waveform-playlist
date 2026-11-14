@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -11,9 +11,9 @@ import {
   ZoomOutButton,
   MasterVolumeControl,
   WaveformViewOptions,
+  usePlaylistSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 
 // Audio stems served from website/static (Vite publicDir).
@@ -116,20 +116,28 @@ const Status = styled.div`
   color: #9a9aa6;
 `;
 
-export function App() {
-  // Decoding happens up front; the AudioContext stays suspended until the
-  // first user gesture — see "AudioContext and user gestures" in README.md.
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } =
-    useAudioTracks(audioConfigs);
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+// Inside the provider: the loading progress, read from the provider's sources.
+function LoadingProgress() {
+  const { sources, pendingCount, isLoading } = usePlaylistSources();
+  if (!isLoading) return null;
+  return (
+    <span style={{ fontSize: '0.875rem', color: '#9a9aa6' }}>
+      Loading {sources.size - pendingCount}/{sources.size}…
+    </span>
+  );
+}
 
-  // Sync local track state as peaks fill in; once loading finishes this stops
-  // firing, so later updates come from onTracksChange.
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
+export function App() {
+  // The tracks name their audio; the provider fetches and decodes it up front
+  // and builds the engine once all have loaded. The AudioContext stays
+  // suspended until the first user gesture — see "AudioContext and user
+  // gestures" in README.md.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() =>
+    audioConfigs.map((config) => audioTrack(config))
+  );
+  const [error, setError] = useState<string | null>(null);
+  // Stable: the provider rebuilds its engine when `onError` changes identity.
+  const handleError = useCallback((err: Error) => setError(err.message), []);
 
   if (error) {
     return (
@@ -153,7 +161,7 @@ export function App() {
       <WaveformPlaylistProvider
         tracks={tracks}
         onTracksChange={setTracks}
-        deferEngineRebuild={loading}
+        onError={handleError}
         sampleRate={48000}
         samplesPerPixel={1024}
         mono
@@ -168,11 +176,7 @@ export function App() {
           <ZoomOutButton />
           <AudioPosition />
           <MasterVolumeControl />
-          {loading && (
-            <span style={{ fontSize: '0.875rem', color: '#9a9aa6' }}>
-              Loading {loadedCount}/{totalCount}…
-            </span>
-          )}
+          <LoadingProgress />
         </Controls>
 
         <WaveformViewOptions waveHeight={90} barWidth={3} barGap={1} roundedBars>

@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import styled from 'styled-components';
-import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -25,13 +24,11 @@ import {
   WaveformClipHeaders,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import type { AudioTrackConfig } from '@waveform-playlist/browser/tone';
-import type { SpectrogramConfig, RenderMode, ClipTrack } from '@waveform-playlist/core';
+import { audioTrack, type SpectrogramConfig, type RenderMode, type PlaylistTrack } from '@waveform-playlist/core';
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 import { FileDropZone } from '../FileDropZone';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -89,27 +86,27 @@ const DEFAULT_SPECTROGRAM_CONFIG: SpectrogramConfig = {
   labels: false,
 };
 
-const AUDIO_CONFIGS: AudioTrackConfig[] = TRACK_CONFIGS.map((tc) => ({
-  src: tc.src,
-  name: tc.name,
-  renderMode: tc.defaultMode,
-  spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG,
-}));
+// Inside the provider: "Loading tracks..." while sources load, or the error of one that failed.
+function LoadingNotice() {
+  const { isLoading, errorMessage } = useLoadingProgress();
+  if (errorMessage) return <div>Error: {errorMessage}</div>;
+  if (!isLoading) return null;
+  return <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>;
+}
 
 export function MirSpectrogramExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const baseTracksLoadedRef = useRef(false);
-
-  const { tracks: baseTracks, loading, error } = useAudioTracks(AUDIO_CONFIGS, { immediate: true });
-
-  // Seed tracks from baseTracks when loading completes (once)
-  useEffect(() => {
-    if (!loading && baseTracks.length > 0 && !baseTracksLoadedRef.current) {
-      baseTracksLoadedRef.current = true;
-      setTracks(baseTracks);
-    }
-  }, [loading, baseTracks]);
+  // The provider loads the tracks and builds the engine once all have loaded.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() =>
+    TRACK_CONFIGS.map((tc) =>
+      audioTrack({
+        src: tc.src,
+        name: tc.name,
+        renderMode: tc.defaultMode,
+        spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG,
+      })
+    )
+  );
 
   const handleRemoveTrack = useCallback((trackId: string) => {
     setTracks(prev => prev.filter((track) => track.id !== trackId));
@@ -119,30 +116,21 @@ export function MirSpectrogramExample() {
     setTracks([]);
   }, []);
 
-  const addFiles = async (files: File[]) => {
-    const audioContext = Tone.getContext().rawContext as AudioContext;
-    const newTracks = await decodeAudioFiles(audioContext, files, {
-      trackDefaults: { spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG },
-    });
-    if (newTracks.length > 0) {
-      setTracks((prev) => [...prev, ...newTracks]);
-    }
-  };
-
+  // One track per dropped file; the provider loads it.
   const handleFiles = useCallback((files: File[]) => {
     const audioFiles = files.filter(f => f.type.startsWith('audio/'));
-    if (audioFiles.length > 0) addFiles(audioFiles);
+    if (audioFiles.length === 0) return;
+    setTracks((prev) => [
+      ...prev,
+      ...audioFiles.map((file) => audioTrack({ src: file, spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG })),
+    ]);
   }, []);
-
-  if (error) return <div>Error: {error}</div>;
 
   return (
     <Container>
       <p style={{ fontSize: '0.85rem', opacity: 0.7, margin: '0 0 0.75rem' }}>
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
-
-      {loading && <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>}
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
@@ -155,6 +143,7 @@ export function MirSpectrogramExample() {
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
         >
           <SpectrogramProvider colorMap="viridis">
+          <LoadingNotice />
           <KeyboardShortcuts playback />
           <ControlBar>
             <RewindButton />

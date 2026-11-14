@@ -54,8 +54,7 @@ import {
   WaveformClipHeaders,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import {
   PlayheadWithMarker,
   formatTime,
@@ -63,6 +62,7 @@ import {
   type TimeFormat,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -311,7 +311,7 @@ const CustomSelectionInputs: React.FC = () => {
 };
 
 interface FlexibleApiContentProps {
-  tracks: ClipTrack[];
+  tracks: PlaylistTrack[];
 }
 
 // Main Example Content Component - Using individual hooks with Radix UI
@@ -497,6 +497,49 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
   );
 };
 
+// Albert Kader "Ubiquitous" - all 11 tracks
+const audioConfigs = [
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
+];
+
+// Inside the provider: the loading card, the error card, or the example.
+const LoadingGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isLoading, settledCount, totalCount, errorMessage } = useLoadingProgress();
+
+  if (errorMessage) {
+    return (
+      <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)' }}>
+        <Text size="3" color="red">
+          Error loading audio: {errorMessage}
+        </Text>
+      </Card>
+    );
+  }
+
+  // Show loading progress while tracks are being loaded
+  if (isLoading) {
+    return (
+      <Card>
+        <Flex justify="center" align="center" style={{ padding: '3rem' }}>
+          <Text size="3">Loading tracks: {settledCount}/{totalCount}...</Text>
+        </Flex>
+      </Card>
+    );
+  }
+
+  return <>{children}</>;
+};
+
 // Main Example Component
 export function FlexibleApiExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
@@ -532,60 +575,8 @@ export function FlexibleApiExample() {
     timescaleBackgroundColor: '#2c3e50',
   };
 
-  // Albert Kader "Ubiquitous" - all 11 tracks
-  const audioConfigs = React.useMemo(() => [
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Update tracks state as they finish loading
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
-        <Container>
-          <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)' }}>
-            <Text size="3" color="red">
-              Error loading audio: {error}
-            </Text>
-          </Card>
-        </Container>
-      </Theme>
-    );
-  }
-
-  // Show loading progress while tracks are being loaded
-  if (tracks.length === 0 && loading) {
-    return (
-      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
-        <Container>
-          <Card>
-            <Flex justify="center" align="center" style={{ padding: '3rem' }}>
-              <Text size="3">Loading tracks: {loadedCount}/{totalCount}...</Text>
-            </Flex>
-          </Card>
-        </Container>
-      </Theme>
-    );
-  }
+  // The provider loads the tracks and builds the engine once all have loaded.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() => audioConfigs.map((config) => audioTrack(config)));
 
   return (
     <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
@@ -594,13 +585,14 @@ export function FlexibleApiExample() {
           tracks={tracks}
           sampleRate={48000}
           onTracksChange={setTracks}
-          deferEngineRebuild={loading}
           samplesPerPixel={512}
           mono
           automaticScroll
           theme={customTheme}
         >
-          <FlexibleApiContent tracks={tracks} />
+          <LoadingGate>
+            <FlexibleApiContent tracks={tracks} />
+          </LoadingGate>
         </WaveformPlaylistProvider>
 
         <Card style={{ marginTop: '2rem', background: 'var(--gray-2)' }}>
