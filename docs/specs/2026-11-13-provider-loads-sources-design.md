@@ -71,6 +71,11 @@ There is one sensible way (1); the maintainer set its direction in the issue.
   2026-11-13): the new track enters empty at once and gets its clip when the
   decode finishes, with no rebuild. A loading clip with a `duration` is drawn
   as a placeholder meanwhile, so the timeline can grow before the track sounds.
+- **Audio that arrives clears the undo history, as today** (choice a,
+  2026-11-13): every application of an arrived source to a running engine (a
+  `filled` track, in both the old and the extended case) ends with
+  `engine.clearHistory()` and the `onUndoEngineState` call that follows it
+  today. Making arrivals invisible to undo is #837.
 - Carried over from the issue: one fetch and decode per source key; a failed
   source stays failed (no automatic retry); a cleanup aborts in-flight work and
   the setup asks again; sources nothing names are dropped; mixer fields on a
@@ -435,13 +440,6 @@ find only the upgrade guide.
 - The order of pending clips relative to engine clips inside a merged track,
   as long as it is stable.
 - Wording of warnings and errors.
-
-## Open, waiting for the maintainer
-
-- **Undo and arriving audio.** Today a file drop's decode ends with
-  `engine.clearHistory()` (`WaveformPlaylistContext.tsx:641`): the undo history
-  of every track is gone. `engine.updateTrack` and `addTrack` each push an undo
-  snapshot, so without the clear an undo can remove a clip that just arrived.
 
 ## Open, to tell the maintainer when known
 
