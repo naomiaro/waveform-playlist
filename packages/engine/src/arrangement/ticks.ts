@@ -52,6 +52,29 @@ export function clipMapper(change: ClipChange): (tracks: Tracks) => Tracks {
   };
 }
 
+/**
+ * What an engine that attaches does to every state: a clip without a
+ * `startTick` gets one from its `startSample`, and a tick counted in another
+ * engine's ppqn (`fromPpqn`; null when no engine has attached yet) is
+ * converted to this one's. Sample positions are not touched.
+ */
+export function tickPreparer(
+  timeBase: { sampleRate: number; ppqn: number; secondsToTicks(seconds: number): number },
+  fromPpqn: number | null
+): (tracks: Tracks) => Tracks {
+  return clipMapper(
+    forLoadedClips((clip) => {
+      if (clip.startTick === undefined) {
+        const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
+        return { ...clip, startTick };
+      }
+      if (fromPpqn === null || fromPpqn === timeBase.ppqn) return clip;
+      const startTick = rescaleTick(clip.startTick, fromPpqn, timeBase.ppqn);
+      return startTick === clip.startTick ? clip : { ...clip, startTick };
+    })
+  );
+}
+
 /** A tick counted in `fromPpqn`, as the nearest tick in `toPpqn`. */
 export function rescaleTick(tick: number, fromPpqn: number, toPpqn: number): number {
   return Math.round((tick * toPpqn) / fromPpqn);

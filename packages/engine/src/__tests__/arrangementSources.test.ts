@@ -12,7 +12,7 @@ import type {
   ClipTrack,
   LoadingClip,
 } from '@waveform-playlist/core';
-import { PlaylistEngine, createArrangement } from '../index';
+import { PlaylistEngine, attachDecodeContext, createArrangement } from '../index';
 import type { Arrangement, ArrangementSourcesValue, LoadSource } from '../index';
 import { recordingAdapter } from './helpers/recordingAdapter';
 
@@ -93,13 +93,9 @@ function fakeLoads() {
 /** Let promise callbacks run: a load starts, or a settled load is applied. */
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-interface Attachable {
-  attachDecodeContext(getContext: () => Promise<BaseAudioContext>): () => void;
-}
 const CONTEXT = { fake: 'decode context' } as unknown as BaseAudioContext;
-/** Give the arrangement a context to decode with (an engine does this from Task 10 on). */
-const attach = (arrangement: Arrangement) =>
-  (arrangement as unknown as Attachable).attachDecodeContext(async () => CONTEXT);
+/** Give the arrangement a context to decode with, as a host or an engine does. */
+const attach = (arrangement: Arrangement) => attachDecodeContext(arrangement, async () => CONTEXT);
 
 async function setup(tracks: ArrangementTrack[], options: { attached?: boolean } = {}) {
   const loads = fakeLoads();

@@ -132,6 +132,13 @@ export class ArrangementSources {
    * ones again.
    */
   attachDecodeContext(getContext: () => Promise<BaseAudioContext>): () => void {
+    if (this._getContext) {
+      console.warn(
+        '[waveform-playlist] An arrangement decodes with one audio context at a time: a ' +
+          'context was attached while another still is. Detach the first (dispose its ' +
+          'engine) before attaching another.'
+      );
+    }
     this._getContext = getContext;
     this._attached.resolve();
     // Loads a detach aborted are pending without a load: this starts them.

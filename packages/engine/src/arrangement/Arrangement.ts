@@ -32,6 +32,8 @@ import type {
   ValueSource,
 } from '@waveform-playlist/core';
 import { isLoadingClip } from '@waveform-playlist/core';
+import { ARRANGEMENT_ATTACH_DECODE, ARRANGEMENT_ATTACH_TIME_BASE } from './attach';
+import type { ArrangementTimeBase, GetDecodeContext } from './attach';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
 import type { ClipEditTime } from './clipEdits';
 import { freezeTracksInDevelopment } from './devFreeze';
@@ -52,7 +54,7 @@ import {
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
-import { clipMapper, forLoadedClips, rescaleTick, withClips } from './ticks';
+import { forLoadedClips, tickPreparer, withClips } from './ticks';
 import {
   assertClipsOfTrackKind,
   assertUniqueClipIds,
@@ -79,14 +81,7 @@ export type ArrangementChange =
   | { type: 'recompute' }
   | { type: 'history' };
 
-/** How the arrangement converts time. The engine provides it from its adapter and tempo. */
-export interface ArrangementTimeBase {
-  sampleRate: number;
-  /** The unit of the ticks this time base converts to and from: ticks per quarter note. */
-  ppqn: number;
-  secondsToTicks(seconds: number): number;
-  ticksToSeconds(tick: number): number;
-}
+export type { ArrangementTimeBase };
 
 export interface ArrangementOptions {
   /** Maximum number of undo steps (default 100). */
@@ -166,13 +161,14 @@ export class ArrangementImpl implements Arrangement {
     this._sources.retry(src);
   }
 
-  /**
-   * Internal, for whoever owns an audio context: give the loader a context
-   * to decode with. Nothing is fetched before. Returns the function that
-   * takes it away again (loads in flight are aborted; loaded sources stay).
-   */
-  attachDecodeContext(getContext: () => Promise<BaseAudioContext>): () => void {
+  /** The attach point of `attachDecodeContext()` (./attach.ts): a context to decode with. */
+  [ARRANGEMENT_ATTACH_DECODE](getContext: GetDecodeContext): () => void {
     return this._sources.attachDecodeContext(getContext);
+  }
+
+  /** The attach point an engine uses (./attach.ts): `attachEngine`. */
+  [ARRANGEMENT_ATTACH_TIME_BASE](timeBase: ArrangementTimeBase): () => void {
+    return this.attachEngine(timeBase);
   }
 
   /** Counts structural changes. */
@@ -229,19 +225,7 @@ export class ArrangementImpl implements Arrangement {
     }
     // Work everything out first: the engine's tempo map may throw, and then
     // nothing here has changed and the arrangement is not attached.
-    const fromPpqn = this._tickPpqn;
-    const toPpqn = timeBase.ppqn;
-    const prepare = clipMapper(
-      forLoadedClips((clip) => {
-        if (clip.startTick === undefined) {
-          const startTick = timeBase.secondsToTicks(clip.startSample / timeBase.sampleRate);
-          return { ...clip, startTick };
-        }
-        if (fromPpqn === null || fromPpqn === toPpqn) return clip;
-        const startTick = rescaleTick(clip.startTick, fromPpqn, toPpqn);
-        return startTick === clip.startTick ? clip : { ...clip, startTick };
-      })
-    );
+    const prepare = tickPreparer(timeBase, this._tickPpqn);
     const tracks = prepare(this._tracks);
     const history = {
       undo: this._history.undo.map(prepare),
@@ -253,7 +237,7 @@ export class ArrangementImpl implements Arrangement {
     };
 
     this._timeBase = timeBase;
-    this._tickPpqn = toPpqn;
+    this._tickPpqn = timeBase.ppqn;
     this._history = history;
     this._transaction = transaction;
     if (tracks !== this._tracks) {

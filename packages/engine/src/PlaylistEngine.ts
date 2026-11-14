@@ -13,6 +13,7 @@ import { AdapterSync } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
 import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
 import type { ClipBounds } from './arrangement';
+import { attachDecodeContext, attachTimeBase, isArrangement } from './arrangement/attach';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
 
@@ -26,6 +27,7 @@ export class PlaylistEngine {
   private _arrangement: ArrangementImpl;
   private _stopFollowingArrangement: () => void;
   private _detachFromArrangement: () => void;
+  private _detachDecodeContext: (() => void) | null = null;
   private _adapterSync: AdapterSync;
   private _currentTime = 0;
   private _playStartPosition = 0;
@@ -106,7 +108,7 @@ export class PlaylistEngine {
 
     // Attach first (clips without a tick get one), then follow, then bring
     // the adapter in step with the tracks that are already there.
-    this._detachFromArrangement = this._arrangement.attachEngine(timeBase);
+    this._detachFromArrangement = attachTimeBase(this._arrangement, timeBase);
     this._adapterSync = new AdapterSync(this._arrangement, this._adapter);
     this._stopFollowingArrangement = this._arrangement.onChange((change, at) =>
       this._onArrangementChange(change, at)
@@ -118,6 +120,14 @@ export class PlaylistEngine {
       this._stopFollowingArrangement();
       this._detachFromArrangement();
       throw error;
+    }
+    // The arrangement's sources are decoded with the adapter's context, unless the host attaches one.
+    const adapter = this._adapter;
+    if (adapter && options.attachDecodeContext !== false) {
+      this._detachDecodeContext = attachDecodeContext(
+        this._arrangement,
+        async () => adapter.audioContext
+      );
     }
   }
 
@@ -564,6 +574,8 @@ export class PlaylistEngine {
     this._disposed = true;
     this._stopFollowingArrangement();
     this._detachFromArrangement();
+    this._detachDecodeContext?.();
+    this._detachDecodeContext = null;
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
@@ -667,7 +679,8 @@ export class PlaylistEngine {
 
 /** The object behind an `Arrangement` from `createArrangement()`. */
 function asArrangementImpl(arrangement: unknown): ArrangementImpl {
-  if (arrangement instanceof ArrangementImpl) return arrangement;
+  // By key, not `instanceof`: the arrangement may come from another copy of this package.
+  if (isArrangement(arrangement)) return arrangement as ArrangementImpl;
   throw new Error(
     '[waveform-playlist] PlaylistEngine: the `arrangement` option must be an arrangement ' +
       'made by createArrangement().'
