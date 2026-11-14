@@ -253,4 +253,116 @@ describe('createSourceLoader', () => {
     expect(state.error).toBeInstanceOf(Error);
     expect(state.error.message).toBe('boom');
   });
+
+  it('suspend does not publish', () => {
+    const { loader } = setup();
+    loader.setWanted(['a']);
+    const before = loader.getSnapshot();
+    const listener = vi.fn();
+    loader.subscribe(listener);
+    loader.suspend();
+    expect(loader.getSnapshot()).toBe(before);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('setWanted that only restarts suspended loads does not publish', () => {
+    const { calls, loader } = setup();
+    loader.setWanted(['a']);
+    loader.suspend();
+    const before = loader.getSnapshot();
+    const listener = vi.fn();
+    loader.subscribe(listener);
+    loader.setWanted(['a']);
+    expect(calls).toHaveLength(2);
+    expect(loader.getSnapshot()).toBe(before);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('a restart whose load throws synchronously is published as failed', () => {
+    let throwNow = false;
+    const loader = createSourceLoader<string, string>({
+      load: () => {
+        if (throwNow) throw new Error('sync');
+        return new Promise<string>(() => {});
+      },
+    });
+    loader.setWanted(['a']);
+    loader.suspend();
+    throwNow = true;
+    const listener = vi.fn();
+    loader.subscribe(listener);
+    loader.setWanted(['a']);
+    expect(loader.getSnapshot().get('a')?.status).toBe('failed');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('retry while suspended starts no load and leaves the key pending', async () => {
+    const { calls, load, loader } = setup();
+    loader.setWanted(['a']);
+    calls[0].reject(new Error('nope'));
+    await flush();
+    loader.suspend();
+    loader.retry('a');
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'pending' });
+    loader.setWanted(['a']);
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(calls[1].signal.aborted).toBe(false);
+    calls[1].resolve('A');
+    await flush();
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'loaded', value: 'A' });
+  });
+
+  it('retry after setWanted following a suspend starts a load', async () => {
+    const { calls, loader } = setup();
+    loader.setWanted(['a']);
+    loader.suspend();
+    loader.setWanted(['a']);
+    calls[1].reject(new Error('nope'));
+    await flush();
+    loader.retry('a');
+    expect(calls).toHaveLength(3);
+  });
+
+  it('a load that returns a value instead of a promise becomes loaded', async () => {
+    const loader = createSourceLoader<string, string>({
+      load: (() => 'v') as unknown as (key: string, signal: AbortSignal) => Promise<string>,
+    });
+    loader.setWanted(['a']);
+    await flush();
+    expect(loader.getSnapshot().get('a')).toEqual({ status: 'loaded', value: 'v' });
+  });
+
+  it('retry whose load throws synchronously ends failed and publishes', async () => {
+    let throwNow = false;
+    const calls: Array<(reason: unknown) => void> = [];
+    const loader = createSourceLoader<string, string>({
+      load: () => {
+        if (throwNow) throw new Error('sync');
+        return new Promise<string>((_, reject) => calls.push(reject));
+      },
+    });
+    loader.setWanted(['a']);
+    calls[0](new Error('first'));
+    await flush();
+    throwNow = true;
+    const listener = vi.fn();
+    loader.subscribe(listener);
+    loader.retry('a');
+    const state = loader.getSnapshot().get('a');
+    expect(state?.status === 'failed' && state.error.message).toBe('sync');
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('a load the loader aborted that rejects with a plain Error is ignored', async () => {
+    const { calls, loader } = setup();
+    loader.setWanted(['a', 'b']);
+    loader.setWanted(['b']);
+    calls[0].reject(new Error('late'));
+    loader.suspend();
+    calls[1].reject(new Error('late'));
+    await flush();
+    expect(loader.getSnapshot().has('a')).toBe(false);
+    expect(loader.getSnapshot().get('b')).toEqual({ status: 'pending' });
+  });
 });

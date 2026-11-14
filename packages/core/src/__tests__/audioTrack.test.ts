@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { audioTrack } from '../audioTrack';
 import { isLoadingClip } from '../types/clip';
 import type { AudioClip, LoadingClip, WaveformDataObject } from '../types/clip';
@@ -157,6 +157,16 @@ describe('audioTrack name', () => {
   it('uses the given name', () => {
     expect(audioTrack({ src: 'a.mp3', name: 'Kick' }).name).toBe('Kick');
   });
+
+  it('is Untitled for a data: or blob: URL', () => {
+    expect(audioTrack({ src: 'data:audio/wav;base64,AAAA.BBBB' }).name).toBe('Untitled');
+    expect(audioTrack({ src: 'blob:https://x.test/1234-5678' }).name).toBe('Untitled');
+  });
+
+  it('decodes a percent-encoded file name, and keeps a malformed one raw', () => {
+    expect(audioTrack({ src: '/a/my%20song.mp3' }).name).toBe('my song');
+    expect(audioTrack({ src: '/a/bad%E0%A4%A.mp3' }).name).toBe('bad%E0%A4%A');
+  });
 });
 
 describe('audioTrack follow-ups', () => {
@@ -169,13 +179,52 @@ describe('audioTrack follow-ups', () => {
     );
   });
 
-  it('throws when offset + duration is longer than the audio', () => {
-    expect(() => audioTrack({ audioBuffer: buffer, offset: 1, duration: 1.5 })).toThrow(
-      'audioTrack: offset + duration is longer than the audio'
-    );
-    expect(() => audioTrack({ waveformData: peaks, offset: 1, duration: 2.5 })).toThrow(
-      'audioTrack: offset + duration is longer than the audio'
-    );
+  it('builds a clip when offset + duration is the end of the audio up to float error', () => {
+    const b = { sampleRate: 48000, length: 43200, duration: 0.9, numberOfChannels: 1 };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const track = audioTrack({
+        audioBuffer: b as unknown as AudioBuffer,
+        offset: 0.3,
+        duration: 0.9 - 0.3,
+      });
+      const clip = track.clips[0] as AudioClip;
+      expect(clip.offsetSamples).toBe(14400);
+      expect(clip.durationSamples).toBe(28800);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not warn for a duration one sample past the end, and cuts it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const clip = audioTrack({ audioBuffer: buffer, duration: 2 + 1 / 48000 })
+        .clips[0] as AudioClip;
+      expect(clip.durationSamples).toBe(96000);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('cuts a duration that runs past the audio to the end, with one warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const clip = audioTrack({ audioBuffer: buffer, name: 'Kick', offset: 1, duration: 2 })
+        .clips[0] as AudioClip;
+      expect(clip.durationSamples).toBe(48000);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.lastCall?.[0]).toMatch(/^\[waveform-playlist\] audioTrack: .*Kick/);
+      warn.mockClear();
+      const fromPeaks = audioTrack({ waveformData: peaks, offset: 1, duration: 3 })
+        .clips[0] as AudioClip;
+      expect(fromPeaks.durationSamples).toBe(2 * 44100);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('does not check offset or duration against the audio for a loading clip', () => {

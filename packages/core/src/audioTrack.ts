@@ -62,6 +62,14 @@ function checkOptions(options: AudioTrackOptions): void {
   }
 }
 
+function decodeName(name: string): string {
+  try {
+    return decodeURIComponent(name);
+  } catch {
+    return name; // a malformed sequence keeps the raw name
+  }
+}
+
 function defaultName(src: ClipSource | undefined): string {
   const raw =
     typeof src === 'string'
@@ -69,24 +77,39 @@ function defaultName(src: ClipSource | undefined): string {
       : typeof File !== 'undefined' && src instanceof File
         ? src.name
         : '';
+  if (/^(data|blob):/i.test(raw)) return 'Untitled';
   const path = raw.split(/[?#]/)[0];
   const file = path.slice(path.lastIndexOf('/') + 1);
   const dot = file.lastIndexOf('.');
   const base = dot > 0 ? file.slice(0, dot) : file;
-  return base || 'Untitled';
+  return decodeName(base) || 'Untitled';
 }
 
-function checkAgainstAudio(
+/**
+ * Duration in seconds to build the clip with. An offset at or past the end of
+ * the audio throws; a duration that runs past the end is cut to it, with a
+ * warning. Compared in samples, with a tolerance of one sample.
+ */
+function fitToAudio(
+  name: string,
   offset: number,
   duration: number | undefined,
-  sourceSeconds: number
-): void {
-  if (offset >= sourceSeconds) {
+  sampleRate: number,
+  sourceSamples: number
+): number {
+  const offsetSamples = Math.round(offset * sampleRate);
+  if (offsetSamples >= sourceSamples) {
     throw new Error('audioTrack: offset is past the end of the audio');
   }
-  if (duration !== undefined && offset + duration > sourceSeconds) {
-    throw new Error('audioTrack: offset + duration is longer than the audio');
+  const remaining = sourceSamples - offsetSamples;
+  if (duration === undefined) return remaining / sampleRate;
+  const wanted = Math.round(duration * sampleRate);
+  if (offsetSamples + wanted > sourceSamples + 1) {
+    console.warn(
+      `[waveform-playlist] audioTrack: offset + duration of "${name}" runs past the end of the audio; the clip is cut to the end.`
+    );
   }
+  return Math.min(wanted, remaining) / sampleRate;
 }
 
 function buildLoadingClip(
@@ -117,14 +140,17 @@ function buildClip(options: AudioTrackOptions, name: string): AudioClip | Loadin
   if (!audioBuffer && !waveformData) {
     throw new Error('audioTrack: give src, audioBuffer or waveformData');
   }
-  const sourceSeconds = audioBuffer?.duration ?? waveformData?.duration ?? 0;
-  checkAgainstAudio(offset, duration, sourceSeconds);
+  // The same source length createClipFromSeconds records as sourceDurationSamples.
+  const sampleRate = audioBuffer?.sampleRate ?? waveformData?.sample_rate ?? 0;
+  const sourceSamples =
+    audioBuffer?.length ?? Math.ceil((waveformData?.duration ?? 0) * sampleRate);
+  const clipSeconds = fitToAudio(name, offset, duration, sampleRate, sourceSamples);
   const clip = createClipFromSeconds({
     audioBuffer,
     waveformData,
     startTime: start,
     offset,
-    duration: duration ?? sourceSeconds - offset,
+    duration: clipSeconds,
     name,
     gain: options.gain,
     fadeIn: options.fadeIn,

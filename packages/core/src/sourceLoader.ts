@@ -45,6 +45,8 @@ export function createSourceLoader<K, V>(options: {
 }): SourceLoader<K, V> {
   const { load } = options;
   const entries = new Map<K, Entry<V>>();
+  // Set by suspend(), cleared by setWanted(): while set, nothing may start a load.
+  let suspended = false;
   const { source, publish } = createValueSource<ReadonlyMap<K, SourceState<V>>>(new Map());
 
   const publishEntries = () => {
@@ -73,7 +75,8 @@ export function createSourceLoader<K, V>(options: {
 
     let promise: Promise<V>;
     try {
-      promise = load(key, controller.signal);
+      // A plain function that returns the value instead of a promise is accepted.
+      promise = Promise.resolve(load(key, controller.signal));
     } catch (err) {
       entries.set(key, { state: { status: 'failed', error: toError(err) }, token });
       return;
@@ -81,7 +84,8 @@ export function createSourceLoader<K, V>(options: {
     promise.then(
       (value) => settle({ status: 'loaded', value }),
       (err: unknown) => {
-        // Only an abort the loader made is ignored; a load's own AbortError is a failure.
+        // The token above is what ignores a late result. This line only tells the
+        // loader's own abort (ignored) from a load's own AbortError (a failure).
         if (controller.signal.aborted) return;
         settle({ status: 'failed', error: toError(err) });
       }
@@ -91,6 +95,7 @@ export function createSourceLoader<K, V>(options: {
   return {
     setWanted(keys) {
       const wanted = new Set(keys);
+      suspended = false;
       let changed = false;
       for (const [key, entry] of [...entries]) {
         if (wanted.has(key)) continue;
@@ -102,12 +107,14 @@ export function createSourceLoader<K, V>(options: {
         const entry = entries.get(key);
         if (entry && (entry.state.status !== 'pending' || entry.controller)) continue;
         start(key);
-        changed = true;
+        // Restarting a suspended key leaves it pending: nothing to publish unless it failed at once.
+        if (!entry || entries.get(key)?.state.status !== 'pending') changed = true;
       }
       if (changed) publishEntries();
     },
 
     suspend() {
+      suspended = true;
       for (const [key, entry] of [...entries]) {
         if (entry.state.status !== 'pending' || !entry.controller) continue;
         abort(entry);
@@ -125,7 +132,12 @@ export function createSourceLoader<K, V>(options: {
 
     retry(key) {
       if (entries.get(key)?.state.status !== 'failed') return;
-      start(key);
+      if (suspended) {
+        // Nothing would abort a load started now: wait for the next setWanted.
+        entries.set(key, { state: { status: 'pending' }, token: Symbol('suspended') });
+      } else {
+        start(key);
+      }
       publishEntries();
     },
 
