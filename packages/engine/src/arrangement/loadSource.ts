@@ -70,7 +70,11 @@ async function readBytes(
     // fetch reports a network failure or a refused cross-origin request as a
     // bare TypeError ("Failed to fetch", "Load failed"): say which source.
     if (error instanceof TypeError) {
-      throw Object.assign(new Error('Failed to fetch ' + label), { cause: error });
+      const failure = new Error('Failed to fetch ' + label);
+      // The browser's own message can quote the whole URL (Chromium does for
+      // one with credentials). It is kept as the cause only when the label
+      // left nothing of the source out.
+      throw label === src ? Object.assign(failure, { cause: error }) : failure;
     }
     throw error;
   }

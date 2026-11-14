@@ -122,7 +122,8 @@ export interface Arrangement {
   // loading
   /**
    * Where each source the clips name is: pending, loaded or failed (also a
-   * source whose clip could not be made from its audio). Read it with `getSnapshot()` or
+   * source of which a clip in the current tracks could not be made from its
+   * audio). Read it with `getSnapshot()` or
    * `subscribe()`; the same object until a status changes. When a source is
    * loaded, every loading clip that names it has become a loaded clip, in the
    * current tracks and in every undo and redo state; that is not an undo step.

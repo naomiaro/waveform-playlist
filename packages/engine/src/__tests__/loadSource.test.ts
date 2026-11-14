@@ -301,7 +301,7 @@ describe('defaultLoadSource', () => {
     it('a TypeError (network failure, CORS) becomes an Error that names the source and keeps the cause', async () => {
       const original = new TypeError('Failed to fetch');
       globalThis.fetch = vi.fn().mockRejectedValue(original) as never;
-      const error = (await defaultLoadSource('https://x/a.mp3?token=SECRET', ctx()).catch(
+      const error = (await defaultLoadSource('https://x/a.mp3', ctx()).catch(
         (e: Error) => e
       )) as Error & { cause?: unknown };
       expect(error).toBeInstanceOf(Error);
@@ -309,6 +309,29 @@ describe('defaultLoadSource', () => {
       expect(error.message).toBe('Failed to fetch https://x/a.mp3');
       expect(error.cause).toBe(original);
     });
+
+    // Chromium's own message for a URL with credentials quotes the whole URL
+    // ("Request cannot be constructed from a URL that includes credentials: …").
+    it.each([
+      ['a user name and password', 'https://alice:s3cret@x.example/a.mp3'],
+      ['a query string', 'https://x.example/a.mp3?token=SECRET'],
+      ['a fragment', 'https://x.example/a.mp3#access_token=SECRET'],
+      ['a data: URL', 'data:audio/wav;base64,AAAA'],
+    ])(
+      "when something was left out of the name (%s), the browser's error is not kept: it may quote the URL",
+      async (_name, src) => {
+        const original = new TypeError('Request cannot be constructed from a URL: ' + src);
+        globalThis.fetch = vi.fn().mockRejectedValue(original) as never;
+        const error = (await defaultLoadSource(src, ctx()).catch((e: Error) => e)) as Error & {
+          cause?: unknown;
+        };
+        expect(error.message).toMatch(/^Failed to fetch /);
+        expect('cause' in error).toBe(false);
+        expect(JSON.stringify([error.message, String(error.stack)])).not.toMatch(
+          /s3cret|SECRET|AAAA/
+        );
+      }
+    );
 
     it('an AbortError is left as it is', async () => {
       const abort = new DOMException('The operation was aborted.', 'AbortError');

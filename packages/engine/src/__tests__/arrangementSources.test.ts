@@ -570,13 +570,39 @@ describe('a clip that cannot be made, and a source that fails', () => {
     expect(isLoaded(clipOf(arrangement, 'A', 'bad'))).toBe(false);
     expect(statusOf(arrangement, 'a.opus')).toBe('failed');
 
-    // When the unusable clip is gone, so is the failure.
+    // When the unusable clip is gone from the CURRENT tracks, so is the failure:
+    // an undo step that still holds the clip does not count.
     arrangement.updateTrack('A', (current) => ({
       ...current,
       clips: current.clips.filter((c) => c.id !== 'bad'),
     }));
-    arrangement.clearHistory();
+    expect(arrangement.canUndo).toBe(true);
     expect(statusOf(arrangement, 'a.opus')).toBe('loaded');
+    expect(arrangement.sources.getSnapshot().failedCount).toBe(0);
+
+    // The undo brings the clip back, and its failure with it.
+    arrangement.undo();
+    expect(isLoaded(clipOf(arrangement, 'A', 'bad'))).toBe(false);
+    expect(statusOf(arrangement, 'a.opus')).toBe('failed');
+    arrangement.redo();
+    expect(statusOf(arrangement, 'a.opus')).toBe('loaded');
+  });
+
+  it('a clip that cannot be made and is only in a stored state does not fail its source', async () => {
+    const { arrangement, loads } = await setup([
+      track('A', [loading('ok', 'a.opus')]),
+      track('B', [loading('bad', 'a.opus', 0, { offset: 60 })]),
+    ]);
+    arrangement.removeTrack('B');
+    loads.calls[0].resolve(fakeBuffer(4));
+    await flush();
+    expect(statusOf(arrangement, 'a.opus')).toBe('loaded');
+
+    arrangement.undo();
+    expect(statusOf(arrangement, 'a.opus')).toBe('failed');
+    expect(arrangement.sources.getSnapshot().sources.get('a.opus')?.error?.message).toBe(
+      'clip "bad": offset is at or past the end of the audio'
+    );
   });
 
   it('a failure whose reason changes is a new value', async () => {

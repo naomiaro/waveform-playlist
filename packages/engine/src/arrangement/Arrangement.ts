@@ -690,15 +690,15 @@ export class ArrangementImpl implements Arrangement {
    * the current tracks from before, or null when they did not change.
    */
   private _switchLoaded(): readonly ArrangementTrack[] | null {
-    const apply = this._sources.beginPass((startSample) => this._tickAt(startSample));
+    const pass = this._sources.beginPass((startSample) => this._tickAt(startSample));
     const previous = this._tracks;
-    this._tracks = apply(previous);
+    this._tracks = pass.current(previous);
     this._history = {
-      undo: this._history.undo.map(apply),
-      redo: this._history.redo.map(apply),
+      undo: this._history.undo.map(pass.stored),
+      redo: this._history.redo.map(pass.stored),
     };
     if (this._transaction) {
-      this._transaction = { ...this._transaction, tracks: apply(this._transaction.tracks) };
+      this._transaction = { ...this._transaction, tracks: pass.stored(this._transaction.tracks) };
     }
     return this._tracks === previous ? null : previous;
   }

@@ -91,7 +91,7 @@ export class ArrangementSources {
     { buffer: AudioBuffer; result: ResolvedLoadingClip }
   >();
   private _wanted: ReadonlySet<ClipSource> = new Set();
-  /** Per source, the reason its clip could not be made (found by the last `apply`). */
+  /** Per source, the reason a clip of the CURRENT tracks could not be made (found by the last pass). */
   private _unusable: ReadonlyMap<ClipSource, string> = new Map();
   private _getContext: (() => Promise<BaseAudioContext>) | null = null;
   private _attached = deferred();
@@ -188,26 +188,35 @@ export class ArrangementSources {
   }
 
   /**
-   * A function that replaces, in a tracks array, every loading clip whose
-   * source is loaded with its loaded clip. It remembers each track it has
-   * seen, so states that shared a track object go on sharing one, and it
-   * returns the same array when nothing in it changed. Use one function for
-   * all the states of one pass, then `finishPass()`.
+   * One pass over every state: two functions that replace, in a tracks
+   * array, every loading clip whose source is loaded with its loaded clip.
+   * They remember each track they have seen, so states that shared a track
+   * object go on sharing one, and they return the same array when nothing in
+   * it changed. Call `current` with the current tracks FIRST, then `stored`
+   * for each stored state, then `finishPass()`.
+   *
+   * A clip that cannot be made fails its source only while it is in the
+   * current tracks: one that only an undo or redo state holds is not
+   * something the app can see or mend.
    *
    * @param tickAt the tick of a sample position (undefined without an engine)
    */
-  beginPass(tickAt: (startSample: number) => number | undefined): (tracks: Tracks) => Tracks {
+  beginPass(tickAt: (startSample: number) => number | undefined): {
+    current(tracks: Tracks): Tracks;
+    stored(tracks: Tracks): Tracks;
+  } {
     const loaded = this._loader.getSnapshot();
     const unusable = new Map<ClipSource, string>();
     this._unusable = unusable;
     const seen = new Map<ArrangementTrack, ArrangementTrack>();
+    let inCurrentTracks = false;
 
     const switched = (clip: LoadingClip): AudioClip | LoadingClip => {
       const state = loaded.get(clip.src);
       if (state?.status !== 'loaded') return clip;
       const result = this._resolve(clip, state.value, tickAt);
       if ('clip' in result) return result.clip;
-      if (!unusable.has(clip.src)) unusable.set(clip.src, result.unusable);
+      if (inCurrentTracks && !unusable.has(clip.src)) unusable.set(clip.src, result.unusable);
       return clip;
     };
 
@@ -223,9 +232,20 @@ export class ArrangementSources {
       return next;
     };
 
-    return (tracks) => {
+    const apply = (tracks: Tracks): Tracks => {
       const next = tracks.map(mapTrack);
       return next.some((track, i) => track !== tracks[i]) ? next : tracks;
+    };
+    return {
+      current: (tracks) => {
+        inCurrentTracks = true;
+        try {
+          return apply(tracks);
+        } finally {
+          inCurrentTracks = false;
+        }
+      },
+      stored: (tracks) => apply(tracks),
     };
   }
 
