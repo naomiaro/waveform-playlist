@@ -93,7 +93,8 @@ const trackConfigs = [
   },
   {
     name: 'Bass',
-    clips: [{ fileId: 'bass', startTime: 0, duration: 20, offset: 0 }],
+    // The whole file: it decodes to 16.645 s (48 kHz), so the clip ends with it.
+    clips: [{ fileId: 'bass', startTime: 0, duration: 16.64, offset: 0 }],
   },
   {
     name: 'Synth 1',

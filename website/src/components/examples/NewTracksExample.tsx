@@ -30,8 +30,9 @@ import {
   WaveformViewOptions,
   usePlaylistSources,
 } from '@waveform-playlist/browser';
-import { audioTrack, type ClipSource, type PlaylistTrack } from '@waveform-playlist/core';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { RemoveFailedDrops, FailedDropsAlert, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 import { FileDropZone } from '../FileDropZone';
 
 const Container = styled.div`
@@ -73,13 +74,6 @@ const StyledDropZone = styled(FileDropZone)`
   margin-bottom: 1.5rem;
 `;
 
-const sourceName = (src: ClipSource): string =>
-  typeof File !== 'undefined' && src instanceof File
-    ? src.name.replace(/\.[^/.]+$/, '')
-    : typeof src === 'string'
-      ? src.split('/').pop()?.replace(/\.[^/.]+$/, '') ?? 'Untitled'
-      : 'Untitled';
-
 interface TrackDropZoneProps {
   onFiles: (files: File[]) => void;
   /** Files still decoding (0 outside the provider: nothing is loading there). */
@@ -109,37 +103,21 @@ const TrackDropZone: React.FC<TrackDropZoneProps> = ({ onFiles, loadingCount = 0
 );
 
 // Inside the provider: the drop zone with the number of files still decoding,
-// and the files that failed, both from the provider's source status.
+// from the provider's source status.
 const DropZoneWithStatus: React.FC<{ onFiles: (files: File[]) => void }> = ({ onFiles }) => {
-  const { sources, pendingCount } = usePlaylistSources();
-  const failed = [...sources].filter(([, entry]) => entry.status === 'failed');
-  return (
-    <>
-      <TrackDropZone onFiles={onFiles} loadingCount={pendingCount} />
-
-      {failed.length > 0 && (
-        <div role="alert" style={{
-          padding: '0.75rem 1rem',
-          marginBottom: '1rem',
-          background: 'var(--ifm-color-danger-contrast-background, #fdf0ef)',
-          border: '1px solid var(--ifm-color-danger-dark, #c0392b)',
-          borderRadius: '0.5rem',
-          color: 'var(--ifm-color-danger-darkest, #7f1d1d)',
-          fontSize: '0.875rem',
-        }}>
-          {failed.map(([src, entry], i) => (
-            <div key={i}>Failed to load &quot;{sourceName(src)}&quot;: {entry.error?.message}</div>
-          ))}
-        </div>
-      )}
-    </>
-  );
+  const { pendingCount } = usePlaylistSources();
+  return <TrackDropZone onFiles={onFiles} loadingCount={pendingCount} />;
 };
 
 export function NewTracksExample() {
   const { theme } = useDocusaurusTheme();
   // One track per dropped file; the provider loads each one.
   const [tracks, setTracks] = useState<PlaylistTrack[]>([]);
+  // Files that could not be decoded: their tracks are removed, the list stays.
+  const [failures, setFailures] = useState<FailedDrop[]>([]);
+  const handleFailed = useCallback((failure: FailedDrop) => {
+    setFailures((prev) => [...prev, failure]);
+  }, []);
 
   const handleFiles = useCallback((files: File[]) => {
     const audioFiles = files.filter((file) => file.type.startsWith('audio/'));
@@ -154,7 +132,12 @@ export function NewTracksExample() {
 
   return (
     <Container>
-      {tracks.length === 0 && <TrackDropZone onFiles={handleFiles} />}
+      {tracks.length === 0 && (
+        <>
+          <TrackDropZone onFiles={handleFiles} />
+          <FailedDropsAlert failures={failures} />
+        </>
+      )}
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
@@ -167,7 +150,9 @@ export function NewTracksExample() {
           automaticScroll={true}
           theme={theme}
         >
+          <RemoveFailedDrops setTracks={setTracks} onFailed={handleFailed} />
           <DropZoneWithStatus onFiles={handleFiles} />
+          <FailedDropsAlert failures={failures} />
 
           <Controls>
             <ControlGroup>

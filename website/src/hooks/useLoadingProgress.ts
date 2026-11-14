@@ -6,7 +6,12 @@ export interface LoadingProgress {
   /** Every source the tracks name. */
   totalCount: number;
   isLoading: boolean;
-  /** The message of the first source that failed, or null. */
+  /**
+   * The message of the first URL source that failed, or null. It is the
+   * error's message as it is, shown verbatim on the page: an app with its own
+   * `loadSource` must not put a URL with a token in its errors. A dropped file
+   * that fails is not counted here: `useRemoveFailedDrops` removes and lists it.
+   */
   errorMessage: string | null;
 }
 
@@ -17,8 +22,8 @@ export interface LoadingProgress {
 export function useLoadingProgress(): LoadingProgress {
   const { sources, pendingCount, isLoading } = usePlaylistSources();
   let errorMessage: string | null = null;
-  for (const entry of sources.values()) {
-    if (entry.status === 'failed') {
+  for (const [src, entry] of sources) {
+    if (entry.status === 'failed' && typeof src === 'string') {
       errorMessage = entry.error?.message ?? 'unknown error';
       break;
     }

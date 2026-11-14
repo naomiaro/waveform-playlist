@@ -143,12 +143,13 @@ function AudioError() {
  * WaveformData Example
  *
  * Demonstrates fully progressive loading with BBC pre-computed peaks.
- * Each track appears as soon as its peaks load (~50KB), then audio
- * loads in the background (~3MB). No waiting for all tracks!
+ * Each track appears once its peaks (~50KB) and those of every track listed
+ * before it have loaded (tracks keep the config order), then its audio loads
+ * in the background (~3MB). No waiting for all the audio!
  *
  * Key features demonstrated:
- * - Progressive peaks: each track appears as its peaks file loads
- * - Progressive audio: tracks become playable as audio loads
+ * - Progressive peaks: tracks appear in config order as their peaks files load
+ * - Progressive audio: each track becomes playable when its own audio has decoded
  * - usePlaylistSources(): real-time progress tracking
  */
 export function WaveformDataExample() {
@@ -211,23 +212,23 @@ export function WaveformDataExample() {
         automaticScroll
         theme={theme}
       >
-      <AudioError />
-      <StatsContainer>
-        <StatBox $variant="peaks">
-          <strong>{totalPeaksSize} KB</strong>
-          <span>BBC Peaks (8-bit)</span>
-        </StatBox>
-        <StatBox $variant="audio">
-          <strong>{(totalAudioSize / 1000).toFixed(1)} MB</strong>
-          <span>Full Audio</span>
-        </StatBox>
-        <StatBox>
-          <strong>{Math.round(totalAudioSize / totalPeaksSize)}x</strong>
-          <span>smaller</span>
-        </StatBox>
-        {/* Show loading progress from the provider's source status */}
-        <AudioProgressStat />
-      </StatsContainer>
+        <AudioError />
+        <StatsContainer>
+          <StatBox $variant="peaks">
+            <strong>{totalPeaksSize} KB</strong>
+            <span>BBC Peaks (8-bit)</span>
+          </StatBox>
+          <StatBox $variant="audio">
+            <strong>{(totalAudioSize / 1000).toFixed(1)} MB</strong>
+            <span>Full Audio</span>
+          </StatBox>
+          <StatBox>
+            <strong>{Math.round(totalAudioSize / totalPeaksSize)}x</strong>
+            <span>smaller</span>
+          </StatBox>
+          {/* Show loading progress from the provider's source status */}
+          <AudioProgressStat />
+        </StatsContainer>
 
         <Controls>
           <ControlGroup>

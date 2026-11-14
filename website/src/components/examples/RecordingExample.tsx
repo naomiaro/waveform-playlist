@@ -6,7 +6,7 @@
  * - Multiple track recording
  * - Drag & drop audio file import
  * - VU meter for input level monitoring
- * - Recording starts from max(cursor position, last clip end)
+ * - Recording starts at the cursor and replaces what it records over (punch-in)
  * - Auto-scroll keeps recording in view
  */
 
@@ -65,6 +65,7 @@ import { SegmentedVUMeter, BaseControlButton } from '@waveform-playlist/ui-compo
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';
 import { FileDropZone } from '../FileDropZone';
+import { RemoveFailedDrops, failedDropText, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -533,6 +534,12 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     return recordingProgress.subscribe(follow);
   }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, scrollContainerRef]);
 
+  // Dropped files that could not be decoded: their tracks are removed, the list stays.
+  const [failedDrops, setFailedDrops] = useState<FailedDrop[]>([]);
+  const handleFailedDrop = useCallback((failure: FailedDrop) => {
+    setFailedDrops((prev) => [...prev, failure]);
+  }, []);
+
   // Handle dropped/selected audio files: one track per file, loaded by the provider
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -589,6 +596,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   return (
     <>
       <KeyboardShortcuts additionalShortcuts={allShortcuts} />
+      <RemoveFailedDrops setTracks={setTracks} onFailed={handleFailedDrop} />
       {error && (
         <ErrorBanner>
           <Text size="2" color="red">
@@ -596,6 +604,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           </Text>
         </ErrorBanner>
       )}
+      {failedDrops.map((failure, i) => (
+        <ErrorBanner key={i}>
+          <Text size="2" color="red">
+            Error: {failedDropText(failure)}
+          </Text>
+        </ErrorBanner>
+      ))}
 
       {/* DAW Toolbar — single row */}
       <Toolbar>

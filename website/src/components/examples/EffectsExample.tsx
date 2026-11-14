@@ -49,6 +49,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { useLoadingProgress } from '../../hooks/useLoadingProgress';
+import { RemoveFailedDrops, failedDropText, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 import { EffectRack, TrackEffectControls } from '../effects';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 
@@ -354,6 +355,8 @@ interface EffectsControlsProps {
   isDarkMode: boolean;
   onDeleteTrack: (trackId: string) => void;
   onAddTracks: (newTracks: PlaylistTrack[]) => void;
+  /** Dropped files that could not be decoded (their tracks are removed). */
+  failedDrops: FailedDrop[];
   masterEffectsFunction: any;
   trackCount: number;
   createOfflineMasterEffects: () => any;
@@ -370,6 +373,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   trackCount,
   createOfflineMasterEffects,
   tracks,
+  failedDrops,
 }) => {
   const { isLoading, settledCount, totalCount, errorMessage } = useLoadingProgress();
   // Export options state
@@ -457,6 +461,9 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
           {errorMessage && <span style={{ fontSize: '0.875rem', color: 'red' }}>Error loading audio: {errorMessage}</span>}
+          {failedDrops.map((failure, i) => (
+            <span key={i} style={{ fontSize: '0.875rem', color: 'red' }}>{failedDropText(failure)}</span>
+          ))}
           {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {settledCount}/{totalCount}</span>}
         </ControlsRow>
         <VisualizerWrapper>
@@ -645,6 +652,12 @@ export function EffectsExample() {
     setTracks(prevTracks => prevTracks.filter((track) => track.id !== trackId));
   }, [clearTrackEffects]);
 
+  // Dropped files that could not be decoded: their tracks are removed, the list stays.
+  const [failedDrops, setFailedDrops] = useState<FailedDrop[]>([]);
+  const handleFailedDrop = useCallback((failure: FailedDrop) => {
+    setFailedDrops((prev) => [...prev, failure]);
+  }, []);
+
   // Handle add tracks
   const handleAddTracks = useCallback((newTracks: PlaylistTrack[]) => {
     setTracks(prevTracks => [...prevTracks, ...newTracks]);
@@ -666,6 +679,7 @@ export function EffectsExample() {
         effects={masterEffects}
       >
         <KeyboardShortcuts playback />
+        <RemoveFailedDrops setTracks={setTracks} onFailed={handleFailedDrop} />
         <EffectsControls
           analyserRef={analyserRef}
           trackEffectsManager={trackEffectsManager}
@@ -676,6 +690,7 @@ export function EffectsExample() {
           trackCount={tracks.length}
           createOfflineMasterEffects={createOfflineEffectsFunction}
           tracks={tracks}
+          failedDrops={failedDrops}
         />
       </WaveformPlaylistProvider>
     </Container>

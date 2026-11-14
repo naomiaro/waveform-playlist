@@ -35,6 +35,7 @@ import type { MidiTrackConfig } from '@waveform-playlist/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
+import { RemoveFailedDrops, failedDropText, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 
 const darkThemeOverrides: Partial<WaveformPlaylistTheme> = {
   waveformDrawMode: 'inverted',
@@ -323,6 +324,12 @@ export function MidiExample() {
     setUserMidiConfigs((prev) => [...prev, ...newConfigs]);
   }, []);
 
+  // Audio files that could not be decoded: their tracks are removed, the list stays.
+  const [failedDrops, setFailedDrops] = React.useState<FailedDrop[]>([]);
+  const handleFailedDrop = React.useCallback((failure: FailedDrop) => {
+    setFailedDrops((prev) => [...prev, failure]);
+  }, []);
+
   // One track per audio file; the provider loads it.
   const addAudioFiles = React.useCallback((files: File[]) => {
     setUserAudioTracks((prev) => [...prev, ...files.map((file) => audioTrack({ src: file }))]);
@@ -399,6 +406,9 @@ export function MidiExample() {
             : 'MIDI tracks are synthesized in the browser using Tone.js PolySynth. Notes may be dropped when exceeding the polyphony limit.'}
         {filteredTracks.length > 0 &&
           ` Showing ${filteredTracks.length} individual MIDI track${filteredTracks.length !== 1 ? 's' : ''}.`}
+        {failedDrops.map((failure, i) => (
+          <div key={i} style={{ color: 'red' }}>{failedDropText(failure)}</div>
+        ))}
       </InfoBanner>
 
       {filteredTracks.length > 0 ? (
@@ -413,6 +423,7 @@ export function MidiExample() {
           automaticScroll
         >
           <KeyboardShortcuts playback />
+          <RemoveFailedDrops setTracks={setUserAudioTracks} onFailed={handleFailedDrop} />
           <Controls>
             <PlayButton />
             <PauseButton />

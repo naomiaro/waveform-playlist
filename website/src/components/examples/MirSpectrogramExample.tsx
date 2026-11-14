@@ -28,6 +28,7 @@ import { audioTrack, type SpectrogramConfig, type RenderMode, type PlaylistTrack
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { useLoadingProgress } from '../../hooks/useLoadingProgress';
+import { RemoveFailedDrops, failedDropText, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 import { FileDropZone } from '../FileDropZone';
 
 const Container = styled.div`
@@ -116,6 +117,12 @@ export function MirSpectrogramExample() {
     setTracks([]);
   }, []);
 
+  // Dropped files that could not be decoded: their tracks are removed, the list stays.
+  const [failures, setFailures] = useState<FailedDrop[]>([]);
+  const handleFailed = useCallback((failure: FailedDrop) => {
+    setFailures((prev) => [...prev, failure]);
+  }, []);
+
   // One track per dropped file; the provider loads it.
   const handleFiles = useCallback((files: File[]) => {
     const audioFiles = files.filter(f => f.type.startsWith('audio/'));
@@ -132,6 +139,10 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
+      {failures.map((failure, i) => (
+        <div key={i}>Error: {failedDropText(failure)}</div>
+      ))}
+
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
           tracks={tracks}
@@ -144,6 +155,7 @@ export function MirSpectrogramExample() {
         >
           <SpectrogramProvider colorMap="viridis">
           <LoadingNotice />
+          <RemoveFailedDrops setTracks={setTracks} onFailed={handleFailed} />
           <KeyboardShortcuts playback />
           <ControlBar>
             <RewindButton />

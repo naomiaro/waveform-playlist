@@ -47,6 +47,7 @@ import {
 } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { useLoadingProgress } from '../../hooks/useLoadingProgress';
+import { RemoveFailedDrops, failedDropText, type FailedDrop } from '../../hooks/useRemoveFailedDrops';
 import { sonnetNotes as defaultNotes } from './sonnetAnnotations';
 
 
@@ -203,19 +204,33 @@ const SuccessButton = styled(ActionButton)`
   /* Same as ActionButton - no special styling */
 `;
 
-// The drop zone, showing "Loading audio..." while a source loads. A component
-// of its own so that a source settling does not render the page.
-const AudioDropZone: React.FC<{ onFiles: (files: File[]) => void }> = ({ onFiles }) => {
+// The drop zone, showing "Loading audio..." while a source loads, and the
+// dropped files that could not be decoded (their tracks are removed again). A
+// component of its own so that a source settling does not render the page.
+const AudioDropZone: React.FC<{
+  onFiles: (files: File[]) => void;
+  setTracks: React.Dispatch<React.SetStateAction<PlaylistTrack[]>>;
+}> = ({ onFiles, setTracks }) => {
   const { isLoading } = useLoadingProgress();
+  const [failures, setFailures] = useState<FailedDrop[]>([]);
+  const handleFailed = useCallback((failure: FailedDrop) => {
+    setFailures((prev) => [...prev, failure]);
+  }, []);
   return (
-    <FileDropZone
-      accept="audio/*"
-      onFiles={onFiles}
-      fileFilter={(f) => f.type.startsWith('audio/')}
-      label="Drop audio files here or click to browse"
-      dragLabel="Drop audio files here"
-      loadingContent={isLoading ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined}
-    />
+    <>
+      <RemoveFailedDrops setTracks={setTracks} onFailed={handleFailed} />
+      <FileDropZone
+        accept="audio/*"
+        onFiles={onFiles}
+        fileFilter={(f) => f.type.startsWith('audio/')}
+        label="Drop audio files here or click to browse"
+        dragLabel="Drop audio files here"
+        loadingContent={isLoading ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined}
+      />
+      {failures.map((failure, i) => (
+        <p key={i} style={{ margin: '0.5rem 0 0', color: 'red' }}>Error: {failedDropText(failure)}</p>
+      ))}
+    </>
   );
 };
 
@@ -421,7 +436,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
       <Container>
         <KeyboardShortcuts playback annotations />
         {/* Drop Zone for Audio */}
-        <AudioDropZone onFiles={handleFiles} />
+        <AudioDropZone onFiles={handleFiles} setTracks={onTracksChange} />
 
         <TopBar>
           <ControlGroup>
@@ -537,6 +552,7 @@ export function AnnotationsExample() {
   return (
     <WaveformPlaylistProvider
       tracks={tracks}
+      onTracksChange={setTracks}
       sampleRate={48000}
       samplesPerPixel={1024}
       mono
