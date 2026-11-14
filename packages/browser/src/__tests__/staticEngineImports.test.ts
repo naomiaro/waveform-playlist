@@ -41,6 +41,7 @@ const FILES = [
   'index.tsx',
   'soundFontSync.ts',
   'hooks/useAnnotationDragHandlers.ts',
+  'utils/resolveTracks.ts',
 ];
 
 const FORBIDDEN = [
