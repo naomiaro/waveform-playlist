@@ -284,7 +284,8 @@ export interface CreateClipOptions {
   /** MIDI channel (0-indexed). Channel 9 = GM percussion. */
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
-  midiProgram?: number /** The source this clip was loaded from — passed through to the created AudioClip */;
+  midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
   src?: ClipSource;
 }
 
@@ -317,7 +318,8 @@ export interface CreateClipOptionsSeconds {
   /** MIDI channel (0-indexed). Channel 9 = GM percussion. */
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
-  midiProgram?: number /** The source this clip was loaded from — passed through to the created AudioClip */;
+  midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
   src?: ClipSource;
 }
 

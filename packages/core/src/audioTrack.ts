@@ -42,8 +42,9 @@ export interface AudioTrackOptions {
   spectrogramColorMap?: ColorMapValue;
 }
 
+// A copy of the private generateId in types/clip.ts (same id format).
 function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
 function checkNonNegative(name: string, value: number | undefined): void {
@@ -62,7 +63,12 @@ function checkOptions(options: AudioTrackOptions): void {
 }
 
 function defaultName(src: ClipSource | undefined): string {
-  const raw = typeof src === 'string' ? src : src instanceof File ? src.name : '';
+  const raw =
+    typeof src === 'string'
+      ? src
+      : typeof File !== 'undefined' && src instanceof File
+        ? src.name
+        : '';
   const path = raw.split(/[?#]/)[0];
   const file = path.slice(path.lastIndexOf('/') + 1);
   const dot = file.lastIndexOf('.');
@@ -70,34 +76,50 @@ function defaultName(src: ClipSource | undefined): string {
   return base || 'Untitled';
 }
 
-function buildClip(options: AudioTrackOptions): AudioClip | LoadingClip {
-  const { src, audioBuffer, waveformData, start = 0, offset = 0, duration } = options;
-  const id = options.clipId || generateId();
-  if (src !== undefined && !audioBuffer) {
-    const clip: LoadingClip = {
-      id,
-      src,
-      start,
-      offset,
-      duration,
-      gain: options.gain,
-      fadeIn: options.fadeIn,
-      fadeOut: options.fadeOut,
-      color: options.color,
-      waveformData,
-    };
-    return clip;
+function checkAgainstAudio(
+  offset: number,
+  duration: number | undefined,
+  sourceSeconds: number
+): void {
+  if (offset >= sourceSeconds) {
+    throw new Error('audioTrack: offset is past the end of the audio');
   }
+  if (duration !== undefined && offset + duration > sourceSeconds) {
+    throw new Error('audioTrack: offset + duration is longer than the audio');
+  }
+}
+
+function buildLoadingClip(id: string, src: ClipSource, options: AudioTrackOptions): LoadingClip {
+  const given = {
+    start: options.start,
+    duration: options.duration,
+    offset: options.offset,
+    gain: options.gain,
+    fadeIn: options.fadeIn,
+    fadeOut: options.fadeOut,
+    color: options.color,
+    waveformData: options.waveformData,
+  };
+  const present = Object.entries(given).filter(([, value]) => value !== undefined);
+  return { id, src, ...Object.fromEntries(present) };
+}
+
+function buildClip(options: AudioTrackOptions): AudioClip | LoadingClip {
+  const { audioBuffer, waveformData, start = 0, offset = 0, duration } = options;
+  const src = options.src || undefined; // '' counts as none
+  const id = options.clipId || generateId();
+  if (src !== undefined && !audioBuffer) return buildLoadingClip(id, src, options);
   if (!audioBuffer && !waveformData) {
     throw new Error('audioTrack: give src, audioBuffer or waveformData');
   }
   const sourceSeconds = audioBuffer?.duration ?? waveformData?.duration ?? 0;
+  checkAgainstAudio(offset, duration, sourceSeconds);
   const clip = createClipFromSeconds({
     audioBuffer,
     waveformData,
     startTime: start,
     offset,
-    duration: duration ?? Math.max(sourceSeconds - offset, 0),
+    duration: duration ?? sourceSeconds - offset,
     gain: options.gain,
     fadeIn: options.fadeIn,
     fadeOut: options.fadeOut,
@@ -123,6 +145,7 @@ export function audioTrack(options: AudioTrackOptions): PlaylistTrack {
     pan: options.pan,
     spectrogramConfig: options.spectrogramConfig,
     spectrogramColorMap: options.spectrogramColorMap,
+    color: options.color,
   });
   const track: PlaylistTrack = {
     ...base,

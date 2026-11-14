@@ -686,7 +686,8 @@ interface AudioTrackOptions {
   id?: string; clipId?: string; name?: string;   // '' counts as none; name defaults to the file name of src, else 'Untitled'
   src?: ClipSource; audioBuffer?: AudioBuffer; waveformData?: WaveformDataObject;
   start?: number; duration?: number; offset?: number;   // Seconds
-  fadeIn?: Fade; fadeOut?: Fade; gain?: number; color?: string;
+  fadeIn?: Fade; fadeOut?: Fade; gain?: number;
+  color?: string;                       // On the track and on the clip
   muted?: boolean; soloed?: boolean; volume?: number; pan?: number;
   renderMode?: RenderMode; spectrogramConfig?: SpectrogramConfig; spectrogramColorMap?: ColorMapValue;
 }
@@ -695,6 +696,8 @@ audioTrack(options: AudioTrackOptions): PlaylistTrack;
 // src alone: one LoadingClip. audioBuffer or waveformData (with or without src): one AudioClip.
 // None of the three: throws 'audioTrack: give src, audioBuffer or waveformData'.
 // A negative or non-finite start or offset, or a duration that is not positive and finite, throws.
+// With audioBuffer or waveformData, an offset at or past the end of the audio, or offset + duration longer than it, throws.
+// src: '' counts as not given.
 ```
 
 A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console warning, and the playlist stays in its loading state until `tracks` is valid. Always pass `onError`.
