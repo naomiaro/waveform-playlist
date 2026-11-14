@@ -84,7 +84,7 @@ What is wrong is who holds the tracks around it:
 - Keeping the engine alive across a hidden `<Activity>` (#842). The document,
   its loaded buffers AND its undo history do survive, which removes most of
   what #842 lists.
-- Serializable tracks (#836), a source timeout (#840), undoable mixer moves.
+- Serializable tracks (#836), a source timeout (#840), undoable mixer moves (#843).
 - Fixing #841 (a reschedule that clicks) and #838 (splitting a MIDI clip).
 
 ## Anti-goals
@@ -114,6 +114,14 @@ What is wrong is who holds the tracks around it:
 ## Decided by the maintainer
 
 - The document (2026-11-13), and the rule.
+- **Structure-only undo** (2026-11-13): mixer values are owned by the
+  document, they are not undo steps (as today), and an undo or redo restores
+  structure and keeps each track's current mixer values. No user-facing
+  ability is removed: mixer moves are not undoable today; what goes is the
+  side effect that a snapshot captures the mix (`PlaylistEngine.ts:852-854`),
+  so that undoing a clip edit can put old values back into the engine (audible
+  with the native transport, whose `updateTrack` applies them). Mixer moves as
+  real undo steps, one per gesture, are #843.
 - Carried over: a source added while the engine runs does not stop it; an
   arriving clip is applied in place whatever its position; no source timeout;
   a loading clip on a MIDI track is reported and never fetched; a dropped file
@@ -123,37 +131,32 @@ What is wrong is who holds the tracks around it:
 
 ## My calls (for the maintainer to confirm or change)
 
-1. **Mixer values are owned by the document.** They are not undo steps (as
-   today), and an undo or redo no longer changes them: it restores structure
-   and keeps each track's current mixer values. (Today a snapshot captures
-   them, so an undo can put old values back into the engine;
-   `PlaylistEngine.ts:852-854`.)
-2. **Arriving audio is not an undo step and never clears the history.** It is
+1. **Arriving audio is not an undo step and never clears the history.** It is
    written into the current tracks and into every snapshot the history holds.
    This reverses "arriving audio clears undo" from the first design and closes
    #837, because with one owner it is the simpler behaviour to build.
-3. **A gesture is the document's transaction.** A trim changes the document on
+2. **A gesture is the document's transaction.** A trim changes the document on
    every pointer move inside an open transaction; the engine does not push
    track changes to the adapter while one is open, and pushes the net change
    at commit. `isDraggingRef`, the drag flag and previewing through app state
    go away. (This makes the earlier `isDraggingRef` choice moot: the ref is
    removed from `useEngineRefs()`.)
-4. **The engine is built at once; "ready" waits for the first sources.** There
+3. **The engine is built at once; "ready" waits for the first sources.** There
    is no first-load wait in front of the engine build any more. `isReady`,
    `waveform-playlist:ready` and `onReady` happen when the engine exists AND
    every source named at that moment has settled; Play does nothing before.
    What a user sees is what was decided (one "ready", rows shown while
    loading); what changes is that clips reach the adapter as they load.
-5. **Track changes never rebuild the engine.** Adding, removing and updating a
+4. **Track changes never rebuild the engine.** Adding, removing and updating a
    track are adapter calls, as dawcore already makes them. A full rebuild is
    left for what it is needed for: a new adapter (effects, sample rate,
    `createAdapter`).
-6. **Loading clips cannot be edited** (moved, trimmed, split) until they have
+5. **Loading clips cannot be edited** (moved, trimmed, split) until they have
    loaded; the operations refuse them as they refuse an unknown clip.
-7. **Names:** `PlaylistDocument`, `createPlaylistDocument`, the provider prop
+6. **Names:** `PlaylistDocument`, `createPlaylistDocument`, the provider prop
    `playlist`, `useCreatePlaylist(init)` to make one for a component and
    `usePlaylist()` to read the provider's.
-8. The document lives in `@waveform-playlist/engine` (the operations are
+7. The document lives in `@waveform-playlist/engine` (the operations are
    there, and dawcore already depends on it). `LoadSource`,
    `defaultLoadSource` and the sources value type move there from browser.
 
@@ -340,7 +343,7 @@ const playlist = useCreatePlaylist(() => [audioTrack({ src: 'a.mp3', name: 'A' }
   provider mounts and when something that needs a new adapter changes, and
   disposes them in its cleanup. The #675 rules (no disposed engine reachable,
   a queued play starts on the new engine) stay as they are.
-- **Ready** (call 4): `isReady` is true when an engine is attached and no
+- **Ready** (call 3): `isReady` is true when an engine is attached and no
   source the document names is pending. It turns true once per engine build;
   sources named later do not turn it false.
 - The view derives from `playlist` through `useSyncExternalStore`: the tracks
@@ -435,7 +438,7 @@ Branch `feat/812-2-provider-resolution` (not pushed).
 | `incrementalTrackChange`, `mergeLoadingClips`, `unappliedClips`, `useMergedTracksChange`, `useSourceLoading`, `useEarlyAdapter`, `useDragFlag`, the echo suppression | go |
 | `useDisposeEngineOnUnmount`, the duplicate-id warning (moves to the document), `useReportRejectedClips` | kept |
 | `usePlaylistSources()` and its context | kept, fed by the document |
-| placeholders not editable (`ClipPeaks.isPlaceholder`, `Clip`'s prop, export, controls) | kept; split's skip moves into the document's rule 6 |
+| placeholders not editable (`ClipPeaks.isPlaceholder`, `Clip`'s prop, export, controls) | kept; split's skip moves into the document's call 5 |
 | removal of the two hooks; the converted pages, stories, starter | kept; each page swaps `useState` and two props for a document |
 | recording's index rule for loading clips | goes (a take is added through the document) |
 | the provider tests | the first-load, arrival, failure, retry, unmount, StrictMode and `<Activity>` cases are re-expressed over a document; the guard, seed and merge cases go |
@@ -487,7 +490,7 @@ Branch `feat/812-2-provider-resolution` (not pushed).
 
 ## Open, for the maintainer
 
-- "My calls" 1 to 8.
+- "My calls" 1 to 7.
 - Whether one document may be attached to two engines at once (a React
   provider and a `<daw-editor>` on one page). Not built here; nothing in the
   interface assumes one attacher beyond the warning.
