@@ -129,6 +129,52 @@ export interface AudioClip {
 
   /** MIDI program number (0-127). GM instrument number for SoundFont playback. */
   midiProgram?: number;
+
+  /** The source this clip's audio came from (a URL, Blob or File), when it is known. */
+  src?: ClipSource;
+}
+
+/** What a loading clip names. A string is a URL; a Blob or File is keyed by identity. */
+export type ClipSource = string | Blob;
+
+/**
+ * A clip whose audio is not loaded yet. Times are in seconds; whatever loads
+ * `src` turns it into an `AudioClip` (integer samples).
+ */
+export interface LoadingClip {
+  /** Unique identifier for this clip */
+  id: string;
+
+  /** The audio to load */
+  src: ClipSource;
+
+  /** Position on the timeline, in seconds. Default 0. */
+  start?: number;
+
+  /** Duration in seconds. Default: the whole source from `offset`. */
+  duration?: number;
+
+  /** Start within the source, in seconds. Default 0. */
+  offset?: number;
+
+  name?: string;
+  gain?: number;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+  color?: string;
+
+  /** Pre-computed peaks, drawn while the audio loads */
+  waveformData?: WaveformDataObject;
+}
+
+/** A track whose clips are loaded (`AudioClip`) or not loaded yet (`LoadingClip`). */
+export type ArrangementTrack = Omit<ClipTrack, 'clips'> & {
+  clips: (AudioClip | LoadingClip)[];
+};
+
+/** True for a clip whose audio is not loaded yet (it has no `sampleRate`). */
+export function isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip {
+  return !('sampleRate' in clip) || clip.sampleRate == null;
 }
 
 /** What a track holds: audio clips or MIDI clips. A track never holds both. */
@@ -239,6 +285,8 @@ export interface CreateClipOptions {
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
   midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
+  src?: ClipSource;
 }
 
 /**
@@ -271,6 +319,8 @@ export interface CreateClipOptionsSeconds {
   midiChannel?: number;
   /** MIDI program number (0-127). GM instrument for SoundFont playback. */
   midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
+  src?: ClipSource;
 }
 
 /**
@@ -300,6 +350,8 @@ export interface CreateClipOptionsTicks {
   midiNotes?: MidiNoteData[];
   midiChannel?: number;
   midiProgram?: number;
+  /** The source this clip was loaded from — passed through to the created AudioClip */
+  src?: ClipSource;
 }
 
 export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip {
@@ -345,6 +397,7 @@ export function createClipFromTicks(options: CreateClipOptionsTicks): AudioClip 
     midiNotes: options.midiNotes,
     midiChannel: options.midiChannel,
     midiProgram: options.midiProgram,
+    src: options.src,
   });
 }
 
@@ -388,6 +441,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   } = options;
 
   // Determine sample rate: audioBuffer > explicit option > waveformData
@@ -443,6 +497,7 @@ export function createClip(options: CreateClipOptions): AudioClip {
     midiNotes,
     midiChannel,
     midiProgram,
+    ...(src !== undefined ? { src } : {}),
   };
 }
 
@@ -468,6 +523,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   } = options;
 
   // Determine sample rate: audioBuffer > explicit option > waveformData
@@ -509,6 +565,7 @@ export function createClipFromSeconds(options: CreateClipOptionsSeconds): AudioC
     midiNotes,
     midiChannel,
     midiProgram,
+    src,
   });
 }
 

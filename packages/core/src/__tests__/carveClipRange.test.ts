@@ -129,4 +129,15 @@ describe('carveClipRange', () => {
     expect(carveClipRange([clip], 500, 500)).toEqual([clip]);
     expect(carveClipRange([clip], 800, 200)).toEqual([clip]);
   });
+
+  it('keeps src on the head, the tail and a trimmed clip', () => {
+    const blob = new Blob(['x']);
+    const split = makeClip({ id: 'a', startSample: 0, durationSamples: 4000, src: blob });
+    const [head, tail] = carveClipRange([split], 1000, 2000);
+    expect(head.src).toBe(blob);
+    expect(tail.src).toBe(blob);
+
+    const trimmed = makeClip({ id: 'b', startSample: 0, durationSamples: 1500, src: 'b.mp3' });
+    expect(carveClipRange([trimmed], 1000, 2000)[0].src).toBe('b.mp3');
+  });
 });
