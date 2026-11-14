@@ -6,7 +6,7 @@
 
 **Build:** Uses tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 
-**Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
+**Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`. An engine with an adapter attaches the adapter's audio context to its arrangement, so a test that gives such an engine a LOADING clip without a `loadSource` of its own runs `defaultLoadSource`: a real `fetch` of the clip's `src`, which fails in Node and marks the source failed some time after the test. Pass `createArrangement({ loadSource })` with a fake (`fakeLoads()` in `arrangementSources.test.ts` keeps every call pending until the test settles it; `await flush()` after each settle), or `attachDecodeContext: false`.
 
 **Key types:** `Arrangement`, `CreateArrangementOptions`, `RemoveTrackOptions`, `ClipBounds`, `TrackMixerValues`, `ArrangementSourcesValue`, `ArrangementSourceState`, `LoadSource` (the arrangement's public face; its tracks are core's `ArrangementTrack`, whose clips are `AudioClip | LoadingClip`), `PlayoutAdapter` (pluggable audio backend interface — requires `readonly audioContext: AudioContext`, `readonly ppqn: number`; optional `addWorkletModule`/`createAudioWorkletNode`/`createMediaStreamSource` for cross-context worklet support, `masterOutputNode` for analyzer/recorder tap), `EngineState` (state snapshot; its `tracks` is `readonly ClipTrack[]`, not a copy, and holds loaded clips only), `EngineEvents` (statechange, play/pause/stop).
 
