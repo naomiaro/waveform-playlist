@@ -2,11 +2,12 @@
 export * from './operations';
 
 // The arrangement: the owner of the tracks, the mix and the undo history
-export { createArrangement } from './arrangement';
+export { createArrangement, defaultLoadSource } from './arrangement';
 export type {
   Arrangement,
   ClipBounds,
   CreateArrangementOptions,
+  LoadSource,
   RemoveTrackOptions,
   TrackMixerValues,
 } from './arrangement';
