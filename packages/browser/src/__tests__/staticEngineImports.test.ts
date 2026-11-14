@@ -44,6 +44,7 @@ const FILES = [
   'utils/resolveTracks.ts',
   'utils/mergeLoadingClips.ts',
   'utils/loadSource.ts',
+  'providerInternals/useSourceLoading.ts',
 ];
 
 const FORBIDDEN = [
