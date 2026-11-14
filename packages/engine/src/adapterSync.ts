@@ -178,6 +178,8 @@ export class AdapterSync {
         if (!this.sendTrack(change.trackId)) this.sendAllTracks();
         break;
       case 'restore':
+      case 'load':
+        // After a load: each track that gained a clip (the rest plays the same).
         this._restore(change.previous);
         break;
       case 'recompute':

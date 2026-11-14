@@ -5,6 +5,8 @@ export * from './operations';
 export { createArrangement, defaultLoadSource } from './arrangement';
 export type {
   Arrangement,
+  ArrangementSourceState,
+  ArrangementSourcesValue,
   ClipBounds,
   CreateArrangementOptions,
   LoadSource,

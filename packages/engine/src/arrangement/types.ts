@@ -2,7 +2,9 @@
  * The public face of an arrangement.
  */
 
-import type { ArrangementTrack } from '@waveform-playlist/core';
+import type { ArrangementTrack, ClipSource, ValueSource } from '@waveform-playlist/core';
+import type { LoadSource } from './loadSource';
+import type { ArrangementSourcesValue } from './sources';
 import type { TrackMixerValues } from './mixer';
 
 export interface ClipBounds {
@@ -116,6 +118,19 @@ export interface Arrangement {
   commitTransaction(): void;
   /** Put the tracks back as they were when the transaction began. */
   abortTransaction(): void;
+
+  // loading
+  /**
+   * Where each source the clips name is: pending, loaded or failed (also a
+   * source whose clip could not be made from its audio, and one named by a
+   * loading clip on a MIDI track). Read it with `getSnapshot()` or
+   * `subscribe()`; the same object until a status changes. When a source is
+   * loaded, every loading clip that names it has become a loaded clip, in the
+   * current tracks and in every undo and redo state; that is not an undo step.
+   */
+  readonly sources: ValueSource<ArrangementSourcesValue>;
+  /** Start a failed source again. Does nothing for a source that is not failed. */
+  retry(src: ClipSource): void;
 }
 
 export interface CreateArrangementOptions {
@@ -123,4 +138,9 @@ export interface CreateArrangementOptions {
   tracks?: readonly ArrangementTrack[];
   /** Maximum number of undo steps (default 100). */
   undoLimit?: number;
+  /**
+   * How a clip's source becomes an AudioBuffer. Default: `defaultLoadSource`
+   * (fetch a URL or read a Blob, then decode).
+   */
+  loadSource?: LoadSource;
 }

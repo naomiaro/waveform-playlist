@@ -24,11 +24,21 @@
  * delivered after the one being handled has reached everyone.
  */
 
-import type { ArrangementTrack, AudioClip, LoadingClip } from '@waveform-playlist/core';
+import type {
+  ArrangementTrack,
+  AudioClip,
+  ClipSource,
+  LoadingClip,
+  ValueSource,
+} from '@waveform-playlist/core';
 import { isLoadingClip } from '@waveform-playlist/core';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
 import type { ClipEditTime } from './clipEdits';
 import { freezeTracksInDevelopment } from './devFreeze';
+import { defaultLoadSource } from './loadSource';
+import type { LoadSource } from './loadSource';
+import { ArrangementSources } from './sources';
+import type { ArrangementSourcesValue } from './sources';
 import {
   EMPTY_HISTORY,
   beginBase,
@@ -63,6 +73,8 @@ export type ArrangementChange =
   | { type: 'update'; trackId: string; previous: ArrangementTrack }
   | { type: 'reorder' }
   | { type: 'restore'; previous: readonly ArrangementTrack[] }
+  /** Audio arrived: loading clips of the current tracks became loaded clips. */
+  | { type: 'load'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
   | { type: 'recompute' }
   | { type: 'history' };
@@ -83,6 +95,8 @@ export interface ArrangementOptions {
   timeBase?: ArrangementTimeBase;
   /** The first tracks. Not an undo step. */
   tracks?: readonly ArrangementTrack[];
+  /** How a clip's source becomes an AudioBuffer. Default: fetch (or read) and decode. */
+  loadSource?: LoadSource;
 }
 
 /** The versions the arrangement had right after a change. */
@@ -107,12 +121,16 @@ export class ArrangementImpl implements Arrangement {
   private _listeners: Set<ChangeListener> = new Set();
   private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
   private _delivering = false;
+  private readonly _sources: ArrangementSources;
   readonly undoLimit: number;
 
   constructor(options: ArrangementOptions = {}) {
     this.undoLimit = options.undoLimit ?? DEFAULT_UNDO_LIMIT;
     this._timeBase = options.timeBase ?? null;
     this._tickPpqn = options.timeBase?.ppqn ?? null;
+    this._sources = new ArrangementSources(options.loadSource ?? defaultLoadSource, () =>
+      this._onSourceSettled()
+    );
     if (options.tracks) this.setTracks(options.tracks);
   }
 
@@ -133,6 +151,28 @@ export class ArrangementImpl implements Arrangement {
    */
   getMixer(): Mixer {
     return this._mixer;
+  }
+
+  /**
+   * Where each source the clips name is: pending, loaded or failed. The same
+   * object until a status changes.
+   */
+  get sources(): ValueSource<ArrangementSourcesValue> {
+    return this._sources.value;
+  }
+
+  /** Start a failed source again. Does nothing for any other source. */
+  retry(src: ClipSource): void {
+    this._sources.retry(src);
+  }
+
+  /**
+   * Internal, for whoever owns an audio context: give the loader a context
+   * to decode with. Nothing is fetched before. Returns the function that
+   * takes it away again (loads in flight are aborted; loaded sources stay).
+   */
+  attachDecodeContext(getContext: () => Promise<BaseAudioContext>): () => void {
+    return this._sources.attachDecodeContext(getContext);
   }
 
   /** Counts structural changes. */
@@ -631,6 +671,44 @@ export class ArrangementImpl implements Arrangement {
     }
   }
 
+  /** Declare the sources every state names, and switch the clips whose audio is there. */
+  private _syncSources(): void {
+    this._sources.declare(this._heldStates());
+    this._switchLoaded();
+  }
+
+  /**
+   * Replace every loading clip whose source is loaded with its loaded clip,
+   * in the current tracks and in every state the arrangement can return to.
+   * The same loading-clip object becomes the same loaded clip everywhere, and
+   * states go on sharing the tracks they shared. Not an undo step. Returns
+   * the current tracks from before, or null when they did not change.
+   */
+  private _switchLoaded(): readonly ArrangementTrack[] | null {
+    const apply = this._sources.beginPass((startSample) => this._tickAt(startSample));
+    const previous = this._tracks;
+    this._tracks = apply(previous);
+    this._history = {
+      undo: this._history.undo.map(apply),
+      redo: this._history.redo.map(apply),
+    };
+    if (this._transaction) {
+      this._transaction = { ...this._transaction, tracks: apply(this._transaction.tracks) };
+    }
+    return this._tracks === previous ? null : previous;
+  }
+
+  /** A load finished or failed by itself (not inside one of this arrangement's methods). */
+  private _onSourceSettled(): void {
+    const previous = this._switchLoaded();
+    if (previous) {
+      this._tracksVersion++;
+      this._emit({ type: 'load', previous });
+    } else {
+      this._sources.finishPass();
+    }
+  }
+
   /**
    * Announce a change. Called after the state has changed. When a listener
    * makes a change of its own, that change waits here until the one being
@@ -643,6 +721,9 @@ export class ArrangementImpl implements Arrangement {
    * always received that error).
    */
   private _emit(change: ArrangementChange): void {
+    // The states may name other sources now, and a clip that came in may name
+    // one that is loaded already: it is a loaded clip before anyone is told.
+    if (change.type !== 'mixer') this._syncSources();
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
@@ -684,6 +765,9 @@ export class ArrangementImpl implements Arrangement {
     } finally {
       this._delivering = false;
     }
+    // Last: whoever follows `sources` finds the tracks as they are now, and a
+    // change it makes in answer is a call of its own.
+    this._sources.finishPass();
     if (failed) throw firstError;
   }
 }
