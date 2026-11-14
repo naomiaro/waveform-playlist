@@ -133,7 +133,7 @@ export class PlaylistEngine {
 
   getState(): EngineState {
     return {
-      tracks: this._arrangement.getTracks().map((t) => ({ ...t, clips: [...t.clips] })),
+      tracks: this._tracks(),
       tracksVersion: this._arrangement.tracksVersion,
       mixerVersion: this._arrangement.mixerVersion,
       duration: calculateDuration(this._arrangement.getTracks()),
@@ -167,7 +167,7 @@ export class PlaylistEngine {
   // throw leaves the engine, the undo history and the adapter untouched.
   setTracks(tracks: ClipTrack[]): void {
     this._arrangement.setTracks(tracks);
-    this._adapter?.setTracks(this._arrangement.getTracks());
+    this._adapter?.setTracks(this._tracks());
     this._emitStateChange();
   }
 
@@ -176,7 +176,7 @@ export class PlaylistEngine {
     if (this._adapter?.addTrack) {
       this._adapter.addTrack(enriched);
     } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
+      this._adapter?.setTracks(this._tracks());
     }
     this._emitStateChange();
   }
@@ -189,7 +189,7 @@ export class PlaylistEngine {
     if (this._adapter?.removeTrack) {
       this._adapter.removeTrack(trackId);
     } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
+      this._adapter?.setTracks(this._tracks());
     }
     this._emitStateChange();
   }
@@ -213,7 +213,7 @@ export class PlaylistEngine {
       if (this._adapter?.updateTrack) {
         this._adapter.updateTrack(trackId, enriched);
       } else {
-        this._adapter?.setTracks(this._arrangement.getTracks());
+        this._adapter?.setTracks(this._tracks());
       }
       this._emitStateChange();
       return;
@@ -229,7 +229,7 @@ export class PlaylistEngine {
     if (this._adapter?.updateTrack) {
       this._adapter.updateTrack(trackId, t);
     } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
+      this._adapter?.setTracks(this._tracks());
     }
   }
 
@@ -580,6 +580,15 @@ export class PlaylistEngine {
   // Private helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * The arrangement's tracks, for the adapter and for `getState()`. The array
+   * is the arrangement's own and is never written to; `ClipTrack[]` is the
+   * type the adapter interface and `EngineState` have had from the start.
+   */
+  private _tracks(): ClipTrack[] {
+    return this._arrangement.getTracks() as ClipTrack[];
+  }
+
   /** Runs a change on the arrangement. True when the tracks changed. */
   private _changed(change: () => void): boolean {
     const version = this._arrangement.tracksVersion;
@@ -594,17 +603,22 @@ export class PlaylistEngine {
   private _restore(restore: () => void): void {
     const oldTracks = this._arrangement.getTracks();
     if (!this._changed(restore)) return;
-    const snapshot = this._arrangement.getTracks();
-    // Use incremental adapter updates when track count is unchanged —
-    // avoids full playout rebuild that interrupts playback during undo/redo.
-    if (this._adapter && oldTracks.length === snapshot.length) {
-      for (let i = 0; i < snapshot.length; i++) {
-        if (oldTracks[i] !== snapshot[i]) {
-          this._updateTrackOnAdapter(snapshot[i].id);
+    const restored = this._arrangement.getTracks();
+    // Use incremental adapter updates when the same tracks are there before
+    // and after — avoids full playout rebuild that interrupts playback during
+    // undo/redo. A track an undo did not touch is the same object in both
+    // states and is skipped; so is a change of order only.
+    const oldById = new Map(oldTracks.map((t) => [t.id, t]));
+    const sameSet =
+      oldTracks.length === restored.length && restored.every((t) => oldById.has(t.id));
+    if (this._adapter && sameSet) {
+      for (const track of restored) {
+        if (oldById.get(track.id) !== track) {
+          this._updateTrackOnAdapter(track.id);
         }
       }
     } else {
-      this._adapter?.setTracks(snapshot);
+      this._adapter?.setTracks(this._tracks());
     }
     this._emitStateChange();
   }

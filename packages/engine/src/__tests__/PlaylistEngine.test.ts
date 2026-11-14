@@ -98,17 +98,22 @@ describe('PlaylistEngine', () => {
       );
     });
 
-    it('returns a defensive copy of tracks from getState', () => {
+    // #812: the tracks are immutable, so getState() hands out the arrangement's
+    // own array instead of a copy. It is the same array until the tracks change
+    // (this test asserted a fresh copy per call before).
+    it('returns the same tracks array from getState until the tracks change', () => {
       const engine = new PlaylistEngine();
       const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 44100 });
       engine.setTracks([makeTrack('t1', [clip])]);
 
       const state1 = engine.getState();
       const state2 = engine.getState();
-      // Same content but different references
-      expect(state1.tracks).toEqual(state2.tracks);
-      expect(state1.tracks).not.toBe(state2.tracks);
-      expect(state1.tracks[0]).not.toBe(state2.tracks[0]);
+      expect(state1.tracks).toBe(state2.tracks);
+      expect(state1.tracks[0]).toBe(state2.tracks[0]);
+
+      engine.moveClip('t1', 'c1', 100);
+      expect(engine.getState().tracks).not.toBe(state1.tracks);
+      expect(state1.tracks[0].clips[0].startSample).toBe(0);
       engine.dispose();
     });
   });

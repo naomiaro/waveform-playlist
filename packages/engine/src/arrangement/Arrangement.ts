@@ -1,15 +1,17 @@
 /**
  * Arrangement — the tracks, their undo history and an open transaction.
  *
- * Extracted from PlaylistEngine by code motion (#812): every method here
- * does what the engine's method did to its own `_tracks`. Snapshots are
- * still copies and mixer values are still written in place; the
- * arrangement's own rules come in later steps.
+ * Immutable: a change replaces the tracks array and only the track and
+ * clip objects that changed, and nothing is ever written into an object
+ * that `getTracks()` has returned. Tracks are copied on their way in
+ * (`setTracks`, `addTrack`, `updateTrack`), so the caller's objects are
+ * never the arrangement's; what `getTracks()` returns is NOT a copy and
+ * must not be written to. A snapshot of the undo history is
+ * therefore a reference to an earlier array, and two states share every
+ * track that is the same in both (#812).
  *
- * One order differs from the engine before the extraction: a mixer setter
- * bumps `mixerVersion` here, so before the engine's adapter call and not
- * after it. Only an adapter that reads the engine's state, throws, or calls
- * the engine from inside a mixer setter can tell.
+ * A mixer setter bumps `mixerVersion` here, so before the engine's adapter
+ * call (before the extraction from PlaylistEngine it came after).
  *
  * It knows nothing of adapters or playback. The engine calls a method,
  * then makes the adapter call and emits `statechange` itself.
@@ -23,6 +25,8 @@ import {
   canSplitAt,
   splitClip as splitClipOp,
 } from '../operations/clipOperations';
+import { EMPTY_HISTORY, beginBase, pushStep, redoStep, undoStep } from './history';
+import type { History, TransactionBase } from './history';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -62,14 +66,11 @@ export interface ClipBounds {
 type ChangeListener = (change: ArrangementChange) => void;
 
 export class Arrangement {
-  private _tracks: ClipTrack[] = [];
+  private _tracks: readonly ClipTrack[] = [];
   private _tracksVersion = 0;
   private _mixerVersion = 0;
-  private _undoStack: ClipTrack[][] = [];
-  private _redoStack: ClipTrack[][] = [];
-  private _inTransaction = false;
-  private _transactionSnapshot: ClipTrack[] | null = null;
-  private _transactionMutated = false;
+  private _history: History = EMPTY_HISTORY;
+  private _transaction: TransactionBase | null = null;
   private _timeBase: ArrangementTimeBase;
   private _listeners: Set<ChangeListener> = new Set();
   readonly undoLimit: number;
@@ -83,8 +84,8 @@ export class Arrangement {
   // Read
   // ---------------------------------------------------------------------------
 
-  /** The live array of tracks. */
-  getTracks(): ClipTrack[] {
+  /** The tracks. The same array until something changes; never written to. */
+  getTracks(): readonly ClipTrack[] {
     return this._tracks;
   }
 
@@ -111,76 +112,65 @@ export class Arrangement {
   // ---------------------------------------------------------------------------
 
   get canUndo(): boolean {
-    return this._undoStack.length > 0;
+    return this._history.undo.length > 0;
   }
 
   get canRedo(): boolean {
-    return this._redoStack.length > 0;
+    return this._history.redo.length > 0;
   }
 
   undo(): void {
-    if (this._undoStack.length === 0) return;
-    const snapshot = this._undoStack.pop()!;
-    this._redoStack.push(this._snapshotTracks());
-    this._restoreTracks(snapshot);
+    const step = undoStep(this._history, this._tracks);
+    if (!step) return;
+    this._history = step.history;
+    this._restoreTracks(step.tracks);
   }
 
   redo(): void {
-    if (this._redoStack.length === 0) return;
-    const snapshot = this._redoStack.pop()!;
-    this._undoStack.push(this._snapshotTracks());
-    this._restoreTracks(snapshot);
+    const step = redoStep(this._history, this._tracks);
+    if (!step) return;
+    this._history = step.history;
+    this._restoreTracks(step.tracks);
   }
 
   clearHistory(): void {
-    this._undoStack = [];
-    this._redoStack = [];
+    this._history = EMPTY_HISTORY;
   }
 
   beginTransaction(): void {
-    if (this._inTransaction) {
+    if (this._transaction) {
       console.warn(
         '[waveform-playlist/engine] beginTransaction: already in a transaction, ' +
           'previous snapshot will be overwritten'
       );
     }
-    this._transactionSnapshot = this._snapshotTracks();
-    this._inTransaction = true;
-    this._transactionMutated = false;
+    this._transaction = beginBase(this._tracks);
   }
 
   commitTransaction(): void {
-    if (!this._inTransaction || this._transactionSnapshot === null) {
+    const transaction = this._transaction;
+    if (!transaction) {
       console.warn('[waveform-playlist/engine] commitTransaction: no active transaction to commit');
       return;
     }
+    this._transaction = null;
     // Only push undo entry if mutations actually occurred during the transaction.
     // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
-    if (this._transactionMutated) {
-      this._undoStack.push(this._transactionSnapshot);
-      if (this._undoStack.length > this.undoLimit) {
-        this._undoStack.shift();
-      }
-      this._redoStack = [];
+    if (transaction.changed) {
+      this._history = pushStep(this._history, transaction.tracks, this.undoLimit);
     }
-    this._transactionSnapshot = null;
-    this._inTransaction = false;
-    this._transactionMutated = false;
   }
 
   abortTransaction(): void {
-    if (!this._inTransaction || this._transactionSnapshot === null) {
+    const transaction = this._transaction;
+    if (!transaction) {
       console.warn('[waveform-playlist/engine] abortTransaction: no active transaction to abort');
       return;
     }
-    const snapshot = this._transactionSnapshot;
-    const mutated = this._transactionMutated;
-    this._transactionSnapshot = null;
-    this._inTransaction = false;
-    this._transactionMutated = false;
+    this._transaction = null;
     // Only restore if mutations occurred — avoids full adapter rebuild on click
-    if (mutated) {
-      this._restoreTracks(snapshot);
+    if (transaction.changed) {
+      this._restoreTracks(transaction.tracks);
     }
   }
 
@@ -191,7 +181,7 @@ export class Arrangement {
   // A track holds audio clips or MIDI clips, never both (#756). The three
   // methods that take a track check it before they change anything, so a
   // throw leaves the tracks, the undo history and every subscriber untouched.
-  setTracks(tracks: ClipTrack[]): void {
+  setTracks(tracks: readonly ClipTrack[]): void {
     tracks.forEach(assertTrackKind);
     this.clearHistory();
     this._tracks = tracks.map((track) => this._withStartTicks(track));
@@ -460,33 +450,26 @@ export class Arrangement {
   // Mixer values
   // ---------------------------------------------------------------------------
   //
-  // Written into the track in place, so a later adapter rebuild keeps the
-  // value. NOT structural changes: they bump mixerVersion, never
-  // tracksVersion (#501). An id no track has changes no track and still
-  // bumps the version and announces the change, as the engine did.
+  // The track is replaced by a copy with the new value, so a later adapter
+  // rebuild keeps it. NOT structural changes: they bump mixerVersion, never
+  // tracksVersion (#501), and are not undo steps. An id no track has changes
+  // no track and still bumps the version and announces the change, as the
+  // engine did.
 
   setTrackVolume(trackId: string, volume: number): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (track) track.volume = volume;
-    this._mixerChanged(trackId);
+    this._setMixerValues(trackId, { volume });
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (track) track.muted = muted;
-    this._mixerChanged(trackId);
+    this._setMixerValues(trackId, { muted });
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (track) track.soloed = soloed;
-    this._mixerChanged(trackId);
+    this._setMixerValues(trackId, { soloed });
   }
 
   setTrackPan(trackId: string, pan: number): void {
-    const track = this._tracks.find((t) => t.id === trackId);
-    if (track) track.pan = pan;
-    this._mixerChanged(trackId);
+    this._setMixerValues(trackId, { pan });
   }
 
   // ---------------------------------------------------------------------------
@@ -495,18 +478,14 @@ export class Arrangement {
 
   /** Re-derive `startSample` from `startTick` for every clip that has one (after a tempo change). */
   recomputeStartSamples(): void {
-    this._tracks = this._tracks.map((track) => ({
-      ...track,
-      clips: track.clips.map((clip) => {
+    const { ticksToSeconds, sampleRate } = this._timeBase;
+    this._tracks = this._tracks.map((track) =>
+      withClips(track, (clip) => {
         if (clip.startTick === undefined) return clip;
-        return {
-          ...clip,
-          startSample: Math.round(
-            this._timeBase.ticksToSeconds(clip.startTick) * this._timeBase.sampleRate
-          ),
-        };
-      }),
-    }));
+        const startSample = Math.round(ticksToSeconds(clip.startTick) * sampleRate);
+        return startSample === clip.startSample ? clip : { ...clip, startSample };
+      })
+    );
     this._tracksVersion++;
     this._emit({ type: 'recompute' });
   }
@@ -523,7 +502,11 @@ export class Arrangement {
     return Math.floor(DEFAULT_MIN_DURATION_SECONDS * this._timeBase.sampleRate);
   }
 
-  /** A copy of the track in which every clip has a `startTick`. */
+  /**
+   * A copy of a track on its way in, with a `startTick` on every clip. The
+   * track and each clip are always copied, so the arrangement holds no
+   * object its caller can still write to.
+   */
   private _withStartTicks(track: ClipTrack): ClipTrack {
     return {
       ...track,
@@ -534,28 +517,29 @@ export class Arrangement {
     };
   }
 
-  private _mixerChanged(trackId: string): void {
+  private _setMixerValues(
+    trackId: string,
+    values: Partial<Pick<ClipTrack, 'volume' | 'muted' | 'soloed' | 'pan'>>
+  ): void {
+    if (this._tracks.some((t) => t.id === trackId)) {
+      this._tracks = this._tracks.map((t) => (t.id === trackId ? { ...t, ...values } : t));
+    }
     this._mixerVersion++;
     this._emit({ type: 'mixer', trackId });
   }
 
-  private _snapshotTracks(): ClipTrack[] {
-    return this._tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c })) }));
-  }
-
+  /** The state before a change: an undo step, or the mark that an open transaction changed. */
   private _pushUndoSnapshot(): void {
-    if (this._inTransaction) {
-      this._transactionMutated = true;
+    if (this._transaction) {
+      if (!this._transaction.changed) {
+        this._transaction = { ...this._transaction, changed: true };
+      }
       return;
     }
-    this._undoStack.push(this._snapshotTracks());
-    if (this._undoStack.length > this.undoLimit) {
-      this._undoStack.shift();
-    }
-    this._redoStack = [];
+    this._history = pushStep(this._history, this._tracks, this.undoLimit);
   }
 
-  private _restoreTracks(snapshot: ClipTrack[]): void {
+  private _restoreTracks(snapshot: readonly ClipTrack[]): void {
     const previous = this._tracks;
     this._tracks = snapshot;
     this._tracksVersion++;
@@ -571,4 +555,15 @@ export class Arrangement {
       }
     }
   }
+}
+
+/** The track with `change` applied to each clip; the same track when no clip changed. */
+function withClips(track: ClipTrack, change: (clip: AudioClip) => AudioClip): ClipTrack {
+  let changed = false;
+  const clips = track.clips.map((clip) => {
+    const next = change(clip);
+    if (next !== clip) changed = true;
+    return next;
+  });
+  return changed ? { ...track, clips } : track;
 }

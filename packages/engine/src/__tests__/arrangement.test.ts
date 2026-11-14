@@ -317,31 +317,34 @@ describe('Arrangement: clips', () => {
   });
 });
 
-describe('Arrangement: mixer values (written in place, as the engine did)', () => {
+describe('Arrangement: mixer values', () => {
   it.each([
     ['setTrackVolume', (a: Arrangement, id: string) => a.setTrackVolume(id, 0.5), 'volume', 0.5],
     ['setTrackMute', (a: Arrangement, id: string) => a.setTrackMute(id, true), 'muted', true],
     ['setTrackSolo', (a: Arrangement, id: string) => a.setTrackSolo(id, true), 'soloed', true],
     ['setTrackPan', (a: Arrangement, id: string) => a.setTrackPan(id, -0.5), 'pan', -0.5],
   ] as const)(
-    '%s writes the value, bumps mixerVersion only, announces "mixer", is not an undo step',
+    '%s puts the value on a new track object, bumps mixerVersion only, announces "mixer", is not an undo step',
     (_, run, field, value) => {
       const { arrangement, changes } = setup();
-      const tracks = arrangement.getTracks();
-      const first = tracks[0];
+      const first = arrangement.getTracks()[0];
+      const was = first[field];
 
       run(arrangement, 'A');
 
-      expect(arrangement.getTracks()).toBe(tracks);
-      expect(arrangement.getTracks()[0]).toBe(first);
-      expect(first[field]).toBe(value);
+      // Immutable (#812): the track is replaced, the old object keeps its value.
+      expect(arrangement.getTracks()[0]).not.toBe(first);
+      expect(arrangement.getTracks()[0][field]).toBe(value);
+      expect(first[field]).toBe(was);
       expect(arrangement.mixerVersion).toBe(1);
       expect(arrangement.tracksVersion).toBe(1);
       expect(arrangement.canUndo).toBe(false);
       expect(changes).toEqual([{ type: 'mixer', trackId: 'A' }]);
 
       // An unknown id: no track changes; the version and the change are as before (today).
+      const tracks = arrangement.getTracks();
       run(arrangement, 'nope');
+      expect(arrangement.getTracks()).toBe(tracks);
       expect(arrangement.mixerVersion).toBe(2);
       expect(changes[1]).toEqual({ type: 'mixer', trackId: 'nope' });
     }
@@ -370,16 +373,6 @@ describe('Arrangement: history', () => {
     expect(arrangement.canUndo).toBe(true);
     expect(arrangement.canRedo).toBe(false);
     expect(changes[1].type === 'restore' && changes[1].previous).toBe(undone);
-  });
-
-  // A snapshot is a copy: no restored track is an object that was live before (as the engine did).
-  it('a restored track is never the object it replaces', () => {
-    const { arrangement } = setup();
-    const before = arrangement.getTracks();
-    arrangement.moveClip('A', 'a1', 10000);
-    arrangement.undo();
-    expect(arrangement.getTracks()[0]).not.toBe(before[0]);
-    expect(arrangement.getTracks()[1]).not.toBe(before[1]);
   });
 
   it('a snapshot captures the mixer values of its moment (as the engine did)', () => {
@@ -572,12 +565,14 @@ describe('Arrangement: recomputeStartSamples', () => {
     expect(changes).toEqual([{ type: 'recompute' }]);
   });
 
-  it('leaves a clip without a startTick where it is', () => {
+  it('changes nothing in a clip whose start is already right, and keeps the object', () => {
     const { arrangement, clipOf } = setup();
-    // A clip can lose its tick only by being written in place; the rule is still the engine's.
-    delete (clipOf('A', 'a2') as { startTick?: number }).startTick;
+    const a2 = clipOf('A', 'a2');
+    const tracks = arrangement.getTracks();
     arrangement.recomputeStartSamples();
-    expect(clipOf('A', 'a2').startSample).toBe(96000);
+    expect(clipOf('A', 'a2')).toBe(a2);
+    expect(arrangement.getTracks()[0]).toBe(tracks[0]);
+    expect(arrangement.tracksVersion).toBe(2);
   });
 });
 

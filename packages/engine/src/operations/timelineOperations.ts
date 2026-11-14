@@ -8,7 +8,7 @@ import type { ClipTrack } from '@waveform-playlist/core';
  * @param tracks - Array of clip tracks
  * @returns Duration in seconds
  */
-export function calculateDuration(tracks: ClipTrack[]): number {
+export function calculateDuration(tracks: readonly ClipTrack[]): number {
   let maxDuration = 0;
   for (const track of tracks) {
     for (const clip of track.clips) {
