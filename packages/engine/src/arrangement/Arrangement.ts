@@ -16,8 +16,12 @@
  * never changes the mix. The entry of a removed track is kept while any
  * state of the history still holds the track.
  *
- * It knows nothing of adapters or playback. The engine calls a method,
- * then makes the adapter call and emits `statechange` itself.
+ * It knows nothing of adapters or playback. The engine subscribes with
+ * `onChange` and makes the adapter call for each change it is told about.
+ *
+ * A change is announced after the state has changed, to every listener, in
+ * the order the changes were made: a change made from inside a listener is
+ * delivered after the one being handled has reached everyone.
  */
 
 import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
@@ -33,6 +37,7 @@ import { EMPTY_HISTORY, beginBase, pushStep, redoStep, undoStep } from './histor
 import type { History, TransactionBase } from './history';
 import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
+import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -45,7 +50,7 @@ export type ArrangementChange =
   | { type: 'update'; trackId: string }
   | { type: 'reorder' }
   | { type: 'restore'; previous: readonly ClipTrack[] }
-  | { type: 'mixer'; trackId: string }
+  | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
   | { type: 'recompute' }
   | { type: 'history' };
 
@@ -69,7 +74,13 @@ export interface ClipBounds {
   sourceDurationSamples: number;
 }
 
-type ChangeListener = (change: ArrangementChange) => void;
+/** The versions the arrangement had right after a change. */
+export interface ArrangementVersions {
+  tracksVersion: number;
+  mixerVersion: number;
+}
+
+type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
 
 export class Arrangement {
   private _tracks: readonly ClipTrack[] = [];
@@ -80,6 +91,8 @@ export class Arrangement {
   private _transaction: TransactionBase | null = null;
   private _timeBase: ArrangementTimeBase;
   private _listeners: Set<ChangeListener> = new Set();
+  private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
+  private _delivering = false;
   readonly undoLimit: number;
 
   constructor(options: ArrangementOptions) {
@@ -136,6 +149,7 @@ export class Arrangement {
   }
 
   undo(): void {
+    this._abortOpenTransaction();
     const step = undoStep(this._history, this._tracks);
     if (!step) return;
     this._history = step.history;
@@ -143,6 +157,7 @@ export class Arrangement {
   }
 
   redo(): void {
+    this._abortOpenTransaction();
     const step = redoStep(this._history, this._tracks);
     if (!step) return;
     this._history = step.history;
@@ -150,8 +165,10 @@ export class Arrangement {
   }
 
   clearHistory(): void {
+    const hadHistory = this.canUndo || this.canRedo;
     this._history = EMPTY_HISTORY;
     this._mixer = retainMixer(this._mixer, this._heldStates());
+    if (hadHistory) this._emit({ type: 'history' });
   }
 
   beginTransaction(): void {
@@ -175,6 +192,7 @@ export class Arrangement {
     // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
     if (transaction.changed) {
       this._history = pushStep(this._history, transaction.tracks, this.undoLimit);
+      this._emit({ type: 'history' });
     }
   }
 
@@ -184,22 +202,23 @@ export class Arrangement {
       console.warn('[waveform-playlist/engine] abortTransaction: no active transaction to abort');
       return;
     }
-    this._transaction = null;
-    // Only restore if mutations occurred — avoids full adapter rebuild on click
-    if (transaction.changed) {
-      this._restoreTracks(transaction.tracks);
-    }
+    this._abortOpenTransaction();
   }
 
   // ---------------------------------------------------------------------------
   // Track Management
   // ---------------------------------------------------------------------------
 
-  // A track holds audio clips or MIDI clips, never both (#756). The three
-  // methods that take a track check it before they change anything, so a
-  // throw leaves the tracks, the undo history and every subscriber untouched.
+  // A track holds audio clips or MIDI clips, never both (#756); track ids are
+  // unique, and so are clip ids within a track. The three methods that take a
+  // track check it before they change anything, so a throw leaves the tracks,
+  // the undo history, the mixer and every subscriber untouched.
   setTracks(tracks: readonly ClipTrack[]): void {
     tracks.forEach(assertTrackKind);
+    assertUniqueTrackIds(tracks);
+    tracks.forEach(assertUniqueClipIds);
+    // Everything before is replaced, an open transaction included.
+    this._transaction = null;
     this._history = EMPTY_HISTORY;
     this._tracks = tracks.map((track) => this._withStartTicks(track));
     // An id that is already there keeps its mix; entries of tracks that are gone are dropped.
@@ -208,16 +227,16 @@ export class Arrangement {
     this._emit({ type: 'set' });
   }
 
-  /** Returns the track as stored (each clip given a `startTick`). */
-  addTrack(track: ClipTrack): ClipTrack {
+  addTrack(track: ClipTrack): void {
     assertTrackKind(track);
+    assertUniqueClipIds(track);
+    if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
     const enriched = this._withStartTicks(track);
     this._tracks = [...this._tracks, enriched];
     this._mixer = seedMixer(this._mixer, [enriched]);
     this._tracksVersion++;
     this._emit({ type: 'add', trackId: track.id });
-    return enriched;
   }
 
   removeTrack(trackId: string): void {
@@ -246,19 +265,23 @@ export class Arrangement {
   }
 
   /**
-   * Replace a track. Returns the track as stored (each clip given a `startTick`).
-   * The mixer fields of the given track are not read: the mix is in `getMixer()`.
-   * An id no track has still pushes an undo step, bumps the version and
-   * announces the change, and adds no track, as the engine did.
+   * Replace a track. The mixer fields of the given track are not read: the
+   * mix is in `getMixer()`. An id no track has does nothing.
    */
-  updateTrack(trackId: string, track: ClipTrack): ClipTrack {
+  updateTrack(trackId: string, track: ClipTrack): void {
     assertTrackKind(track);
+    assertUniqueClipIds(track);
+    if (track.id !== trackId && this._tracks.some((t) => t.id === track.id)) {
+      throw duplicateTrackId(track.id);
+    }
+    if (!this._tracks.some((t) => t.id === trackId)) return;
     this._pushUndoSnapshot();
     const enriched = this._withStartTicks(track);
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
+    // Only a track that was given a new id has no entry yet.
+    this._mixer = seedMixer(this._mixer, [enriched]);
     this._tracksVersion++;
     this._emit({ type: 'update', trackId });
-    return enriched;
   }
 
   // ---------------------------------------------------------------------------
@@ -542,7 +565,7 @@ export class Arrangement {
     if (next === this._mixer) return;
     this._mixer = next;
     this._mixerVersion++;
-    this._emit({ type: 'mixer', trackId });
+    this._emit({ type: 'mixer', trackId, values });
   }
 
   /**
@@ -572,17 +595,58 @@ export class Arrangement {
     this._emit({ type: 'restore', previous });
   }
 
+  /** Ends an open transaction, restoring the tracks it began from if it changed them. */
+  private _abortOpenTransaction(): void {
+    const transaction = this._transaction;
+    if (!transaction) return;
+    this._transaction = null;
+    // Only restore if mutations occurred — avoids full adapter rebuild on click
+    if (transaction.changed) {
+      this._restoreTracks(transaction.tracks);
+    }
+  }
+
+  /**
+   * Announce a change. Called after the state has changed. When a listener
+   * makes a change of its own, that change waits here until the one being
+   * delivered has reached every listener, so all of them see the changes in
+   * the order they were made.
+   *
+   * A listener that throws does not stop the delivery; the first error is
+   * thrown to the caller once everyone has been told (the engine's listener
+   * throws when its adapter does, and the caller of the engine method has
+   * always received that error).
+   */
   private _emit(change: ArrangementChange): void {
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
-    for (const listener of this._listeners) {
-      try {
-        listener(change);
-      } catch (error) {
-        console.warn('[waveform-playlist/engine] Error in arrangement change listener:', error);
+    this._pending.push({
+      change,
+      at: { tracksVersion: this._tracksVersion, mixerVersion: this._mixerVersion },
+    });
+    if (this._delivering) return;
+
+    this._delivering = true;
+    let failed = false;
+    let firstError: unknown;
+    try {
+      for (let next = this._pending.shift(); next; next = this._pending.shift()) {
+        for (const listener of [...this._listeners]) {
+          try {
+            listener(next.change, next.at);
+          } catch (error) {
+            if (!failed) {
+              failed = true;
+              firstError = error;
+            }
+          }
+        }
       }
+    } finally {
+      this._delivering = false;
     }
+    if (failed) throw firstError;
   }
 }
 

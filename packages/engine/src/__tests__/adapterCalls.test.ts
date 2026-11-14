@@ -148,14 +148,16 @@ describe.each([
       expect(engine.canUndo).toBe(false);
     });
 
-    it('updateTrack(id, track) with an unknown id: an undo step, a version bump, an adapter call and an emission, and no track added', () => {
+    // Rule (#812): updateTrack with an id no track has does nothing. (Before:
+    // an undo step, a version bump, an adapter call and an emission.)
+    it('updateTrack(id, track) with an unknown id: nothing', () => {
       const { adapter, engine, states, summaries } = setup({ incremental });
       const before = engine.getState().tracksVersion;
       engine.updateTrack('nope', track('nope', [clip('n1', 0)]));
-      expect(adapter.calls).toEqual(oneTrack({ id: 'nope', clips: ['n1'] }, [A, B]));
-      expect(states).toHaveLength(1);
-      expect(states[0].tracksVersion).toBe(before + 1);
-      expect(engine.canUndo).toBe(true);
+      expect(adapter.calls).toEqual([]);
+      expect(states).toHaveLength(0);
+      expect(engine.getState().tracksVersion).toBe(before);
+      expect(engine.canUndo).toBe(false);
       expect(summaries()).toEqual([A, B]);
     });
 
@@ -328,13 +330,15 @@ describe.each([
       expect(states).toHaveLength(1);
     });
 
-    it('undo of an addTrack leaves the selected track id as it was (today)', () => {
+    // Rule (#812): the selected track id names a track, so it is cleared when
+    // a restore takes that track away. (Before: it stayed.)
+    it('undo of an addTrack clears the selected track id when it was that track', () => {
       const { engine } = setup({ incremental });
       engine.addTrack(track('C', [clip('c1', 0)]));
       engine.selectTrack('C');
       engine.undo();
       expect(engine.getState().tracks.map((t) => t.id)).toEqual(['A', 'B']);
-      expect(engine.getState().selectedTrackId).toBe('C');
+      expect(engine.getState().selectedTrackId).toBeNull();
     });
 
     it('undo with nothing to undo: no call, no emission', () => {
@@ -361,7 +365,10 @@ describe.each([
 
       engine.commitTransaction();
       expect(adapter.calls).toEqual(oneTrack(A, [A, B]));
-      expect(states).toHaveLength(3);
+      // Rule (#812): the commit is a history change and is announced, so
+      // canUndo is never stale. (Before: three emissions, none for the commit.)
+      expect(states).toHaveLength(4);
+      expect(states[3].canUndo).toBe(true);
       expect(startOf('A', 'a1')).toBe(300);
       expect(engine.canUndo).toBe(true);
 
@@ -404,17 +411,21 @@ describe.each([
       expect(states).toHaveLength(0);
     });
 
-    it('commitTransaction with a change emits nothing itself (today)', () => {
-      const { engine, states } = setup({ incremental });
+    // Rule (#812): every history change is announced. (Before: no emission.)
+    it('commitTransaction with a change emits one statechange and calls no adapter', () => {
+      const { adapter, engine, states } = setup({ incremental });
       engine.beginTransaction();
       engine.moveClip('A', 'a1', 100, true);
       states.length = 0;
       engine.commitTransaction();
-      expect(states).toHaveLength(0);
-      expect(engine.canUndo).toBe(true);
+      expect(states).toHaveLength(1);
+      expect(states[0].canUndo).toBe(true);
+      expect(adapter.calls).toEqual([]);
     });
 
-    it('undo while a transaction is open: the undo acts and the transaction stays open (today)', () => {
+    // Rule (#812): undo and redo with a transaction open abort it first, then
+    // act. (Before: the undo acted and the transaction stayed open.)
+    it('undo while a transaction is open: the transaction is aborted, then the undo acts', () => {
       const { adapter, engine, states, startOf } = setup({ incremental });
       engine.moveClip('A', 'a1', 1000);
       engine.beginTransaction();
@@ -424,20 +435,14 @@ describe.each([
 
       engine.undo();
       expect(startOf('A', 'a1')).toBe(0);
-      // Rule (#812, immutability): only the track that differs. (Before: every track.)
-      expect(adapter.calls).toEqual(oneTrack(A, [A, B]));
-      expect(states).toHaveLength(1);
+      // Two restores (the abort, then the undo), each sending the track that differs.
+      expect(adapter.calls).toEqual([...oneTrack(A, [A, B]), ...oneTrack(A, [A, B])]);
+      expect(states).toHaveLength(2);
       expect(engine.canRedo).toBe(true);
 
-      // The transaction is still open: its commit pushes the state from when
-      // it began (a1 at 1000) and clears the redo stack.
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       engine.commitTransaction();
-      expect(warn).not.toHaveBeenCalled();
-      expect(engine.canUndo).toBe(true);
-      expect(engine.canRedo).toBe(false);
-      engine.undo();
-      expect(startOf('A', 'a1')).toBe(1000);
+      expect(warn).toHaveBeenCalledTimes(1); // no transaction is open any more
     });
   });
 
@@ -620,12 +625,10 @@ describe('a statechange listener that calls back into the engine', () => {
     expect(summaries()).toEqual([B, A]);
   });
 
-  // Today's delivery is nested: the re-entrant change is emitted from inside
-  // the first listener's call, so a listener registered AFTER it is told about
-  // the second change before the first. Recorded as it is; the arrangement's
-  // ordered delivery (#812, "a listener that writes gets its own change
-  // delivered after the one it is handling") changes this expectation.
-  it('a later listener is told about the re-entrant change first (today)', () => {
+  // Rule (#812, ordered delivery): a change made from inside a listener is
+  // delivered after the one being handled has reached every listener.
+  // (Before: nested, so a later listener was told about the second change first.)
+  it('a later listener is told about both changes in the order they were made', () => {
     const { engine } = setup();
     const start = engine.getState().tracksVersion;
     let reentered = false;
@@ -640,6 +643,6 @@ describe('a statechange listener that calls back into the engine', () => {
 
     engine.moveClip('A', 'a1', 1000);
 
-    expect(later).toEqual([start + 2, start + 1]);
+    expect(later).toEqual([start + 1, start + 2]);
   });
 });

@@ -108,15 +108,14 @@ describe('Arrangement: tracks', () => {
     expect(arrangement.canRedo).toBe(false);
   });
 
-  it('addTrack appends, gives ticks, is an undo step, announces "add", returns the stored track', () => {
+  it('addTrack appends, gives ticks, is an undo step, announces "add"', () => {
     const { arrangement, changes, ids } = setup();
     const before = arrangement.getTracks();
-    const stored = arrangement.addTrack(track('C', [clip('c1', 48000)]));
+    arrangement.addTrack(track('C', [clip('c1', 48000)]));
 
     expect(ids()).toEqual(['A', 'B', 'C']);
     expect(arrangement.getTracks()).not.toBe(before);
-    expect(stored).toBe(arrangement.getTracks()[2]);
-    expect(stored.clips[0].startTick).toBe(1920);
+    expect(arrangement.getTracks()[2].clips[0].startTick).toBe(1920);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
     expect(changes).toEqual([{ type: 'add', trackId: 'C' }]);
@@ -139,26 +138,19 @@ describe('Arrangement: tracks', () => {
     expect(changes).toEqual([]);
   });
 
-  it('updateTrack replaces the track, gives ticks, is an undo step, announces "update", returns the stored track', () => {
+  it('updateTrack replaces the track, gives ticks, is an undo step, announces "update"', () => {
     const { arrangement, changes } = setup();
-    const stored = arrangement.updateTrack('A', track('A', [clip('a3', 48000)]));
-    expect(arrangement.getTracks()[0]).toBe(stored);
-    expect(stored.clips.map((c) => [c.id, c.startTick])).toEqual([['a3', 1920]]);
+    arrangement.updateTrack('A', track('A', [clip('a3', 48000)]));
+    expect(arrangement.getTracks()[0].clips.map((c) => [c.id, c.startTick])).toEqual([
+      ['a3', 1920],
+    ]);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
     expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
   });
 
-  // Today's behaviour, pinned in adapterCalls.test.ts; Task 5 of the plan makes this a no-op.
-  it('updateTrack with an unknown id adds no track but is an undo step, a version bump and an "update"', () => {
-    const { arrangement, changes, ids } = setup();
-    const stored = arrangement.updateTrack('nope', track('nope', [clip('n1', 0)]));
-    expect(ids()).toEqual(['A', 'B']);
-    expect(stored.id).toBe('nope');
-    expect(arrangement.tracksVersion).toBe(2);
-    expect(arrangement.canUndo).toBe(true);
-    expect(changes).toEqual([{ type: 'update', trackId: 'nope' }]);
-  });
+  // updateTrack with an unknown id, history announcements, validation and the
+  // order of delivery are in arrangementRules.test.ts.
 
   it('reorderTrack moves the track, clamps the index, is an undo step, announces "reorder"', () => {
     const { arrangement, changes, ids } = setup();
@@ -396,16 +388,14 @@ describe('Arrangement: history', () => {
     expect(new Arrangement({ timeBase: timeBase() }).undoLimit).toBe(100);
   });
 
-  it('clearHistory empties both stacks and announces nothing (today)', () => {
-    const { arrangement, changes } = setup();
+  it('clearHistory empties both stacks', () => {
+    const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 10000);
     arrangement.moveClip('A', 'a1', 10000);
     arrangement.undo();
-    changes.length = 0;
     arrangement.clearHistory();
     expect(arrangement.canUndo).toBe(false);
     expect(arrangement.canRedo).toBe(false);
-    expect(changes).toEqual([]);
   });
 });
 
@@ -420,7 +410,7 @@ describe('Arrangement: transactions', () => {
 
     arrangement.commitTransaction();
     expect(arrangement.canUndo).toBe(true);
-    expect(changes).toHaveLength(2); // commit announces nothing (today)
+    expect(changes.map((c) => c.type)).toEqual(['update', 'update', 'history']);
 
     arrangement.undo();
     expect(clipOf('A', 'a1').startSample).toBe(0);
@@ -555,17 +545,5 @@ describe('Arrangement: onChange', () => {
     );
     arrangement.setTracks(fixture());
     expect(seen).toEqual([2, 1]);
-  });
-
-  it('a listener that throws is reported and does not stop the others', () => {
-    const arrangement = new Arrangement({ timeBase: timeBase() });
-    const second = vi.fn();
-    arrangement.onChange(() => {
-      throw new Error('boom');
-    });
-    arrangement.onChange(second);
-    expect(() => arrangement.setTracks(fixture())).not.toThrow();
-    expect(second).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

@@ -142,12 +142,6 @@ describe('seeding', () => {
     expect(arrangement.getMixer()).toBe(mixer);
   });
 
-  it('of two tracks with one id in a set, the first seeds the entry', () => {
-    const arrangement = new Arrangement({ timeBase: timeBase() });
-    arrangement.setTracks([track('X', [], { volume: 0.2 }), track('X', [], { volume: 0.9 })]);
-    expect(arrangement.getMixer().get('X')?.volume).toBe(0.2);
-  });
-
   it('seeding does not count as a mixer change', () => {
     const { arrangement, changes } = setup();
     arrangement.addTrack(track('C', []));
@@ -187,7 +181,7 @@ describe('setters', () => {
       expect(arrangement.tracksVersion).toBe(1);
       expect(arrangement.mixerVersion).toBe(1);
       expect(arrangement.canUndo).toBe(false);
-      expect(changes).toEqual([{ type: 'mixer', trackId: 'A' }]);
+      expect(changes).toEqual([{ type: 'mixer', trackId: 'A', values: patch }]);
     }
   );
 
@@ -275,7 +269,7 @@ describe('retention', () => {
     expect([...arrangement.getMixer().keys()]).toEqual(['B']);
     // Dropping the entry of a track that is gone is not a mixer change.
     expect(arrangement.mixerVersion).toBe(version);
-    expect(changes).toEqual([]);
+    expect(changes).toEqual([{ type: 'history' }]);
   });
 
   it('clearHistory keeps the Map when there is nothing to drop', () => {

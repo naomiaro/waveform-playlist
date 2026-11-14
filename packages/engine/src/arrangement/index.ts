@@ -4,5 +4,6 @@ export type {
   ArrangementChange,
   ArrangementOptions,
   ArrangementTimeBase,
+  ArrangementVersions,
   ClipBounds,
 } from './Arrangement';
