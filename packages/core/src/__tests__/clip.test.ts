@@ -12,7 +12,7 @@ import {
   findGaps,
   isLoadingClip,
 } from '../types/clip';
-import type { AudioClip, ClipTrack, PlaylistTrack } from '../types/clip';
+import type { AudioClip, ClipTrack, ArrangementTrack } from '../types/clip';
 
 function makeClip(
   overrides: Partial<AudioClip> & {
@@ -761,8 +761,8 @@ describe('loading clips', () => {
     expect(isLoadingClip(clip)).toBe(false);
   });
 
-  it('a ClipTrack is assignable to PlaylistTrack', () => {
-    const t: PlaylistTrack = createTrack({ name: 'x', clips: [] });
+  it('a ClipTrack is assignable to ArrangementTrack', () => {
+    const t: ArrangementTrack = createTrack({ name: 'x', clips: [] });
     expect(t.clips).toEqual([]);
   });
 });

@@ -5,7 +5,7 @@ import type {
   AudioClip,
   ClipSource,
   LoadingClip,
-  PlaylistTrack,
+  ArrangementTrack,
   WaveformDataObject,
 } from './types/clip';
 
@@ -168,7 +168,7 @@ function buildClip(options: AudioTrackOptions, name: string): AudioClip | Loadin
  * `audioBuffer`, or `waveformData` and no `src`, it is an `AudioClip` built now.
  * A duration that runs past the end of the audio is cut to it, with a warning.
  */
-export function audioTrack(options: AudioTrackOptions): PlaylistTrack {
+export function audioTrack(options: AudioTrackOptions): ArrangementTrack {
   checkOptions(options);
   const name = options.name ?? defaultName(options.src);
   const clip = buildClip(options, name);
@@ -182,7 +182,7 @@ export function audioTrack(options: AudioTrackOptions): PlaylistTrack {
     spectrogramColorMap: options.spectrogramColorMap,
     color: options.color,
   });
-  const track: PlaylistTrack = {
+  const track: ArrangementTrack = {
     ...base,
     id: options.id || base.id,
     clips: [clip],

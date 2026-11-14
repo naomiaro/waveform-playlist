@@ -168,7 +168,7 @@ export interface LoadingClip {
 }
 
 /** A track whose clips are loaded (`AudioClip`) or not loaded yet (`LoadingClip`). */
-export type PlaylistTrack = Omit<ClipTrack, 'clips'> & {
+export type ArrangementTrack = Omit<ClipTrack, 'clips'> & {
   clips: (AudioClip | LoadingClip)[];
 };
 

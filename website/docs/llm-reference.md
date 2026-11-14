@@ -675,7 +675,7 @@ interface LoadingClip {                 // Times in seconds
   waveformData?: WaveformDataObject;    // Pre-computed peaks
 }
 
-type PlaylistTrack = Omit<ClipTrack, 'clips'> & { clips: (AudioClip | LoadingClip)[] };
+type ArrangementTrack = Omit<ClipTrack, 'clips'> & { clips: (AudioClip | LoadingClip)[] };
 
 isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip;  // True for a clip with no sampleRate
 
@@ -692,7 +692,7 @@ interface AudioTrackOptions {
   renderMode?: RenderMode; spectrogramConfig?: SpectrogramConfig; spectrogramColorMap?: ColorMapValue;
 }
 
-audioTrack(options: AudioTrackOptions): PlaylistTrack;
+audioTrack(options: AudioTrackOptions): ArrangementTrack;
 // src without audioBuffer: one LoadingClip (it carries waveformData when given).
 // audioBuffer (with or without src), or waveformData with no src: one AudioClip.
 // None of the three: throws 'audioTrack: give src, audioBuffer or waveformData'.
