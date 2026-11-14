@@ -140,7 +140,8 @@ function buildClip(options: AudioTrackOptions, name: string): AudioClip | Loadin
   if (!audioBuffer && !waveformData) {
     throw new Error('audioTrack: give src, audioBuffer or waveformData');
   }
-  // The same source length createClipFromSeconds records as sourceDurationSamples.
+  // The length of the audio in samples: the buffer's own length, or the
+  // waveform data's duration rounded up, as createClipFromSeconds rounds it.
   const sampleRate = audioBuffer?.sampleRate ?? waveformData?.sample_rate ?? 0;
   const sourceSamples =
     audioBuffer?.length ?? Math.ceil((waveformData?.duration ?? 0) * sampleRate);

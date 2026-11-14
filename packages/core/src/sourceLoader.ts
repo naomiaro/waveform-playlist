@@ -84,8 +84,9 @@ export function createSourceLoader<K, V>(options: {
     promise.then(
       (value) => settle({ status: 'loaded', value }),
       (err: unknown) => {
-        // The token above is what ignores a late result. This line only tells the
-        // loader's own abort (ignored) from a load's own AbortError (a failure).
+        // A load the loader aborted is ignored by the token check in settle()
+        // as well; returning here only skips building an Error for it. A load
+        // that rejects with its own AbortError is not aborted here: a failure.
         if (controller.signal.aborted) return;
         settle({ status: 'failed', error: toError(err) });
       }
