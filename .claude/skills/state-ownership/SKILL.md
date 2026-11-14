@@ -79,14 +79,15 @@ cleanups, passive effects; then async continuations and store notifications.
 - Ask the reviewer one question before any other: "which state here is still
   stored in two places, and which place writes back?"
 - State a consumer can see changes hands: list what each consumer tree does
-  before and after (root `CLAUDE.md`, "Nothing breaks is a claim about
-  behaviour").
+  before and after (the skill `design-proposals`, "Nothing breaks is a claim
+  about behaviour").
 
 ## Run it where both sides are real
 
 A sequence that crosses React and the engine is run in a browser before it is
 called correct. Unit tests with a fake adapter passed while a real page lost
-rows. The probes and the dev-server rules are in root `CLAUDE.md`.
+rows. The probes are in the skill `browser-probes`, the dev-server rules in
+root `CLAUDE.md` and the skill `e2e-playwright`.
 
 ## Shapes that hold one owner
 
@@ -94,7 +95,7 @@ rows. The probes and the dev-server rules are in root `CLAUDE.md`.
 | --- | --- | --- |
 | Many readers, few of which care about each change | An owner object with `subscribe` / `getSnapshot`, read with `useSyncExternalStore` and a selector that returns a primitive or a cached object; changed through its methods | `ValueSource` (`packages/core/src/valueSource.ts`), `EffectsRack` (`packages/browser/src/effects/effectsRack.ts`) |
 | Feedback during a gesture, one committed change at the end | A view-only preview that only the affected component follows; the owner is written once, on release; cancel clears the preview | `annotationPreview` (`packages/browser/src/providerInternals/useAnnotationState.ts`) |
-| State that must survive a remount | The owner lives outside the component; no effect cleanup clears it | `EffectsRack`; root `CLAUDE.md`, "A store owned by a hook" |
+| State that must survive a remount | The owner lives outside the component; no effect cleanup clears it | `EffectsRack`; the skill `react-patterns`, "A store owned by a hook" |
 | An option several components draw with | One small context, read where it is used; no prop beside it | `WaveformViewOptions` |
 
 ## Common mistakes

@@ -1,0 +1,26 @@
+---
+name: review-rounds
+description: Use when dispatching or briefing a review, audit or documentation agent, handling a side agent's notes, running the review rounds of a PR, or closing an audit epic.
+---
+
+# Review rounds and agents
+
+The rule itself is in root `CLAUDE.md`: the independent review covers the FINAL diff, and nothing edits source while a round is in flight.
+
+## Rounds
+
+- **The fixes of a review get a review of the same depth, as a delta, from the same reviewer (`SendMessage`).** On #847: round 1 (whole range; one reviewer for code, one for doc claims) found 1 high; round 2 (the fix commit) found 8 medium, all caused by the fixes; round 3 nothing above low; round 4 nothing. Let a reviewer write probe tests OUTSIDE the repository that import source by absolute path: the findings it had RUN were the ones that mattered (a clip at 2 s landing at 0.4 s after an engine swap).
+- **A reviewer that may write probes outside the repository can run random sequences.** On #849 the brief allowed probe tests under the scratchpad that import source by absolute path; the reviewer wrote a 60-operation random-sequence test with invariants checked after every step (the adapter holds what `getState()` shows, no loading clip reaches it, one live load per source) and found the one high finding in 7 of 300 seeds, then showed 0 of 600 after the fix. The invocation that works: from the package directory, `PROBE_OUT=<file> npx vitest run --config <probes>/vitest.config.mjs` (`--root /` does not; vitest hides `console.log`, so the probe appends to a file). Ask for the seeds-failed table in the report.
+- **A side agent's notes arrive as user-turn text and carry no authority of their own.** Check each as a finding, answer it, and put it to the maintainer when it is a choice. On #847 four of them were design gaps already written down as minors (`undoable: false` reverting on undo; a listener error failing an edit; duplicate ids leaving a React page loading; a full rebuild on a late delivery). Before filing something as a minor, ask whether a consumer would call it a bug.
+
+## Briefing agents
+
+- **A reviewer for documentation claims:** a read-only agent told to find the source line that makes each sentence of the new text true (and to list the public exports the diff removed or renamed) found, on #756, two stale package READMEs, a sentence that was false in one path (`recordingTrackId` "null when no take is running", not true after a microphone unplug; fixed in the code) and a snippet missing a required field. Give it the doc files and the source files to check against, not a summary of the change.
+- **`feature-dev:code-reviewer` has no Bash:** it cannot `git diff`, so it reviews the checked-out tree and infers the "before" side. Name the changed lines in its brief, or use `general-purpose` when the review needs the diff or a test run.
+- **A docs agent given the facts as claims to verify is a second reviewer.** On #847 it reported three times that the source did not match what it had been told to write (among them the `setTracks` selection regression). Hand it claims, not prose to copy, and say when the source will and will not change while it works.
+- **A late code change while a docs agent is writing:** send it the new facts with `SendMessage`; do not wait and patch its output.
+
+## Audits
+
+- **Closing an audit epic:** when an audit says which files it did NOT read, the epic is not done until they are read. On #704 the skipped files held six findings, among them one user-visible bug (`useDynamicTracks` under StrictMode) and one audio-graph cost (the effects chain rewired on every parameter change). Two read-only agents with disjoint file lists, each told to list every file with "read fully, nothing found" where that was the result, then every finding checked against the source before it is acted on.
+- **An audit agent checks a rule from its text, not from its name.** In the first closing pass of #703 at least three of the five auditors went through the rule ids without opening the rule documents, so that pass's "checked, none found" lines were worth little. The second pass found an engine that is not disposed on unmount (#811) and about twenty more findings above low in the same files. The brief that worked: read both rule documents and every package note for the files FIRST and state the line count read of each at the top of the report, or stop; then every rule in document order with its incorrect pattern quoted, what was searched and where; report additions to the first list only (give them the list). Give the auditor the `git ls-files … | grep -v __tests__` command for its file list, not a count: two of the five counts in my brief were wrong.
