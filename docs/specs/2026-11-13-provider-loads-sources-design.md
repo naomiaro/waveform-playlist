@@ -309,9 +309,7 @@ dependency of anything.
 
 ### Which sources are requested
 
-In an effect over the set of sources `tracks` names: `loader.request` for each
-new one, the withdraw function called for each that is gone and for all on
-cleanup. "Names" counts loading clips AND resolved clips that carry `src`, so a
+An effect over the set of sources `tracks` names tells the loader. "Names" counts loading clips AND resolved clips that carry `src`, so a
 source stays in the loader while any clip of it is in the app's state. The
 effect body calls `loader.setWanted(names)` and its cleanup calls
 `loader.suspend()`. The loader itself lives in a ref created once per provider
