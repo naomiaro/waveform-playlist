@@ -16,6 +16,7 @@ const SAMPLE_RATE = 48000;
 function timeBase() {
   return {
     sampleRate: SAMPLE_RATE,
+    ppqn: 960,
     secondsToTicks: (seconds: number) => Math.round(seconds * 1920),
     ticksToSeconds: (tick: number) => tick / 1920,
   };
@@ -321,12 +322,6 @@ describe('ids are unique', () => {
     expect(arrangement.getTracks().map((t) => t.id)).toEqual(['Z', 'B']);
   });
 
-  it('a track that is given a new id gets a mixer entry from its own fields', () => {
-    const { arrangement } = setup();
-    arrangement.updateTrack('A', { ...track('Z', []), volume: 0.3 });
-    expect(arrangement.getMixer().get('Z')?.volume).toBe(0.3);
-  });
-
   it('through the engine: a track given a new id reaches the adapter as a full set', () => {
     const { adapter, engine } = setupEngine();
     engine.updateTrack('A', track('Z', [clip('z1', 0)]));
@@ -395,7 +390,7 @@ describe('delivery is ordered', () => {
     ]);
   });
 
-  it('a listener that keeps writing is stopped: the changes are delivered, without an endless loop', () => {
+  it('a listener that writes on each of five changes is told about all six, one after the other', () => {
     const { arrangement } = setup();
     let writes = 0;
     let told = 0;
@@ -407,7 +402,8 @@ describe('delivery is ordered', () => {
       }
     });
     arrangement.reorderTrack('A', 1);
-    expect(told).toBe(writes + 1);
+    expect(writes).toBe(5);
+    expect(told).toBe(6);
   });
 
   it('a listener that throws does not stop the others; the error reaches the caller after everyone was told', () => {
@@ -493,6 +489,8 @@ describe('the engine follows the arrangement by subscription', () => {
       engine.setTracks(fixture());
       engine.moveClip('A', 'a1', 1000);
       engine.setTrackVolume('A', 0.5);
+      engine.setTrackVolume('not-a-track', 0.5);
+      engine.updateTrack('A');
       engine.undo();
     }).not.toThrow();
     expect(adapter.calls).toEqual([]);

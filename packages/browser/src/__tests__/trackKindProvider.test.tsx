@@ -77,14 +77,15 @@ const Probe: React.FC = () => {
   return null;
 };
 
-function mount(tracks: ClipTrack[]) {
+function mount(tracks: ClipTrack[], options: { withOnError?: boolean } = {}) {
+  const { withOnError = true } = options;
   const adapters: ReturnType<typeof createFakeAdapter>[] = [];
   const onError = vi.fn();
   const view = (next: ClipTrack[]) => (
     <WaveformPlaylistProvider
       tracks={next}
       sampleRate={SAMPLE_RATE}
-      onError={onError}
+      onError={withOnError ? onError : undefined}
       createAdapter={() => {
         const adapter = createFakeAdapter();
         adapters.push(adapter);
@@ -158,5 +159,64 @@ describe('a wrong-kind track in the provider (#756)', () => {
 
     await waitFor(() => expect(isReady).toBe(true));
     expect(onError).not.toHaveBeenCalled();
+  });
+
+  // #812: the engine refuses two tracks with one id (it used to accept them).
+  // An app that has them goes from "plays, with a warning" to "never finishes
+  // loading", so the console says so as an error, not as a warning.
+  describe('a playlist that cannot be built says so as a console error', () => {
+    const twins = () => [
+      track('same', 'audio', [clip('a', false)]),
+      track('same', 'audio', [clip('b', false)]),
+    ];
+
+    it('duplicate track ids: onError gets the error, and one console.error names the cause and the state', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { onError } = mount(twins());
+
+      await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      expect(onError.mock.calls[0][0].message).toMatch(/Duplicate track id "same"/);
+      expect(isReady).toBe(false);
+
+      const messages = error.mock.calls.map((call) => String(call[0]));
+      const ours = messages.filter((message) => message.startsWith('[waveform-playlist]'));
+      expect(ours).toHaveLength(1);
+      expect(ours[0]).toMatch(/could not be built/);
+      expect(ours[0]).toMatch(/stays in its loading state/);
+      expect(ours[0]).toMatch(/Duplicate track id "same"/);
+      // With an onError prop the app is handling it: no hint to add one.
+      expect(ours[0]).not.toMatch(/onError/);
+    });
+
+    it('without an onError prop, the message says how to handle it in the app', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mount(twins(), { withOnError: false });
+
+      await waitFor(() =>
+        expect(
+          error.mock.calls.some((call) => String(call[0]).startsWith('[waveform-playlist]'))
+        ).toBe(true)
+      );
+      const ours = error.mock.calls
+        .map((call) => String(call[0]))
+        .filter((message) => message.startsWith('[waveform-playlist]'));
+      expect(ours).toHaveLength(1);
+      expect(ours[0]).toMatch(/Duplicate track id "same"/);
+      expect(ours[0]).toMatch(/onError/);
+    });
+
+    it('a wrong-kind track is reported the same way', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { onError } = mount([track('t1', 'audio', [clip('m', true)])]);
+      await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+      const ours = error.mock.calls
+        .map((call) => String(call[0]))
+        .filter((message) => message.startsWith('[waveform-playlist]'));
+      expect(ours).toHaveLength(1);
+      expect(ours[0]).toMatch(/could not be built[\s\S]*is an audio track/);
+    });
   });
 });

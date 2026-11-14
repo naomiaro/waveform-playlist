@@ -647,7 +647,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           // As a rebuild did: "the audio arrived" is not a step to undo back
           // to an empty placeholder.
           engine.clearHistory();
-          // clearHistory emits nothing; without this `canUndo` stays true.
+          // clearHistory emits statechange when there was history; this call
+          // covers the case where there was none.
           onUndoEngineState(engine.getState());
         }
 
@@ -935,7 +936,16 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           engineBuildInFlightRef.current = false;
           pendingResumeRef.current = null;
         }
-        console.warn('[waveform-playlist] Error loading audio: ' + String(error));
+        // An error, not a warning: nothing is drawn or played until a later
+        // build succeeds, and without an `onError` prop the console is the
+        // only place that says why.
+        const reason = error instanceof Error ? error.message : String(error);
+        console.error(
+          '[waveform-playlist] The playlist could not be built and stays in its loading state ' +
+            '(nothing is drawn or played). Reason: ' +
+            reason +
+            (onError ? '' : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
+        );
         onError?.(error instanceof Error ? error : new Error(String(error)));
       }
     };

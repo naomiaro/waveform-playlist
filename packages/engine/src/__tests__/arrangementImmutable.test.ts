@@ -16,6 +16,7 @@ const SAMPLE_RATE = 48000;
 function timeBase() {
   return {
     sampleRate: SAMPLE_RATE,
+    ppqn: 960,
     secondsToTicks: (seconds: number) => Math.round(seconds * 1920),
     ticksToSeconds: (tick: number) => tick / 1920,
   };

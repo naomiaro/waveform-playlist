@@ -14,6 +14,7 @@ const TICKS_PER_SECOND = 1920; // 960 ppqn at 120 bpm
 function timeBase(ticksPerSecond = TICKS_PER_SECOND): ArrangementTimeBase {
   return {
     sampleRate: SAMPLE_RATE,
+    ppqn: 960,
     secondsToTicks: (seconds) => Math.round(seconds * ticksPerSecond),
     ticksToSeconds: (tick) => tick / ticksPerSecond,
   };
@@ -108,6 +109,8 @@ describe('Arrangement: tracks', () => {
     expect(arrangement.canRedo).toBe(false);
   });
 
+  // #812: addTrack and updateTrack return nothing, as in the design (during the
+  // extraction they returned the stored track for the engine's adapter call).
   it('addTrack appends, gives ticks, is an undo step, announces "add"', () => {
     const { arrangement, changes, ids } = setup();
     const before = arrangement.getTracks();
@@ -388,6 +391,8 @@ describe('Arrangement: history', () => {
     expect(new Arrangement({ timeBase: timeBase() }).undoLimit).toBe(100);
   });
 
+  // #812: every history change is announced; that clearHistory announces
+  // "history" is in arrangementRules.test.ts (this test once said "nothing").
   it('clearHistory empties both stacks', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 10000);
@@ -410,6 +415,7 @@ describe('Arrangement: transactions', () => {
 
     arrangement.commitTransaction();
     expect(arrangement.canUndo).toBe(true);
+    // #812: the commit is a history change and is announced (it was silent).
     expect(changes.map((c) => c.type)).toEqual(['update', 'update', 'history']);
 
     arrangement.undo();
@@ -498,6 +504,7 @@ describe('Arrangement: recomputeStartSamples', () => {
     const arrangement = new Arrangement({
       timeBase: {
         sampleRate: SAMPLE_RATE,
+        ppqn: 960,
         secondsToTicks: (seconds) => Math.round(seconds * ticksPerSecond),
         ticksToSeconds: (tick) => tick / ticksPerSecond,
       },
@@ -526,6 +533,8 @@ describe('Arrangement: recomputeStartSamples', () => {
     expect(changes).toEqual([]);
   });
 
+  // #812, immutability: a clip is never written in place, so the earlier test
+  // that deleted a clip's startTick to show "left where it is" is gone.
   it('changes nothing in a clip whose start is already right, and keeps the object', () => {
     const { arrangement, clipOf } = setup();
     const a2 = clipOf('A', 'a2');

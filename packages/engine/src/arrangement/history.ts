@@ -69,7 +69,8 @@ export function withoutTrack(tracks: Tracks, trackId: string): Tracks {
     : tracks;
 }
 
-function sameTracks(a: Tracks, b: Tracks): boolean {
+/** The same tracks, as the same objects, in the same order. */
+export function sameTracks(a: Tracks, b: Tracks): boolean {
   return a === b || (a.length === b.length && a.every((track, i) => track === b[i]));
 }
 

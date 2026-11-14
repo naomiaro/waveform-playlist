@@ -34,6 +34,12 @@ export class PlaylistEngine {
    * the mark travels with the change's version, not with the call.
    */
   private _skipAdapterAt = new Set<number>();
+  /**
+   * The arrangement's `tracksVersion` when the adapter was last sent every
+   * track. A change that is delivered later than it was made (from inside a
+   * listener) may already be in what the adapter was sent.
+   */
+  private _syncedTracksVersion = -1;
   private _projection: {
     tracksVersion: number;
     mixerVersion: number;
@@ -103,6 +109,7 @@ export class PlaylistEngine {
 
     const timeBase = {
       sampleRate: this._sampleRate,
+      ppqn: this._ppqn,
       secondsToTicks: (seconds: number) => this._secondsToTicks(seconds),
       ticksToSeconds: (tick: number) => this._ticksToSeconds(tick),
     };
@@ -125,8 +132,13 @@ export class PlaylistEngine {
     this._stopFollowingArrangement = this._arrangement.onChange((change, at) =>
       this._onArrangementChange(change, at)
     );
-    if (this._arrangement.getTracks().length > 0) {
-      this._adapter?.setTracks(this._tracksForAdapter());
+    try {
+      if (this._arrangement.getTracks().length > 0) this._sendAllTracks();
+    } catch (error) {
+      // Nobody will hold this engine to dispose it: let go of the arrangement here.
+      this._stopFollowingArrangement();
+      this._detachFromArrangement();
+      throw error;
     }
   }
 
@@ -235,7 +247,8 @@ export class PlaylistEngine {
       this._arrangement.updateTrack(trackId, track);
       return;
     }
-    this._updateTrackOnAdapter(trackId);
+    // A disposed engine no longer follows the arrangement, and has no adapter to send to.
+    if (!this._disposed) this._updateTrackOnAdapter(trackId);
   }
 
   /** Send the arrangement's current track to the adapter. False when there is no such track. */
@@ -245,7 +258,7 @@ export class PlaylistEngine {
     if (this._adapter?.updateTrack) {
       this._adapter.updateTrack(trackId, this._withMix(t));
     } else {
-      this._adapter?.setTracks(this._tracksForAdapter());
+      this._sendAllTracks();
     }
     return true;
   }
@@ -286,9 +299,11 @@ export class PlaylistEngine {
    */
   moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter = false): number {
     const mark = this._markSkipAdapter(skipAdapter);
-    const constrainedDelta = this._arrangement.moveClip(trackId, clipId, deltaSamples);
-    this._unmarkIfUnchanged(mark);
-    return constrainedDelta;
+    try {
+      return this._arrangement.moveClip(trackId, clipId, deltaSamples);
+    } finally {
+      this._unmarkIfUnchanged(mark);
+    }
   }
 
   splitClip(trackId: string, clipId: string, atSample: number): void {
@@ -303,8 +318,11 @@ export class PlaylistEngine {
     skipAdapter = false
   ): void {
     const mark = this._markSkipAdapter(skipAdapter);
-    this._arrangement.trimClip(trackId, clipId, boundary, deltaSamples);
-    this._unmarkIfUnchanged(mark);
+    try {
+      this._arrangement.trimClip(trackId, clipId, boundary, deltaSamples);
+    } finally {
+      this._unmarkIfUnchanged(mark);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -511,22 +529,22 @@ export class PlaylistEngine {
 
   setTrackVolume(trackId: string, volume: number): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackVolume(trackId, volume));
-    if (!changed) this._adapter?.setTrackVolume(trackId, volume);
+    if (!changed && !this._disposed) this._adapter?.setTrackVolume(trackId, volume);
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackMute(trackId, muted));
-    if (!changed) this._adapter?.setTrackMute(trackId, muted);
+    if (!changed && !this._disposed) this._adapter?.setTrackMute(trackId, muted);
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackSolo(trackId, soloed));
-    if (!changed) this._adapter?.setTrackSolo(trackId, soloed);
+    if (!changed && !this._disposed) this._adapter?.setTrackSolo(trackId, soloed);
   }
 
   setTrackPan(trackId: string, pan: number): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan));
-    if (!changed) this._adapter?.setTrackPan(trackId, pan);
+    if (!changed && !this._disposed) this._adapter?.setTrackPan(trackId, pan);
   }
 
   // ---------------------------------------------------------------------------
@@ -631,40 +649,48 @@ export class PlaylistEngine {
   /**
    * The arrangement changed: bring the adapter in step, then emit
    * `statechange`. Every change is one emission. An adapter that throws
-   * stops the emission, and the arrangement hands the error to whoever made
-   * the change.
+   * stops the emission and fails the arrangement call that is delivering
+   * (for a change made from inside a listener, that is the outer call).
+   *
+   * A change made from inside a listener is delivered later than it was
+   * made, and the adapter is always sent the arrangement's CURRENT tracks.
+   * So once the adapter has been sent every track, a change from before
+   * that moment needs no adapter call.
    */
   private _onArrangementChange(change: ArrangementChange, at: ArrangementVersions): void {
+    const skipped = change.type === 'update' && this._skipAdapterAt.delete(at.tracksVersion);
+    const alreadySent = at.tracksVersion <= this._syncedTracksVersion;
     switch (change.type) {
       case 'set':
-        this._adapter?.setTracks(this._tracksForAdapter());
+        if (!alreadySent) this._sendAllTracks();
         break;
       case 'add':
-        this._addTrackOnAdapter(change.trackId);
+        if (!alreadySent) this._addTrackOnAdapter(change.trackId);
         break;
       case 'remove':
         this._clearSelectionIfGone();
+        if (alreadySent) break;
         if (this._adapter?.removeTrack) {
           this._adapter.removeTrack(change.trackId);
         } else {
-          this._adapter?.setTracks(this._tracksForAdapter());
+          this._sendAllTracks();
         }
         break;
       case 'update':
-        if (this._skipAdapterAt.delete(at.tracksVersion)) break;
-        // A track that was given a new id is not found under the old one.
-        if (!this._updateTrackOnAdapter(change.trackId)) {
-          this._adapter?.setTracks(this._tracksForAdapter());
-        }
+        // A track that was given a new id is gone under the old one.
+        this._clearSelectionIfGone();
+        if (skipped || alreadySent) break;
+        if (!this._updateTrackOnAdapter(change.trackId)) this._sendAllTracks();
         break;
       case 'restore':
         this._clearSelectionIfGone();
-        this._restoreOnAdapter(change.previous);
+        if (!alreadySent) this._restoreOnAdapter(change.previous);
         break;
       case 'mixer':
         this._setMixerOnAdapter(change.trackId, change.values);
         break;
       case 'recompute':
+        if (alreadySent) break;
         // Use incremental updates to avoid full playout rebuild during playback
         for (const track of this._arrangement.getTracks()) {
           this._updateTrackOnAdapter(track.id);
@@ -677,12 +703,18 @@ export class PlaylistEngine {
     this._emitStateChange();
   }
 
+  /** Send the adapter every track, and remember up to which change that covers. */
+  private _sendAllTracks(): void {
+    this._syncedTracksVersion = this._arrangement.tracksVersion;
+    this._adapter?.setTracks(this._tracksForAdapter());
+  }
+
   private _addTrackOnAdapter(trackId: string): void {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
     if (track && this._adapter?.addTrack) {
       this._adapter.addTrack(this._withMix(track));
     } else {
-      this._adapter?.setTracks(this._tracksForAdapter());
+      this._sendAllTracks();
     }
   }
 
@@ -703,7 +735,7 @@ export class PlaylistEngine {
         }
       }
     } else {
-      this._adapter?.setTracks(this._tracksForAdapter());
+      this._sendAllTracks();
     }
   }
 

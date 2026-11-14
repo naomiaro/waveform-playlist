@@ -5,7 +5,8 @@
  * The values live here and not on the track objects, so a fader move
  * replaces no track, and an undo (which restores tracks) never changes the
  * mix. A track's own `volume` / `muted` / `soloed` / `pan` fields are the
- * values it ENTERED with; they seed its entry and are not read again.
+ * values it ENTERED with; they seed its entry when its id has none, and are
+ * not read while it has one.
  */
 
 import type { ClipTrack } from '@waveform-playlist/core';
@@ -41,7 +42,6 @@ export function mixerValuesOf(track: ClipTrack): TrackMixerValues {
 export function seedMixer(mixer: Mixer, tracks: readonly ClipTrack[]): Mixer {
   let next: Map<string, TrackMixerValues> | null = null;
   for (const track of tracks) {
-    // Also the first of two tracks with one id wins, as everywhere a track is found by id.
     if ((next ?? mixer).has(track.id)) continue;
     if (!next) next = new Map(mixer);
     next.set(track.id, mixerValuesOf(track));
@@ -61,6 +61,16 @@ export function setMixerValues(
   const entry = mixer.get(trackId);
   if (!entry) return mixer;
   return new Map(mixer).set(trackId, { ...entry, ...patch });
+}
+
+/**
+ * A track is given a new id: its mix goes with it. The same Map when the old
+ * id has no entry or the new id already has one.
+ */
+export function carryMixerEntry(mixer: Mixer, fromId: string, toId: string): Mixer {
+  const entry = mixer.get(fromId);
+  if (!entry || mixer.has(toId)) return mixer;
+  return new Map(mixer).set(toId, entry);
 }
 
 /**

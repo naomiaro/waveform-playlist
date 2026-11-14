@@ -91,7 +91,7 @@ arrangement.setTrackVolume('track-1', 0.5);
 arrangement.getTracks(); // readonly ClipTrack[]; the same array until the tracks change
 arrangement.getMixer().get('track-1'); // { volume: 0.5, muted: false, soloed: false, pan: 0 }
 const unsubscribe = arrangement.subscribe(() => {
-  // once per change (tracks, mix or history), after the adapter is in step
+  // once per change (tracks, mix or history), after the engine has made its adapter call for it
 });
 
 // Play it
@@ -104,6 +104,10 @@ const next = new PlaylistEngine({ adapter: createToneAdapter(), arrangement });
 // next has the same tracks, the same mix and the same undo history
 ```
 
+A clip's `startTick` is counted in an engine's `ppqn`. When the next engine has another `ppqn` (the Tone.js adapter at 192 after the native transport at 960, or the reverse), every stored tick is converted to the new unit, rounded to the nearest tick, in the current tracks, in every undo and redo state and in the base of an open transaction. `startSample` is not touched, the conversion is not an undo step, and when it changes the current tracks subscribers are told once (`tracksVersion` goes up by one). With the same `ppqn`, or when no tick changes, nothing happens. Going to a coarser `ppqn` rounds: 7 ticks at 960 become 1 at 192, and 5 when an engine at 960 takes over again, so a later tempo change places such a clip on the coarser engine's tick grid.
+
+A different tempo is not converted. A tick is the musical position, so an engine built at another tempo than the one the ticks were made under has clips whose `startSample` and `startTick` disagree until the next `setTempo`, which moves `startSample` to follow the tick.
+
 An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`.
 
 The engine's track, clip, mixer and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
@@ -111,11 +115,11 @@ The engine's track, clip, mixer and history methods call the arrangement's, so a
 Rules that hold for the engine and the arrangement alike:
 
 - **Nothing handed out is a copy.** `arrangement.getTracks()`, `engine.getState().tracks` and the tracks an adapter receives are shared with the undo history. Never write to the array, a track or a clip: copy first (`{ ...track, clips: [...] }`) and pass the copy to `updateTrack`. Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in strict code (every module is strict). What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen. Tracks are copied on their way in, so the objects you pass stay yours.
-- **A change replaces only what changed.** The tracks array and the changed track and clip objects are new; every other track is the same object as before, so a comparison by identity finds what changed.
-- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none; while the id has an entry, `setTracks`, `addTrack` and `updateTrack` do not read them. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
+- **A change replaces only what changed.** The tracks array and the changed track and clip objects are new; every other track is the same object as before, so a comparison by identity finds what changed. The exception is `setTracks`, which copies every track it is given: after it no track is the object it was.
+- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none. `setTracks` keeps the mix of an id that is in the tracks it replaces, `updateTrack` keeps the track's mix (also when it gives the track a new id), and `addTrack` of a track whose removal can still be undone finds the mix it had; in those cases the fields are not read. An entry is dropped when no state holds its track any more: not the current tracks, not an undo or redo step, not the base of an open transaction. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`, which act on a track that is in the current tracks. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
 - **Undo, redo and an aborted transaction restore tracks and clips, never the mix.** Undoing a `removeTrack` brings the track back with the mix it had.
 - **Ids are unique.** `setTracks`, `addTrack` and `updateTrack` throw an `Error` for a duplicate track id, for two clips with one id on the same track, and for a track whose clips do not match its `kind`, before anything changes.
-- **Without an engine** clips are given no `startTick` (they get one when an engine attaches), and the shortest a clip may be is 0.1 s at the clip's own sample rate.
+- **Without an engine** clips are given no `startTick`, and a clip that came with one loses it when it is moved, trimmed on the left or split. Every clip without a tick gets one from its `startSample` when an engine attaches. The shortest a clip may be is 0.1 s at the clip's own sample rate.
 
 ## API
 

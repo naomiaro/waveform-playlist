@@ -36,8 +36,10 @@ export interface Arrangement {
   getTracks(): readonly ClipTrack[];
   /**
    * The current volume, mute, solo and pan by track id. The same Map until a
-   * value changes. A track's own mixer fields in `getTracks()` are the
-   * values it entered with; the current ones are here.
+   * value changes, a track with a new id enters, or entries of tracks that
+   * are gone are dropped (`mixerVersion` counts value changes only). A
+   * track's own mixer fields in `getTracks()` are the values it entered
+   * with; the current ones are here.
    */
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
   /**
@@ -53,7 +55,10 @@ export interface Arrangement {
   readonly mixerVersion: number;
 
   // whole set
-  /** Replace every track. Clears the undo history. A track id that is already there keeps its mix. */
+  /**
+   * Replace every track. Clears the undo history and ends an open
+   * transaction. An id that is in the tracks being replaced keeps its mix.
+   */
   setTracks(tracks: readonly ClipTrack[]): void;
 
   // tracks
@@ -61,8 +66,10 @@ export interface Arrangement {
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   /**
    * Replace a track, with a track or with a function of the current one.
-   * Does nothing for an id no track has. The mixer fields of the new track
-   * are not read: use the setters.
+   * Changes nothing for an id no track has (a track object is still checked
+   * and may throw; a function is not called). The mixer fields of the new
+   * track are not read: use the setters. A track that is given a new id
+   * takes its mix with it.
    */
   updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void;
   /** Move a track to another place in the order. */
@@ -81,7 +88,8 @@ export interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps; an undo never changes them)
+  // mixer (not undo steps; an undo never changes them; a track that is not
+  // in the current tracks is left alone)
   setTrackVolume(trackId: string, volume: number): void;
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;

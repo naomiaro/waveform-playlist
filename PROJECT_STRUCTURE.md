@@ -151,6 +151,7 @@ const clip = createClipFromSeconds({
   - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks, mix, history, transactions, ordered delivery of changes
   - `arrangement/mixer.ts` — `TrackMixerValues`; the mix as pure functions over a Map by track id
   - `arrangement/history.ts` — Undo/redo as pure functions over references to earlier tracks arrays
+  - `arrangement/ticks.ts` — Converts clip ticks when an engine with another ppqn takes over
   - `arrangement/validate.ts` — Unique track ids, unique clip ids within a track
   - `arrangement/devFreeze.ts` — Freezes handed-out tracks outside production builds
   - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and keeps the adapter in step

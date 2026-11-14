@@ -184,9 +184,13 @@ engine.selectTrack(trackId: string | null): void;
 - a track ID that another track has;
 - two clips with the same ID on one track (the same clip ID on two different tracks is accepted).
 
-A track's `volume`, `muted`, `soloed` and `pan` fields are the mix it enters with. They are read when its ID has no mixer entry yet; for an ID the engine already has, these three methods keep the current mix. Use the [volume methods](#volume) to change it.
+A track's `volume`, `muted`, `soloed` and `pan` fields are the mix it enters with. They are read when its ID has no mixer entry yet. `setTracks()` keeps the mix of an ID that is in the tracks it replaces; `updateTrack(id, track)` keeps the track's mix, also when the new track has another ID; `addTrack()` of a track whose removal can still be undone finds the mix it had. In those cases the fields are not read. Use the [volume methods](#volume) to change the mix.
 
-When the selected track is removed (by `removeTrack()`, an undo or a redo), `selectedTrackId` becomes `null`.
+A mixer entry is dropped when no state holds its track any more: not the current tracks, not an undo or redo step, not the base of an open transaction. That happens on `setTracks()` and `clearHistory()`, and when a new undo step clears the redo stack or pushes the oldest step past `undoLimit`.
+
+`updateTrack(id, track)` may give the track an ID no other track has. The track keeps its mix, and the adapter receives every track through `setTracks`.
+
+`selectedTrackId` becomes `null` when its track goes away: by `removeTrack()`, by an undo, a redo or an aborted transaction that takes the track away, or when `updateTrack()` gives the track a new ID. `setTracks()` does not clear it.
 
 ### Clip Editing
 
@@ -278,7 +282,7 @@ engine.setTrackSolo(trackId: string, soloed: boolean): void;
 engine.setTrackPan(trackId: string, pan: number): void;
 ```
 
-Each per-track method stores the value in the arrangement's mix, calls the adapter, increments `mixerVersion` and emits `statechange`; the next `state.tracks` carries the value in that track's field. They are not undo steps, and an undo never changes the mix. For a track ID the engine does not have, the adapter method is still called, but no state changes and no `statechange` is emitted.
+Each per-track method stores the value in the arrangement's mix, calls the adapter, increments `mixerVersion` and emits `statechange`; the next `state.tracks` carries the value in that track's field. They are not undo steps, and an undo never changes the mix. They act on a track that is in the current tracks. For any other track ID (one the engine has never seen, or a removed track whose removal can still be undone), the adapter method is still called, but no state changes and no `statechange` is emitted.
 
 ### Undo & Redo
 
@@ -298,8 +302,8 @@ engine.abortTransaction(): void; // put the tracks back as they were at beginTra
 - Undo steps are made by `addTrack()`, `removeTrack()`, `updateTrack(id, track)`, `reorderTrack()`, `moveClip()`, `trimClip()` and `splitClip()`. `setTracks()` clears the history.
 - Undo, redo and an aborted transaction restore tracks and clips only. Volume, mute, solo and pan stay as they are; undoing a `removeTrack()` brings the track back with the mix it had.
 - `undo()` and `redo()` called while a transaction is open abort the transaction first.
-- `commitTransaction()` emits `statechange` when the transaction changed something, and `clearHistory()` when there was history, so `canUndo` and `canRedo` in the state are current.
-- After an undo or a redo the adapter receives only the tracks that differ (its `updateTrack` for each) when the same track IDs are there before and after, and `setTracks` otherwise. An undo of a reorder calls no adapter method.
+- `commitTransaction()` adds one undo step and emits `statechange` when the transaction changed something. When the tracks are back where the transaction began (the same track objects in the same order; for example a track added during the transaction and then taken out with the arrangement's `removeTrack(id, { undoable: false })`. A clip moved away and back is not that: the clip is a new object), it adds no step and emits nothing. `clearHistory()` emits `statechange` when there was history. So `canUndo` and `canRedo` in the state are current.
+- After an undo, a redo or an aborted transaction the adapter receives only the tracks that differ when the same track IDs are there before and after: its `updateTrack` for each, or, when the adapter has no `updateTrack`, one `setTracks` per differing track. When the set of IDs differs it receives one `setTracks`. An undo of a reorder calls no adapter method.
 
 ### Events
 
@@ -315,7 +319,7 @@ engine.off(event, listener): void;
 | `pause` | `() => void` | Playback pauses |
 | `stop` | `() => void` | Playback stops |
 
-The `statechange` event fires on every change (tracks, mix, undo history, selection, zoom, volume, playback state), after the adapter has been brought in step. A change made from inside a `statechange` listener is delivered after the one being handled has reached every listener, so all listeners see the changes in the order they were made. If the adapter throws while a track change is applied, the error reaches the caller of the engine method and that change emits no `statechange`. Use the `tracksVersion` field to distinguish structural track changes, and `mixerVersion` to distinguish per-track mixer edits (volume/mute/solo/pan), from other state updates.
+The `statechange` event fires on every change (tracks, mix, undo history, selection, zoom, volume, playback state), after the engine has made its adapter call for that change. A change made from inside a `statechange` listener is delivered after the one being handled has reached every listener, so all listeners see the changes in the order they were made. The adapter is always sent the current tracks, so once it has been sent every track, changes made before that moment are delivered without a further adapter call. If the adapter throws while a track change is applied, that change emits no `statechange` and the error reaches the caller of the engine method; for a change made from inside a listener, that is the caller of the outer method, the one whose `statechange` the listener was handling. Use the `tracksVersion` field to distinguish structural track changes, and `mixerVersion` to distinguish per-track mixer edits (volume/mute/solo/pan), from other state updates.
 
 ### Cleanup
 
@@ -348,7 +352,7 @@ const engine = new PlaylistEngine({ adapter, arrangement });
 // The tracks and their clips. The same array until they change.
 arrangement.getTracks(); // readonly ClipTrack[]
 
-// The current mix by track ID. The same Map until a value changes.
+// The current mix by track ID. The same Map until a value changes, an entry is added or entries are dropped.
 arrangement.getMixer(); // ReadonlyMap<string, TrackMixerValues>
 arrangement.getMixer().get(trackId); // { volume, muted, soloed, pan } | undefined
 
@@ -358,14 +362,14 @@ const unsubscribe = arrangement.subscribe(() => {
 });
 
 arrangement.tracksVersion; // counts changes to the tracks
-arrangement.mixerVersion;  // counts changes to the mix
+arrangement.mixerVersion;  // counts the changes made by the four mixer setters
 arrangement.canUndo;
 arrangement.canRedo;
 ```
 
 `getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed` and `pan` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields.)
 
-A subscriber is called after the engine has brought its adapter in step. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
+A subscriber is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
 
 ### Changing
 
@@ -389,7 +393,7 @@ The arrangement's `moveClip()` and `trimClip()` have no `skipAdapter` argument; 
 
 An arrangement needs no engine. Every method above works on one that has none, with two differences:
 
-- Clips are given no `startTick`, because there is no tempo to convert with (a clip that came with one keeps it). They get one when an engine attaches.
+- Clips are given no `startTick`, because there is no tempo to convert with. A clip that came with one keeps it until it is moved, trimmed on the left or split; after that it has none. When an engine attaches, every clip without a `startTick` gets one from its `startSample`.
 - The shortest a clip may be (0.1 seconds) is counted at the clip's own sample rate instead of the engine's.
 
 ### Swapping the Engine
@@ -410,7 +414,11 @@ engine.getState().tracks.length; // as before
 engine.canUndo;                  // true
 ```
 
-The new engine sends the tracks it finds to its adapter once, in its constructor, with their mix. Selection, loop, zoom, the playback position and the master volume belong to the engine and start from their defaults in the new one.
+A clip's `startTick` is counted in an engine's `ppqn`. When the next engine has another `ppqn` (the Tone.js adapter at 192 after the native transport at 960, or the reverse), every stored tick is converted to the new unit, rounded to the nearest tick, in the current tracks, in every undo and redo state and in the base of an open transaction. `startSample` is not touched, the conversion is not an undo step, and when it changes the current tracks subscribers are told once (`tracksVersion` goes up by one). With the same `ppqn`, or when no tick changes, nothing happens. Going to a coarser `ppqn` rounds: 7 ticks at 960 become 1 at 192, and 5 when an engine at 960 takes over again, so a later tempo change places such a clip on the coarser engine's tick grid.
+
+A different tempo is not converted. A tick is the musical position, so an engine built at another tempo than the one the ticks were made under has clips whose `startSample` and `startTick` disagree until the next `setTempo`, which moves `startSample` to follow the tick.
+
+The new engine sends the tracks it finds to its adapter once, in its constructor, with their mix. If that call throws, the constructor throws and the engine is no longer attached to the arrangement. After `dispose()`, the engine's track, clip and history methods still change the arrangement, but call no adapter and emit no `statechange`. Selection, loop, zoom, the playback position and the master volume belong to the engine and start from their defaults in the new one.
 
 An arrangement plays through one engine at a time. Building a second engine on an arrangement whose first engine has not been disposed logs a console warning. The `arrangement` option accepts only an object made by `createArrangement()`; anything else throws.
 
@@ -593,14 +601,14 @@ The engine avoids unnecessary listener calls. Mutating methods bail early when:
 - A track/clip ID is not found
 - A zoom level is already at the requested value
 - Selection, loop region or master volume values haven't changed
-- `updateTrack(id, track)` names a track the engine does not have
+- `updateTrack(id, track)` names a track the engine does not have (the track object is still checked, and an invalid one throws)
 - A transaction that changed nothing is committed or aborted
 
 This prevents wasted re-renders in your UI framework.
 
 ### Shared, Read-Only Tracks
 
-The tracks are immutable. A change replaces the tracks array and only the track and clip objects that changed; every other track is the same object as before, so comparing by identity (`prev.tracks[i] !== next.tracks[i]`) finds what changed. An undo step is a reference to an earlier array.
+The tracks are immutable. A change replaces the tracks array and only the track and clip objects that changed; every other track is the same object as before, so comparing by identity (`prev.tracks[i] !== next.tracks[i]`) finds what changed. The exception is `setTracks()`: it copies every track it is given, so after it no track is the object it was. An undo step is a reference to an earlier array.
 
 - `setTracks()`, `addTrack()` and `updateTrack()` copy each track and clip they are given — your objects are not retained
 - `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are **not** copies. They are typed `readonly ClipTrack[]`
@@ -626,7 +634,7 @@ Consumers can trust that `EngineState.selectionStart <= selectionEnd` and `loopS
 
 ### tracksVersion Counter
 
-The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track changes: `setTracks`, `addTrack`, `removeTrack`, `reorderTrack`, `updateTrack(id, track)`, `moveClip`, `trimClip`, `splitClip`, `undo`, `redo`, an aborted transaction that had changed something, and a `setTempo` that the adapter did not refuse. It does **not** increment on selection, zoom, master volume, or loop changes, on a change of the undo history alone (`commitTransaction`, `clearHistory`), nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
+The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track changes: `setTracks`, `addTrack`, `removeTrack`, `reorderTrack`, `updateTrack(id, track)`, `moveClip`, `trimClip`, `splitClip`, `undo`, `redo`, an aborted transaction that had changed something, a `setTempo` that the adapter did not refuse (`setTempo` with the tempo the engine already has and no `atTick` returns before that), and an engine being built on an arrangement that has clips without a `startTick`, or whose ticks are in another `ppqn` (they are converted). It does **not** increment on selection, zoom, master volume, or loop changes, on a change of the undo history alone (`commitTransaction`, `clearHistory`), nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
 
 Per-track mixer edits (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`) instead bump a separate `mixerVersion` counter (and emit `statechange`). This lets a consumer refresh what it shows of the mix without re-running the structural work gated on `tracksVersion`. The split matters because mixer setters fire continuously during a volume/pan slider drag.
 

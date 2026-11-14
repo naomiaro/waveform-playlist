@@ -14,7 +14,7 @@
  * by track id (`getMixer()`, ./mixer.ts). A setter replaces the Map and one
  * entry and no track object; the history holds tracks only, so an undo
  * never changes the mix. The entry of a removed track is kept while any
- * state of the history still holds the track.
+ * state of the history still holds the track, and dropped when none does.
  *
  * It knows nothing of adapters or playback. The engine subscribes with
  * `onChange` and makes the adapter call for each change it is told about.
@@ -39,12 +39,14 @@ import {
   purgeTrack,
   pushStep,
   redoStep,
+  sameTracks,
   undoStep,
   withoutTrack,
 } from './history';
 import type { History, TransactionBase } from './history';
-import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
+import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
+import { tickConverter, withClips } from './ticks';
 import { assertUniqueClipIds, assertUniqueTrackIds, duplicateTrackId } from './validate';
 import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
 
@@ -66,6 +68,8 @@ export type ArrangementChange =
 /** How the arrangement converts time. The engine provides it from its adapter and tempo. */
 export interface ArrangementTimeBase {
   sampleRate: number;
+  /** The unit of the ticks this time base converts to and from: ticks per quarter note. */
+  ppqn: number;
   secondsToTicks(seconds: number): number;
   ticksToSeconds(tick: number): number;
 }
@@ -95,6 +99,8 @@ export class ArrangementImpl implements Arrangement {
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
   private _timeBase: ArrangementTimeBase | null;
+  /** The ppqn the stored ticks are counted in. Null until an engine has attached. */
+  private _tickPpqn: number | null;
   private _subscribers: Set<() => void> = new Set();
   private _listeners: Set<ChangeListener> = new Set();
   private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
@@ -104,6 +110,7 @@ export class ArrangementImpl implements Arrangement {
   constructor(options: ArrangementOptions = {}) {
     this.undoLimit = options.undoLimit ?? DEFAULT_UNDO_LIMIT;
     this._timeBase = options.timeBase ?? null;
+    this._tickPpqn = options.timeBase?.ppqn ?? null;
     if (options.tracks) this.setTracks(options.tracks);
   }
 
@@ -118,7 +125,8 @@ export class ArrangementImpl implements Arrangement {
 
   /**
    * The current mixer values by track id. The same Map until a value
-   * changes; never written to. A track's own mixer fields in `getTracks()`
+   * changes, a track with a new id enters or entries are dropped; never
+   * written to. A track's own mixer fields in `getTracks()`
    * are the values it entered with, not these.
    */
   getMixer(): Mixer {
@@ -159,9 +167,14 @@ export class ArrangementImpl implements Arrangement {
 
   /**
    * Internal, for the engine: how to convert time, for as long as the engine
-   * lives. Clips that have no `startTick` yet are given one now. Returns the
-   * function that detaches; afterwards clips are given no ticks until the
-   * next engine attaches.
+   * lives. Ticks counted in another engine's ppqn are converted to this
+   * one's, in every state the arrangement holds, and clips that have no
+   * `startTick` yet are given one. Returns the function that detaches;
+   * afterwards clips are given no ticks until the next engine attaches.
+   *
+   * Ticks a clip came with before any engine attached are read in the first
+   * engine's ppqn. A different TEMPO is not converted: a tick is the musical
+   * position, and `startSample` follows it at the next tempo change.
    */
   attachEngine(timeBase: ArrangementTimeBase): () => void {
     if (this._timeBase) {
@@ -172,13 +185,18 @@ export class ArrangementImpl implements Arrangement {
       );
     }
     this._timeBase = timeBase;
+    const before = this._tracks;
+    if (this._tickPpqn !== null && this._tickPpqn !== timeBase.ppqn) {
+      this._convertTicks(this._tickPpqn, timeBase.ppqn);
+    }
+    this._tickPpqn = timeBase.ppqn;
     const withTicks = this._tracks.map((track) =>
       withClips(track, (clip) =>
         clip.startTick !== undefined ? clip : { ...clip, startTick: this._tickAt(clip.startSample) }
       )
     );
-    if (withTicks.some((track, i) => track !== this._tracks[i])) {
-      this._tracks = withTicks;
+    if (withTicks.some((track, i) => track !== this._tracks[i])) this._tracks = withTicks;
+    if (this._tracks !== before) {
       this._tracksVersion++;
       this._emit({ type: 'recompute' });
     }
@@ -241,8 +259,9 @@ export class ArrangementImpl implements Arrangement {
     this._transaction = null;
     // Only push undo entry if mutations actually occurred during the transaction.
     // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
-    if (transaction.changed) {
-      this._history = pushStep(this._history, transaction.tracks, this.undoLimit);
+    // ... and only if the tracks are not back where the transaction began.
+    if (transaction.changed && !sameTracks(transaction.tracks, this._tracks)) {
+      this._pushStep(transaction.tracks);
       this._emit({ type: 'history' });
     }
   }
@@ -271,9 +290,11 @@ export class ArrangementImpl implements Arrangement {
     // Everything before is replaced, an open transaction included.
     this._transaction = null;
     this._history = EMPTY_HISTORY;
-    this._tracks = tracks.map((track) => this._withStartTicks(track));
-    // An id that is already there keeps its mix; entries of tracks that are gone are dropped.
-    this._mixer = retainMixer(seedMixer(this._mixer, this._tracks), this._heldStates());
+    // An id that is in the tracks being replaced keeps its mix; every other
+    // entry is dropped (a track that only the history held is gone with it).
+    const kept = retainMixer(this._mixer, [this._tracks]);
+    this._tracks = tracks.map((track) => this._ingest(track));
+    this._mixer = retainMixer(seedMixer(kept, this._tracks), [this._tracks]);
     this._tracksVersion++;
     this._emit({ type: 'set' });
   }
@@ -283,7 +304,7 @@ export class ArrangementImpl implements Arrangement {
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
-    const enriched = this._withStartTicks(track);
+    const enriched = this._ingest(track);
     this._tracks = [...this._tracks, enriched];
     this._mixer = seedMixer(this._mixer, [enriched]);
     this._tracksVersion++;
@@ -327,7 +348,8 @@ export class ArrangementImpl implements Arrangement {
   /**
    * Replace a track, with a track or with a function of the current one. The
    * mixer fields of the new track are not read: the mix is in `getMixer()`.
-   * An id no track has does nothing (a function is not called for it).
+   * An id no track has changes nothing (a track object is still checked and
+   * may throw; a function is not called for it).
    *
    * A track object is copied on its way in. A function's result keeps the
    * clip objects the arrangement already held, so states go on sharing them.
@@ -346,10 +368,10 @@ export class ArrangementImpl implements Arrangement {
     }
     if (!current) return;
     this._pushUndoSnapshot();
-    const enriched = this._withStartTicks(track, byFunction ? new Set(current.clips) : undefined);
+    const enriched = this._ingest(track, byFunction ? new Set(current.clips) : undefined);
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
-    // Only a track that was given a new id has no entry yet.
-    this._mixer = seedMixer(this._mixer, [enriched]);
+    // A track that is given a new id takes its mix with it.
+    this._mixer = seedMixer(carryMixerEntry(this._mixer, trackId, enriched.id), [enriched]);
     this._tracksVersion++;
     this._emit({ type: 'update', trackId });
   }
@@ -566,8 +588,8 @@ export class ArrangementImpl implements Arrangement {
   //
   // Each replaces the Map and one entry, bumps mixerVersion and announces
   // the change. NOT structural changes: no track object is replaced,
-  // tracksVersion stays (#501), and they are not undo steps. An id the
-  // arrangement holds no entry for does nothing.
+  // tracksVersion stays (#501), and they are not undo steps. An id that is
+  // not in the current tracks does nothing.
 
   setTrackVolume(trackId: string, volume: number): void {
     this._setMixerValues(trackId, { volume });
@@ -625,12 +647,12 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /**
-   * A copy of a track on its way in, with a `startTick` on every clip (when
-   * an engine is attached). The track and each clip are copied, so the
+   * A copy of a track on its way in, with a `startTick` on every clip when
+   * an engine is attached (and none added when there is no engine). The track and each clip are copied, so the
    * arrangement holds no object its caller can still write to; a clip in
    * `held` is one the arrangement already holds and is kept as it is.
    */
-  private _withStartTicks(track: ClipTrack, held?: ReadonlySet<AudioClip>): ClipTrack {
+  private _ingest(track: ClipTrack, held?: ReadonlySet<AudioClip>): ClipTrack {
     return {
       ...track,
       clips: track.clips.map((clip) =>
@@ -642,6 +664,8 @@ export class ArrangementImpl implements Arrangement {
   }
 
   private _setMixerValues(trackId: string, values: Partial<TrackMixerValues>): void {
+    // The entry of a removed track is kept for an undo; it is not a track to mix.
+    if (!this._tracks.some((t) => t.id === trackId)) return;
     const next = setMixerValues(this._mixer, trackId, values);
     if (next === this._mixer) return;
     this._mixer = next;
@@ -690,7 +714,14 @@ export class ArrangementImpl implements Arrangement {
       }
       return;
     }
-    this._history = pushStep(this._history, this._tracks, this.undoLimit);
+    this._pushStep(this._tracks);
+  }
+
+  /** Add an undo step. The history may let go of states with it (the redo stack, a step past the limit). */
+  private _pushStep(tracks: readonly ClipTrack[]): void {
+    const letsGo = this._history.redo.length > 0 || this._history.undo.length >= this.undoLimit;
+    this._history = pushStep(this._history, tracks, this.undoLimit);
+    if (letsGo) this._mixer = retainMixer(this._mixer, this._heldStates());
   }
 
   private _restoreTracks(snapshot: readonly ClipTrack[]): void {
@@ -698,6 +729,19 @@ export class ArrangementImpl implements Arrangement {
     this._tracks = snapshot;
     this._tracksVersion++;
     this._emit({ type: 'restore', previous });
+  }
+
+  /** Every stored tick, from one engine's unit to another's: the current tracks and every state held. */
+  private _convertTicks(fromPpqn: number, toPpqn: number): void {
+    const convert = tickConverter(fromPpqn, toPpqn);
+    this._tracks = convert(this._tracks);
+    this._history = {
+      undo: this._history.undo.map(convert),
+      redo: this._history.redo.map(convert),
+    };
+    if (this._transaction) {
+      this._transaction = { ...this._transaction, tracks: convert(this._transaction.tracks) };
+    }
   }
 
   /** Ends an open transaction, restoring the tracks it began from if it changed them. */
@@ -761,15 +805,4 @@ export class ArrangementImpl implements Arrangement {
     }
     if (failed) throw firstError;
   }
-}
-
-/** The track with `change` applied to each clip; the same track when no clip changed. */
-function withClips(track: ClipTrack, change: (clip: AudioClip) => AudioClip): ClipTrack {
-  let changed = false;
-  const clips = track.clips.map((clip) => {
-    const next = change(clip);
-    if (next !== clip) changed = true;
-    return next;
-  });
-  return changed ? { ...track, clips } : track;
 }

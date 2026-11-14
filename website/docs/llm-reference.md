@@ -702,7 +702,7 @@ audioTrack(options: AudioTrackOptions): ArrangementTrack;
 // src: '' counts as not given.
 ```
 
-A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console warning, and the playlist stays in its loading state until `tracks` is valid. Always pass `onError`.
+A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console error that says the playlist could not be built and why, and the playlist stays in its loading state until `tracks` is valid. The same holds for two tracks with one id, or two clips with one id on a track. Always pass `onError`.
 
 ```typescript
 interface TrackState {
@@ -1513,18 +1513,18 @@ interface ClipBounds {
 interface Arrangement {
   // read
   getTracks(): readonly ClipTrack[];                    // The same array until the tracks change. A track's mixer fields are the values it entered with
-  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id. The same Map until a value changes
+  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id. The same Map until a value changes, an entry is added or entries are dropped
   subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
   readonly tracksVersion: number;                       // Counts changes to the tracks
-  readonly mixerVersion: number;                        // Counts changes to the mix
+  readonly mixerVersion: number;                        // Counts the changes made by the four mixer setters (not entries added or dropped)
 
   // whole set
-  setTracks(tracks: readonly ClipTrack[]): void;        // Replace every track. Clears the undo history. A track id that is already there keeps its mix
+  setTracks(tracks: readonly ClipTrack[]): void;        // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
 
   // tracks
   addTrack(track: ClipTrack): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
-  updateTrack(                                          // Does nothing for an id no track has. The new track's mixer fields are not read
+  updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw). The mix stays, also for a track given a new id
     trackId: string,
     next: ClipTrack | ((track: ClipTrack) => ClipTrack)
   ): void;
@@ -1542,7 +1542,7 @@ interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps; an undo never changes them)
+  // mixer (not undo steps; an undo never changes them). Only for a track that is in the current tracks
   setTrackVolume(trackId: string, volume: number): void;
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
@@ -1555,7 +1555,7 @@ interface Arrangement {
   redo(): void;                                         // With a transaction open: aborts it first
   clearHistory(): void;
   beginTransaction(): void;                             // Changes made until commitTransaction are one undo step
-  commitTransaction(): void;
+  commitTransaction(): void;                            // No step when the tracks are back where the transaction began
   abortTransaction(): void;                             // Put the tracks back as they were when the transaction began
 }
 
