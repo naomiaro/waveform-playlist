@@ -84,8 +84,17 @@ There is one sensible way (1); the maintainer set its direction in the issue.
 - `isLoadingClip(clip)` tests for a missing `sampleRate`. No `kind` field.
 - A provider prop `loadSource` for custom loading.
 - An explicit `retry(src)` on the status hook.
-- `deferEngineRebuild` is removed (every use in the repo is `={loading}` fed
-  by the hooks that go away).
+- `deferEngineRebuild` is removed. Its uses are the pages fed by the hooks that
+  go away, `BeatsAndBarsExample` (its own fetch loop and buffer map, copied to
+  state in an effect: converted in PR 2 like the six pages; the plan reads how
+  it positions clips first) and three unit tests, which are rewritten over
+  loading clips.
+- Loading into an empty engine waits for every source; `play()` during that
+  wait does nothing (both under "What the engine effect does").
+- The loader is declarative (`setWanted` / `suspend` / `provide`), with one owner.
+- `useIntegratedRecording(tracks, setTracks)` in `@waveform-playlist/recording`
+  is retyped to `PlaylistTrack[]` in PR 2 (it receives the app's state); a
+  break in that package, with a changeset and an upgrade entry.
 - The pending-clip merge in `onTracksChange` (below).
 - Three PRs (below), each with its own docs.
 
@@ -156,8 +165,12 @@ export type SourceState<V> =
   | { status: 'failed'; error: Error };
 
 export interface SourceLoader<K, V> {
-  /** Ask for a key. Returns the function that withdraws this request. */
-  request(key: K): () => void;
+  /** Declare the whole set of keys that are wanted now. */
+  setWanted(keys: Iterable<K>): void;
+  /** Abort every load in flight. Wanted keys and loaded values are kept. */
+  suspend(): void;
+  /** Record a value the caller already holds as loaded. */
+  provide(key: K, value: V): void;
   /** Start a failed key again. A no-op for any other state. */
   retry(key: K): void;
   /** `ValueSource` shape: a new Map object on every change. */
@@ -170,17 +183,26 @@ export function createSourceLoader<K, V>(options: {
 }): SourceLoader<K, V>;
 ```
 
+The loader has one owner that declares what it wants; there is no request
+counting. (A first draft counted requests and dropped a key when its last
+request was withdrawn; the builder check showed that a hidden `<Activity>`,
+whose cleanup is followed by no setup, would then drop every buffer.)
+
 Rules, each with a test:
 
-- One `load` per key however many requests; all requesters see one state object.
-- Requests are counted. When the last request for a key is withdrawn: a pending
-  load is aborted and the key removed; a loaded or failed key is removed (the
-  value can be collected). A withdraw followed by a request in the same
-  synchronous turn must not abort (StrictMode's setup, cleanup, setup): removal
-  is deferred to a microtask and cancelled by a new request.
+- `setWanted(keys)`: a key that is new starts one `load`; a wanted key whose
+  load was suspended starts again; a key no longer in the set is dropped (a
+  pending load aborted, a loaded value or a failure forgotten). A key that is
+  loaded or failed and still wanted is left alone.
+- `suspend()`: aborts pending loads and nothing else. The keys stay `pending`
+  in the snapshot and start again at the next `setWanted`. The owner calls it
+  from an effect cleanup; it must never forget a loaded value.
+- `provide(key, value)`: the key becomes `loaded` with that value; a load in
+  flight for it is aborted. A no-op for a key that is already loaded. The key
+  is still dropped by a later `setWanted` that leaves it out.
 - A rejection with `name === 'AbortError'` is never recorded as `failed`.
-- A late result for a key that was removed, or removed and requested again, is
-  ignored (compare a per-load token, not a flag that must be reset).
+- A late result of an aborted or dropped load is ignored (compare a per-load
+  token, not a flag that must be reset).
 - A failed key stays failed until `retry(key)`.
 - `getSnapshot()` returns the same Map until something changes.
 - Keys are compared as Map keys: strings by value, objects by identity.
@@ -224,11 +246,20 @@ Identity rules (tests assert each):
 The effect keeps its structure and depends on `engineTracks` where it depended
 on `tracks`.
 
-- **First load.** While the provider has never completed a build and any source
+- **Loading into an empty engine waits for everything.** While the engine
+  holds no tracks (never built, or built for an empty timeline) and any source
   named by `tracks` is pending, no tracks are applied (this replaces
-  `deferEngineRebuild`). When all have settled, one full build. `isReady`, the
-  `waveform-playlist:ready` event and `onReady` come from that build, as today.
-  A `play()` during the wait is queued, as during any build in flight.
+  `deferEngineRebuild`). When all have settled they are applied in one step: a
+  full build when there is no engine yet, the incremental `added` path when an
+  engine for an empty timeline exists. `isReady`, the `waveform-playlist:ready`
+  event and `onReady` come from a full build only, as today, so an app that
+  mounts with no tracks and sets them later gets them before any audio exists,
+  as it does today. A `play()` during the wait does nothing, as today under
+  `deferEngineRebuild` (the effect returns before a build is in flight).
+- **A source that settles during a trim drag** (`isDraggingRef`) is applied
+  after the release, not lost: the effect's drag branch must not record the
+  new `engineTracks` as already applied. Test: a decode that finishes mid-drag
+  sounds after the release, with no rebuild.
 - **After the first build**, a source that settles changes `engineTracks`, and
   `incrementalTrackChange` decides, as today. It is extended by one case: a
   track whose previous clips are all still present as the same objects and
@@ -282,16 +313,31 @@ In an effect over the set of sources `tracks` names: `loader.request` for each
 new one, the withdraw function called for each that is gone and for all on
 cleanup. "Names" counts loading clips AND resolved clips that carry `src`, so a
 source stays in the loader while any clip of it is in the app's state. The
-loader itself lives in a ref created once per provider instance and is never
-cleared by a cleanup.
+effect body calls `loader.setWanted(names)` and its cleanup calls
+`loader.suspend()`. The loader itself lives in a ref created once per provider
+instance and is never cleared by a cleanup.
+
+A clip in the `tracks` prop that carries both `src` and `audioBuffer` (handed
+back earlier, restored by an undo, kept by the app across a remount of the
+provider) is given to the loader with `provide(src, audioBuffer)` before
+`setWanted`: nothing is fetched for it, it never holds back a build, and the
+status hook shows it as loaded. A later loading clip naming the same source
+resolves from that buffer.
 
 ### `onTracksChange`
 
-The engine's statechange carries the engine's tracks. Before handing them to
-the app, the provider puts back every loading clip the engine does not hold
-(pending, or failed), from the latest `tracks` prop, per track: the engine's
-clips, then that track's unresolved loading clips in their order. A track with
-no such clip is handed back as the engine's own object.
+Everything that reaches the app's `onTracksChange` goes through one merge: the
+engine's statechange, AND the `onTracksChange` in the `usePlaylistTimeline()`
+value, which `useClipDragHandlers` calls on every move of a trim and on a
+cancel with copies of the view's tracks (`useClipDragHandlers.ts:272`, `:310`).
+
+The merge, per track: placeholder clips are removed; then every loading clip of
+that track in the latest `tracks` prop whose `id` is not among the remaining
+clips is put back, after them, in its order. The test is the clip's id, not
+its source's status: a clip whose source has loaded but which the engine does
+not hold yet (it settled during a drag) stays a loading clip in the app's
+state and enters the engine through the normal path. A track with nothing
+removed and nothing put back is handed on as the same object.
 
 - The merged array is what is stored in `engineTracksRef`, so the "tracks came
   from the engine" guard still recognises it when it returns as the prop.
@@ -391,6 +437,13 @@ find only the upgrade guide.
 - The order of pending clips relative to engine clips inside a merged track,
   as long as it is stable.
 - Wording of warnings and errors.
+
+## Open, waiting for the maintainer
+
+- **Undo and arriving audio.** Today a file drop's decode ends with
+  `engine.clearHistory()` (`WaveformPlaylistContext.tsx:641`): the undo history
+  of every track is gone. `engine.updateTrack` and `addTrack` each push an undo
+  snapshot, so without the clear an undo can remove a clip that just arrived.
 
 ## Open, to tell the maintainer when known
 
