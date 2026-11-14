@@ -173,6 +173,7 @@ export class AdapterSync {
         }
         break;
       case 'update':
+        if (this._playsTheSame(change.previous, change.trackId)) break;
         // A track that was given a new id is not found under the old one.
         if (!this.sendTrack(change.trackId)) this.sendAllTracks();
         break;
@@ -209,13 +210,32 @@ export class AdapterSync {
     const sameSet = previous.length === restored.length && restored.every((t) => oldById.has(t.id));
     if (this._adapter && sameSet) {
       for (const track of restored) {
-        if (oldById.get(track.id) !== track) {
-          this.sendTrack(track.id);
-        }
+        // `sameSet`: every restored track has a track of its id in `previous`.
+        const old = oldById.get(track.id) as ArrangementTrack;
+        if (!this._playsTheSame(old, track.id)) this.sendTrack(track.id);
       }
     } else {
       this.sendAllTracks();
     }
+  }
+
+  /**
+   * True when the arrangement's current track of that id is, for an adapter,
+   * what `previous` was: the same loaded clip objects in the same order and
+   * the same fields. Only its loading clips differ, and an adapter is not
+   * given those, so there is nothing to send.
+   */
+  private _playsTheSame(previous: ArrangementTrack, trackId: string): boolean {
+    const current = this._arrangement.getTracks().find((t) => t.id === trackId);
+    if (!current) return false;
+    if (current === previous) return true;
+    const before = this._loaded(previous);
+    const now = this._loaded(current);
+    if (before.clips.length !== now.clips.length) return false;
+    if (before.clips.some((clip, i) => clip !== now.clips[i])) return false;
+    const keys = new Set([...Object.keys(before), ...Object.keys(now)]) as Set<keyof ClipTrack>;
+    keys.delete('clips');
+    return [...keys].every((key) => Object.is(before[key], now[key]));
   }
 
   /** What an adapter and `getState()` are given for one of the arrangement's tracks. */

@@ -147,7 +147,9 @@ describe('Arrangement: tracks', () => {
     expect(loaded(arrangement)[0].clips.map((c) => [c.id, c.startTick])).toEqual([['a3', 1920]]);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
   });
 
   // updateTrack with an unknown id, history announcements, validation and the
@@ -206,7 +208,9 @@ describe('Arrangement: clips', () => {
     expect(arrangement.getTracks()[1]).toBe(others);
     expect(arrangement.tracksVersion).toBe(2);
     expect(arrangement.canUndo).toBe(true);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
   });
 
   it('moveClip stops at a neighbour', () => {
@@ -250,7 +254,22 @@ describe('Arrangement: clips', () => {
     expect(trimmed.offsetSamples).toBe(24000);
     expect(trimmed.durationSamples).toBe(24000);
     expect(arrangement.canUndo).toBe(true);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
+  });
+
+  it('an "update" carries the track object it replaced, for a clip edit and for updateTrack', () => {
+    const { arrangement, changes } = setup();
+    const first = arrangement.getTracks()[0];
+    arrangement.moveClip('A', 'a1', 24000);
+    const second = arrangement.getTracks()[0];
+    arrangement.updateTrack('A', (current) => ({ ...current, name: 'renamed' }));
+
+    expect(second).not.toBe(first);
+    expect(changes).toHaveLength(2);
+    expect((changes[0] as { previous: unknown }).previous).toBe(first);
+    expect((changes[1] as { previous: unknown }).previous).toBe(second);
   });
 
   it('trimClip on the right changes the duration only', () => {
@@ -258,7 +277,9 @@ describe('Arrangement: clips', () => {
     arrangement.trimClip('A', 'a1', 'right', -1000);
     expect(clipOf('A', 'a1').durationSamples).toBe(47000);
     expect(clipOf('A', 'a1').startSample).toBe(0);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
   });
 
   it('trimClip keeps the minimum duration of a tenth of a second at the time base’s rate', () => {
@@ -298,7 +319,9 @@ describe('Arrangement: clips', () => {
       [96000, 48000, 3840],
     ]);
     expect(arrangement.canUndo).toBe(true);
-    expect(changes).toEqual([{ type: 'update', trackId: 'A' }]);
+    expect(changes).toEqual([
+      { type: 'update', trackId: 'A', previous: expect.objectContaining({ id: 'A' }) },
+    ]);
   });
 
   it('splitClip too close to an edge warns and changes nothing', () => {

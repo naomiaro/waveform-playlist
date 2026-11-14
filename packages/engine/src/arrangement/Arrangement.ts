@@ -59,7 +59,8 @@ export type ArrangementChange =
   | { type: 'set' }
   | { type: 'add'; trackId: string }
   | { type: 'remove'; trackId: string }
-  | { type: 'update'; trackId: string }
+  /** `previous`: the track object that was replaced (for a listener that sends only what differs). */
+  | { type: 'update'; trackId: string; previous: ArrangementTrack }
   | { type: 'reorder' }
   | { type: 'restore'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
@@ -398,7 +399,7 @@ export class ArrangementImpl implements Arrangement {
     this._mixer = seedMixer(carryMixerEntry(this._mixer, trackId, enriched.id), [enriched]);
     if (enriched.id !== trackId) this._mixer = retainMixer(this._mixer, this._heldStates());
     this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    this._emit({ type: 'update', trackId, previous: current });
   }
 
   // ---------------------------------------------------------------------------
@@ -497,10 +498,12 @@ export class ArrangementImpl implements Arrangement {
 
   /** The tracks after an edit of one track: an undo step, the new array, the announcement. */
   private _replaceTrack(trackId: string, tracks: readonly ArrangementTrack[]): void {
+    // The edit found the track, so it is there.
+    const previous = this._tracks.find((t) => t.id === trackId) as ArrangementTrack;
     this._pushUndoSnapshot();
     this._tracks = tracks;
     this._tracksVersion++;
-    this._emit({ type: 'update', trackId });
+    this._emit({ type: 'update', trackId, previous });
   }
 
   /** How the clip edits convert time: through the attached engine, or not at all. */

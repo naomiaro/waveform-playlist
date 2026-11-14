@@ -385,3 +385,131 @@ describe('what an engine plays and reports leaves loading clips out', () => {
     engine.dispose();
   });
 });
+
+describe('a change to loading clips only is not sent to the adapter', () => {
+  // The adapter plays loaded clips: a track whose loaded clips and own fields
+  // are what it already has would be rebuilt for nothing.
+  const setup = (incremental: boolean) => {
+    const adapter = recordingAdapter({ incremental });
+    const arrangement = createArrangement({ tracks: fixture() });
+    const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: SAMPLE_RATE });
+    const events = vi.fn();
+    engine.on('statechange', events);
+    adapter.reset();
+    return { adapter, arrangement, engine, events };
+  };
+  const addLoading = (arrangement: Arrangement, id: string) =>
+    arrangement.updateTrack('A', (current) => ({
+      ...current,
+      clips: [...current.clips, loading(id, 5)],
+    }));
+  const dropLoading = (arrangement: Arrangement, id: string) =>
+    arrangement.updateTrack('A', (current) => ({
+      ...current,
+      clips: current.clips.filter((c) => c.id !== id),
+    }));
+
+  for (const incremental of [true, false]) {
+    const kind = incremental ? 'an incremental adapter' : 'an adapter with setTracks only';
+
+    it(`${kind}: adding, replacing and removing a loading clip make no adapter call`, () => {
+      const { adapter, arrangement, engine, events } = setup(incremental);
+
+      addLoading(arrangement, 'N');
+      arrangement.updateTrack('A', (current) => ({
+        ...current,
+        clips: current.clips.map((c) => (c.id === 'N' ? loading('N', 7) : c)),
+      }));
+      dropLoading(arrangement, 'L');
+
+      expect(adapter.calls).toEqual([]);
+      // The change itself happened and was announced, each time.
+      expect(clipIds(arrangement, 'A')).toEqual(['a1', 'a2', 'N']);
+      expect(events).toHaveBeenCalledTimes(3);
+      expect(arrangement.canUndo).toBe(true);
+      engine.dispose();
+    });
+
+    it(`${kind}: undo and redo of such a change make no adapter call`, () => {
+      const { adapter, arrangement, engine, events } = setup(incremental);
+      addLoading(arrangement, 'N');
+      arrangement.undo();
+      arrangement.redo();
+      expect(adapter.calls).toEqual([]);
+      expect(events).toHaveBeenCalledTimes(3);
+      engine.dispose();
+    });
+  }
+
+  it('a change that also touches a loaded clip, or a field of the track, is sent', () => {
+    const { adapter, arrangement, engine } = setup(true);
+
+    arrangement.updateTrack('A', (current) => ({
+      ...current,
+      clips: [...current.clips.filter((c) => c.id !== 'a2'), loading('N', 5)],
+    }));
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['A', { id: 'A', clips: ['a1'] }] },
+    ]);
+
+    adapter.reset();
+    arrangement.updateTrack('A', (current) => ({ ...current, name: 'renamed' }));
+    expect(adapter.calls.map((call) => call.method)).toEqual(['updateTrack']);
+
+    // The order of the loaded clips is theirs too.
+    // A loaded clip more, after the ones the adapter has.
+    adapter.reset();
+    arrangement.updateTrack('B', (current) => ({
+      ...current,
+      clips: [...current.clips, clip('b0', 5 * SECOND)],
+    }));
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['B', { id: 'B', clips: ['b1', 'b0'] }] },
+    ]);
+    adapter.reset();
+    arrangement.updateTrack('B', (current) => ({
+      ...current,
+      clips: [...current.clips].reverse(),
+    }));
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['B', { id: 'B', clips: ['b0', 'b1'] }] },
+    ]);
+    engine.dispose();
+  });
+
+  it('the next change to a loaded clip sends the track as it is then', () => {
+    const { adapter, arrangement, engine } = setup(true);
+    addLoading(arrangement, 'N');
+    arrangement.moveClip('A', 'a2', SECOND);
+
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['A', { id: 'A', clips: ['a1', 'a2'] }] },
+    ]);
+    const sent = adapter.rawCalls[0].args[1] as ClipTrack;
+    expect(sent.clips[1].startSample).toBe(4 * SECOND);
+    engine.dispose();
+  });
+
+  it('an undo that restores a loaded clip on one track sends that track only', () => {
+    const { adapter, arrangement, engine } = setup(true);
+    arrangement.beginTransaction();
+    addLoading(arrangement, 'N');
+    arrangement.moveClip('B', 'b1', SECOND);
+    arrangement.commitTransaction();
+    adapter.reset();
+
+    arrangement.undo();
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['B', { id: 'B', clips: ['b1'] }] },
+    ]);
+    engine.dispose();
+  });
+
+  it('a track sent again with updateTrack(id) is always sent', () => {
+    const { adapter, arrangement, engine } = setup(true);
+    addLoading(arrangement, 'N');
+    engine.updateTrack('A');
+    expect(adapter.calls.map((call) => call.method)).toEqual(['updateTrack']);
+    engine.dispose();
+  });
+});
