@@ -63,7 +63,16 @@ Owners in this design:
 - A granular document with per-field transactions as openDAW has. The store
   holds immutable tracks and replaces what changed.
 - Serializable tracks (#836). The store makes it easier; it is not built.
-- dawcore using the store. It is framework-free so that it could.
+- dawcore using the store. The maintainer's picture (2026-11-13) is that
+  `<daw-editor>` shares the store's CODE: it keeps three copies of its tracks
+  today (`_tracks` descriptors, `_engineTracks`, the engine's) and reconciles
+  them by hand. Sharing one store INSTANCE between a React provider and a
+  `<daw-editor>` "could be interesting" and is not a target. So: the store
+  stays free of React and of anything provider-specific, its one tie to audio
+  is the decode context that the engine's owner attaches, and nothing in it may
+  assume a single kind of attacher. A follow-up issue is filed when this
+  interface is final; it has to settle who wins between the store and
+  dawcore's declarative DOM (`<daw-clip src>` attributes).
 
 ## Anti-goals
 
