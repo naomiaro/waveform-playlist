@@ -473,3 +473,29 @@ find only the upgrade guide.
   the position of the clip that arrived.
 - `src` survives split, trim, move, track updates, undo and redo (PR 1: split
   was fixed, the others have tests).
+
+## Decided during the build (maintainer, 2026-11-13)
+
+- **`isDraggingRef` keeps its place and its type** (choice a). The provider
+  creates it with a `current` setter that tells it when a trim drag ends, so a
+  clip that arrived during the drag is applied after a release that changed
+  nothing. No new option on `useClipDragHandlers`. The upgrade guide says that
+  the object must be passed on as it is, not copied.
+- **The engine is disposed on every cleanup of the provider** (choice
+  "dispose"): a real unmount, a hidden `<Activity>` and a Fast Refresh alike.
+  A provider that is hidden and revealed builds a new engine: undo history is
+  lost, audio stops while hidden and resumes on reveal, and
+  `waveform-playlist:ready` and `onReady` fire again. Keeping the engine across
+  a hide is #842.
+- **An engine track keeps its identity while nothing the engine sees changed**
+  (my ruling, told to the maintainer): the same clip objects and equal other
+  fields, also for a new input track object. A copy of a track with identical
+  content no longer rebuilds the engine.
+- **A loading clip on a MIDI track** is reported through `onError`, never
+  fetched, and does not hold back the first build.
+- **No source timeout** (#840). The docs show the app-side way
+  (`AbortSignal.timeout` in its own `loadSource`).
+- **The loader is wired with one effect that follows `tracks`** (`provide`,
+  then `setWanted`) and one cleanup that calls `suspend()`; the section "Which
+  sources are requested" above describes an earlier shape.
+
