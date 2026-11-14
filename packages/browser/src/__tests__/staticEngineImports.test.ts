@@ -50,6 +50,8 @@ const FILES = [
   'providerInternals/useDragFlag.ts',
   'providerInternals/useDisposeEngineOnUnmount.ts',
   'providerInternals/useReportRejectedClips.ts',
+  'providerInternals/useWarnDuplicateTrackIds.ts',
+  'utils/duplicateTrackIds.ts',
   'utils/unappliedClips.ts',
 ];
 

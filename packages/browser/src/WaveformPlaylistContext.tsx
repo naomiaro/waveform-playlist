@@ -44,6 +44,7 @@ import { useMergedTracksChange } from './providerInternals/useMergedTracksChange
 import { useDragFlag } from './providerInternals/useDragFlag';
 import { useDisposeEngineOnUnmount } from './providerInternals/useDisposeEngineOnUnmount';
 import { useReportRejectedClips } from './providerInternals/useReportRejectedClips';
+import { useWarnDuplicateTrackIds } from './providerInternals/useWarnDuplicateTrackIds';
 import { resolveTracks, EMPTY_RESOLVE_CACHE, type ResolveCache } from './utils/resolveTracks';
 import { hasUnappliedContent, sameElements } from './utils/unappliedClips';
 import type { LoadSource } from './utils/loadSource';
@@ -322,6 +323,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   }, [tracksProp, sources, sampleRate]);
   const { viewTracks: tracks, engineTracks, placeholderIds, rejected } = resolved;
   useReportRejectedClips(rejected, tracksProp, onError);
+  useWarnDuplicateTrackIds(tracksProp);
   // Only the tracks the provider is mounted with wait for every source: until
   // the first engine build, while one of them is still loading, nothing is
   // built. A provider mounted with no tracks never waits.
