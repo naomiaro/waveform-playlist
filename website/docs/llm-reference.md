@@ -1459,22 +1459,110 @@ Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. **Cleanup-
 
 Framework-agnostic timeline engine. Used internally by the browser package provider.
 
-`setTracks(tracks)`, `addTrack(track)` and `updateTrack(id, track)` throw an `Error` when a track's clips are not all of its `kind` (see `ClipTrack` under Data Types). The check runs before any state changes: no undo step, no adapter call.
+`setTracks(tracks)`, `addTrack(track)` and `updateTrack(id, track)` throw an `Error` when a track's clips are not all of its `kind` (see `ClipTrack` under Data Types), when a track id is a duplicate, and when two clips of one track have the same id. The check runs before any state changes: no undo step, no adapter call.
+
+The arrangement (`createArrangement()`) owns the tracks, the mix and the undo history; a `PlaylistEngine` plays it, and makes its own when the `arrangement` option is left out. Nothing either hands out is a copy: `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are shared with the undo history and frozen outside production builds.
 
 ```typescript
-import { PlaylistEngine } from '@waveform-playlist/engine';
+import { PlaylistEngine, createArrangement } from '@waveform-playlist/engine';
 import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions } from '@waveform-playlist/engine';
+import type {
+  Arrangement,
+  ArrangementChangeOptions,
+  ClipBounds,
+  CreateArrangementOptions,
+  TrackMixerValues,
+} from '@waveform-playlist/engine';
 
 interface PlaylistEngineOptions {
   adapter?: PlayoutAdapter;
+  arrangement?: Arrangement;    // From createArrangement(). Outlives the engine; left out, the engine makes its own. One engine at a time
   sampleRate?: number;          // Default: 48000 (use AudioContext.sampleRate for hardware rate)
-  samplesPerPixel?: number;     // Default: 1000
+  samplesPerPixel?: number;     // Default: 1024; must be one of zoomLevels
   zoomLevels?: number[];        // Default: [256, 512, 1024, 2048, 4096, 8192]
+  undoLimit?: number;           // Default: 100. Only when the engine makes its own arrangement
+  bpm?: number;                 // Default: 120
+  ppqn?: number;                // Without an adapter (default 960); with one, adapter.ppqn is used
+}
+
+function createArrangement(options?: CreateArrangementOptions): Arrangement;
+
+interface CreateArrangementOptions {
+  tracks?: readonly ClipTrack[];  // The first tracks. Not an undo step
+  undoLimit?: number;             // Maximum number of undo steps (default 100)
+}
+
+interface ArrangementChangeOptions {
+  undoable?: boolean;             // false makes the change without an undo step
+}
+
+interface TrackMixerValues {
+  volume: number;
+  muted: boolean;
+  soloed: boolean;
+  pan: number;
+}
+
+interface ClipBounds {
+  offsetSamples: number;
+  durationSamples: number;
+  startSample: number;
+  sourceDurationSamples: number;
+}
+
+interface Arrangement {
+  // read
+  getTracks(): readonly ClipTrack[];                    // The same array until the tracks change. A track's mixer fields are the values it entered with
+  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id. The same Map until a value changes
+  subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
+  readonly tracksVersion: number;                       // Counts changes to the tracks
+  readonly mixerVersion: number;                        // Counts changes to the mix
+
+  // whole set
+  setTracks(tracks: readonly ClipTrack[]): void;        // Replace every track. Clears the undo history. A track id that is already there keeps its mix
+
+  // tracks
+  addTrack(track: ClipTrack, options?: ArrangementChangeOptions): void;
+  removeTrack(trackId: string, options?: ArrangementChangeOptions): void;
+  updateTrack(                                          // Does nothing for an id no track has. The new track's mixer fields are not read
+    trackId: string,
+    next: ClipTrack | ((track: ClipTrack) => ClipTrack),
+    options?: ArrangementChangeOptions
+  ): void;
+  reorderTrack(trackId: string, toIndex: number): void;
+
+  // clips
+  moveClip(trackId: string, clipId: string, deltaSamples: number): number;  // Returns the delta actually applied
+  trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
+  splitClip(trackId: string, clipId: string, atSample: number): void;
+  getClipBounds(trackId: string, clipId: string): ClipBounds | null;
+  constrainTrimDelta(
+    trackId: string,
+    clipId: string,
+    boundary: 'left' | 'right',
+    deltaSamples: number
+  ): number;
+
+  // mixer (not undo steps; an undo never changes them)
+  setTrackVolume(trackId: string, volume: number): void;
+  setTrackMute(trackId: string, muted: boolean): void;
+  setTrackSolo(trackId: string, soloed: boolean): void;
+  setTrackPan(trackId: string, pan: number): void;
+
+  // history
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  undo(): void;                                         // With a transaction open: aborts it first
+  redo(): void;                                         // With a transaction open: aborts it first
+  clearHistory(): void;
+  beginTransaction(): void;                             // Changes made until commitTransaction are one undo step
+  commitTransaction(): void;
+  abortTransaction(): void;                             // Put the tracks back as they were when the transaction began
 }
 
 interface EngineState {
-  tracks: ClipTrack[];
-  tracksVersion: number;        // Monotonic counter; increments on structural track mutations only
+  tracks: readonly ClipTrack[]; // Each track with its current mixer values. Shared, not a copy: never write to it. Frozen outside production builds
+  tracksVersion: number;        // Monotonic counter; increments on structural track changes only
   mixerVersion: number;         // Monotonic counter; increments on per-track mixer edits (volume/mute/solo/pan)
   duration: number;
   currentTime: number;
@@ -1491,13 +1579,19 @@ interface EngineState {
   loopStart: number;            // Guaranteed: loopStart <= loopEnd
   loopEnd: number;
   isLoopEnabled: boolean;
+  bpm: number;                  // Current base tempo
+  ppqn: number;                 // Pulses per quarter note
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 // Key methods on PlaylistEngine:
-// Track management: setTracks(), addTrack(), removeTrack(), selectTrack()
-// Clip editing: moveClip(), trimClip(), splitClip()
+// Track management: setTracks(tracks: readonly ClipTrack[]), addTrack(), removeTrack(), updateTrack(), reorderTrack(), selectTrack()
+// Clip editing: moveClip(), trimClip(), splitClip(), getClipBounds(), constrainTrimDelta()
+// Track mix: setTrackVolume(), setTrackMute(), setTrackSolo(), setTrackPan()
+// History: undo(), redo(), clearHistory(), beginTransaction(), commitTransaction(), abortTransaction(), canUndo, canRedo
 // Playback: play(), pause(), stop(), seek()
-// State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume()
+// State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume(), setTempo()
 // Zoom: zoomIn(), zoomOut(), setZoomLevel()
 // Events: on(event, listener), off(event, listener)
 // Lifecycle: dispose()

@@ -3541,6 +3541,146 @@ The nodes are typed `ToneAudioNode | AudioNode`, so use Tone's `connect()` helpe
 
 Also changed: `EffectDefinition['category']` is now `EffectCategory`, the known category names or any other string (a registered custom effect names its own). `BuiltInEffectCategory` is the closed union it used to be. An exhaustive `switch` over `category` needs a `default` case.
 
+## `PlaylistEngine`: the arrangement owns the tracks, the mix and the undo history
+
+**Packages:** `@waveform-playlist/engine`, `@waveform-playlist/browser`.
+
+This entry is for code that calls a `PlaylistEngine` itself: an engine you construct, or the one behind `useEngineRefs().playoutRef`. One part of it reaches every React app: the tracks handed to `onTracksChange` (the first heading below).
+
+The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes below. `WaveformPlaylistProvider` takes `tracks` and `onTracksChange` as before. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
+
+### `getState().tracks` and the tracks in `onTracksChange` are read-only
+
+`EngineState.tracks` is now `readonly ClipTrack[]` and is no longer a copy: it is the engine's own array, shared with the undo history. Before, every `getState()` and every `statechange` carried a fresh copy of each track (with a copy of its `clips` array), and writing to it changed nothing but your copy. `PlayoutAdapter.setTracks` receives a `readonly ClipTrack[]` too.
+
+In `WaveformPlaylistProvider`, the array passed to `onTracksChange` is a new array you may keep in state, but the track and clip objects in it are the engine's.
+
+Outside production builds (`process.env.NODE_ENV` is not `'production'`) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws a `TypeError` in a module. In a production build nothing is frozen and a write silently changes the engine's state and its undo history. What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen.
+
+**Find:**
+
+- Assignments to a track or clip that came from `engine.getState().tracks`, from a `statechange` listener's `state.tracks`, or from the argument of `onTracksChange`: `track.name = …`, `track.clips.push(…)`, `clip.startSample = …`, `tracks.sort(…)`, `tracks.splice(…)`.
+- Variables typed `ClipTrack[]` that are assigned `engine.getState().tracks`. TypeScript reports each one (`The type 'readonly ClipTrack[]' is 'readonly' and cannot be assigned to the mutable type 'ClipTrack[]'`).
+- A custom `PlayoutAdapter` whose `setTracks`, `addTrack` or `updateTrack` writes to the tracks it is given.
+
+**Replace with:**
+
+```typescript
+// Before
+const state = engine.getState();
+const track = state.tracks.find((t) => t.id === id);
+track.name = 'Bass';
+engine.updateTrack(id, track);
+
+// After
+const track = engine.getState().tracks.find((t) => t.id === id);
+if (track) {
+  engine.updateTrack(id, { ...track, name: 'Bass' });
+}
+```
+
+```tsx
+// Before
+onTracksChange={(next) => {
+  next[0].name = 'Bass';
+  setTracks(next);
+}}
+
+// After
+onTracksChange={(next) => {
+  setTracks(next.map((track, i) => (i === 0 ? { ...track, name: 'Bass' } : track)));
+}}
+```
+
+```typescript
+// Before
+const tracks: ClipTrack[] = engine.getState().tracks;
+
+// After
+const tracks: readonly ClipTrack[] = engine.getState().tracks;
+// or, when you need an array of your own to sort or splice:
+const mine = [...engine.getState().tracks];
+```
+
+`setTracks()`, `addTrack()` and `updateTrack()` copy the tracks they are given, so the objects you pass in are never frozen and stay yours.
+
+Also changed: `state.tracks` is the same array until the tracks or the mix change, and a track that did not change is the same object from one state to the next. Code that relied on a new array per `statechange` (an effect keyed on `state.tracks`) now runs only when something in it changed.
+
+### A track's `volume`, `muted`, `soloed` and `pan` fields seed the mix once
+
+The mix is kept by track id, apart from the track objects. A track's own four fields are read when its id has no mixer entry yet. For an id the engine already has, `setTracks()`, `addTrack()` and `updateTrack(id, track)` keep the current mix and do not read the fields. Before, `setTracks()` and `updateTrack(id, track)` took the mix from the fields of the tracks they were given.
+
+`getState().tracks` and the tracks an adapter receives carry the current mix in those fields.
+
+**Find:** code that changes a track's mix by passing a track with other `volume`, `muted`, `soloed` or `pan` values to `engine.setTracks()` or `engine.updateTrack(id, track)`.
+
+**Replace with:**
+
+```typescript
+// Before
+engine.updateTrack(id, { ...track, volume: 0.5, muted: true });
+
+// After
+engine.setTrackVolume(id, 0.5);
+engine.setTrackMute(id, true);
+```
+
+An entry is dropped when its track is in neither the current tracks nor any state the undo history can return to: after a `setTracks()` without that id, or after `clearHistory()` for a track that was removed. A track with that id entering afterwards seeds the mix from its fields again.
+
+### Undo and redo no longer change volume, pan, mute or solo
+
+The undo history holds tracks and clips only. Before, an undo step was a copy of the tracks with the mix they had when the step was made, so undoing a clip move after a fader move also put the fader back. Now `undo()`, `redo()` and `abortTransaction()` leave the mix as it is, and undoing a `removeTrack()` brings the track back with the mix it had when it was removed.
+
+**Find:** code or tests that expect `undo()` to restore a track's volume, pan, mute or solo.
+
+**Replace with:** keep the earlier value yourself and set it with `setTrackVolume()`, `setTrackPan()`, `setTrackMute()` or `setTrackSolo()`.
+
+### Duplicate track ids, and duplicate clip ids within a track, throw
+
+`setTracks()`, `addTrack()` and `updateTrack(id, track)` now throw an `Error` whose message starts with `[waveform-playlist]`, before changing anything, for:
+
+- two tracks with the same id (`setTracks`), a track whose id another track has (`addTrack`), or a track given a new id that another track has (`updateTrack`);
+- two clips with the same id on one track. The same clip id on two different tracks is accepted.
+
+Before, such tracks were accepted. In `WaveformPlaylistProvider` the throw comes from the same engine calls as the one for a track of the wrong kind, which the provider catches and reports through `onError`, not to an error boundary (see [A track has a kind](#a-track-has-a-kind-audio-or-midi-never-both)).
+
+**Find:** places that build track or clip ids by hand (an index, a file name, a copied clip that keeps its id), and saved projects.
+
+**Replace with:** an id per track and, within a track, per clip. `createTrack()`, `createClip()`, `createClipFromSeconds()` and `createClipFromTicks()` of `@waveform-playlist/core` generate a new id on every call.
+
+```typescript
+// Before: a duplicated clip keeps its id
+const copy = { ...clip, startSample: clip.startSample + clip.durationSamples };
+
+// After
+const copy = { ...clip, id: crypto.randomUUID(), startSample: clip.startSample + clip.durationSamples };
+```
+
+### `updateTrack(id, track)` with an unknown id does nothing
+
+Before, `engine.updateTrack(id, track)` for an id no track has still pushed an undo step, incremented `tracksVersion`, called the adapter and emitted `statechange`, while the tracks stayed as they were. Now it changes nothing: no undo step, no adapter call, no `statechange`. The track is still checked first, so one whose clips do not match its kind throws.
+
+**Find:** `engine.updateTrack(id, track)` used to send a track the engine does not hold to the adapter.
+
+**Replace with:** `engine.addTrack(track)` for a new track.
+
+### `commitTransaction()` and `clearHistory()` emit `statechange`; a mixer setter for an unknown track does not
+
+- `commitTransaction()` emits one `statechange` when the transaction changed something, and `clearHistory()` when there was history to clear. Before, neither emitted, and `canUndo` / `canRedo` in the last state could be out of date.
+- `setTrackVolume()`, `setTrackMute()`, `setTrackSolo()` and `setTrackPan()` for a track id the engine does not have still call the adapter, but no longer increment `mixerVersion` or emit `statechange`.
+
+**Find:** `statechange` listeners that count emissions, or that do work on every emission without comparing `tracksVersion` / `mixerVersion`; and code that waits for a `statechange` after a mixer setter for a track that is not in the engine.
+
+**Replace with:** compare `state.tracksVersion` and `state.mixerVersion` with the last values seen to decide what to do. Neither changes on a `statechange` that is about the history alone.
+
+### `undo()` and `redo()` abort an open transaction first
+
+Between `beginTransaction()` and `commitTransaction()`, `undo()` and `redo()` now abort the transaction (its changes are dropped) and then undo or redo the step before it. Before, they acted on the history while the transaction stayed open. `setTracks()` also ends an open transaction: a `commitTransaction()` or `abortTransaction()` after it logs a console warning and does nothing.
+
+**Find:** `undo()` or `redo()` reachable while a drag is in progress (a keyboard shortcut during a pointer drag).
+
+**Replace with:** nothing, if aborting the drag is what you want. Otherwise call `commitTransaction()` before `undo()`. After an `undo()` that aborted the transaction, a later `commitTransaction()` or `abortTransaction()` for that drag logs a console warning and does nothing.
+
 ## Web components: the effect registry moves from `@dawcore/components` to `@waveform-playlist/core`
 
 **Packages:** `@dawcore/components`, `@waveform-playlist/core`.

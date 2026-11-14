@@ -157,6 +157,8 @@ const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
 <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
 ```
 
+The array is yours to keep in state. The track and clip objects in it are the engine's own, shared with its undo history: do not write to them. To change a track, put a copy in your state (`{ ...track, name }`). In development the objects are frozen, so a write throws.
+
 #### `onReady`
 
 **Type:** `() => void`

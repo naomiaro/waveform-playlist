@@ -1,6 +1,6 @@
 # @waveform-playlist/engine
 
-Framework-agnostic multitrack timeline engine for waveform-playlist — pure clip/track operations plus a stateful `PlaylistEngine` that manages tracks, selection, loop, zoom, and undo/redo, decoupled from any audio backend via a pluggable `PlayoutAdapter`.
+Framework-agnostic multitrack timeline engine for waveform-playlist — pure clip/track operations, an arrangement that owns the tracks, the mix and the undo history, and a stateful `PlaylistEngine` that plays an arrangement and manages selection, loop and zoom, decoupled from any audio backend via a pluggable `PlayoutAdapter`.
 
 Used by `@waveform-playlist/browser` (the React provider) and `@dawcore/components` (the Lit web-components layer). Pair it with a `PlayoutAdapter` implementation such as `@waveform-playlist/playout` (Tone.js) or `@dawcore/transport` (native Web Audio) to actually produce sound — the engine itself never touches the audio graph directly.
 
@@ -8,7 +8,8 @@ Used by `@waveform-playlist/browser` (the React provider) and `@dawcore/componen
 
 - **Clip-based timeline model** — tracks hold multiple clips; move, trim, and split with automatic collision constraints
 - **Sample + tick timeline math** — integer samples for precision, ticks for tempo-independent positioning
-- **Undo/redo** — snapshot-based history for all structural mutations, with transaction grouping for drag gestures
+- **The arrangement** — one object owns the tracks, the mix (volume, mute, solo and pan by track id) and the undo history; it needs no engine and outlives the engine that plays it
+- **Undo/redo** — history for the structural changes (tracks and clips), with transaction grouping for drag gestures; an undo never changes the mix
 - **Selection, loop, and zoom state** — engine owns selection range, loop region, zoom level, and master volume
 - **`statechange` events** — subscribe once and mirror a single `EngineState` snapshot into any UI framework
 - **Adapter-pluggable playback** — bring your own `PlayoutAdapter` (Tone.js, native Web Audio, or a custom backend); the engine runs headless without one
@@ -26,9 +27,9 @@ npm install @waveform-playlist/engine @waveform-playlist/core
 ```typescript
 import { PlaylistEngine } from '@waveform-playlist/engine';
 import { createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
-import { TonePlayout } from '@waveform-playlist/playout'; // any PlayoutAdapter implementation
+import { createToneAdapter } from '@waveform-playlist/playout'; // any PlayoutAdapter implementation
 
-const adapter = new TonePlayout();
+const adapter = createToneAdapter();
 const engine = new PlaylistEngine({ adapter, sampleRate: 48000 });
 await engine.init();
 
@@ -42,13 +43,14 @@ const track: ClipTrack = {
       startTime: 0,
     }),
   ],
+  // The mix the track enters with. Afterwards change it with engine.setTrackVolume() etc.
   muted: false,
   soloed: false,
   volume: 1.0,
   pan: 0,
 };
 
-engine.setTracks([track]);
+engine.setTracks([track]); // the engine keeps a copy; `track` stays yours
 
 // Subscribe once; mirror EngineState into your framework's state
 engine.on('statechange', (state) => {
@@ -70,21 +72,67 @@ engine.undo();
 engine.redo();
 ```
 
+## The arrangement
+
+An arrangement is the owner of three things: the tracks with their clips, the mix (volume, mute, solo and pan by track id) and the undo history with its transactions. Everything else reads it and changes it by calling its methods. A `PlaylistEngine` plays an arrangement: it follows it by subscription, and for each change it makes the adapter call and emits `statechange`.
+
+An engine built without an `arrangement` option makes one of its own, so `new PlaylistEngine({ adapter })` works as in the Quick Start. Make the arrangement yourself when it has to exist before the engine does, or outlive it:
+
+```typescript
+import { createArrangement, PlaylistEngine } from '@waveform-playlist/engine';
+
+const arrangement = createArrangement({ tracks: [track], undoLimit: 50 });
+
+// No engine is needed to edit
+arrangement.moveClip('track-1', track.clips[0].id, 48000);
+arrangement.setTrackVolume('track-1', 0.5);
+
+// Read: nothing returned is a copy
+arrangement.getTracks(); // readonly ClipTrack[]; the same array until the tracks change
+arrangement.getMixer().get('track-1'); // { volume: 0.5, muted: false, soloed: false, pan: 0 }
+const unsubscribe = arrangement.subscribe(() => {
+  // once per change (tracks, mix or history), after the adapter is in step
+});
+
+// Play it
+const engine = new PlaylistEngine({ adapter: createToneAdapter(), arrangement });
+await engine.init();
+
+// The arrangement outlives the engine
+engine.dispose();
+const next = new PlaylistEngine({ adapter: createToneAdapter(), arrangement });
+// next has the same tracks, the same mix and the same undo history
+```
+
+An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`.
+
+The engine's track, clip, mixer and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `addTrack`, `removeTrack` and `updateTrack` also take `{ undoable: false }` (the change is made without an undo step), and `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
+
+Rules that hold for the engine and the arrangement alike:
+
+- **Nothing handed out is a copy.** `arrangement.getTracks()`, `engine.getState().tracks` and the tracks an adapter receives are shared with the undo history. Never write to the array, a track or a clip: copy first (`{ ...track, clips: [...] }`) and pass the copy to `updateTrack`. Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in strict code (every module is strict). What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen. Tracks are copied on their way in, so the objects you pass stay yours.
+- **A change replaces only what changed.** The tracks array and the changed track and clip objects are new; every other track is the same object as before, so a comparison by identity finds what changed.
+- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none; while the id has an entry, `setTracks`, `addTrack` and `updateTrack` do not read them. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
+- **Undo, redo and an aborted transaction restore tracks and clips, never the mix.** Undoing a `removeTrack` brings the track back with the mix it had.
+- **Ids are unique.** `setTracks`, `addTrack` and `updateTrack` throw an `Error` for a duplicate track id, for two clips with one id on the same track, and for a track whose clips do not match its `kind`, before anything changes.
+- **Without an engine** clips are given no `startTick` (they get one when an engine attaches), and the shortest a clip may be is 0.1 s at the clip's own sample rate.
+
 ## API
 
 ### PlaylistEngine
 
-Key methods (see `src/types.ts` for the full `EngineState` shape):
+Key methods (see `src/types.ts` for the full `EngineState` shape). `PlaylistEngineOptions` takes `adapter`, `arrangement`, `sampleRate`, `samplesPerPixel`, `zoomLevels`, `undoLimit`, `bpm` and `ppqn`, all optional:
 
 ```typescript
 class PlaylistEngine {
   constructor(options?: PlaylistEngineOptions);
 
   // Tracks
-  setTracks(tracks: ClipTrack[]): void;
+  setTracks(tracks: readonly ClipTrack[]): void; // replaces every track, clears the undo history
   addTrack(track: ClipTrack): void;
   removeTrack(trackId: string): void;
-  updateTrack(trackId: string, track?: ClipTrack): void;
+  updateTrack(trackId: string, track?: ClipTrack): void; // with a track: replace it; without: send the current one to the adapter again
+  reorderTrack(trackId: string, toIndex: number): void;
   selectTrack(trackId: string | null): void;
 
   // Clip editing (undoable)
@@ -92,6 +140,7 @@ class PlaylistEngine {
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number, skipAdapter?: boolean): void;
   splitClip(trackId: string, clipId: string, atSample: number): void;
   constrainTrimDelta(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): number;
+  getClipBounds(trackId: string, clipId: string): ClipBounds | null;
 
   // Playback (no-ops without an adapter)
   init(): Promise<void>;
@@ -116,9 +165,9 @@ class PlaylistEngine {
   setZoomLevel(samplesPerPixel: number): void;
   setTempo(bpm: number, atTick?: number): void;
 
-  // Undo/redo
-  undo(): void;
-  redo(): void;
+  // Undo/redo (tracks and clips; never the mix)
+  undo(): void; // with a transaction open: aborts it first
+  redo(): void; // with a transaction open: aborts it first
   clearHistory(): void;
   beginTransaction(): void;
   commitTransaction(): void;
@@ -146,7 +195,7 @@ interface PlayoutAdapter {
   setPpqn?(ppqn: number): void;
 
   init(): Promise<void>;
-  setTracks(tracks: ClipTrack[]): void;
+  setTracks(tracks: readonly ClipTrack[]): void; // the engine's own objects: read them, never write to them
   addTrack?(track: ClipTrack): void;
   removeTrack?(trackId: string): void;
   updateTrack?(trackId: string, track: ClipTrack): void;
