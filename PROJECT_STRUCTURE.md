@@ -1465,6 +1465,9 @@ pnpm build
 ### Documentation
 
 - `CLAUDE.md` - AI development notes and architectural decisions
+- `packages/*/CLAUDE.md` - notes of one package, loaded when a file of that package is read
+- `packages/browser/notes/`, `packages/dawcore/notes/` - the notes of those two packages, one file per topic; the package's `CLAUDE.md` is the index that says which file to read before changing which part
+- `.claude/skills/<name>/SKILL.md` - project skills: task-specific notes loaded when a task matches the skill's description (unit tests, e2e, browser probes, mutation checks, React patterns, dnd-kit, design proposals, review rounds, dependency updates, releasing, state ownership, translatable strings). The root `CLAUDE.md` has the table
 - `PROJECT_STRUCTURE.md` - This file
 
 ## Flexible/Headless API Architecture

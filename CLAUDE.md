@@ -113,6 +113,7 @@ Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), l
 | `translatable-strings` | a React component draws or announces text                                  |
 | `design-proposals`     | proposing a design, a fix or an option; removing or moving anything public |
 | `react-patterns`       | writing or reviewing effects, contexts, stores, provider values            |
+| `dnd-kit`              | any code that uses @dnd-kit; a drag that misbehaves; issue #796            |
 | `unit-testing`         | writing or debugging a vitest test                                         |
 | `mutation-testing`     | checking that new tests can fail                                           |
 | `e2e-playwright`       | writing, running or debugging a Playwright spec                            |

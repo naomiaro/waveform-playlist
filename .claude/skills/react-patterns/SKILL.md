@@ -5,7 +5,7 @@ description: Use when writing or reviewing React code in packages/ - an effect a
 
 # React patterns learned in this codebase
 
-The conventions (React 19, `use()`, one source per option, boolean props) are in root `CLAUDE.md`; state that has more than one place is the skill `state-ownership`.
+The conventions (React 19, `use()`, one source per option, boolean props) are in root `CLAUDE.md`; state that has more than one place is the skill `state-ownership`. What the dnd-kit library does (events, Feedback, sortables) is the skill `dnd-kit`.
 
 ## Effects and refs
 
@@ -27,9 +27,8 @@ The conventions (React 19, `use()`, one source per option, boolean props) are in
 - **A render of a view root alone is about 15 components, not 1** (the root, `Playlist` and its styled elements). On #685 part 2 "the root renders once more on a selection" was approved as +1 and withdrawn before building. Count the frame under the root before quoting a cost.
 - **Module state that two copies of a package must share goes on `globalThis` under a versioned `Symbol.for` key** (core's effect registry, #679). `browser` pins core exactly, so an app whose own core version differs installs two copies; a module-level `Map` in each is two registries. Test it with `vi.resetModules()` and a second `import()`.
 
-## dnd-kit and odds
+## Odds
 
-- **dnd-kit can send a `dragover` after the `dragend` of a canceled drag.** It set the reorder preview again for good (Escape mid-drag, 6 of 6 e2e runs on #687). A handler that publishes drag state checks that a drag is in progress (#796 tracks the dnd-kit workarounds).
 - **A function handed to `Array.prototype.map` gets the index as its second argument.** `states.map(apply)` with `apply(tracks, isCurrent = false)` would have read index 1 as `true`. Give such a function one parameter, or return two named functions (`{ current, stored }` in `arrangement/sources.ts`).
 
 ## From the browser package

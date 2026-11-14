@@ -110,7 +110,7 @@ Read before changing `useClipDragHandlers`, `ClipInteractionProvider`, a dnd-kit
 - Trim/Move Asymmetry in useClipDragHandlers
 - Stable Drag Handlers and Modifiers (#694)
 - Clip Interaction Options Have One Source (#690)
-- @dnd-kit/react v0.5.0 Event API Quirks
+- @dnd-kit/react v0.5.0 Event API Quirks: moved to the project skill `dnd-kit`
 - SnapToGridModifier (Beats & Bars)
 - Snap-to-Grid: Absolute Position, Not Delta
 

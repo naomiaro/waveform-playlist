@@ -37,6 +37,4 @@ The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider
 >
 ```
 
-## @dnd-kit Feedback Plugin
-
-Annotation boundary resize handles disable the Feedback plugin per-entity: `useDraggable({ plugins: [Feedback.configure({ feedback: 'none' })] })` (`Feedback` from `@dnd-kit/dom`, a declared peer; hoist the array to a module constant for a stable reference). `@dnd-kit` 0.5 removed the old top-level `feedback` hook option — it is silently ignored at runtime, so `annotationBoxFeedbackPlugins.test.tsx` reads the config back from the real registered entity. Resize visual feedback comes from React state updates repositioning the annotation, not CSS translate.
+**dnd-kit:** the Feedback plugin on the annotation resize handles is in the project skill `dnd-kit`, "Annotation resize handles".

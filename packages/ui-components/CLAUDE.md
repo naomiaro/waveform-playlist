@@ -127,13 +127,7 @@ The theme stays on the providers (#689): it is not an option of one view, the co
 
 **Overscan buffer contract:** The 1.5× container-width buffer in `ScrollViewportProvider` is a contract — `SpectrogramProvider.getVisibleChunkRange()` depends on matching this exact buffer size. If changed, update both.
 
-## @dnd-kit Feedback Plugin Per-Entity Config
-
-**Pattern (@dnd-kit 0.5+):** Feedback behavior is configured per-entity through the `plugins` hook option — `useDraggable({ plugins: [Feedback.configure({ feedback: 'none' })] })` disables the Feedback plugin for that draggable (no fixed positioning, no CSS translate, no placeholder, no drop animation); `plugins: [Feedback.configure({ dropAnimation: null })]` keeps default feedback but skips the snap-back animation on drop. `Feedback` comes from `@dnd-kit/dom` (declared optional peer alongside `@dnd-kit/react`). Hoist the arrays to module constants — `useDraggable` re-assigns `draggable.plugins` on reference change.
-
-**0.3 → 0.5 trap:** the old top-level `feedback: 'none'` hook option was REMOVED upstream and is silently ignored at runtime (type error only). The Feedback plugin reads `source.pluginConfig(Feedback)`, which matches the `Feedback` constructor by identity — a duplicated `@dnd-kit/dom` copy in a consumer bundle makes `'none'` silently no-op too, which is why it's a peer, never a dependency. `clipFeedbackPlugins.test.tsx` reads the config back from the real registered entities rather than asserting on props.
-
-**Applied in:** `Clip.tsx` (trim handles `'none'`, clip-move `dropAnimation: null`), `AnnotationBox.tsx` (start/end handles `'none'`).
+**dnd-kit:** how the Feedback plugin is configured per draggable (`Clip.tsx`, `AnnotationBox.tsx`) is in the project skill `dnd-kit`, "Feedback is configured per entity".
 
 ## Bar Width Peak Aggregation (Channel.tsx)
 
