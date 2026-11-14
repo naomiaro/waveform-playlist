@@ -43,6 +43,7 @@ const FILES = [
   'hooks/useAnnotationDragHandlers.ts',
   'utils/resolveTracks.ts',
   'utils/mergeLoadingClips.ts',
+  'utils/loadSource.ts',
 ];
 
 const FORBIDDEN = [
