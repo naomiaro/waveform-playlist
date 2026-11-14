@@ -84,6 +84,7 @@ const engine = new PlaylistEngine(options?: PlaylistEngineOptions);
 | `samplesPerPixel` | `number` | `1024` | Initial zoom level. Must be one of `zoomLevels`, or the constructor throws |
 | `zoomLevels` | `number[]` | `[256, 512, 1024, 2048, 4096, 8192]` | Available zoom steps (samples per pixel) |
 | `undoLimit` | `number` | `100` | Maximum number of undo steps. Only when the engine makes its own arrangement; with `arrangement` it is ignored, with a console warning |
+| `attachDecodeContext` | `boolean` | `true` | With an adapter, the engine gives its arrangement `adapter.audioContext` to decode audio with and takes it away in `dispose()`. `false`: the host attaches a context itself. See [Loading Audio](#loading-audio) |
 | `bpm` | `number` | `120` | Initial tempo |
 | `ppqn` | `number` | `960` | Pulses per quarter note without an adapter. With an adapter, `adapter.ppqn` is used |
 
@@ -187,6 +188,8 @@ engine.selectTrack(trackId: string | null): void;
 A track's `volume`, `muted`, `soloed` and `pan` fields are the mix it enters with. They are read when its ID has no mixer entry yet. `setTracks()` keeps the mix of an ID that is in the tracks it replaces; `updateTrack(id, track)` keeps the track's mix, also when the new track has another ID; `addTrack()` of a track whose removal can still be undone finds the mix it had. In those cases the fields are not read. Use the [volume methods](#volume) to change the mix.
 
 A mixer entry is dropped when no state holds its track any more: not the current tracks, not an undo or redo step, not the base of an open transaction. That can happen on `setTracks()`, on `clearHistory()`, on the arrangement's `removeTrack(id, { undoable: false })`, when a new undo step clears the redo stack or pushes the oldest step past `undoLimit`, and when a removal, an undo, a redo or an aborted transaction leaves no state holding the track. With `undoLimit: 0` the entry of a removed track goes at once.
+
+`updateTrack(id, track)` calls the adapter only when the track plays differently from before. A track whose loaded clips are the same objects in the same order and whose own fields are unchanged is not sent; the undo step and the `statechange` are the same either way. Clips are compared by identity: a clip object this track already holds (one taken from this track in `getState().tracks` or `arrangement.getTracks()`) is kept as it is, and any other clip object, also one held by another track, is copied and counts as changed.
 
 `updateTrack(id, track)` may give the track an ID no other track has. The track keeps its mix (also over an entry the new ID still has from a removed track), and the adapter receives every track through `setTracks`.
 
@@ -327,7 +330,7 @@ The `statechange` event fires on every change (tracks, mix, undo history, select
 engine.dispose(): void;
 ```
 
-Disposes the adapter, clears all event listeners and stops following the arrangement. Safe to call multiple times. An arrangement you passed in is not cleared: see [The Arrangement](#the-arrangement).
+Disposes the adapter, clears all event listeners, stops following the arrangement and takes back the audio context it gave the arrangement to decode with (loads in flight are aborted and stay pending). Safe to call multiple times. An arrangement you passed in is not cleared: see [The Arrangement](#the-arrangement).
 
 ## The Arrangement
 
@@ -350,7 +353,7 @@ const engine = new PlaylistEngine({ adapter, arrangement });
 
 ```typescript
 // The tracks and their clips. The same array until they change.
-arrangement.getTracks(); // readonly ClipTrack[]
+arrangement.getTracks(); // readonly ArrangementTrack[]: clips are AudioClip | LoadingClip
 
 // The current mix by track ID. The same Map until a value changes, an entry is added or entries are dropped.
 arrangement.getMixer(); // ReadonlyMap<string, TrackMixerValues>
@@ -367,7 +370,7 @@ arrangement.canUndo;
 arrangement.canRedo;
 ```
 
-`getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed` and `pan` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields.)
+`getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed` and `pan` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields and without the clips that are [still loading](#loading-audio).)
 
 A subscriber is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
 
@@ -375,7 +378,7 @@ A subscriber is called after the engine has made its adapter call for that chang
 
 The arrangement has the engine's track, clip, mixer and history methods: `setTracks`, `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`, `moveClip`, `trimClip`, `splitClip`, `getClipBounds`, `constrainTrimDelta`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`, `undo`, `redo`, `clearHistory`, `beginTransaction`, `commitTransaction` and `abortTransaction`. The engine's methods call them, so a change made through either reaches the adapter and emits `statechange`.
 
-Two things are on the arrangement only:
+Besides [loading audio](#loading-audio), two things are on the arrangement only:
 
 ```typescript
 // Remove a track for good: no undo step, and no undo or redo brings it back
@@ -385,9 +388,175 @@ arrangement.removeTrack(trackId, { undoable: false });
 arrangement.updateTrack(trackId, (track) => ({ ...track, name: 'Bass' }));
 ```
 
+`updateTrack()`, given a track or a function, keeps each clip object the track already holds and copies every other clip. The clips you did not replace are therefore the same objects afterwards.
+
 `removeTrack(trackId, { undoable: false })` is for a track that should never have been there, such as a dropped file that could not be decoded. The track is taken out of the current tracks and out of every undo and redo state, and an undo step that no longer changes anything is dropped. Its mixer values go with it.
 
 The arrangement's `moveClip()` and `trimClip()` have no `skipAdapter` argument; that one is the engine's.
+
+### Loading Audio
+
+A clip of an arrangement may name its audio instead of carrying it. The arrangement fetches and decodes each source once, reports where each one is, and replaces the clip with a loaded one when the audio arrives.
+
+An arrangement's tracks are `ArrangementTrack` (from `@waveform-playlist/core`): each clip is an `AudioClip` (loaded) or a `LoadingClip` (a `src` and times in seconds; the audio is not loaded yet). `isLoadingClip(clip)` tells them apart. `createArrangement({ tracks })`, `getTracks()`, `setTracks()`, `addTrack()` and `updateTrack()` of the arrangement use that type. The engine's own `setTracks()`, `addTrack()` and `updateTrack()` still take `ClipTrack`, whose clips are all loaded.
+
+`audioTrack()` from core builds a track with one clip. With `src` and no `audioBuffer` that clip is a `LoadingClip`:
+
+```typescript
+import { createArrangement, PlaylistEngine } from '@waveform-playlist/engine';
+import { audioTrack, isLoadingClip } from '@waveform-playlist/core';
+
+const arrangement = createArrangement({
+  tracks: [
+    audioTrack({ id: 'guitar', src: '/audio/guitar.opus' }),
+    audioTrack({ id: 'vocals', src: '/audio/vocals.opus', start: 4 }), // seconds
+  ],
+});
+
+// Nothing is fetched yet: there is no audio context to decode with.
+arrangement.sources.getSnapshot().pendingCount; // 2
+
+// An engine with an adapter attaches adapter.audioContext, and the loads start.
+const engine = new PlaylistEngine({ adapter, arrangement });
+
+// Where each source is
+const stop = arrangement.sources.subscribe(({ sources, isLoading }) => {
+  showSpinner(isLoading);
+  for (const [src, state] of sources) {
+    if (state.status === 'failed') showRetryButton(src, state.error); // state.error is an Error
+  }
+});
+
+// The tracks: narrow a clip before reading its sample fields
+arrangement.subscribe(() => {
+  for (const track of arrangement.getTracks()) {
+    for (const clip of track.clips) {
+      if (isLoadingClip(clip)) {
+        drawPlaceholder(clip.start ?? 0, clip.duration); // seconds; duration may be undefined
+      } else {
+        drawClip(clip.startSample, clip.durationSamples);
+      }
+    }
+  }
+});
+
+// A source whose load failed is started again only by this
+arrangement.retry('/audio/guitar.opus');
+```
+
+A `src` is a URL string, a `Blob` or a `File`. A string is one source however many clips name it; a `Blob` or `File` is a source by identity.
+
+#### What a loading clip is, and is not
+
+- It is copied on its way in, stays the same object through every operation on its track, keeps its place among the track's clips and is part of the undo steps. It has no `startTick`.
+- It cannot be edited. `moveClip()`, `trimClip()` and `splitClip()` on it log a console warning (`… is still loading and cannot be edited until its audio has loaded`) and change nothing; `getClipBounds()` returns `null` and `constrainTrimDelta()` returns `0`. A loaded clip that is moved or trimmed does not collide with it.
+- It is an audio clip, whatever else it carries. `createArrangement({ tracks })`, `setTracks()`, `addTrack()` and `updateTrack()` throw for a `kind: 'midi'` track that holds one, with the same error as for a MIDI track that holds a loaded audio clip, and change nothing.
+- An engine neither plays nor reports it. The tracks an adapter is sent and `getState().tracks` are each track without its loading clips, and `getState().duration` counts loaded clips only. Read `arrangement.getTracks()` to draw the clips that are still loading.
+- A change that leaves a track's loaded clips (the same objects in the same order) and its own fields as they were makes no adapter call for that track: adding, replacing or removing a loading clip, and an undo or a redo of that. The `statechange` is still emitted. `engine.updateTrack(id)` with no track always sends.
+
+#### Which sources are loaded
+
+Every source a loading clip names in the current tracks, in an undo or redo state, or in the base of an open transaction. An undo therefore never fetches a source again. When no state names a source any more (the track was removed and the history cleared, or `setTracks()` replaced everything), its load is aborted and its audio is let go; a clip that names it later starts a new fetch.
+
+A loaded clip that carries both `src` and `audioBuffer` (what `audioTrack({ src, audioBuffer })` builds) counts as well: its buffer is used for that source, nothing is fetched, and a loading clip of the same `src` is loaded from it. A loaded clip with `src` and no `audioBuffer` is not fetched and does not appear in `sources`: it never gets audio from the arrangement.
+
+#### When the audio arrives
+
+Every loading clip that names the source becomes an `AudioClip`:
+
+- `start`, `offset` and `duration` in seconds become integer samples at the sample rate of the decoded buffer. Without a `duration` the clip runs from `offset` to the end of the audio.
+- The clip keeps its `id`, and its `name`, `color`, `gain`, `fadeIn`, `fadeOut`, `waveformData` and `src`.
+- A `duration` that runs past the end of the audio is cut to it, with one console warning.
+- It gets a `startTick` when an engine is attached; without one, when the next engine attaches.
+
+This happens in the current tracks and in every undo and redo state, so an undo brings back a loaded clip. It is not an undo step. When the current tracks changed, subscribers are told once and `tracksVersion` goes up by one; an engine sends each track that gained a clip to its adapter (`updateTrack`, or `setTracks` for an adapter without it) and emits one `statechange`. When only undo or redo states changed, nobody is told except the subscribers of `sources`.
+
+A clip added later that names a source that is already loaded is a loaded clip when the call that added it returns. A clip that comes in carrying `src` and `audioBuffer` for a source other loading clips are waiting for loads those clips inside the same call: one notification and one `statechange`, and the adapter is also sent each other track that gained a clip.
+
+If the adapter throws while an engine applies audio that arrived, there is no caller to fail. The engine logs `[waveform-playlist] The playout adapter failed while loaded audio was applied:` with the error, still emits the `statechange`, and sends the adapter every track at the next track change. For every other change an adapter that throws fails the call that made the change, and no `statechange` is emitted for it.
+
+#### `arrangement.sources` and `retry()`
+
+`sources` is a `ValueSource`: `getSnapshot()` returns the current value and `subscribe(listener)` calls the listener with each new one (the shape React's `useSyncExternalStore` takes). The value:
+
+```typescript
+interface ArrangementSourcesValue {
+  sources: ReadonlyMap<ClipSource, ArrangementSourceState>;
+  pendingCount: number;
+  failedCount: number;
+  isLoading: boolean; // true while a source is pending
+}
+
+interface ArrangementSourceState {
+  status: 'pending' | 'loaded' | 'failed';
+  error?: Error; // when failed
+}
+```
+
+It is the same object until a source is added or dropped, a status changes, or a failed source gets another error. A new value is published after the subscribers of `arrangement.subscribe()` have been told about the change it belongs to, so a listener of `sources` that sees `loaded` finds the loaded clip in `getTracks()`. The other way round, a listener of `arrangement.subscribe()` that finds the loaded clip still reads its source as `pending` in `sources`. The order of the entries of `sources` means nothing.
+
+A source is `failed` in two cases:
+
+| Case | What the tracks show | `error` | How it ends |
+| --- | --- | --- | --- |
+| The load failed: the fetch, the decode, or getting the audio context | No track changes; the clips stay loading clips | What the loader rejected with | `arrangement.retry(src)` starts the load again. Nothing else does |
+| A clip cannot be made from the audio: its `offset` is at or past the end, or its `start`, `offset` or `duration` is not a usable number | That clip stays a loading clip; other clips of the same source are loaded | An `Error` with the message `clip "<id>": <reason>` | When no state holds that clip any more. `retry()` does nothing |
+
+For the second case, replace or remove the clip with `updateTrack()`. An undo step that still holds the clip keeps the failure; `clearHistory()` lets go of those steps.
+
+`retry(src)` does nothing for a source that is pending or loaded, and for one no clip names.
+
+#### How a source is loaded
+
+`createArrangement({ loadSource })` replaces how a source becomes an `AudioBuffer`. The default, exported as `defaultLoadSource`, fetches a string (or reads a `Blob` or `File` with `arrayBuffer()`) and decodes it with `audioContext.decodeAudioData()`. It checks the abort signal before it starts and after each step, so a cancelled load neither decodes nor resolves.
+
+```typescript
+import { createArrangement, defaultLoadSource } from '@waveform-playlist/engine';
+import type { LoadSource } from '@waveform-playlist/engine';
+
+const loadSource: LoadSource = async (src, { signal, audioContext }) => {
+  if (typeof src !== 'string') return defaultLoadSource(src, { signal, audioContext });
+  const response = await fetch(src, { signal, credentials: 'include' });
+  if (!response.ok) throw new Error(`Failed to fetch audio: ${response.status}`);
+  return audioContext.decodeAudioData(await response.arrayBuffer());
+};
+
+const arrangement = createArrangement({ loadSource });
+```
+
+A `loadSource` of your own should pass `signal` to what it awaits: the arrangement aborts a load when its source is no longer named and when the audio context is taken away.
+
+The error messages `defaultLoadSource` writes itself:
+
+| Message | When |
+| --- | --- |
+| `Failed to fetch <source>: <status> <statusText>` | The response is not ok |
+| `Failed to fetch <source>` | `fetch` threw a `TypeError` (a network failure, a refused cross-origin request). The `TypeError` is in the error's `cause` |
+| `Decoded audio is empty: <source>` | The decoded buffer has no samples |
+| `Failed to decode audio: <source>` | The decoder rejected with something that is not an `Error` |
+
+In these, `<source>` is the URL without its query string, its fragment and a user name or password before the host (each can hold a secret). A URL in which the browser's URL parser finds a user name or password (also in forms such as one slash after the scheme, backslashes, or white space in front) is named in its parsed, absolute form without them. A malformed URL that the parser refuses loses only its query string and fragment. The `TypeError` in `cause` is the browser's own, and its message may contain the full URL: do not show `cause` to users if your URLs carry secrets. A `data:` or `blob:` URL is never echoed (`data: URL`, `blob: URL`), a `File` is called by its name and any other `Blob` is `Blob`. An `Error` the browser's decoder rejects with is passed on unchanged: its message is the browser's and does not name the source. An abort is passed on as the `AbortError` it is.
+
+#### The audio context to decode with
+
+Nothing is fetched until the arrangement has an audio context to decode with. Until then its sources are `pending`.
+
+- `new PlaylistEngine({ adapter, arrangement })` attaches `adapter.audioContext` in its constructor and takes it away in `dispose()`.
+- An engine without an adapter attaches nothing.
+- With `attachDecodeContext: false` the engine leaves it to you.
+
+To attach one yourself:
+
+```typescript
+import { attachDecodeContext } from '@waveform-playlist/engine';
+
+// getContext is called for each load, so it may create or resume the context when the first one is needed
+const detach = attachDecodeContext(arrangement, async () => audioContext);
+
+detach();
+```
+
+`detach()` aborts the loads in flight. Their sources stay `pending`, loaded sources stay loaded, and the next attach starts the aborted ones again. That is what happens between one engine's `dispose()` and the next engine. One context at a time: a second attach while one is attached logs a console warning and replaces the first, and the first one's `detach` then does nothing. A `getContext` that rejects fails the source with that error; `retry()` asks again.
 
 ### Without an Engine
 
@@ -422,7 +591,7 @@ A different tempo is not converted. A tick is the musical position, so an engine
 
 The new engine sends the tracks it finds to its adapter once, in its constructor, with their mix. If that call throws, the constructor throws and the engine is no longer attached to the arrangement. After `dispose()`, the engine's track, clip, mixer and history methods still change the arrangement, but call no adapter and emit no `statechange`, and `setTempo()` does nothing. Selection, loop, zoom, the playback position and the master volume belong to the engine and start from their defaults in the new one.
 
-An arrangement plays through one engine at a time. Building a second engine on an arrangement whose first engine has not been disposed logs a console warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The `arrangement` option accepts only an object made by `createArrangement()`; anything else throws.
+An arrangement plays through one engine at a time. Building a second engine on an arrangement whose first engine has not been disposed logs a console warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The `arrangement` option accepts only an object made by `createArrangement()`; anything else throws. The engine recognises an arrangement by a versioned `Symbol.for` key, not by `instanceof`, so one made by another installed copy of `@waveform-playlist/engine` (an app and a library that pin different versions) is accepted when both copies use the same key version. The keys are `@waveform-playlist/engine/arrangement/time-base/v1` and `@waveform-playlist/engine/arrangement/attach-decode/v1`.
 
 ## Implementing a PlayoutAdapter
 
@@ -604,6 +773,7 @@ The engine avoids unnecessary listener calls. Mutating methods bail early when:
 - A zoom level is already at the requested value
 - Selection, loop region or master volume values haven't changed
 - `updateTrack(id, track)` names a track the engine does not have (the track object is still checked, and an invalid one throws)
+- `moveClip`, `trimClip` or `splitClip` names a clip that is still loading
 - A transaction that changed nothing is committed or aborted
 
 This prevents wasted re-renders in your UI framework.
@@ -613,7 +783,8 @@ This prevents wasted re-renders in your UI framework.
 The tracks are immutable. A change replaces the tracks array and only the track and clip objects that changed; every other track is the same object as before, so comparing by identity (`prev.tracks[i] !== next.tracks[i]`) finds what changed. The exception is `setTracks()`: it copies every track it is given, so after it no track is the object it was. An undo step is a reference to an earlier array.
 
 - `setTracks()`, `addTrack()` and `updateTrack()` copy each track and clip they are given — your objects are not retained
-- `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are **not** copies. They are typed `readonly ClipTrack[]`
+- `updateTrack()` keeps a clip object the track already holds, so a clip you did not replace is the same object afterwards
+- `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are **not** copies. They are typed `readonly ClipTrack[]` (`readonly ArrangementTrack[]` for `getTracks()`, which also holds the clips that are still loading)
 - Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in a module. What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen
 
 To change a track, build a new one from it:
@@ -636,7 +807,7 @@ Consumers can trust that `EngineState.selectionStart <= selectionEnd` and `loopS
 
 ### tracksVersion Counter
 
-The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track changes: `setTracks`, `addTrack`, `removeTrack`, `reorderTrack`, `updateTrack(id, track)`, `moveClip`, `trimClip`, `splitClip`, `undo`, `redo`, an aborted transaction that had changed something, a `setTempo` that the adapter did not refuse (`setTempo` with the tempo the engine already has and no `atTick` returns before that), and an engine being built on an arrangement that has clips without a `startTick`, or whose ticks are in another `ppqn` (they are converted). It does **not** increment on selection, zoom, master volume, or loop changes, on a change of the undo history alone (`commitTransaction`, `clearHistory`), nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
+The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track changes: `setTracks`, `addTrack`, `removeTrack`, `reorderTrack`, `updateTrack(id, track)`, `moveClip`, `trimClip`, `splitClip`, `undo`, `redo`, an aborted transaction that had changed something, a `setTempo` that the adapter did not refuse (`setTempo` with the tempo the engine already has and no `atTick` returns before that), and an engine being built on an arrangement that has clips without a `startTick`, or whose ticks are in another `ppqn` (they are converted), and the audio of a loading clip in the current tracks arriving (see [Loading Audio](#loading-audio)). It does **not** increment on selection, zoom, master volume, or loop changes, on a change of the undo history alone (`commitTransaction`, `clearHistory`), nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
 
 Per-track mixer edits (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`) instead bump a separate `mixerVersion` counter (and emit `statechange`). This lets a consumer refresh what it shows of the mix without re-running the structural work gated on `tracksVersion`. The split matters because mixer setters fire continuously during a volume/pan slider drag.
 
@@ -736,20 +907,30 @@ import type {
   RemoveTrackOptions,
   ClipBounds,
   TrackMixerValues,
+  ArrangementSourcesValue,
+  ArrangementSourceState,
+  LoadSource,
 } from '@waveform-playlist/engine';
 ```
 
 Data model types come from `@waveform-playlist/core`:
 
 ```typescript
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
+import type {
+  AudioClip,
+  ClipTrack,
+  ArrangementTrack,
+  LoadingClip,
+  ClipSource,
+  ValueSource,
+} from '@waveform-playlist/core';
 ```
 
 ### EngineState
 
 ```typescript
 interface EngineState {
-  tracks: readonly ClipTrack[]; // shared, not a copy; frozen outside production builds
+  tracks: readonly ClipTrack[]; // shared, not a copy; frozen outside production builds; loaded clips only
   tracksVersion: number;
   mixerVersion: number;
   duration: number;
@@ -784,6 +965,7 @@ interface PlaylistEngineOptions {
   samplesPerPixel?: number;
   zoomLevels?: number[];
   undoLimit?: number;
+  attachDecodeContext?: boolean; // default true
   bpm?: number;
   ppqn?: number;
 }
@@ -795,8 +977,34 @@ interface PlaylistEngineOptions {
 function createArrangement(options?: CreateArrangementOptions): Arrangement;
 
 interface CreateArrangementOptions {
-  tracks?: readonly ClipTrack[]; // the first tracks; not an undo step
-  undoLimit?: number;            // default 100
+  tracks?: readonly ArrangementTrack[]; // the first tracks; not an undo step
+  undoLimit?: number;                   // default 100
+  loadSource?: LoadSource;              // default: defaultLoadSource
+}
+
+type LoadSource = (
+  src: ClipSource,
+  context: { signal: AbortSignal; audioContext: BaseAudioContext }
+) => Promise<AudioBuffer>;
+
+const defaultLoadSource: LoadSource;
+
+// Returns the function that detaches
+function attachDecodeContext(
+  arrangement: Arrangement,
+  getContext: () => Promise<BaseAudioContext>
+): () => void;
+
+interface ArrangementSourceState {
+  status: 'pending' | 'loaded' | 'failed';
+  error?: Error;
+}
+
+interface ArrangementSourcesValue {
+  sources: ReadonlyMap<ClipSource, ArrangementSourceState>;
+  pendingCount: number;
+  failedCount: number;
+  isLoading: boolean;
 }
 
 interface RemoveTrackOptions {
@@ -819,22 +1027,25 @@ interface ClipBounds {
 
 interface Arrangement {
   // read
-  getTracks(): readonly ClipTrack[];
+  getTracks(): readonly ArrangementTrack[];
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
   subscribe(listener: () => void): () => void;
   readonly tracksVersion: number;
   readonly mixerVersion: number;
 
   // whole set
-  setTracks(tracks: readonly ClipTrack[]): void;
+  setTracks(tracks: readonly ArrangementTrack[]): void;
 
   // tracks
-  addTrack(track: ClipTrack): void;
+  addTrack(track: ArrangementTrack): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
-  updateTrack(trackId: string, next: ClipTrack | ((track: ClipTrack) => ClipTrack)): void;
+  updateTrack(
+    trackId: string,
+    next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
+  ): void;
   reorderTrack(trackId: string, toIndex: number): void;
 
-  // clips
+  // clips (a clip that is still loading cannot be edited)
   moveClip(trackId: string, clipId: string, deltaSamples: number): number;
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
   splitClip(trackId: string, clipId: string, atSample: number): void;
@@ -861,6 +1072,10 @@ interface Arrangement {
   beginTransaction(): void;
   commitTransaction(): void;
   abortTransaction(): void;
+
+  // loading
+  readonly sources: ValueSource<ArrangementSourcesValue>;
+  retry(src: ClipSource): void;
 }
 ```
 

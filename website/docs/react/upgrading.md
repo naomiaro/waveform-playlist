@@ -3549,7 +3549,7 @@ Also changed: `EffectDefinition['category']` is now `EffectCategory`, the known 
 
 This entry is for code that calls a `PlaylistEngine` itself: an engine you construct, or the one behind `useEngineRefs().playoutRef`. One part of it reaches every React app: the tracks handed to `onTracksChange` (the first heading below).
 
-The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the six listed under [Also changed](#also-changed-in-the-engine) at the end. `WaveformPlaylistProvider` takes `tracks` and `onTracksChange` as before. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
+The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the seven listed under [Also changed](#also-changed-in-the-engine) at the end. One more heading, [The arrangement's own API](#the-arrangements-own-api-clips-that-are-still-loading), is about code written against the arrangement itself, which is new. `WaveformPlaylistProvider` takes `tracks` and `onTracksChange` as before. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
 
 ### `getState().tracks` and the tracks in `onTracksChange` are read-only
 
@@ -3694,6 +3694,35 @@ Both built-in editors offer undo during a clip drag, and neither cancels the ges
 
 In both, the clip does not end where the pointer released it: the drag's distance is applied to the position the undo restored. That part is not new in this version; it happens in the version before as well, where the undo after such a drag returned to a state that had already been undone.
 
+### The arrangement's own API: clips that are still loading
+
+`createArrangement()`, the `Arrangement` type and everything on it are new in this version, so there is no earlier code to change. Three things to know when you write against it, because they differ from the engine's methods of the same names:
+
+- **The clips in `arrangement.getTracks()` are `AudioClip | LoadingClip`.** The arrangement's tracks are `ArrangementTrack` (from `@waveform-playlist/core`), not `ClipTrack`: a clip whose audio is not loaded yet is a `LoadingClip`, which has `src` and optional `start`, `duration` and `offset` in seconds, and none of the sample fields. `engine.getState().tracks` is still `readonly ClipTrack[]`: it leaves the loading clips out, and so do `getState().duration` and the tracks a `PlayoutAdapter` receives. The engine's own `setTracks()`, `addTrack()` and `updateTrack()` still take `ClipTrack`.
+- **A loading clip on a MIDI track throws.** `createArrangement({ tracks })`, `arrangement.setTracks()`, `arrangement.addTrack()` and `arrangement.updateTrack()` throw for a `kind: 'midi'` track that holds a `LoadingClip`, before anything changes, with the error for a track whose clips do not match its kind (see [A track has a kind](#a-track-has-a-kind-audio-or-midi-never-both)). A loading clip is an audio clip.
+- **`updateTrack()` keeps the clip objects the track already holds,** whether it is given a track object or a function of the current track. Every other clip object is copied. A clip you did not replace is therefore the same object before and after.
+
+**Find:** code that reads `startSample`, `durationSamples`, `offsetSamples`, `sampleRate` or `audioBuffer` from a clip of `arrangement.getTracks()`, or that passes such a clip to a function that takes an `AudioClip`. TypeScript reports each one (`Property 'startSample' does not exist on type 'LoadingClip'`).
+
+**Replace with:**
+
+```typescript
+import { isLoadingClip } from '@waveform-playlist/core';
+
+for (const track of arrangement.getTracks()) {
+  for (const clip of track.clips) {
+    if (isLoadingClip(clip)) {
+      // clip.src, and clip.start / clip.duration / clip.offset in seconds (each may be undefined)
+      continue;
+    }
+    // an AudioClip
+    clip.startSample;
+  }
+}
+```
+
+The [engine guide](/docs/framework-agnostic/engine#loading-audio) describes loading: which sources are fetched, `arrangement.sources`, `arrangement.retry()`, the `loadSource` option and `attachDecodeContext()`.
+
 ### Also changed in the engine
 
 - **Undo, redo and `abortTransaction()` send the adapter only the tracks that differ.** When the same track ids are there before and after, the adapter's `updateTrack` is called for each track that changed (one `setTracks` per changed track for an adapter without `updateTrack`), and an undo of a reorder calls no adapter method. Before, every track was sent again. "The same tracks" is decided by track id: before, it was decided by the number of tracks, so an undo that swapped one track for another sent `updateTrack` calls; now it sends one `setTracks`.
@@ -3701,9 +3730,10 @@ In both, the clip does not end where the pointer released it: the drag's distanc
 - **`selectedTrackId` is cleared when its track goes away by an undo, a redo or an aborted transaction, or when `updateTrack(id, track)` gives the track a new id.** `setTracks()` still leaves it alone.
 - **A track given a new id through `updateTrack(id, track)` keeps its mix,** whatever the new track's mixer fields say and also when the new id still has an entry from a removed track, and the adapter receives every track through `setTracks` instead of an `updateTrack` call under the old id.
 - **After `dispose()`, the engine's track, clip, mixer and history methods change its arrangement but call no adapter and emit no `statechange`, and `setTempo()` does nothing.** Before, they still called the disposed adapter.
+- **`updateTrack(id, track)` calls the adapter only when the track plays differently.** When the new track's clips are the same clip objects in the same order (objects taken from this track in `getState().tracks`) and its own fields are unchanged, the adapter is not called; the undo step and the `statechange` are as before. Before, the adapter's `updateTrack` was called every time. `updateTrack(id)` with no track still sends the track every time.
 - **Two or more track edits made from inside one `statechange` or `subscribe` listener run rebuild the adapter.** The first of them is delivered after the tracks have changed again, so the engine sends the adapter every track once (`setTracks`, which can interrupt playback); the edits still waiting make no adapter call. One track edit made from inside a listener is sent as itself (`updateTrack`, `addTrack` or `removeTrack`). A reorder and a move made with `skipAdapter` count as track edits here. If a rebuild matters, make several track edits from an event handler, not from inside a listener (a transaction does not change this: it groups undo steps, not adapter calls). After an adapter call for a track change has thrown, the next track change sends every track.
 
-**Find:** a custom `PlayoutAdapter` or a test that counts `setTracks` / `updateTrack` calls after an undo; `statechange` listeners that call an engine method and rely on later listeners seeing that change first; code that reads `selectedTrackId` after an undo; calls on an engine after `dispose()`.
+**Find:** a custom `PlayoutAdapter` or a test that counts `setTracks` / `updateTrack` calls after an undo; `engine.updateTrack(id, track)` with an unchanged track, used to make the adapter rebuild that track (use `engine.updateTrack(id)`); `statechange` listeners that call an engine method and rely on later listeners seeing that change first; code that reads `selectedTrackId` after an undo; calls on an engine after `dispose()`.
 
 **Replace with:** nothing for an adapter that implements `updateTrack(trackId, track)` and `setTracks(tracks)` by replacing what it holds. In a listener, read the state it is handed, not `engine.getState()`, when it needs the state of the change it is handling.
 

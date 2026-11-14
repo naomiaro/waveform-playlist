@@ -147,20 +147,24 @@ const clip = createClipFromSeconds({
   - `operations/viewportOperations.ts` — Bounds, chunks, scroll threshold
   - `operations/timelineOperations.ts` — Duration, zoom, seek
   - `arrangement/index.ts` — `createArrangement()` and the public arrangement types
-  - `arrangement/types.ts` — `Arrangement`, `ClipBounds`, `RemoveTrackOptions`, `CreateArrangementOptions`
-  - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks, mix, history, transactions, ordered delivery of changes
+  - `arrangement/types.ts` — `Arrangement` (tracks, mix, history, `sources`, `retry`), `ClipBounds`, `RemoveTrackOptions`, `CreateArrangementOptions` (`tracks`, `undoLimit`, `loadSource`)
+  - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks (loaded and loading clips), mix, history, transactions, ordered delivery of changes
+  - `arrangement/sources.ts` — `ArrangementSources`: which sources the states name, the one source loader, the switch of a loading clip to a loaded one, `ArrangementSourcesValue`
+  - `arrangement/loadSource.ts` — `LoadSource`, `defaultLoadSource` (fetch or read, then decode)
+  - `arrangement/resolveLoadingClip.ts` — A `LoadingClip` and its `AudioBuffer` become an `AudioClip`, or the reason they cannot
+  - `arrangement/attach.ts` — The two attach points under `Symbol.for` keys: `attachDecodeContext()` and the engine's time base
   - `arrangement/mixer.ts` — `TrackMixerValues`; the mix as pure functions over a Map by track id
   - `arrangement/history.ts` — Undo/redo as pure functions over references to earlier tracks arrays
   - `arrangement/clipEdits.ts` — Move, trim and split as pure functions over a tracks array
-  - `arrangement/ticks.ts` — Clip mapping across states (`clipMapper`) and tick rescaling between ppqn values (`rescaleTick`), used when an engine attaches
-  - `arrangement/validate.ts` — Unique track ids, unique clip ids within a track
+  - `arrangement/ticks.ts` — Clip mapping across states (`clipMapper`, `forLoadedClips`), what an attaching engine does to every state (`tickPreparer`) and tick rescaling between ppqn values (`rescaleTick`)
+  - `arrangement/validate.ts` — A track's clips are of its kind (a loading clip is an audio clip), unique track ids, unique clip ids within a track
   - `arrangement/devFreeze.ts` — Freezes handed-out tracks outside production builds
-  - `adapterSync.ts` — `AdapterSync`: the adapter call for each arrangement change, and the tracks-with-current-mix projection that `getState().tracks` and the adapter are given
+  - `adapterSync.ts` — `AdapterSync`: the adapter call for each arrangement change, and the projection that `getState().tracks` and the adapter are given (each track without its loading clips, with the current mix)
   - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and hands each change to its `AdapterSync`
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
-- **State Ownership:** The arrangement owns the tracks, the per-track mix and the undo history. The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
+- **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
 - **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.
   - `trimClip()` accepts optional `skipAdapter` parameter.

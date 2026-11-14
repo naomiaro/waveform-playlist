@@ -141,7 +141,9 @@ engine's `getState().tracks`, the view's tracks with placeholders, peaks,
 - Carried over: a source added while the engine runs does not stop it; an
   arriving clip is applied in place whatever its position; files dropped on an
   empty timeline play one by one; no source timeout; a loading clip on a MIDI
-  track is reported and never fetched; a dropped file that cannot be decoded is
+  track is reported and never fetched (changed 2026-11-14: a loading clip on a
+  MIDI track is refused at the door: `setTracks`, `addTrack`, `updateTrack` and
+  `createArrangement({ tracks })` throw, so no state holds one); a dropped file that cannot be decoded is
   removed by the example pages and listed; the engine is disposed on every
   cleanup of the provider; recording does not start on a track that holds a
   clip still loading.
@@ -291,7 +293,8 @@ test that pins it moves with it):
   and by an open transaction's snapshot, so an undo never starts a fetch for a
   source the history still names and a failed source stays failed until
   `retry`. Loading clips on MIDI tracks are skipped and reported once through
-  `sources`. A clip that carries `src` and `audioBuffer` is given to the
+  `sources` (changed 2026-11-14: there are none to skip; the arrangement
+  refuses a loading clip on a MIDI track when the track enters). A clip that carries `src` and `audioBuffer` is given to the
   loader (`provide`). The wanted set is re-declared only when it changed.
 - When a source becomes `loaded`, the arrangement replaces every `LoadingClip`
   object naming it with its `AudioClip`, in the current tracks and in every

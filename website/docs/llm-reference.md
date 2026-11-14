@@ -658,7 +658,8 @@ createSourceLoader<K, V>(options: {
   load: (key: K, signal: AbortSignal) => Promise<V>;
 }): SourceLoader<K, V>;
 
-// Clips that name their audio. WaveformPlaylistProvider does not accept loading clips yet: its `tracks` prop still takes ClipTrack[].
+// Clips that name their audio. An arrangement (createArrangement() of @waveform-playlist/engine) holds and loads them;
+// PlaylistEngine's own setTracks/addTrack/updateTrack and WaveformPlaylistProvider's `tracks` prop still take ClipTrack[].
 type ClipSource = string | Blob;        // A string is a URL; a Blob or File is keyed by identity
 
 interface LoadingClip {                 // Times in seconds
@@ -1459,17 +1460,22 @@ Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. **Cleanup-
 
 Framework-agnostic timeline engine. Used internally by the browser package provider.
 
-`setTracks(tracks)`, `addTrack(track)` and `updateTrack(id, track)` throw an `Error` when a track's clips are not all of its `kind` (see `ClipTrack` under Data Types), when a track id is a duplicate, and when two clips of one track have the same id. The check runs before any state changes: no undo step, no adapter call.
+`setTracks(tracks)`, `addTrack(track)` and `updateTrack(id, track)` throw an `Error` when a track's clips are not all of its `kind` (see `ClipTrack` under Data Types), when a track id is a duplicate, and when two clips of one track have the same id. The check runs before any state changes: no undo step, no adapter call. A `LoadingClip` is an audio clip for this check, so the arrangement refuses a `kind: 'midi'` track that holds one.
 
 The arrangement (`createArrangement()`) owns the tracks, the mix and the undo history; a `PlaylistEngine` plays it, and makes its own when the `arrangement` option is left out. Nothing either hands out is a copy: `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are shared with the undo history and frozen outside production builds.
 
+An arrangement's tracks are `ArrangementTrack` (core): a clip is an `AudioClip` or a `LoadingClip` (audio not loaded yet; narrow with `isLoadingClip` before reading sample fields). The arrangement loads every source its loading clips name, in the current tracks and in every undo and redo state, once a decode context is attached (an engine with an adapter attaches `adapter.audioContext`), and replaces each loading clip with an `AudioClip` of the same id when its audio arrives (seconds to integer samples at the decoded buffer's sample rate; not an undo step; one notification). `getState().tracks`, `getState().duration` and the tracks an adapter receives leave loading clips out. `PlaylistEngine`'s own `setTracks` / `addTrack` / `updateTrack` take `ClipTrack` (loaded clips only).
+
 ```typescript
-import { PlaylistEngine, createArrangement } from '@waveform-playlist/engine';
+import { PlaylistEngine, createArrangement, attachDecodeContext, defaultLoadSource } from '@waveform-playlist/engine';
 import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions } from '@waveform-playlist/engine';
 import type {
   Arrangement,
+  ArrangementSourceState,
+  ArrangementSourcesValue,
   ClipBounds,
   CreateArrangementOptions,
+  LoadSource,
   RemoveTrackOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -1481,6 +1487,8 @@ interface PlaylistEngineOptions {
   samplesPerPixel?: number;     // Default: 1024; must be one of zoomLevels
   zoomLevels?: number[];        // Default: [256, 512, 1024, 2048, 4096, 8192]
   undoLimit?: number;           // Default: 100. Only when the engine makes its own arrangement
+  attachDecodeContext?: boolean; // Default: true: an engine with an adapter gives its arrangement adapter.audioContext to decode with, and takes it away in dispose().
+                                // false: the host calls attachDecodeContext() itself. An engine without an adapter attaches nothing
   bpm?: number;                 // Default: 120
   ppqn?: number;                // Without an adapter (default 960); with one, adapter.ppqn is used
 }
@@ -1488,8 +1496,44 @@ interface PlaylistEngineOptions {
 function createArrangement(options?: CreateArrangementOptions): Arrangement;
 
 interface CreateArrangementOptions {
-  tracks?: readonly ClipTrack[];  // The first tracks. Not an undo step
-  undoLimit?: number;             // Maximum number of undo steps (default 100)
+  tracks?: readonly ArrangementTrack[];  // The first tracks. Not an undo step
+  undoLimit?: number;                    // Maximum number of undo steps (default 100)
+  loadSource?: LoadSource;               // How a clip's source becomes an AudioBuffer. Default: defaultLoadSource
+}
+
+type LoadSource = (
+  src: ClipSource,
+  context: { signal: AbortSignal; audioContext: BaseAudioContext }
+) => Promise<AudioBuffer>;
+
+// fetch for a string, arrayBuffer() for a Blob or File, then audioContext.decodeAudioData. The signal is checked before
+// the work starts and after each await. Its own messages ('Failed to fetch <source>: <status> <statusText>',
+// 'Failed to fetch <source>' with fetch's TypeError in `cause`, 'Decoded audio is empty: <source>',
+// 'Failed to decode audio: <source>' for a decode rejection that is not an Error) name a URL without its query string,
+// fragment and user name/password (a malformed URL the URL parser refuses loses only query and fragment), never echo a
+// data: or blob: URL, and call a File by its name and a Blob 'Blob'. `cause` is the browser's TypeError; its message may hold the full URL.
+// A decode Error from the browser and an AbortError are rethrown as they are.
+const defaultLoadSource: LoadSource;
+
+// Give an arrangement the audio context its sources are decoded with. Nothing is fetched before; the sources are
+// pending meanwhile. getContext is called for each load. Returns the function that takes the context away: loads in
+// flight are aborted and stay pending, loaded sources are kept, and the next attach starts the aborted ones again.
+// One context at a time: a second attach warns and replaces the first. Throws for anything that is not an arrangement.
+function attachDecodeContext(
+  arrangement: Arrangement,
+  getContext: () => Promise<BaseAudioContext>
+): () => void;
+
+interface ArrangementSourceState {
+  status: 'pending' | 'loaded' | 'failed';
+  error?: Error;                         // There when it failed
+}
+
+interface ArrangementSourcesValue {      // What arrangement.sources holds. A new object only when a source is added or dropped, a status changes or a failure's error changes
+  sources: ReadonlyMap<ClipSource, ArrangementSourceState>;  // Every source the arrangement's clips name. The order of the entries means nothing
+  pendingCount: number;
+  failedCount: number;
+  isLoading: boolean;                    // True while a source is pending
 }
 
 interface RemoveTrackOptions {
@@ -1512,25 +1556,27 @@ interface ClipBounds {
 
 interface Arrangement {
   // read
-  getTracks(): readonly ClipTrack[];                    // The same array until the tracks change. A track's mixer fields are the values it entered with
+  getTracks(): readonly ArrangementTrack[];             // Loaded clips (AudioClip) and clips still loading (LoadingClip; isLoadingClip). The same array until the tracks change. A track's mixer fields are the values it entered with
   getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id. The same Map until a value changes, an entry is added or entries are dropped
   subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
   readonly tracksVersion: number;                       // Counts changes to the tracks
   readonly mixerVersion: number;                        // Counts the changes made by the four mixer setters (not entries added or dropped)
 
   // whole set
-  setTracks(tracks: readonly ClipTrack[]): void;        // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
+  setTracks(tracks: readonly ArrangementTrack[]): void; // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
 
   // tracks
-  addTrack(track: ClipTrack): void;
+  addTrack(track: ArrangementTrack): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
-  updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw). The mix stays; a track given a new id takes its mix with it
+  updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw; a function is not called). The mix stays; a track given a new id takes its mix with it.
+                                                        // In both forms a clip object the track already holds is kept as it is; every other clip is copied
     trackId: string,
-    next: ClipTrack | ((track: ClipTrack) => ClipTrack)
+    next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
   ): void;
   reorderTrack(trackId: string, toIndex: number): void;
 
-  // clips
+  // clips. A clip that is still loading cannot be edited: moveClip/trimClip/splitClip warn and change nothing,
+  // getClipBounds is null, constrainTrimDelta is 0, and loaded clips do not collide with it
   moveClip(trackId: string, clipId: string, deltaSamples: number): number;  // Returns the delta actually applied
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
   splitClip(trackId: string, clipId: string, atSample: number): void;
@@ -1557,13 +1603,27 @@ interface Arrangement {
   beginTransaction(): void;                             // Changes made until commitTransaction are one undo step
   commitTransaction(): void;                            // No step when the tracks are back where the transaction began
   abortTransaction(): void;                             // Put the tracks back as they were when the transaction began
+
+  // loading
+  readonly sources: ValueSource<ArrangementSourcesValue>;  // Where each source is. Read with getSnapshot() or subscribe(); published after the tracks notification,
+                                                        // so a subscribe() listener told of a loaded clip still reads its source as pending here.
+                                                        // 'failed' is a load that failed (no track changes) or a clip that could not be made from its audio
+                                                        // (it stays a LoadingClip; error.message is 'clip "<id>": <reason>'; other clips of the source are still loaded)
+  retry(src: ClipSource): void;                         // Start a source whose LOAD failed again. Does nothing for any other source, also one shown as failed because a clip could not be made
 }
 
+// Wanted sources: every src a LoadingClip names in the current tracks, an undo or redo state or an open transaction's base,
+// plus the src of a loaded clip that carries BOTH src and audioBuffer (its buffer is used; nothing is fetched).
+// A loaded clip with src and no audioBuffer is not fetched and not in `sources` (it never gets audio from the arrangement). A source no state names any more is dropped
+// (its load aborted); named again, it is fetched again.
+// The engine recognises an arrangement by a versioned Symbol.for key ('@waveform-playlist/engine/arrangement/time-base/v1'),
+// not by instanceof, so an arrangement made by another installed copy of the package is accepted.
+
 interface EngineState {
-  tracks: readonly ClipTrack[]; // Each track with its current mixer values. Shared, not a copy: never write to it. Frozen outside production builds
+  tracks: readonly ClipTrack[]; // Each track with its current mixer values and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
   tracksVersion: number;        // Monotonic counter; increments on structural track changes only
   mixerVersion: number;         // Monotonic counter; increments on per-track mixer edits (volume/mute/solo/pan)
-  duration: number;
+  duration: number;             // Of the loaded clips
   currentTime: number;
   isPlaying: boolean;
   samplesPerPixel: number;
