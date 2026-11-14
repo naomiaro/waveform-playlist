@@ -638,6 +638,65 @@ splitTrackByKind(track, midiTrackId?): ClipTrack[];  // One track with its kind 
                                                      // (audio keeps the id; MIDI gets id + '-midi' or midiTrackId)
 ```
 
+```typescript
+// From @waveform-playlist/core: loading a source by key (framework-free)
+type SourceState<V> =
+  | { status: 'pending' }
+  | { status: 'loaded'; value: V }
+  | { status: 'failed'; error: Error };
+
+interface SourceLoader<K, V> {
+  setWanted(keys: Iterable<K>): void;   // Declare the whole set of keys wanted now
+  suspend(): void;                       // Abort every load in flight; wanted keys and loaded values are kept
+  provide(key: K, value: V): void;       // Record a value the caller already holds as loaded
+  retry(key: K): void;                   // Start a failed key again; a no-op for any other state
+  subscribe(listener: (states: ReadonlyMap<K, SourceState<V>>) => void): () => void;
+  getSnapshot(): ReadonlyMap<K, SourceState<V>>;   // A new Map object on every change
+}
+
+createSourceLoader<K, V>(options: {
+  load: (key: K, signal: AbortSignal) => Promise<V>;
+}): SourceLoader<K, V>;
+
+// Clips that name their audio
+type ClipSource = string | Blob;        // A string is a URL; a Blob or File is keyed by identity
+
+interface LoadingClip {                 // Times in seconds
+  id: string;
+  src: ClipSource;
+  start?: number;                       // Default 0
+  duration?: number;                    // Default: the whole source from offset
+  offset?: number;                      // Default 0
+  name?: string;
+  gain?: number;
+  fadeIn?: Fade;
+  fadeOut?: Fade;
+  color?: string;
+  waveformData?: WaveformDataObject;    // Pre-computed peaks
+}
+
+type PlaylistTrack = Omit<ClipTrack, 'clips'> & { clips: (AudioClip | LoadingClip)[] };
+
+isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip;  // True for a clip with no sampleRate
+
+// AudioClip.src?: ClipSource            // The source the clip was loaded from. createClip, createClipFromSeconds
+//                                       // and createClipFromTicks take `src` and carry it onto the clip.
+
+interface AudioTrackOptions {
+  id?: string; clipId?: string; name?: string;   // '' counts as none; name defaults to the file name of src, else 'Untitled'
+  src?: ClipSource; audioBuffer?: AudioBuffer; waveformData?: WaveformDataObject;
+  start?: number; duration?: number; offset?: number;   // Seconds
+  fadeIn?: Fade; fadeOut?: Fade; gain?: number; color?: string;
+  muted?: boolean; soloed?: boolean; volume?: number; pan?: number;
+  renderMode?: RenderMode; spectrogramConfig?: SpectrogramConfig; spectrogramColorMap?: ColorMapValue;
+}
+
+audioTrack(options: AudioTrackOptions): PlaylistTrack;
+// src alone: one LoadingClip. audioBuffer or waveformData (with or without src): one AudioClip.
+// None of the three: throws 'audioTrack: give src, audioBuffer or waveformData'.
+// A negative or non-finite start or offset, or a duration that is not positive and finite, throws.
+```
+
 A track whose clips do not match its kind is rejected: `PlaylistEngine.setTracks/addTrack/updateTrack` throw. Under `WaveformPlaylistProvider` the throw does not reach React (an error boundary does not see it): the provider calls `onError(error)`, logs a console warning, and the playlist stays in its loading state until `tracks` is valid. Always pass `onError`.
 
 ```typescript
