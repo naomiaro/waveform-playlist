@@ -500,9 +500,9 @@ A source is `failed` in two cases:
 | Case | What the tracks show | `error` | How it ends |
 | --- | --- | --- | --- |
 | The load failed: the fetch, the decode, or getting the audio context | No track changes; the clips stay loading clips | What the loader rejected with | `arrangement.retry(src)` starts the load again. Nothing else does |
-| A clip cannot be made from the audio: its `offset` is at or past the end, or its `start`, `offset` or `duration` is not a usable number | That clip stays a loading clip; other clips of the same source are loaded | An `Error` with the message `clip "<id>": <reason>` | When no state holds that clip any more. `retry()` does nothing |
+| A clip in the current tracks cannot be made from the audio: its `offset` is at or past the end, or its `start`, `offset` or `duration` is not a usable number | That clip stays a loading clip; other clips of the same source are loaded | An `Error` with the message `clip "<id>": <reason>` | When that clip is no longer in the current tracks. `retry()` does nothing |
 
-For the second case, replace or remove the clip with `updateTrack()`. An undo step that still holds the clip keeps the failure; `clearHistory()` lets go of those steps.
+For the second case, replace or remove the clip with `updateTrack()`: the failure is cleared at once. Only clips in the current tracks count, so an undo step that still holds the clip does not keep the failure, and an undo that brings the clip back brings the failure back.
 
 `retry(src)` does nothing for a source that is pending or loaded, and for one no clip names.
 
@@ -531,11 +531,11 @@ The error messages `defaultLoadSource` writes itself:
 | Message | When |
 | --- | --- |
 | `Failed to fetch <source>: <status> <statusText>` | The response is not ok |
-| `Failed to fetch <source>` | `fetch` threw a `TypeError` (a network failure, a refused cross-origin request). The `TypeError` is in the error's `cause` |
+| `Failed to fetch <source>` | `fetch` threw a `TypeError` (a network failure, a refused cross-origin request). The `TypeError` is in the error's `cause` when the source is named unchanged (see below) |
 | `Decoded audio is empty: <source>` | The decoded buffer has no samples |
 | `Failed to decode audio: <source>` | The decoder rejected with something that is not an `Error` |
 
-In these, `<source>` is the URL without its query string, its fragment and a user name or password before the host (each can hold a secret). A URL in which the browser's URL parser finds a user name or password (also in forms such as one slash after the scheme, backslashes, or white space in front) is named in its parsed, absolute form without them. A malformed URL that the parser refuses loses only its query string and fragment. The `TypeError` in `cause` is the browser's own, and its message may contain the full URL: do not show `cause` to users if your URLs carry secrets. A `data:` or `blob:` URL is never echoed (`data: URL`, `blob: URL`), a `File` is called by its name and any other `Blob` is `Blob`. An `Error` the browser's decoder rejects with is passed on unchanged: its message is the browser's and does not name the source. An abort is passed on as the `AbortError` it is.
+In these, `<source>` is the URL without its query string, its fragment and a user name or password before the host (each can hold a secret). A URL in which the browser's URL parser finds a user name or password (also in forms such as one slash after the scheme, backslashes, or white space in front) is named in its parsed, absolute form without them. A malformed URL that the parser refuses loses only its query string and fragment. The browser's `TypeError` is kept in `cause` only when the name in the message is the source unchanged. When anything was left out of the name (a user name or password, a query string, a fragment, a `data:` or `blob:` URL) the error has no `cause`, because the browser's own message can quote the whole URL (Chromium's does for a URL with a user name or password). A `data:` or `blob:` URL is never echoed (`data: URL`, `blob: URL`), a `File` is called by its name and any other `Blob` is `Blob`. An `Error` the browser's decoder rejects with is passed on unchanged: its message is the browser's and does not name the source. An abort is passed on as the `AbortError` it is.
 
 #### The audio context to decode with
 

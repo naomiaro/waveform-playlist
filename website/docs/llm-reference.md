@@ -1508,10 +1508,11 @@ type LoadSource = (
 
 // fetch for a string, arrayBuffer() for a Blob or File, then audioContext.decodeAudioData. The signal is checked before
 // the work starts and after each await. Its own messages ('Failed to fetch <source>: <status> <statusText>',
-// 'Failed to fetch <source>' with fetch's TypeError in `cause`, 'Decoded audio is empty: <source>',
+// 'Failed to fetch <source>' when fetch threw a TypeError, 'Decoded audio is empty: <source>',
 // 'Failed to decode audio: <source>' for a decode rejection that is not an Error) name a URL without its query string,
 // fragment and user name/password (a malformed URL the URL parser refuses loses only query and fragment), never echo a
-// data: or blob: URL, and call a File by its name and a Blob 'Blob'. `cause` is the browser's TypeError; its message may hold the full URL.
+// data: or blob: URL, and call a File by its name and a Blob 'Blob'. The TypeError is in `cause` only when <source> is the source unchanged;
+// when anything was left out of it the error has no `cause` (the browser's message can quote the whole URL).
 // A decode Error from the browser and an AbortError are rethrown as they are.
 const defaultLoadSource: LoadSource;
 
@@ -1607,8 +1608,8 @@ interface Arrangement {
   // loading
   readonly sources: ValueSource<ArrangementSourcesValue>;  // Where each source is. Read with getSnapshot() or subscribe(); published after the tracks notification,
                                                         // so a subscribe() listener told of a loaded clip still reads its source as pending here.
-                                                        // 'failed' is a load that failed (no track changes) or a clip that could not be made from its audio
-                                                        // (it stays a LoadingClip; error.message is 'clip "<id>": <reason>'; other clips of the source are still loaded)
+                                                        // 'failed' is a load that failed (no track changes) or a clip in the CURRENT tracks that could not be made from its audio
+                                                        // (it stays a LoadingClip; error.message is 'clip "<id>": <reason>'; other clips of the source are still loaded; a clip only an undo or redo state holds does not count)
   retry(src: ClipSource): void;                         // Start a source whose LOAD failed again. Does nothing for any other source, also one shown as failed because a clip could not be made
 }
 
