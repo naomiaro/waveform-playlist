@@ -372,8 +372,10 @@ export class ArrangementImpl implements Arrangement {
    * An id no track has changes nothing (a track object is still checked and
    * may throw; a function is not called for it).
    *
-   * A track object is copied on its way in. A function's result keeps the
-   * clip objects the arrangement already held, so states go on sharing them.
+   * The track is copied on its way in, and so is each clip, except a clip
+   * object this track already holds (one taken from `getTracks()`): that
+   * one is kept as it is, so states go on sharing it and a listener can see
+   * that it did not change.
    */
   updateTrack(
     trackId: string,
@@ -392,7 +394,8 @@ export class ArrangementImpl implements Arrangement {
     }
     if (!current) return;
     this._pushUndoSnapshot();
-    const enriched = this._ingest(track, byFunction ? new Set(current.clips) : undefined);
+    // A clip object this track already holds is kept, in either form.
+    const enriched = this._ingest(track, new Set(current.clips));
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
     // A track that is given a new id takes its mix with it; the old id's
     // entry goes unless a stored state still holds a track of that id.

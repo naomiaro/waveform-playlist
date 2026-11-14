@@ -441,6 +441,53 @@ describe('a change to loading clips only is not sent to the adapter', () => {
     });
   }
 
+  it("a track OBJECT built from the arrangement's own track is recognised too", () => {
+    const { adapter, arrangement, engine, events } = setup(true);
+    const current = arrangement.getTracks()[0];
+    const given = { ...current, clips: [...current.clips, loading('N', 5)] };
+    arrangement.updateTrack('A', given);
+
+    expect(adapter.calls).toEqual([]);
+    expect(events).toHaveBeenCalledTimes(1);
+    const stored = arrangement.getTracks()[0];
+    expect(stored.clips.map((c) => c.id)).toEqual(['a1', 'L', 'a2', 'N']);
+    // The clips the arrangement already held are kept as they are ...
+    expect(stored.clips[0]).toBe(current.clips[0]);
+    expect(stored.clips[1]).toBe(current.clips[1]);
+    expect(stored.clips[2]).toBe(current.clips[2]);
+    // ... while the track, its clips array and the new clip are copies.
+    expect(stored).not.toBe(given);
+    expect(stored.clips).not.toBe(given.clips);
+    expect(stored.clips[3]).not.toBe(given.clips[3]);
+    // And an undo step shares the kept clips with the current state.
+    arrangement.undo();
+    expect(arrangement.getTracks()[0].clips[0]).toBe(current.clips[0]);
+    engine.dispose();
+  });
+
+  it('a track object with clip objects of its own is copied and sent, as before', () => {
+    const { adapter, arrangement, engine } = setup(true);
+    const mine = clip('a1', 0);
+    arrangement.updateTrack('A', track('A', [mine, loading('L'), clip('a2', 3 * SECOND)]));
+
+    expect(arrangement.getTracks()[0].clips[0]).not.toBe(mine);
+    expect(adapter.calls).toEqual([
+      { method: 'updateTrack', args: ['A', { id: 'A', clips: ['a1', 'a2'] }] },
+    ]);
+    engine.dispose();
+  });
+
+  it('a clip object held by ANOTHER track is copied when it is put on this one', () => {
+    const { arrangement, engine } = setup(true);
+    const ofB = arrangement.getTracks()[1].clips[0];
+    const a = arrangement.getTracks()[0];
+    arrangement.updateTrack('A', { ...a, clips: [{ ...ofB, id: 'x' }, ofB] });
+    const stored = arrangement.getTracks()[0].clips;
+    expect(stored[1]).toEqual(ofB);
+    expect(stored[1]).not.toBe(ofB);
+    engine.dispose();
+  });
+
   it('a change that also touches a loaded clip, or a field of the track, is sent', () => {
     const { adapter, arrangement, engine } = setup(true);
 
