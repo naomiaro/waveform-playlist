@@ -11,7 +11,12 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React, { StrictMode, useState } from 'react';
 import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
-import { useEngineRefs, usePlaylistTimeline } from '../contexts/playlistContexts';
+import {
+  useEngineRefs,
+  useIsPlaying,
+  usePlaybackControls,
+  usePlaylistTimeline,
+} from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter, PlaylistEngine } from '@waveform-playlist/engine';
 
@@ -84,11 +89,15 @@ const createAdapter = () => {
 
 let engineRef: React.RefObject<PlaylistEngine | null>;
 let isReady: boolean;
+let isPlaying: boolean;
+let play: (startTime?: number) => Promise<void>;
 let setAppTracks: (tracks: ClipTrack[]) => void;
 
 const Probe: React.FC = () => {
   engineRef = useEngineRefs().playoutRef;
   isReady = usePlaylistTimeline().isReady;
+  isPlaying = useIsPlaying().isPlaying;
+  play = usePlaybackControls().play;
   return null;
 };
 
@@ -289,6 +298,105 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     // The rebuilt engine has the moved clip.
     const given = adapters[1].setTracks.mock.lastCall![0] as ClipTrack[];
     expect(given[0].clips[0].startSample).toBe(SAMPLE_RATE);
+  });
+
+  // A deferred rebuild builds nothing, so after a hide that disposed the
+  // engine the view is not ready until the deferral ends, as on a mount with
+  // deferEngineRebuild set (it must not say ready with no engine to play).
+  it('an <Activity> reveal while a rebuild is deferred is not ready until the deferral ends', async () => {
+    const t1 = drums();
+    const tree = (mode: 'visible' | 'hidden', defer: boolean) => (
+      <React.Activity mode={mode}>
+        <App initial={[t1]} deferEngineRebuild={defer} />
+      </React.Activity>
+    );
+    const view = render(tree('visible', false));
+    await waitFor(() => expect(isReady).toBe(true));
+    view.rerender(tree('visible', true));
+    await act(async () => {
+      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+    });
+    await settle();
+
+    view.rerender(tree('hidden', true));
+    await settle();
+    view.rerender(tree('visible', true));
+    await settle();
+    expect(engineRef.current).toBeNull();
+    expect(isReady).toBe(false);
+
+    view.rerender(tree('visible', false));
+    await waitFor(() => expect(isReady).toBe(true));
+    expect(engineRef.current).not.toBeNull();
+    expect(adapters).toHaveLength(2);
+    expect(disposeCounts()).toEqual([1, 0]);
+  });
+});
+
+// Maintainer's choice (2026-11-13): a provider hidden in an <Activity> during
+// playback stops its audio (the engine is disposed with the hide) and resumes
+// from where it was hidden when it is shown again.
+describe('playback across an unmount or an <Activity> hide (#811)', () => {
+  beforeEach(() => {
+    adapters = [];
+    failNextAdapter = false;
+    isReady = false;
+    isPlaying = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  const startPlayingAt = async (seconds: number) => {
+    await act(async () => {
+      await play(1);
+    });
+    expect(isPlaying).toBe(true);
+    expect(adapters[0].play).toHaveBeenCalled();
+    // Where the transport has got to when the provider goes away.
+    adapters[0].getCurrentTime = () => seconds;
+  };
+
+  it('an unmount during playback disposes the playing adapter', async () => {
+    const t1 = drums();
+    const view = render(<App initial={[t1]} />);
+    await waitFor(() => expect(isReady).toBe(true));
+    await act(async () => {
+      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+    });
+    await startPlayingAt(2.5);
+
+    view.unmount();
+
+    expect(disposeCounts()).toEqual([1]);
+  });
+
+  it('a hide during playback stops the audio; the reveal resumes where it was hidden', async () => {
+    const t1 = drums();
+    const tree = (mode: 'visible' | 'hidden') => (
+      <React.Activity mode={mode}>
+        <App initial={[t1]} />
+      </React.Activity>
+    );
+    const view = render(tree('visible'));
+    await waitFor(() => expect(isReady).toBe(true));
+    await act(async () => {
+      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+    });
+    await startPlayingAt(2.5);
+
+    view.rerender(tree('hidden'));
+    await settle();
+    expect(disposeCounts()).toEqual([1]);
+
+    view.rerender(tree('visible'));
+    await waitFor(() => expect(adapters).toHaveLength(2));
+    await waitFor(() => expect(adapters[1].play).toHaveBeenCalled());
+    expect(adapters[1].play.mock.calls[0][0]).toBe(2.5);
+    expect(isPlaying).toBe(true);
+    expect(adapters[1].dispose).not.toHaveBeenCalled();
   });
 });
 

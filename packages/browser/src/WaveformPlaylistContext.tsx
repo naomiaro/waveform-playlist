@@ -674,6 +674,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
     // When deferEngineRebuild flips to false, this effect re-runs and builds once.
     if (deferEngineRebuild) {
+      // No engine (an <Activity> hide disposed it, or none was built yet):
+      // not ready until the deferral ends and the build below runs (#811).
+      if (!engineRef.current) setIsReady(false);
       return;
     }
 
