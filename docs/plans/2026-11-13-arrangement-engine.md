@@ -1,14 +1,14 @@
-# Playlist Document (engine half) Implementation Plan
+# Arrangement (engine half) Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** One object, the playlist document, owns the tracks and everything that changes them; `PlaylistEngine` delegates to it and plays it one way (#812, the engine half).
+**Goal:** One object, the arrangement, owns the tracks and everything that changes them; `PlaylistEngine` delegates to it and plays it one way (#812, the engine half).
 
-**Architecture:** `PlaylistDocument` is extracted from `PlaylistEngine` (code motion first, then its own rules: immutability, a mixer part by track id, structure-only undo, history notifications), then gains the source loader and the switch of a loading clip to a loaded one. The engine keeps its public API by delegating, so dawcore is unchanged in what it calls. The React half (provider, recording, examples, docs) and MIDI get their own plan once this half is reviewed, because that plan is written against the interface this one produces.
+**Architecture:** `Arrangement` is extracted from `PlaylistEngine` (code motion first, then its own rules: immutability, a mixer part by track id, structure-only undo, history notifications), then gains the source loader and the switch of a loading clip to a loaded one. The engine keeps its public API by delegating, so dawcore is unchanged in what it calls. The React half (provider, recording, examples, docs) and MIDI get their own plan once this half is reviewed, because that plan is written against the interface this one produces.
 
 **Tech Stack:** TypeScript, vitest, tsup, pnpm workspace, changesets. No React in this plan.
 
-**Spec:** `docs/specs/2026-11-13-playlist-document-design.md` (approved 2026-11-13, eight calls included). `docs/specs/2026-11-13-provider-loads-sources-design.md` stays in force for the types, `createSourceLoader`, `audioTrack()` and the conversion of a loading clip. Read both before any task.
+**Spec:** `docs/specs/2026-11-13-arrangement-design.md` (approved 2026-11-13, eight calls included). `docs/specs/2026-11-13-provider-loads-sources-design.md` stays in force for the types, `createSourceLoader`, `audioTrack()` and the conversion of a loading clip. Read both before any task.
 
 ## Global Constraints
 
@@ -31,7 +31,7 @@
 1. **dawcore's clip drag** (`clip-pointer-handler.ts`: `beginTransaction`, `moveClip(…, skipAdapter=true)` per pointer move, `updateTrack(id)` on drop, `commitTransaction`, `abortTransaction` on cancel): the adapter must receive exactly what it receives today, in the same order. Test in Task 1 (pinned) and Task 2 (still green).
 2. **A statechange listener that calls back into the engine** (dawcore's handler overwrites its own track map and can trigger `reorderTrack` through `_syncDomToEngineOrder`): no lost or re-ordered notification, no recursion without end. Test in Task 1 (pinned on today's engine), still green after Task 2 and Task 5.
 3. **An undo that changes the number of tracks** (undo of `addTrack` / `removeTrack`): `adapter.setTracks`, not per-track updates, and the selected track cleared when its track is gone. Test in Task 1 and Task 4.
-4. **A mixer setter for a track the document does not hold** (dawcore sets values for a track that is still loading): the adapter is still called, the document changes nothing, no throw. Test in Task 4.
+4. **A mixer setter for a track the arrangement does not hold** (dawcore sets values for a track that is still loading): the adapter is still called, the arrangement changes nothing, no throw. Test in Task 4.
 5. **A source that settles after its clip was removed and the removal undone, or after `setTracks` replaced everything:** no clip resurrected in a state that should not have it, no fetch started twice, a late result of an aborted load ignored. Test in Task 9.
 
 ---
@@ -40,23 +40,23 @@
 
 | File | Responsibility |
 | --- | --- |
-| `packages/engine/src/document/PlaylistDocument.ts` (new) | the class: tracks, history, transactions, mixer part, change notifications |
-| `packages/engine/src/document/history.ts` (new, PR 3) | undo / redo stacks and the transaction base as pure helpers |
-| `packages/engine/src/document/mixer.ts` (new, PR 3) | the mixer part: seeding, setters, retention |
-| `packages/engine/src/document/sources.ts` (new, PR 4) | wanted set, the loader, the switch, snapshot patching |
-| `packages/engine/src/document/resolveLoadingClip.ts` (new, PR 4) | seconds to samples for one loading clip (ported from the first build's `resolveTracks.ts`) |
-| `packages/engine/src/document/loadSource.ts` (new, PR 4) | `LoadSource`, `defaultLoadSource` (moved from browser's first build) |
-| `packages/engine/src/document/attach.ts` (new, PR 4) | the versioned `Symbol.for` keys and the two attach points |
-| `packages/engine/src/document/index.ts` (new) | `createPlaylistDocument`, the public types |
+| `packages/engine/src/arrangement/Arrangement.ts` (new) | the class: tracks, history, transactions, mixer part, change notifications |
+| `packages/engine/src/arrangement/history.ts` (new, PR 3) | undo / redo stacks and the transaction base as pure helpers |
+| `packages/engine/src/arrangement/mixer.ts` (new, PR 3) | the mixer part: seeding, setters, retention |
+| `packages/engine/src/arrangement/sources.ts` (new, PR 4) | wanted set, the loader, the switch, snapshot patching |
+| `packages/engine/src/arrangement/resolveLoadingClip.ts` (new, PR 4) | seconds to samples for one loading clip (ported from the first build's `resolveTracks.ts`) |
+| `packages/engine/src/arrangement/loadSource.ts` (new, PR 4) | `LoadSource`, `defaultLoadSource` (moved from browser's first build) |
+| `packages/engine/src/arrangement/attach.ts` (new, PR 4) | the versioned `Symbol.for` keys and the two attach points |
+| `packages/engine/src/arrangement/index.ts` (new) | `createArrangement`, the public types |
 | `packages/engine/src/PlaylistEngine.ts` | transport, view state, adapter sync; delegates the rest |
 | `packages/engine/src/__tests__/adapterCalls.test.ts` (new) | what the adapter is called with, per operation |
-| `packages/engine/src/__tests__/document*.test.ts` (new) | the document alone |
+| `packages/engine/src/__tests__/arrangement*.test.ts` (new) | the arrangement alone |
 
-Branches, a linear stack: `feat/812-provider-loads-sources` (#839, open) → `feat/812-doc-1-extract` (PR 2) → `feat/812-doc-2-rules` (PR 3) → `feat/812-doc-3-loading` (PR 4). The first build, `feat/812-2-provider-resolution`, is not a parent of any of them: files are ported from it by path where a task says so. The spec and this plan are copied onto the first new branch and removed before the last PR of #812 merges.
+Branches, a linear stack: `feat/812-provider-loads-sources` (#839, open) → `feat/812-arr-1-extract` (PR 2) → `feat/812-arr-2-rules` (PR 3) → `feat/812-arr-3-loading` (PR 4). The first build, `feat/812-2-provider-resolution`, is not a parent of any of them: files are ported from it by path where a task says so. The spec and this plan are copied onto the first new branch and removed before the last PR of #812 merges.
 
 ---
 
-# PR 2: extract the document, code motion only
+# PR 2: extract the arrangement, code motion only
 
 ### Task 1: pin what the adapter is called with today
 
@@ -83,19 +83,19 @@ No engine test asserts the adapter calls of `undo`, `redo`, `abortTransaction` o
 - [ ] **Step 3: Check each group is real.** Break one line per group in `PlaylistEngine.ts` (skip the adapter call in `_restoreTracks`; drop the `skipAdapter` guard; drop the mixer forward for an unknown id; make `reorderTrack` call the adapter), see a named test fail, restore.
 - [ ] **Step 4: Commit** `test(engine): pin the adapter calls and emissions of every track operation (for #812)`.
 
-### Task 2: `PlaylistDocument`, by code motion
+### Task 2: `Arrangement`, by code motion
 
 **Files:**
-- Create: `packages/engine/src/document/PlaylistDocument.ts`, `packages/engine/src/document/index.ts`
+- Create: `packages/engine/src/arrangement/Arrangement.ts`, `packages/engine/src/arrangement/index.ts`
 - Modify: `packages/engine/src/PlaylistEngine.ts`
-- Test: `packages/engine/src/__tests__/document.test.ts`
+- Test: `packages/engine/src/__tests__/arrangement.test.ts`
 
 **Interfaces:**
 - Consumes: Task 1's tests as the contract.
 - Produces (internal in this PR; NOT exported from the package's `index.ts` yet):
 
 ```ts
-export type DocumentChange =
+export type ArrangementChange =
   | { type: 'set' }
   | { type: 'add'; trackId: string }
   | { type: 'remove'; trackId: string }
@@ -106,41 +106,41 @@ export type DocumentChange =
   | { type: 'recompute' }
   | { type: 'history' };
 
-export interface DocumentTimeBase {
+export interface ArrangementTimeBase {
   sampleRate: number;
   secondsToTicks(seconds: number): number;
   ticksToSeconds(tick: number): number;
 }
 
-export class PlaylistDocument {
-  constructor(options: { undoLimit?: number; timeBase: DocumentTimeBase });
+export class Arrangement {
+  constructor(options: { undoLimit?: number; timeBase: ArrangementTimeBase });
   getTracks(): ClipTrack[];            // the live array, as `_tracks` is today
   readonly tracksVersion: number;
   readonly mixerVersion: number;
-  onChange(listener: (change: DocumentChange) => void): () => void;
+  onChange(listener: (change: ArrangementChange) => void): () => void;
   // the track, clip, mixer, undo and transaction methods of the spec's interface,
   // each with exactly today's behaviour
   recomputeStartSamples(): void;
 }
 ```
 
-- [ ] **Step 1: Write `document.test.ts`**, driving a `PlaylistDocument` with a fake time base and no engine: for each operation, the resulting tracks, the two versions, `canUndo` / `canRedo`, and the `DocumentChange` emitted. Port the cases of `undo.test.ts` that do not need an adapter. Expected now: FAIL, module not found.
-- [ ] **Step 2: Move the code.** Into the document: `_tracks`, `_tracksVersion`, `_mixerVersion`, `_undoStack`, `_redoStack`, `_inTransaction`, `_transactionSnapshot`, `_transactionMutated`, `undoLimit`, `_snapshotTracks`, `_pushUndoSnapshot`, the track and clip methods' state logic, the mixer setters' in-place writes, the startTick enrichment and `_recomputeStartSamples`' loop (through the time base), `assertTrackKind` calls. Behaviour is copied line for line: snapshots are still copies, mixer writes are still in place, `updateTrack` with an unknown id still does what Task 1 recorded. In the engine: each public method calls the document, then makes the adapter call it made before, then emits `statechange`, in the order it had. The engine builds the time base from its `_sampleRate`, `_secondsToTicks`, `_ticksToSeconds`. `getState()` reads the document. `removeTrack` still clears the selected track in the engine method.
+- [ ] **Step 1: Write `arrangement.test.ts`**, driving a `Arrangement` with a fake time base and no engine: for each operation, the resulting tracks, the two versions, `canUndo` / `canRedo`, and the `ArrangementChange` emitted. Port the cases of `undo.test.ts` that do not need an adapter. Expected now: FAIL, module not found.
+- [ ] **Step 2: Move the code.** Into the arrangement: `_tracks`, `_tracksVersion`, `_mixerVersion`, `_undoStack`, `_redoStack`, `_inTransaction`, `_transactionSnapshot`, `_transactionMutated`, `undoLimit`, `_snapshotTracks`, `_pushUndoSnapshot`, the track and clip methods' state logic, the mixer setters' in-place writes, the startTick enrichment and `_recomputeStartSamples`' loop (through the time base), `assertTrackKind` calls. Behaviour is copied line for line: snapshots are still copies, mixer writes are still in place, `updateTrack` with an unknown id still does what Task 1 recorded. In the engine: each public method calls the arrangement, then makes the adapter call it made before, then emits `statechange`, in the order it had. The engine builds the time base from its `_sampleRate`, `_secondsToTicks`, `_ticksToSeconds`. `getState()` reads the arrangement. `removeTrack` still clears the selected track in the engine method.
   The engine does NOT yet subscribe to `onChange` for adapter sync: in this PR `onChange` exists and is tested, and the engine's methods stay the place where adapter calls are made, so the order cannot drift. (Task 5 moves adapter sync onto the subscription.)
 - [ ] **Step 3: Run** the engine suite: `(cd packages/engine && npx vitest run > <scratchpad file> 2>&1)`. Expected: every existing test and Task 1's file PASS with NO edit to any existing test file. A change to an existing test's expectation is not allowed in this PR; if one seems needed, stop and report.
 - [ ] **Step 4: Downstream.** Port check, then `pnpm --filter @waveform-playlist/engine build`, then `(cd packages/browser && npx vitest run)`, `(cd packages/dawcore && npx vitest run)`, `(cd packages/playout && npx vitest run)`, `(cd packages/transport && npx vitest run)`, `pnpm typecheck`, `pnpm lint` (0 errors). All green, unchanged.
-- [ ] **Step 5: Size.** `PlaylistEngine.ts` is smaller than before; no method body was changed beyond replacing state access with a call to the document. State the line counts in the report.
+- [ ] **Step 5: Size.** `PlaylistEngine.ts` is smaller than before; no method body was changed beyond replacing state access with a call to the arrangement. State the line counts in the report.
 - [ ] **Step 6: e2e.** `pnpm build`, then the full Playwright suite on the head commit (`pnpm test`, or `PORT=3077 pnpm test` with your own server). All green.
-- [ ] **Step 7: Changeset** (engine `patch`: "internal: track state moves into a document object; no behaviour change"). Commit `refactor(engine): track state, undo and transactions move into PlaylistDocument (for #812)`.
+- [ ] **Step 7: Changeset** (engine `patch`: "internal: track state moves into a arrangement object; no behaviour change"). Commit `refactor(engine): track state, undo and transactions move into Arrangement (for #812)`.
 - [ ] **Step 8 (controller):** independent review of the PR 2 diff with the question "is any behaviour different", fix, repeat until nothing above low. Tell the maintainer; open the PR as "Part 2 of 6 for #812".
 
 ---
 
-# PR 3: the document's rules
+# PR 3: the arrangement's rules
 
 ### Task 3: immutability and snapshots by reference
 
-**Files:** `document/PlaylistDocument.ts`, `document/history.ts` (new), `__tests__/documentImmutable.test.ts` (new).
+**Files:** `arrangement/Arrangement.ts`, `arrangement/history.ts` (new), `__tests__/arrangementImmutable.test.ts` (new).
 
 **Interfaces:**
 - Produces: `getTracks(): readonly ClipTrack[]` returning the same array until a change; every write replaces the array and only the changed track and clip objects; `history.ts` exports pure `pushStep`, `undoStep`, `redoStep`, `beginBase`, typed over `readonly ClipTrack[]`.
@@ -148,16 +148,16 @@ export class PlaylistDocument {
 - [ ] **Step 1: Tests:** after any single-track operation the other tracks and every untouched clip are the SAME objects; `getTracks()` is the same array across a selection or zoom change of the engine and across `getState()` calls; a snapshot taken before a change still equals what it was (deep-equal against a `structuredClone` taken at the time, with `audioBuffer` left out); `undo` then `redo` returns arrays whose unchanged tracks are identical objects to the pre-undo ones; freezing (`Object.freeze` on tracks and clip arrays in the test) breaks nothing.
 - [ ] **Step 2–4:** fail, implement (snapshots become references; `_snapshotTracks` goes), pass.
 - [ ] **Step 5:** Task 1's file: update ONLY the expectations this rule changes, each with a comment naming the rule: `undo` / `redo` with the same number of tracks now call `updateTrack` for the tracks that differ, not for every track. Everything else stays green untouched.
-- [ ] **Step 6:** engine `getState()`: `tracks` is the document's array (no copy). Grep every consumer of `getState().tracks` and `state.tracks` in `packages/browser/src`, `packages/dawcore/src`, `examples/` for a write to the array or to a track object after receiving it (`.push(`, `.sort(`, `.splice(`, an assignment to `track.` or `clip.`); list what was found in the report; a writer is a blocker to report, not to patch.
+- [ ] **Step 6:** engine `getState()`: `tracks` is the arrangement's array (no copy). Grep every consumer of `getState().tracks` and `state.tracks` in `packages/browser/src`, `packages/dawcore/src`, `examples/` for a write to the array or to a track object after receiving it (`.push(`, `.sort(`, `.splice(`, an assignment to `track.` or `clip.`); list what was found in the report; a writer is a blocker to report, not to patch.
 - [ ] **Step 7:** Commit.
 
 ### Task 4: the mixer part and structure-only undo
 
-**Files:** `document/mixer.ts` (new), `document/PlaylistDocument.ts`, `PlaylistEngine.ts`, `__tests__/documentMixer.test.ts` (new).
+**Files:** `arrangement/mixer.ts` (new), `arrangement/Arrangement.ts`, `PlaylistEngine.ts`, `__tests__/arrangementMixer.test.ts` (new).
 
 **Interfaces:**
-- Produces: `getMixer(): ReadonlyMap<string, TrackMixerValues>` (same Map until a value changes); the four setters replace the Map and one entry, bump `mixerVersion`, emit `{ type: 'mixer', trackId }`, replace no track object; a setter for an unknown id changes nothing and emits nothing in the DOCUMENT (the ENGINE method still forwards to the adapter, Review Focus 4).
-  In the engine: `private _tracksForAdapter(): ClipTrack[]`, the document's tracks with the current mixer values merged in, cached by `(tracksVersion, mixerVersion)`; it is what every adapter track call and `getState().tracks` use.
+- Produces: `getMixer(): ReadonlyMap<string, TrackMixerValues>` (same Map until a value changes); the four setters replace the Map and one entry, bump `mixerVersion`, emit `{ type: 'mixer', trackId }`, replace no track object; a setter for an unknown id changes nothing and emits nothing in the ARRANGEMENT (the ENGINE method still forwards to the adapter, Review Focus 4).
+  In the engine: `private _tracksForAdapter(): ClipTrack[]`, the arrangement's tracks with the current mixer values merged in, cached by `(tracksVersion, mixerVersion)`; it is what every adapter track call and `getState().tracks` use.
 
 - [ ] **Step 1: Tests:**
   - a track entering through `setTracks` / `addTrack` seeds its entry from its own fields; an id that already has an entry keeps it;
@@ -173,7 +173,7 @@ export class PlaylistDocument {
 
 ### Task 5: history notifications, the fixes, adapter sync by subscription
 
-**Files:** `document/PlaylistDocument.ts`, `PlaylistEngine.ts`, tests.
+**Files:** `arrangement/Arrangement.ts`, `PlaylistEngine.ts`, tests.
 
 - [ ] **Step 1: Tests:**
   - `commitTransaction` (with a change) and `clearHistory` emit `{ type: 'history' }`, and the engine emits `statechange` with fresh `canUndo` / `canRedo`;
@@ -182,43 +182,43 @@ export class PlaylistDocument {
   - `setTracks` with a transaction open aborts it and clears the history;
   - duplicate track ids, or duplicate clip ids within a track, in `setTracks` / `addTrack` / `updateTrack`: throws `[waveform-playlist] …` naming the ids, and tracks, history, mixer and subscribers are untouched;
   - a listener that writes during a notification gets its own change after the one it is handling, and every listener sees every change once, in order.
-- [ ] **Step 2: Move adapter sync onto the subscription.** The engine subscribes to `onChange` in its constructor and maps each `DocumentChange` to the adapter call of the spec's "Document to adapter" list; its public methods become: call the document. `skipAdapter` is a flag the engine sets around that one call so its subscriber skips the forward; `updateTrack(id)` with no track forwards the current track. Task 1's file must stay green apart from the expectations Tasks 3–5 changed by rule.
+- [ ] **Step 2: Move adapter sync onto the subscription.** The engine subscribes to `onChange` in its constructor and maps each `ArrangementChange` to the adapter call of the spec's "Arrangement to adapter" list; its public methods become: call the arrangement. `skipAdapter` is a flag the engine sets around that one call so its subscriber skips the forward; `updateTrack(id)` with no track forwards the current track. Task 1's file must stay green apart from the expectations Tasks 3–5 changed by rule.
 - [ ] **Step 3:** `removeTrack` clearing the selected track becomes the subscriber's reaction to a `remove` or a `restore` in which the selected id is gone (this also fixes: undo of an `addTrack` leaves a selected id that no track has; add that test).
 - [ ] **Step 4–5:** run all, break the abort-first line, the validation, the ordered delivery; see named tests fail. Commit.
 
-### Task 6: the document as an engine option
+### Task 6: the arrangement as an engine option
 
-**Files:** `document/index.ts`, `PlaylistEngine.ts`, `types.ts`, `packages/engine/src/index.ts`, tests.
+**Files:** `arrangement/index.ts`, `PlaylistEngine.ts`, `types.ts`, `packages/engine/src/index.ts`, tests.
 
 **Interfaces:**
-- Produces (public, exported from `@waveform-playlist/engine`): `createPlaylistDocument(options?: { tracks?, undoLimit? })`, the `PlaylistDocument` interface of the spec WITHOUT `sources` and `retry` (PR 4 adds them) and with `ClipTrack` where the spec has `PlaylistTrack` (PR 4 widens it), `TrackMixerValues`; `PlaylistEngineOptions.document?: PlaylistDocument`.
+- Produces (public, exported from `@waveform-playlist/engine`): `createArrangement(options?: { tracks?, undoLimit? })`, the `Arrangement` interface of the spec WITHOUT `sources` and `retry` (PR 4 adds them) and with `ClipTrack` where the spec has `ArrangementTrack` (PR 4 widens it), `TrackMixerValues`; `PlaylistEngineOptions.arrangement?: Arrangement`.
 
 - [ ] **Step 1: Tests:**
-  - `new PlaylistEngine({ adapter })` behaves as before (creates its own document);
-  - a document with tracks given to a new engine: `adapter.setTracks` once in the constructor with the merged projection; `getState().tracks` matches;
-  - changes made on the DOCUMENT directly (not through the engine) reach the adapter and emit `statechange`;
-  - dispose the engine; change the document (no adapter call, no throw); build a second engine on it: same tracks, same mix, same undo history (`canUndo` true, `undo()` works and reaches the new adapter);
+  - `new PlaylistEngine({ adapter })` behaves as before (creates its own arrangement);
+  - a arrangement with tracks given to a new engine: `adapter.setTracks` once in the constructor with the merged projection; `getState().tracks` matches;
+  - changes made on the ARRANGEMENT directly (not through the engine) reach the adapter and emit `statechange`;
+  - dispose the engine; change the arrangement (no adapter call, no throw); build a second engine on it: same tracks, same mix, same undo history (`canUndo` true, `undo()` works and reaches the new adapter);
   - a second engine attached while the first is alive: one `console.warn`;
-  - a document created with no engine: every operation works; clips are not given ticks until an engine attaches; `minDuration` uses the clip's own `sampleRate`;
-  - `undoLimit` on the engine options still applies when the engine creates the document; ignored with a warning when a document is passed.
+  - a arrangement created with no engine: every operation works; clips are not given ticks until an engine attaches; `minDuration` uses the clip's own `sampleRate`;
+  - `undoLimit` on the engine options still applies when the engine creates the arrangement; ignored with a warning when a arrangement is passed.
 - [ ] **Step 2–4:** fail, implement, pass.
-- [ ] **Step 5: Docs for the engine API:** `packages/engine/README.md`, `packages/engine/CLAUDE.md` (a section "The document owns the tracks"; correct every sentence there that says the engine holds tracks, snapshots or mixer values), `website/docs/llm-reference.md` and `website/static/llms.txt` for the engine entries, `website/docs/framework-agnostic/engine.md`. `pnpm --filter website build`.
+- [ ] **Step 5: Docs for the engine API:** `packages/engine/README.md`, `packages/engine/CLAUDE.md` (a section "The arrangement owns the tracks"; correct every sentence there that says the engine holds tracks, snapshots or mixer values), `website/docs/llm-reference.md` and `website/static/llms.txt` for the engine entries, `website/docs/framework-agnostic/engine.md`. `pnpm --filter website build`.
 - [ ] **Step 6: Whole-repo checks.** Engine build; browser, dawcore, playout, transport, recording unit suites; `pnpm typecheck`; `pnpm lint`; `pnpm build`; full e2e (it includes dawcore's specs). The behaviour-change table for the PR text: one row per rule that changed an expectation in Task 1's file or in a dawcore/browser test, with the dawcore or browser path it reaches.
-- [ ] **Step 7:** Changeset (engine `major`). Commit `feat(engine)!: PlaylistDocument owns the tracks, the mix and the history; the engine plays it (#812)`.
+- [ ] **Step 7:** Changeset (engine `major`). Commit `feat(engine)!: Arrangement owns the tracks, the mix and the history; the engine plays it (#812)`.
 - [ ] **Step 8 (controller):** independent review of the final diff, the behaviour table to the maintainer in chat, PR "Part 3 of 6 for #812".
 
 ---
 
-# PR 4: loading in the document
+# PR 4: loading in the arrangement
 
 Needs #839 merged or as an ancestor (it is: the stack starts on it).
 
-### Task 7: loading clips in the document
+### Task 7: loading clips in the arrangement
 
-**Files:** `document/PlaylistDocument.ts`, `PlaylistEngine.ts`, tests.
+**Files:** `arrangement/Arrangement.ts`, `PlaylistEngine.ts`, tests.
 
 **Interfaces:**
-- Produces: the document's tracks are `readonly PlaylistTrack[]` (`getTracks`, `setTracks`, `addTrack`, `updateTrack`); the engine's projection (`_tracksForAdapter`, `getState().tracks`) leaves loading clips out and stays `ClipTrack[]`.
+- Produces: the arrangement's tracks are `readonly ArrangementTrack[]` (`getTracks`, `setTracks`, `addTrack`, `updateTrack`); the engine's projection (`_tracksForAdapter`, `getState().tracks`) leaves loading clips out and stays `ClipTrack[]`.
 
 - [ ] **Step 1: Tests:** a loading clip survives every track operation on its track (same object) and is in undo snapshots; `moveClip` / `trimClip` / `splitClip` / `getClipBounds` / `constrainTrimDelta` on a loading clip's id behave as for an unknown clip (warn, 0 or null, no change); neighbours' constraints ignore loading clips; a loading clip on a MIDI track passes validation and is never projected; the adapter never receives a loading clip; `calculateDuration` in `getState()` ignores them; clip order within a track is kept.
 - [ ] **Step 2–4:** fail, implement, pass. Commit.
@@ -226,7 +226,7 @@ Needs #839 merged or as an ancestor (it is: the stack starts on it).
 ### Task 8: `LoadSource` and the conversion, moved into the engine package
 
 **Files:**
-- Create: `document/loadSource.ts` (port `packages/browser/src/utils/loadSource.ts` and its test from branch `feat/812-2-provider-resolution`, with the label rules of that file), `document/resolveLoadingClip.ts` (port the loaded-clip conversion, its validation and its warn-once record from that branch's `packages/browser/src/utils/resolveTracks.ts`: `git show feat/812-2-provider-resolution:<path>`), tests beside them.
+- Create: `arrangement/loadSource.ts` (port `packages/browser/src/utils/loadSource.ts` and its test from branch `feat/812-2-provider-resolution`, with the label rules of that file), `arrangement/resolveLoadingClip.ts` (port the loaded-clip conversion, its validation and its warn-once record from that branch's `packages/browser/src/utils/resolveTracks.ts`: `git show feat/812-2-provider-resolution:<path>`), tests beside them.
 
 **Interfaces:**
 - Produces: `type LoadSource`, `defaultLoadSource`; `resolveLoadingClip(clip: LoadingClip, buffer: AudioBuffer): { clip: AudioClip } | { unusable: string }` (never throws; the conversion rules of the first design; "unusable" carries the reason for call 6).
@@ -236,11 +236,11 @@ Needs #839 merged or as an ancestor (it is: the stack starts on it).
 
 ### Task 9: the loader, the switch, history patching
 
-**Files:** `document/sources.ts` (new), `document/PlaylistDocument.ts`, `document/index.ts`, tests `__tests__/documentSources.test.ts`.
+**Files:** `arrangement/sources.ts` (new), `arrangement/Arrangement.ts`, `arrangement/index.ts`, tests `__tests__/arrangementSources.test.ts`.
 
 **Interfaces:**
 - Consumes: `createSourceLoader` from core; Task 8.
-- Produces: `document.sources: ValueSource<PlaylistSourcesValue>` (`{ sources: ReadonlyMap<ClipSource, { status, error? }>, pendingCount, failedCount, isLoading }`, the same object until a status changes), `document.retry(src)`, `createPlaylistDocument({ loadSource })`, and the type `PlaylistSourcesValue` exported from the engine package.
+- Produces: `arrangement.sources: ValueSource<ArrangementSourcesValue>` (`{ sources: ReadonlyMap<ClipSource, { status, error? }>, pendingCount, failedCount, isLoading }`, the same object until a status changes), `arrangement.retry(src)`, `createArrangement({ loadSource })`, and the type `ArrangementSourcesValue` exported from the engine package.
 
 - [ ] **Step 1: Tests** (a fake `loadSource` that keeps every pending call; a fake decode context attached through Task 10's point, written first as a test helper that calls a not-yet-existing method: write Task 10's attach in this task if that is simpler, and say so):
   - wanted = sources of the current tracks ∪ every undo and redo snapshot ∪ an open transaction's base; removing a track with a pending clip does not abort its load while a snapshot names it; `clearHistory` then drops it (abort);
@@ -258,14 +258,14 @@ Needs #839 merged or as an ancestor (it is: the stack starts on it).
 
 ### Task 10: attaching, safe across two copies of the package
 
-**Files:** `document/attach.ts` (new), `document/PlaylistDocument.ts`, `PlaylistEngine.ts`, tests.
+**Files:** `arrangement/attach.ts` (new), `arrangement/Arrangement.ts`, `PlaylistEngine.ts`, tests.
 
 **Interfaces:**
-- Produces: `DOCUMENT_ATTACH_DECODE = Symbol.for('@waveform-playlist/engine/document/attach-decode/v1')` and `…/time-base/v1`; exported helpers `attachDecodeContext(document, getContext: () => Promise<BaseAudioContext>): () => void` and (internal) `setTimeBase`; `PlaylistEngineOptions.attachDecodeContext?: boolean` (default `true`: a standalone engine attaches its adapter's context in the constructor and detaches in `dispose()`; the React provider will pass `false` and attach itself).
+- Produces: `ARRANGEMENT_ATTACH_DECODE = Symbol.for('@waveform-playlist/engine/arrangement/attach-decode/v1')` and `…/time-base/v1`; exported helpers `attachDecodeContext(arrangement, getContext: () => Promise<BaseAudioContext>): () => void` and (internal) `setTimeBase`; `PlaylistEngineOptions.attachDecodeContext?: boolean` (default `true`: a standalone engine attaches its adapter's context in the constructor and detaches in `dispose()`; the React provider will pass `false` and attach itself).
 
-- [ ] **Step 1: Tests:** nothing is fetched before an attach; `sources` shows wanted sources as pending meanwhile; attach starts them; detach suspends in-flight loads and keeps loaded values; re-attach restarts the suspended ones once; two attaches at once: the second warns and replaces; a document created by a SECOND copy of the module (`vi.resetModules()` and a second `import()`) can be attached and given a time base by the first copy's engine; an engine with `attachDecodeContext: false` does not attach.
+- [ ] **Step 1: Tests:** nothing is fetched before an attach; `sources` shows wanted sources as pending meanwhile; attach starts them; detach suspends in-flight loads and keeps loaded values; re-attach restarts the suspended ones once; two attaches at once: the second warns and replaces; a arrangement created by a SECOND copy of the module (`vi.resetModules()` and a second `import()`) can be attached and given a time base by the first copy's engine; an engine with `attachDecodeContext: false` does not attach.
 - [ ] **Step 2–4:** fail, implement, pass.
-- [ ] **Step 5: Docs:** the engine README and notes, `llm-reference.md`, `llms.txt`, `framework-agnostic/engine.md` for loading in the document; `packages/core/CLAUDE.md` if the loader's described owner changes. `pnpm --filter website build`.
+- [ ] **Step 5: Docs:** the engine README and notes, `llm-reference.md`, `llms.txt`, `framework-agnostic/engine.md` for loading in the arrangement; `packages/core/CLAUDE.md` if the loader's described owner changes. `pnpm --filter website build`.
 - [ ] **Step 6: Whole-repo checks** as in Task 6 Step 6, plus the core suite.
-- [ ] **Step 7:** Changeset (engine `major` already pending: extend its text). Commit `feat(engine): the document loads the audio its clips name and switches them when it arrives (#812)`.
+- [ ] **Step 7:** Changeset (engine `major` already pending: extend its text). Commit `feat(engine): the arrangement loads the audio its clips name and switches them when it arrives (#812)`.
 - [ ] **Step 8 (controller):** independent review of the final diff; tell the maintainer; PR "Part 4 of 6 for #812". Then write the plan for the React half against the interface as built, and file the dawcore follow-up issue with that interface.

@@ -83,7 +83,7 @@ There is one sensible way (1); the maintainer set its direction in the issue.
 
 ## My calls (not yet confirmed one by one; listed for the maintainer)
 
-- Names: `LoadingClip`, `src: string | Blob`, `isLoadingClip()`, `PlaylistTrack`,
+- Names: `LoadingClip`, `src: string | Blob`, `isLoadingClip()`, `ArrangementTrack`,
   `audioTrack()`, `createSourceLoader`, `usePlaylistSources()`, `loadSource`,
   `loadMidiTracks()`.
 - `isLoadingClip(clip)` tests for a missing `sampleRate`. No `kind` field.
@@ -98,7 +98,7 @@ There is one sensible way (1); the maintainer set its direction in the issue.
   effect does").
 - The loader is declarative (`setWanted` / `suspend` / `provide`), with one owner.
 - `useIntegratedRecording(tracks, setTracks)` in `@waveform-playlist/recording`
-  is retyped to `PlaylistTrack[]` in PR 2 (it receives the app's state); a
+  is retyped to `ArrangementTrack[]` in PR 2 (it receives the app's state); a
   break in that package, with a changeset and an upgrade entry.
 - The pending-clip merge in `onTracksChange` (below).
 - Three PRs (below), each with its own docs.
@@ -131,7 +131,7 @@ export interface AudioClip {
 }
 
 /** What the app's state holds and the provider's `tracks` prop takes. */
-export type PlaylistTrack = Omit<ClipTrack, 'clips'> & {
+export type ArrangementTrack = Omit<ClipTrack, 'clips'> & {
   clips: (AudioClip | LoadingClip)[];
 };
 
@@ -140,15 +140,15 @@ export function isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingCli
 
 - `ClipTrack` (clips: `AudioClip[]`) stays the type of the engine, the adapters
   and `usePlaylistTimeline().tracks`. A `ClipTrack` is assignable to
-  `PlaylistTrack`.
+  `ArrangementTrack`.
 - A loading clip is valid on an audio track only. On a MIDI track the provider
   reports it through `onError` and leaves it out.
 - **Breaking for TypeScript apps:** `onTracksChange` is
-  `(tracks: PlaylistTrack[]) => void`. An app with `useState<ClipTrack[]>` and
+  `(tracks: ArrangementTrack[]) => void`. An app with `useState<ClipTrack[]>` and
   `onTracksChange={setTracks}` no longer compiles; it changes the state's type.
   Upgrade-guide entry.
 - `audioTrack(options)` in core: a plain function that returns a
-  `PlaylistTrack` with one clip. Options are the track fields (`id`, `name`,
+  `ArrangementTrack` with one clip. Options are the track fields (`id`, `name`,
   `muted`, `soloed`, `volume`, `pan`, `color`, `renderMode`,
   `spectrogramConfig`, `spectrogramColorMap`) and the clip fields (`src`,
   `start`, `duration`, `offset`, `fadeIn`, `fadeOut`, `waveformData`,
@@ -421,7 +421,7 @@ builds the clip with `createClipFromSeconds({ midiNotes })`.
 
 Each PR updates what it touches, in the same PR: the guides and API pages, the
 upgrade guide (a removal table for the three hooks and `deferEngineRebuild`,
-the loading clip, `PlaylistTrack`, `usePlaylistSources`), `llm-reference.md`,
+the loading clip, `ArrangementTrack`, `usePlaylistSources`), `llm-reference.md`,
 `llms.txt`, the package READMEs, the root README, the package notes. PR 3 ends
 with a sweep: `git grep` for every removed name over the whole repository must
 find only the upgrade guide.
