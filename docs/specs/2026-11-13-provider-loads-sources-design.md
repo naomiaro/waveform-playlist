@@ -458,9 +458,18 @@ find only the upgrade guide.
   as long as it is stable.
 - Wording of warnings and errors.
 
-## Open, to tell the maintainer when known
+## Measured, and decided
 
-- Whether `engine.updateTrack` on a playing track with clips is inaudible (run
-  in a browser in PR 2 before the extended `filled` case is relied on).
-- Whether `src` survives every engine operation that copies a clip (split,
-  trim, move, undo): read each, test each.
+- **`engine.updateTrack` on a playing track** (run 2026-11-13, headless
+  Chromium, `examples/dawcore-tone`, raw output samples against a control):
+  adding a clip LATER than the track's existing clips is bit-identical to the
+  control (15 of 15; the other tracks 5 of 5). Adding a clip EARLIER than the
+  track's first clip, which makes the Tone adapter reschedule every clip of
+  the track, disturbed playback in 6 of 25 runs (4 clicks of 2.7 to 5.3 ms; 2
+  runs where that track stays 128 samples late until stop), 0 of 24 in the
+  control. The adapter behaviour is #841.
+- **Maintainer, 2026-11-13: update the track in place in that case too**
+  (choice a), not a full rebuild. The extended `filled` case applies whatever
+  the position of the clip that arrived.
+- `src` survives split, trim, move, track updates, undo and redo (PR 1: split
+  was fixed, the others have tests).
