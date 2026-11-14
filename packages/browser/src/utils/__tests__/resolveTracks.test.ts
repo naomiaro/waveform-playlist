@@ -121,7 +121,7 @@ describe('resolveTracks', () => {
     it('cuts a duration within one sample of the end silently', () => {
       const warn = warnSpy();
       const buf = fakeBuffer(44100, 441000);
-      // 10.00002 s * 44100 = 441000.88 -> rounds to 441001, one past
+      // 441001 / 44100 s * 44100 = 441001 samples: one past the end
       const lc: LoadingClip = { id: 'c', src: 'a', duration: 441001 / 44100 };
       const r = resolveTracks(
         [track('t', [lc])],
@@ -247,11 +247,147 @@ describe('resolveTracks', () => {
       expect(r3.placeholderIds.size).toBe(0);
     });
 
+    it('carries the display fields', () => {
+      const fade = { duration: 0.2 } as never;
+      const lc: LoadingClip = {
+        id: 'p',
+        src: 'a',
+        duration: 1,
+        name: 'N',
+        gain: 0.3,
+        fadeIn: fade,
+        fadeOut: fade,
+        color: '#0f0',
+      };
+      const r = resolveTracks([track('t', [lc])], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      expect(r.viewTracks[0].clips[0]).toMatchObject({
+        name: 'N',
+        gain: 0.3,
+        fadeIn: fade,
+        fadeOut: fade,
+        color: '#0f0',
+      });
+    });
+
+    it('with duration and waveformData, the duration is cut to the waveform data like a loaded clip', () => {
+      const warn = warnSpy();
+      const lc: LoadingClip = {
+        id: 'cut',
+        src: 'a',
+        offset: 1,
+        duration: 9,
+        waveformData: wd(1000, 4),
+      };
+      const r = resolveTracks([track('t', [lc])], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      expect(r.viewTracks[0].clips[0]).toMatchObject({
+        sampleRate: 1000,
+        sourceDurationSamples: 4000,
+        offsetSamples: 1000,
+        durationSamples: 3000,
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('cut');
+    });
+
     it('a new sample rate makes a new placeholder', () => {
       const t = track('t', [{ id: 'p', src: 'a', duration: 2 }]);
       const r1 = resolveTracks([t], new Map(), 48000, EMPTY_RESOLVE_CACHE);
       const r2 = resolveTracks([t], new Map(), 44100, r1.cache);
       expect(r2.viewTracks[0].clips[0].durationSamples).toBe(88200);
+    });
+  });
+
+  describe('malformed input', () => {
+    const SAMPLE_FIELDS = [
+      'startSample',
+      'offsetSamples',
+      'durationSamples',
+      'sampleRate',
+      'sourceDurationSamples',
+    ] as const;
+    const expectSane = (r: ReturnType<typeof resolveTracks>) => {
+      for (const list of [r.viewTracks, r.engineTracks]) {
+        for (const t of list) {
+          for (const c of t.clips) {
+            for (const f of SAMPLE_FIELDS) {
+              expect(Number.isInteger(c[f]), `${c.id}.${f} = ${c[f]}`).toBe(true);
+            }
+            expect(c.durationSamples).toBeGreaterThan(0);
+          }
+        }
+      }
+    };
+    const badWd = (fields: object) => fields as unknown as WaveformDataObject;
+
+    it.each([
+      ['NaN sample_rate', { duration: 4, sample_rate: NaN }],
+      ['missing sample_rate', { duration: 4 }],
+      ['zero sample_rate', { duration: 4, sample_rate: 0 }],
+      ['negative sample_rate', { duration: 4, sample_rate: -1 }],
+      ['NaN duration', { duration: NaN, sample_rate: 1000 }],
+      ['infinite duration', { duration: Infinity, sample_rate: 1000 }],
+      ['negative duration', { duration: -1, sample_rate: 1000 }],
+    ])(
+      'waveformData with %s: placeholder from the clip duration, bad data ignored',
+      (_n, fields) => {
+        const warn = warnSpy();
+        const lc: LoadingClip = { id: 'bw', src: 'a', duration: 1, waveformData: badWd(fields) };
+        const r = resolveTracks([track('t', [lc])], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+        expect(r.viewTracks[0].clips[0]).toMatchObject({
+          sampleRate: 48000,
+          durationSamples: 48000,
+        });
+        expect(r.viewTracks[0].clips[0].waveformData).toBeUndefined();
+        expect(r.engineTracks[0].clips).toEqual([]);
+        expectSane(r);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain('bw');
+        expect(String(warn.mock.calls[0][0])).toContain(
+          'waveformData has no usable sample_rate or duration'
+        );
+      }
+    );
+
+    it.each([
+      ['NaN sample_rate', { duration: 4, sample_rate: NaN }],
+      ['missing sample_rate', { duration: 4 }],
+      ['zero sample_rate', { duration: 4, sample_rate: 0 }],
+      ['NaN duration', { duration: NaN, sample_rate: 1000 }],
+    ])('waveformData with %s and no clip duration: no placeholder', (_n, fields) => {
+      const warn = warnSpy();
+      const lc: LoadingClip = { id: 'bw2', src: 'a', waveformData: badWd(fields) };
+      const r = resolveTracks([track('t', [lc])], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      expect(r.viewTracks[0].clips).toEqual([]);
+      expect(r.engineTracks[0].clips).toEqual([]);
+      expectSane(r);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['zero length', { length: 0, sampleRate: 44100 }],
+      ['NaN length', { length: NaN, sampleRate: 44100 }],
+      ['zero rate', { length: 100, sampleRate: 0 }],
+      ['NaN rate', { length: 100, sampleRate: NaN }],
+      ['infinite rate', { length: 100, sampleRate: Infinity }],
+    ])('a buffer with %s: no clip, one warning that says the buffer is empty', (_n, b) => {
+      const warn = warnSpy();
+      const buf = fakeBuffer(b.sampleRate, b.length);
+      const t = track('t', [{ id: 'eb', src: 'a' }]);
+      const r = resolveTracks([t], new Map([['a', loaded(buf)]]), 48000, EMPTY_RESOLVE_CACHE);
+      expect(r.viewTracks[0].clips).toEqual([]);
+      expect(r.engineTracks[0].clips).toEqual([]);
+      expectSane(r);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('eb');
+      expect(String(warn.mock.calls[0][0])).toContain('buffer is empty');
+    });
+
+    it('a time too large for integer samples gives no clip', () => {
+      warnSpy();
+      const t = track('t', [{ id: 'big', src: 'a', start: 1e308, duration: 1 }]);
+      const r = resolveTracks([t], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      expect(r.viewTracks[0].clips).toEqual([]);
+      expectSane(r);
     });
   });
 
@@ -284,11 +420,48 @@ describe('resolveTracks', () => {
       const buf = fakeBuffer(44100, 44100);
       const t = track('a', [{ id: 'c', src: 'a', duration: 50 }]);
       const sources: Sources = new Map([['a', loaded(buf)]]);
-      const { cache } = resolveTracks([], sources, 48000, EMPTY_RESOLVE_CACHE);
-      const first = resolveTracks([t], sources, 48000, cache);
-      const second = resolveTracks([t], sources, 48000, cache);
-      expect(second.engineTracks[0]).toBe(first.engineTracks[0]);
+      const first = resolveTracks([t], sources, 48000, EMPTY_RESOLVE_CACHE);
+      const second = resolveTracks([t], sources, 48000, EMPTY_RESOLVE_CACHE);
+      expect(second.engineTracks[0].clips[0].durationSamples).toBe(
+        first.engineTracks[0].clips[0].durationSamples
+      );
       expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('an invalid clip warns once in total, pending and then loaded', () => {
+      const warn = warnSpy();
+      const lc: LoadingClip = { id: 'inv', src: 'a', start: -1, duration: 1 };
+      const t = track('a', [lc]);
+      const r1 = resolveTracks([t], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const loadedSources: Sources = new Map([['a', loaded(fakeBuffer(44100, 44100))]]);
+      resolveTracks([t], loadedSources, 48000, r1.cache);
+      resolveTracks([t], loadedSources, 48000, EMPTY_RESOLVE_CACHE);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('the first clip keeps its object when a second clip of the track loads', () => {
+      const bufA = fakeBuffer(44100, 44100);
+      const t = track('t', [
+        { id: 'a', src: 'a' },
+        { id: 'b', src: 'b' },
+      ]);
+      const r1 = resolveTracks([t], new Map([['a', loaded(bufA)]]), 48000, EMPTY_RESOLVE_CACHE);
+      const both: Sources = new Map([
+        ['a', loaded(bufA)],
+        ['b', loaded(fakeBuffer(44100, 22050))],
+      ]);
+      const r2 = resolveTracks([t], both, 48000, r1.cache);
+      expect(r1.engineTracks[0].clips).toHaveLength(1);
+      expect(r2.engineTracks[0].clips).toHaveLength(2);
+      expect(r2.engineTracks[0].clips[0]).toBe(r1.engineTracks[0].clips[0]);
+    });
+
+    it('a placeholder keeps its identity under the same rate for a new input track object', () => {
+      const lc: LoadingClip = { id: 'p', src: 'a', duration: 2 };
+      const r1 = resolveTracks([track('t', [lc])], new Map(), 48000, EMPTY_RESOLVE_CACHE);
+      const r2 = resolveTracks([track('t', [lc])], new Map(), 48000, r1.cache);
+      expect(r2.viewTracks[0]).not.toBe(r1.viewTracks[0]);
+      expect(r2.viewTracks[0].clips[0]).toBe(r1.viewTracks[0].clips[0]);
     });
 
     it('one source settling changes only the tracks naming it', () => {
@@ -364,12 +537,12 @@ describe('resolveTracks', () => {
   });
 
   describe('seedResolved', () => {
-    it('returns the seeded track for that input, and does not touch the given cache', () => {
+    it('returns a new cache object; the seed is visible through any cache sharing the maps', () => {
       const buf = fakeBuffer(44100, 44100);
       const t = track('t', [{ id: 'c', src: 'a' }]);
       const sources: Sources = new Map([['a', loaded(buf)]]);
-      const seeded: ClipTrack = { ...t, clips: [createClip({ audioBuffer: buf, startSample: 0 })] };
       const r0 = resolveTracks([t], sources, 48000, EMPTY_RESOLVE_CACHE);
+      const seeded: ClipTrack = { ...t, clips: r0.engineTracks[0].clips };
       const cache = seedResolved(r0.cache, t, seeded);
       expect(cache).not.toBe(r0.cache);
       const r1 = resolveTracks([t], sources, 48000, cache);
@@ -382,6 +555,50 @@ describe('resolveTracks', () => {
       const seeded: ClipTrack = { ...t, clips: [] };
       const r = resolveTracks([t], new Map(), 48000, seedResolved(EMPTY_RESOLVE_CACHE, t, seeded));
       expect(r.engineTracks[0]).toBe(seeded);
+    });
+
+    it('a seed never hides a clip that loads later', () => {
+      const t = track('t', [{ id: 'c', src: 'a', duration: 1 }]);
+      const seeded: ClipTrack = { ...t, clips: [] };
+      const cache = seedResolved(EMPTY_RESOLVE_CACHE, t, seeded);
+      const r1 = resolveTracks([t], new Map(), 48000, cache);
+      expect(r1.engineTracks[0]).toBe(seeded);
+      const r2 = resolveTracks(
+        [t],
+        new Map([['a', loaded(fakeBuffer(44100, 44100))]]),
+        48000,
+        r1.cache
+      );
+      expect(r2.engineTracks[0].clips.map((c) => c.id)).toEqual(['c']);
+      expect(r2.viewTracks[0].clips.map((c) => c.id)).toEqual(['c']);
+      expect(r2.viewTracks[0].clips[0].audioBuffer).toBeDefined();
+    });
+
+    it('a seed holding the input clip is used until a loading clip arrives, then A is kept', () => {
+      const buf = fakeBuffer(44100, 44100);
+      const a = createClip({ audioBuffer: buf, startSample: 0 });
+      const t = track('t', [a, { id: 'l', src: 'x' }]);
+      const seeded: ClipTrack = { ...t, clips: [a] };
+      const cache = seedResolved(EMPTY_RESOLVE_CACHE, t, seeded);
+      const r1 = resolveTracks([t], new Map(), 48000, cache);
+      expect(r1.engineTracks[0]).toBe(seeded);
+      expect(r1.viewTracks[0]).toBe(seeded);
+      const r2 = resolveTracks([t], new Map([['x', loaded(buf)]]), 48000, r1.cache);
+      expect(r2.engineTracks[0]).not.toBe(seeded);
+      expect(r2.engineTracks[0].clips.map((c) => c.id)).toEqual([a.id, 'l']);
+      expect(r2.engineTracks[0].clips[0]).toBe(a);
+      expect(r2.viewTracks[0]).toBe(r2.engineTracks[0]);
+    });
+
+    it('a stale seed (clips differ from the input) is not returned', () => {
+      const buf = fakeBuffer(44100, 44100);
+      const a = createClip({ audioBuffer: buf, startSample: 0 });
+      const other = createClip({ audioBuffer: buf, startSample: 5 });
+      const t = track('t', [a]);
+      const seeded: ClipTrack = { ...t, clips: [other] };
+      const r = resolveTracks([t], new Map(), 48000, seedResolved(EMPTY_RESOLVE_CACHE, t, seeded));
+      expect(r.engineTracks[0]).toBe(t);
+      expect(r.viewTracks[0]).toBe(t);
     });
 
     it('keeps a placeholder in the view when the input has one', () => {

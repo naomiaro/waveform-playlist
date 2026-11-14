@@ -30,6 +30,7 @@ import type {
   LoadingClip,
   PlaylistTrack,
   SourceState,
+  WaveformDataObject,
 } from '@waveform-playlist/core';
 
 interface ClipEntry {
@@ -103,8 +104,15 @@ function mapsOf(cache: ResolveCache): Maps {
   };
 }
 
-function warn(clipId: string, message: string): void {
-  console.warn(`[waveform-playlist] clip "${clipId}": ${message}`);
+/** Messages already written, per loading-clip object, for the life of the page. */
+const warned = new WeakMap<LoadingClip, Set<string>>();
+
+function warn(lc: LoadingClip, message: string): void {
+  const seen = warned.get(lc) ?? new Set<string>();
+  warned.set(lc, seen);
+  if (seen.has(message)) return;
+  seen.add(message);
+  console.warn(`[waveform-playlist] clip "${lc.id}": ${message}`);
 }
 
 const isNonNegative = (n: number): boolean => Number.isFinite(n) && n >= 0;
@@ -113,21 +121,21 @@ const isNonNegative = (n: number): boolean => Number.isFinite(n) && n >= 0;
 function validFields(lc: LoadingClip): boolean {
   if (!isNonNegative(lc.start ?? 0)) {
     warn(
-      lc.id,
+      lc,
       `start must be a finite number of seconds >= 0, got ${String(lc.start)}; clip left out`
     );
     return false;
   }
   if (!isNonNegative(lc.offset ?? 0)) {
     warn(
-      lc.id,
+      lc,
       `offset must be a finite number of seconds >= 0, got ${String(lc.offset)}; clip left out`
     );
     return false;
   }
   if (lc.duration !== undefined && !(Number.isFinite(lc.duration) && lc.duration > 0)) {
     warn(
-      lc.id,
+      lc,
       `duration must be a positive, finite number of seconds, got ${String(lc.duration)}; clip left out`
     );
     return false;
@@ -135,79 +143,104 @@ function validFields(lc: LoadingClip): boolean {
   return true;
 }
 
-function display(lc: LoadingClip) {
+function display(lc: LoadingClip, waveformData: WaveformDataObject | undefined) {
   return {
     gain: lc.gain,
     name: lc.name,
     color: lc.color,
     fadeIn: lc.fadeIn,
     fadeOut: lc.fadeOut,
-    waveformData: lc.waveformData,
+    waveformData,
     src: lc.src,
   };
 }
 
+/** The clip's duration in samples against a source of `total` samples; null leaves the clip out. */
+function fitDuration(lc: LoadingClip, offsetSamples: number, total: number, rate: number) {
+  if (!(offsetSamples < total)) {
+    warn(lc, 'offset is at or past the end of the audio; clip left out');
+    return null;
+  }
+  const rest = total - offsetSamples;
+  const wanted = lc.duration === undefined ? rest : Math.round(lc.duration * rate);
+  if (!(wanted >= 1)) {
+    warn(lc, 'duration is shorter than one sample; clip left out');
+    return null;
+  }
+  if (wanted > rest + 1) warn(lc, 'duration runs past the end of the audio and was cut to it');
+  return Math.min(wanted, rest);
+}
+
+const samplesOk = (...n: number[]): boolean => n.every((x) => Number.isSafeInteger(x));
+
 function loadedClip(lc: LoadingClip, buffer: AudioBuffer): AudioClip | null {
-  if (!validFields(lc)) return null;
   const r = buffer.sampleRate;
+  if (!(Number.isFinite(r) && r > 0 && buffer.length >= 1)) {
+    warn(lc, 'the decoded buffer is empty or has no usable sample rate; clip left out');
+    return null;
+  }
+  if (!validFields(lc)) return null;
   const offsetSamples = Math.round((lc.offset ?? 0) * r);
-  if (offsetSamples >= buffer.length) {
-    warn(lc.id, `offset is at or past the end of the audio; clip left out`);
+  const startSample = Math.round((lc.start ?? 0) * r);
+  if (!samplesOk(offsetSamples, startSample)) {
+    warn(lc, 'start or offset is too large; clip left out');
     return null;
   }
-  const rest = buffer.length - offsetSamples;
-  let durationSamples = lc.duration === undefined ? rest : Math.round(lc.duration * r);
-  if (durationSamples < 1) {
-    warn(lc.id, `duration is shorter than one sample; clip left out`);
-    return null;
-  }
-  if (durationSamples > rest) {
-    if (durationSamples > rest + 1) {
-      warn(lc.id, `duration runs past the end of the audio and was cut to it`);
-    }
-    durationSamples = rest;
-  }
+  const durationSamples = fitDuration(lc, offsetSamples, buffer.length, r);
+  if (durationSamples === null) return null;
   return {
     ...createClip({
       audioBuffer: buffer,
-      startSample: Math.round((lc.start ?? 0) * r),
+      startSample,
       offsetSamples,
       durationSamples,
-      ...display(lc),
+      ...display(lc, lc.waveformData),
     }),
     id: lc.id,
   };
 }
 
+function usableWaveformData(lc: LoadingClip): WaveformDataObject | undefined {
+  const w = lc.waveformData;
+  if (!w) return undefined;
+  const sr = w.sample_rate;
+  const d = w.duration;
+  if (Number.isFinite(sr) && sr > 0 && Number.isFinite(d) && d >= 0) return w;
+  warn(lc, 'waveformData has no usable sample_rate or duration; it is ignored');
+  return undefined;
+}
+
 function placeholderClip(lc: LoadingClip, contextRate: number): AudioClip | null {
-  if (lc.duration === undefined && !lc.waveformData) return null;
+  const wdata = usableWaveformData(lc);
+  if (lc.duration === undefined && !wdata) return null;
   if (!validFields(lc)) return null;
-  const wdata = lc.waveformData;
   const r = wdata ? wdata.sample_rate : contextRate;
   const offsetSamples = Math.round((lc.offset ?? 0) * r);
-  let durationSamples: number;
-  let sourceDurationSamples: number;
-  if (lc.duration !== undefined) {
-    durationSamples = Math.round(lc.duration * r);
-    sourceDurationSamples = wdata
-      ? Math.max(Math.ceil(wdata.duration * r), offsetSamples + durationSamples)
-      : offsetSamples + durationSamples;
+  const startSample = Math.round((lc.start ?? 0) * r);
+  const sourceDurationSamples = wdata ? Math.ceil(wdata.duration * r) : undefined;
+  let durationSamples: number | null;
+  if (sourceDurationSamples !== undefined) {
+    durationSamples = fitDuration(lc, offsetSamples, sourceDurationSamples, r);
   } else {
-    sourceDurationSamples = Math.ceil((wdata?.duration ?? 0) * r);
-    durationSamples = sourceDurationSamples - offsetSamples;
+    durationSamples = Math.round((lc.duration ?? 0) * r);
   }
-  if (durationSamples < 1) {
-    warn(lc.id, `nothing left of the waveform data after offset; clip left out`);
+  if (durationSamples === null) return null;
+  const sourceLength = sourceDurationSamples ?? offsetSamples + durationSamples;
+  if (
+    !(durationSamples >= 1) ||
+    !samplesOk(startSample, offsetSamples, durationSamples, sourceLength)
+  ) {
+    warn(lc, 'a time is too large or too small for whole samples; clip left out');
     return null;
   }
   return {
     ...createClip({
-      startSample: Math.round((lc.start ?? 0) * r),
+      startSample,
       offsetSamples,
       durationSamples,
       sampleRate: r,
-      sourceDurationSamples,
-      ...display(lc),
+      sourceDurationSamples: sourceLength,
+      ...display(lc, wdata),
     }),
     id: lc.id,
   };
@@ -246,12 +279,7 @@ function resolveTrack(
   rate: number,
   maps: Maps
 ): TrackResult {
-  const seed = maps.seeds.get(input);
   const hasLoading = input.clips.some(isLoadingClip);
-  if (!hasLoading) {
-    const same = input as ClipTrack;
-    return { view: seed ?? same, engine: seed ?? same, placeholders: [], rejected: [] };
-  }
   const midi = trackKind(input) === 'midi';
   const viewClips: AudioClip[] = [];
   const engineClips: AudioClip[] = [];
@@ -271,10 +299,15 @@ function resolveTrack(
       else engineClips.push(entry.clip);
     }
   }
-  const built = buildTrack(input, viewClips, engineClips, maps.tracks);
+  const built = hasLoading
+    ? buildTrack(input, viewClips, engineClips, maps.tracks)
+    : { view: input as ClipTrack, engine: input as ClipTrack };
+  // A seed counts only while it still describes the built result.
+  const seed = maps.seeds.get(input);
+  const seedFits = seed !== undefined && sameElements(seed.clips, engineClips);
   return {
-    view: seed && placeholders.length === 0 ? seed : built.view,
-    engine: seed ?? built.engine,
+    view: seedFits && placeholders.length === 0 ? seed : built.view,
+    engine: seedFits ? seed : built.engine,
     placeholders,
     rejected,
   };
@@ -355,10 +388,12 @@ export function resolveTracks(
 /**
  * Tell the cache that `input` resolves to `engineTrack`: the next call returns
  * it in `engineTracks`, and in `viewTracks` too when the input has no
- * placeholder. Returns a new cache. The WeakMap behind it is shared with the
- * given one and gains the entry (keyed by the `input` object, which no earlier
- * pass could have produced a result for under a different meaning), the same
- * kind of fill `resolveTracks` does.
+ * placeholder, but only while the seed's clips are the same objects as the
+ * clips the input resolves to for the engine; a seed that no longer matches
+ * (a loading clip has loaded since) is ignored. Returns a new cache object.
+ * The seed is stored in a WeakMap shared with the given cache, so it is
+ * visible through any cache that shares the maps; that is safe because a seed
+ * is only used while it matches the built result.
  */
 export function seedResolved(
   cache: ResolveCache,
