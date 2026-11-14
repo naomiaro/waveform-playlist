@@ -110,11 +110,11 @@ export interface UseIntegratedRecordingReturn {
 
 /**
  * The clips of the armed track once a take that owns
- * `[rangeStart, rangeEnd)` is added. Loaded clips are carved (punch-in replace,
- * #579). A loading clip (`LoadingClip`, audio not decoded yet) has no length in
- * samples, so it is not carved and is passed through as the same object, after
- * the carved clips and before the take; it may overlap the take once its audio
- * arrives.
+ * `[rangeStart, rangeEnd)` is added. Loaded clips are carved in place
+ * (punch-in replace, #579). A loading clip (`LoadingClip`, audio not decoded
+ * yet) has no length in samples, so it is not carved: it keeps its index
+ * among the clips as the same object, and may overlap the take once its audio
+ * arrives. The take comes last, as before.
  */
 function clipsWithTake(
   clips: readonly (AudioClip | LoadingClip)[],
@@ -122,13 +122,10 @@ function clipsWithTake(
   rangeEnd: number,
   take: AudioClip
 ): (AudioClip | LoadingClip)[] {
-  const loaded: AudioClip[] = [];
-  const loading: LoadingClip[] = [];
-  for (const clip of clips) {
-    if (isLoadingClip(clip)) loading.push(clip);
-    else loaded.push(clip);
-  }
-  return [...carveClipRange(loaded, rangeStart, rangeEnd), ...loading, take];
+  const kept = clips.flatMap<AudioClip | LoadingClip>((clip) =>
+    isLoadingClip(clip) ? [clip] : carveClipRange([clip], rangeStart, rangeEnd)
+  );
+  return [...kept, take];
 }
 
 /**

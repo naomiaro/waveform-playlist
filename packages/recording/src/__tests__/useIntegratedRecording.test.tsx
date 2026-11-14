@@ -524,26 +524,77 @@ describe('useIntegratedRecording', () => {
       expect(finalTracks.find((t) => t.id === 'track-2')).toBe(other);
     });
 
-    it('carves the loaded clips it overlaps and leaves a loading clip on the same track alone', async () => {
-      const loaded = {
-        id: 'existing',
-        startSample: 0,
-        durationSamples: 2048,
+    const loadedClip = (id: string, startSample: number, durationSamples = 2048) =>
+      ({
+        id,
+        startSample,
+        durationSamples,
         offsetSamples: 0,
         sampleRate: 48000,
-        sourceDurationSamples: 2048,
+        sourceDurationSamples: 4096,
         gain: 1,
-      } as AudioClip;
+      }) as AudioClip;
+
+    it('carves the loaded clips it overlaps; a loading clip keeps its place among the clips', async () => {
+      const loaded = loadedClip('existing', 0);
       const armed: PlaylistTrack = { ...makeTrack('track-1'), clips: [loadingOnArmed, loaded] };
 
       const finalTracks = await recordOneChunk([armed]);
 
       const t1 = finalTracks.find((t) => t.id === 'track-1')!;
-      expect(t1.clips.map((c) => c.id)).toEqual(['existing', 'armed-loading', t1.clips[2].id]);
-      expect(t1.clips[1]).toBe(loadingOnArmed);
-      const carved = t1.clips[0] as AudioClip;
+      expect(t1.clips.map((c) => c.id)).toEqual(['armed-loading', 'existing', t1.clips[2].id]);
+      expect(t1.clips[0]).toBe(loadingOnArmed);
+      const carved = t1.clips[1] as AudioClip;
       expect(carved.startSample).toBe(1024);
       expect(carved.durationSamples).toBe(1024);
+    });
+
+    it('a loading clip between two loaded clips stays between them; the take comes last', async () => {
+      const first = loadedClip('first', 0);
+      const second = loadedClip('second', 4096);
+      const armed: PlaylistTrack = {
+        ...makeTrack('track-1'),
+        clips: [first, loadingOnArmed, second],
+      };
+
+      const finalTracks = await recordOneChunk([armed]);
+
+      const t1 = finalTracks.find((t) => t.id === 'track-1')!;
+      expect(t1.clips.map((c) => c.id)).toEqual([
+        'first',
+        'armed-loading',
+        'second',
+        t1.clips[3].id,
+      ]);
+      expect(t1.clips[1]).toBe(loadingOnArmed);
+      // The take (0 to 1024) carved the head of the first clip; the second is untouched.
+      expect((t1.clips[0] as AudioClip).startSample).toBe(1024);
+      expect(t1.clips[2]).toBe(second);
+      expect((t1.clips[3] as AudioClip).startSample).toBe(0);
+    });
+
+    // OPEN DECISION (#812, for the maintainer): a take is not carved out of a
+    // loading clip whose time range it covers, because the loading clip's length
+    // in samples is not known yet. Once its audio arrives, the old audio plays
+    // under the take. This test pins that current behaviour; change it with
+    // the decision.
+    it('a loading clip under the take is kept as it is, not carved (current behaviour)', async () => {
+      // 0 to 1 s on the timeline: the take (0 to 1024 samples) lies inside it.
+      const under: LoadingClip = {
+        id: 'under',
+        src: 'under.mp3',
+        start: 0,
+        duration: 1,
+        offset: 0,
+      };
+      const armed: PlaylistTrack = { ...makeTrack('track-1'), clips: [under] };
+
+      const finalTracks = await recordOneChunk([armed]);
+
+      const t1 = finalTracks.find((t) => t.id === 'track-1')!;
+      expect(t1.clips).toHaveLength(2);
+      expect(t1.clips[0]).toBe(under);
+      expect(under).toEqual({ id: 'under', src: 'under.mp3', start: 0, duration: 1, offset: 0 });
     });
   });
 });
