@@ -14,9 +14,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { createTrack, type ClipTrack } from '@waveform-playlist/core';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { audioTrack, createTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   // PlayButton, PauseButton, StopButton omitted — recording example uses
@@ -172,8 +170,8 @@ const ErrorBanner = styled.div`
 
 // Inner component that uses playlist context
 interface RecordingControlsInnerProps {
-  tracks: ClipTrack[];
-  setTracks: (tracks: ClipTrack[]) => void;
+  tracks: PlaylistTrack[];
+  setTracks: React.Dispatch<React.SetStateAction<PlaylistTrack[]>>;
   selectedTrackId: string | null;
   setSelectedTrackId: (id: string | null) => void;
   onAddTrack: () => void;
@@ -535,15 +533,13 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     return recordingProgress.subscribe(follow);
   }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, scrollContainerRef]);
 
-  // Handle dropped/selected audio files
+  // Handle dropped/selected audio files: one track per file, loaded by the provider
   const handleFiles = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       const audioFiles = files.filter(file => file.type.startsWith('audio/'));
       if (audioFiles.length === 0) return;
 
-      const audioContext = getGlobalAudioContext();
-      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-      if (newTracks.length > 0) setTracks(prev => [...prev, ...newTracks]);
+      setTracks(prev => [...prev, ...audioFiles.map((file) => audioTrack({ src: file }))]);
     },
     [setTracks]
   );
@@ -772,7 +768,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 // Main component
 export function RecordingExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  const [tracks, setTracks] = useState<PlaylistTrack[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
   const handleAddTrack = () => {

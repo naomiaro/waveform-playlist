@@ -22,8 +22,9 @@ import {
   WaveformPlayhead,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 
 const Controls = styled.div`
   display: flex;
@@ -36,38 +37,31 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
+// Stereo tracks - these are stereo files from the Ubiquitous album. Defined
+// once; the provider loads them.
+const tracks = [
+  audioTrack({
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+    name: 'Synth 1 (Stereo)',
+  }),
+  audioTrack({
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+    name: 'Synth 2 (Stereo)',
+  }),
+];
+
+// Inside the provider: "Loading: 1/2" while the files load, or the error of one that failed
+function LoadingStatus() {
+  const { isLoading, settledCount, totalCount, errorMessage } = useLoadingProgress();
+  if (errorMessage) {
+    return <span style={{ fontSize: '0.875rem', color: 'red' }}>Error loading audio: {errorMessage}</span>;
+  }
+  if (!isLoading) return null;
+  return <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {settledCount}/{totalCount}</span>;
+}
 
 export function StereoExample() {
   const { theme } = useDocusaurusTheme();
-
-  // Load stereo tracks - these are stereo files from the Ubiquitous album
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
-      name: 'Synth 1 (Stereo)',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-      name: 'Synth 2 (Stereo)',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
 
   return (
     <WaveformPlaylistProvider
@@ -81,7 +75,7 @@ export function StereoExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+        <LoadingStatus />
       </Controls>
 
       <WaveformViewOptions barWidth={2} barGap={0}>

@@ -7,7 +7,7 @@
  * - Multiple tracks with independent controls
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -28,8 +28,9 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  usePlaylistSources,
 } from '@waveform-playlist/browser';
-import { useDynamicTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack, type ClipSource, type PlaylistTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 
@@ -72,43 +73,51 @@ const StyledDropZone = styled(FileDropZone)`
   margin-bottom: 1.5rem;
 `;
 
-export function NewTracksExample() {
-  const { theme } = useDocusaurusTheme();
-  const { tracks, addTracks, removeTrack, loadingCount, isLoading, errors } = useDynamicTracks();
+const sourceName = (src: ClipSource): string =>
+  typeof File !== 'undefined' && src instanceof File
+    ? src.name.replace(/\.[^/.]+$/, '')
+    : typeof src === 'string'
+      ? src.split('/').pop()?.replace(/\.[^/.]+$/, '') ?? 'Untitled'
+      : 'Untitled';
 
-  const handleFiles = useCallback(
-    (files: File[]) => {
-      const audioFiles = files.filter((file) => file.type.startsWith('audio/'));
-      if (audioFiles.length > 0) {
-        addTracks(audioFiles);
-      }
-    },
-    [addTracks]
-  );
+interface TrackDropZoneProps {
+  onFiles: (files: File[]) => void;
+  /** Files still decoding (0 outside the provider: nothing is loading there). */
+  loadingCount?: number;
+}
 
+const TrackDropZone: React.FC<TrackDropZoneProps> = ({ onFiles, loadingCount = 0 }) => (
+  <StyledDropZone
+    accept="audio/*"
+    onFiles={onFiles}
+    fileFilter={(f) => f.type.startsWith('audio/')}
+    label="Drop audio files here to add tracks, or click to browse"
+    dragLabel="Drop audio files here"
+    loadingContent={
+      loadingCount > 0 ? (
+        <>
+          <p style={{ margin: 0 }}>
+            Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
+          </p>
+          <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
+        </>
+      ) : undefined
+    }
+  >
+    <Subtext>Supports MP3, WAV, OGG, and more</Subtext>
+  </StyledDropZone>
+);
+
+// Inside the provider: the drop zone with the number of files still decoding,
+// and the files that failed, both from the provider's source status.
+const DropZoneWithStatus: React.FC<{ onFiles: (files: File[]) => void }> = ({ onFiles }) => {
+  const { sources, pendingCount } = usePlaylistSources();
+  const failed = [...sources].filter(([, entry]) => entry.status === 'failed');
   return (
-    <Container>
-      <StyledDropZone
-        accept="audio/*"
-        onFiles={handleFiles}
-        fileFilter={(f) => f.type.startsWith('audio/')}
-        label="Drop audio files here to add tracks, or click to browse"
-        dragLabel="Drop audio files here"
-        loadingContent={
-          isLoading ? (
-            <>
-              <p style={{ margin: 0 }}>
-                Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
-              </p>
-              <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
-            </>
-          ) : undefined
-        }
-      >
-        <Subtext>Supports MP3, WAV, OGG, and more</Subtext>
-      </StyledDropZone>
+    <>
+      <TrackDropZone onFiles={onFiles} loadingCount={pendingCount} />
 
-      {errors.length > 0 && (
+      {failed.length > 0 && (
         <div role="alert" style={{
           padding: '0.75rem 1rem',
           marginBottom: '1rem',
@@ -118,15 +127,39 @@ export function NewTracksExample() {
           color: 'var(--ifm-color-danger-darkest, #7f1d1d)',
           fontSize: '0.875rem',
         }}>
-          {errors.map((e, i) => (
-            <div key={i}>Failed to load &quot;{e.name}&quot;: {e.error.message}</div>
+          {failed.map(([src, entry], i) => (
+            <div key={i}>Failed to load &quot;{sourceName(src)}&quot;: {entry.error?.message}</div>
           ))}
         </div>
       )}
+    </>
+  );
+};
+
+export function NewTracksExample() {
+  const { theme } = useDocusaurusTheme();
+  // One track per dropped file; the provider loads each one.
+  const [tracks, setTracks] = useState<PlaylistTrack[]>([]);
+
+  const handleFiles = useCallback((files: File[]) => {
+    const audioFiles = files.filter((file) => file.type.startsWith('audio/'));
+    if (audioFiles.length > 0) {
+      setTracks((prev) => [...prev, ...audioFiles.map((file) => audioTrack({ src: file }))]);
+    }
+  }, []);
+
+  const removeTrack = useCallback((trackId: string) => {
+    setTracks((prev) => prev.filter((track) => track.id !== trackId));
+  }, []);
+
+  return (
+    <Container>
+      {tracks.length === 0 && <TrackDropZone onFiles={handleFiles} />}
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
           tracks={tracks}
+          onTracksChange={setTracks}
           sampleRate={48000}
           samplesPerPixel={8192}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
@@ -134,6 +167,8 @@ export function NewTracksExample() {
           automaticScroll={true}
           theme={theme}
         >
+          <DropZoneWithStatus onFiles={handleFiles} />
+
           <Controls>
             <ControlGroup>
               <PlayButton />

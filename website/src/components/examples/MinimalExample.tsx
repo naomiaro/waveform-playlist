@@ -21,9 +21,10 @@ import {
   WaveformPlayhead,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { useLoadingProgress } from '../../hooks/useLoadingProgress';
 
 // Dark mode: Amber/gold gradient waveform on dark brown background
 const darkModeGradientTheme: Partial<WaveformPlaylistTheme> = {
@@ -88,35 +89,27 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
+// Define your tracks once, outside the component: the provider loads the audio
+const tracks = [
+  audioTrack({
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    name: 'Bass',
+  }),
+];
+
+// Inside the provider: "Loading..." while the audio loads, or the error if it failed
+function LoadingStatus() {
+  const { isLoading, errorMessage } = useLoadingProgress();
+  if (errorMessage) {
+    return <span style={{ fontSize: '0.875rem', color: 'red' }}>Error loading audio: {errorMessage}</span>;
+  }
+  if (!isLoading) return null;
+  return <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>;
+}
 
 export function MinimalExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const gradientTheme = isDarkMode ? darkModeGradientTheme : lightModeGradientTheme;
-
-  // Define your track configuration - use useMemo to prevent re-creating on every render
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-      name: 'Bass',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders
-  const { tracks, loading, error } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
 
   return (
     <WaveformPlaylistProvider tracks={tracks} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
@@ -125,7 +118,7 @@ export function MinimalExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
+        <LoadingStatus />
       </Controls>
 
       <WaveformViewOptions progressBarWidth={2}>
