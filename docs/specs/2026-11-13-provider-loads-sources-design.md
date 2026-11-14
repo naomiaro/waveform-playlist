@@ -198,10 +198,19 @@ Rules, each with a test:
 - `setWanted(keys)`: a key that is new starts one `load`; a wanted key whose
   load was suspended starts again; a key no longer in the set is dropped (a
   pending load aborted, a loaded value or a failure forgotten). A key that is
-  loaded or failed and still wanted is left alone.
-- `suspend()`: aborts pending loads and nothing else. The keys stay `pending`
-  in the snapshot and start again at the next `setWanted`. The owner calls it
-  from an effect cleanup; it must never forget a loaded value.
+  loaded or failed and still wanted is left alone. It also ends the suspended
+  state. It publishes only when the snapshot changes: restarting suspended
+  keys, which were and stay `pending`, publishes nothing (unless a restarted
+  `load` throws at once, which is a change to `failed`).
+- `suspend()`: aborts pending loads and nothing else; it publishes nothing.
+  The keys stay `pending` in the snapshot and start again at the next
+  `setWanted`. The owner calls it from an effect cleanup; it must never forget
+  a loaded value.
+- `retry(key)` while suspended starts nothing (nothing would abort that load):
+  the key becomes `pending`, published, and the next `setWanted` that still
+  wants it starts it.
+- `load` may return a plain value instead of a promise; the key becomes
+  `loaded` with it. A `load` that throws synchronously is `failed`.
 - `provide(key, value)`: the key becomes `loaded` with that value; a load in
   flight for it is aborted. A no-op for a key that is already loaded. The key
   is still dropped by a later `setWanted` that leaves it out.

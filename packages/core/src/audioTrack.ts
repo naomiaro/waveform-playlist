@@ -18,7 +18,7 @@ export interface AudioTrackOptions {
   name?: string;
   /** The audio to load. A string is a URL; a Blob or File is keyed by identity. */
   src?: ClipSource;
-  /** Audio already in memory. With `src` too, the clip is built loaded and nothing is fetched. */
+  /** Audio already in memory. With `src` too, the clip is an `AudioClip` that records `src`. */
   audioBuffer?: AudioBuffer;
   /** Pre-computed peaks. Without `src` or `audioBuffer`, the clip is built from these alone. */
   waveformData?: WaveformDataObject;
@@ -162,9 +162,10 @@ function buildClip(options: AudioTrackOptions, name: string): AudioClip | Loadin
 }
 
 /**
- * Builds a track whose one clip names its audio. With `src` the clip is a
- * loading clip the provider loads; with `audioBuffer` or `waveformData` it is
- * an `AudioClip` built now.
+ * Builds a track whose one clip names its audio. With `src` and no
+ * `audioBuffer` the clip is a `LoadingClip` (audio not loaded yet); with
+ * `audioBuffer`, or `waveformData` and no `src`, it is an `AudioClip` built now.
+ * A duration that runs past the end of the audio is cut to it, with a warning.
  */
 export function audioTrack(options: AudioTrackOptions): PlaylistTrack {
   checkOptions(options);

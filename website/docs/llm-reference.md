@@ -658,7 +658,7 @@ createSourceLoader<K, V>(options: {
   load: (key: K, signal: AbortSignal) => Promise<V>;
 }): SourceLoader<K, V>;
 
-// Clips that name their audio
+// Clips that name their audio. WaveformPlaylistProvider does not accept loading clips yet: its `tracks` prop still takes ClipTrack[].
 type ClipSource = string | Blob;        // A string is a URL; a Blob or File is keyed by identity
 
 interface LoadingClip {                 // Times in seconds
@@ -683,7 +683,7 @@ isLoadingClip(clip: AudioClip | LoadingClip): clip is LoadingClip;  // True for 
 //                                       // and createClipFromTicks take `src` and carry it onto the clip.
 
 interface AudioTrackOptions {
-  id?: string; clipId?: string; name?: string;   // '' counts as none; name defaults to the file name of src, else 'Untitled'; the clip gets the same name
+  id?: string; clipId?: string; name?: string;   // id and clipId: '' counts as none; name defaults to the file name of src, else 'Untitled'; the clip gets the same name
   src?: ClipSource; audioBuffer?: AudioBuffer; waveformData?: WaveformDataObject;
   start?: number; duration?: number; offset?: number;   // Seconds
   fadeIn?: Fade; fadeOut?: Fade; gain?: number;
@@ -693,10 +693,12 @@ interface AudioTrackOptions {
 }
 
 audioTrack(options: AudioTrackOptions): PlaylistTrack;
-// src alone: one LoadingClip. audioBuffer or waveformData (with or without src): one AudioClip.
+// src without audioBuffer: one LoadingClip (it carries waveformData when given).
+// audioBuffer (with or without src), or waveformData with no src: one AudioClip.
 // None of the three: throws 'audioTrack: give src, audioBuffer or waveformData'.
 // A negative or non-finite start or offset, or a duration that is not positive and finite, throws.
-// With audioBuffer or waveformData, an offset at or past the end of the audio, or offset + duration longer than it, throws.
+// With audioBuffer or waveformData, an offset at or past the end of the audio throws; a duration that runs past
+// the end is cut to it, with one console.warn (compared in samples, one sample of tolerance).
 // src: '' counts as not given.
 ```
 

@@ -130,7 +130,7 @@ export interface AudioClip {
   /** MIDI program number (0-127). GM instrument number for SoundFont playback. */
   midiProgram?: number;
 
-  /** The source this clip was loaded from, when the provider loaded it. */
+  /** The source this clip's audio came from (a URL, Blob or File), when it is known. */
   src?: ClipSource;
 }
 
@@ -138,8 +138,8 @@ export interface AudioClip {
 export type ClipSource = string | Blob;
 
 /**
- * A clip whose audio is not loaded yet. Times are in seconds; the provider
- * loads `src` and replaces this with an `AudioClip` (integer samples).
+ * A clip whose audio is not loaded yet. Times are in seconds; whatever loads
+ * `src` turns it into an `AudioClip` (integer samples).
  */
 export interface LoadingClip {
   /** Unique identifier for this clip */
@@ -167,7 +167,7 @@ export interface LoadingClip {
   waveformData?: WaveformDataObject;
 }
 
-/** What the app's state holds and the provider's `tracks` prop takes. */
+/** A track whose clips are loaded (`AudioClip`) or not loaded yet (`LoadingClip`). */
 export type PlaylistTrack = Omit<ClipTrack, 'clips'> & {
   clips: (AudioClip | LoadingClip)[];
 };
