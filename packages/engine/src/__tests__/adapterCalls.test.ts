@@ -148,14 +148,16 @@ describe.each([
       expect(engine.canUndo).toBe(false);
     });
 
-    it('updateTrack(id, track) with an unknown id: an undo step, a version bump, an adapter call and an emission, and no track added', () => {
+    // Rule (#812): updateTrack with an id no track has does nothing. (Before:
+    // an undo step, a version bump, an adapter call and an emission.)
+    it('updateTrack(id, track) with an unknown id: nothing', () => {
       const { adapter, engine, states, summaries } = setup({ incremental });
       const before = engine.getState().tracksVersion;
       engine.updateTrack('nope', track('nope', [clip('n1', 0)]));
-      expect(adapter.calls).toEqual(oneTrack({ id: 'nope', clips: ['n1'] }, [A, B]));
-      expect(states).toHaveLength(1);
-      expect(states[0].tracksVersion).toBe(before + 1);
-      expect(engine.canUndo).toBe(true);
+      expect(adapter.calls).toEqual([]);
+      expect(states).toHaveLength(0);
+      expect(engine.getState().tracksVersion).toBe(before);
+      expect(engine.canUndo).toBe(false);
       expect(summaries()).toEqual([A, B]);
     });
 
@@ -220,8 +222,9 @@ describe.each([
   });
 
   describe('undo and redo', () => {
-    // A snapshot is a copy, so no track of it is the object the engine holds:
-    // with the same number of tracks the adapter gets EVERY track, one by one.
+    // Rule (#812, immutability): a snapshot is a reference, so a track an undo
+    // did not touch is the same object before and after and is NOT sent. Only
+    // the tracks that differ are. (Before: every track, one by one.)
     it.each([
       ['a move', (engine: PlaylistEngine) => void engine.moveClip('A', 'a1', 1000)],
       ['a trim', (engine: PlaylistEngine) => engine.trimClip('A', 'a1', 'right', -1000)],
@@ -230,8 +233,7 @@ describe.each([
         'an updateTrack',
         (engine: PlaylistEngine) => engine.updateTrack('A', track('A', [clip('a3', 0)])),
       ],
-      ['a reorderTrack', (engine: PlaylistEngine) => engine.reorderTrack('A', 1)],
-    ])('of %s: every track is sent, in the restored order, one emission each way', (_, edit) => {
+    ])('of %s: only the track that differs is sent, one emission each way', (_, edit) => {
       const { adapter, engine, states, summaries } = setup({ incremental });
       edit(engine);
       const edited = summaries();
@@ -240,15 +242,57 @@ describe.each([
 
       engine.undo();
       expect(summaries()).toEqual([A, B]);
-      expect(adapter.calls).toEqual(everyTrack([A, B]));
+      expect(adapter.calls).toEqual(oneTrack(A, [A, B]));
       expect(states).toHaveLength(1);
 
       adapter.reset();
       states.length = 0;
       engine.redo();
       expect(summaries()).toEqual(edited);
-      expect(adapter.calls).toEqual(everyTrack(edited));
+      expect(adapter.calls).toEqual(oneTrack(edited[0], edited));
       expect(states).toHaveLength(1);
+    });
+
+    // Rule (#812, immutability): the order of tracks is not audible and no
+    // track object differs, so nothing is sent. (Before: every track.)
+    it('of a reorderTrack: no adapter call, one emission each way', () => {
+      const { adapter, engine, states, summaries } = setup({ incremental });
+      engine.reorderTrack('A', 1);
+      adapter.reset();
+      states.length = 0;
+
+      engine.undo();
+      expect(summaries()).toEqual([A, B]);
+      expect(adapter.calls).toEqual([]);
+      expect(states).toHaveLength(1);
+
+      engine.redo();
+      expect(summaries()).toEqual([B, A]);
+      expect(adapter.calls).toEqual([]);
+      expect(states).toHaveLength(2);
+    });
+
+    it('of edits on two tracks in one transaction: both tracks are sent, in track order', () => {
+      const { adapter, engine } = setup({ incremental });
+      engine.beginTransaction();
+      engine.moveClip('B', 'b1', 1000);
+      engine.moveClip('A', 'a1', 1000);
+      engine.commitTransaction();
+      adapter.reset();
+      engine.undo();
+      expect(adapter.calls).toEqual(everyTrack([A, B]));
+    });
+
+    // Rule (#812): "the same tracks" is decided by id, not by count.
+    it('of a transaction that removed one track and added another: setTracks (same count, other tracks)', () => {
+      const { adapter, engine } = setup({ incremental });
+      engine.beginTransaction();
+      engine.removeTrack('A');
+      engine.addTrack(track('D', [clip('d1', 0)]));
+      engine.commitTransaction();
+      adapter.reset();
+      engine.undo();
+      expect(adapter.calls).toEqual([setTracksCall([A, B])]);
     });
 
     it('of an addTrack: setTracks each way (the number of tracks changes)', () => {
@@ -286,13 +330,15 @@ describe.each([
       expect(states).toHaveLength(1);
     });
 
-    it('undo of an addTrack leaves the selected track id as it was (today)', () => {
+    // Rule (#812): the selected track id names a track, so it is cleared when
+    // a restore takes that track away. (Before: it stayed.)
+    it('undo of an addTrack clears the selected track id when it was that track', () => {
       const { engine } = setup({ incremental });
       engine.addTrack(track('C', [clip('c1', 0)]));
       engine.selectTrack('C');
       engine.undo();
       expect(engine.getState().tracks.map((t) => t.id)).toEqual(['A', 'B']);
-      expect(engine.getState().selectedTrackId).toBe('C');
+      expect(engine.getState().selectedTrackId).toBeNull();
     });
 
     it('undo with nothing to undo: no call, no emission', () => {
@@ -319,7 +365,10 @@ describe.each([
 
       engine.commitTransaction();
       expect(adapter.calls).toEqual(oneTrack(A, [A, B]));
-      expect(states).toHaveLength(3);
+      // Rule (#812): the commit is a history change and is announced, so
+      // canUndo is never stale. (Before: three emissions, none for the commit.)
+      expect(states).toHaveLength(4);
+      expect(states[3].canUndo).toBe(true);
       expect(startOf('A', 'a1')).toBe(300);
       expect(engine.canUndo).toBe(true);
 
@@ -329,7 +378,8 @@ describe.each([
       expect(engine.canUndo).toBe(false);
     });
 
-    it('the same drag aborted: every track is sent back, one more emission, no undo step', () => {
+    // Rule (#812, immutability): only the dragged clip's track is sent back. (Before: every track.)
+    it('the same drag aborted: the dragged track is sent back, one more emission, no undo step', () => {
       const { adapter, engine, states, startOf } = setup({ incremental });
       engine.beginTransaction();
       engine.moveClip('A', 'a1', 100, true);
@@ -337,7 +387,7 @@ describe.each([
       engine.moveClip('A', 'a1', 100, true);
       engine.abortTransaction();
 
-      expect(adapter.calls).toEqual(everyTrack([A, B]));
+      expect(adapter.calls).toEqual(oneTrack(A, [A, B]));
       expect(states).toHaveLength(4);
       expect(startOf('A', 'a1')).toBe(0);
       expect(engine.canUndo).toBe(false);
@@ -361,17 +411,21 @@ describe.each([
       expect(states).toHaveLength(0);
     });
 
-    it('commitTransaction with a change emits nothing itself (today)', () => {
-      const { engine, states } = setup({ incremental });
+    // Rule (#812): every history change is announced. (Before: no emission.)
+    it('commitTransaction with a change emits one statechange and calls no adapter', () => {
+      const { adapter, engine, states } = setup({ incremental });
       engine.beginTransaction();
       engine.moveClip('A', 'a1', 100, true);
       states.length = 0;
       engine.commitTransaction();
-      expect(states).toHaveLength(0);
-      expect(engine.canUndo).toBe(true);
+      expect(states).toHaveLength(1);
+      expect(states[0].canUndo).toBe(true);
+      expect(adapter.calls).toEqual([]);
     });
 
-    it('undo while a transaction is open: the undo acts and the transaction stays open (today)', () => {
+    // Rule (#812): undo and redo with a transaction open abort it first, then
+    // act. (Before: the undo acted and the transaction stayed open.)
+    it('undo while a transaction is open: the transaction is aborted, then the undo acts', () => {
       const { adapter, engine, states, startOf } = setup({ incremental });
       engine.moveClip('A', 'a1', 1000);
       engine.beginTransaction();
@@ -381,19 +435,14 @@ describe.each([
 
       engine.undo();
       expect(startOf('A', 'a1')).toBe(0);
-      expect(adapter.calls).toEqual(everyTrack([A, B]));
-      expect(states).toHaveLength(1);
+      // Two restores (the abort, then the undo), each sending the track that differs.
+      expect(adapter.calls).toEqual([...oneTrack(A, [A, B]), ...oneTrack(A, [A, B])]);
+      expect(states).toHaveLength(2);
       expect(engine.canRedo).toBe(true);
 
-      // The transaction is still open: its commit pushes the state from when
-      // it began (a1 at 1000) and clears the redo stack.
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       engine.commitTransaction();
-      expect(warn).not.toHaveBeenCalled();
-      expect(engine.canUndo).toBe(true);
-      expect(engine.canRedo).toBe(false);
-      engine.undo();
-      expect(startOf('A', 'a1')).toBe(1000);
+      expect(warn).toHaveBeenCalledTimes(1); // no transaction is open any more
     });
   });
 
@@ -423,15 +472,19 @@ describe.each([
       }
     );
 
+    // Rule (#812, the mixer part): a setter for a track the arrangement does
+    // not hold changes no state, so nothing is emitted and mixerVersion
+    // stays. The adapter is still called (dawcore sets values for a track
+    // that is still loading). Before: one emission and a version bump.
     it.each(setters)(
-      '%s for an unknown track: the adapter is still called, one emission',
+      '%s for an unknown track: the adapter is still called, no emission',
       (method, call, value) => {
         const { adapter, engine, states, summaries } = setup({ incremental });
         const before = engine.getState();
         call(engine, 'still-loading');
         expect(adapter.calls).toEqual([{ method, args: ['still-loading', value] }]);
-        expect(states).toHaveLength(1);
-        expect(states[0].mixerVersion).toBe(before.mixerVersion + 1);
+        expect(states).toHaveLength(0);
+        expect(engine.getState().mixerVersion).toBe(before.mixerVersion);
         expect(summaries()).toEqual([A, B]);
       }
     );
@@ -490,16 +543,26 @@ describe('what the adapter is handed, and when', () => {
     expect(sentTrack(adapter.rawCalls[0]).clips[0].startSample).toBe(1000);
   });
 
-  it('an undo sends the restored tracks, and a later mixer write lands on the object the adapter was sent', () => {
+  // Rule (#812, immutability): nothing is written into a track after it was
+  // sent, so "the stored object" is shown by identity with getState().tracks.
+  // (Before: by a later in-place mixer write landing on the sent object.)
+  it('an undo sends the restored track, and it is the stored object', () => {
     const { adapter, engine } = setup();
     engine.moveClip('A', 'a1', 1000);
     adapter.reset();
     engine.undo();
     const sent = sentTrack(adapter.rawCalls[0]);
     expect(sent.clips[0].startSample).toBe(0);
-    // The adapter holds the engine's own track object, not a copy of it.
+    expect(sent).toBe(engine.getState().tracks[0]);
+  });
+
+  it('a mixer write leaves the object the adapter was sent as it was; the next state has a new one', () => {
+    const { adapter, engine } = setup();
+    engine.updateTrack('A');
+    const sent = sentTrack(adapter.rawCalls[0]);
     engine.setTrackVolume('A', 0.3);
-    expect(sent.volume).toBe(0.3);
+    expect(sent.volume).toBe(1);
+    expect(engine.getState().tracks[0].volume).toBe(0.3);
   });
 
   it('addTrack and updateTrack(id, track) send a track whose clips have ticks, and it is the stored object', () => {
@@ -510,18 +573,14 @@ describe('what the adapter is handed, and when', () => {
     const updated = sentTrack(adapter.rawCalls[1]);
     expect(added.clips[0].startTick).toBe(1920);
     expect(updated.clips[0].startTick).toBe(1920);
-    engine.setTrackPan('C', 0.5);
-    engine.setTrackPan('A', -0.5);
-    expect(added.pan).toBe(0.5);
-    expect(updated.pan).toBe(-0.5);
+    expect(added).toBe(engine.getState().tracks[2]);
+    expect(updated).toBe(engine.getState().tracks[0]);
   });
 
-  it('setTracks sends an array whose tracks are the stored objects', () => {
+  it('setTracks sends the stored array', () => {
     const { adapter, engine } = setup();
     engine.setTracks(fixture());
-    const sent = adapter.rawCalls[0].args[0] as ClipTrack[];
-    engine.setTrackMute('B', true);
-    expect(sent[1].muted).toBe(true);
+    expect(adapter.rawCalls[0].args[0]).toBe(engine.getState().tracks);
   });
 
   it.each([
@@ -566,12 +625,10 @@ describe('a statechange listener that calls back into the engine', () => {
     expect(summaries()).toEqual([B, A]);
   });
 
-  // Today's delivery is nested: the re-entrant change is emitted from inside
-  // the first listener's call, so a listener registered AFTER it is told about
-  // the second change before the first. Recorded as it is; the arrangement's
-  // ordered delivery (#812, "a listener that writes gets its own change
-  // delivered after the one it is handling") changes this expectation.
-  it('a later listener is told about the re-entrant change first (today)', () => {
+  // Rule (#812, ordered delivery): a change made from inside a listener is
+  // delivered after the one being handled has reached every listener.
+  // (Before: nested, so a later listener was told about the second change first.)
+  it('a later listener is told about both changes in the order they were made', () => {
     const { engine } = setup();
     const start = engine.getState().tracksVersion;
     let reentered = false;
@@ -586,6 +643,6 @@ describe('a statechange listener that calls back into the engine', () => {
 
     engine.moveClip('A', 'a1', 1000);
 
-    expect(later).toEqual([start + 2, start + 1]);
+    expect(later).toEqual([start + 1, start + 2]);
   });
 });

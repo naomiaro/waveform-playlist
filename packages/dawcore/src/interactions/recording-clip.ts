@@ -28,7 +28,7 @@ export interface RecordingClipHost {
   _raiseZoomFloor(scale: number): void;
   _peakPipeline: PeakPipeline;
   _engine: {
-    setTracks(tracks: ClipTrack[]): void;
+    setTracks(tracks: readonly ClipTrack[]): void;
     updateTrack?(trackId: string, track: ClipTrack): void;
   } | null;
   _recomputeDuration(): void;

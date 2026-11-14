@@ -142,21 +142,31 @@ const clip = createClipFromSeconds({
 #### `@waveform-playlist/engine`
 
 - **Purpose:** Framework-agnostic timeline engine — stateful `PlaylistEngine` class with event emitter
-- **Architecture:** Two layers — pure operations functions + stateful class
+- **Architecture:** Three layers — pure operations functions, the arrangement (owner of the tracks, the mix and the undo history), and the stateful class that plays an arrangement
   - `operations/clipOperations.ts` — Drag constraints, boundary trim, split
   - `operations/viewportOperations.ts` — Bounds, chunks, scroll threshold
   - `operations/timelineOperations.ts` — Duration, zoom, seek
-  - `PlaylistEngine.ts` — Composes operations with state + events
+  - `arrangement/index.ts` — `createArrangement()` and the public arrangement types
+  - `arrangement/types.ts` — `Arrangement`, `ClipBounds`, `RemoveTrackOptions`, `CreateArrangementOptions`
+  - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks, mix, history, transactions, ordered delivery of changes
+  - `arrangement/mixer.ts` — `TrackMixerValues`; the mix as pure functions over a Map by track id
+  - `arrangement/history.ts` — Undo/redo as pure functions over references to earlier tracks arrays
+  - `arrangement/clipEdits.ts` — Move, trim and split as pure functions over a tracks array
+  - `arrangement/ticks.ts` — Clip mapping across states (`clipMapper`) and tick rescaling between ppqn values (`rescaleTick`), used when an engine attaches
+  - `arrangement/validate.ts` — Unique track ids, unique clip ids within a track
+  - `arrangement/devFreeze.ts` — Freezes handed-out tracks outside production builds
+  - `adapterSync.ts` — `AdapterSync`: the adapter call for each arrangement change, and the tracks-with-current-mix projection that `getState().tracks` and the adapter are given
+  - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and hands each change to its `AdapterSync`
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
-- **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `EngineState` (state snapshot incl. `tracksVersion`/`mixerVersion`), `EngineEvents` (statechange, play/pause/stop)
-- **State Ownership:** Engine owns selection, loop, selectedTrackId, zoom, masterVolume, and tracks (for clip mutations). React subscribes to `statechange` events.
-- **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` update internal tracks, sync adapter via `adapter.setTracks()`, and emit `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
+- **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
+- **State Ownership:** The arrangement owns the tracks, the per-track mix and the undo history. The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
+- **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.
   - `trimClip()` accepts optional `skipAdapter` parameter.
   - `getClipBounds()` — returns clip boundary info for constraint calculations.
   - `constrainTrimDelta()` — wraps pure `constrainBoundaryTrim` for per-frame collision detection during trim drag.
-- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. `_transactionMutated` flag prevents phantom undo entries from no-op drags.
+- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. A transaction that changed nothing pushes no undo step, so a no-op drag leaves no phantom entry. The history holds tracks and clips, not the mix: an undo never changes volume, mute, solo or pan.
 - **Dependencies:** Only peer dependency is `@waveform-playlist/core`
 - **No React, no Tone.js** — zero framework dependencies
 
@@ -784,7 +794,8 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 │   └─→ Canvas Rendering (SmartChannel)
 │
 └─→ PlaylistEngine (state + events)
-    ├─→ Owns: selection, loop, zoom, volume, selectedTrackId, tracks (clip mutations)
+    ├─→ Owns: transport, selection, loop, zoom, master volume, selectedTrackId
+    ├─→ Arrangement (createArrangement, or the engine's own): tracks, mix, undo history
     ├─→ Emits: statechange → provider mirrors into React state
     └─→ ToneAdapter (PlayoutAdapter interface)
         └─→ TonePlayout (Tone.js)
@@ -795,7 +806,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 ```
 Hook calls engine method (e.g., engine.moveClip())
     ↓
-Engine updates internal state + syncs adapter
+Arrangement changes its tracks and tells the engine; engine syncs adapter
     ↓
 Engine emits 'statechange' with EngineState snapshot
     ↓
@@ -881,6 +892,8 @@ Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistPro
 - `packages/browser/src/hooks/` - Reusable business logic
 - `packages/browser/src/components/` - React components
 - `packages/engine/src/PlaylistEngine.ts` - Stateful timeline engine
+- `packages/engine/src/arrangement/` - The arrangement: tracks, mix, undo history
+- `packages/engine/src/adapterSync.ts` - Keeps the adapter in step with the arrangement
 - `packages/engine/src/operations/` - Pure clip/timeline/viewport operations
 - `packages/ui-components/src/components/Playlist.tsx` - UI container
 - `packages/playout/src/TonePlayout.ts` - Audio playback

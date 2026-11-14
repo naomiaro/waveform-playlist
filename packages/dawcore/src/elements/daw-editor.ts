@@ -1508,7 +1508,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * ghost that even removeTrack() can't clean (no element, no engine
    * entry). Never prunes tracks that are mid-load or element-backed —
    * their descriptors legitimately precede their engine entries. */
-  _reconcileDescriptorsWithEngineTracks(tracks: ClipTrack[]): void {
+  _reconcileDescriptorsWithEngineTracks(tracks: readonly ClipTrack[]): void {
     const engineIds = new Set(tracks.map((t) => t.id));
     let next: Map<string, TrackDescriptor> | null = null;
     for (const track of tracks) {
@@ -3669,7 +3669,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * the observer's _syncEngineOrderToDom, which finds the orders equal and
    * no-ops — converges in one pass (write-only-on-change).
    */
-  _syncDomToEngineOrder(tracks: ClipTrack[]): void {
+  _syncDomToEngineOrder(tracks: readonly ClipTrack[]): void {
     const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
     if (els.length < 2) return;
     const byId = new Map<string, DawTrackElement>(els.map((el) => [el.trackId, el]));

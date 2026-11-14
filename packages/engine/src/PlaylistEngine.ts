@@ -1,14 +1,17 @@
 /**
  * PlaylistEngine — Stateful, framework-agnostic timeline engine.
  *
- * Composes an Arrangement (the tracks, their undo history and transactions)
- * with an event emitter and optional PlayoutAdapter for audio playback
- * delegation. Each track method calls the arrangement, then the adapter,
- * then emits `statechange`.
+ * Composes an Arrangement (the tracks, the mix, the undo history and
+ * transactions) with an event emitter and optional PlayoutAdapter for audio
+ * playback delegation. A track method calls the arrangement; the engine
+ * subscribes to the arrangement and, for each change it is told about, makes
+ * the adapter call and emits `statechange`.
  */
 
 import type { ClipTrack } from '@waveform-playlist/core';
-import { Arrangement } from './arrangement';
+import { AdapterSync } from './adapterSync';
+import { ArrangementImpl } from './arrangement/Arrangement';
+import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
 import type { ClipBounds } from './arrangement';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
@@ -20,7 +23,10 @@ const DEFAULT_ZOOM_LEVELS = [256, 512, 1024, 2048, 4096, 8192];
 type EventName = keyof EngineEvents;
 
 export class PlaylistEngine {
-  private _arrangement: Arrangement;
+  private _arrangement: ArrangementImpl;
+  private _stopFollowingArrangement: () => void;
+  private _detachFromArrangement: () => void;
+  private _adapterSync: AdapterSync;
   private _currentTime = 0;
   private _playStartPosition = 0;
   private _isPlaying = false;
@@ -47,7 +53,6 @@ export class PlaylistEngine {
     this._sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE;
     this._zoomLevels = [...(options.zoomLevels ?? DEFAULT_ZOOM_LEVELS)];
     this._adapter = options.adapter ?? null;
-    this.undoLimit = options.undoLimit ?? 100;
 
     // Bounded playback (#608): adapters that self-terminate at an endTime
     // report completion here. Deferred via queueMicrotask — the Tone adapter
@@ -80,14 +85,40 @@ export class PlaylistEngine {
     // Adapter is the source of truth for PPQN. Headless mode falls back to options.ppqn or 960.
     this._ppqn = options.adapter?.ppqn ?? options.ppqn ?? 960;
 
-    this._arrangement = new Arrangement({
-      undoLimit: this.undoLimit,
-      timeBase: {
-        sampleRate: this._sampleRate,
-        secondsToTicks: (seconds) => this._secondsToTicks(seconds),
-        ticksToSeconds: (tick) => this._ticksToSeconds(tick),
-      },
-    });
+    const timeBase = {
+      sampleRate: this._sampleRate,
+      ppqn: this._ppqn,
+      secondsToTicks: (seconds: number) => this._secondsToTicks(seconds),
+      ticksToSeconds: (tick: number) => this._ticksToSeconds(tick),
+    };
+    if (options.arrangement) {
+      this._arrangement = asArrangementImpl(options.arrangement);
+      if (options.undoLimit !== undefined) {
+        console.warn(
+          '[waveform-playlist] PlaylistEngine: undoLimit is ignored when an arrangement is ' +
+            'passed. Set it on createArrangement({ undoLimit }).'
+        );
+      }
+    } else {
+      this._arrangement = new ArrangementImpl({ undoLimit: options.undoLimit });
+    }
+    this.undoLimit = this._arrangement.undoLimit;
+
+    // Attach first (clips without a tick get one), then follow, then bring
+    // the adapter in step with the tracks that are already there.
+    this._detachFromArrangement = this._arrangement.attachEngine(timeBase);
+    this._adapterSync = new AdapterSync(this._arrangement, this._adapter);
+    this._stopFollowingArrangement = this._arrangement.onChange((change, at) =>
+      this._onArrangementChange(change, at)
+    );
+    try {
+      this._adapterSync.sendInitialTracks();
+    } catch (error) {
+      // Nobody will hold this engine to dispose it: let go of the arrangement here.
+      this._stopFollowingArrangement();
+      this._detachFromArrangement();
+      throw error;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -103,11 +134,11 @@ export class PlaylistEngine {
   }
 
   undo(): void {
-    this._restore(() => this._arrangement.undo());
+    this._arrangement.undo();
   }
 
   redo(): void {
-    this._restore(() => this._arrangement.redo());
+    this._arrangement.redo();
   }
 
   clearHistory(): void {
@@ -123,8 +154,7 @@ export class PlaylistEngine {
   }
 
   abortTransaction(): void {
-    // Restores only if something changed — avoids a full adapter rebuild on click
-    this._restore(() => this._arrangement.abortTransaction());
+    this._arrangement.abortTransaction();
   }
 
   // ---------------------------------------------------------------------------
@@ -133,7 +163,7 @@ export class PlaylistEngine {
 
   getState(): EngineState {
     return {
-      tracks: this._arrangement.getTracks().map((t) => ({ ...t, clips: [...t.clips] })),
+      tracks: this._adapterSync.tracks(),
       tracksVersion: this._arrangement.tracksVersion,
       mixerVersion: this._arrangement.mixerVersion,
       duration: calculateDuration(this._arrangement.getTracks()),
@@ -165,33 +195,16 @@ export class PlaylistEngine {
   // A track holds audio clips or MIDI clips, never both (#756). The three
   // methods that take a track check it before they change anything, so a
   // throw leaves the engine, the undo history and the adapter untouched.
-  setTracks(tracks: ClipTrack[]): void {
+  setTracks(tracks: readonly ClipTrack[]): void {
     this._arrangement.setTracks(tracks);
-    this._adapter?.setTracks(this._arrangement.getTracks());
-    this._emitStateChange();
   }
 
   addTrack(track: ClipTrack): void {
-    const enriched = this._arrangement.addTrack(track);
-    if (this._adapter?.addTrack) {
-      this._adapter.addTrack(enriched);
-    } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
-    }
-    this._emitStateChange();
+    this._arrangement.addTrack(track);
   }
 
   removeTrack(trackId: string): void {
-    if (!this._changed(() => this._arrangement.removeTrack(trackId))) return;
-    if (this._selectedTrackId === trackId) {
-      this._selectedTrackId = null;
-    }
-    if (this._adapter?.removeTrack) {
-      this._adapter.removeTrack(trackId);
-    } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
-    }
-    this._emitStateChange();
+    this._arrangement.removeTrack(trackId);
   }
 
   /**
@@ -201,36 +214,20 @@ export class PlaylistEngine {
    * playout and interrupt playback for a visual-only change.
    */
   reorderTrack(trackId: string, toIndex: number): void {
-    if (!this._changed(() => this._arrangement.reorderTrack(trackId, toIndex))) return;
-    this._emitStateChange();
+    this._arrangement.reorderTrack(trackId, toIndex);
   }
 
-  /** Update a single track's clips on the adapter (no full rebuild). */
+  /**
+   * With a track: replace that track (an undo step). Without one: send the
+   * current track to the adapter again (no full rebuild, no change of state).
+   */
   updateTrack(trackId: string, track?: ClipTrack): void {
     if (track) {
-      const enriched = this._arrangement.updateTrack(trackId, track);
-      // Forward enriched track to adapter
-      if (this._adapter?.updateTrack) {
-        this._adapter.updateTrack(trackId, enriched);
-      } else {
-        this._adapter?.setTracks(this._arrangement.getTracks());
-      }
-      this._emitStateChange();
+      this._arrangement.updateTrack(trackId, track);
       return;
     }
-    // No track arg — just forward existing track to adapter
-    this._updateTrackOnAdapter(trackId);
-  }
-
-  /** Internal: send the arrangement's current track to the adapter. */
-  private _updateTrackOnAdapter(trackId: string): void {
-    const t = this._arrangement.getTracks().find((tr) => tr.id === trackId);
-    if (!t) return;
-    if (this._adapter?.updateTrack) {
-      this._adapter.updateTrack(trackId, t);
-    } else {
-      this._adapter?.setTracks(this._arrangement.getTracks());
-    }
+    // A disposed engine no longer follows the arrangement, and its adapter is disposed.
+    if (!this._disposed) this._adapterSync.sendTrack(trackId);
   }
 
   selectTrack(trackId: string | null): void {
@@ -263,21 +260,21 @@ export class PlaylistEngine {
   // Clip Editing (delegates to the arrangement)
   // ---------------------------------------------------------------------------
 
-  /** Move a clip by deltaSamples. Returns the constrained delta actually applied (0 if no-op). */
+  /**
+   * Move a clip by deltaSamples. Returns the constrained delta actually applied (0 if no-op).
+   * With `skipAdapter` the change is not sent to the adapter (a drag sends the track once, on drop).
+   */
   moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter = false): number {
-    const constrainedDelta = this._arrangement.moveClip(trackId, clipId, deltaSamples);
-    if (constrainedDelta === 0) return 0;
-    if (!skipAdapter) {
-      this._updateTrackOnAdapter(trackId);
+    const mark = this._adapterSync.markSkip(skipAdapter);
+    try {
+      return this._arrangement.moveClip(trackId, clipId, deltaSamples);
+    } finally {
+      this._adapterSync.unmarkIfUnchanged(mark);
     }
-    this._emitStateChange();
-    return constrainedDelta;
   }
 
   splitClip(trackId: string, clipId: string, atSample: number): void {
-    if (!this._changed(() => this._arrangement.splitClip(trackId, clipId, atSample))) return;
-    this._updateTrackOnAdapter(trackId);
-    this._emitStateChange();
+    this._arrangement.splitClip(trackId, clipId, atSample);
   }
 
   trimClip(
@@ -287,12 +284,12 @@ export class PlaylistEngine {
     deltaSamples: number,
     skipAdapter = false
   ): void {
-    const trim = () => this._arrangement.trimClip(trackId, clipId, boundary, deltaSamples);
-    if (!this._changed(trim)) return;
-    if (!skipAdapter) {
-      this._updateTrackOnAdapter(trackId);
+    const mark = this._adapterSync.markSkip(skipAdapter);
+    try {
+      this._arrangement.trimClip(trackId, clipId, boundary, deltaSamples);
+    } finally {
+      this._adapterSync.unmarkIfUnchanged(mark);
     }
-    this._emitStateChange();
   }
 
   // ---------------------------------------------------------------------------
@@ -386,14 +383,16 @@ export class PlaylistEngine {
       return;
     }
     if (bpm === this._bpm && atTick === undefined) return;
+    if (this._disposed) return;
     // Commit only when the adapter accepts (an explicit `false` means refused,
     // e.g. the transport's multi-entry tempo-map guard — #407). Void-returning
     // and absent adapters count as accepted.
     const accepted = this._adapter?.setTempo?.(bpm, atTick);
     if (accepted === false) return;
     this._bpm = bpm;
-    this._recomputeStartSamples();
-    this._emitStateChange();
+    // The arrangement announces the recompute; the engine's listener sends
+    // every track to the adapter and emits statechange.
+    this._arrangement.recomputeStartSamples();
   }
 
   getCurrentTime(): number {
@@ -483,11 +482,12 @@ export class PlaylistEngine {
   // Per-Track Audio (persists into the arrangement, forwards to adapter, emits)
   // ---------------------------------------------------------------------------
   //
-  // Each setter writes the value into the arrangement's track (so a later
-  // adapter rebuild via setTracks keeps the value, and mixerVersion is bumped),
-  // forwards to the adapter also for a track the arrangement does not hold
-  // (a consumer may target a track that has not been ingested yet), and emits
-  // statechange. These are NOT structural
+  // Each setter writes the value into the arrangement's mixer part (so a later
+  // adapter rebuild via setTracks keeps the value, and mixerVersion is bumped);
+  // the engine's listener then calls the adapter and emits statechange. For a
+  // track the arrangement does not hold nothing changes, and the adapter is
+  // still called from here (a consumer may target a track that has not been
+  // ingested yet). These are NOT structural
   // changes, so they deliberately do NOT bump tracksVersion — that would make
   // tracksVersion-gated consumers re-run expensive structural work (audio-graph
   // rewire, peak regeneration) on every volume/pan drag frame. Consumers that
@@ -496,27 +496,23 @@ export class PlaylistEngine {
   // rebuild no longer reverts live mixer state (#501).
 
   setTrackVolume(trackId: string, volume: number): void {
-    this._arrangement.setTrackVolume(trackId, volume);
-    this._adapter?.setTrackVolume(trackId, volume);
-    this._emitStateChange();
+    const changed = this._mixerChanged(() => this._arrangement.setTrackVolume(trackId, volume));
+    if (!changed && !this._disposed) this._adapter?.setTrackVolume(trackId, volume);
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
-    this._arrangement.setTrackMute(trackId, muted);
-    this._adapter?.setTrackMute(trackId, muted);
-    this._emitStateChange();
+    const changed = this._mixerChanged(() => this._arrangement.setTrackMute(trackId, muted));
+    if (!changed && !this._disposed) this._adapter?.setTrackMute(trackId, muted);
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
-    this._arrangement.setTrackSolo(trackId, soloed);
-    this._adapter?.setTrackSolo(trackId, soloed);
-    this._emitStateChange();
+    const changed = this._mixerChanged(() => this._arrangement.setTrackSolo(trackId, soloed));
+    if (!changed && !this._disposed) this._adapter?.setTrackSolo(trackId, soloed);
   }
 
   setTrackPan(trackId: string, pan: number): void {
-    this._arrangement.setTrackPan(trackId, pan);
-    this._adapter?.setTrackPan(trackId, pan);
-    this._emitStateChange();
+    const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan));
+    if (!changed && !this._disposed) this._adapter?.setTrackPan(trackId, pan);
   }
 
   // ---------------------------------------------------------------------------
@@ -566,6 +562,8 @@ export class PlaylistEngine {
   dispose(): void {
     if (this._disposed) return;
     this._disposed = true;
+    this._stopFollowingArrangement();
+    this._detachFromArrangement();
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
@@ -580,33 +578,45 @@ export class PlaylistEngine {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /** Runs a change on the arrangement. True when the tracks changed. */
-  private _changed(change: () => void): boolean {
-    const version = this._arrangement.tracksVersion;
+  /** Runs a mixer setter on the arrangement. True when a value changed. */
+  private _mixerChanged(change: () => void): boolean {
+    const version = this._arrangement.mixerVersion;
     change();
-    return this._arrangement.tracksVersion !== version;
+    return this._arrangement.mixerVersion !== version;
   }
 
   /**
-   * Runs an undo, a redo or an abort on the arrangement and, when it restored
-   * tracks, brings the adapter in step and emits.
+   * The arrangement changed: bring the adapter in step, then emit
+   * `statechange`. Every change is one emission. An adapter that throws
+   * stops the emission and fails the arrangement call that is delivering
+   * (for a change made from inside a listener, that is the outer call).
    */
-  private _restore(restore: () => void): void {
-    const oldTracks = this._arrangement.getTracks();
-    if (!this._changed(restore)) return;
-    const snapshot = this._arrangement.getTracks();
-    // Use incremental adapter updates when track count is unchanged —
-    // avoids full playout rebuild that interrupts playback during undo/redo.
-    if (this._adapter && oldTracks.length === snapshot.length) {
-      for (let i = 0; i < snapshot.length; i++) {
-        if (oldTracks[i] !== snapshot[i]) {
-          this._updateTrackOnAdapter(snapshot[i].id);
+  private _onArrangementChange(change: ArrangementChange, at: ArrangementVersions): void {
+    switch (change.type) {
+      case 'mixer':
+        this._adapterSync.sendMixerValues(change.trackId, change.values);
+        break;
+      case 'reorder': // not audible: adapter nodes are keyed by track id
+      case 'history':
+        break;
+      default:
+        // The selected track id is cleared when its track is removed, taken
+        // away by an undo, a redo or an abort, or given a new id. Not by
+        // `setTracks`: a host may empty the tracks and add them again.
+        if (change.type === 'remove' || change.type === 'restore' || change.type === 'update') {
+          this._clearSelectionIfGone();
         }
-      }
-    } else {
-      this._adapter?.setTracks(snapshot);
+        this._adapterSync.follow(change, at);
     }
     this._emitStateChange();
+  }
+
+  /** The selected track id names a track; when that track is gone, nothing is selected. */
+  private _clearSelectionIfGone(): void {
+    const selected = this._selectedTrackId;
+    if (selected !== null && !this._arrangement.getTracks().some((t) => t.id === selected)) {
+      this._selectedTrackId = null;
+    }
   }
 
   private _emit(event: string, ...args: unknown[]): void {
@@ -650,15 +660,16 @@ export class PlaylistEngine {
     return Math.round((seconds * this._ppqn * this._bpm) / 60);
   }
 
-  private _recomputeStartSamples(): void {
-    this._arrangement.recomputeStartSamples();
-    // Use incremental updates to avoid full playout rebuild during playback
-    for (const track of this._arrangement.getTracks()) {
-      this._updateTrackOnAdapter(track.id);
-    }
-  }
-
   private _emitStateChange(): void {
     this._emit('statechange', this.getState());
   }
+}
+
+/** The object behind an `Arrangement` from `createArrangement()`. */
+function asArrangementImpl(arrangement: unknown): ArrangementImpl {
+  if (arrangement instanceof ArrangementImpl) return arrangement;
+  throw new Error(
+    '[waveform-playlist] PlaylistEngine: the `arrangement` option must be an arrangement ' +
+      'made by createArrangement().'
+  );
 }

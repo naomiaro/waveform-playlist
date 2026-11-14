@@ -1,4 +1,5 @@
 import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from './arrangement';
 
 /**
  * Interface for pluggable audio playback adapters.
@@ -11,7 +12,8 @@ export interface PlayoutAdapter {
   /** Set the adapter's tick resolution. Optional — adapters with fixed PPQN ignore this. */
   setPpqn?(ppqn: number): void;
   init(): Promise<void>;
-  setTracks(tracks: ClipTrack[]): void;
+  /** The tracks are the engine's own objects: read them, never write to them. */
+  setTracks(tracks: readonly ClipTrack[]): void;
   /** Incrementally add a single track without rebuilding the entire playout. */
   addTrack?(track: ClipTrack): void;
   /** Incrementally remove a single track without rebuilding the entire playout. */
@@ -80,7 +82,13 @@ export interface PlayoutAdapter {
  * Snapshot of playlist engine state, emitted on every state change.
  */
 export interface EngineState {
-  tracks: ClipTrack[];
+  /**
+   * The tracks, each with its current mixer values. The same array until the
+   * tracks or the mix change. It is the engine's own, shared with the undo
+   * history: never write to it or to a track or clip in it (copy first).
+   * Outside production builds it is frozen, so a write throws.
+   */
+  tracks: readonly ClipTrack[];
   /** Monotonic counter incremented on any structural tracks mutation (setTracks, addTrack, removeTrack, moveClip, trimClip, splitClip). Does NOT change on per-track mixer edits — see `mixerVersion`. */
   tracksVersion: number;
   /** Monotonic counter incremented on per-track mixer edits (setTrackVolume, setTrackMute, setTrackSolo, setTrackPan). Lets consumers refresh a cached track snapshot to keep mixer state without triggering the structural resync work (audio-graph rewire, peak regeneration) gated on `tracksVersion`. */
@@ -121,10 +129,20 @@ export interface EngineState {
  */
 export interface PlaylistEngineOptions {
   adapter?: PlayoutAdapter;
+  /**
+   * The arrangement to play, from `createArrangement()`. It outlives the
+   * engine: dispose the engine, build another on the same arrangement, and
+   * the tracks, the mix and the undo history are all still there. Left out,
+   * the engine makes an arrangement of its own. One engine at a time.
+   */
+  arrangement?: Arrangement;
   sampleRate?: number;
   samplesPerPixel?: number;
   zoomLevels?: number[];
-  /** Maximum number of undo steps (default 100). */
+  /**
+   * Maximum number of undo steps (default 100). Only when the engine makes its
+   * own arrangement; an arrangement that is passed in has its own limit.
+   */
   undoLimit?: number;
   /** Initial tempo in BPM (default 120). */
   bpm?: number;

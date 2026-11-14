@@ -7,7 +7,7 @@ import type { DawClipSplitDetail } from '../events';
 
 /** Narrow engine contract for split operations. */
 export interface SplitEngineContract {
-  getState(): { selectedTrackId: string | null; tracks: ClipTrack[] };
+  getState(): { selectedTrackId: string | null; tracks: readonly ClipTrack[] };
   splitClip(trackId: string, clipId: string, atSample: number): void;
 }
 

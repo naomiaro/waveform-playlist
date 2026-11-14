@@ -18,7 +18,10 @@ export interface ClipPeakSyncHost {
  *
  * Called from the statechange handler when tracksVersion changes.
  */
-export function syncPeaksForChangedClips(host: ClipPeakSyncHost, tracks: ClipTrack[]): void {
+export function syncPeaksForChangedClips(
+  host: ClipPeakSyncHost,
+  tracks: readonly ClipTrack[]
+): void {
   // Collect all current clip IDs for orphan detection
   const currentClipIds = new Set<string>();
 
