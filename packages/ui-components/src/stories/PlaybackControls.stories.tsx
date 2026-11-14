@@ -41,7 +41,7 @@ These components automatically connect to the playlist state and handle:
 - Disabled states based on playback status
 
 **Note:** These stories show the UI without audio - controls will be in their default states.
-In a real app, use \`useAudioTracks\` to load audio files first.
+In a real app, give the provider tracks that name their audio (\`audioTrack({ src })\` from \`@waveform-playlist/core\`); it loads them.
         `,
       },
     },

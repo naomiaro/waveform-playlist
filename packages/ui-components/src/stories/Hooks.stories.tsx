@@ -265,7 +265,7 @@ These stories demonstrate how to test and visualize custom React hooks.
 - \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
 
 ### Require Full Context (not demoed)
-- \`useAudioTracks\` - Load audio files
+- \`usePlaylistSources\` - Loading status of the audio the tracks name (the provider loads it)
 - \`useClipDragHandlers\` - Drag-to-move and boundary trimming
 - \`useClipSplitting\` - Split clips at cursor position
 - \`useAnnotationDragHandlers\` - Drag annotation boundaries (the \`WaveformAnnotationBoxes\` part calls it for you)

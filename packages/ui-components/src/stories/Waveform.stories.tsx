@@ -53,22 +53,21 @@ The Waveform component provides the main visualization and interaction surface f
 - Timescale display
 
 **Note:** These stories show the Waveform component with empty tracks.
-To display actual waveforms, use the \`useAudioTracks\` hook to load real audio files.
+To display actual waveforms, give the provider tracks that name their audio: it loads them.
 
 \`\`\`tsx
+import { useState } from 'react';
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 
 function MyPlaylist() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track1.mp3', name: 'Vocals' },
-    { src: '/audio/track2.mp3', name: 'Guitar' },
+  const [tracks, setTracks] = useState<PlaylistTrack[]>(() => [
+    audioTrack({ src: '/audio/track1.mp3', name: 'Vocals' }),
+    audioTrack({ src: '/audio/track2.mp3', name: 'Guitar' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} samplesPerPixel={1024}>
       <Waveform />
     </WaveformPlaylistProvider>
   );

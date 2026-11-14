@@ -7,7 +7,6 @@
 
 import React from 'react';
 import styled from 'styled-components';
-import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -30,11 +29,10 @@ import {
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { audioTrack, type PlaylistTrack } from '@waveform-playlist/core';
 import { useMidiTracks } from '@waveform-playlist/midi';
 import type { MidiTrackConfig } from '@waveform-playlist/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 
@@ -270,7 +268,7 @@ export function MidiExample() {
   const [baseHidden, setBaseHidden] = React.useState(false);
   const [userMidiConfigs, setUserMidiConfigs] = React.useState<MidiTrackConfig[]>([]);
   const [removedTrackIds, setRemovedTrackIds] = React.useState<Set<string>>(new Set());
-  const [userAudioTracks, setUserAudioTracks] = React.useState<ClipTrack[]>([]);
+  const [userAudioTracks, setUserAudioTracks] = React.useState<PlaylistTrack[]>([]);
   const objectUrlsRef = React.useRef<string[]>([]);
 
   const soundFontUrl = useSoundFont
@@ -325,10 +323,9 @@ export function MidiExample() {
     setUserMidiConfigs((prev) => [...prev, ...newConfigs]);
   }, []);
 
-  const addAudioFiles = React.useCallback(async (files: File[]) => {
-    const audioContext = Tone.getContext().rawContext as AudioContext;
-    const newTracks = await decodeAudioFiles(audioContext, files);
-    if (newTracks.length > 0) setUserAudioTracks((prev) => [...prev, ...newTracks]);
+  // One track per audio file; the provider loads it.
+  const addAudioFiles = React.useCallback((files: File[]) => {
+    setUserAudioTracks((prev) => [...prev, ...files.map((file) => audioTrack({ src: file }))]);
   }, []);
 
   const handleFiles = React.useCallback(
@@ -359,7 +356,7 @@ export function MidiExample() {
 
   // Mirror engine mutations back to userAudioTracks state.
   // MIDI tracks (in allTracks) are managed by useMidiTracks; only audio tracks are updated.
-  const handleTracksChange = React.useCallback((updatedTracks: ClipTrack[]) => {
+  const handleTracksChange = React.useCallback((updatedTracks: PlaylistTrack[]) => {
     const midiTrackIds = new Set(allTracks.map((t) => t.id));
     const updatedAudioTracks = updatedTracks.filter((t) => !midiTrackIds.has(t.id));
     setUserAudioTracks(updatedAudioTracks);

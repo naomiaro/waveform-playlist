@@ -456,10 +456,11 @@ test.describe('Stem Tracks Example', () => {
 });
 
 /**
- * The stem page shows placeholder tracks immediately and decodes audio in the
- * background (`useAudioTracks({ immediate: true })` + `deferEngineRebuild`).
- * Until loading finishes the provider has no mixer state for the tracks and the
- * engine does not know them, so the default track controls must be disabled.
+ * The stem page shows its tracks immediately and the provider decodes their
+ * audio in the background (loading clips in `tracks`; the first engine build
+ * waits for all of them). Until loading finishes the provider has no mixer
+ * state for the tracks and the engine does not know them, so the default
+ * track controls must be disabled.
  */
 test.describe('Stem Tracks Example — track controls while loading', () => {
   test('mute, solo, volume and pan are disabled until tracks have loaded', async ({
