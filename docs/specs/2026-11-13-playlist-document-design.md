@@ -1,15 +1,14 @@
 # The playlist document: one owner of the tracks and of everything that changes them (#812)
 
 Status: design, not built. Statements about today's code carry a file and line
-and were read (a full map of `PlaylistEngine` and its callers was made first);
-what was run says so.
+and were read (a full map of `PlaylistEngine` and its callers was made first,
+and two reviews checked earlier drafts against the code); what was run says so.
 
 This replaces "## The provider (PR 2)" of
-`2026-11-13-provider-loads-sources-design.md` and an earlier "store" draft of
-this file. From the first document these stay in force: the types
-(`LoadingClip`, `PlaylistTrack`, `AudioClip.src`), `createSourceLoader`,
-`audioTrack()`, the conversion rules of a loading clip, MIDI as an awaited
-function.
+`2026-11-13-provider-loads-sources-design.md`. From that document these stay
+in force: the types (`LoadingClip`, `PlaylistTrack`, `AudioClip.src`),
+`createSourceLoader`, `audioTrack()`, the conversion rules of a loading clip,
+MIDI as an awaited function.
 
 ## Why
 
@@ -18,9 +17,8 @@ engine, joined by a controlled `tracks` prop and an `onTracksChange` callback.
 Three faults in one day had that root: a loaded clip that stayed a loading
 clip in the app's state, a lost update (run: the Waveform Data page showed 2,
 4 and 3 rows of 4), and an undo that removed from the engine a track the app
-still held. A "store" draft then moved the seam to store-and-engine: the
-engine still kept its own tracks and undo and wrote back, and a review named
-four ways that write-back deletes things.
+still held. A "store" draft then moved the seam to store-and-engine (the
+engine kept its own tracks and undo and wrote back) and was rejected in review.
 
 ## The rule
 
@@ -33,33 +31,37 @@ changes it by asking the owner.** (Maintainer, 2026-11-13.) It goes into root
 - `PlayoutAdapter` is already a player that only receives: `setTracks`,
   `addTrack?`, `removeTrack?`, `updateTrack?`, the mixer setters, the transport
   calls (`packages/engine/src/types.ts`). It never writes tracks back.
-- `PlaylistEngine` already runs with no adapter at all
-  (`_adapter` may be null; `PlaylistEngine.ts:60`).
-- Its clip operations are pure functions (`operations/clipOperations.ts`:
-  `constrainClipDrag`, `constrainBoundaryTrim`, `splitClip`, `canSplitAt`).
+- `PlaylistEngine` already runs with no adapter (`PlaylistEngine.ts:60`), and
+  its clip operations are pure functions (`operations/clipOperations.ts`).
 
 What is wrong is who holds the tracks around it:
 
 - The React provider builds a NEW `PlaylistEngine` on every full build
-  (`WaveformPlaylistContext.tsx:904`) and feeds it from a `tracks` prop, so the
+  (`WaveformPlaylistContext.tsx:904`) and feeds it from a `tracks` prop: the
   tracks live in the app's state and in the engine, undo history is lost on
-  every rebuild, and selection, loop, zoom, master volume and the mixer are
+  every rebuild, and the mixer, selection, loop, zoom and master volume are
   carried over by hand (`:912-929`).
 - dawcore keeps descriptors, a map of engine-shaped tracks and the engine's
   own tracks, and reconciles them (`daw-editor.ts:443-444`, `:1511-1557`,
-  `:2658-2665`).
+  `:2658-2665`). Not changed here.
 
 ## Owners after this change
 
 | State | Owner | How others reach it |
 | --- | --- | --- |
-| The tracks and clips, including clips still loading | the document | `subscribe` / `getTracks`; its methods |
-| Mixer values of a track (`volume`, `muted`, `soloed`, `pan`) | the document (they are track fields) | the same |
-| Undo and redo history, an open gesture | the document | `undo`, `redo`, `beginTransaction` … |
-| Which sources are pending, loaded, failed; their buffers | the document's source loader | `document.sources` |
+| The tracks and clips, including clips still loading | the document | `subscribe` / `getTracks()`; its methods |
+| Mixer values of a track | the document, in a part of its own, by track id | `getMixer()`; the four setters |
+| Undo and redo history, an open transaction | the document | `undo`, `redo`, `beginTransaction` … |
+| Which sources are pending, loaded, failed; their buffers | the document's source loader | `document.sources`, `retry` |
+| A trim drag in progress | the provider's trim preview (view only) | the dragged clip's view |
 | Audio nodes, transport position, play state | the engine and its adapter | as today |
-| Selection, loop, zoom, selected track, master volume | the engine (as today) | as today |
-| A tempo map | the adapter (as today) | the engine hands conversions to the document |
+| Selection, loop, zoom, selected track, master volume | the engine | as today |
+| Tempo map, sample rate | the adapter / the engine | the engine converts for the document |
+| `isReady` | the provider | `usePlaylistTimeline()` |
+
+Derived, not owned (computed from an owner, cached, never written back): the
+engine's `getState().tracks`, the view's tracks with placeholders, peaks,
+`duration`, `trackStates`, what an adapter holds.
 
 ## Goals
 
@@ -68,104 +70,115 @@ What is wrong is who holds the tracks around it:
 - A clip switches from `LoadingClip` to `AudioClip` in the document the moment
   its source has loaded, for every reader at once.
 - No whole-array callback from the library into app state.
-- `PlaylistEngine`'s public API keeps working for dawcore unchanged.
+- `PlaylistEngine`'s public API keeps working for dawcore.
 - The adapters and the view's parts still see `AudioClip` only.
+- A subscriber to the document only ever sees committed states.
 
 ## Non-goals
 
 - dawcore moving onto a shared document. The maintainer's picture is that
   `<daw-editor>` shares the CODE (a shared instance "could be interesting", not
-  a target). This change keeps the document free of React and of anything
-  provider-specific so that it can; a follow-up issue is filed when the
-  interface is final and has to settle who wins between a document and
-  dawcore's declarative DOM.
+  a target). The document stays free of React and of anything
+  provider-specific; a follow-up issue is filed when the interface is final and
+  has to settle who wins between a document and dawcore's declarative DOM.
 - View state (selection, loop, zoom, selected track, master volume) leaving
-  the engine. It is still carried over by hand when React rebuilds an engine.
+  the engine.
 - Keeping the engine alive across a hidden `<Activity>` (#842). The document,
-  its loaded buffers AND its undo history do survive, which removes most of
-  what #842 lists.
-- Serializable tracks (#836), a source timeout (#840), undoable mixer moves (#843).
-- Fixing #841 (a reschedule that clicks) and #838 (splitting a MIDI clip).
+  its buffers and its undo history do survive.
+- Reworking how tick and sample positions are kept in step. Today's rule
+  stays: a clip without a `startTick` gets one when it enters an engine, and
+  `startSample` is re-derived from ticks only on `setTempo`
+  (`PlaylistEngine.ts:218, 927-943`). A first draft re-derived on every attach
+  and every undo; with the Tone adapter's 192 ppqn that would have snapped
+  every clip to a grid of about 125 samples. Known and left: an undo after a
+  tempo change restores positions from the old tempo, as on `main`.
+- Serializable tracks (#836), a source timeout (#840), mixer moves as undo
+  steps (#843), #841 (a reschedule that clicks), #838 (splitting a MIDI clip).
 
 ## Anti-goals
 
 - No controlled mode beside the document: `tracks` and `onTracksChange` leave
   `WaveformPlaylistProvider`.
-- No second stored copy of the tracks anywhere in the React packages.
+- No second stored copy of the tracks in the React packages.
 - No engine method that changes tracks without going through the document.
+- No document write during a React render.
 
 ## Approaches
 
 1. **A document that owns the tracks and every change; the engine plays it
-   (chosen by the maintainer).** All five DAWs looked at work this way: one
-   owner, every edit through it, a gesture is one undo step with begin, end
-   and abort (Ardour `HistoryOwner`, Nota's gesture rule, Zrythm's
-   preview-then-commit, openDAW's `BoxEditing.modify` / `mark` / `checkpoint`),
-   and the engine only receives (Nota's published graph, openDAW's
-   `apply_updates`).
+   (chosen by the maintainer).** The DAWs looked at work this way: one owner,
+   every edit through it, a gesture is one undo step (Ardour `HistoryOwner`,
+   Nota's gesture rule, Zrythm's preview-then-commit, openDAW's
+   `BoxEditing.modify`), and the engine only receives (Nota's published graph,
+   openDAW's `apply_updates`).
 2. **A store beside an engine that keeps its own tracks and undo.** Rejected
-   after review: the same two owners one level down.
-3. **Make `PlaylistEngine` itself the long-lived object** (it is already
-   headless-capable). Not chosen: it would also make transport and view state
-   long-lived, and it changes the lifecycle the provider's rebuild logic
-   (#675, #811) is written around. Extracting the document leaves that
-   lifecycle as it is: a new engine is built around the same document.
+   after review: two owners one level down.
+3. **Make `PlaylistEngine` itself the long-lived object.** Not chosen: it would
+   make transport and view state long-lived too and change the lifecycle the
+   provider's rebuild logic (#675, #811) is written around.
 
-## Decided by the maintainer
+## Decided by the maintainer (2026-11-13)
 
-- The document (2026-11-13), and the rule.
-- **Structure-only undo** (2026-11-13): mixer values are owned by the
-  document, they are not undo steps (as today), and an undo or redo restores
-  structure and keeps each track's current mixer values. No user-facing
-  ability is removed: mixer moves are not undoable today; what goes is the
-  side effect that a snapshot captures the mix (`PlaylistEngine.ts:852-854`),
-  so that undoing a clip edit can put old values back into the engine (audible
-  with the native transport, whose `updateTrack` applies them). Mixer moves as
-  real undo steps, one per gesture, are #843.
+- The document, and the rule.
+- **Structure-only undo.** Mixer values are not undo steps (as today), and an
+  undo or redo never changes them. No ability is removed: what goes is the side
+  effect that a snapshot captures the mix (`PlaylistEngine.ts:852-854`).
+  Mixer moves as undo steps are #843.
+- **A trim previews in the view, not in the document.** The drag updates a
+  view-only preview that the dragged clip follows; the document changes once,
+  on release.
+- **Mixer values are a part of the document of their own, by track id.** A
+  fader move replaces no track object.
+- **The armed track's mute during a take is visible:** recording mutes the
+  track through the document and restores it afterwards.
 - Carried over: a source added while the engine runs does not stop it; an
-  arriving clip is applied in place whatever its position; no source timeout;
-  a loading clip on a MIDI track is reported and never fetched; a dropped file
-  that cannot be decoded is removed by the example pages and listed; the
-  engine is disposed on every cleanup of the provider; recording does not
-  start on a track that holds a clip still loading.
+  arriving clip is applied in place whatever its position; files dropped on an
+  empty timeline play one by one; no source timeout; a loading clip on a MIDI
+  track is reported and never fetched; a dropped file that cannot be decoded is
+  removed by the example pages and listed; the engine is disposed on every
+  cleanup of the provider; recording does not start on a track that holds a
+  clip still loading.
 
 ## My calls (for the maintainer to confirm or change)
 
 1. **Arriving audio is not an undo step and never clears the history.** It is
    written into the current tracks and into every snapshot the history holds.
-   This reverses "arriving audio clears undo" from the first design and closes
-   #837, because with one owner it is the simpler behaviour to build.
-2. **A gesture is the document's transaction.** A trim changes the document on
-   every pointer move inside an open transaction; the engine does not push
-   track changes to the adapter while one is open, and pushes the net change
-   at commit. `isDraggingRef`, the drag flag and previewing through app state
-   go away. (This makes the earlier `isDraggingRef` choice moot: the ref is
-   removed from `useEngineRefs()`.)
-3. **The engine is built at once; "ready" waits for the first sources.** There
-   is no first-load wait in front of the engine build any more. `isReady`,
-   `waveform-playlist:ready` and `onReady` happen when the engine exists AND
-   every source named at that moment has settled; Play does nothing before.
-   What a user sees is what was decided (one "ready", rows shown while
-   loading); what changes is that clips reach the adapter as they load.
-4. **Track changes never rebuild the engine.** Adding, removing and updating a
-   track are adapter calls, as dawcore already makes them. A full rebuild is
-   left for what it is needed for: a new adapter (effects, sample rate,
-   `createAdapter`).
-5. **Loading clips cannot be edited** (moved, trimmed, split) until they have
-   loaded; the operations refuse them as they refuse an unknown clip.
-6. **Names:** `PlaylistDocument`, `createPlaylistDocument`, the provider prop
-   `playlist`, `useCreatePlaylist(init)` to make one for a component and
-   `usePlaylist()` to read the provider's.
-7. The document lives in `@waveform-playlist/engine` (the operations are
-   there, and dawcore already depends on it). `LoadSource`,
+   This reverses "arriving audio clears undo" from the first design and is why
+   #837 was folded into #812.
+2. **`useEngineRefs().isDraggingRef` is removed** (the earlier choice to keep
+   it with a setter is moot: a trim no longer holds back the engine).
+3. **"Ready" waits for the first sources, once.** The engine is built as soon
+   as the provider mounts. `isReady`, `waveform-playlist:ready` and `onReady`
+   happen the first time an engine is attached AND every source named at that
+   moment has settled; Play does nothing before. Later engine rebuilds are
+   ready when the engine is attached, whatever is still loading.
+4. **Track changes never rebuild the engine.**
+5. **Loading clips cannot be moved, trimmed or split** until they have loaded.
+6. **A clip that cannot be made from its audio** (its `offset` is past the end
+   of the decoded file, its `duration` is not usable) **stays a loading clip
+   and its source is shown as failed** with a message. The document deletes
+   nothing the app put in it.
+7. **Names:** `PlaylistDocument`, `createPlaylistDocument`, the provider prop
+   `playlist`, `useCreatePlaylist(init, options?)` to make one for a
+   component, `usePlaylist()` to read the provider's.
+8. The document lives in `@waveform-playlist/engine`. `LoadSource`,
    `defaultLoadSource` and the sources value type move there from browser.
+   `packages/recording` gains engine as a dependency.
 
 ## The document (`@waveform-playlist/engine`)
 
 ```ts
+export interface TrackMixerValues {
+  volume: number;
+  muted: boolean;
+  soloed: boolean;
+  pan: number;
+}
+
 export interface PlaylistDocument {
   // read
-  getTracks(): readonly PlaylistTrack[]; // same array until something changes
+  getTracks(): readonly PlaylistTrack[]; // structure; same array until it changes
+  getMixer(): ReadonlyMap<string, TrackMixerValues>; // same Map until a value changes
   subscribe(listener: () => void): () => void;
   readonly tracksVersion: number; // structural changes
   readonly mixerVersion: number; // mixer changes
@@ -218,79 +231,98 @@ export function createPlaylistDocument(options?: {
 }): PlaylistDocument;
 ```
 
-Rules (each gets a test; where a rule is today's engine behaviour the existing
-engine test moves with it):
+Rules (each gets a test; where a rule is today's engine behaviour, the engine
+test that pins it moves with it):
 
-- **Immutable.** Every change replaces the tracks array and only the track and
-  clip objects that changed. The mixer setters replace the track object (today
-  they write in place, `PlaylistEngine.ts:761-785`). A snapshot is therefore a
-  reference to an earlier array, not a copy.
-- **Synchronous.** After any method returns, `getTracks()` is the new state
-  and subscribers have been told once.
-- **Validation first.** `assertTrackKind`, unique track ids and unique clip ids
-  within a track are checked before anything changes; a failed check throws
-  and leaves tracks, history and subscribers untouched (the #756 rule).
-  `updateTrack` with an unknown id does nothing (today it pushes an undo step
-  and calls the adapter; `PlaylistEngine.ts:282-304`).
+- **Immutable.** A change replaces the tracks array and only the track and
+  clip objects that changed. A snapshot is a reference to an earlier array.
+- **Synchronous.** When a method returns, `getTracks()` / `getMixer()` are the
+  new state and subscribers have been told once, in the order the changes were
+  made (a listener that writes gets its own change delivered after the one it
+  is handling).
+- **Validation first.** `assertTrackKind`, unique track ids, and unique clip
+  ids within a track are checked before anything changes; a failed check
+  throws and leaves everything as it was (the #756 rule). `updateTrack` with
+  an unknown id does nothing (today it pushes an undo step and calls the
+  adapter; `PlaylistEngine.ts:282-304`).
 - **History.** `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`,
-  `moveClip`, `trimClip`, `splitClip` are undo steps unless `undoable: false`
-  or a transaction is open. Inside a transaction no step is pushed; `commit`
-  pushes one step for the whole gesture if anything changed, `abort` restores
-  the state from before it. `undo` / `redo` with a transaction open abort it
-  first (today they ignore it). `setTracks` clears the history and aborts an
-  open transaction. Every history change notifies subscribers, so `canUndo` /
+  `moveClip`, `trimClip`, `splitClip` are undo steps unless `undoable: false`.
+  `setTracks` clears the history. Transactions keep today's contract: inside
+  one, changes push no step; `commit` pushes one step if anything changed;
+  `abort` restores the state from before it; other changes made while one is
+  open join it, as today. (In React nothing opens a transaction for a trim any
+  more; dawcore's drags do.) New: `undo` / `redo` with a transaction open
+  abort it first; every history change notifies subscribers, so `canUndo` /
   `canRedo` are never stale (today `commitTransaction` and `clearHistory` emit
   nothing; `PlaylistEngine.ts:121-155`).
-- **Undo restores structure, not the mix.** A restored track takes the
-  `volume`, `muted`, `soloed` and `pan` of the current track with its id.
-- **A listener that writes** during a notification is allowed; every listener
-  is called after each change with the latest state readable through
-  `getTracks()`.
+- **Clip order inside a track is the document's.** Readers address clips by
+  id, never by index.
 
-### The time base
+### The mixer part
 
-Clip positions carry `startTick` (authoritative) and `startSample` (derived),
-and converting needs the sample rate and the tempo map, which belong to the
-engine and its adapter. The document holds a time base it is GIVEN:
-
-```ts
-// engine-internal, not part of the public interface
-setTimeBase(document, { sampleRate, secondsToTicks, ticksToSeconds }): void;
-```
-
-- Before an engine attaches: the engine's own defaults (48000 Hz, 120 bpm,
-  960 ppqn; `PlaylistEngine.ts:58, 90-92`).
-- When it is set or changes (an engine attaches, `setTempo`): clips without a
-  `startTick` get one, and clips with one get their `startSample` re-derived.
-  Not an undo step. The same re-derivation runs on every restored snapshot, so
-  an undo after a tempo change no longer brings back positions from the old
-  tempo (today it does; `PlaylistEngine.ts:927-943` against `:868-884`).
-- `minDuration` for a trim or split is `floor(0.1 * sampleRate)` of the time
-  base, as today (`:373`).
+- The mixer values of a track live in `getMixer()`, keyed by track id. A track
+  that enters (`setTracks`, `addTrack`) seeds its entry from its own `volume`,
+  `muted`, `soloed`, `pan` fields unless the document already holds an entry
+  for that id. The fields on a track object in `getTracks()` are the values it
+  ENTERED with; the current values are in the mixer part. The docs say so, as
+  they say today that those fields are starting values.
+- A setter replaces the Map and that track's entry, bumps `mixerVersion`,
+  notifies, and replaces no track object. A setter for an id the document does
+  not hold does nothing.
+- `updateTrack` does not change mixer values: the mixer fields of the track it
+  is given are ignored once an entry exists.
+- **Undo restores structure.** The mixer part is not in a snapshot. The entry
+  of a removed track is kept while any snapshot of the history still holds
+  that track, so undoing a removal brings the track back with the mix it had.
+- `getTracksWithMixer()` is NOT part of the interface. An app that saves a
+  session reads both parts.
 
 ### Loading and the switch
 
-- The document owns one `createSourceLoader`. After every change of the tracks
-  it declares the sources they name (`provide` for a clip that carries `src`
-  and `audioBuffer`, then `setWanted`), skipping loading clips on MIDI tracks
-  (reported once through `sources`).
+- The document owns one `createSourceLoader`. The wanted sources are those
+  named by the current tracks, by every snapshot of the undo and redo stacks
+  and by an open transaction's snapshot, so an undo never starts a fetch for a
+  source the history still names and a failed source stays failed until
+  `retry`. Loading clips on MIDI tracks are skipped and reported once through
+  `sources`. A clip that carries `src` and `audioBuffer` is given to the
+  loader (`provide`). The wanted set is re-declared only when it changed.
 - When a source becomes `loaded`, the document replaces every `LoadingClip`
-  naming it with its `AudioClip`: in the current tracks, in every snapshot of
-  the undo and redo stacks, and in the snapshot of an open transaction. The
-  conversion is the first design's (seconds to integer samples at the BUFFER's
-  rate, same id; a duration past the end cut with a warning; an unusable clip
-  left out with a warning). One notification. No undo step.
-- A failed source changes no track; `sources` shows it; `retry` restarts it.
+  object naming it with its `AudioClip`, in the current tracks and in every
+  snapshot it holds, per loading-clip object (the same clip id can be a
+  different object in different snapshots) and memoized per track object, so
+  snapshots keep sharing the tracks they shared. The conversion is the first
+  design's (seconds to integer samples at the BUFFER's rate, same id; a
+  duration past the end cut with a warning). One notification. No undo step.
+- A clip that cannot be made (call 6) stays a loading clip; `sources` shows
+  that source as failed with the reason.
+- A failed source changes no track; `retry` restarts it.
 - A clip added for a source that is already loaded is resolved in the same
   call.
-- Because snapshots are patched, no undo, redo or abort can bring back a
-  loading clip for audio the document holds, or drop a clip because its audio
-  arrived (the three history cases the review named).
-- The decode context: `attachDecodeContext(document, getContext)` (internal),
-  called by the engine when it has an adapter; detaching (engine disposed)
-  suspends loads in flight and keeps what has loaded. While none is attached
-  the document does not call `setWanted`, so nothing is fetched; `sources`
-  shows the named sources as pending.
+- `document.sources` covers every wanted source, including ones not yet given
+  to the loader (shown as pending).
+
+### Attaching (internal, safe across two copies of the package)
+
+Two things reach the document from outside: a decode context and a time base.
+They are methods on the document object under versioned `Symbol.for` keys
+(the #679 lesson: browser pins engine exactly, so an app can hold two copies,
+and a module-private function of one copy does not know the other's object).
+
+- **Decode context:** `attach(getContext: () => Promise<BaseAudioContext>)`
+  returns a detach function. While none is attached nothing is fetched.
+  Detaching suspends loads in flight and keeps what has loaded; the next attach
+  starts them again. WHO attaches: the owner of the engine's lifetime. The
+  React provider does it in a mount-only effect, with a getter that resolves
+  to its current adapter's context, so loads continue across an engine
+  rebuild. A standalone `PlaylistEngine` given a document attaches in its
+  constructor and detaches in `dispose()` unless told that someone else does.
+- **Time base:** the engine gives the document `sampleRate` and the two tick
+  conversions when it attaches. The document uses them exactly where the
+  engine does today: a clip without `startTick` gets one on entry;
+  `minDuration` for a trim or split; `recomputeStartSamples()` when the engine
+  handles `setTempo`. Without an engine attached, entries are not given ticks
+  (they get them at attach) and `minDuration` uses each clip's own
+  `sampleRate`.
 
 ## `PlaylistEngine` on a document
 
@@ -299,32 +331,34 @@ new PlaylistEngine({ adapter, document?, … })
 ```
 
 - Without `document` the engine creates its own. dawcore, the examples and
-  every existing caller are unchanged.
-- `_tracks`, `_undoStack`, `_redoStack`, the transaction fields,
-  `_tracksVersion` and `_mixerVersion` leave the engine. Its track, clip,
-  mixer, undo and transaction methods delegate to the document and keep their
-  signatures and return values (`moveClip`'s and `trimClip`'s `skipAdapter`
-  argument stays for dawcore).
-- **Document to adapter.** The engine subscribes to the document. Each change
-  carries what it was (`set`, `add`, `remove`, `update`, `reorder`, `restore`,
-  `mixer`, with the track ids), and the engine makes the adapter call it makes
-  today for that operation, in the same order relative to `statechange`
-  (`add` → `adapter.addTrack?` else `setTracks`; `update` → `updateTrack?`;
-  `reorder` → nothing; `restore` → `updateTrack` for the tracks that differ,
-  now really only those, since snapshots share unchanged track objects).
-  The adapter is given `AudioClip`s only: a track's loading clips are left out.
-- **While a transaction is open** the engine makes no track call on the
-  adapter. At commit it calls `updateTrack` once for each track the gesture
-  changed; at abort it calls nothing. (`skipAdapter` during a move plus
-  `updateTrack(id)` on drop is what dawcore does by hand today;
-  `clip-pointer-handler.ts:263, 358`.)
-- **`getState().tracks`** is the document's tracks without loading clips, the
-  same array until something changes (today every `statechange`, including a
-  selection or zoom change, copies every track; `PlaylistEngine.ts:179`).
-  `statechange` is emitted when the document changes, as now.
-- The engine sets the document's time base and decode context when it is
-  constructed, and detaches both in `dispose()`. `removeTrack` clearing the
-  selected track (`:251-253`) becomes the engine reacting to the change.
+  every existing caller are unchanged in what they call.
+- `_tracks`, the undo stacks, the transaction fields and the two version
+  counters leave the engine. Its track, clip, mixer, undo and transaction
+  methods delegate and keep their signatures and return values, including
+  `skipAdapter` on `moveClip` / `trimClip` (the engine does not forward that
+  one change to the adapter) and `updateTrack(id)` with no track (forwards the
+  current track to the adapter, as today). The mixer setters keep forwarding
+  to the adapter for an id the document does not hold, as dawcore relies on.
+- **On construction** the engine gives the document its time base and, when
+  the document already holds tracks, calls `adapter.setTracks` with them.
+- **Document to adapter.** The engine subscribes. Each change carries what it
+  was (`set`, `add`, `remove`, `update`, `reorder`, `restore`, `mixer`, with
+  the track ids), and the engine makes the adapter call it makes today for
+  that operation, in the same order relative to `statechange`: `add` →
+  `addTrack?` else `setTracks`; `remove` → `removeTrack?` else `setTracks`;
+  `update` → `updateTrack?` else `setTracks`; `reorder` → nothing; `restore` →
+  `updateTrack` for each track that differs when the set of tracks is the
+  same, `setTracks` when it changed (as `_restoreTracks` does, `:868-884`,
+  except that unchanged tracks are now really skipped); a switch →
+  `updateTrack` for each track that gained a clip. What the adapter is given
+  is the track without its loading clips and WITH its current mixer values
+  merged in.
+- **`getState()`** returns `tracks` as that same projection, cached by
+  `tracksVersion` and `mixerVersion` (today every `statechange`, including a
+  selection or zoom change, copies every track; `:179`). `statechange` is
+  emitted for every document change, including history changes.
+- `removeTrack` clearing the selected track (`:251-253`) becomes the engine
+  reacting to the change.
 - One engine per document at a time; a second one attaching warns.
 
 ## The provider (`@waveform-playlist/browser`)
@@ -334,61 +368,70 @@ const playlist = useCreatePlaylist(() => [audioTrack({ src: 'a.mp3', name: 'A' }
 <WaveformPlaylistProvider playlist={playlist}>…</WaveformPlaylistProvider>
 ```
 
-- Props removed: `tracks`, `onTracksChange`, `loadSource` (an option of
-  `createPlaylistDocument`). Prop added: `playlist` (required).
+- Props removed: `tracks`, `onTracksChange`, `loadSource`. Prop added:
+  `playlist` (required). A new `playlist` object is a new mount of everything
+  below; a development warning says so.
 - The loading effect loses everything about tracks: the comparison with the
   previous tracks, `incrementalTrackChange`, the "came from the engine" guard,
   the seed, the merge, the echo suppression, the first-load wait, the early
-  adapter. It builds an adapter and an engine around `playlist` when the
-  provider mounts and when something that needs a new adapter changes, and
-  disposes them in its cleanup. The #675 rules (no disposed engine reachable,
-  a queued play starts on the new engine) stay as they are.
-- **Ready** (call 3): `isReady` is true when an engine is attached and no
-  source the document names is pending. It turns true once per engine build;
-  sources named later do not turn it false.
-- The view derives from `playlist` through `useSyncExternalStore`: the tracks
-  without loading clips plus a placeholder for each loading clip that has a
+  adapter. It resolves an adapter and builds an engine around `playlist` when
+  the provider mounts and when something that needs a new adapter changes, and
+  disposes them in its cleanup. The #675 rules stay: no disposed engine is
+  reachable, and a play asked for while a rebuild is in flight starts on the
+  new engine (`pendingResumeRef`, `engineEpoch`); the new engine already holds
+  the tracks when it is assigned.
+- **Ready** (call 3). A flag, set once per provider mount, when an engine is
+  attached and no wanted source is pending. Before it: `isReady` false, Play
+  does nothing. After it: `isReady` follows "an engine is attached".
+- **The decode context** is attached in a mount-only effect (see "Attaching").
+- **The view** derives from `playlist` with `useSyncExternalStore`: the tracks
+  without loading clips, plus a placeholder for each loading clip that has a
   `duration` or `waveformData` (the placeholder derivation and
-  `ClipPeaks.isPlaceholder` of the first build stay). `usePlaylistTimeline()`
-  keeps `tracks`, `peaksDataArray`, `duration`, `isReady`; `onTracksChange`
-  leaves it.
-- The mixer: `usePlaylistMixer().trackStates` is derived from the document's
-  tracks (a selector on `mixerVersion`); the provider's own map by id and the
-  seeding of tracks with it go. The four setters call the document.
-- `useUndoRedo()` reads the document; undo history survives an engine rebuild
-  and a hidden `<Activity>`.
-- `usePlaylistSources()` keeps its value; it reads `playlist.sources`.
-- Hooks: `useCreatePlaylist(init?)` (one document for the component's life),
-  `usePlaylist()` (the provider's document; throws outside one),
-  `usePlaylistTracks(playlist?)` (its tracks, by subscription).
+  `ClipPeaks.isPlaceholder` of the first build stay). A mixer change does not
+  change this value. `usePlaylistTimeline()` keeps `tracks`, `peaksDataArray`,
+  `duration`, `isReady`; `onTracksChange` leaves it.
+- **The mixer:** `usePlaylistMixer().trackStates` is derived from
+  `playlist.getMixer()` and the track names; the provider's own map by id and
+  the seeding of tracks with it go. The setters call the document. What
+  renders on a fader step is what renders today
+  (`contextSplitByChangeRate.test.tsx` stays the contract).
+- `useUndoRedo()` reads the document. `usePlaylistSources()` reads
+  `playlist.sources`.
+- Hooks: `useCreatePlaylist(init?, { loadSource?, undoLimit? })` (one document
+  for the component's life; most apps never import the engine package),
+  `usePlaylist()` (the provider's document; throws outside a provider),
+  `usePlaylistTracks(playlist?)`.
 
 ### Drags, split, shortcuts
 
-- `useClipDragHandlers` takes the document (from the provider) and loses its
-  `tracks`, `onTracksChange` and `isDraggingRef` options.
-  - Trim: `beginTransaction` at the start; `trimClip` with the pointer's delta
-    on every move (each move is computed from the bounds captured at the
-    start, as today); `commitTransaction` on release; `abortTransaction` on
-    cancel.
-  - Move: unchanged in shape (`beginTransaction`, one `moveClip` on drop,
-    commit or abort).
-- `useClipSplitting` and the keyboard shortcuts call the document.
-- Reordering tracks calls `reorderTrack` as now.
+- **Trim.** The provider holds a trim preview, a `ValueSource` of
+  `{ trackId, clipId, startSample, durationSamples, offsetSamples } | null`
+  (the `annotationPreview` pattern). `useClipDragHandlers` computes each move
+  from the bounds captured at the start, snapped and constrained as today
+  (`calculateBoundaryTrim`, `document.constrainTrimDelta`), and publishes it;
+  only the dragged clip's view follows the preview. Release: one
+  `document.trimClip` with the final delta, and the preview is cleared in the
+  same flush. Cancel: the preview is cleared. No transaction, no
+  `isDraggingRef`.
+- **Move.** One `document.moveClip` on drop, as today, without the
+  transaction around it.
+- `useClipDragHandlers` takes the document from the provider and loses its
+  `tracks`, `onTracksChange`, `engineRef` and `isDraggingRef` options.
+- `useClipSplitting` and the keyboard shortcuts call the document and address
+  clips by id (`splitClipAt(trackIndex, clipIndex, …)` becomes ids).
+- All of them work while no engine is attached (during a rebuild).
 
 ### Recording
 
-`useIntegratedRecording(playlist, …)` takes the document (the recording package
-depends on engine through core types only; the plan confirms the dependency it
-needs and that it stays free of browser). It adds its take with
-`updateTrack(id, (track) => …)`. Because a loaded clip is an `AudioClip` in the
-document, punch-in carves it. `startRecording` refuses, through the hook's
-error state, when the armed track holds a `LoadingClip`, and says whether it
-is still loading or failed.
+`useIntegratedRecording(playlist, …)` takes the document and adds its take with
+`updateTrack(id, (track) => …)`, which makes a take an undo step. A loaded clip
+is an `AudioClip` in the document, so punch-in carves it. `startRecording`
+refuses, through the hook's error state, when the armed track holds a
+`LoadingClip`, and says whether it is still loading or failed.
 
-The arm mute during a take is not a document change (it would be saved and
-undone as the user's own mute): it is a playout override on the engine. The
-plan names the method; today it is `engine.setTrackMute` with a restore
-(`WaveformPlaylistContext.tsx:389-395`).
+The arm mute is `document.setTrackMute(id, true)` when a take starts and a
+restore of the earlier value when it ends, so the track shows as muted during
+the take. A user's own mute change during the take is what is kept at the end.
 
 ## What an app writes
 
@@ -406,7 +449,7 @@ const playlist = useCreatePlaylist(() => configs.map(audioTrack));
 playlist.addTrack(audioTrack({ src: file })); // a dropped file
 playlist.removeTrack(id, { undoable: false }); // a file that failed to decode
 const tracks = usePlaylistTracks(playlist); // read, anywhere
-const stop = playlist.subscribe(() => save(playlist.getTracks())); // outside React
+const stop = playlist.subscribe(() => save(playlist.getTracks(), playlist.getMixer()));
 ```
 
 ## Behaviour a consumer will notice (for the upgrade guide)
@@ -416,19 +459,25 @@ const stop = playlist.subscribe(() => save(playlist.getTracks())); // outside Re
 | `tracks` / `onTracksChange` props | `playlist` prop; edits need no wiring |
 | `useAudioTracks`, `useDynamicTracks`, `deferEngineRebuild` | `audioTrack()` in the document |
 | A page without `onTracksChange` reverts every edit and warns | edits stay |
-| Removing a track, or replacing tracks, rebuilds the engine | an adapter call; playback of the other tracks goes on |
+| Removing a track, or replacing tracks, rebuilds the engine | an adapter call; the other tracks keep playing |
 | Undo history is lost on every engine rebuild, and when a dropped file finishes loading | it is kept |
-| Undo can put old volume, pan and mute values back | undo never changes the mix |
-| A selection or zoom change hands `statechange` listeners freshly copied tracks | the same array until tracks change |
-| `useClipDragHandlers({ tracks, onTracksChange, isDraggingRef, … })` | takes the document |
+| Undoing a clip edit can put old volume, pan and mute values back | undo never changes the mix |
+| A recorded take rebuilds nothing but is not an undo step of its own | a take is an undo step |
+| The armed track is muted during a take without the mixer showing it | the mute button shows it |
+| A track's `volume` / `muted` / `soloed` / `pan` fields are starting values; the current ones are in `usePlaylistMixer()` | the same, and `playlist.getMixer()` outside React |
+| Edits and undo do nothing while the engine is being rebuilt | they work |
+| `useClipDragHandlers({ tracks, onTracksChange, engineRef, isDraggingRef, … })` | takes the document |
 | `useEngineRefs().isDraggingRef` | removed |
 | `useIntegratedRecording(tracks, setTracks, …)` | takes the document; refuses over a clip still loading |
+| `splitClipAt(trackIndex, clipIndex, time)` | by track id and clip id |
+| `statechange` hands listeners freshly copied tracks on every event | the same array until tracks or mix change |
 | `engine.updateTrack(id, track)` with an unknown id pushes an undo step | does nothing |
-| `engine.undo()` during a drag ignores the drag | aborts it first |
+| `engine.undo()` during a transaction ignores it | aborts it first |
+| `commitTransaction` and `clearHistory` emit no `statechange` | they do |
 
 ## What happens to the first build of PR 2
 
-Branch `feat/812-2-provider-resolution` (not pushed).
+Branch `feat/812-2-provider-resolution` (not pushed as a PR).
 
 | Piece | Fate |
 | --- | --- |
@@ -436,61 +485,67 @@ Branch `feat/812-2-provider-resolution` (not pushed).
 | `defaultLoadSource`, `LoadSource`, the sources value type | move to the engine package |
 | the loading-clip conversion, warn-once, validation (`resolveTracks.ts`) | the conversion moves into the document; the placeholder derivation stays in browser |
 | `incrementalTrackChange`, `mergeLoadingClips`, `unappliedClips`, `useMergedTracksChange`, `useSourceLoading`, `useEarlyAdapter`, `useDragFlag`, the echo suppression | go |
-| `useDisposeEngineOnUnmount`, the duplicate-id warning (moves to the document), `useReportRejectedClips` | kept |
+| `useDisposeEngineOnUnmount`, the duplicate-id warning (becomes the document's validation), `useReportRejectedClips` | kept |
 | `usePlaylistSources()` and its context | kept, fed by the document |
-| placeholders not editable (`ClipPeaks.isPlaceholder`, `Clip`'s prop, export, controls) | kept; split's skip moves into the document's call 5 |
+| placeholders not editable (`ClipPeaks.isPlaceholder`, `Clip`'s prop, export, controls) | kept; split's skip becomes the document's refusal (call 5) |
 | removal of the two hooks; the converted pages, stories, starter | kept; each page swaps `useState` and two props for a document |
-| recording's index rule for loading clips | goes (a take is added through the document) |
-| the provider tests | the first-load, arrival, failure, retry, unmount, StrictMode and `<Activity>` cases are re-expressed over a document; the guard, seed and merge cases go |
+| recording's index rule for loading clips | goes |
+| the provider tests | the load, arrival, failure, retry, unmount, StrictMode and `<Activity>` cases are re-expressed over a document; the guard, seed and merge cases go |
 
 ## PRs
 
-1. #839 as it is.
-2. **engine: extract the document, no behaviour change.** `PlaylistEngine`
-   delegates to an internal `PlaylistDocument`; the engine's 232 tests, and
-   the browser and dawcore suites, pass unchanged, and a new test file drives
-   the document alone. The only code moved is bookkeeping; the rules above
-   that CHANGE behaviour are not in this PR.
-3. **engine: the document's own rules.** Immutable mixer writes, undo keeps
-   the mix, history notifications, the unknown-id and transaction fixes, the
-   time base, transaction-deferred adapter sync, loading and the switch with
-   history patching, `document` as an engine option. Each behaviour change is
-   listed with the dawcore path it touches, and dawcore's e2e runs.
-4. **browser, recording, examples, docs:** the provider on the document.
-5. midi.
+1. #839 as it is (core loader, types, `audioTrack`).
+2. **engine: extract the document, code motion only.** `PlaylistEngine`
+   delegates to an internal document that still copies snapshots and still
+   writes mixer values in place; every engine, browser and dawcore test passes
+   unchanged. It adds the tests nobody has today: the adapter calls of `undo`,
+   `redo`, `abortTransaction` and `_restoreTracks`.
+3. **engine: the document's rules, part a.** Immutability, snapshots by
+   reference, the mixer part and structure-only undo, history notifications,
+   the unknown-id and undo-in-transaction fixes, the cached `getState`,
+   `document` as an engine option with the initial sync. Each behaviour change
+   is listed with the dawcore path it touches; dawcore's unit suite and e2e
+   run.
+4. **engine: part b.** The loader, the switch, history patching, attaching.
+5. **browser, recording, examples, docs:** the provider on the document; the
+   removals; the trim preview; the upgrade guide; the rule in `CLAUDE.md`.
+6. midi: `loadMidiTracks`; `useMidiTracks` removed; the sweep.
 
 ## Tests that must exist
 
-- Document alone: every rule above; the three history cases (an arrival, then
-  abort; an arrival, then undo; a track added with a pending clip, undo, redo,
-  then the arrival); two appends from two promise callbacks both land; nothing
+- Document alone: every rule above; an arrival then an abort, an arrival then
+  an undo, and a track added with a pending clip then undo, redo and the
+  arrival, each ending with the clip present and loaded; undo of a removal
+  brings back the track's mix; a fader move changes no track object; nothing
   fetched before a decode context is attached; a re-attach restarts suspended
-  loads and keeps buffers.
+  loads and keeps buffers; a document from a second copy of the module can be
+  attached.
 - Engine on a document: the adapter receives exactly today's calls for each
-  operation (pin them first: no engine test covers the adapter calls of undo
-  and redo today); no track call while a transaction is open; one
-  `updateTrack` per changed track at commit; a second engine built on the same
-  document after the first is disposed plays the same tracks with the history
-  intact.
-- Provider: one "ready" per build after the first sources settle; a file
-  dropped while playing; a source that settles during a trim gesture, then
-  release, then cancel; removal of a track during playback does not rebuild;
-  unmount on every path; StrictMode; a hidden `<Activity>` keeps the history.
+  operation (pinned in PR 2); dawcore's move drag (`skipAdapter` moves, then
+  `updateTrack(id)`) makes the adapter calls it makes today; a second engine
+  built on the same document after the first is disposed plays the same
+  tracks with the history and the mix intact.
+- Provider: one "ready" per mount after the first sources settle, and a
+  rebuild after it that does not wait for a pending drop; a file dropped while
+  playing; a source that settles during a trim drag, then release, then
+  cancel; removal of a track during playback does not rebuild; a fader step
+  renders what it renders today; a trim move renders only the dragged clip's
+  view and notifies no document subscriber; unmount on every path; StrictMode;
+  a hidden `<Activity>` keeps the history.
 - e2e: Waveform Data with every peaks file delayed shows 4 rows of 4; a drop
   while playing; recording refused over a loading clip; punch-in over a clip
   that loaded and was never edited carves it; undo after an arrival keeps the
-  arrived clip.
+  arrived clip; Escape during a trim leaves the clip where it was.
 
 ## Left to the builder
 
 - The document's internals and the shape of a change description.
 - How the engine keeps `statechange` ordering identical in PR 2.
-- The placeholder derivation's cache.
-- The test harness.
+- The placeholder derivation's cache; the test harness.
 
 ## Open, for the maintainer
 
-- "My calls" 1 to 7.
+- "My calls" 1 to 8.
 - Whether one document may be attached to two engines at once (a React
   provider and a `<daw-editor>` on one page). Not built here; nothing in the
   interface assumes one attacher beyond the warning.
