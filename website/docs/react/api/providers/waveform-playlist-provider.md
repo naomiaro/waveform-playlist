@@ -209,7 +209,7 @@ By default playback **auto-stops** at the end of the timeline and the cursor ret
 
 When `true`, the provider skips rebuilding the audio engine when `tracks` change. Set this to the `loading` value from `useAudioTracks` when using `{ immediate: true }` mode — placeholder tracks render instantly while audio decodes, then the engine builds once when all tracks are ready.
 
-Turning it on after the playlist has loaded (a new set of files) disposes the engine. Until the deferral ends and the engine is built again, `isReady` is `false` and the view is `data-playlist-state="loading"`, as on the first load.
+Turning it on after the playlist has loaded disposes the engine when the last `tracks` change rebuilt it (the first load, or a set of tracks that replaced the previous one). Until the deferral ends and the engine is built again, `isReady` is `false` and the view is `data-playlist-state="loading"`, as on the first load. Tracks appended while it is on are added to the running engine, and the view stays ready.
 
 ```tsx
 const { tracks, loading } = useAudioTracks(configs, { immediate: true });
