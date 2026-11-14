@@ -140,4 +140,104 @@ describe('incrementalTrackChange', () => {
       filled: [filledTrack],
     });
   });
+
+  // A clip whose source finished loading arrives on a track that already has
+  // clips: the previous clips are still there, the same objects, in order.
+  describe('a track that gained a clip', () => {
+    const a = clip('a');
+    const b = clip('b');
+    const x = clip('x');
+
+    it('detects a clip appended after the existing one', () => {
+      const prev = makeTrack('1', [a]);
+      const next = { ...prev, clips: [a, x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toEqual({ added: [], filled: [next] });
+    });
+
+    it('detects a new clip before or between the existing ones', () => {
+      const prev = makeTrack('1', [a, b]);
+      const between = { ...prev, clips: [a, x, b] } as ClipTrack;
+      const before = { ...prev, clips: [x, a, b] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [between])?.filled).toEqual([between]);
+      expect(incrementalTrackChange([prev], [before])?.filled).toEqual([before]);
+    });
+
+    it('returns null when the previous clip was replaced by another object with its id', () => {
+      const prev = makeTrack('1', [a]);
+      const next = { ...prev, clips: [{ ...a }, x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toBeNull();
+    });
+
+    it('returns null when a previous clip is gone', () => {
+      const prev = makeTrack('1', [a]);
+      const next = { ...prev, clips: [x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toBeNull();
+    });
+
+    it('returns null when the previous clips changed order', () => {
+      const prev = makeTrack('1', [a, b]);
+      const next = { ...prev, clips: [b, a, x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toBeNull();
+    });
+
+    it('returns null for a new track object with the same clips (nothing gained)', () => {
+      const prev = makeTrack('1', [a]);
+      const next = { ...prev, clips: [a] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toBeNull();
+    });
+
+    it('returns null when anything but the clips differs', () => {
+      const prev = makeTrack('1', [a]);
+      const clips = [a, x];
+
+      for (const change of [
+        { name: 'Renamed' },
+        { muted: true },
+        { volume: 0.5 },
+        { color: 'red' },
+      ]) {
+        const next = { ...prev, ...change, clips } as ClipTrack;
+        expect(incrementalTrackChange([prev], [next])).toBeNull();
+      }
+    });
+
+    it('returns null when a field present before is gone', () => {
+      const prev = { ...makeTrack('1', [a]), color: 'red' } as ClipTrack;
+      const { color: _color, ...rest } = prev as ClipTrack & { color: string };
+      const next = { ...rest, clips: [a, x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev], [next])).toBeNull();
+    });
+
+    it('keeps the rules: a gained clip and an unrelated rebuild is still a rebuild', () => {
+      const prev1 = makeTrack('1', [a]);
+      const prev2 = makeTrack('2', [b]);
+      const next1 = { ...prev1, clips: [a, x] } as ClipTrack;
+
+      expect(incrementalTrackChange([prev1, prev2], [next1, { ...prev2 }])).toBeNull();
+      expect(incrementalTrackChange([prev1, prev2], [prev2, next1])).toBeNull();
+    });
+
+    it('handles a track filled the old way, one the new way and one added', () => {
+      const placeholder = makeTrack('1');
+      const filledOld = { ...placeholder, clips: [clip('p')] } as ClipTrack;
+      const prev2 = makeTrack('2', [a]);
+      const filledNew = { ...prev2, clips: [a, x] } as ClipTrack;
+      const unchanged = makeTrack('3', [b]);
+      const added = makeTrack('4');
+
+      expect(
+        incrementalTrackChange(
+          [placeholder, prev2, unchanged],
+          [filledOld, filledNew, unchanged, added]
+        )
+      ).toEqual({ added: [added], filled: [filledOld, filledNew] });
+    });
+  });
 });
