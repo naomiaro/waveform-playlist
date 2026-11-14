@@ -375,6 +375,26 @@ describe('changes delivered later than they were made', () => {
   });
 });
 
+describe('a clip edit whose tempo map throws', () => {
+  it('changes nothing and leaves no undo step', () => {
+    const adapter = recordingAdapter();
+    let fail = false;
+    adapter.secondsToTicks = (seconds: number) => {
+      if (fail) throw new Error('tempo map broke');
+      return Math.round(seconds * 1920);
+    };
+    const engine = new PlaylistEngine({ adapter, sampleRate: SAMPLE_RATE });
+    engine.setTracks(fixture());
+    const tracks = engine.getState().tracks;
+    fail = true;
+    expect(() => engine.moveClip('A', 'a1', 1000)).toThrow('tempo map broke');
+    expect(() => engine.trimClip('A', 'a2', 'left', 1000)).toThrow('tempo map broke');
+    expect(() => engine.splitClip('A', 'a1', 24000)).toThrow('tempo map broke');
+    expect(engine.canUndo).toBe(false);
+    expect(engine.getState().tracks).toBe(tracks);
+  });
+});
+
 describe('skipAdapter when the arrangement call throws', () => {
   it('leaves no mark behind: the next change is sent to the adapter', () => {
     const adapter = recordingAdapter();
@@ -527,6 +547,25 @@ describe('a track that is given a new id', () => {
     arrangement.removeTrack('B'); // B's entry is kept for an undo
     arrangement.updateTrack('A', (current) => ({ ...current, id: 'B' }));
     expect(arrangement.getMixer().get('B')?.volume).toBe(0.3);
+  });
+
+  it('the old id’s entry goes when no state holds a track of that id any more', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.beginTransaction();
+    arrangement.addTrack(track('C', [], { volume: 0.2 }));
+    arrangement.updateTrack('C', (current) => ({ ...current, id: 'D' }));
+    arrangement.commitTransaction();
+    expect([...arrangement.getMixer().keys()].sort()).toEqual(['A', 'B', 'D']);
+    // The same id entering again is a new track.
+    arrangement.addTrack(track('C', [], { volume: 0.9 }));
+    expect(arrangement.getMixer().get('C')?.volume).toBe(0.9);
+  });
+
+  it('the old id’s entry stays while an undo step holds the track under that id', () => {
+    const arrangement = createArrangement({ tracks: fixture() });
+    arrangement.setTrackVolume('A', 0.3);
+    arrangement.updateTrack('A', (current) => ({ ...current, id: 'Z' }));
+    expect(arrangement.getMixer().has('A')).toBe(true);
   });
 
   it('undoing the change gives the old id its mix back', () => {

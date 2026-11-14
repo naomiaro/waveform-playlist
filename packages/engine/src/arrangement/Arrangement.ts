@@ -383,8 +383,10 @@ export class ArrangementImpl implements Arrangement {
     this._pushUndoSnapshot();
     const enriched = this._ingest(track, byFunction ? new Set(current.clips) : undefined);
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
-    // A track that is given a new id takes its mix with it.
+    // A track that is given a new id takes its mix with it; the old id's
+    // entry goes unless a stored state still holds a track of that id.
     this._mixer = seedMixer(carryMixerEntry(this._mixer, trackId, enriched.id), [enriched]);
+    if (enriched.id !== trackId) this._mixer = retainMixer(this._mixer, this._heldStates());
     this._tracksVersion++;
     this._emit({ type: 'update', trackId });
   }
