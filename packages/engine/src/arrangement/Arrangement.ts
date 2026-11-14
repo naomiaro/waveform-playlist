@@ -2,9 +2,14 @@
  * Arrangement — the tracks, their undo history and an open transaction.
  *
  * Extracted from PlaylistEngine by code motion (#812): every method here
- * does what the engine's method did to its own `_tracks`, line for line.
- * Snapshots are still copies and mixer values are still written in place;
- * the arrangement's own rules come in later steps.
+ * does what the engine's method did to its own `_tracks`. Snapshots are
+ * still copies and mixer values are still written in place; the
+ * arrangement's own rules come in later steps.
+ *
+ * One order differs from the engine before the extraction: a mixer setter
+ * bumps `mixerVersion` here, so before the engine's adapter call and not
+ * after it. Only an adapter that reads the engine's state, throws, or calls
+ * the engine from inside a mixer setter can tell.
  *
  * It knows nothing of adapters or playback. The engine calls a method,
  * then makes the adapter call and emits `statechange` itself.

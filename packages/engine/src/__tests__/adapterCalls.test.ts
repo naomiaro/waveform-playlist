@@ -263,9 +263,10 @@ describe.each([
       expect(states).toHaveLength(1);
 
       adapter.reset();
+      states.length = 0;
       engine.redo();
       expect(adapter.calls).toEqual([setTracksCall([A, B, C])]);
-      expect(states).toHaveLength(2);
+      expect(states).toHaveLength(1);
     });
 
     it('of a removeTrack: setTracks each way', () => {
@@ -279,9 +280,10 @@ describe.each([
       expect(states).toHaveLength(1);
 
       adapter.reset();
+      states.length = 0;
       engine.redo();
       expect(adapter.calls).toEqual([setTracksCall([B])]);
-      expect(states).toHaveLength(2);
+      expect(states).toHaveLength(1);
     });
 
     it('undo of an addTrack leaves the selected track id as it was (today)', () => {
@@ -475,6 +477,72 @@ describe.each([
         expect(states[0].tracks[0].clips[1].startSample).toBe(192000);
       }
     );
+  });
+});
+
+describe('what the adapter is handed, and when', () => {
+  /** The track of an `updateTrack` call, as the object that was passed. */
+  const sentTrack = (call: AdapterCall): ClipTrack => call.args[1] as ClipTrack;
+
+  it('a move sends the track with the clip already moved', () => {
+    const { adapter, engine } = setup();
+    engine.moveClip('A', 'a1', 1000);
+    expect(sentTrack(adapter.rawCalls[0]).clips[0].startSample).toBe(1000);
+  });
+
+  it('an undo sends the restored tracks, and a later mixer write lands on the object the adapter was sent', () => {
+    const { adapter, engine } = setup();
+    engine.moveClip('A', 'a1', 1000);
+    adapter.reset();
+    engine.undo();
+    const sent = sentTrack(adapter.rawCalls[0]);
+    expect(sent.clips[0].startSample).toBe(0);
+    // The adapter holds the engine's own track object, not a copy of it.
+    engine.setTrackVolume('A', 0.3);
+    expect(sent.volume).toBe(0.3);
+  });
+
+  it('addTrack and updateTrack(id, track) send a track whose clips have ticks, and it is the stored object', () => {
+    const { adapter, engine } = setup();
+    engine.addTrack(track('C', [clip('c1', 48000)]));
+    engine.updateTrack('A', track('A', [clip('a3', 48000)]));
+    const added = adapter.rawCalls[0].args[0] as ClipTrack;
+    const updated = sentTrack(adapter.rawCalls[1]);
+    expect(added.clips[0].startTick).toBe(1920);
+    expect(updated.clips[0].startTick).toBe(1920);
+    engine.setTrackPan('C', 0.5);
+    engine.setTrackPan('A', -0.5);
+    expect(added.pan).toBe(0.5);
+    expect(updated.pan).toBe(-0.5);
+  });
+
+  it('setTracks sends an array whose tracks are the stored objects', () => {
+    const { adapter, engine } = setup();
+    engine.setTracks(fixture());
+    const sent = adapter.rawCalls[0].args[0] as ClipTrack[];
+    engine.setTrackMute('B', true);
+    expect(sent[1].muted).toBe(true);
+  });
+
+  it.each([
+    ['moveClip', (engine: PlaylistEngine) => void engine.moveClip('A', 'a1', 1000)],
+    ['trimClip', (engine: PlaylistEngine) => engine.trimClip('A', 'a1', 'right', -1000)],
+    ['splitClip', (engine: PlaylistEngine) => engine.splitClip('A', 'a1', 24000)],
+    ['addTrack', (engine: PlaylistEngine) => engine.addTrack(track('C', []))],
+    ['removeTrack', (engine: PlaylistEngine) => engine.removeTrack('A')],
+    ['updateTrack', (engine: PlaylistEngine) => engine.updateTrack('A', track('A', []))],
+    ['setTracks', (engine: PlaylistEngine) => engine.setTracks(fixture())],
+    ['setTrackVolume', (engine: PlaylistEngine) => engine.setTrackVolume('A', 0.5)],
+    ['undo', (engine: PlaylistEngine) => engine.undo()],
+  ])('%s: the adapter is called before statechange is emitted', (_, run) => {
+    const { adapter, engine } = setup();
+    engine.moveClip('A', 'a2', 1000); // something for the undo case to undo
+    adapter.reset();
+    const callsAtEmission: number[] = [];
+    engine.on('statechange', () => callsAtEmission.push(adapter.calls.length));
+    run(engine);
+    expect(adapter.calls.length).toBeGreaterThan(0);
+    expect(callsAtEmission).toEqual([adapter.calls.length]);
   });
 });
 
