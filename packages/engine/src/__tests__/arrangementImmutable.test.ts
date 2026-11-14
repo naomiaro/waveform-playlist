@@ -81,6 +81,10 @@ const EDITS_OF_A: Edit[] = [
   ['trimClip right', (a) => a.trimClip('A', 'a1', 'right', -1000)],
   ['splitClip', (a) => a.splitClip('A', 'a1', 24000)],
   ['updateTrack', (a) => void a.updateTrack('A', track('A', [clip('a9', 0)]))],
+];
+
+/** The mixer setters: they change the mixer part and no track (arrangementMixer.test.ts). */
+const MIXER_EDITS: Edit[] = [
   ['setTrackVolume', (a) => a.setTrackVolume('A', 0.5)],
   ['setTrackMute', (a) => a.setTrackMute('A', true)],
   ['setTrackSolo', (a) => a.setTrackSolo('A', true)],
@@ -122,7 +126,6 @@ describe('a change replaces only what changed', () => {
     ['moveClip', (a: Arrangement) => void a.moveClip('A', 'a1', 1000)],
     ['trimClip', (a: Arrangement) => a.trimClip('A', 'a1', 'right', -1000)],
     ['splitClip', (a: Arrangement) => a.splitClip('A', 'a1', 24000)],
-    ['setTrackVolume', (a: Arrangement) => a.setTrackVolume('A', 0.5)],
   ])('%s on clip a1: the clip beside it is the same object', (_, edit) => {
     const { arrangement, clipOf } = setup();
     const a2 = clipOf('A', 'a2');
@@ -150,7 +153,7 @@ describe('a change replaces only what changed', () => {
     arrangement.moveClip('A', 'a1', 0); // cannot move: nothing changes
     arrangement.removeTrack('nope');
     arrangement.reorderTrack('A', 0);
-    arrangement.setTrackVolume('nope', 0.5);
+    MIXER_EDITS.forEach(([, run]) => run(arrangement));
     arrangement.beginTransaction();
     arrangement.commitTransaction();
     arrangement.clearHistory();
@@ -197,7 +200,7 @@ describe('a snapshot is a reference and is never written to', () => {
       tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, audioBuffer: undefined })) }))
     );
 
-  it.each([...EDITS_OF_A, ...EDITS_OF_THE_SET])(
+  it.each([...EDITS_OF_A, ...MIXER_EDITS, ...EDITS_OF_THE_SET])(
     'the array from before %s still holds what it held',
     (_, edit) => {
       const { arrangement } = setup();
@@ -251,15 +254,6 @@ describe('a snapshot is a reference and is never written to', () => {
     arrangement.abortTransaction();
     expect(arrangement.getTracks()).toBe(before);
   });
-
-  // Mixer values are still part of a track in this step, so a snapshot holds them (as before).
-  it('a snapshot holds the mixer values of its moment', () => {
-    const { arrangement, trackOf } = setup();
-    arrangement.moveClip('A', 'a1', 1000);
-    arrangement.setTrackVolume('A', 0.2);
-    arrangement.undo();
-    expect(trackOf('A').volume).toBe(1);
-  });
 });
 
 describe('frozen tracks', () => {
@@ -267,6 +261,7 @@ describe('frozen tracks', () => {
     const { arrangement } = setup();
     const steps: Array<(a: Arrangement) => void> = [
       ...EDITS_OF_A.map(([, run]) => run),
+      ...MIXER_EDITS.map(([, run]) => run),
       (a) => void a.addTrack(track('D', [clip('d1', 0)])),
       (a) => a.reorderTrack('D', 0),
       (a) => a.removeTrack('B'),

@@ -1,0 +1,94 @@
+/**
+ * The mixer part of an arrangement: volume, mute, solo and pan by track id,
+ * as pure functions over an immutable Map.
+ *
+ * The values live here and not on the track objects, so a fader move
+ * replaces no track, and an undo (which restores tracks) never changes the
+ * mix. A track's own `volume` / `muted` / `soloed` / `pan` fields are the
+ * values it ENTERED with; they seed its entry and are not read again.
+ */
+
+import type { ClipTrack } from '@waveform-playlist/core';
+
+export interface TrackMixerValues {
+  volume: number;
+  muted: boolean;
+  soloed: boolean;
+  pan: number;
+}
+
+export type Mixer = ReadonlyMap<string, TrackMixerValues>;
+
+export const EMPTY_MIXER: Mixer = new Map();
+
+const DEFAULT_VOLUME = 1;
+const DEFAULT_PAN = 0;
+
+/** The mixer values a track carries in its own fields (defaults for a field it lacks). */
+export function mixerValuesOf(track: ClipTrack): TrackMixerValues {
+  return {
+    volume: track.volume ?? DEFAULT_VOLUME,
+    muted: track.muted ?? false,
+    soloed: track.soloed ?? false,
+    pan: track.pan ?? DEFAULT_PAN,
+  };
+}
+
+/**
+ * Entries for the tracks that have none yet, from their own fields. An id
+ * that already has an entry keeps it. The same Map when nothing was added.
+ */
+export function seedMixer(mixer: Mixer, tracks: readonly ClipTrack[]): Mixer {
+  let next: Map<string, TrackMixerValues> | null = null;
+  for (const track of tracks) {
+    // Also the first of two tracks with one id wins, as everywhere a track is found by id.
+    if ((next ?? mixer).has(track.id)) continue;
+    if (!next) next = new Map(mixer);
+    next.set(track.id, mixerValuesOf(track));
+  }
+  return next ?? mixer;
+}
+
+/**
+ * A Map in which the entry of `trackId` has `patch` applied. The same Map
+ * when there is no such entry.
+ */
+export function setMixerValues(
+  mixer: Mixer,
+  trackId: string,
+  patch: Partial<TrackMixerValues>
+): Mixer {
+  const entry = mixer.get(trackId);
+  if (!entry) return mixer;
+  return new Map(mixer).set(trackId, { ...entry, ...patch });
+}
+
+/**
+ * Only the entries of tracks that one of `states` holds. The same Map when
+ * every entry is still held.
+ */
+export function retainMixer(mixer: Mixer, states: Iterable<readonly ClipTrack[]>): Mixer {
+  const held = new Set<string>();
+  for (const tracks of states) {
+    for (const track of tracks) held.add(track.id);
+  }
+  if ([...mixer.keys()].every((id) => held.has(id))) return mixer;
+  return new Map([...mixer].filter(([id]) => held.has(id)));
+}
+
+/**
+ * The track with the entry's values in its fields: what an adapter is sent.
+ * The same track when its fields already hold them.
+ */
+export function withMixerValues(track: ClipTrack, values: TrackMixerValues | undefined): ClipTrack {
+  if (
+    !values ||
+    (track.volume === values.volume &&
+      track.muted === values.muted &&
+      track.soloed === values.soloed &&
+      track.pan === values.pan)
+  ) {
+    return track;
+  }
+  return { ...track, ...values };
+}

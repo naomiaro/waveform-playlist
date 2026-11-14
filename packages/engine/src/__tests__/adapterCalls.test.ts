@@ -467,15 +467,19 @@ describe.each([
       }
     );
 
+    // Rule (#812, the mixer part): a setter for a track the arrangement does
+    // not hold changes no state, so nothing is emitted and mixerVersion
+    // stays. The adapter is still called (dawcore sets values for a track
+    // that is still loading). Before: one emission and a version bump.
     it.each(setters)(
-      '%s for an unknown track: the adapter is still called, one emission',
+      '%s for an unknown track: the adapter is still called, no emission',
       (method, call, value) => {
         const { adapter, engine, states, summaries } = setup({ incremental });
         const before = engine.getState();
         call(engine, 'still-loading');
         expect(adapter.calls).toEqual([{ method, args: ['still-loading', value] }]);
-        expect(states).toHaveLength(1);
-        expect(states[0].mixerVersion).toBe(before.mixerVersion + 1);
+        expect(states).toHaveLength(0);
+        expect(engine.getState().mixerVersion).toBe(before.mixerVersion);
         expect(summaries()).toEqual([A, B]);
       }
     );
@@ -547,7 +551,7 @@ describe('what the adapter is handed, and when', () => {
     expect(sent).toBe(engine.getState().tracks[0]);
   });
 
-  it('a mixer write replaces the track and leaves the object the adapter was sent as it was', () => {
+  it('a mixer write leaves the object the adapter was sent as it was; the next state has a new one', () => {
     const { adapter, engine } = setup();
     engine.updateTrack('A');
     const sent = sentTrack(adapter.rawCalls[0]);

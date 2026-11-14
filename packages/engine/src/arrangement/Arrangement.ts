@@ -10,8 +10,11 @@
  * therefore a reference to an earlier array, and two states share every
  * track that is the same in both (#812).
  *
- * A mixer setter bumps `mixerVersion` here, so before the engine's adapter
- * call (before the extraction from PlaylistEngine it came after).
+ * The mixer values (volume, mute, solo, pan) are a part of their own, a Map
+ * by track id (`getMixer()`, ./mixer.ts). A setter replaces the Map and one
+ * entry and no track object; the history holds tracks only, so an undo
+ * never changes the mix. The entry of a removed track is kept while any
+ * state of the history still holds the track.
  *
  * It knows nothing of adapters or playback. The engine calls a method,
  * then makes the adapter call and emits `statechange` itself.
@@ -27,6 +30,8 @@ import {
 } from '../operations/clipOperations';
 import { EMPTY_HISTORY, beginBase, pushStep, redoStep, undoStep } from './history';
 import type { History, TransactionBase } from './history';
+import { EMPTY_MIXER, retainMixer, seedMixer, setMixerValues } from './mixer';
+import type { Mixer, TrackMixerValues } from './mixer';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -69,6 +74,7 @@ export class Arrangement {
   private _tracks: readonly ClipTrack[] = [];
   private _tracksVersion = 0;
   private _mixerVersion = 0;
+  private _mixer: Mixer = EMPTY_MIXER;
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
   private _timeBase: ArrangementTimeBase;
@@ -87,6 +93,15 @@ export class Arrangement {
   /** The tracks. The same array until something changes; never written to. */
   getTracks(): readonly ClipTrack[] {
     return this._tracks;
+  }
+
+  /**
+   * The current mixer values by track id. The same Map until a value
+   * changes; never written to. A track's own mixer fields in `getTracks()`
+   * are the values it entered with, not these.
+   */
+  getMixer(): Mixer {
+    return this._mixer;
   }
 
   /** Counts structural changes. */
@@ -135,6 +150,7 @@ export class Arrangement {
 
   clearHistory(): void {
     this._history = EMPTY_HISTORY;
+    this._mixer = retainMixer(this._mixer, this._heldStates());
   }
 
   beginTransaction(): void {
@@ -183,8 +199,10 @@ export class Arrangement {
   // throw leaves the tracks, the undo history and every subscriber untouched.
   setTracks(tracks: readonly ClipTrack[]): void {
     tracks.forEach(assertTrackKind);
-    this.clearHistory();
+    this._history = EMPTY_HISTORY;
     this._tracks = tracks.map((track) => this._withStartTicks(track));
+    // An id that is already there keeps its mix; entries of tracks that are gone are dropped.
+    this._mixer = retainMixer(seedMixer(this._mixer, this._tracks), this._heldStates());
     this._tracksVersion++;
     this._emit({ type: 'set' });
   }
@@ -195,6 +213,7 @@ export class Arrangement {
     this._pushUndoSnapshot();
     const enriched = this._withStartTicks(track);
     this._tracks = [...this._tracks, enriched];
+    this._mixer = seedMixer(this._mixer, [enriched]);
     this._tracksVersion++;
     this._emit({ type: 'add', trackId: track.id });
     return enriched;
@@ -227,6 +246,7 @@ export class Arrangement {
 
   /**
    * Replace a track. Returns the track as stored (each clip given a `startTick`).
+   * The mixer fields of the given track are not read: the mix is in `getMixer()`.
    * An id no track has still pushes an undo step, bumps the version and
    * announces the change, and adds no track, as the engine did.
    */
@@ -450,11 +470,10 @@ export class Arrangement {
   // Mixer values
   // ---------------------------------------------------------------------------
   //
-  // The track is replaced by a copy with the new value, so a later adapter
-  // rebuild keeps it. NOT structural changes: they bump mixerVersion, never
-  // tracksVersion (#501), and are not undo steps. An id no track has changes
-  // no track and still bumps the version and announces the change, as the
-  // engine did.
+  // Each replaces the Map and one entry, bumps mixerVersion and announces
+  // the change. NOT structural changes: no track object is replaced,
+  // tracksVersion stays (#501), and they are not undo steps. An id the
+  // arrangement holds no entry for does nothing.
 
   setTrackVolume(trackId: string, volume: number): void {
     this._setMixerValues(trackId, { volume });
@@ -517,15 +536,21 @@ export class Arrangement {
     };
   }
 
-  private _setMixerValues(
-    trackId: string,
-    values: Partial<Pick<ClipTrack, 'volume' | 'muted' | 'soloed' | 'pan'>>
-  ): void {
-    if (this._tracks.some((t) => t.id === trackId)) {
-      this._tracks = this._tracks.map((t) => (t.id === trackId ? { ...t, ...values } : t));
-    }
+  private _setMixerValues(trackId: string, values: Partial<TrackMixerValues>): void {
+    const next = setMixerValues(this._mixer, trackId, values);
+    if (next === this._mixer) return;
+    this._mixer = next;
     this._mixerVersion++;
     this._emit({ type: 'mixer', trackId });
+  }
+
+  /**
+   * The tracks arrays the arrangement can still return to once the history
+   * is empty, which is when mixer entries are dropped (`setTracks`,
+   * `clearHistory`): the current one, and the base of an open transaction.
+   */
+  private _heldStates(): ReadonlyArray<readonly ClipTrack[]> {
+    return this._transaction ? [this._tracks, this._transaction.tracks] : [this._tracks];
   }
 
   /** The state before a change: an undo step, or the mark that an open transaction changed. */

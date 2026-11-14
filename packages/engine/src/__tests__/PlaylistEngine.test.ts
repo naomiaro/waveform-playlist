@@ -606,10 +606,13 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('bumps mixerVersion and emits even when the target track is absent', () => {
-      // The adapter forward (and the version bump + emit) are deliberately
-      // unconditional — a consumer may target a track the engine has not
-      // ingested yet. Guard against regressing the bump inside the `if (track)`.
+    // #812, the mixer part: a setter for a track the arrangement does not hold
+    // changes no state, so mixerVersion stays and nothing is emitted. The
+    // adapter forward stays unconditional (a consumer may target a track the
+    // engine has not ingested yet; adapterCalls.test.ts and
+    // arrangementMixer.test.ts assert the forward). Before, this test asserted
+    // a bump and an emission for the absent track.
+    it('does not bump mixerVersion or emit when the target track is absent', () => {
       const engine = new PlaylistEngine();
       const listener = vi.fn();
       engine.on('statechange', listener);
@@ -617,8 +620,8 @@ describe('PlaylistEngine', () => {
 
       engine.setTrackMute('ghost', true);
 
-      expect(engine.getState().mixerVersion).toBe(version + 1);
-      expect(listener).toHaveBeenCalledTimes(1);
+      expect(engine.getState().mixerVersion).toBe(version);
+      expect(listener).not.toHaveBeenCalled();
       engine.dispose();
     });
 

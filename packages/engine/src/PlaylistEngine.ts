@@ -10,6 +10,8 @@
 import type { ClipTrack } from '@waveform-playlist/core';
 import { Arrangement } from './arrangement';
 import type { ClipBounds } from './arrangement';
+import { withMixerValues } from './arrangement/mixer';
+import type { TrackMixerValues } from './arrangement/mixer';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
 
@@ -21,6 +23,12 @@ type EventName = keyof EngineEvents;
 
 export class PlaylistEngine {
   private _arrangement: Arrangement;
+  private _projection: { tracksVersion: number; mixerVersion: number; tracks: ClipTrack[] } | null =
+    null;
+  private _withMixMemo = new WeakMap<
+    ClipTrack,
+    { values: TrackMixerValues | undefined; merged: ClipTrack }
+  >();
   private _currentTime = 0;
   private _playStartPosition = 0;
   private _isPlaying = false;
@@ -133,7 +141,7 @@ export class PlaylistEngine {
 
   getState(): EngineState {
     return {
-      tracks: this._tracks(),
+      tracks: this._tracksForAdapter(),
       tracksVersion: this._arrangement.tracksVersion,
       mixerVersion: this._arrangement.mixerVersion,
       duration: calculateDuration(this._arrangement.getTracks()),
@@ -167,16 +175,16 @@ export class PlaylistEngine {
   // throw leaves the engine, the undo history and the adapter untouched.
   setTracks(tracks: ClipTrack[]): void {
     this._arrangement.setTracks(tracks);
-    this._adapter?.setTracks(this._tracks());
+    this._adapter?.setTracks(this._tracksForAdapter());
     this._emitStateChange();
   }
 
   addTrack(track: ClipTrack): void {
     const enriched = this._arrangement.addTrack(track);
     if (this._adapter?.addTrack) {
-      this._adapter.addTrack(enriched);
+      this._adapter.addTrack(this._withMix(enriched));
     } else {
-      this._adapter?.setTracks(this._tracks());
+      this._adapter?.setTracks(this._tracksForAdapter());
     }
     this._emitStateChange();
   }
@@ -189,7 +197,7 @@ export class PlaylistEngine {
     if (this._adapter?.removeTrack) {
       this._adapter.removeTrack(trackId);
     } else {
-      this._adapter?.setTracks(this._tracks());
+      this._adapter?.setTracks(this._tracksForAdapter());
     }
     this._emitStateChange();
   }
@@ -211,9 +219,9 @@ export class PlaylistEngine {
       const enriched = this._arrangement.updateTrack(trackId, track);
       // Forward enriched track to adapter
       if (this._adapter?.updateTrack) {
-        this._adapter.updateTrack(trackId, enriched);
+        this._adapter.updateTrack(trackId, this._withMix(enriched));
       } else {
-        this._adapter?.setTracks(this._tracks());
+        this._adapter?.setTracks(this._tracksForAdapter());
       }
       this._emitStateChange();
       return;
@@ -227,9 +235,9 @@ export class PlaylistEngine {
     const t = this._arrangement.getTracks().find((tr) => tr.id === trackId);
     if (!t) return;
     if (this._adapter?.updateTrack) {
-      this._adapter.updateTrack(trackId, t);
+      this._adapter.updateTrack(trackId, this._withMix(t));
     } else {
-      this._adapter?.setTracks(this._tracks());
+      this._adapter?.setTracks(this._tracksForAdapter());
     }
   }
 
@@ -483,11 +491,11 @@ export class PlaylistEngine {
   // Per-Track Audio (persists into the arrangement, forwards to adapter, emits)
   // ---------------------------------------------------------------------------
   //
-  // Each setter writes the value into the arrangement's track (so a later
+  // Each setter writes the value into the arrangement's mixer part (so a later
   // adapter rebuild via setTracks keeps the value, and mixerVersion is bumped),
   // forwards to the adapter also for a track the arrangement does not hold
   // (a consumer may target a track that has not been ingested yet), and emits
-  // statechange. These are NOT structural
+  // statechange when a value changed. These are NOT structural
   // changes, so they deliberately do NOT bump tracksVersion — that would make
   // tracksVersion-gated consumers re-run expensive structural work (audio-graph
   // rewire, peak regeneration) on every volume/pan drag frame. Consumers that
@@ -496,27 +504,27 @@ export class PlaylistEngine {
   // rebuild no longer reverts live mixer state (#501).
 
   setTrackVolume(trackId: string, volume: number): void {
-    this._arrangement.setTrackVolume(trackId, volume);
+    const changed = this._mixerChanged(() => this._arrangement.setTrackVolume(trackId, volume));
     this._adapter?.setTrackVolume(trackId, volume);
-    this._emitStateChange();
+    if (changed) this._emitStateChange();
   }
 
   setTrackMute(trackId: string, muted: boolean): void {
-    this._arrangement.setTrackMute(trackId, muted);
+    const changed = this._mixerChanged(() => this._arrangement.setTrackMute(trackId, muted));
     this._adapter?.setTrackMute(trackId, muted);
-    this._emitStateChange();
+    if (changed) this._emitStateChange();
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
-    this._arrangement.setTrackSolo(trackId, soloed);
+    const changed = this._mixerChanged(() => this._arrangement.setTrackSolo(trackId, soloed));
     this._adapter?.setTrackSolo(trackId, soloed);
-    this._emitStateChange();
+    if (changed) this._emitStateChange();
   }
 
   setTrackPan(trackId: string, pan: number): void {
-    this._arrangement.setTrackPan(trackId, pan);
+    const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan));
     this._adapter?.setTrackPan(trackId, pan);
-    this._emitStateChange();
+    if (changed) this._emitStateChange();
   }
 
   // ---------------------------------------------------------------------------
@@ -581,12 +589,37 @@ export class PlaylistEngine {
   // ---------------------------------------------------------------------------
 
   /**
-   * The arrangement's tracks, for the adapter and for `getState()`. The array
-   * is the arrangement's own and is never written to; `ClipTrack[]` is the
-   * type the adapter interface and `EngineState` have had from the start.
+   * The arrangement's tracks with the current mixer values in their fields:
+   * what every adapter track call and `getState().tracks` use. Derived, never
+   * written back. The same array until the tracks or the mix change, and the
+   * same track object while neither that track nor its mix changed.
    */
-  private _tracks(): ClipTrack[] {
-    return this._arrangement.getTracks() as ClipTrack[];
+  private _tracksForAdapter(): ClipTrack[] {
+    const { tracksVersion, mixerVersion } = this._arrangement;
+    const cached = this._projection;
+    if (cached && cached.tracksVersion === tracksVersion && cached.mixerVersion === mixerVersion) {
+      return cached.tracks;
+    }
+    const tracks = this._arrangement.getTracks().map((track) => this._withMix(track));
+    this._projection = { tracksVersion, mixerVersion, tracks };
+    return tracks;
+  }
+
+  /** One track with its current mixer values in its fields (memoized per track object). */
+  private _withMix(track: ClipTrack): ClipTrack {
+    const values = this._arrangement.getMixer().get(track.id);
+    const memo = this._withMixMemo.get(track);
+    if (memo && memo.values === values) return memo.merged;
+    const merged = withMixerValues(track, values);
+    this._withMixMemo.set(track, { values, merged });
+    return merged;
+  }
+
+  /** Runs a mixer setter on the arrangement. True when a value changed. */
+  private _mixerChanged(change: () => void): boolean {
+    const version = this._arrangement.mixerVersion;
+    change();
+    return this._arrangement.mixerVersion !== version;
   }
 
   /** Runs a change on the arrangement. True when the tracks changed. */
@@ -618,7 +651,7 @@ export class PlaylistEngine {
         }
       }
     } else {
-      this._adapter?.setTracks(this._tracks());
+      this._adapter?.setTracks(this._tracksForAdapter());
     }
     this._emitStateChange();
   }

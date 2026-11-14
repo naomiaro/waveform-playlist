@@ -317,39 +317,7 @@ describe('Arrangement: clips', () => {
   });
 });
 
-describe('Arrangement: mixer values', () => {
-  it.each([
-    ['setTrackVolume', (a: Arrangement, id: string) => a.setTrackVolume(id, 0.5), 'volume', 0.5],
-    ['setTrackMute', (a: Arrangement, id: string) => a.setTrackMute(id, true), 'muted', true],
-    ['setTrackSolo', (a: Arrangement, id: string) => a.setTrackSolo(id, true), 'soloed', true],
-    ['setTrackPan', (a: Arrangement, id: string) => a.setTrackPan(id, -0.5), 'pan', -0.5],
-  ] as const)(
-    '%s puts the value on a new track object, bumps mixerVersion only, announces "mixer", is not an undo step',
-    (_, run, field, value) => {
-      const { arrangement, changes } = setup();
-      const first = arrangement.getTracks()[0];
-      const was = first[field];
-
-      run(arrangement, 'A');
-
-      // Immutable (#812): the track is replaced, the old object keeps its value.
-      expect(arrangement.getTracks()[0]).not.toBe(first);
-      expect(arrangement.getTracks()[0][field]).toBe(value);
-      expect(first[field]).toBe(was);
-      expect(arrangement.mixerVersion).toBe(1);
-      expect(arrangement.tracksVersion).toBe(1);
-      expect(arrangement.canUndo).toBe(false);
-      expect(changes).toEqual([{ type: 'mixer', trackId: 'A' }]);
-
-      // An unknown id: no track changes; the version and the change are as before (today).
-      const tracks = arrangement.getTracks();
-      run(arrangement, 'nope');
-      expect(arrangement.getTracks()).toBe(tracks);
-      expect(arrangement.mixerVersion).toBe(2);
-      expect(changes[1]).toEqual({ type: 'mixer', trackId: 'nope' });
-    }
-  );
-});
+// The mixer part (getMixer and the four setters) is in arrangementMixer.test.ts.
 
 describe('Arrangement: history', () => {
   it('undo and redo restore the tracks, bump tracksVersion, and announce "restore" with the tracks they replaced', () => {
@@ -373,14 +341,6 @@ describe('Arrangement: history', () => {
     expect(arrangement.canUndo).toBe(true);
     expect(arrangement.canRedo).toBe(false);
     expect(changes[1].type === 'restore' && changes[1].previous).toBe(undone);
-  });
-
-  it('a snapshot captures the mixer values of its moment (as the engine did)', () => {
-    const { arrangement } = setup();
-    arrangement.moveClip('A', 'a1', 10000);
-    arrangement.setTrackVolume('A', 0.2);
-    arrangement.undo();
-    expect(arrangement.getTracks()[0].volume).toBe(1);
   });
 
   it('undo and redo with nothing to do change nothing', () => {
