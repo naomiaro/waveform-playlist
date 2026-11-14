@@ -1,0 +1,309 @@
+import { describe, it, expect, vi } from 'vitest';
+import { audioTrack } from '../audioTrack';
+import { isLoadingClip } from '../types/clip';
+import type { AudioClip, LoadingClip, WaveformDataObject } from '../types/clip';
+import type { SpectrogramConfig } from '../types/spectrogram';
+
+const buffer = {
+  sampleRate: 48000,
+  length: 96000,
+  duration: 2,
+  numberOfChannels: 1,
+} as unknown as AudioBuffer;
+
+const peaks = { sample_rate: 44100, duration: 3, scale: 256, length: 10 } as WaveformDataObject;
+
+describe('audioTrack with src', () => {
+  it('builds one loading clip carrying the options', () => {
+    const fadeIn = { duration: 0.1 };
+    const fadeOut = { duration: 0.2 };
+    const track = audioTrack({
+      src: 'a.mp3',
+      start: 1,
+      duration: 2,
+      offset: 0.5,
+      fadeIn,
+      fadeOut,
+      waveformData: peaks,
+      gain: 0.5,
+      color: 'red',
+    });
+    expect(track.clips).toHaveLength(1);
+    const clip = track.clips[0] as LoadingClip;
+    expect(isLoadingClip(clip)).toBe(true);
+    expect(clip).toMatchObject({
+      src: 'a.mp3',
+      start: 1,
+      duration: 2,
+      offset: 0.5,
+      fadeIn,
+      fadeOut,
+      waveformData: peaks,
+      gain: 0.5,
+      color: 'red',
+    });
+    expect(clip.id).toBeTruthy();
+  });
+
+  it('uses the given id and clipId', () => {
+    const track = audioTrack({ src: 'a.mp3', id: 't1', clipId: 'c1' });
+    expect(track.id).toBe('t1');
+    expect(track.clips[0].id).toBe('c1');
+  });
+
+  it('treats an empty-string id as none', () => {
+    const track = audioTrack({ src: 'a.mp3', id: '', clipId: '' });
+    expect(track.id).not.toBe('');
+    expect(track.clips[0].id).not.toBe('');
+  });
+
+  it('defaults the track fields', () => {
+    const track = audioTrack({ src: 'a.mp3' });
+    expect(track).toMatchObject({ kind: 'audio', muted: false, soloed: false, volume: 1, pan: 0 });
+  });
+
+  it('passes the track fields through', () => {
+    const track = audioTrack({
+      src: 'a.mp3',
+      muted: true,
+      soloed: true,
+      volume: 0.5,
+      pan: -1,
+      renderMode: 'spectrogram',
+    });
+    expect(track).toMatchObject({
+      muted: true,
+      soloed: true,
+      volume: 0.5,
+      pan: -1,
+      renderMode: 'spectrogram',
+    });
+  });
+});
+
+describe('audioTrack with audio already in memory', () => {
+  it('builds an AudioClip from audioBuffer', () => {
+    const track = audioTrack({ audioBuffer: buffer, start: 1, offset: 0.5 });
+    const clip = track.clips[0] as AudioClip;
+    expect(isLoadingClip(clip)).toBe(false);
+    expect(clip.audioBuffer).toBe(buffer);
+    expect(clip.startSample).toBe(48000);
+    expect(clip.offsetSamples).toBe(24000);
+    expect(clip.durationSamples).toBe(72000); // 2 s - 0.5 s offset
+  });
+
+  it('uses a given duration', () => {
+    const clip = audioTrack({ audioBuffer: buffer, duration: 1 }).clips[0] as AudioClip;
+    expect(clip.durationSamples).toBe(48000);
+  });
+
+  it('builds an AudioClip from waveformData alone', () => {
+    const clip = audioTrack({ waveformData: peaks }).clips[0] as AudioClip;
+    expect(isLoadingClip(clip)).toBe(false);
+    expect(clip.sampleRate).toBe(44100);
+    expect(clip.durationSamples).toBe(3 * 44100);
+  });
+
+  it('keeps both src and audioBuffer on an AudioClip', () => {
+    const clip = audioTrack({ src: 'a.mp3', audioBuffer: buffer }).clips[0] as AudioClip;
+    expect(isLoadingClip(clip)).toBe(false);
+    expect(clip.src).toBe('a.mp3');
+    expect(clip.audioBuffer).toBe(buffer);
+  });
+
+  it('uses the given ids', () => {
+    const track = audioTrack({ audioBuffer: buffer, id: 't', clipId: 'c' });
+    expect(track.id).toBe('t');
+    expect(track.clips[0].id).toBe('c');
+  });
+});
+
+describe('audioTrack validation', () => {
+  it('throws with nothing to build a clip from', () => {
+    expect(() => audioTrack({})).toThrow('audioTrack: give src, audioBuffer or waveformData');
+  });
+
+  it.each([
+    ['start', { start: -1 }],
+    ['start', { start: NaN }],
+    ['offset', { offset: -0.1 }],
+    ['offset', { offset: Infinity }],
+    ['duration', { duration: 0 }],
+    ['duration', { duration: -1 }],
+    ['duration', { duration: NaN }],
+  ])('throws naming %s', (name, extra) => {
+    expect(() => audioTrack({ src: 'a.mp3', ...extra })).toThrow(
+      new RegExp(`^audioTrack: .*${name}`)
+    );
+  });
+});
+
+describe('audioTrack name', () => {
+  it('is the file name of a string src without its extension', () => {
+    expect(audioTrack({ src: '/audio/drums.mp3' }).name).toBe('drums');
+    expect(audioTrack({ src: 'https://x.test/a/b/bass.line.wav?v=2' }).name).toBe('bass.line');
+  });
+
+  it('is a File name without its extension', () => {
+    const file = new File(['x'], 'vocal.flac');
+    expect(audioTrack({ src: file }).name).toBe('vocal');
+  });
+
+  it('is Untitled for a Blob or no src', () => {
+    expect(audioTrack({ src: new Blob(['x']) }).name).toBe('Untitled');
+    expect(audioTrack({ audioBuffer: buffer }).name).toBe('Untitled');
+  });
+
+  it('uses the given name', () => {
+    expect(audioTrack({ src: 'a.mp3', name: 'Kick' }).name).toBe('Kick');
+  });
+
+  it('is Untitled for a data: or blob: URL', () => {
+    expect(audioTrack({ src: 'data:audio/wav;base64,AAAA.BBBB' }).name).toBe('Untitled');
+    expect(audioTrack({ src: 'blob:https://x.test/1234-5678' }).name).toBe('Untitled');
+  });
+
+  it('decodes a percent-encoded file name, and keeps a malformed one raw', () => {
+    expect(audioTrack({ src: '/a/my%20song.mp3' }).name).toBe('my song');
+    expect(audioTrack({ src: '/a/bad%E0%A4%A.mp3' }).name).toBe('bad%E0%A4%A');
+  });
+});
+
+describe('audioTrack follow-ups', () => {
+  it('throws when offset is at or past the end of the audio', () => {
+    expect(() => audioTrack({ audioBuffer: buffer, offset: 2 })).toThrow(
+      'audioTrack: offset is past the end of the audio'
+    );
+    expect(() => audioTrack({ waveformData: peaks, offset: 5 })).toThrow(
+      'audioTrack: offset is past the end of the audio'
+    );
+  });
+
+  it('builds a clip when offset + duration is the end of the audio up to float error', () => {
+    const b = { sampleRate: 48000, length: 43200, duration: 0.9, numberOfChannels: 1 };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const track = audioTrack({
+        audioBuffer: b as unknown as AudioBuffer,
+        offset: 0.3,
+        duration: 0.9 - 0.3,
+      });
+      const clip = track.clips[0] as AudioClip;
+      expect(clip.offsetSamples).toBe(14400);
+      expect(clip.durationSamples).toBe(28800);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not warn for a duration one sample past the end, and cuts it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const clip = audioTrack({ audioBuffer: buffer, duration: 2 + 1 / 48000 })
+        .clips[0] as AudioClip;
+      expect(clip.durationSamples).toBe(96000);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('cuts a duration that runs past the audio to the end, with one warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const clip = audioTrack({ audioBuffer: buffer, name: 'Kick', offset: 1, duration: 2 })
+        .clips[0] as AudioClip;
+      expect(clip.durationSamples).toBe(48000);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.lastCall?.[0]).toMatch(/^\[waveform-playlist\] audioTrack: .*Kick/);
+      warn.mockClear();
+      const fromPeaks = audioTrack({ waveformData: peaks, offset: 1, duration: 3 })
+        .clips[0] as AudioClip;
+      expect(fromPeaks.durationSamples).toBe(2 * 44100);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not check offset or duration against the audio for a loading clip', () => {
+    expect(() => audioTrack({ src: 'a.mp3', offset: 100, duration: 100 })).not.toThrow();
+  });
+
+  it('names a Blob src Untitled where File is undefined', () => {
+    const original = globalThis.File;
+    try {
+      // @ts-expect-error simulate an environment without File
+      delete globalThis.File;
+      expect(audioTrack({ src: new Blob(['x']) }).name).toBe('Untitled');
+    } finally {
+      globalThis.File = original;
+    }
+  });
+
+  it('puts color on the track and on the clip', () => {
+    const loading = audioTrack({ src: 'a.mp3', color: 'red' });
+    expect(loading.color).toBe('red');
+    expect(loading.clips[0].color).toBe('red');
+    const loaded = audioTrack({ audioBuffer: buffer, color: 'blue' });
+    expect(loaded.color).toBe('blue');
+    expect(loaded.clips[0].color).toBe('blue');
+  });
+
+  it('counts an empty-string src as not given', () => {
+    expect(() => audioTrack({ src: '' })).toThrow(
+      'audioTrack: give src, audioBuffer or waveformData'
+    );
+    const clip = audioTrack({ src: '', audioBuffer: buffer }).clips[0];
+    expect('src' in clip).toBe(false);
+  });
+
+  it('builds a loading clip without undefined keys', () => {
+    const clip = audioTrack({ src: 'a.mp3' }).clips[0];
+    expect(Object.keys(clip).sort()).toEqual(['id', 'name', 'src']);
+    const given = audioTrack({ src: 'a.mp3', start: 1, gain: 0.5 }).clips[0];
+    expect(Object.keys(given).sort()).toEqual(['gain', 'id', 'name', 'src', 'start']);
+  });
+
+  it('carries gain, fades and color on the AudioClip', () => {
+    const fadeIn = { duration: 0.1 };
+    const fadeOut = { duration: 0.2 };
+    const clip = audioTrack({ audioBuffer: buffer, gain: 0.5, fadeIn, fadeOut, color: 'red' })
+      .clips[0] as AudioClip;
+    expect(clip.gain).toBe(0.5);
+    expect(clip.fadeIn).toBe(fadeIn);
+    expect(clip.fadeOut).toBe(fadeOut);
+    expect(clip.color).toBe('red');
+  });
+
+  it('uses a given duration with waveformData', () => {
+    const clip = audioTrack({ waveformData: peaks, offset: 1, duration: 1 }).clips[0] as AudioClip;
+    expect(clip.durationSamples).toBe(44100);
+    expect(clip.offsetSamples).toBe(44100);
+  });
+
+  it('passes spectrogramConfig and spectrogramColorMap to the track', () => {
+    const spectrogramConfig: SpectrogramConfig = { fftSize: 1024 };
+    const track = audioTrack({
+      src: 'a.mp3',
+      spectrogramConfig,
+      spectrogramColorMap: 'viridis',
+    });
+    expect(track.spectrogramConfig).toBe(spectrogramConfig);
+    expect(track.spectrogramColorMap).toBe('viridis');
+  });
+});
+
+describe('audioTrack clip name', () => {
+  it('is the given name on a loading clip and an AudioClip', () => {
+    expect(audioTrack({ src: 'a.mp3', name: 'Kick' }).clips[0].name).toBe('Kick');
+    expect(audioTrack({ audioBuffer: buffer, name: 'Kick' }).clips[0].name).toBe('Kick');
+  });
+
+  it('is the default name when none is given', () => {
+    expect(audioTrack({ src: '/x/drums.mp3' }).clips[0].name).toBe('drums');
+    expect(audioTrack({ audioBuffer: buffer }).clips[0].name).toBe('Untitled');
+    expect(audioTrack({ src: 'a.mp3', audioBuffer: buffer }).clips[0].name).toBe('a');
+  });
+});

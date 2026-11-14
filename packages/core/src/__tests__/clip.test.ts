@@ -10,8 +10,9 @@ import {
   clipsOverlap,
   sortClipsByTime,
   findGaps,
+  isLoadingClip,
 } from '../types/clip';
-import type { AudioClip, ClipTrack } from '../types/clip';
+import type { AudioClip, ClipTrack, ArrangementTrack } from '../types/clip';
 
 function makeClip(
   overrides: Partial<AudioClip> & {
@@ -744,5 +745,64 @@ describe('findGaps', () => {
     const track = makeTrack([clip1, clip2]);
     const gaps = findGaps(track);
     expect(gaps).toEqual([]);
+  });
+});
+
+describe('loading clips', () => {
+  it('isLoadingClip is true for a clip without sampleRate', () => {
+    expect(isLoadingClip({ id: 'c', src: 'a.mp3' })).toBe(true);
+  });
+
+  it('isLoadingClip is false for an AudioClip, also one that carries src', () => {
+    const clip: AudioClip = {
+      ...makeClip({ id: 'c', startSample: 0, durationSamples: 100 }),
+      src: 'a.mp3',
+    };
+    expect(isLoadingClip(clip)).toBe(false);
+  });
+
+  it('a ClipTrack is assignable to ArrangementTrack', () => {
+    const t: ArrangementTrack = createTrack({ name: 'x', clips: [] });
+    expect(t.clips).toEqual([]);
+  });
+});
+
+describe('src on created clips', () => {
+  const base = {
+    startSample: 0,
+    durationSamples: 100,
+    sampleRate: 44100,
+    sourceDurationSamples: 100,
+  };
+
+  it('createClip carries src when given', () => {
+    expect(createClip({ ...base, src: 'a.mp3' }).src).toBe('a.mp3');
+    const blob = new Blob(['x']);
+    expect(createClip({ ...base, src: blob }).src).toBe(blob);
+  });
+
+  it('createClip has no src key when none is given', () => {
+    expect('src' in createClip(base)).toBe(false);
+  });
+
+  it('createClipFromSeconds carries src when given', () => {
+    const clip = createClipFromSeconds({
+      startTime: 0,
+      duration: 1,
+      sampleRate: 44100,
+      sourceDuration: 1,
+      src: 'a.mp3',
+    });
+    expect(clip.src).toBe('a.mp3');
+  });
+
+  it('createClipFromSeconds has no src key when none is given', () => {
+    const clip = createClipFromSeconds({
+      startTime: 0,
+      duration: 1,
+      sampleRate: 44100,
+      sourceDuration: 1,
+    });
+    expect('src' in clip).toBe(false);
   });
 });
