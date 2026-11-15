@@ -27,6 +27,7 @@ import {
 import { audioTrack } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
 
 const Controls = styled.div`
   display: flex;
@@ -60,7 +61,6 @@ export function StereoExample() {
   const sources = useArrangementSources(arrangement);
   const totalCount = sources.sources.size;
   const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
-  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
     <WaveformPlaylistProvider
@@ -75,14 +75,7 @@ export function StereoExample() {
         <StopButton />
         <AudioPosition />
         {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
-        {failed && (
-          <span style={{ fontSize: '0.875rem', color: 'red' }}>
-            Error loading audio: {failed[1].error?.message}{' '}
-            <button type="button" onClick={() => arrangement.retry(failed[0])}>
-              Retry
-            </button>
-          </span>
-        )}
+        <SourceLoadError arrangement={arrangement} />
       </Controls>
 
       <WaveformViewOptions barWidth={2} barGap={0}>

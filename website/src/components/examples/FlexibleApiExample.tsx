@@ -65,6 +65,7 @@ import {
   type TimeFormat,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { findFailedSource } from './SourceLoadError';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -224,10 +225,7 @@ const GrungyTimestamp = styled.div<{ $left: number }>`
 // Custom Track Controls Component - compact horizontal layout
 // Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
 const CustomTrackControls: React.FC = () => {
-  const { name: trackName, muted, soloed, volume, isLoading, setMuted, setSoloed, setVolume } =
-    useTrack();
-
-  if (isLoading) return null;
+  const { name: trackName, muted, soloed, volume, setMuted, setSoloed, setVolume } = useTrack();
 
   return (
     <TrackControlsContainer>
@@ -549,7 +547,7 @@ export function FlexibleApiExample() {
   // placeholder until its file has decoded
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const sources = useArrangementSources(arrangement);
-  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
+  const failed = findFailedSource(sources);
 
   return (
     <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
@@ -558,9 +556,9 @@ export function FlexibleApiExample() {
           <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)', marginBottom: '1rem' }}>
             <Flex align="center" gap="3">
               <Text size="3" color="red">
-                Error loading audio: {failed[1].error?.message}
+                Error loading audio: {failed.message}
               </Text>
-              <Button size="1" variant="soft" color="red" onClick={() => arrangement.retry(failed[0])}>
+              <Button size="1" variant="soft" color="red" onClick={() => arrangement.retry(failed.src)}>
                 Retry
               </Button>
             </Flex>

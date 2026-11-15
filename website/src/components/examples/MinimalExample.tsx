@@ -27,6 +27,7 @@ import { audioTrack } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
 
 // Dark mode: Amber/gold gradient waveform on dark brown background
 const darkModeGradientTheme: Partial<WaveformPlaylistTheme> = {
@@ -107,7 +108,6 @@ export function MinimalExample() {
   // shows a placeholder until it arrives
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const sources = useArrangementSources(arrangement);
-  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
     <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
@@ -117,14 +117,7 @@ export function MinimalExample() {
         <StopButton />
         <AudioPosition />
         {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
-        {failed && (
-          <span style={{ fontSize: '0.875rem', color: 'red' }}>
-            Error loading audio: {failed[1].error?.message}{' '}
-            <button type="button" onClick={() => arrangement.retry(failed[0])}>
-              Retry
-            </button>
-          </span>
-        )}
+        <SourceLoadError arrangement={arrangement} />
       </Controls>
 
       <WaveformViewOptions progressBarWidth={2}>

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
 import {
@@ -16,11 +16,12 @@ import {
   WaveformViewOptions,
   useCreateArrangement,
   useArrangementSources,
+  useArrangementTracks,
 } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
-import type { ArrangementTrack } from '@waveform-playlist/core';
 // Channel import removed - no longer using preview rendering
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { findFailedSource } from './SourceLoadError';
 
 // Track configuration with both audio and BBC peaks files
 // Albert Kader "Ubiquitous" minimal techno - Using 8-bit peaks at 30 SPP
@@ -118,68 +119,64 @@ const StatBox = styled.div<{ $variant?: 'peaks' | 'audio' }>`
 
 // Removed preview-related styled components - progressive loading shows tracks directly
 
+const MUTED_TEXT_STYLE = { padding: '2rem', color: 'var(--ifm-color-emphasis-600)' } as const;
+
+/** The peaks of each track, in config order (null: its peaks file failed and the track is left out). */
+function loadAllPeaks(): Promise<(WaveformData | null)[]> {
+  return Promise.all(
+    trackConfigs.map(async (config) => {
+      try {
+        return await loadWaveformData(config.peaksSrc);
+      } catch (error) {
+        console.error(`Error loading peaks for ${config.name}:`, error);
+        return null;
+      }
+    })
+  );
+}
+
 /**
  * WaveformData Example
  *
- * Demonstrates fully progressive loading with BBC pre-computed peaks.
- * Each track appears once its peaks (~50KB) and those of every track listed
- * before it have loaded (tracks keep the config order), then its audio loads
- * in the background (~3MB). No waiting for all the audio!
+ * Demonstrates progressive loading with BBC pre-computed peaks. The peaks
+ * (~50KB per track) are fetched first; the tracks are then drawn from them at
+ * once while the audio (~3MB) loads in the background.
  *
  * Key features demonstrated:
- * - Progressive peaks: tracks appear in config order as their peaks files load
+ * - Peaks first: every track is drawn from its peaks before its audio arrives
  * - Progressive audio: each track becomes playable when its own audio has decoded
  * - useArrangementSources(): real-time progress tracking
  */
 export function WaveformDataExample() {
   const { theme } = useDocusaurusTheme();
-  // Starts empty: each track is added when its peaks have loaded, with a
-  // clip that names its audio and carries the peaks, so it is drawn at once
-  // and becomes playable when the arrangement has decoded its audio.
+  // Starts empty: the tracks are added when the peaks files have been fetched,
+  // each with a clip that names its audio and carries its peaks. The playlist
+  // is shown from then on, and it is ready when the audio has decoded.
   const arrangement = useCreateArrangement();
+  const [peaksSettled, setPeaksSettled] = useState(false);
+  const tracks = useArrangementTracks(arrangement);
   const sources = useArrangementSources(arrangement);
   const totalCount = sources.sources.size;
   const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
-  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
+  const failed = findFailedSource(sources);
 
-  // Load BBC peaks independently - each track appears as its peaks load
+  // Load the BBC peaks of every track, then add the tracks in config order
   useEffect(() => {
     let cancelled = false;
-    // Peaks that have arrived (null: failed), by config index. Tracks are
-    // added in config order once every earlier one has arrived, so a track
-    // never enters in front of one already shown.
-    const arrived = new Map<number, WaveformData | null>();
-    let next = 0;
-    const addArrived = () => {
-      const ready: ArrangementTrack[] = [];
-      while (arrived.has(next)) {
-        const waveformData = arrived.get(next);
-        const config = trackConfigs[next];
-        if (waveformData) {
-          ready.push(audioTrack({ src: config.audioSrc, name: config.name, waveformData }));
-        }
-        next++;
-      }
-      // A track already there (an effect run again by Fast Refresh) is not added twice.
-      const present = arrangement.getTracks();
-      ready
-        .filter((track) => !present.some((p) => p.name === track.name))
-        .forEach((track) => arrangement.addTrack(track));
-      // The first load is not an undo step.
-      if (next === trackConfigs.length) arrangement.clearHistory();
-    };
-
-    // Load each track's peaks independently (not Promise.all)
-    trackConfigs.forEach(async (config, index) => {
-      let waveformData: WaveformData | null = null;
-      try {
-        waveformData = await loadWaveformData(config.peaksSrc);
-      } catch (error) {
-        console.error(`Error loading peaks for ${config.name}:`, error);
-      }
+    loadAllPeaks().then((peaks) => {
       if (cancelled) return;
-      arrived.set(index, waveformData);
-      addArrived();
+      // Tracks already there (an effect run again by Fast Refresh) are not added twice
+      if (arrangement.getTracks().length === 0) {
+        trackConfigs.forEach((config, index) => {
+          const waveformData = peaks[index];
+          if (waveformData) {
+            arrangement.addTrack(audioTrack({ src: config.audioSrc, name: config.name, waveformData }));
+          }
+        });
+        // The first load is not an undo step
+        arrangement.clearHistory();
+      }
+      setPeaksSettled(true);
     });
     return () => {
       cancelled = true;
@@ -190,8 +187,8 @@ export function WaveformDataExample() {
     <Container>
       {failed && (
         <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {failed[1].error?.message}{' '}
-          <button type="button" onClick={() => arrangement.retry(failed[0])}>
+          Error loading audio: {failed.message}{' '}
+          <button type="button" onClick={() => arrangement.retry(failed.src)}>
             Retry
           </button>
         </div>
@@ -218,43 +215,49 @@ export function WaveformDataExample() {
         )}
       </StatsContainer>
 
-      <WaveformPlaylistProvider
-        arrangement={arrangement}
-        sampleRate={48000}
-        samplesPerPixel={1024}
-        mono
-        automaticScroll
-        theme={theme}
-      >
-        <Controls>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-          </ControlGroup>
+      {!peaksSettled && <div style={MUTED_TEXT_STYLE}>Loading peaks...</div>}
+      {peaksSettled && tracks.length === 0 && (
+        <div style={{ padding: '2rem', color: 'red' }}>Error loading peaks: no peaks file could be loaded</div>
+      )}
+      {peaksSettled && tracks.length > 0 && (
+        <WaveformPlaylistProvider
+          arrangement={arrangement}
+          sampleRate={48000}
+          samplesPerPixel={1024}
+          mono
+          automaticScroll
+          theme={theme}
+        >
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+            </ControlGroup>
 
-          <ControlGroup>
-            <ZoomInButton />
-            <ZoomOutButton />
-          </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AudioPosition />
-          </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
 
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
+            <ControlGroup>
+              <MasterVolumeControl />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-          </ControlGroup>
-        </Controls>
+            <ControlGroup>
+              <AutomaticScrollCheckbox />
+            </ControlGroup>
+          </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <Waveform />
-        </WaveformViewOptions>
-      </WaveformPlaylistProvider>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <Waveform />
+          </WaveformViewOptions>
+        </WaveformPlaylistProvider>
+      )}
     </Container>
   );
 }

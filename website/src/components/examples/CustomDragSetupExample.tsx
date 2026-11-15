@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionOptions,
@@ -22,6 +21,7 @@ import {
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
 
 const Controls = styled.div`
   display: flex;
@@ -68,33 +68,29 @@ const trackConfigs = [
   },
 ];
 
-async function loadTracks(): Promise<ClipTrack[]> {
-  const audioContext = getGlobalAudioContext();
-  const buffers = new Map<string, AudioBuffer>();
-  await Promise.all(
-    audioFiles.map(async (file) => {
-      const response = await fetch(file.src);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${file.src}: ${response.statusText}`);
-      }
-      buffers.set(file.id, await audioContext.decodeAudioData(await response.arrayBuffer()));
-    })
-  );
-  return trackConfigs.map((config) =>
-    createTrack({
-      name: config.name,
-      clips: config.clips.map((clip) =>
-        createClipFromSeconds({
-          audioBuffer: buffers.get(clip.fileId)!,
-          startTime: clip.startTime,
-          duration: clip.duration,
-          offset: clip.offset,
-          name: `${config.name} ${clip.offset}-${clip.offset + clip.duration}s`,
-        })
-      ),
-    })
-  );
-}
+const fileSrc = (fileId: string): string => {
+  const file = audioFiles.find((f) => f.id === fileId);
+  if (!file) throw new Error(`Audio file not found for ID: ${fileId}`);
+  return file.src;
+};
+
+// Each clip is a loading clip in seconds that names its file: the arrangement
+// fetches each file once, the waveform draws a placeholder until it has
+// decoded, and the page is ready when every file has.
+const buildTracks = (): ArrangementTrack[] =>
+  trackConfigs.map((config) => ({
+    ...createTrack({ name: config.name, clips: [] }),
+    clips: config.clips.map(
+      (clip, index): LoadingClip => ({
+        id: `${clip.fileId}-${index}`,
+        src: fileSrc(clip.fileId),
+        start: clip.startTime,
+        duration: clip.duration,
+        offset: clip.offset,
+        name: `${config.name} ${clip.offset}-${clip.offset + clip.duration}s`,
+      })
+    ),
+  }));
 
 interface ClipDragSetupProps {
   touchOptimized: boolean;
@@ -162,39 +158,10 @@ function ClipDragSetup({ touchOptimized, children }: ClipDragSetupProps) {
 
 export function CustomDragSetupExample() {
   const { theme } = useDocusaurusTheme();
-  // Starts empty: the tracks are added once their audio has decoded
-  const arrangement = useCreateArrangement();
-  const [error, setError] = useState<Error | null>(null);
+  // The arrangement owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(buildTracks);
   const [interactive, setInteractive] = useState(true);
   const [touchOptimized, setTouchOptimized] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadTracks().then(
-      (loaded) => {
-        if (cancelled) return;
-        // A track already there (an effect run again by Fast Refresh) is not added twice.
-        const present = arrangement.getTracks();
-        loaded
-          .filter((track) => !present.some((p) => p.name === track.name))
-          .forEach((track) => arrangement.addTrack(track));
-        // The first load is not an undo step
-        arrangement.clearHistory();
-      },
-      (err) => {
-        if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)));
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [arrangement]);
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
-    );
-  }
 
   return (
     <WaveformPlaylistProvider
@@ -209,6 +176,7 @@ export function CustomDragSetupExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
+        <SourceLoadError arrangement={arrangement} />
         <Option>
           <input
             type="checkbox"

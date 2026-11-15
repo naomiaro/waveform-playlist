@@ -28,6 +28,7 @@ import {
   type ScaleMode,
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
 
 const Controls = styled.div`
   display: flex;
@@ -160,7 +161,6 @@ export function BeatsAndBarsExample() {
   const arrangement = useCreateArrangement(buildTracks);
   const sources = useArrangementSources(arrangement);
   const settledCount = sources.sources.size - sources.pendingCount;
-  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   const snap = scaleMode === 'beats' ? snapTo !== 'off' : temporalSnap;
 
@@ -188,14 +188,7 @@ export function BeatsAndBarsExample() {
                   Loading: {settledCount}/{sources.sources.size}
                 </span>
               )}
-              {failed && (
-                <span style={{ fontSize: '0.875rem', color: 'red' }}>
-                  Error loading audio: {failed[1].error?.message}{' '}
-                  <button type="button" onClick={() => arrangement.retry(failed[0])}>
-                    Retry
-                  </button>
-                </span>
-              )}
+              <SourceLoadError arrangement={arrangement} />
             </ControlGroup>
             <ControlGroup>
               <ZoomInButton />
