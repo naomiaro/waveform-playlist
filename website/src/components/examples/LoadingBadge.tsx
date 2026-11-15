@@ -43,9 +43,10 @@ const Badge = styled.span`
   border: 1px solid var(--ifm-color-emphasis-300);
   border-radius: 0.25rem;
   background: var(--ifm-background-surface-color);
-  color: var(--ifm-color-emphasis-700);
+  color: var(--ifm-color-emphasis-800);
   font-family: 'Courier New', monospace;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 `;
