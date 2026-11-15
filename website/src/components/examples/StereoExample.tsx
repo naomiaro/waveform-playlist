@@ -21,8 +21,11 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 const Controls = styled.div`
@@ -36,42 +39,32 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
+// Stereo tracks - these are stereo files from the Ubiquitous album
+const audioConfigs: AudioTrackOptions[] = [
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+    name: 'Synth 1 (Stereo)',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+    name: 'Synth 2 (Stereo)',
+  },
+];
 
 export function StereoExample() {
   const { theme } = useDocusaurusTheme();
 
-  // Load stereo tracks - these are stereo files from the Ubiquitous album
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
-      name: 'Synth 1 (Stereo)',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-      name: 'Synth 2 (Stereo)',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio - each row shows a
+  // placeholder until its file has decoded
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
+  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
       samplesPerPixel={1024}
       theme={theme}
@@ -81,7 +74,15 @@ export function StereoExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+        {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+        {failed && (
+          <span style={{ fontSize: '0.875rem', color: 'red' }}>
+            Error loading audio: {failed[1].error?.message}{' '}
+            <button type="button" onClick={() => arrangement.retry(failed[0])}>
+              Retry
+            </button>
+          </span>
+        )}
       </Controls>
 
       <WaveformViewOptions barWidth={2} barGap={0}>

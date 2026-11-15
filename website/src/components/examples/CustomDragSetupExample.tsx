@@ -16,7 +16,8 @@ import {
   useDragSensors,
   useEditorControls,
   usePlaylistZoom,
-  useEngineRefs,
+  usePlaylistTimeline,
+  useCreateArrangement,
   WaveformEditor,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
@@ -96,7 +97,6 @@ async function loadTracks(): Promise<ClipTrack[]> {
 }
 
 interface ClipDragSetupProps {
-  tracks: ClipTrack[];
   touchOptimized: boolean;
   children: React.ReactNode;
 }
@@ -106,9 +106,12 @@ interface ClipDragSetupProps {
  * own `DragDropProvider`, with the library's sensors, drag handlers and
  * collision modifier.
  */
-function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps) {
+function ClipDragSetup({ touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef } = useEngineRefs();
+  // The arrangement's tracks with their loaded clips: what a drag moves and
+  // collides with, in the order of the rows (the handlers read the
+  // arrangement themselves)
+  const { tracks } = usePlaylistTimeline();
   const { setSelectedTrackId } = useEditorControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
@@ -119,11 +122,7 @@ function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps)
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-  });
+  } = useClipDragHandlers({ samplesPerPixel });
 
   // Select the track of the clip that is being dragged.
   const onDragStart: typeof handleDragStart = (event) => {
@@ -163,7 +162,8 @@ function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps)
 
 export function CustomDragSetupExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  // Starts empty: the tracks are added once their audio has decoded
+  const arrangement = useCreateArrangement();
   const [error, setError] = useState<Error | null>(null);
   const [interactive, setInteractive] = useState(true);
   const [touchOptimized, setTouchOptimized] = useState(false);
@@ -172,7 +172,14 @@ export function CustomDragSetupExample() {
     let cancelled = false;
     loadTracks().then(
       (loaded) => {
-        if (!cancelled) setTracks(loaded);
+        if (cancelled) return;
+        // A track already there (an effect run again by Fast Refresh) is not added twice.
+        const present = arrangement.getTracks();
+        loaded
+          .filter((track) => !present.some((p) => p.name === track.name))
+          .forEach((track) => arrangement.addTrack(track));
+        // The first load is not an undo step
+        arrangement.clearHistory();
       },
       (err) => {
         if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)));
@@ -181,7 +188,7 @@ export function CustomDragSetupExample() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [arrangement]);
 
   if (error) {
     return (
@@ -191,9 +198,8 @@ export function CustomDragSetupExample() {
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
-      onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
       theme={theme}
@@ -221,7 +227,7 @@ export function CustomDragSetupExample() {
         </Option>
       </Controls>
 
-      <ClipDragSetup tracks={tracks} touchOptimized={touchOptimized}>
+      <ClipDragSetup touchOptimized={touchOptimized}>
         {/* The one place the clips learn what they may do. Waveform takes no prop for it. */}
         <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
           <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>

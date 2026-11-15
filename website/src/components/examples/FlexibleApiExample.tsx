@@ -9,7 +9,7 @@
  * - Full theming customization
  */
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { getContext } from 'tone';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
@@ -53,9 +53,11 @@ import {
   WaveformPlayhead,
   WaveformClipHeaders,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import {
   PlayheadWithMarker,
   formatTime,
@@ -310,12 +312,8 @@ const CustomSelectionInputs: React.FC = () => {
   );
 };
 
-interface FlexibleApiContentProps {
-  tracks: ClipTrack[];
-}
-
 // Main Example Content Component - Using individual hooks with Radix UI
-const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
+const FlexibleApiContent: React.FC = () => {
   const { play, pause, stop, seekTo, setTimeFormat, setAutomaticScroll } = usePlaybackControls();
   const { setMasterVolume, setLoopEnabled, setLoopRegion, zoomIn, zoomOut } = useEditorControls();
   const { currentTimeRef } = usePlaybackRefs();
@@ -497,6 +495,21 @@ const FlexibleApiContent: React.FC<FlexibleApiContentProps> = ({ tracks }) => {
   );
 };
 
+// Albert Kader "Ubiquitous" - all 11 tracks
+const audioConfigs: AudioTrackOptions[] = [
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
+  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
+];
+
 // Main Example Component
 export function FlexibleApiExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
@@ -532,75 +545,36 @@ export function FlexibleApiExample() {
     timescaleBackgroundColor: '#2c3e50',
   };
 
-  // Albert Kader "Ubiquitous" - all 11 tracks
-  const audioConfigs = React.useMemo(() => [
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
-    { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Update tracks state as they finish loading
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
-        <Container>
-          <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)' }}>
-            <Text size="3" color="red">
-              Error loading audio: {error}
-            </Text>
-          </Card>
-        </Container>
-      </Theme>
-    );
-  }
-
-  // Show loading progress while tracks are being loaded
-  if (tracks.length === 0 && loading) {
-    return (
-      <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
-        <Container>
-          <Card>
-            <Flex justify="center" align="center" style={{ padding: '3rem' }}>
-              <Text size="3">Loading tracks: {loadedCount}/{totalCount}...</Text>
-            </Flex>
-          </Card>
-        </Container>
-      </Theme>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio - each row shows a
+  // placeholder until its file has decoded
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
     <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
       <Container>
+        {failed && (
+          <Card style={{ background: 'var(--red-3)', border: '1px solid var(--red-6)', marginBottom: '1rem' }}>
+            <Flex align="center" gap="3">
+              <Text size="3" color="red">
+                Error loading audio: {failed[1].error?.message}
+              </Text>
+              <Button size="1" variant="soft" color="red" onClick={() => arrangement.retry(failed[0])}>
+                Retry
+              </Button>
+            </Flex>
+          </Card>
+        )}
         <WaveformPlaylistProvider
-          tracks={tracks}
+          arrangement={arrangement}
           sampleRate={48000}
-          onTracksChange={setTracks}
-          deferEngineRebuild={loading}
           samplesPerPixel={512}
           mono
           automaticScroll
           theme={customTheme}
         >
-          <FlexibleApiContent tracks={tracks} />
+          <FlexibleApiContent />
         </WaveformPlaylistProvider>
 
         <Card style={{ marginTop: '2rem', background: 'var(--gray-2)' }}>

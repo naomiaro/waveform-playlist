@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -22,14 +22,16 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
-import { type ClipTrack } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
-const audioConfigs = [
+const audioConfigs: AudioTrackOptions[] = [
   {
     src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/01_Loop1.opus',
     name: 'Loop 1',
@@ -112,34 +114,18 @@ const ControlGroup = styled.div`
 export function StemTracksExample() {
   const { theme } = useDocusaurusTheme();
 
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Sync local track state as peaks fill in; once loading finishes this stops
-  // firing, so subsequent updates (e.g. track reordering) come from onTracksChange.
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // The arrangement owns the tracks (reordering included) and loads their
+  // audio - each row shows a placeholder until its file has decoded
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
+  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
     <Container>
       <WaveformPlaylistProvider
-        tracks={tracks}
-        onTracksChange={setTracks}
-        deferEngineRebuild={loading}
+        arrangement={arrangement}
         sampleRate={48000}
         samplesPerPixel={512}
         mono
@@ -153,7 +139,15 @@ export function StemTracksExample() {
               <PlayButton />
               <PauseButton />
               <StopButton />
-              {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+              {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+              {failed && (
+                <span style={{ fontSize: '0.875rem', color: 'red' }}>
+                  Error loading audio: {failed[1].error?.message}{' '}
+                  <button type="button" onClick={() => arrangement.retry(failed[0])}>
+                    Retry
+                  </button>
+                </span>
+              )}
             </ControlGroup>
 
             <ControlGroup>

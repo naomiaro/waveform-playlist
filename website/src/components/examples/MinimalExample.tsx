@@ -20,8 +20,11 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -88,44 +91,40 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
+// Define your track configuration once, outside the component
+const audioConfigs: AudioTrackOptions[] = [
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    name: 'Bass',
+  },
+];
 
 export function MinimalExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const gradientTheme = isDarkMode ? darkModeGradientTheme : lightModeGradientTheme;
 
-  // Define your track configuration - use useMemo to prevent re-creating on every render
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-      name: 'Bass',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders
-  const { tracks, loading, error } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio; the waveform
+  // shows a placeholder until it arrives
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
+    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
       <Controls>
         <PlayButton />
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
+        {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
+        {failed && (
+          <span style={{ fontSize: '0.875rem', color: 'red' }}>
+            Error loading audio: {failed[1].error?.message}{' '}
+            <button type="button" onClick={() => arrangement.retry(failed[0])}>
+              Retry
+            </button>
+          </span>
+        )}
       </Controls>
 
       <WaveformViewOptions progressBarWidth={2}>

@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
@@ -17,6 +16,8 @@ import {
   MasterVolumeControl,
   WaveformEditor,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import {
   BeatsAndBarsProvider,
@@ -48,7 +49,8 @@ const ControlGroup = styled.div`
   }
 `;
 
-// Audio files - each file is loaded and decoded once
+// Audio files - each file is loaded and decoded once by the arrangement,
+// however many clips name it
 // All from Ubiquitous for consistency
 const audioFiles = [
   { id: 'kick', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus' },
@@ -92,7 +94,8 @@ const trackConfigs = [
   },
   {
     name: 'Bass',
-    clips: [{ fileId: 'bass', startTime: 0, duration: 20, offset: 0 }],
+    // The whole file: it decodes to 16.645 s (48 kHz), so the clip ends with it.
+    clips: [{ fileId: 'bass', startTime: 0, duration: 16.64, offset: 0 }],
   },
   {
     name: 'Synth 1',
@@ -111,34 +114,37 @@ const trackConfigs = [
   },
 ];
 
-// Default sample rate for placeholder clips (before audio loads)
-const DEFAULT_SAMPLE_RATE = 48000;
+const fileSrc = (fileId: string): string => {
+  const file = audioFiles.find((f) => f.id === fileId);
+  if (!file) throw new Error(`Audio file not found for ID: ${fileId}`);
+  return file.src;
+};
 
-// Build tracks from config, optionally attaching audioBuffers from loaded files
-const buildTracks = (fileBuffers: Map<string, AudioBuffer>): ClipTrack[] =>
+// Build tracks from config. Each clip is a loading clip in seconds; its
+// duration lets the waveform draw it as a placeholder at once, and the
+// arrangement makes it a playable clip when its file has decoded.
+const buildTracks = (): ArrangementTrack[] =>
   trackConfigs.map((trackConfig) => {
-    const clips = trackConfig.clips.map((clipConfig) => {
-      const audioBuffer = fileBuffers.get(clipConfig.fileId);
+    const clips: LoadingClip[] = trackConfig.clips.map((clipConfig, index) => ({
+      id: `${clipConfig.fileId}-${index}`,
+      src: fileSrc(clipConfig.fileId),
+      start: clipConfig.startTime,
+      duration: clipConfig.duration,
+      offset: clipConfig.offset,
+      name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
+    }));
 
-      return createClipFromSeconds({
-        audioBuffer,
-        sampleRate: audioBuffer?.sampleRate ?? DEFAULT_SAMPLE_RATE,
-        sourceDuration: audioBuffer?.duration ?? clipConfig.duration + clipConfig.offset,
-        startTime: clipConfig.startTime,
-        duration: clipConfig.duration,
-        offset: clipConfig.offset,
-        name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
-      });
-    });
-
-    return createTrack({
-      name: trackConfig.name,
+    return {
+      ...createTrack({
+        name: trackConfig.name,
+        clips: [],
+        muted: false,
+        soloed: false,
+        volume: 1,
+        pan: 0,
+      }),
       clips,
-      muted: false,
-      soloed: false,
-      volume: 1,
-      pan: 0,
-    });
+    };
   });
 
 export function BeatsAndBarsExample() {
@@ -150,83 +156,22 @@ export function BeatsAndBarsExample() {
   const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
   const [temporalSnap, setTemporalSnap] = useState(true);
 
-  // Load audio files in parallel — each file updates loadedFiles independently
-  const [loadedFiles, setLoadedFiles] = useState<Map<string, AudioBuffer>>(new Map());
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadedCount, setLoadedCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const abortController = new AbortController();
-    const audioContext = getGlobalAudioContext();
-
-    audioFiles.forEach(async (file) => {
-      try {
-        const response = await fetch(file.src, { signal: abortController.signal });
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${file.src}: ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        if (!cancelled) {
-          setLoadedFiles((prev) => {
-            const next = new Map(prev);
-            next.set(file.id, audioBuffer);
-            return next;
-          });
-          setLoadedCount((prev) => prev + 1);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error(
-            `[waveform-playlist] Failed to load ${file.id}: ${err instanceof Error ? err.message : String(err)}`
-          );
-          setLoadError(err instanceof Error ? err.message : `Failed to load ${file.id}`);
-          // Count failed loads so loading eventually completes
-          setLoadedCount((prev) => prev + 1);
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      abortController.abort();
-    };
-  }, []);
-
-  const loading = loadedCount < audioFiles.length;
-
-  // Build tracks from config — placeholder clips render immediately,
-  // audioBuffers are attached as they load (peaks fill in progressively).
-  const tracks = React.useMemo(() => buildTracks(loadedFiles), [loadedFiles]);
-  const [tracksState, setTracks] = useState<ClipTrack[]>(tracks);
-
-  // Sync derived tracks into state synchronously during render.
-  // useEffect sync causes a 1-render lag — if loading flips to false in a
-  // separate batch, the provider sees stale tracksState and rebuilds twice.
-  const prevTracksRef = useRef(tracks);
-  if (tracks !== prevTracksRef.current) {
-    prevTracksRef.current = tracks;
-    setTracks(tracks);
-  }
+  // The arrangement owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(buildTracks);
+  const sources = useArrangementSources(arrangement);
+  const settledCount = sources.sources.size - sources.pendingCount;
+  const failed = Array.from(sources.sources).find(([, state]) => state.status === 'failed');
 
   const snap = scaleMode === 'beats' ? snapTo !== 'off' : temporalSnap;
 
-  if (loadError) {
-    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {loadError}</div>;
-  }
-
   return (
     <WaveformPlaylistProvider
-      tracks={tracksState}
+      arrangement={arrangement}
       sampleRate={48000}
-      onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
       automaticScroll
       theme={theme}
-      deferEngineRebuild={loading}
       indefinitePlayback
     >
       <BeatsAndBarsProvider bpm={bpm} timeSignature={timeSignature} snapTo={snapTo} scaleMode={scaleMode}>
@@ -238,9 +183,17 @@ export function BeatsAndBarsExample() {
               <PauseButton />
               <StopButton />
               <LoopButton />
-              {loading && (
+              {sources.isLoading && (
                 <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>
-                  Loading: {loadedCount}/{audioFiles.length}
+                  Loading: {settledCount}/{sources.sources.size}
+                </span>
+              )}
+              {failed && (
+                <span style={{ fontSize: '0.875rem', color: 'red' }}>
+                  Error loading audio: {failed[1].error?.message}{' '}
+                  <button type="button" onClick={() => arrangement.retry(failed[0])}>
+                    Retry
+                  </button>
                 </span>
               )}
             </ControlGroup>

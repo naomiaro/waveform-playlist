@@ -17,6 +17,7 @@ import {
   MasterVolumeControl,
   WaveformEditor,
   WaveformViewOptions,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 
@@ -139,10 +140,13 @@ const createTrackFromConfig = (
   });
 };
 
+const configIndexOf = (name: string): number => trackConfigs.findIndex((config) => config.name === name);
+
 export function MultiClipExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [loadedFiles, setLoadedFiles] = useState<Map<string, AudioBuffer>>(new Map());
+  // Starts empty: the arrangement owns the tracks, and each track is added
+  // once every file its clips use has decoded
+  const arrangement = useCreateArrangement();
   const [error, setError] = useState<Error | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
 
@@ -150,6 +154,24 @@ export function MultiClipExample() {
   useEffect(() => {
     let cancelled = false;
     const audioContext = getGlobalAudioContext();
+    const loadedFiles = new Map<string, AudioBuffer>();
+
+    // Add each track whose files have all decoded, at its place in the
+    // config order (a track already there - an effect run again by Fast
+    // Refresh - is not added twice)
+    const addReadyTracks = () => {
+      trackConfigs.forEach((trackConfig, index) => {
+        const present = arrangement.getTracks();
+        if (present.some((track) => track.name === trackConfig.name)) return;
+        if (!getRequiredFileIds(trackConfig).every((id) => loadedFiles.has(id))) return;
+        const track = createTrackFromConfig(trackConfig, loadedFiles);
+        const at = present.filter((p) => configIndexOf(p.name) < index).length;
+        arrangement.addTrack(track);
+        if (at < present.length) arrangement.reorderTrack(track.id, at);
+      });
+      // The first load is not an undo step
+      if (arrangement.getTracks().length === trackConfigs.length) arrangement.clearHistory();
+    };
 
     // Load each file independently (not Promise.all)
     audioFiles.forEach(async (file) => {
@@ -163,13 +185,10 @@ export function MultiClipExample() {
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
         if (!cancelled) {
-          // Update loaded files map for THIS file immediately
-          setLoadedFiles(prev => {
-            const newMap = new Map(prev);
-            newMap.set(file.id, audioBuffer);
-            return newMap;
-          });
+          // Add the tracks this file completes immediately
+          loadedFiles.set(file.id, audioBuffer);
           setLoadedCount(prev => prev + 1);
+          addReadyTracks();
         }
       } catch (err) {
         if (!cancelled) {
@@ -182,24 +201,7 @@ export function MultiClipExample() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Build tracks progressively as files load
-  useEffect(() => {
-    // For each track config, check if all required files are loaded
-    const newTracks: ClipTrack[] = [];
-
-    for (const trackConfig of trackConfigs) {
-      const requiredFileIds = getRequiredFileIds(trackConfig);
-      const allFilesLoaded = requiredFileIds.every(id => loadedFiles.has(id));
-
-      if (allFilesLoaded) {
-        newTracks.push(createTrackFromConfig(trackConfig, loadedFiles));
-      }
-    }
-
-    setTracks(newTracks);
-  }, [loadedFiles]);
+  }, [arrangement]);
 
   const loading = loadedCount < audioFiles.length;
 
@@ -213,9 +215,8 @@ export function MultiClipExample() {
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
-      onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
       automaticScroll={true}
