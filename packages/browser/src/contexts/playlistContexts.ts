@@ -18,6 +18,7 @@ import type { TimeFormat } from '@waveform-playlist/ui-components';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import type { FrameData } from '../providerInternals/useFrameCallbacks';
 import type { TrackDragPreview } from '../utils/trackOrderPreview';
+import type { TrimPreviewHandle, TrimPreviewPeaksValue } from '../providerInternals/useTrimPreview';
 import type { TrackClipPeaks, TrackState } from '../WaveformPlaylistContext';
 
 export type { FrameData };
@@ -321,9 +322,6 @@ export interface EngineRefsContextValue {
   getOutputLatency: () => number;
   /** The engine. `current` is null until the first build and during a rebuild. */
   playoutRef: React.RefObject<PlaylistEngine | null>;
-  /** Ref set by useClipDragHandlers during boundary trim drags.
-   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
-  isDraggingRef: React.MutableRefObject<boolean>;
 }
 
 /** Loop region (separate from selection), Audacity-style loop points (#768). */
@@ -345,9 +343,10 @@ export interface UndoRedoContextValue {
 }
 
 /**
- * What is on the timeline (#768). Changes on every clip operation, on every
- * pointer move of a trim and on a zoom (the peaks are computed per zoom
- * level), so call `usePlaylistTimeline()` only in a component
+ * What is on the timeline (#768). Changes on every clip operation (a trim
+ * once, on release: its moves are a preview only the dragged clip follows,
+ * #812) and on a zoom (the peaks are computed per zoom level), so call
+ * `usePlaylistTimeline()` only in a component
  * that draws tracks or needs the timeline length during render.
  */
 export interface PlaylistTimelineContextValue {
@@ -447,6 +446,16 @@ export const UndoRedoContext = slot<UndoRedoContextValue>();
 export const PlaylistTimelineContext = slot<PlaylistTimelineContextValue>();
 export const PlaylistMixerContext = slot<PlaylistMixerContextValue>();
 export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>();
+/**
+ * INTERNAL (neither context is exported from the package, #812): a clip trim
+ * drag in progress. The first holds the preview source, which the drag
+ * handlers write on every pointer move and clear on release and on cancel;
+ * the second the stable function that draws the previewed clip. Both values
+ * keep their identity for the life of the provider; only the dragged clip's
+ * view and the root (for the width) subscribe to the source.
+ */
+export const TrimPreviewContext = slot<TrimPreviewHandle>();
+export const TrimPreviewPeaksContext = slot<TrimPreviewPeaksValue>();
 
 // MediaElementPlaylistProvider only
 export const PlaybackRateContext = slot<PlaybackRateContextValue>();
@@ -575,8 +584,8 @@ export const useUndoRedo = () => useSlot(UndoRedoContext, 'useUndoRedo', WEB_AUD
 
 /**
  * `{ tracks, peaksDataArray, duration, isReady, onTracksChange }`. A component
- * that calls this re-renders on every clip operation, on every pointer move of
- * a trim and on a zoom.
+ * that calls this re-renders on every clip operation (a trim once, on release)
+ * and on a zoom.
  */
 export const usePlaylistTimeline = () =>
   useSlot(PlaylistTimelineContext, 'usePlaylistTimeline', WEB_AUDIO);
@@ -633,3 +642,12 @@ const orNull = <T>(value: T | typeof BLOCKED | null): T | null =>
  */
 export const usePlaylistViewOptional = () => orNull(use(PlaylistViewContext));
 export const usePlaylistZoomOptional = () => orNull(use(PlaylistZoomContext));
+
+/**
+ * INTERNAL (not exported from the package): the trim preview source and the
+ * previewed clip's drawing, or `null` under the MediaElement provider (which
+ * blocks both) and outside a provider. The clip rows are shared by both
+ * views, so their reads mean "no preview" there instead of throwing.
+ */
+export const useTrimPreviewOptional = () => orNull(use(TrimPreviewContext));
+export const useTrimPreviewPeaksOptional = () => orNull(use(TrimPreviewPeaksContext));

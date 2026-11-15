@@ -23,6 +23,7 @@ import {
 } from '../utils/trackOrderPreview';
 import { useTrailingActive } from '../hooks/useTrailingActive';
 import { useRecordingLayout } from '../hooks/useRecordingLayout';
+import { useTrimPreviewExtent } from '../hooks/useTrimPreviewView';
 import { trackKind, type RenderMode, type SpectrogramConfig } from '@waveform-playlist/core';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
 import { trackRenderMode } from '../utils/trackRenderMode';
@@ -59,7 +60,8 @@ export interface WaveformRootProps {
  * measured container width), on play and stop (its selection drag reads
  * `isPlaying`), on every change of the timeline, the zoom, the view settings,
  * the reorder preview, the spectrogram integration and the theme, on a
- * recording layout step, and whenever the component that composes it renders.
+ * recording layout step, on a 10-second step of a trim dragged past the end
+ * of the timeline, and whenever the component that composes it renders.
  * None of that renders a part by itself: the
  * parts are `children`, whose elements are the same as on the previous render
  * unless the component that composed them rendered too, and each part follows
@@ -133,6 +135,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     sampleRate
   );
   const recordingTrackId = recordingState?.isRecording ? recordingState.trackId : null;
+  // A trim dragged past the end of the timeline: its end, in 10-second steps (#812).
+  const trimPreviewEnd = useTrimPreviewExtent(sampleRate, duration);
   const recordingChannelCount = recordingProgress ? (mono ? 1 : recordingLayout.channelCount) : 0;
 
   // State for spectrogram settings modal
@@ -175,6 +179,8 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     // Grows in steps, not with every frame of the take (#695).
     displayDuration = Math.max(displayDuration, recordingLayout.displayEndSeconds);
   }
+
+  displayDuration = Math.max(displayDuration, trimPreviewEnd);
 
   // Reads `tracks` through a ref so its identity survives `tracks` changes: it
   // is a prop of every memoized clip and control panel.

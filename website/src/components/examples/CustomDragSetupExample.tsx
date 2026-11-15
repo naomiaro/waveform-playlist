@@ -109,7 +109,7 @@ interface ClipDragSetupProps {
  */
 function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId } = useEditorControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
@@ -125,7 +125,6 @@ function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: Cli
     onTracksChange,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
   });
 
   // Select the track of the clip that is being dragged.

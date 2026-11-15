@@ -27,6 +27,9 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
+  useEngineRefs,
+  useTrimPreviewOptional,
+  useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -176,6 +179,23 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
+// Reads the two internal trim preview values (#812) and the engine refs.
+let trimProbe: {
+  preview: ReturnType<typeof useTrimPreviewOptional>;
+  peaks: ReturnType<typeof useTrimPreviewPeaksOptional>;
+  engineRefs: ReturnType<typeof useEngineRefs>;
+  renders: number;
+};
+const TrimProbeChild: React.FC = () => {
+  trimProbe = {
+    preview: useTrimPreviewOptional(),
+    peaks: useTrimPreviewPeaksOptional(),
+    engineRefs: useEngineRefs(),
+    renders: (trimProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
+
 // Calls actions only, as a transport button or a custom control does (#767).
 let controlsProbe: { renders: number };
 const ControlsProbeChild: React.FC = () => {
@@ -211,6 +231,7 @@ const CHILDREN = (
     <CurrentTimeProbeChild />
     <ActiveAnnotationProbeChild />
     <ControlsProbeChild />
+    <TrimProbeChild />
     <LayoutSeekChild />
   </>
 );
@@ -371,6 +392,76 @@ describe('provider context values keep their identity (#691)', () => {
 
     expect(probe.mixer.trackStates[0]).toMatchObject({ muted: true, volume: 0.3 });
     expect(probe.mixer.trackStates[1]).toMatchObject({ pan: -0.5, soloed: true });
+  });
+});
+
+// #812: the trim preview source and the function that draws the previewed
+// clip are made once; the engine refs lost `isDraggingRef`.
+describe('the trim preview values keep their identity (#812)', () => {
+  it('through a mixer change, a selection, play and pause, a zoom, new tracks, a re-render with inline props and a preview', async () => {
+    const { setTracks } = await mount({ inlineProps: true });
+    const { preview, peaks, engineRefs, renders } = trimProbe;
+    expect(preview).not.toBeNull();
+    expect(peaks).not.toBeNull();
+    expect('isDraggingRef' in engineRefs).toBe(false);
+
+    await act(async () => {
+      probe.editor.setTrackVolume('track-1', 0.4);
+      probe.controls.setSelection(0.1, 0.5);
+      probe.editor.zoomIn();
+    });
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    await act(async () => {
+      probe.controls.pause();
+    });
+    await act(async () => {
+      setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]);
+    });
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
+    await act(async () => {
+      preview!.publish({
+        trackId: 'track-1',
+        clipId: 'track-1-clip',
+        startSample: 0,
+        durationSamples: SAMPLE_RATE / 2,
+        offsetSamples: 0,
+      });
+    });
+    await act(async () => {
+      preview!.publish(null);
+    });
+
+    expect(trimProbe.preview).toBe(preview);
+    expect(trimProbe.peaks).toBe(peaks);
+    expect(trimProbe.engineRefs).toBe(engineRefs);
+    expect(trimProbe.renders).toBe(renders);
+  });
+
+  it('the previewed clip is drawn from the latest tracks', async () => {
+    const { setTracks } = await mount();
+    const peaksFor = trimProbe.peaks!.peaksFor;
+    const preview = {
+      trackId: 'track-3',
+      clipId: 'track-3-clip',
+      startSample: 0,
+      durationSamples: SAMPLE_RATE / 2,
+      offsetSamples: 0,
+    };
+    expect(peaksFor(preview)).toBeNull();
+
+    await act(async () => {
+      setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]);
+    });
+    await waitFor(() => expect(probe.timeline.duration).toBe(2));
+
+    expect(trimProbe.peaks!.peaksFor).toBe(peaksFor);
+    expect(peaksFor(preview)).toMatchObject({
+      clipId: 'track-3-clip',
+      trackName: 'track-3',
+      durationSamples: SAMPLE_RATE / 2,
+    });
   });
 });
 

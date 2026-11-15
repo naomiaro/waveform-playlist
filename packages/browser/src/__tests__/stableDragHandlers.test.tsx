@@ -6,6 +6,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, render, cleanup, act } from '@testing-library/react';
+import { createValueSource } from '@waveform-playlist/core';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlaylistEngine } from '@waveform-playlist/engine';
 
@@ -40,6 +41,8 @@ vi.mock('@dnd-kit/react', () => ({
 vi.mock('../hooks/useDragSensors', () => ({ useDragSensors: () => [] }));
 
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
+import { TrimPreviewContext } from '../contexts/playlistContexts';
+import type { TrimPreview } from '../providerInternals/useTrimPreview';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
@@ -80,9 +83,8 @@ function makeTracks(): ClipTrack[] {
 
 function fakeEngine() {
   return {
-    beginTransaction: vi.fn(),
-    commitTransaction: vi.fn(),
-    abortTransaction: vi.fn(),
+    // The engine allows every delta: the track's own constraints decide.
+    constrainTrimDelta: vi.fn((_t: string, _c: string, _b: string, delta: number) => delta),
     trimClip: vi.fn(),
     moveClip: vi.fn(),
   };
@@ -107,44 +109,54 @@ function trimEvent(
 }
 
 describe('useClipDragHandlers', () => {
-  function setup() {
+  // A trim's moves go to the provider's trim preview (#812); the hook reads
+  // it from its context.
+  function setup(initialTracks = makeTracks()) {
     const engine = fakeEngine();
     const engineRef = { current: engine as unknown as PlaylistEngine };
-    const isDraggingRef = { current: false };
-    let tracks = makeTracks();
-    const onTracksChange = vi.fn((next: ClipTrack[]) => {
-      tracks = next;
-    });
-    const hook = renderHook(() =>
-      useClipDragHandlers({
-        tracks,
-        onTracksChange,
-        samplesPerPixel: 1000,
-        engineRef,
-        isDraggingRef,
-      })
+    const preview = createValueSource<TrimPreview | null>(null);
+    const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+      <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
     );
-    return { hook, engine, isDraggingRef, onTracksChange, getTracks: () => tracks };
+    const onTracksChange = vi.fn();
+    let tracks = initialTracks;
+    const hook = renderHook(
+      () => useClipDragHandlers({ tracks, onTracksChange, samplesPerPixel: 1000, engineRef }),
+      { wrapper }
+    );
+    return {
+      hook,
+      engine,
+      onTracksChange,
+      preview: () => preview.source.getSnapshot(),
+      setTracks: (next: ClipTrack[]) => {
+        tracks = next;
+        hook.rerender();
+      },
+      tracks: () => tracks,
+    };
   }
 
-  it('keeps the same handlers while a trim updates tracks on every move', () => {
-    const { hook, onTracksChange } = setup();
+  it('keeps the same handlers through a trim and a change of tracks', () => {
+    const { hook, setTracks, onTracksChange, preview } = setup();
     const first = hook.result.current;
 
     act(() => first.onDragStart(trimEvent(0)));
     act(() => first.onDragMove(trimEvent(10)));
-    hook.rerender();
+    setTracks(makeTracks());
     act(() => hook.result.current.onDragMove(trimEvent(20)));
     hook.rerender();
 
-    expect(onTracksChange).toHaveBeenCalledTimes(2);
+    expect(preview()?.startSample).toBe(SAMPLE_RATE + 20_000);
+    expect(onTracksChange).not.toHaveBeenCalled();
     expect(hook.result.current.onDragStart).toBe(first.onDragStart);
     expect(hook.result.current.onDragMove).toBe(first.onDragMove);
     expect(hook.result.current.onDragEnd).toBe(first.onDragEnd);
   });
 
-  it('applies each move to the latest tracks, from the original clip', () => {
-    const { hook, getTracks } = setup();
+  it('computes each move from the clip at drag start, and changes no track', () => {
+    const { hook, preview, tracks } = setup();
+    const before = tracks();
     const handlers = hook.result.current;
 
     act(() => handlers.onDragStart(trimEvent(0)));
@@ -153,71 +165,36 @@ describe('useClipDragHandlers', () => {
     // Called through the handler captured before the re-render.
     act(() => handlers.onDragMove(trimEvent(20)));
 
-    const b = getTracks()[0].clips[0];
-    expect(b.startSample).toBe(SAMPLE_RATE + 20_000);
-    expect(b.offsetSamples).toBe(SAMPLE_RATE + 20_000);
-    expect(b.durationSamples).toBe(SAMPLE_RATE - 20_000);
-    // Untouched clips keep their identity.
-    expect(getTracks()[0].clips[1].id).toBe('a');
-  });
-
-  it('stops a left trim exactly at the end of the previous clip', () => {
-    const { hook, getTracks } = setup();
-    const handlers = hook.result.current;
-
-    act(() => handlers.onDragStart(trimEvent(0)));
-    act(() => handlers.onDragMove(trimEvent(-10)));
-    hook.rerender();
-    // Far past clip `a`, which ends at 0.5 s. `a` is stored AFTER `b` in the
-    // clips array, so a wrong sorted index would pick the wrong neighbour.
-    act(() => handlers.onDragMove(trimEvent(-5000)));
-
-    expect(getTracks()[0].clips[0].startSample).toBe(SAMPLE_RATE / 2);
-  });
-
-  it('stops a right trim exactly at the start of the next clip', () => {
-    const { hook, getTracks } = setup();
-    const handlers = hook.result.current;
-
-    act(() => handlers.onDragStart(trimEvent(0, {}, 'right')));
-    act(() => handlers.onDragMove(trimEvent(10, {}, 'right')));
-    hook.rerender();
-    act(() => handlers.onDragMove(trimEvent(5000, {}, 'right')));
-
-    const b = getTracks()[0].clips[0];
-    expect(b.startSample + b.durationSamples).toBe(3 * SAMPLE_RATE);
+    expect(preview()).toEqual({
+      trackId: 'track-1',
+      clipId: 'b',
+      startSample: SAMPLE_RATE + 20_000,
+      offsetSamples: SAMPLE_RATE + 20_000,
+      durationSamples: SAMPLE_RATE - 20_000,
+    });
+    expect(tracks()).toBe(before);
+    expect(tracks()[0].clips[0].startSample).toBe(SAMPLE_RATE);
   });
 
   it('follows a neighbour that is replaced during the drag (undo mid-trim)', () => {
-    const engine = fakeEngine();
-    let tracks = makeTracks();
-    const onTracksChange = (next: ClipTrack[]) => {
-      tracks = next;
-    };
-    const hook = renderHook(() =>
-      useClipDragHandlers({
-        tracks,
-        onTracksChange,
-        samplesPerPixel: 1000,
-        engineRef: { current: engine as unknown as PlaylistEngine },
-        isDraggingRef: { current: false },
-      })
-    );
+    const { hook, preview, setTracks, tracks } = setup();
     const handlers = hook.result.current;
 
     act(() => handlers.onDragStart(trimEvent(0, {}, 'right')));
     act(() => handlers.onDragMove(trimEvent(10, {}, 'right')));
-    hook.rerender();
 
     // Something else moves clip `c` 0.5 s earlier while the trim is in progress.
-    tracks = tracks.map((track) => ({
-      ...track,
-      clips: track.clips.map((c) => (c.id === 'c' ? { ...c, startSample: 2.5 * SAMPLE_RATE } : c)),
-    }));
-    hook.rerender();
+    setTracks(
+      tracks().map((track) => ({
+        ...track,
+        clips: track.clips.map((c) =>
+          c.id === 'c' ? { ...c, startSample: 2.5 * SAMPLE_RATE } : c
+        ),
+      }))
+    );
     act(() => handlers.onDragMove(trimEvent(5000, {}, 'right')));
 
-    const b = tracks[0].clips[0];
+    const b = preview() as TrimPreview;
     expect(b.startSample + b.durationSamples).toBe(2.5 * SAMPLE_RATE);
   });
 
@@ -235,26 +212,24 @@ describe('useClipDragHandlers', () => {
     expect(sort.mock.calls.length).toBeLessThanOrEqual(1);
   });
 
-  it('commits the last delta on drop and reverts on cancel', () => {
-    const { hook, engine, isDraggingRef, getTracks } = setup();
+  it('commits the last delta on drop, and a cancel commits nothing', () => {
+    const { hook, engine, preview, onTracksChange } = setup();
     const handlers = hook.result.current;
 
     act(() => handlers.onDragStart(trimEvent(0)));
-    expect(isDraggingRef.current).toBe(true);
     act(() => handlers.onDragMove(trimEvent(10)));
-    hook.rerender();
     act(() => handlers.onDragEnd(trimEvent(10)));
+    expect(engine.trimClip).toHaveBeenCalledTimes(1);
     expect(engine.trimClip).toHaveBeenCalledWith('track-1', 'b', 'left', 10_000);
-    expect(engine.commitTransaction).toHaveBeenCalledTimes(1);
-    expect(isDraggingRef.current).toBe(false);
+    expect(preview()).toBeNull();
 
     act(() => handlers.onDragStart(trimEvent(0)));
-    const before = getTracks()[0].clips[0].startSample;
     act(() => handlers.onDragMove(trimEvent(30)));
-    hook.rerender();
+    expect(preview()?.startSample).toBe(SAMPLE_RATE + 30_000);
     act(() => handlers.onDragEnd(trimEvent(30, { canceled: true })));
-    expect(getTracks()[0].clips[0].startSample).toBe(before);
-    expect(engine.abortTransaction).toHaveBeenCalledTimes(1);
+    expect(preview()).toBeNull();
+    expect(engine.trimClip).toHaveBeenCalledTimes(1);
+    expect(onTracksChange).not.toHaveBeenCalled();
   });
 });
 
@@ -264,7 +239,6 @@ describe('ClipInteractionProvider', () => {
       samplesPerPixel: 1000,
       sampleRate: SAMPLE_RATE,
       playoutRef: { current: null },
-      isDraggingRef: { current: false },
       onTracksChange: () => {},
     };
     playlistData = { ...base, tracks: makeTracks() };
@@ -309,7 +283,6 @@ describe('ClipInteractionProvider: the track-reorder preview', () => {
       samplesPerPixel: 1000,
       sampleRate: SAMPLE_RATE,
       playoutRef: { current: null },
-      isDraggingRef: { current: false },
       onTracksChange: () => {},
       tracks: makeTracks(),
     };

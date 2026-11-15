@@ -40,6 +40,7 @@ import {
   useWaveformRows,
 } from './waveformLayoutContext';
 import { useClipInteraction } from '../contexts/ClipInteractionContext';
+import { usePreviewedClipPeaks } from '../hooks/useTrimPreviewView';
 import { ChannelWithProgress } from './ChannelWithProgress';
 import {
   TrackRowPositioner,
@@ -90,10 +91,12 @@ interface ClipViewProps extends RowDisplayOptions {
  * changed (see utils/derivePeaks.ts) and everything else is a primitive or a
  * stable callback, so an edit to one clip re-renders that clip only. Each
  * `Clip` runs three `useDraggable` hooks, which is what made re-rendering all
- * of them per pointer move expensive.
+ * of them per pointer move expensive. While a trim of this clip is dragged it
+ * also follows the trim preview, and draws the previewed geometry (#812); a
+ * move of that drag renders this clip's view and no other.
  */
 const ClipView = React.memo(function ClipView({
-  clip,
+  clip: committedClip,
   trackId,
   trackIndex,
   clipIndex,
@@ -114,6 +117,7 @@ const ClipView = React.memo(function ClipView({
   // The one source of both options (#690): set by `ClipInteractionProvider`
   // or `ClipInteractionOptions` above, never passed down as props.
   const { enabled: interactiveClips, touchOptimized } = useClipInteraction();
+  const clip = usePreviewedClipPeaks(committedClip, trackId);
   const peaksData = clip.peaks;
   const width = peaksData.length;
 
