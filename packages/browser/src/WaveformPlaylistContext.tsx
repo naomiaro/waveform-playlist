@@ -33,6 +33,7 @@ import {
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
+import { useTrimPreview } from './providerInternals/useTrimPreview';
 import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
 import { timelineDuration } from './utils/timelineDuration';
 import { incrementalTrackChange } from './utils/incrementalTrackChange';
@@ -107,6 +108,8 @@ import {
   SelectedRowContext,
   SelectionContext,
   TrackReorderPreviewContext,
+  TrimPreviewContext,
+  TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
   type CurrentTimeContextValue,
@@ -396,10 +399,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // engine when we're skipping the rebuild. React runs previous cleanup before the
   // current effect body, so the flag must be set during render (which precedes cleanup).
   const skipEngineDisposeRef = useRef(false);
-  // Set by useClipDragHandlers during boundary trim drags. When true,
-  // loadAudio skips the full engine rebuild — visual updates flow via React
-  // state only. On drag end, engine.trimClip() commits the final delta.
-  const isDraggingRef = useRef(false);
   // Snapshot of tracks from the previous loadAudio run, used to detect
   // additive-only changes (new tracks appended, existing unchanged).
   const prevTracksRef = useRef<ClipTrack[]>([]);
@@ -489,6 +488,14 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // eslint-disable-next-line react-hooks/exhaustive-deps -- generatedWaveformVersion invalidates the ref-backed lookup
   }, [tracks, samplesPerPixel, mono, getGeneratedWaveformData, generatedWaveformVersion]);
 
+  // A trim drag in progress (#812): moves go to this source, and only the
+  // dragged clip's view follows them. The tracks change once, on release.
+  const { trimPreview, trimPreviewPeaks } = useTrimPreview({
+    tracks,
+    peaksOptions: { samplesPerPixel, mono, getGeneratedWaveformData },
+    peaksCacheRef,
+  });
+
   // Cross-hook concern: reads selection refs to set loop region
   const setLoopRegionFromSelection = useCallback(() => {
     const start = selectionStartRef.current ?? 0;
@@ -507,8 +514,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Render-phase guard: detect when tracks prop came from an engine clip operation.
   // Must be set before effects run so the previous effect cleanup can skip disposal.
-  // Also skip disposal during active boundary trim drags — onDragMove updates React
-  // tracks per-frame, triggering effect re-runs whose cleanup would dispose the engine.
   const isEngineTracks = tracks === engineTracksRef.current;
 
   // Detect track changes that can be applied to the running engine: new tracks
@@ -524,7 +529,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // it must NOT require prevTracks.length > 0. The engineRef !== null guard keeps
   // it correct: a lazy/no-engine consumer still takes the full build path.
 
-  skipEngineDisposeRef.current = isEngineTracks || isDraggingRef.current || isIncrementalAdd;
+  skipEngineDisposeRef.current = isEngineTracks || isIncrementalAdd;
 
   // Adjust scroll position proportionally when zoom changes
   useEffect(() => {
@@ -598,17 +603,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Guard: skip full rebuild when tracks came from an engine clip operation
     // (moveClip, trimClip, splitClip). The engine and adapter already have the
     // correct tracks — we just need to update duration for the timeline.
-    // Also skip during active boundary trim drags — visual updates flow via
-    // React state only; engine.trimClip() commits the final delta on drag end.
     // With no engine, the engine's tracks are built like any others: the
     // unmount cleanup below disposes it on an <Activity> hide, and on the
     // reveal React runs this effect again with the latest render's closure,
     // which is this path when the clip operation and the hide were one commit.
-    if ((isEngineTracks && engineRef.current) || isDraggingRef.current) {
-      if (isEngineTracks) {
-        engineTracksRef.current = null;
-      }
-
+    if (isEngineTracks && engineRef.current) {
+      engineTracksRef.current = null;
       prevTracksRef.current = tracks;
       return;
     }
@@ -1026,7 +1026,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
   // Dispose the engine on unmount, whichever path the loading effect took
   // last (#811). Only the full-build path returns a cleanup that disposes; the
-  // others (an engine clip operation, a drag, an incremental add or fill, the
+  // others (an engine clip operation, an incremental add or fill, the
   // emptied timeline with the engine kept, a deferred rebuild) return none,
   // and after one of them an unmount disposed nothing. `skipEngineDisposeRef`
   // cannot decide here: it describes the next run, and an unmount has none.
@@ -1760,7 +1760,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getLookAhead,
       getOutputLatency,
       playoutRef: engineRef,
-      isDraggingRef,
     }),
     [
       playbackStartTimeRef,
@@ -1770,7 +1769,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getLookAhead,
       getOutputLatency,
       engineRef,
-      isDraggingRef,
     ]
   );
 
@@ -1952,8 +1950,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [samplesPerPixel, zoom.canZoomIn, zoom.canZoomOut]
   );
 
-  // Changes on every pointer move of a trim, and on a zoom (the peaks are
-  // computed per zoom level).
+  // Changes on every clip operation (a trim once, on release: its moves are
+  // the trim preview, #812) and on a zoom (the peaks are computed per zoom
+  // level).
   const timelineValue: PlaylistTimelineContextValue = useMemo(
     () => ({ tracks, peaksDataArray, duration, isReady, onTracksChange }),
     [tracks, peaksDataArray, duration, isReady, onTracksChange]
@@ -1981,43 +1980,49 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         <MediaElementTrackContext value={BLOCKED}>
           <PlaybackRefsContext value={refsValue}>
             <EngineRefsContext value={engineRefsValue}>
-              <PlaybackControlsContext value={controlsValue}>
-                <EditorControlsContext value={editorControlsValue}>
-                  <PlaylistViewContext value={viewValue}>
-                    <PlaylistSettingsContext value={settingsValue}>
-                      <PlaylistZoomContext value={zoomValue}>
-                        <UndoRedoContext value={undoRedoValue}>
-                          <SelectedTrackIdContext value={selectedTrackIdValue}>
-                            <SelectedRowContext value={selectedTrackIdValue}>
-                              <LoopContext value={loopValue}>
-                                <AnnotationOptionsContext value={annotationOptionsValue}>
-                                  <AnnotationsContext value={annotationsValue}>
-                                    <IsPlayingContext value={isPlayingValue}>
-                                      <ActiveAnnotationContext value={activeAnnotationValue}>
-                                        <CurrentTimeContext value={currentTimeValue}>
-                                          <SelectionContext value={selectionValue}>
-                                            <TrackReorderPreviewContext value={reorderPreviewValue}>
-                                              <PlaylistMixerContext value={mixerValue}>
-                                                <PlaylistTimelineContext value={timelineValue}>
-                                                  {children}
-                                                </PlaylistTimelineContext>
-                                              </PlaylistMixerContext>
-                                            </TrackReorderPreviewContext>
-                                          </SelectionContext>
-                                        </CurrentTimeContext>
-                                      </ActiveAnnotationContext>
-                                    </IsPlayingContext>
-                                  </AnnotationsContext>
-                                </AnnotationOptionsContext>
-                              </LoopContext>
-                            </SelectedRowContext>
-                          </SelectedTrackIdContext>
-                        </UndoRedoContext>
-                      </PlaylistZoomContext>
-                    </PlaylistSettingsContext>
-                  </PlaylistViewContext>
-                </EditorControlsContext>
-              </PlaybackControlsContext>
+              <TrimPreviewContext value={trimPreview}>
+                <TrimPreviewPeaksContext value={trimPreviewPeaks}>
+                  <PlaybackControlsContext value={controlsValue}>
+                    <EditorControlsContext value={editorControlsValue}>
+                      <PlaylistViewContext value={viewValue}>
+                        <PlaylistSettingsContext value={settingsValue}>
+                          <PlaylistZoomContext value={zoomValue}>
+                            <UndoRedoContext value={undoRedoValue}>
+                              <SelectedTrackIdContext value={selectedTrackIdValue}>
+                                <SelectedRowContext value={selectedTrackIdValue}>
+                                  <LoopContext value={loopValue}>
+                                    <AnnotationOptionsContext value={annotationOptionsValue}>
+                                      <AnnotationsContext value={annotationsValue}>
+                                        <IsPlayingContext value={isPlayingValue}>
+                                          <ActiveAnnotationContext value={activeAnnotationValue}>
+                                            <CurrentTimeContext value={currentTimeValue}>
+                                              <SelectionContext value={selectionValue}>
+                                                <TrackReorderPreviewContext
+                                                  value={reorderPreviewValue}
+                                                >
+                                                  <PlaylistMixerContext value={mixerValue}>
+                                                    <PlaylistTimelineContext value={timelineValue}>
+                                                      {children}
+                                                    </PlaylistTimelineContext>
+                                                  </PlaylistMixerContext>
+                                                </TrackReorderPreviewContext>
+                                              </SelectionContext>
+                                            </CurrentTimeContext>
+                                          </ActiveAnnotationContext>
+                                        </IsPlayingContext>
+                                      </AnnotationsContext>
+                                    </AnnotationOptionsContext>
+                                  </LoopContext>
+                                </SelectedRowContext>
+                              </SelectedTrackIdContext>
+                            </UndoRedoContext>
+                          </PlaylistZoomContext>
+                        </PlaylistSettingsContext>
+                      </PlaylistViewContext>
+                    </EditorControlsContext>
+                  </PlaybackControlsContext>
+                </TrimPreviewPeaksContext>
+              </TrimPreviewContext>
             </EngineRefsContext>
           </PlaybackRefsContext>
         </MediaElementTrackContext>

@@ -32,6 +32,13 @@ export interface SmartChannelProps {
   /** Counterpart for chunk unmount / unmount. */
   spectrogramOnCanvasUnregister?: (canvasId: string) => void;
   /**
+   * The range of the audio the spectrogram is drawn for, in samples: where
+   * the drawn clip starts in its audio and how much it covers. Its canvases
+   * register with it (see `SpectrogramChannel`). Omitted: the clip's own.
+   */
+  spectrogramOffsetSamples?: number;
+  spectrogramDurationSamples?: number;
+  /**
    * The notes of a MIDI clip. When given (an empty array included), the
    * channel is drawn as a piano roll and `renderMode` is not used. Pass the
    * same array while the notes are unchanged: a new array is redrawn.
@@ -51,6 +58,8 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   spectrogramClipId,
   spectrogramOnCanvasRegister,
   spectrogramOnCanvasUnregister,
+  spectrogramOffsetSamples,
+  spectrogramDurationSamples,
   midiNotes,
   sampleRate: sampleRateProp,
   clipOffsetSeconds,
@@ -115,6 +124,8 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
         clipId={spectrogramClipId}
         onCanvasRegister={spectrogramOnCanvasRegister}
         onCanvasUnregister={spectrogramOnCanvasUnregister}
+        offsetSamples={spectrogramOffsetSamples}
+        durationSamples={spectrogramDurationSamples}
       />
     );
   }
@@ -135,6 +146,8 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
           clipId={spectrogramClipId}
           onCanvasRegister={spectrogramOnCanvasRegister}
           onCanvasUnregister={spectrogramOnCanvasUnregister}
+          offsetSamples={spectrogramOffsetSamples}
+          durationSamples={spectrogramDurationSamples}
         />
         <div
           style={{

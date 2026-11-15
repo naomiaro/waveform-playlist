@@ -185,8 +185,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Key Hooks:**
 
-- `useClipDragHandlers` - Drag-to-move and boundary trimming
-- `useClipSplitting` - Split clips at playhead
+- `useClipDragHandlers` - Drag-to-move and boundary trimming: a trim is a view-only preview, then one `engine.trimClip()` on release; clips found by id
+- `useClipSplitting` - Split clips at playhead; `splitClipAt(trackId, clipId, splitTime)` takes ids
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback

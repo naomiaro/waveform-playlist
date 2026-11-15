@@ -74,7 +74,7 @@ export const WaveformViewOptions: React.FC<WaveformViewOptionsProps> = ({
   const progressBarWidth = ownProgressBarWidth ?? above.progressBarWidth;
   const fillViewport = ownFillViewport ?? above.fillViewport;
   // Memoized on the six values: the component that renders this usually
-  // holds the tracks and renders on every move of a trim.
+  // holds the tracks and renders whenever they change.
   const value = useMemo<WaveformViewOptionsValue>(
     () => ({ waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport }),
     [waveHeight, barWidth, barGap, roundedBars, progressBarWidth, fillViewport]

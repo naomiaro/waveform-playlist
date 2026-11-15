@@ -474,9 +474,6 @@ interface EngineRefsContextValue {
   getOutputLatency: () => number;
   /** The engine. `current` is null until the first build and during a rebuild. */
   playoutRef: React.RefObject<PlaylistEngine | null>;
-  /** Ref set by useClipDragHandlers during boundary trim drags.
-   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
-  isDraggingRef: React.MutableRefObject<boolean>;
 }
 ```
 
@@ -484,9 +481,10 @@ interface EngineRefsContextValue {
 
 ```typescript
 /**
- * What is on the timeline (#768). Changes on every clip operation, on every
- * pointer move of a trim and on a zoom (the peaks are computed per zoom
- * level), so call `usePlaylistTimeline()` only in a component
+ * What is on the timeline (#768). Changes on every clip operation (a trim once,
+ * on release: its moves are a preview only the dragged clip follows, #812) and
+ * on a zoom (the peaks are computed per zoom level), so call
+ * `usePlaylistTimeline()` only in a component
  * that draws tracks or needs the timeline length during render.
  */
 interface PlaylistTimelineContextValue {
@@ -1299,24 +1297,21 @@ With `preview`, each move is published to it (the built-in annotation boxes and 
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {
-  onDragStart: (event: DragStartCallback) => void;
-  onDragMove: (event: DragMoveCallback) => void;
-  onDragEnd: (event: DragEndCallback) => void;
+  onDragStart: (event: DragStartEvent) => void; // DragStartEvent, DragMoveEvent, DragEndEvent: @dnd-kit/abstract
+  onDragMove: (event: DragMoveEvent) => void;
+  onDragEnd: (event: DragEndEvent) => void;
 };
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
-  /** Ref toggled during boundary trim drags. Obtain from useEngineRefs(). */
-  isDraggingRef: MutableRefObject<boolean>;
   /** Optional snap function for boundary trims — snaps a sample position to nearest grid line */
   snapSamplePosition?: (samplePos: number) => number;
 }
 ```
 
-Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. Cancel is handled inside `onDragEnd` via `event.canceled` — reverts React state for boundary trims, resets `isDraggingRef`. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop). The three handlers keep their identity while `tracks` and `onTracksChange` change (they are read through refs); they are re-created only when `samplesPerPixel` or the sample rate changes.
+Delegates move to `engine.moveClip()` on drop and trim to `engine.trimClip()` on release: each is one engine call and one undo step, and neither opens a transaction. While a trim handle is dragged, each move is constrained by `engine.constrainTrimDelta` (with an engine attached; without one, by the bounds captured at the start) and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); `tracks` and the engine do not change, and `onTracksChange` and `engine.trimClip()` are not called, until the release, which calls `onTracksChange` once. Escape (`event.canceled`) clears the preview and changes nothing. The clip is found by `clipId` within `tracks[trackIndex]` (a trim keeps that track, by id, if its row changes during the drag; a move of a clip id that is not in the track is dropped with a console warning); `clipIndex` of the drag data is not read. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop). The three handlers keep their identity while `tracks` changes (it is read through a ref): `onDragStart` never changes, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`, and both also depend on `engineRef` and the provider's trim preview, which are stable for a provider's life.
 
 ### useDragSensors
 
@@ -1378,11 +1373,11 @@ interface UseClipSplittingOptions {
 
 interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
-  splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
+  splitClipAt: (trackId: string, clipId: string, splitTime: number) => boolean;
 }
 ```
 
-Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync, and statechange emission.
+Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync, and statechange emission. `splitClipAt` takes ids and returns `false`, changing nothing, for a track id or clip id that is not in `tracks`.
 
 ---
 
@@ -2789,7 +2784,14 @@ export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@wave
 export type { SpectrogramIntegration } from '@waveform-playlist/browser';
 // SpectrogramWorkerApi (above) is a type of @dawcore/spectrogram; browser does not export it.
 // SpectrogramCanvasRegistration (what a spectrogram canvas registers with) is declared once,
-// in @waveform-playlist/core; browser and ui-components do not export it.
+// in @waveform-playlist/core; browser and ui-components do not export it:
+//   { canvasId, canvas, clipId, channelIndex, chunkIndex, widthPx, heightPx,
+//     offsetSamples?, durationSamples? }
+// offsetSamples / durationSamples: the range of the audio the canvas is drawn for (the view
+// draws a trim being dragged before the tracks have it); SpectrogramProvider draws a clip for
+// the range its canvases registered with, and for the clip's own when they are omitted.
+// SpectrogramChannel (ui-components) takes them as optional props of the same names (SmartChannel:
+// spectrogramOffsetSamples, spectrogramDurationSamples) and mounts new canvases when they change.
 // TrackMenuItem (what SpectrogramMenuItems returns an array of) is from
 // @waveform-playlist/ui-components; the spectrogram package does not export it.
 ```

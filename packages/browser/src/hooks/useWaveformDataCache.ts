@@ -36,7 +36,7 @@ export interface UseWaveformDataCacheReturn {
  * Attempts per buffer before giving up. A failed job is tried again on the
  * next `tracks` change (a crashed worker is replaced), but a buffer that can
  * never succeed (a CSP that blocks blob workers) must not be copied and sent
- * again on every pointer move of a trim.
+ * again on every change of the tracks.
  */
 const MAX_GENERATION_ATTEMPTS = 3;
 

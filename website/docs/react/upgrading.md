@@ -460,7 +460,7 @@ Four hooks are removed from `@waveform-playlist/browser`: `usePlaylistData()`, `
 
 This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, `usePlaylistData()`, `usePlaylistState()` or `usePlaybackAnimation()`, use the hook from the tables below.
 
-**Note:** three hooks named in this entry are changed again later in this major, and the four MediaElement hooks are removed. `usePlaylistControls()` is replaced by `usePlaybackControls()` and `useEditorControls()`; `usePlaylistAnnotations()` by `useAnnotations()` and `useAnnotationEditing()`; `usePlaybackRefs()` keeps `currentTimeRef`, `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback`, and its other eight fields (`playoutRef` and `isDraggingRef` among them) are on `useEngineRefs()`. When migrating in one go, apply the tables below and then [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers), or go straight to the hook that entry names for each field.
+**Note:** three hooks named in this entry are changed again later in this major, and the four MediaElement hooks are removed. `usePlaylistControls()` is replaced by `usePlaybackControls()` and `useEditorControls()`; `usePlaylistAnnotations()` by `useAnnotations()` and `useAnnotationEditing()`; `usePlaybackRefs()` keeps `currentTimeRef`, `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback`, and its other eight fields (`playoutRef` and `isDraggingRef` among them) are on `useEngineRefs()`, where `isDraggingRef` is removed again later in this major (see [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs)). When migrating in one go, apply the tables below and then [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers), or go straight to the hook that entry names for each field.
 
 ### The new hooks
 
@@ -520,7 +520,7 @@ From `usePlaylistData()`:
 | `trackDragPreview`  | `useTrackReorderPreview()` |
 | `trackReorderEpoch` | `useTrackReorderPreview()` |
 | `playoutRef`        | `usePlaybackRefs()`        |
-| `isDraggingRef`     | `usePlaybackRefs()`        |
+| `isDraggingRef`     | `usePlaybackRefs()` (removed later: see the entry on `isDraggingRef`) |
 
 From `usePlaylistState()`:
 
@@ -640,7 +640,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 2. **In plain JavaScript a call to a removed hook fails loudly.** Under webpack or Rspack the missing import is `undefined` and the call throws at the first render. In native ES modules and the Vite dev server a missing named export fails earlier, when the module is linked ("does not provide an export named …"). Either way nothing fails silently, and TypeScript reports the import.
 
-3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
+3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
 
 4. **`trackReorderEpoch` and `trackDragPreview`** are in `useTrackReorderPreview()`, not in `usePlaylistData()`. A custom track panel does not need either: `renderTrackControls` and `SortableTrackControls` are removed later in this major, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
 
@@ -652,7 +652,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 This affects you only if you render `PlaylistInfoContext.Provider` or `<SmartScale>` yourself. `<Waveform>`, `<PlaylistVisualization>` and the MediaElement components do it for you and need no change.
 
-The context value no longer has a `duration` field. Every channel and track reads `PlaylistInfoContext`, and the timeline length changes on every pointer move of a trim at the end of the timeline. `<SmartScale>` now takes the length as a required prop, `durationMs`, in milliseconds (the unit the removed field had).
+The context value no longer has a `duration` field. Every channel and track reads `PlaylistInfoContext`, and the displayed length changes when a clip operation moves the end of the timeline, and in steps of 10 seconds while a trim is dragged past it. `<SmartScale>` now takes the length as a required prop, `durationMs`, in milliseconds (the unit the removed field had).
 
 **Find:** `duration` in a value passed to `PlaylistInfoContext.Provider`; `duration` read from `usePlaylistInfo()` or `useContext(PlaylistInfoContext)`; every `<SmartScale`.
 
@@ -855,7 +855,7 @@ A custom playout created from the package's own `MediaElementPlayout` class need
 
 Six hooks are removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()` and `useMediaElementData()`. A leftover call to a removed hook fails at import (the export is missing), not silently: under webpack or Rspack the import is `undefined` and the call throws at the first render; in native ES modules and the Vite dev server the module fails to link ("does not provide an export named …"). TypeScript reports the import.
 
-`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()`. The value is a plain object with the four fields that remain, so a leftover read of one of the eight is `undefined`, with no error at the read. In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` gives `undefined` and the code fails where it next uses the name ("Cannot read properties of undefined (reading 'current')", or "getPlaybackTime is not a function"). A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. Search for the eight names next to `usePlaybackRefs` before running the app. Under `MediaElementPlaylistProvider` the player is `useMediaElementTrack().playoutRef`.
+`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()` (`isDraggingRef` is removed there later: [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs)). The value is a plain object with the four fields that remain, so a leftover read of one of the eight is `undefined`, with no error at the read. In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` gives `undefined` and the code fails where it next uses the name ("Cannot read properties of undefined (reading 'current')", or "getPlaybackTime is not a function"). A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. Search for the eight names next to `usePlaybackRefs` before running the app. Under `MediaElementPlaylistProvider` the player is `useMediaElementTrack().playoutRef`.
 
 | Removed | Replace with |
 | --- | --- |
@@ -905,6 +905,8 @@ Under either provider:
 | `useMediaElementTrack()` | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` |
 
 The values of `usePlaybackControls()`, `useEditorControls()`, `usePlaybackRefs()` and `useEngineRefs()` never change, so calling them never re-renders the component.
+
+`isDraggingRef`, in the `useEngineRefs()` row above, is removed later in this major: [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs).
 
 Type names: `PlaylistControlsContextValue`, `PlaylistAnnotationsContextValue`, `MediaElementAnimationContextValue`, `MediaElementStateContextValue`, `MediaElementControlsContextValue` and `MediaElementDataContextValue` are removed. The new value types are `PlaybackControlsContextValue`, `EditorControlsContextValue`, `AnnotationsContextValue`, `AnnotationEditingContextValue`, `EngineRefsContextValue`, `PlaybackRateContextValue` and `MediaElementTrackContextValue`. `PlaybackRefsContextValue` keeps its name and has the four fields above.
 
@@ -983,7 +985,7 @@ From `usePlaybackRefs()`:
 | `getLookAhead` | `useEngineRefs()` |
 | `getOutputLatency` | `useEngineRefs()` |
 | `playoutRef` | `useEngineRefs()` |
-| `isDraggingRef` | `useEngineRefs()` |
+| `isDraggingRef` | `useEngineRefs()` (removed later: see the entry on `isDraggingRef`) |
 
 From `useMediaElementAnimation()`:
 
@@ -1086,7 +1088,7 @@ function LatencyReadout() {
 }
 ```
 
-`useClipDragHandlers({ engineRef, isDraggingRef, … })` takes both of its refs from `useEngineRefs()` now (`engineRef: playoutRef`).
+`useClipDragHandlers({ engineRef, isDraggingRef, … })` takes both of its refs from `useEngineRefs()` now (`engineRef: playoutRef`). `isDraggingRef`, and the hook's `onTracksChange` option, are removed again later in this major: see [`useClipDragHandlers` takes no `onTracksChange` and no `isDraggingRef`](#useclipdraghandlers-takes-no-ontrackschange-and-no-isdraggingref).
 
 **A hand-built transport under `MediaElementPlaylistProvider`:** the library's buttons replace it. `AudioPosition` shows the position in the provider's time format and follows playback through the provider's animation loop, so the `requestAnimationFrame` loop goes too.
 
@@ -1896,7 +1898,7 @@ There is no `ref` for the item any more: the element that moves is the slot the 
 | A track is removed, or one is added in front of the others (the number of tracks changes and the provider rebuilds) | the panels showed every remaining track back at the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack`, and the rebuilt engine took its values from the old list by position, so a track could sound with a neighbour's values (read from the code, not reproduced as audio) | the other tracks keep what the user set |
 | The list is replaced by one of the same length with other tracks, or the same tracks in another order | state stayed at its position | a track keeps its mixer state for as long as its id is in `tracks`; a new id starts from the fields of its `ClipTrack` |
 | `usePlaylistMixer().trackStates` while tracks are loading (`deferEngineRebuild`, or tracks appended to a running playlist) | filled by position: shorter than `tracks` | one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` **at its own position**, which can be in the middle. `trackStates.length` equals `tracks.length` |
-| The identity of the `trackStates` array | a new array with new state objects whenever the provider loaded `tracks` again (also when only `onTracksChange` was a new function) | the same array while no entry changed: a move of a trim, a clip edit or a re-load for a new `onTracksChange` does not change it, and a mute changes the object of that track only |
+| The identity of the `trackStates` array | a new array with new state objects whenever the provider loaded `tracks` again (also when only `onTracksChange` was a new function) | the same array while no entry changed: a trim, a clip edit or a re-load for a new `onTracksChange` does not change it, and a mute changes the object of that track only |
 | A click in a panel of your own | selected nothing (only the default panel selected its track) | a click anywhere in a track's slot selects the track. `<TrackRemoveButton>`, the button of `<TrackMenuButton>` and the grip and buttons of `<TrackReorderGrip>` do not select. A render-mode choice in the open track menu selects the track, as it did in the default panel |
 | The remove callback | `onRemoveTrack(trackIndex)` | `onRemove(trackId)` |
 | The element a reorder drag moves | the element you gave `ref` from `SortableTrackControls` | the slot the part draws; your grip only starts the drag |
@@ -3844,3 +3846,113 @@ const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSampl
 // After
 const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSamples, isPlaceholder: false };
 ```
+
+## `isDraggingRef` is removed from `useEngineRefs()`
+
+**Package:** `@waveform-playlist/browser`.
+
+`useEngineRefs()` no longer returns `isDraggingRef`. It has no replacement: it existed to make `WaveformPlaylistProvider` ignore changes to `tracks` while a clip trim was dragged, and a trim no longer changes `tracks` while it is dragged (see [A clip trim previews in the view and reaches `onTracksChange` once](#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once)). `useEngineRefs()` has seven fields now: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency` and `playoutRef`. `EngineRefsContextValue` has no `isDraggingRef` either.
+
+The value is a plain object, so a leftover read of `isDraggingRef` is `undefined`, with no error at the read; code that sets `isDraggingRef.current` throws where it does. A TypeScript build reports the property as missing.
+
+The provider no longer skips anything while a drag is under way. A `tracks` change that arrives during a trim is handled like any other `tracks` change that did not come from the engine. Before, the provider ignored a `tracks` change while `isDraggingRef.current` was true.
+
+**An app with its own trim gesture** (one that does not use `useClipDragHandlers`) and calls `onTracksChange` on every pointer move: `isDraggingRef` is gone and the library has no public trim preview, so each of those writes is an ordinary `tracks` change to the provider.
+
+**Find:** `isDraggingRef`, next to `useEngineRefs` or `usePlaybackRefs`, and a pointer handler of yours that passes a new `tracks` array to `onTracksChange` on every move.
+
+**Replace with:** delete the read. If your own gesture set `isDraggingRef.current = true` to hold the provider back, keep the gesture in your own state while the pointer is down and, on release, make one engine call on `useEngineRefs().playoutRef.current`: `engine.trimClip(trackId, clipId, boundary, deltaSamples)`. The provider then reports the engine's tracks through `onTracksChange` once.
+
+```tsx
+// Before
+const { playoutRef, isDraggingRef } = useEngineRefs();
+
+// After
+const { playoutRef } = useEngineRefs();
+```
+
+## `useClipDragHandlers` takes no `onTracksChange` and no `isDraggingRef`
+
+**Package:** `@waveform-playlist/browser`.
+
+The options of `useClipDragHandlers` are now `tracks`, `samplesPerPixel`, `engineRef` and the optional `snapSamplePosition`. `onTracksChange` and `isDraggingRef` are removed: a trim no longer writes the tracks while it is dragged, and a move never did. On release a move is one `engine.moveClip()` and a trim one `engine.trimClip()`; each reaches your state through the provider's `onTracksChange`. Neither opens an engine transaction any more: each is one engine call, and so one undo step.
+
+The hook reads the provider's trim preview, so a trim is shown while it is dragged only under `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` there is no preview and the clip rows draw the committed clip.
+
+The handlers keep their identity while `tracks` changes, as before.
+
+**Find:** `useClipDragHandlers({` with `onTracksChange` or `isDraggingRef` in its argument. TypeScript reports each one (`Object literal may only specify known properties`).
+
+**Replace with:** the same call without the two options.
+
+```tsx
+import { useClipDragHandlers, useEngineRefs, usePlaylistZoom } from '@waveform-playlist/browser';
+
+// Before
+const { playoutRef, isDraggingRef } = useEngineRefs();
+const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
+  tracks,
+  onTracksChange: setTracks,
+  samplesPerPixel,
+  engineRef: playoutRef,
+  isDraggingRef,
+});
+
+// After
+const { playoutRef } = useEngineRefs();
+const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
+  tracks,
+  samplesPerPixel,
+  engineRef: playoutRef,
+});
+```
+
+## `splitClipAt` takes a track id and a clip id; the clip drags find clips by id
+
+**Package:** `@waveform-playlist/browser`.
+
+`useClipSplitting().splitClipAt` was `(trackIndex, clipIndex, splitTime)` and is now `(trackId, clipId, splitTime)`. A track id or a clip id that is not in `tracks` returns `false` and changes nothing. `splitClipAtPlayhead()` is unchanged and picks the same clip as before.
+
+The clip drags find their clip by id too. The drag data of a clip keeps its shape (`clipId`, `trackIndex`, `clipIndex`, and `boundary` for a trim handle), but `useClipDragHandlers` and `ClipCollisionModifier` look the clip up by `clipId` within `tracks[trackIndex]`, and `clipIndex` is no longer read: it is a position in the drawn row, which can hold placeholders that are not in `track.clips`. A trim keeps the track it started on, by id, if the track's row changes during the drag. A trim whose clip id is not in the track does nothing; a move of one is dropped with a console warning (`[waveform-playlist] The move was dropped: track "t1" has no clip "c1".`, with the ids of the drag). Code that builds its own drag source for these handlers must put the clip's `clipId` in the data.
+
+**Find:** `splitClipAt(` with a number as its first argument. TypeScript reports each one (`Argument of type 'number' is not assignable to parameter of type 'string'`); in plain JavaScript the call returns `false`.
+
+**Replace with:**
+
+```tsx
+import {
+  useClipSplitting,
+  useEngineRefs,
+  usePlaylistTimeline,
+  usePlaylistZoom,
+} from '@waveform-playlist/browser';
+
+const { tracks } = usePlaylistTimeline();
+const { samplesPerPixel } = usePlaylistZoom();
+const { playoutRef } = useEngineRefs();
+const { splitClipAt } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
+
+// Before
+splitClipAt(trackIndex, clipIndex, splitTime);
+
+// After
+const track = tracks[trackIndex];
+splitClipAt(track.id, track.clips[clipIndex].id, splitTime);
+```
+
+## A clip trim previews in the view and reaches `onTracksChange` once
+
+**Package:** `@waveform-playlist/browser`.
+
+While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call per pointer move, and `engine.trimClip()` is not called until the release (with an engine attached, each move asks `engine.constrainTrimDelta`, a query that changes nothing). The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move.
+
+The preview is internal to the library. `useClipDragHandlers` and the clip view read it themselves; there is no exported hook or context to read or write it.
+
+- **The width follows a trim dragged past the end.** While the previewed end is past the end of the timeline, the view is as wide as that end rounded up to the next 10 seconds; after the release the width is the exact new duration. The recording layout's own rule is unchanged. When the stepped width shrinks (on the release, or when the edge is dragged back inside), a view scrolled into the spare area is moved back by the browser.
+- **Without `onTracksChange`, the trim is drawn during the drag and undone in the view on release.** The view follows the pointer, then on release returns to the app's `tracks`, which did not change, while the engine keeps the trim; the provider warns "[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider." Before, nothing moved during the drag in that case.
+- **A trimmed edge stops at a neighbouring clip during the drag.** With an engine attached, each move is constrained by `engine.constrainTrimDelta`, after the edge has been snapped to the grid; without one, the bounds the handler captured at the start of the drag decide. Before, the snapped edge was drawn without the engine's constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
+- **A trim, a move or a split made while no engine is attached is dropped, with a console warning.** The clip stays where it was. That is the case before the first build has finished, and while the provider rebuilds the engine after a `tracks` change that did not come from the engine. The warnings read "[waveform-playlist] The trim was dropped: no engine is attached (before the first build, or while it is rebuilt after a change of tracks). The clip stays where it was.", the same with "The move" for a move, and "The split was dropped: … The clip stays whole." for `splitClipAt`. Before, the app's state kept the trim of each pointer move while the engine did not have it.
+
+**Find:** a test or a component that counts `onTracksChange` calls during a trim, or reads `tracks` while a trim handle is dragged to learn the clip's new bounds.
+
+**Replace with:** read the tracks after the release, when `onTracksChange` has been called once. Nothing has to draw the trim during the drag: the library's clip view does.

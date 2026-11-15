@@ -104,8 +104,8 @@ Under either provider:
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
 | `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
-| `useEngineRefs` | `playoutRef` (the engine), `isDraggingRef`, `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
-| `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
+| `useEngineRefs` | `playoutRef` (the engine), `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
+| `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
 | `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`; `undefined` for a track that is still loading), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
 | `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isLoading`, `isSelected`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |
 | `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |

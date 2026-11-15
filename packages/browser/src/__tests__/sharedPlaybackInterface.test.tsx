@@ -37,6 +37,8 @@ import {
   usePlaybackRate,
   useMediaElementTrack,
   useLoopOptional,
+  useTrimPreviewOptional,
+  useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
 import {
   PlayButton,
@@ -582,6 +584,33 @@ describe('what only one provider has throws under the other', () => {
     );
   });
 
+  // #812: the clip rows are shared, so the trim preview's readers mean "no
+  // preview" under the MediaElement provider instead of throwing; the
+  // provider blocks both contexts, so an outer WebAudio provider's preview is
+  // not reached through it.
+  it('the trim preview readers are null under MediaElementPlaylistProvider, also inside a WebAudio provider', () => {
+    const outer = makeReaders({
+      preview: useTrimPreviewOptional,
+      peaks: useTrimPreviewPeaksOptional,
+    });
+    const inner = makeReaders({
+      preview: useTrimPreviewOptional,
+      peaks: useTrimPreviewPeaksOptional,
+    });
+    render(
+      webAudio(
+        <>
+          {outer.children}
+          {mediaElement(inner.children)}
+        </>
+      )
+    );
+    expect(outer.values.preview).not.toBeNull();
+    expect(outer.values.peaks).not.toBeNull();
+    expect(inner.values.preview).toBeNull();
+    expect(inner.values.peaks).toBeNull();
+  });
+
   it('the shared hooks read the NEAREST provider when the two are nested', async () => {
     const inner = makeReaders({ view: usePlaylistView, zoom: usePlaylistZoom });
     const outer = makeReaders({ view: usePlaylistView });
@@ -644,7 +673,6 @@ describe('the WebAudio provider splits its actions and refs', () => {
       'getLookAhead',
       'getOutputLatency',
       'getPlaybackTime',
-      'isDraggingRef',
       'playbackStartTimeRef',
       'playoutRef',
     ]);
@@ -1035,7 +1063,6 @@ describe('review fixes', () => {
     'getLookAhead',
     'getOutputLatency',
     'playoutRef',
-    'isDraggingRef',
   ] as const;
 
   it('usePlaybackShortcuts throws under MediaElementPlaylistProvider, naming itself', () => {
@@ -1083,7 +1110,8 @@ describe('review fixes', () => {
     ).toBeNull();
   });
 
-  it('the eight fields that moved to useEngineRefs() are not on the usePlaybackRefs() value, under either provider', async () => {
+  // `isDraggingRef` moved there too and was removed in #812 (a trim is a preview).
+  it('the seven fields that moved to useEngineRefs() are not on the usePlaybackRefs() value, under either provider', async () => {
     installTimerFrames();
     for (const wrap of [mediaElement, (child: React.ReactNode) => webAudio(child)]) {
       const readers = makeReaders({ refs: usePlaybackRefs });

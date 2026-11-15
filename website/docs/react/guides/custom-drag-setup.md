@@ -42,9 +42,9 @@ import {
 The minimal setup for interactive clips with collision detection:
 
 ```tsx
-function PlaylistWithDrag({ tracks, onTracksChange }) {
+function PlaylistWithDrag({ tracks }) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId } = useEditorControls();
 
   // Configure drag sensors (pointer activation with 1px distance threshold)
@@ -57,10 +57,8 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
   });
 
   // Auto-select track when dragging starts
@@ -94,8 +92,8 @@ function PlaylistWithDrag({ tracks, onTracksChange }) {
 :::note Key Components
 
 - **`useDragSensors()`** — Configures pointer activation. Pass `{ touchOptimized: true }` for mobile (250ms touch delay).
-- **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming.
-- **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track. `tracks` can also be a function returning the current tracks, e.g. `ClipCollisionModifier.configure({ tracks: () => tracksRef.current, samplesPerPixel })`, which lets you memoise the `modifiers` array without rebuilding it each time tracks change (a boundary trim changes them on every pointer move).
+- **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming. A move is one `engine.moveClip()` on drop; a trim is previewed in the view while it is dragged and is one `engine.trimClip()` on release, so `tracks` changes once per drag and not per pointer move.
+- **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track. `tracks` can also be a function returning the current tracks, e.g. `ClipCollisionModifier.configure({ tracks: () => tracksRef.current, samplesPerPixel })`, which lets you memoise the `modifiers` array without rebuilding it each time tracks change.
 - **Feedback plugin config is per-entity** — the clip components declare their own `@dnd-kit` Feedback settings (no drop animation on clip moves, no Feedback on trim handles) via `useDraggable({ plugins })`, so a plain `DragDropProvider` needs no `plugins` prop for them.
 - **`RestrictToHorizontalAxis`** — Constrains drag to horizontal movement only.
 
@@ -117,10 +115,10 @@ import {
 } from '@waveform-playlist/core';
 import { useBeatsAndBars } from '@waveform-playlist/ui-components';
 
-function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
+function PlaylistWithBeatsSnap({ tracks }) {
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const beatsAndBars = useBeatsAndBars();
 
   const { bpm, timeSignature, snapTo } = beatsAndBars;
@@ -140,10 +138,8 @@ function PlaylistWithBeatsSnap({ tracks, onTracksChange }) {
   const sensors = useDragSensors();
   const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
     tracks,
-    onTracksChange,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
     snapSamplePosition, // Snaps boundary trims to grid
   });
 
@@ -311,11 +307,11 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
 | `tracks` | `ClipTrack[]` | Yes | Current tracks state |
-| `onTracksChange` | `(tracks: ClipTrack[]) => void` | Yes | Callback when tracks change |
 | `samplesPerPixel` | `number` | Yes | Current zoom level |
 | `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `useEngineRefs().playoutRef` |
-| `isDraggingRef` | `MutableRefObject<boolean>` | Yes | Drag state ref from `useEngineRefs().isDraggingRef` |
 | `snapSamplePosition` | `(sample: number) => number` | No | Snap function for boundary trims |
+
+The hook finds the dragged clip by its `clipId` within `tracks[trackIndex]`; a trim keeps that track, by id, if its row changes during the drag, and a move of a clip id that is not in the track is dropped with a console warning. With an engine attached, each move of a trim handle is constrained by the engine (`engine.constrainTrimDelta`); without one, the bounds captured at the start of the drag decide. Each move is drawn as a preview of the dragged clip only; the release makes one `engine.trimClip()`. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. See [A clip trim previews in the view and reaches `onTracksChange` once](/docs/react/upgrading#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once).
 
 ### `ClipCollisionModifier.configure(options)`
 

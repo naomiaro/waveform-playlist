@@ -33,7 +33,7 @@ export interface DerivePeaksOptions {
 }
 
 /** What a clip's typed arrays were computed from. */
-interface PeakInputs {
+export interface PeakInputs {
   waveformData: WaveformData | undefined;
   /** Compared only when path A is absent or failed (`usesGenerated`). */
   generated: WaveformData | undefined;
@@ -47,7 +47,8 @@ interface PeakInputs {
   isMidi: boolean;
 }
 
-interface ClipEntry {
+/** What `clipPeaksFor` returns: a clip's drawing record and what it was computed from. */
+export interface ClipPeaksEntry {
   inputs: PeakInputs;
   /** True when path A was absent or failed, so `generated` matters. */
   usesGenerated: boolean;
@@ -56,7 +57,7 @@ interface ClipEntry {
 }
 
 export interface PeaksCache {
-  readonly clips: ReadonlyMap<string, ClipEntry>;
+  readonly clips: ReadonlyMap<string, ClipPeaksEntry>;
   readonly tracks: ReadonlyMap<string, TrackClipPeaks>;
   readonly result: TrackClipPeaks[];
 }
@@ -177,12 +178,18 @@ function sameClipPeaks(a: ClipPeaks, clip: AudioClip, trackName: string, peaks: 
   );
 }
 
-function deriveClip(
+/**
+ * One clip's peaks and drawing record, reusing `previous` (the entry of the
+ * same clip from the last pass) when nothing it depends on changed. The step
+ * `derivePeaks` runs for every clip, exported so that a clip drawn with a
+ * trim preview's geometry is computed by the same code (#812).
+ */
+export function clipPeaksFor(
   clip: AudioClip,
   trackName: string,
   options: DerivePeaksOptions,
-  previous: ClipEntry | undefined
-): ClipEntry {
+  previous?: ClipPeaksEntry
+): ClipPeaksEntry {
   const inputs: PeakInputs = {
     waveformData: clip.waveformData as WaveformData | undefined,
     generated: clip.audioBuffer ? options.getGeneratedWaveformData(clip.audioBuffer) : undefined,
@@ -234,12 +241,12 @@ export function derivePeaks(
   options: DerivePeaksOptions,
   previous: PeaksCache
 ): PeaksCache {
-  const clips = new Map<string, ClipEntry>();
+  const clips = new Map<string, ClipPeaksEntry>();
   const trackPeaks = new Map<string, TrackClipPeaks>();
 
   const derived = tracks.map((track) => {
     const clipPeaks = track.clips.map((clip) => {
-      const entry = deriveClip(clip, track.name, options, previous.clips.get(clip.id));
+      const entry = clipPeaksFor(clip, track.name, options, previous.clips.get(clip.id));
       clips.set(clip.id, entry);
       return entry.clipPeaks;
     });

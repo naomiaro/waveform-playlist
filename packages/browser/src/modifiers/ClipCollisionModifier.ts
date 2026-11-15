@@ -25,8 +25,9 @@ interface ClipCollisionOptions {
  * For clip move operations: constrains horizontal transform to valid positions
  * using the engine's collision detection.
  *
- * For boundary trim operations: returns zero transform because visual feedback
- * comes from React state updates resizing the clip, not from CSS translate.
+ * For boundary trim operations: returns zero transform because the trim is
+ * shown by the trim preview, which draws the clip at its previewed geometry,
+ * not by a CSS translate.
  */
 export class ClipCollisionModifier extends Modifier<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,13 +39,15 @@ export class ClipCollisionModifier extends Modifier<
 
     if (!source?.data || !this.options) return transform;
 
-    const { boundary, trackIndex, clipIndex } = source.data as {
+    // `clipIndex` is a position in the drawn row, not in `track.clips`: the clip
+    // is found by its id.
+    const { boundary, trackIndex, clipId } = source.data as {
       boundary?: 'left' | 'right';
       trackIndex: number;
-      clipIndex: number;
+      clipId: string;
     };
 
-    // Boundary trims: zero transform (visual feedback from React state updates)
+    // Boundary trims: zero transform (the trim preview draws the clip)
     if (boundary) return { x: 0, y: 0 };
 
     const { samplesPerPixel } = this.options;
@@ -53,7 +56,7 @@ export class ClipCollisionModifier extends Modifier<
     const track = tracks[trackIndex];
     if (!track) return transform;
 
-    const clip = track.clips[clipIndex];
+    const clip = track.clips.find((c: AudioClip) => c.id === clipId);
     if (!clip) return transform;
 
     // Convert pixel delta to samples, constrain, convert back

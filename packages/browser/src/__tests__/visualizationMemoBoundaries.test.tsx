@@ -75,6 +75,7 @@ import {
   usePlaylistTimeline,
   usePlaylistZoom,
   useSelectedTrackId,
+  useTrimPreviewOptional,
 } from '../contexts/playlistContexts';
 import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
@@ -162,6 +163,7 @@ let probe: {
   state: ReturnType<typeof useSelectedTrackId>;
   selection: ReturnType<typeof useSelection>;
   activeAnnotationId: string | null;
+  trimPreview: ReturnType<typeof useTrimPreviewOptional>;
 };
 
 const ProbeChild: React.FC = () => {
@@ -172,6 +174,7 @@ const ProbeChild: React.FC = () => {
     state: useSelectedTrackId(),
     selection: useSelection(),
     activeAnnotationId: useActiveAnnotation().activeAnnotationId,
+    trimPreview: useTrimPreviewOptional(),
   };
   return null;
 };
@@ -284,8 +287,9 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
   });
 
   // The timeline length is not in `PlaylistInfoContext` any more: every
-  // channel reads that context, and the length changes on each pointer move
-  // of a trim at the end of the timeline.
+  // channel reads that context, and the length changes with a trim at the end
+  // of the timeline (once, on release, since #812; the moves widen the view in
+  // 10-second steps, trimPreview.test.tsx).
   it('trimming the clip that ends the timeline re-renders the channels of that clip only', async () => {
     const { a, b, c, d } = threeTracks();
     const { setTracks } = await mount([
@@ -442,6 +446,30 @@ describe('visualization memo boundaries (#693)', () => {
     expect(counts.clip.c).toBeUndefined();
     expect(counts.clip.d).toBeUndefined();
     expect(Object.keys(counts.track)).toEqual(['t1']);
+  });
+
+  // #812: the moves of a trim drag are a preview that only the dragged clip
+  // follows; the tracks change once, on release (the case above).
+  it('a move of a trim preview re-renders that clip and its channel only', async () => {
+    await mount(threeTracks().tracks);
+    const preview = probe.trimPreview!;
+
+    await act(async () => {
+      preview.publish({
+        trackId: 't1',
+        clipId: 'b',
+        startSample: SAMPLE_RATE * 2,
+        durationSamples: SAMPLE_RATE / 2,
+        offsetSamples: 0,
+      });
+    });
+
+    expect(counts.clip).toEqual({ b: 1 });
+    expect(counts.channel).toBe(1);
+    expect(counts.track).toEqual({});
+    expect(counts.controls).toBe(0);
+    expect(counts.shell).toBe(0);
+    expect(counts.scale).toBe(0);
   });
 
   it('a mixer change re-renders that track control panel only, and no clip', async () => {

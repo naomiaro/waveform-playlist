@@ -97,7 +97,6 @@ async function loadTracks(): Promise<ClipTrack[]> {
 
 interface ClipDragSetupProps {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   touchOptimized: boolean;
   children: React.ReactNode;
 }
@@ -107,9 +106,9 @@ interface ClipDragSetupProps {
  * own `DragDropProvider`, with the library's sensors, drag handlers and
  * collision modifier.
  */
-function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: ClipDragSetupProps) {
+function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId } = useEditorControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
@@ -122,10 +121,8 @@ function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: Cli
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
   });
 
   // Select the track of the clip that is being dragged.
@@ -138,7 +135,8 @@ function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: Cli
   };
 
   // The collision modifier takes a function for `tracks`, so the modifiers
-  // array is not rebuilt on every pointer move of a trim (tracks change then).
+  // array is not rebuilt when the tracks change (a move or a trim, once each
+  // on release).
   const tracksRef = useRef(tracks);
   tracksRef.current = tracks;
   const getTracks = useCallback(() => tracksRef.current, []);
@@ -186,7 +184,9 @@ export function CustomDragSetupExample() {
   }, []);
 
   if (error) {
-    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>;
+    return (
+      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
+    );
   }
 
   return (
@@ -221,7 +221,7 @@ export function CustomDragSetupExample() {
         </Option>
       </Controls>
 
-      <ClipDragSetup tracks={tracks} onTracksChange={setTracks} touchOptimized={touchOptimized}>
+      <ClipDragSetup tracks={tracks} touchOptimized={touchOptimized}>
         {/* The one place the clips learn what they may do. Waveform takes no prop for it. */}
         <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
           <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>

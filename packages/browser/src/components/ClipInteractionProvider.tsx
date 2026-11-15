@@ -24,9 +24,6 @@ import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
 import { ClipInteractionOptions, useClipInteraction } from '../contexts/ClipInteractionContext';
 
-// Stable noop to avoid creating a new function reference on every render
-const NOOP_TRACKS_CHANGE = () => {};
-
 export interface ClipInteractionProviderProps {
   /** Enable snap-to-grid for clip moves and boundary trims. When true,
    *  auto-detects beats snapping from BeatsAndBarsProvider context
@@ -53,7 +50,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, onTracksChange } = usePlaylistTimeline();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
     useEditorControls();
   const beatsAndBars = useBeatsAndBars();
@@ -96,9 +93,9 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, sampleRate, samplesPerPixel]);
 
   // Handlers and modifiers read tracks through this ref, so their identity does
-  // not change when tracks do. A boundary trim replaces tracks on every pointer
-  // move; keyed on tracks, the handlers and the modifiers array handed to
-  // DragDropProvider were rebuilt mid-drag.
+  // not change when tracks do: keyed on tracks, the handlers and the modifiers
+  // array handed to DragDropProvider would be rebuilt by any clip operation,
+  // also one that lands mid-drag.
   const tracksRef = useRef(tracks);
   tracksRef.current = tracks;
   const getTracks = useCallback(() => tracksRef.current, []);
@@ -113,10 +110,8 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange: onTracksChange ?? NOOP_TRACKS_CHANGE,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
     snapSamplePosition,
   });
 

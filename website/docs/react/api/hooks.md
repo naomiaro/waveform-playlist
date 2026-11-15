@@ -121,8 +121,8 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | Hook | Returns | The component re-renders on |
 | --- | --- | --- |
 | [`useEditorControls()`](#useeditorcontrols) | track mixer and order, zoom, loop, undo, recording | never |
-| [`useEngineRefs()`](#useenginerefs) | `playoutRef`, `isDraggingRef`, the engine's clock refs and functions | never |
-| [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation, every pointer move of a trim, a zoom, loading finishing, peaks arriving |
+| [`useEngineRefs()`](#useenginerefs) | `playoutRef`, the engine's clock refs and functions | never |
+| [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation (a trim once, on release), a zoom, loading finishing, peaks arriving |
 | [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change; tracks added, removed or reordered |
 | [`useTrack()`](#usetrack) | one track's id, name, mixer state and bound actions. Only among the children of `<WaveformTrackControls>` | a change of that track's state, position or selection |
 | [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
@@ -208,7 +208,7 @@ interface PlaylistZoomContextValue {
 
 ### usePlaylistTimeline
 
-`WaveformPlaylistProvider` only. What is on the timeline. The value changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive, so call this hook only in a component that draws tracks or needs the timeline length during render.
+`WaveformPlaylistProvider` only. What is on the timeline. The value changes on every clip operation (a trim once, on release: its pointer moves are a preview that only the dragged clip follows) and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive, so call this hook only in a component that draws tracks or needs the timeline length during render.
 
 ```typescript
 function usePlaylistTimeline(): PlaylistTimelineContextValue;
@@ -254,7 +254,7 @@ const volume = trackStates[i]?.volume ?? 1;
 
 The provider keeps this state by track id. A track keeps its mute, solo, volume and pan for as long as its id is in `tracks`: when other tracks are removed, when tracks are added in front of it, and when it is reordered. A track with a new id starts from the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack`. The `name` follows the track's `name`.
 
-The array keeps its identity while no entry changed (a move of a trim or another clip edit gives new `tracks` and the same `trackStates`), and a change to one track replaces the object of that track only.
+The array keeps its identity while no entry changed (a trim or another clip edit gives new `tracks` and the same `trackStates`), and a change to one track replaces the object of that track only.
 
 To change a value, call the setters of [`useEditorControls()`](#useeditorcontrols) with the track's id. Inside a track's control panel, [`useTrack()`](#usetrack) has the values and the setters of that one track.
 
@@ -410,7 +410,7 @@ interface PlaybackRefsContextValue {
 }
 ```
 
-The engine's refs and clock functions (`playoutRef`, `isDraggingRef`, `getPlaybackTime` and the others) are on [`useEngineRefs()`](#useenginerefs).
+The engine's refs and clock functions (`playoutRef`, `getPlaybackTime` and the others) are on [`useEngineRefs()`](#useenginerefs).
 
 #### Example
 
@@ -460,8 +460,6 @@ interface EngineRefsContextValue {
   /** The engine, from @waveform-playlist/engine. `current` is null until the
    *  first build and during a rebuild. */
   playoutRef: RefObject<PlaylistEngine | null>;
-  /** Set by useClipDragHandlers during boundary trim drags. */
-  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
 
@@ -1495,15 +1493,13 @@ The hook runs `setRecordingActive` (from `useEditorControls()`) in an effect, wh
 
 ### useClipDragHandlers
 
-Handles clip dragging (move) and boundary trimming with collision detection. Delegates move operations to `engine.moveClip()` and trim operations to `engine.trimClip()`.
+Handles clip dragging (move) and boundary trimming. A move is one `engine.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; `tracks`, `onTracksChange` and the engine do not change) and is one `engine.trimClip()` on release, so a trim is one undo step and `onTracksChange` is called once. Escape clears the preview and changes nothing. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. The clip is found by its `clipId` within `tracks[trackIndex]`; a trim keeps that track, by id, if its row changes during the drag, and a move of a clip id that is not in the track is dropped with a console warning. Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {
   onDragStart: (event: DragStartEvent) => void;
   onDragMove: (event: DragMoveEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
-  onDragCancel: (event: DragCancelEvent) => void;
-  collisionModifier: Modifier;
 };
 ```
 
@@ -1512,11 +1508,10 @@ function useClipDragHandlers(options: UseClipDragHandlersOptions): {
 ```typescript
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
-  /** Ref toggled during boundary trim drags. Obtain from useEngineRefs(). */
-  isDraggingRef: MutableRefObject<boolean>;
+  /** Optional snap function for boundary trims: snaps a sample position to the nearest grid line. */
+  snapSamplePosition?: (samplePosition: number) => number;
 }
 ```
 
@@ -1529,21 +1524,23 @@ import {
   ClipCollisionModifier,
   ClipInteractionOptions,
   WaveformEditor,
+  useClipDragHandlers,
   useDragSensors,
+  useEngineRefs,
+  usePlaylistTimeline,
+  usePlaylistZoom,
 } from '@waveform-playlist/browser';
 
 function EditablePlaylist() {
-  const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
+  const { tracks } = usePlaylistTimeline();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef, isDraggingRef } = useEngineRefs();
+  const { playoutRef } = useEngineRefs();
   const sensors = useDragSensors();
 
   const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
     tracks,
-    onTracksChange: setTracks,
     samplesPerPixel,
     engineRef: playoutRef,
-    isDraggingRef,
   });
 
   return (
@@ -1628,9 +1625,11 @@ interface UseClipSplittingOptions {
 ```typescript
 interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
-  splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
+  splitClipAt: (trackId: string, clipId: string, splitTime: number) => boolean;
 }
 ```
+
+`splitClipAt` takes the ids of the track and of the clip and returns `false`, changing nothing, for an id that is not in `tracks`. `splitClipAtPlayhead()` splits the clip under the playhead on the selected track.
 
 #### Example
 

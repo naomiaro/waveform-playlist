@@ -26,7 +26,10 @@ import {
   buildConfigKey,
   buildFFTKey,
   mapsDiffer,
+  registeredClipRange,
+  resolveClipRange,
   type ChunkTiers,
+  type RegisteredAudioRange,
 } from './spectrogram-helpers';
 import { SpectrogramMenuItems } from './components';
 import { SpectrogramSettingsModal } from './components';
@@ -74,6 +77,11 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   // learns it from the canvases: a view draws at its own height, and in
   // "both" mode a canvas is half a row tall.
   const canvasHeightsRef = useRef<Map<string, number>>(new Map());
+  // The range of the audio each canvas registered with, by canvas id: the view
+  // draws a trim being dragged before the tracks have it (#812), so a clip is
+  // rendered for the range its canvases were drawn for, not the track's. Kept
+  // only as part of the registration and never written anywhere else.
+  const canvasRangesRef = useRef<Map<string, RegisteredAudioRange>>(new Map());
   const [spectrogramCanvasVersion, setSpectrogramCanvasVersion] = useState(0);
 
   // Spectrogram refs
@@ -257,6 +265,13 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         if (!clip.audioBuffer) continue;
 
         const monoFlag = mono || clip.audioBuffer.numberOfChannels === 1;
+        const { offsetSamples, durationSamples } = resolveClipRange(
+          clip,
+          registeredClipRange(
+            spectrogramCanvasRegistryRef.current.get(clip.id),
+            canvasRangesRef.current
+          )
+        );
 
         if (!trackFFTChanged && !hasRegisteredCanvases && renderedClipIdsRef.current.has(clip.id)) {
           const channelDataArrays: Float32Array[] = [];
@@ -269,8 +284,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
             channelDataArrays,
             config: cfg,
             sampleRate: clip.audioBuffer.sampleRate,
-            offsetSamples: clip.offsetSamples,
-            durationSamples: clip.durationSamples,
+            offsetSamples,
+            durationSamples,
             clipStartSample: clip.startSample,
             monoFlag,
             colorMap: cm,
@@ -290,8 +305,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           channelDataArrays,
           config: cfg,
           sampleRate: clip.audioBuffer.sampleRate,
-          offsetSamples: clip.offsetSamples,
-          durationSamples: clip.durationSamples,
+          offsetSamples,
+          durationSamples,
           clipStartSample: clip.startSample,
           monoFlag,
           colorMap: cm,
@@ -784,6 +799,14 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       }
 
       canvasHeightsRef.current.set(reg.canvasId, reg.heightPx);
+      if (reg.offsetSamples !== undefined || reg.durationSamples !== undefined) {
+        canvasRangesRef.current.set(reg.canvasId, {
+          offsetSamples: reg.offsetSamples,
+          durationSamples: reg.durationSamples,
+        });
+      } else {
+        canvasRangesRef.current.delete(reg.canvasId);
+      }
       const registry = spectrogramCanvasRegistryRef.current;
       if (!registry.has(reg.clipId)) {
         registry.set(reg.clipId, new Map());
@@ -805,6 +828,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
   const unregisterSpectrogramCanvas = useCallback((canvasId: string) => {
     canvasHeightsRef.current.delete(canvasId);
+    canvasRangesRef.current.delete(canvasId);
     const pool = spectrogramWorkerRef.current;
     if (pool) {
       try {

@@ -52,6 +52,8 @@ import {
   MEDIA_ELEMENT_TRACK_ID,
   SelectionContext,
   TrackReorderPreviewContext,
+  TrimPreviewContext,
+  TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
   type CurrentTimeContextValue,
@@ -945,7 +947,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [duration, isReady, peaksDataArray, trackFadeIn, trackFadeOut]
   );
 
-  // The nine contexts only the WebAudio provider serves are blocked, so that
+  // The ten contexts only the WebAudio provider serves are blocked, so that
   // inside this provider `useLoop()` (say) throws instead of reading a
   // WebAudio provider further out. Outermost: what changes least.
   return (
@@ -959,33 +961,39 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
                   <PlaylistTimelineContext value={BLOCKED}>
                     <PlaylistMixerContext value={BLOCKED}>
                       <TrackReorderPreviewContext value={BLOCKED}>
-                        <PlaybackRefsContext value={refsValue}>
-                          <PlaybackControlsContext value={controlsValue}>
-                            <PlaylistViewContext value={viewValue}>
-                              <PlaylistZoomContext value={zoomValue}>
-                                <PlaylistSettingsContext value={settingsValue}>
-                                  <MediaElementTrackContext value={trackValue}>
-                                    <PlaybackRateContext value={playbackRateValue}>
-                                      <AnnotationsContext value={annotationsValue}>
-                                        <IsPlayingContext value={isPlayingValue}>
-                                          <ActiveAnnotationContext value={activeAnnotationValue}>
-                                            <CurrentTimeContext value={currentTimeValue}>
-                                              <SelectionContext value={selection}>
-                                                <SelectedRowContext value={ONLY_ROW_SELECTED}>
-                                                  {children}
-                                                </SelectedRowContext>
-                                              </SelectionContext>
-                                            </CurrentTimeContext>
-                                          </ActiveAnnotationContext>
-                                        </IsPlayingContext>
-                                      </AnnotationsContext>
-                                    </PlaybackRateContext>
-                                  </MediaElementTrackContext>
-                                </PlaylistSettingsContext>
-                              </PlaylistZoomContext>
-                            </PlaylistViewContext>
-                          </PlaybackControlsContext>
-                        </PlaybackRefsContext>
+                        <TrimPreviewContext value={BLOCKED}>
+                          <TrimPreviewPeaksContext value={BLOCKED}>
+                            <PlaybackRefsContext value={refsValue}>
+                              <PlaybackControlsContext value={controlsValue}>
+                                <PlaylistViewContext value={viewValue}>
+                                  <PlaylistZoomContext value={zoomValue}>
+                                    <PlaylistSettingsContext value={settingsValue}>
+                                      <MediaElementTrackContext value={trackValue}>
+                                        <PlaybackRateContext value={playbackRateValue}>
+                                          <AnnotationsContext value={annotationsValue}>
+                                            <IsPlayingContext value={isPlayingValue}>
+                                              <ActiveAnnotationContext
+                                                value={activeAnnotationValue}
+                                              >
+                                                <CurrentTimeContext value={currentTimeValue}>
+                                                  <SelectionContext value={selection}>
+                                                    <SelectedRowContext value={ONLY_ROW_SELECTED}>
+                                                      {children}
+                                                    </SelectedRowContext>
+                                                  </SelectionContext>
+                                                </CurrentTimeContext>
+                                              </ActiveAnnotationContext>
+                                            </IsPlayingContext>
+                                          </AnnotationsContext>
+                                        </PlaybackRateContext>
+                                      </MediaElementTrackContext>
+                                    </PlaylistSettingsContext>
+                                  </PlaylistZoomContext>
+                                </PlaylistViewContext>
+                              </PlaybackControlsContext>
+                            </PlaybackRefsContext>
+                          </TrimPreviewPeaksContext>
+                        </TrimPreviewContext>
                       </TrackReorderPreviewContext>
                     </PlaylistMixerContext>
                   </PlaylistTimelineContext>

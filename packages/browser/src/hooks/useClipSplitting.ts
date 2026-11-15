@@ -12,7 +12,7 @@ export interface UseClipSplittingOptions {
 
 export interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
-  splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
+  splitClipAt: (trackId: string, clipId: string, splitTime: number) => boolean;
 }
 
 /**
@@ -50,21 +50,22 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
   /**
    * Split a specific clip at a given time
    *
-   * @param trackIndex - Index of the track containing the clip
-   * @param clipIndex - Index of the clip within the track
+   * @param trackId - Id of the track containing the clip
+   * @param clipId - Id of the clip
    * @param splitTime - Timeline position where to split (in seconds)
-   * @returns true if pre-validation passed and the engine was called, false otherwise.
+   * @returns true if pre-validation passed and the engine was called, false otherwise
+   * (also for a track id or clip id that is not in `tracks`: nothing changes).
    * Note: engine.splitClip() returns void so a true here assumes the engine accepted
    * the split (it performs its own canSplitAt check internally).
    */
   const splitClipAt = useCallback(
-    (trackIndex: number, clipIndex: number, splitTime: number): boolean => {
+    (trackId: string, clipId: string, splitTime: number): boolean => {
       const { samplesPerPixel } = options;
 
-      const track = tracks[trackIndex];
+      const track = tracks.find((t) => t.id === trackId);
       if (!track) return false;
 
-      const clip = track.clips[clipIndex];
+      const clip = track.clips.find((c) => c.id === clipId);
       if (!clip) return false;
 
       // Convert split time to sample position, snapped to pixel boundary
@@ -82,7 +83,10 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       // Delegate to engine — handles clip creation, adapter sync, and emits statechange
       const engine = engineRef.current;
       if (!engine) {
-        console.warn('[waveform-playlist] engineRef is null — split not synced to adapter');
+        console.warn(
+          '[waveform-playlist] The split was dropped: no engine is attached (before the first ' +
+            'build, or while it is rebuilt after a change of tracks). The clip stays whole.'
+        );
         return false;
       }
 
@@ -106,27 +110,24 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     }
 
     // Find the selected track
-    const trackIndex = tracks.findIndex((track) => track.id === selectedTrackId);
-    if (trackIndex === -1) {
+    const track = tracks.find((t) => t.id === selectedTrackId);
+    if (!track) {
       console.warn('Selected track not found');
       return false;
     }
-
-    const track = tracks[trackIndex];
 
     // Use ref for real-time position during playback (state updates are throttled)
     const currentTime = currentTimeRef.current ?? 0;
 
     // Find clip at current time on the selected track
-    for (let clipIndex = 0; clipIndex < track.clips.length; clipIndex++) {
-      const clip = track.clips[clipIndex];
+    for (const clip of track.clips) {
       const clipStartTime = clip.startSample / sampleRate;
       const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
 
       // Check if currentTime is within this clip (not at boundaries)
       if (currentTime > clipStartTime && currentTime < clipEndTime) {
         // Found a clip! Split it
-        return splitClipAt(trackIndex, clipIndex, currentTime);
+        return splitClipAt(track.id, clip.id, currentTime);
       }
     }
 

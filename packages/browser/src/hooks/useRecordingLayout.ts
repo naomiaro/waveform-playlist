@@ -1,8 +1,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { RecordingProgressSource } from '@waveform-playlist/core';
 
-/** How far the displayed timeline is extended at a time while a take runs. */
-const RECORDING_EXTENT_STEP_SECONDS = 10;
+/** How far the displayed timeline is extended at a time while a take runs (and a trim is dragged past the end). */
+export const RECORDING_EXTENT_STEP_SECONDS = 10;
 
 /**
  * Where the displayed timeline should end for a take that currently ends at

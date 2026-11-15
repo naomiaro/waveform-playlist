@@ -32,6 +32,8 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
+  useTrimPreviewOptional,
+  useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
 import type { AnnotationData, ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -115,6 +117,11 @@ const HOOKS = {
   activeAnnotation: useActiveAnnotation,
   controls: usePlaybackControls,
   editorControls: useEditorControls,
+  // Internal (#812): the trim preview source and the previewed clip's drawing.
+  // Both values are stable; what changes during a trim is the source's value,
+  // which only the dragged clip's view and the root subscribe to.
+  trimPreview: useTrimPreviewOptional,
+  trimPreviewPeaks: useTrimPreviewPeaksOptional,
 } as const;
 
 // The hooks both providers serve (#688); the rest need WaveformPlaylistProvider.
@@ -134,6 +141,9 @@ const SHARED_HOOKS: HookName[] = [
 
 type HookName = keyof typeof HOOKS;
 const HOOK_NAMES = Object.keys(HOOKS) as HookName[];
+// The internal readers return null where there is no provider instead of throwing.
+const OPTIONAL_HOOKS: HookName[] = ['trimPreview', 'trimPreviewPeaks'];
+const THROWING_HOOK_NAMES = HOOK_NAMES.filter((name) => !OPTIONAL_HOOKS.includes(name));
 
 const renders = {} as Record<HookName, number>;
 const values = {} as { [K in HookName]: ReturnType<(typeof HOOKS)[K]> };
@@ -243,7 +253,6 @@ describe('each hook returns its own group of fields (#768)', () => {
         'getLookAhead',
         'getOutputLatency',
         'playoutRef',
-        'isDraggingRef',
       ].sort()
     );
     expect(keys('controls')).toEqual(
@@ -289,6 +298,8 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setRecordingActive',
       ].sort()
     );
+    expect(keys('trimPreview')).toEqual(['publish', 'source']);
+    expect(keys('trimPreviewPeaks')).toEqual(['peaksFor']);
   });
 
   it('carries the values the provider was given', async () => {
@@ -462,6 +473,22 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     ]);
   });
 
+  it('a trim preview move: no reader of any group (the dragged clip follows the source itself)', async () => {
+    await mount();
+    const preview = values.trimPreview!;
+    const move = (startSample: number) => ({
+      trackId: 'track-1',
+      clipId: 'track-1-clip',
+      startSample,
+      durationSamples: SAMPLE_RATE / 2,
+      offsetSamples: startSample,
+    });
+    expect(await rendered(() => preview.publish(move(100)))).toEqual([]);
+    expect(await rendered(() => preview.publish(move(200)))).toEqual([]);
+    expect(await rendered(() => preview.publish(null))).toEqual([]);
+    expect(values.trimPreview).toBe(preview);
+  });
+
   it('a longer timeline: the timeline, and none of the view, zoom, loop, selection or annotation readers', async () => {
     const { setTracks } = await mount();
     const names = await rendered(() => setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]));
@@ -485,6 +512,8 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'activeAnnotation',
       'controls',
       'editorControls',
+      'trimPreview',
+      'trimPreviewPeaks',
     ] as HookName[]) {
       expect(names).not.toContain(quiet);
     }
@@ -498,6 +527,9 @@ describe('the refs values never change (#768)', () => {
     const rendersBefore = renders.refs;
     const engineBefore = values.engineRefs;
     const engineRendersBefore = renders.engineRefs;
+    const trimPreviewBefore = values.trimPreview;
+    const trimPreviewPeaksBefore = values.trimPreviewPeaks;
+    const trimRendersBefore = renders.trimPreview + renders.trimPreviewPeaks;
 
     await act(async () => {
       values.editorControls.setTrackVolume('track-1', 0.4);
@@ -521,6 +553,9 @@ describe('the refs values never change (#768)', () => {
     expect(renders.refs).toBe(rendersBefore);
     expect(values.engineRefs).toBe(engineBefore);
     expect(renders.engineRefs).toBe(engineRendersBefore);
+    expect(values.trimPreview).toBe(trimPreviewBefore);
+    expect(values.trimPreviewPeaks).toBe(trimPreviewPeaksBefore);
+    expect(renders.trimPreview + renders.trimPreviewPeaks).toBe(trimRendersBefore);
   });
 });
 
@@ -560,9 +595,22 @@ describe('the hooks the groups replace are gone (#768)', () => {
   it('the optional readers stay internal to the package', () => {
     expect('usePlaylistViewOptional' in publicApi).toBe(false);
     expect('usePlaylistZoomOptional' in publicApi).toBe(false);
+    expect('useTrimPreviewOptional' in publicApi).toBe(false);
+    expect('useTrimPreviewPeaksOptional' in publicApi).toBe(false);
   });
 
-  it.each(HOOK_NAMES)('the %s hook throws outside the provider, naming itself', (name) => {
+  it('the trim preview readers are null outside a provider', () => {
+    const Reader: React.FC = () => {
+      values.trimPreview = useTrimPreviewOptional();
+      values.trimPreviewPeaks = useTrimPreviewPeaksOptional();
+      return null;
+    };
+    render(<Reader />);
+    expect(values.trimPreview).toBeNull();
+    expect(values.trimPreviewPeaks).toBeNull();
+  });
+
+  it.each(THROWING_HOOK_NAMES)('the %s hook throws outside the provider, naming itself', (name) => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const Reader: React.FC = () => {
       HOOKS[name]();
