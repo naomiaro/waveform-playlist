@@ -68,6 +68,15 @@ export interface SpectrogramChannelProps {
   onCanvasRegister: (reg: SpectrogramCanvasRegistration) => void;
   /** Counterpart for chunk unmount / component unmount. */
   onCanvasUnregister: (canvasId: string) => void;
+  /**
+   * Where in the audio the drawn clip starts, in samples. Each canvas
+   * registers with it, and the provider draws this range instead of the
+   * clip's own (the view draws a trim being dragged before the tracks have
+   * it). A new value registers new canvases. Omitted: the clip's own.
+   */
+  offsetSamples?: number;
+  /** How much of the audio the drawn clip covers, in samples. See `offsetSamples`. */
+  durationSamples?: number;
 }
 
 export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
@@ -80,6 +89,8 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   clipId,
   onCanvasRegister,
   onCanvasUnregister,
+  offsetSamples,
+  durationSamples,
 }) => {
   const channelIndex = channelIndexProp ?? index;
   const { canvasRef, canvasMapRef } = useChunkedCanvasRefs();
@@ -155,13 +166,24 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
           chunkIndex: canvasIdx,
           widthPx,
           heightPx: waveHeight,
+          ...(offsetSamples !== undefined ? { offsetSamples } : {}),
+          ...(durationSamples !== undefined ? { durationSamples } : {}),
         });
         registeredIdsRef.current.push(canvasId);
       } catch (err) {
         console.warn(`[spectrogram] register failed for ${canvasId}:`, err);
       }
     }
-  }, [canvasMapRef, clipId, channelIndex, length, waveHeight, visibleChunkIndices]);
+  }, [
+    canvasMapRef,
+    clipId,
+    channelIndex,
+    length,
+    waveHeight,
+    offsetSamples,
+    durationSamples,
+    visibleChunkIndices,
+  ]);
 
   // Unregister all canvases on component unmount.
   useEffect(() => {
@@ -185,9 +207,10 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
 
     return (
       <SpectrogramCanvas
-        // The height is in the key: a transferred canvas cannot be resized from
-        // here, and the provider renders at the height a canvas registered with.
-        key={`${length}-${waveHeight}-${i}`}
+        // The height and the audio range are in the key: a transferred canvas
+        // cannot be resized or registered again from here, and the provider
+        // renders at the height and the range a canvas registered with.
+        key={`${length}-${waveHeight}-${offsetSamples ?? ''}-${durationSamples ?? ''}-${i}`}
         $cssWidth={currentWidth}
         $left={chunkLeft}
         width={currentWidth * devicePixelRatio}

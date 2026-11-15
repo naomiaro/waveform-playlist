@@ -247,3 +247,43 @@ export function mapsDiffer(prev: Map<string, string>, current: Map<string, strin
   }
   return false;
 }
+
+/** The range of the audio a canvas registered with (`SpectrogramCanvasRegistration`). */
+export interface RegisteredAudioRange {
+  offsetSamples?: number;
+  durationSamples?: number;
+}
+
+/**
+ * The range a clip's canvases registered with: that of the first canvas that
+ * gave one (all canvases of a clip are drawn for the same range; a new range
+ * registers new canvases). `undefined` when none gave one.
+ */
+export function registeredClipRange(
+  perClip: ReadonlyMap<number, ChannelChunkInfo> | undefined,
+  rangeByCanvasId: ReadonlyMap<string, RegisteredAudioRange>
+): RegisteredAudioRange | undefined {
+  if (!perClip) return undefined;
+  for (const channelInfo of perClip.values()) {
+    for (const canvasId of channelInfo.canvasIds) {
+      const range = rangeByCanvasId.get(canvasId);
+      if (range) return range;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The range to draw a clip for: what its canvases registered with (the view
+ * may draw a clip the tracks do not have yet, a trim being dragged), field by
+ * field, else the clip's own.
+ */
+export function resolveClipRange(
+  clip: { offsetSamples: number; durationSamples: number },
+  registered: RegisteredAudioRange | undefined
+): { offsetSamples: number; durationSamples: number } {
+  return {
+    offsetSamples: registered?.offsetSamples ?? clip.offsetSamples,
+    durationSamples: registered?.durationSamples ?? clip.durationSamples,
+  };
+}

@@ -93,7 +93,8 @@ interface ClipViewProps extends RowDisplayOptions {
  * `Clip` runs three `useDraggable` hooks, which is what made re-rendering all
  * of them per pointer move expensive. While a trim of this clip is dragged it
  * also follows the trim preview, and draws the previewed geometry (#812); a
- * move of that drag renders this clip's view and no other.
+ * move of that drag renders this clip's view and no other. Its spectrogram
+ * canvases register with the range drawn, so the spectrogram follows too.
  */
 const ClipView = React.memo(function ClipView({
   clip: committedClip,
@@ -175,6 +176,10 @@ const ClipView = React.memo(function ClipView({
           spectrogramClipId={clip.clipId}
           spectrogramOnCanvasRegister={registerSpectrogramCanvas}
           spectrogramOnCanvasUnregister={unregisterSpectrogramCanvas}
+          // The range this clip is drawn for (the preview's while a trim of
+          // it is dragged): its spectrogram canvases register with it.
+          spectrogramOffsetSamples={clip.offsetSamples}
+          spectrogramDurationSamples={clip.durationSamples}
         />
       ))}
     </Clip>

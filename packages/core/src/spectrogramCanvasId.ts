@@ -24,6 +24,13 @@
  *
  * The receiver looks the track up from `clipId` and derives the canvas's pixel
  * offset from `chunkIndex`.
+ *
+ * A canvas registers with the range of the audio it is drawn for: the view
+ * may draw a clip with a geometry the tracks do not have yet (a trim being
+ * dragged), so the receiver draws `offsetSamples` / `durationSamples` from
+ * here and falls back to the clip's own when a registration has none. A canvas
+ * is registered once, so a new range means new canvases (`SpectrogramChannel`
+ * keys them on it).
  */
 export interface SpectrogramCanvasRegistration {
   canvasId: string;
@@ -33,6 +40,10 @@ export interface SpectrogramCanvasRegistration {
   chunkIndex: number;
   widthPx: number;
   heightPx: number;
+  /** Where in the audio the drawn clip starts, in samples. Omitted: the clip's own. */
+  offsetSamples?: number;
+  /** How much of the audio the drawn clip covers, in samples. Omitted: the clip's own. */
+  durationSamples?: number;
 }
 
 export interface SpectrogramCanvasIdParts {
