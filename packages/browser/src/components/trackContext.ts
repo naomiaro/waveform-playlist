@@ -41,6 +41,14 @@ export interface TrackContextValue {
    * and `openSpectrogramSettings` then do something.
    */
   hasSpectrogram: boolean;
+  /**
+   * True while a take is being recorded onto this track (`setRecordingActive`,
+   * `useRecordingSession`). The track is muted for the take and its mute from
+   * before is written back when the take ends, so a change made meanwhile does
+   * not stay: the built-in `<TrackMuteButton />` is disabled while this is
+   * true, and an app's own mute control can do the same.
+   */
+  isRecordingArmed: boolean;
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
   // track menu neither becomes available nor stops being so.

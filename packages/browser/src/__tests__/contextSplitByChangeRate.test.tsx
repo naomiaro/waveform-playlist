@@ -33,6 +33,7 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
+  useRecordingArm,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -125,6 +126,8 @@ const HOOKS = {
   // which only the dragged clip's view and the root subscribe to.
   trimPreview: useTrimPreviewOptional,
   trimPreviewPeaks: useTrimPreviewPeaksOptional,
+  // Internal (#812): the track a take is recorded onto.
+  recordingArm: useRecordingArm,
 } as const;
 
 // The hooks both providers serve (#688); the rest need WaveformPlaylistProvider.
@@ -298,6 +301,7 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('trimPreview')).toEqual(['publish', 'source']);
     expect(keys('trimPreviewPeaks')).toEqual(['peaksFor']);
+    expect(keys('recordingArm')).toEqual(['armedTrackId']);
     // The arrangement itself, not a value made for it.
     expect(typeof values.arrangement.getTracks).toBe('function');
     expect(values.arrangement.getTracks().map((t) => t.id)).toEqual(['track-1', 'track-2']);
@@ -451,6 +455,29 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     ]);
   });
 
+  // #812: the arm mute goes through the arrangement's mix, so the mixer
+  // follows; the armed track is its own value, read by the track controls.
+  it('arming a track for a take, moving the arm and ending the take: the recording arm and the mixer', async () => {
+    await mount();
+    expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-1'))).toEqual(
+      ['mixer', 'recordingArm']
+    );
+    expect(values.recordingArm.armedTrackId).toBe('track-1');
+    expect(values.mixer.trackStates[0].muted).toBe(true);
+    expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-2'))).toEqual(
+      ['mixer', 'recordingArm']
+    );
+    expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([
+      'mixer',
+      'recordingArm',
+    ]);
+    expect(values.recordingArm.armedTrackId).toBeNull();
+    expect(values.mixer.trackStates.map((s) => s.muted)).toEqual([false, false]);
+    // A session without an armed track: no reader renders.
+    expect(await rendered(() => values.editorControls.setRecordingActive(true))).toEqual([]);
+    expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([]);
+  });
+
   it('play: isPlaying only; pause: isPlaying and the resting position', async () => {
     await mount();
     expect(await rendered(() => values.controls.play(0))).toEqual(['isPlaying']);
@@ -516,6 +543,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'trimPreview',
       'trimPreviewPeaks',
       'arrangement',
+      'recordingArm',
     ] as HookName[]) {
       expect(names).not.toContain(quiet);
     }
@@ -604,6 +632,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     expect('usePlaylistZoomOptional' in publicApi).toBe(false);
     expect('useTrimPreviewOptional' in publicApi).toBe(false);
     expect('useTrimPreviewPeaksOptional' in publicApi).toBe(false);
+    expect('useRecordingArm' in publicApi).toBe(false);
   });
 
   it('the trim preview readers are null outside a provider', () => {

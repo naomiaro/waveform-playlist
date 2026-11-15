@@ -47,6 +47,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/styled-components": "^5.1.36",
+    "@waveform-playlist/engine": "workspace:*",
     "jsdom": "^28.1.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
@@ -56,6 +57,7 @@
   },
   "dependencies": {
     "@waveform-playlist/core": "workspace:*",
+    "@waveform-playlist/engine": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "@waveform-playlist/worklets": "workspace:*"

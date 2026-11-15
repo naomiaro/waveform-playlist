@@ -1,22 +1,21 @@
 /**
- * Hook for integrated multi-track recording
- * Combines recording functionality with track management
+ * Hook for integrated multi-track recording: the microphone, the take, and
+ * the take added to the arrangement that owns the tracks (#812).
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRecording } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
+import { takeRefusal, withTake } from './takeTarget';
 import type { MicrophoneDevice } from '../types';
 import {
-  type ClipTrack,
   type AudioClip,
   type MeterSource,
   type RecordingProgressSource,
-  carveClipRange,
   resolveRecordingOffsetSamples,
-  trackKind,
 } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   resumeGlobalAudioContext,
   getGlobalAudioContext,
@@ -97,8 +96,14 @@ export interface UseIntegratedRecordingReturn {
   // Recording controls
   /** Start capturing on the selected track. Resolves `true` when the capture
    *  pipeline actually started — callers that synchronize playback with
-   *  recording (overdub) should check this before starting playback. */
+   *  recording (overdub) should check this before starting playback.
+   *  Resolves `false` and sets `error`, recording nothing, when no track is
+   *  selected, when the arrangement holds no track of the selected id, for a
+   *  MIDI track, and for a track that holds a clip whose audio is not loaded
+   *  (still loading, failed to load, or a clip that cannot be made from it). */
   startRecording: () => Promise<boolean>;
+  /** Stop the take and add it to the track it was started on, with one
+   *  `arrangement.updateTrack()`: one undo step. */
   stopRecording: () => void;
   pauseRecording: () => void;
   resumeRecording: () => void;
@@ -106,9 +111,14 @@ export interface UseIntegratedRecordingReturn {
   changeDevice: (deviceId: string) => Promise<void>;
 }
 
+/**
+ * @param arrangement the owner of the tracks (`useCreateArrangement` from
+ *   `@waveform-playlist/browser`). The hook reads its tracks when a take starts
+ *   and ends and keeps no copy of them.
+ * @param selectedTrackId the track the next take is recorded onto
+ */
 export function useIntegratedRecording(
-  tracks: ClipTrack[],
-  setTracks: (tracks: ClipTrack[]) => void,
+  arrangement: Arrangement,
   selectedTrackId: string | null,
   options: IntegratedRecordingOptions = {}
 ): UseIntegratedRecordingReturn {
@@ -140,11 +150,6 @@ export function useIntegratedRecording(
   selectedTrackIdRef.current = selectedTrackId;
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
-  // Latest tracks for reads that happen AFTER an await — the stop handshake
-  // can take >1s, and finalizing against a closure capture would discard any
-  // track edits that landed in that window.
-  const tracksRef = useRef(tracks);
-  tracksRef.current = tracks;
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
@@ -170,9 +175,9 @@ export function useIntegratedRecording(
     error: recError,
   } = useRecording(stream, recordingOptions);
 
-  // Start recording handler
-  // Reads selectedTrackId from ref to avoid stale closures when
-  // auto-create track + start recording happen in the same render cycle
+  // Start recording handler. Reads selectedTrackId from its ref, and the
+  // tracks from the arrangement as they are now: a track the app added in the
+  // same handler is there (arrangement.addTrack is synchronous).
   const startRecording = useCallback(async (): Promise<boolean> => {
     // A take is running or starting: starting again must not re-capture its
     // track or its start position (useRecording would refuse further down,
@@ -184,18 +189,11 @@ export function useIntegratedRecording(
       );
       return false;
     }
-    // A track holds one kind of clip (#756): a take is audio, so it cannot
-    // land on a MIDI track. Refuse before anything is captured. A track that
-    // was created in this same render is not in the list yet and is let through.
-    const target = tracksRef.current.find((t) => t.id === selectedTrackIdRef.current);
-    if (target && trackKind(target) === 'midi') {
-      setHookError(
-        new Error(
-          'Cannot start recording: "' +
-            (target.name || target.id) +
-            '" is a MIDI track. Select or create an audio track first.'
-        )
-      );
+    // Refuse before anything is captured: a track that is not there, a MIDI
+    // track (#756), a track holding a clip whose audio is not loaded.
+    const refusal = takeRefusal(arrangement, selectedTrackIdRef.current);
+    if (refusal) {
+      setHookError(refusal);
       return false;
     }
 
@@ -225,9 +223,9 @@ export function useIntegratedRecording(
     } finally {
       isStartingRef.current = false;
     }
-  }, [isMonitoring, startRec]);
+  }, [arrangement, isMonitoring, startRec]);
 
-  // Stop recording and add clip to selected track
+  // Stop recording and add the take to the track it was started on
   const stopRecording = useCallback(async () => {
     let buffer: AudioBuffer | null;
     try {
@@ -239,15 +237,12 @@ export function useIntegratedRecording(
       setRecordingTrackId(null);
     }
 
-    // Add clip to track after recording completes. Read tracks through the
-    // ref — the awaited stop handshake above can span >1s, and the closure's
-    // tracks capture would silently revert concurrent edits.
-    const currentTracks = tracksRef.current;
-    // The track the take was started on, not the one selected now (#756).
+    // The track the take was started on, not the one selected now (#756),
+    // read from the arrangement after the stop handshake (which can take more
+    // than a second): an edit made meanwhile is in its tracks.
     const trackId = recordingTrackIdRef.current;
     if (buffer && trackId) {
-      const selectedTrackIndex = currentTracks.findIndex((t) => t.id === trackId);
-      if (selectedTrackIndex === -1) {
+      if (!arrangement.getTracks().some((t) => t.id === trackId)) {
         const err = new Error(
           `Recording completed but track "${trackId}" no longer exists. The recorded audio could not be saved.`
         );
@@ -299,24 +294,15 @@ export function useIntegratedRecording(
         name: `Recording ${new Date().toLocaleTimeString()}`,
       };
 
-      // Add clip to track — the recorded clip owns [startSample,
-      // startSample + effectiveDuration): trim/remove/split whatever it overlaps.
-      const newTracks = currentTracks.map((track, index) => {
-        if (index === selectedTrackIndex) {
-          return {
-            ...track,
-            clips: [
-              ...carveClipRange(track.clips, startSample, startSample + effectiveDuration),
-              newClip,
-            ],
-          };
-        }
-        return track;
-      });
-
-      setTracks(newTracks);
+      // One edit, one undo step: the take, and the carve of what it overlaps.
+      try {
+        arrangement.updateTrack(trackId, (track) => withTake(track, newClip));
+      } catch (err) {
+        // The arrangement refused the track (its kind changed during the take).
+        setHookError(err instanceof Error ? err : new Error(String(err)));
+      }
     }
-  }, [setTracks, stopRec, latencyOffset]);
+  }, [arrangement, stopRec, latencyOffset]);
 
   // Auto-select first device when available, or fallback if selected device was unplugged
   useEffect(() => {

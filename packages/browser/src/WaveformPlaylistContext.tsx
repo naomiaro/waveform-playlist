@@ -112,6 +112,7 @@ import {
   SelectionContext,
   TrackReorderPreviewContext,
   TrimPreviewContext,
+  RecordingArmContext,
   TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
@@ -1522,7 +1523,11 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
                                                       <PlaylistTimelineContext
                                                         value={timelineValue}
                                                       >
-                                                        {children}
+                                                        <RecordingArmContext
+                                                          value={editing.recordingArm}
+                                                        >
+                                                          {children}
+                                                        </RecordingArmContext>
                                                       </PlaylistTimelineContext>
                                                     </PlaylistMixerContext>
                                                   </TrackReorderPreviewContext>

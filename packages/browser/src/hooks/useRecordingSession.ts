@@ -11,9 +11,13 @@ export interface RecordingSessionOptions {
 /**
  * Tells the playlist that a take is being recorded into a track, for as long
  * as `isRecording` is true (#685). The provider then keeps playback running
- * past the end of the audio and mutes what the armed track already holds for
- * the take, so a punch-in replaces what it overlaps; the track's own mute
- * state is restored when the take ends or the component unmounts.
+ * past the end of the audio and mutes the armed track in the arrangement for
+ * the take, so what it already holds does not play under a punch-in that
+ * replaces it (#812: the mixer shows the track muted and its built-in Mute
+ * button is disabled). The mute from before the take is written back when the
+ * take ends, the track changes or the component unmounts, whatever was set in
+ * between. An `<Activity>` hide of the component ends the session the same
+ * way, and the reveal starts it again from the track's mute at that moment.
  *
  * Call it in the component that calls `useIntegratedRecording`, under
  * `WaveformPlaylistProvider`. `<WaveformRecordingPreview>` only draws the

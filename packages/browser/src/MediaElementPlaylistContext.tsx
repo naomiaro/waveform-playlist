@@ -54,6 +54,7 @@ import {
   SelectionContext,
   TrackReorderPreviewContext,
   TrimPreviewContext,
+  RecordingArmContext,
   TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
@@ -948,7 +949,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [duration, isReady, peaksDataArray, trackFadeIn, trackFadeOut]
   );
 
-  // The eleven contexts only the WebAudio provider serves are blocked, so that
+  // The twelve contexts only the WebAudio provider serves are blocked, so that
   // inside this provider `useLoop()` (say) throws instead of reading a
   // WebAudio provider further out. Outermost: what changes least.
   return (
@@ -980,7 +981,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
                                                   <CurrentTimeContext value={currentTimeValue}>
                                                     <SelectionContext value={selection}>
                                                       <SelectedRowContext value={ONLY_ROW_SELECTED}>
-                                                        {children}
+                                                        <RecordingArmContext value={BLOCKED}>
+                                                          {children}
+                                                        </RecordingArmContext>
                                                       </SelectedRowContext>
                                                     </SelectionContext>
                                                   </CurrentTimeContext>

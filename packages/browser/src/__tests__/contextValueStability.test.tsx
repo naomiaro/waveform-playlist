@@ -29,6 +29,7 @@ import {
   useActiveAnnotation,
   useEngineRefs,
   useArrangement,
+  useRecordingArm,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -207,6 +208,13 @@ const ArrangementProbeChild: React.FC = () => {
   return null;
 };
 
+// Reads the armed track (#812, internal).
+let armProbe: { value: ReturnType<typeof useRecordingArm>; renders: number };
+const ArmProbeChild: React.FC = () => {
+  armProbe = { value: useRecordingArm(), renders: (armProbe?.renders ?? 0) + 1 };
+  return null;
+};
+
 // Calls actions only, as a transport button or a custom control does (#767).
 let controlsProbe: { renders: number };
 const ControlsProbeChild: React.FC = () => {
@@ -244,6 +252,7 @@ const CHILDREN = (
     <ControlsProbeChild />
     <TrimProbeChild />
     <ArrangementProbeChild />
+    <ArmProbeChild />
     <LayoutSeekChild />
   </>
 );
@@ -497,6 +506,56 @@ describe('the arrangement value is the one given and never changes (#812)', () =
 
     expect(arrangementProbe.value).toBe(arrangement);
     expect(arrangementProbe.renders).toBe(renders);
+  });
+});
+
+// #812: the armed track is provider state with its own small value, so the
+// track controls follow a take without a mixer or a timeline change moving it.
+describe('the recording arm value changes only with the armed track (#812)', () => {
+  it('through a mixer change, a clip edit, an undo, play and pause, a zoom and a re-render with inline props', async () => {
+    const { arrangement, rerender } = await mount({ inlineProps: true });
+    const { value, renders } = armProbe;
+    expect(value).toEqual({ armedTrackId: null });
+
+    await act(async () => {
+      probe.editor.setTrackVolume('track-1', 0.4);
+      probe.editor.setTrackMute('track-2', true);
+      arrangement.moveClip('track-1', 'track-1-clip', SAMPLE_RATE / 10);
+      probe.editor.undo();
+      probe.editor.zoomIn();
+    });
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    await act(async () => {
+      probe.controls.pause();
+      rerender();
+    });
+    // A session without an armed track arms nothing.
+    act(() => probe.editor.setRecordingActive(true));
+    act(() => probe.editor.setRecordingActive(false));
+
+    expect(armProbe.value).toBe(value);
+    expect(armProbe.renders).toBe(renders);
+  });
+
+  it('a new value when a track is armed, the same when it is armed again, a new one at the end', async () => {
+    await mount();
+    act(() => probe.editor.setRecordingActive(true, 'track-1'));
+    const armed = armProbe.value;
+    expect(armed).toEqual({ armedTrackId: 'track-1' });
+    const renders = armProbe.renders;
+
+    act(() => probe.editor.setRecordingActive(true, 'track-1'));
+    // The arm mute is a mixer change: it does not move the arm value.
+    act(() => probe.editor.setTrackVolume('track-1', 0.2));
+    expect(armProbe.value).toBe(armed);
+    expect(armProbe.renders).toBe(renders);
+
+    act(() => probe.editor.setRecordingActive(true, 'track-2'));
+    expect(armProbe.value).toEqual({ armedTrackId: 'track-2' });
+    act(() => probe.editor.setRecordingActive(false));
+    expect(armProbe.value).toEqual({ armedTrackId: null });
   });
 });
 

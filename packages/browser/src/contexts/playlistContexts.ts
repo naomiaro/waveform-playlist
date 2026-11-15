@@ -288,13 +288,17 @@ export interface EditorControlsContextValue {
   // Recording
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an `armedTrackId`, that track's
-   *  existing content is transiently muted — punch-in recording replaces
-   *  whatever the take overlaps (#579), so the doomed material must not play
-   *  under the overdub; its previous mute state is restored when the session
-   *  ends (audio-only, the UI mute control is untouched). `useRecordingSession`
-   *  calls it for the length of a take; overdub flows should also call it
-   *  eagerly (before `play()`). */
+   *  end of existing material, and (2) with an `armedTrackId`, that track is
+   *  muted in the arrangement's mix for the session (#812): punch-in
+   *  recording replaces whatever the take overlaps (#579), so the doomed
+   *  material must not play under the overdub. The mixer and the track's Mute
+   *  button show it muted, the built-in `<TrackMuteButton />` of that track
+   *  is disabled, and `useTrack().isRecordingArmed` is true for it. The mute
+   *  from before the session is written back when it ends or the armed track
+   *  changes, whatever was set in between; nothing is written for a track
+   *  that is no longer in the arrangement. `useRecordingSession` calls it for
+   *  the length of a take; overdub flows should also call it eagerly (before
+   *  `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
@@ -392,6 +396,17 @@ export interface TrackReorderPreviewContextValue {
   trackReorderEpoch: number;
 }
 
+/**
+ * INTERNAL (the context and its hook are not exported from the package,
+ * #812): the track a take is being recorded onto, set by
+ * `setRecordingActive(true, trackId)` and cleared when the session ends.
+ * Changes when a take starts and ends and when the armed track changes. The
+ * track controls read it and give each track's panel `isRecordingArmed`.
+ */
+export interface RecordingArmContextValue {
+  armedTrackId: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // MediaElementPlaylistProvider only
 // ---------------------------------------------------------------------------
@@ -472,6 +487,8 @@ export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>(
  */
 export const TrimPreviewContext = slot<TrimPreviewHandle>();
 export const TrimPreviewPeaksContext = slot<TrimPreviewPeaksValue>();
+/** INTERNAL (#812): see {@link RecordingArmContextValue}. */
+export const RecordingArmContext = slot<RecordingArmContextValue>();
 
 // MediaElementPlaylistProvider only
 export const PlaybackRateContext = slot<PlaybackRateContextValue>();
@@ -626,6 +643,12 @@ export const usePlaylistMixer = () => useSlot(PlaylistMixerContext, 'usePlaylist
  */
 export const useTrackReorderPreview = () =>
   useSlot(TrackReorderPreviewContext, 'useTrackReorderPreview', WEB_AUDIO);
+
+/**
+ * INTERNAL (not exported from the package, #812): `{ armedTrackId }`, the
+ * track a take is being recorded onto. Re-renders when a take starts or ends.
+ */
+export const useRecordingArm = () => useSlot(RecordingArmContext, 'useRecordingArm', WEB_AUDIO);
 
 /** `{ playbackRate, setPlaybackRate }`. MediaElementPlaylistProvider only. */
 export const usePlaybackRate = () => useSlot(PlaybackRateContext, 'usePlaybackRate', MEDIA_ELEMENT);

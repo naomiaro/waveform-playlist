@@ -37,13 +37,18 @@ export const TrackName: React.FC = () => {
   );
 };
 
-/** Mutes and unmutes the track. */
+/**
+ * Mutes and unmutes the track. Disabled while a take is recorded onto the
+ * track (`useTrack().isRecordingArmed`): the track is muted for the take and
+ * its mute from before is written back when the take ends (#812).
+ */
 export const TrackMuteButton: React.FC = () => {
-  const { muted, setMuted } = useTrack();
+  const { muted, setMuted, isRecordingArmed } = useTrack();
   return (
     <Button
       $variant={muted ? 'danger' : 'outline'}
       aria-pressed={muted}
+      disabled={isRecordingArmed}
       onClick={() => setMuted(!muted)}
     >
       Mute

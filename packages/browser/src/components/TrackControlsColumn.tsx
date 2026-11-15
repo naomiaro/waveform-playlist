@@ -5,6 +5,7 @@ import { warnMisplacedPart } from './partWarnings';
 import {
   usePlaylistMixer,
   useEditorControls,
+  useRecordingArm,
   useSelectedTrackId,
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
@@ -64,6 +65,7 @@ interface TrackControlsSlotProps {
   isLast: boolean;
   renderMode: RenderMode;
   hasSpectrogram: boolean;
+  isRecordingArmed: boolean;
   height: number;
   top: number;
   animate: boolean;
@@ -95,6 +97,7 @@ function TrackControlsSlotImpl({
   isLast,
   renderMode,
   hasSpectrogram,
+  isRecordingArmed,
   height,
   top,
   animate,
@@ -156,6 +159,7 @@ function TrackControlsSlotImpl({
       isFirst,
       isLast,
       hasSpectrogram,
+      isRecordingArmed,
       ...actions,
     }),
     [
@@ -172,6 +176,7 @@ function TrackControlsSlotImpl({
       isFirst,
       isLast,
       hasSpectrogram,
+      isRecordingArmed,
       actions,
     ]
   );
@@ -250,6 +255,8 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
     );
   }
   const { selectedTrackId } = useSelectedTrackId();
+  // The track a take is recorded onto (#812): its slot alone renders when a take starts or ends.
+  const { armedTrackId } = useRecordingArm();
   const { trackReorderEpoch } = useTrackReorderPreview();
   const spectrogram = use(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
@@ -304,6 +311,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               isLast={trackIndex === tracks.length - 1}
               renderMode={renderModeById.get(track.id) ?? 'waveform'}
               hasSpectrogram={spectrogram !== null && track.kind !== 'midi'}
+              isRecordingArmed={track.id === armedTrackId}
               height={trackHeightById.get(track.id) ?? 0}
               top={trackLayout.topById.get(track.id) ?? 0}
               animate={animateTrackLayout}
