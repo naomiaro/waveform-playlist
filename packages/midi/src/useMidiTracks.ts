@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  type ClipTrack,
-  type MidiNoteData,
-  createClipFromSeconds,
-  createTrack,
-} from '@waveform-playlist/core';
+import type { ClipTrack, MidiNoteData } from '@waveform-playlist/core';
 import { parseMidiFile } from '@dawcore/midi';
 import { midiConfigsEqual } from './midiConfigsEqual';
+import { buildMidiTracks, createMidiTrack, lastNoteEnd } from './loadMidiTracks';
 
 /**
  * Configuration for a single MIDI track to load.
@@ -58,15 +54,17 @@ export interface UseMidiTracksOptions {
   sampleRate: number;
 }
 
-/** End of the last note, in seconds. A loop, not `Math.max(...)`: a spread of a
- * very large note list exceeds the engine's argument limit. */
-function lastNoteEnd(notes: MidiNoteData[]): number {
-  let end = 0;
-  for (const note of notes) {
-    const noteEnd = note.time + note.duration;
-    if (noteEnd > end) end = noteEnd;
-  }
-  return end;
+/** The part of a config that shapes the track, without the sample rate. */
+function configShape(config: MidiTrackConfig) {
+  return {
+    startTime: config.startTime,
+    duration: config.duration,
+    muted: config.muted,
+    soloed: config.soloed,
+    volume: config.volume,
+    pan: config.pan,
+    color: config.color,
+  };
 }
 
 /**
@@ -128,40 +126,6 @@ export function useMidiTracks(
     let cancelled = false;
     const abortController = new AbortController();
 
-    const createTrackFromNotes = (
-      config: MidiTrackConfig,
-      notes: MidiNoteData[],
-      trackName: string,
-      noteDuration: number,
-      midiChannel?: number,
-      midiProgram?: number
-    ): ClipTrack => {
-      const sampleRate = options.sampleRate;
-      const clipDuration = config.duration ?? noteDuration;
-
-      const clip = createClipFromSeconds({
-        startTime: config.startTime ?? 0,
-        duration: clipDuration,
-        sampleRate,
-        sourceDuration: clipDuration,
-        midiNotes: notes,
-        midiChannel,
-        midiProgram,
-        name: trackName,
-      });
-
-      return createTrack({
-        name: trackName,
-        kind: 'midi',
-        clips: [clip],
-        muted: config.muted ?? false,
-        soloed: config.soloed ?? false,
-        volume: config.volume ?? 1.0,
-        pan: config.pan ?? 0,
-        color: config.color,
-      });
-    };
-
     // Check if all src URLs are already cached — if so, skip loading state
     // to avoid flashing the loading overlay on re-parse-only changes.
     const allCached = stableConfigs.every((c) => !c.src || bufferCacheRef.current.has(c.src));
@@ -214,23 +178,21 @@ export function useMidiTracks(
             // Pre-parsed notes — no fetch needed
             const notes = config.midiNotes;
             const trackName = config.name || 'MIDI Track';
-            allTracks.push(createTrackFromNotes(config, notes, trackName, lastNoteEnd(notes)));
+            allTracks.push(
+              createMidiTrack(
+                { ...configShape(config), sampleRate: options.sampleRate },
+                notes,
+                trackName,
+                lastNoteEnd(notes)
+              )
+            );
           } else if (buffer) {
             const parsed = parseMidiFile(buffer, {
               flatten: config.flatten,
             });
-            for (const parsedTrack of parsed.tracks) {
-              allTracks.push(
-                createTrackFromNotes(
-                  config,
-                  parsedTrack.notes,
-                  parsedTrack.name,
-                  parsedTrack.duration,
-                  parsedTrack.channel,
-                  parsedTrack.programNumber
-                )
-              );
-            }
+            allTracks.push(
+              ...buildMidiTracks(parsed, { ...configShape(config), sampleRate: options.sampleRate })
+            );
           }
         });
 
