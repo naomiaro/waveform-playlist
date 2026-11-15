@@ -89,6 +89,8 @@ If you render `<PlaylistInfoContext value={…}>` yourself, give it every field 
 
 `SpectrogramChannel` takes the background of its area from the theme key `spectrogramBackgroundColor` (`#000` without it). That background shows until the spectrogram has been drawn and where a chunk is not mounted. A new `waveHeight` mounts new canvases, which are registered again through `onCanvasRegister`.
 
+A `Clip` given `isPlaceholder` (the clip's audio is still loading) is drawn without drag and trim handles, dimmed to the theme key `placeholderClipOpacity` (a number from 0 to 1; 0.5 when not set).
+
 ## Theming
 
 Wrap your tree in styled-components' `ThemeProvider` with a `WaveformPlaylistTheme` object — `defaultTheme` and `darkTheme` are exported as starting points and can be partially overridden:

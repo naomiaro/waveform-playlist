@@ -70,6 +70,9 @@ export {
   useZoomControls,
   useTimeFormat,
   useMasterVolume,
+  useCreateArrangement,
+  useArrangementTracks,
+  useArrangementSources,
 } from './hooks';
 export type {
   UsePlaybackShortcutsOptions,
@@ -77,6 +80,7 @@ export type {
   ZoomControls,
   TimeFormatControls,
   MasterVolumeControls,
+  UseCreateArrangementOptions,
 } from './hooks';
 
 export {

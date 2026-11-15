@@ -18,7 +18,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Current Phase:** v5.0.0 Stable
 
-**Semantic Versioning:** Now that v5 is released, follow semver for all changes. Breaking changes require a major version bump. **Bumping a 0.x peer range is a MAJOR** for every package declaring it (e.g. `@dnd-kit/*` ^0.3→^0.5 → browser/ui-components/annotations majors): 0.x minors are breaking upstream, and consumers on the old range can't install. Removing an export in the same PR rides the same major.
+**Semantic Versioning:** Now that v5 is released, follow semver for all changes. Breaking changes require a major version bump. **Bumping a 0.x peer range is a MAJOR** for every package declaring it (e.g. `@dnd-kit/*` ^0.3→^0.5 → browser/ui-components/annotations majors): 0.x minors are breaking upstream, and consumers on the old range can't install. Removing an export in the same PR rides the same major. **A new REQUIRED field on an exported type a consumer can build is a major too**, also in a PR that only adds things: on #853 the plan said `minor` for browser while its own upgrade entry said TypeScript code building a `ClipPeaks` stops compiling (a doc reviewer saw the two disagree).
 
 **Key Milestones Completed:**
 
@@ -132,7 +132,7 @@ Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), l
 
 ### One Owner per Exported Name (#770)
 
-**Rule:** a name is exported by one package. Bound controls live in the lowest package that can reach their state (the four annotation controls are in `annotations`, which reads browser's hooks). The pairs that remain on purpose are the five controlled/bound controls of ui-components and browser. `packages/browser/src/__tests__/oneOwnerPerExport.test.ts` scans the entries of browser (also `./tone`), annotations, ui-components, spectrogram, recording and core; its header lists what it cannot see. To find overlaps yourself, compare the name sets of each `dist/index.d.ts`, and check second entries (`./tone`) too.
+**Rule:** a name is exported by one package. Bound controls live in the lowest package that can reach their state (the four annotation controls are in `annotations`, which reads browser's hooks). The pairs that remain on purpose are the five controlled/bound controls of ui-components and browser. `packages/browser/src/__tests__/oneOwnerPerExport.test.ts` scans the entries of browser (also `./tone`), annotations, ui-components, spectrogram, recording and core; its header lists what it cannot see. To find overlaps yourself, compare the name sets of each `dist/index.d.ts`, and check second entries (`./tone`) too. **`export *` makes every `export` of a file public:** ui-components' `components/index.ts` re-exports each component file whole, so a fallback constant exported from `Clip.tsx` reached the package entry unnoticed (#853). After adding an `export` to such a file, look for the name in the built `dist/index.d.ts`; export only what a consumer is meant to import.
 
 **No literal element id, and nothing read from the page (maintainer, 2026-11-13).** Ids come from `useId()`; a value another component holds arrives as a prop or a context, never through `document.querySelector`. The same test scans for a literal `id=` / `htmlFor=`.
 
@@ -413,7 +413,7 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 
 Root flat ESLint config (`eslint.config.mjs`) with TypeScript + React Hooks checks. Run `pnpm lint` before committing — catches missing hook deps, unused variables, hook-rule violations.
 
-**`pnpm typecheck` and vitest do NOT catch `react-hooks/exhaustive-deps`** — a missing hook dependency is an ESLint _error_ that passes both and surfaces only on full `pnpm -w lint`. Because lint output carries ~359 pre-existing `@typescript-eslint/no-explicit-any` _warnings_, the real signal is the `✖ N problems (E errors, W warnings)` summary / exit code (require **0 errors**, exit 0) — don't grep the noisy output for "error" or trust scoped per-file typecheck.
+**`pnpm typecheck` and vitest do NOT catch `react-hooks/exhaustive-deps`** — a missing hook dependency is an ESLint _error_ that passes both and surfaces only on full `pnpm -w lint`. Because lint output carries about 490 pre-existing _warnings_ (493 on 2026-11-14, mostly `@typescript-eslint/no-explicit-any`), the real signal is the `✖ N problems (E errors, W warnings)` summary / exit code (require **0 errors**, exit 0) — don't grep the noisy output for "error" or trust scoped per-file typecheck. To see whether a branch added warnings, check whether any file it changed appears among the path lines of the output (`grep '^/' lint.log | grep -F -f changed.txt`), not the total.
 
 **`Set<Function>` triggers `@typescript-eslint/no-unsafe-function-type` (an ESLint _error_)** — same trap class: `pnpm typecheck` and vitest pass it, only full `pnpm -w lint` flags it. Event-emitter listener stores need either an inline `// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type` (as `PlaylistEngine` does) or a typed-union `Set<Events[keyof Events]>` (with one localized cast at the `_emit`/attach call site).
 

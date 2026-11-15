@@ -1,5 +1,5 @@
 import React, { FunctionComponent, ReactNode } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { useDraggable } from '@dnd-kit/react';
 import { Feedback } from '@dnd-kit/dom';
 import { ClipHeader } from './ClipHeader';
@@ -7,6 +7,18 @@ import { ClipBoundary } from './ClipBoundary';
 import { FadeOverlay } from './FadeOverlay';
 import { clipPixelWidth, type Fade } from '@waveform-playlist/core';
 import { ClipViewportOriginProvider } from '../contexts/ClipViewportOrigin';
+import type { WaveformPlaylistTheme } from '../wfpl-theme';
+
+/** The opacity of a placeholder clip when the theme sets no `placeholderClipOpacity`. */
+const DEFAULT_PLACEHOLDER_CLIP_OPACITY = 0.5;
+
+/** The theme's value when it is a number from 0 to 1, else the default (never throws). */
+function placeholderOpacity(theme: Partial<WaveformPlaylistTheme> | undefined): number {
+  const value = theme?.placeholderClipOpacity;
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+    ? value
+    : DEFAULT_PLACEHOLDER_CLIP_OPACITY;
+}
 
 // Per-entity Feedback plugin config (@dnd-kit 0.5+). Hoisted so the hooks
 // receive a stable reference across renders.
@@ -25,6 +37,7 @@ interface ClipContainerProps {
   readonly $left?: number; // Horizontal position in pixels (optional for overlay)
   readonly $width?: number; // Width in pixels (optional for overlay)
   readonly $isOverlay?: boolean; // Whether this is rendering in overlay mode
+  readonly $isPlaceholder?: boolean; // The clip's audio is still loading: drawn dimmed
 }
 
 const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
@@ -43,6 +56,12 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
   flex-direction: column;
   z-index: 10; /* Above progress overlay (z-index: 2) but below controls/playhead */
   pointer-events: none; /* Let clicks pass through to ClickOverlay for playhead positioning */
+  ${(props) =>
+    props.$isPlaceholder
+      ? css`
+          opacity: ${placeholderOpacity(props.theme)};
+        `
+      : ''}
 `;
 
 interface ChannelsWrapperProps {
@@ -80,6 +99,13 @@ export interface ClipProps {
   showFades?: boolean; // Show fade in/out overlays
   // Mobile optimization
   touchOptimized?: boolean; // Enable larger touch targets for mobile devices
+  /** The clip's audio is not loaded yet. The whole clip, header included, is
+   *  drawn dimmed at `theme.placeholderClipOpacity` (0.5 when the theme does
+   *  not set it); a loaded clip sets no opacity. The container carries
+   *  `data-clip-placeholder="true"`, the header is the presentational one (no
+   *  drag handle) and there are no trim handles, whatever `disableHeaderDrag`
+   *  says. Default false. */
+  isPlaceholder?: boolean;
 }
 
 /**
@@ -111,6 +137,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
   sampleRate = 44100,
   showFades = false,
   touchOptimized = false,
+  isPlaceholder = false,
 }) => {
   // Calculate horizontal position based on start sample
   // Use Math.floor to always snap to pixel boundaries
@@ -120,7 +147,8 @@ export const Clip: FunctionComponent<ClipProps> = ({
   const width = clipPixelWidth(startSample, durationSamples, samplesPerPixel);
 
   // Use draggable only if header is shown and drag is enabled
-  const enableDrag = showHeader && !disableHeaderDrag && !isOverlay;
+  const headerDragDisabled = disableHeaderDrag || isPlaceholder;
+  const enableDrag = showHeader && !headerDragDisabled && !isOverlay;
 
   // Main clip draggable (for moving entire clip)
   const draggableId = `clip-${trackIndex}-${clipIndex}`;
@@ -164,7 +192,9 @@ export const Clip: FunctionComponent<ClipProps> = ({
       $left={left}
       $width={width}
       $isOverlay={isOverlay}
+      $isPlaceholder={isPlaceholder}
       data-clip-container="true"
+      data-clip-placeholder={isPlaceholder ? 'true' : undefined}
       data-track-id={trackId}
       onMouseDown={onMouseDown}
       // Always set tabIndex=-1 so @dnd-kit doesn't add tabindex="0".
@@ -180,7 +210,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
           clipIndex={clipIndex}
           trackName={trackName}
           isSelected={isSelected}
-          disableDrag={disableHeaderDrag}
+          disableDrag={headerDragDisabled}
           dragHandleProps={enableDrag ? { handleRef } : undefined}
         />
       )}
@@ -207,7 +237,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
         </ChannelsWrapper>
       </ClipViewportOriginProvider>
       {/* Clip boundaries - outside ChannelsWrapper to avoid overflow:hidden clipping */}
-      {showHeader && !disableHeaderDrag && !isOverlay && (
+      {showHeader && !headerDragDisabled && !isOverlay && (
         <>
           <ClipBoundary
             clipId={clipId}

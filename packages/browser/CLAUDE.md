@@ -198,6 +198,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 - `useSelectedTrack` - Selected track ID with engine delegation
 - `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation
 - `useMasterVolume` - Master volume with engine delegation
+- `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources` - Over an engine `Arrangement` (`src/hooks/useCreate*.ts`, `useArrangement*.ts`; core entry). `useCreateArrangement` reads `init` and `options` once and an initializer that throws goes to the render's error boundary; the other two are `useSyncExternalStore` over `arrangement.subscribe` and `arrangement.sources` (`arrangementHooks.test.tsx`). `WaveformPlaylistProvider` does not take an arrangement yet.
+- `ClipPeaks.isPlaceholder` (required) marks the record of a clip that is still loading, built by the internal `placeholderPeaks` (`src/utils/placeholderPeaks.ts`, not exported from the entry); `ui-components`' `Clip` draws it without drag and trim handles. Both providers set it `false` on every record today (`derivePeaks.ts`, `MediaElementPlaylistContext.tsx`), and `sameClipPeaks` compares it.
 - `useTimeFormat`, etc.
 
 **Location:** `src/hooks/`

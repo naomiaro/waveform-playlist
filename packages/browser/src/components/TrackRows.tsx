@@ -140,6 +140,7 @@ const ClipView = React.memo(function ClipView({
       samplesPerPixel={samplesPerPixel}
       showHeader={showClipHeaders}
       disableHeaderDrag={!interactiveClips}
+      isPlaceholder={clip.isPlaceholder}
       isSelected={isSelected}
       trackId={trackId}
       fadeIn={clip.fadeIn}

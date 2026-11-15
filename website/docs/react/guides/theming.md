@@ -321,7 +321,7 @@ function OceanThemedPlaylist() {
 
 ## Full Theme Type Definition
 
-From `packages/ui-components/src/wfpl-theme.ts`. `WaveformColor` is a string or a gradient (see [Gradient Colors](#gradient-colors)). The optional keys have a fallback in the component that reads them: `spectrogramBackgroundColor` is the background of the area a spectrogram is drawn in. It is what shows until the spectrogram has been drawn and where a part of it is not mounted; a drawn spectrogram is opaque and covers it. It is `#000` in both built-in themes and when the key is missing.
+From `packages/ui-components/src/wfpl-theme.ts`. `WaveformColor` is a string or a gradient (see [Gradient Colors](#gradient-colors)). The optional keys have a fallback in the component that reads them: `spectrogramBackgroundColor` is the background of the area a spectrogram is drawn in. It is what shows until the spectrogram has been drawn and where a part of it is not mounted; a drawn spectrogram is opaque and covers it. It is `#000` in both built-in themes and when the key is missing. `placeholderClipOpacity` is the opacity of a `Clip` drawn with `isPlaceholder` (a clip whose audio is still loading), the whole clip including its header; neither built-in theme sets it, and it is 0.5 when the key is missing or is not a number from 0 to 1. No provider produces a placeholder clip yet, so it shows only where an app renders `Clip` with that prop itself.
 
 ```typescript
 interface WaveformPlaylistTheme {
@@ -418,6 +418,13 @@ interface WaveformPlaylistTheme {
    * colour is `#000`.
    */
   spectrogramBackgroundColor?: string;
+
+  /**
+   * Opacity (0 to 1) of a clip whose audio is still loading (`Clip` with
+   * `isPlaceholder`), header included. Optional; without it, or with a value
+   * that is not a number from 0 to 1, the opacity is 0.5.
+   */
+  placeholderClipOpacity?: number;
 
   // Spacing and sizing
   borderRadius: string;

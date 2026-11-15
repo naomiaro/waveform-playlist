@@ -47,6 +47,14 @@ import {
 import { warnOnce } from './components/partWarnings';
 
 // Types
+/**
+ * What one clip is drawn from.
+ *
+ * `isPlaceholder` is true for the record of a clip whose audio is still loading
+ * (`placeholderPeaks`): it is drawn without drag or trim handles, and there is
+ * NO clip for it in `usePlaylistTimeline().tracks`, so look it up by `clipId`,
+ * never by position. Every other record has it false.
+ */
 export interface ClipPeaks {
   clipId: string;
   trackName: string;
@@ -61,6 +69,7 @@ export interface ClipPeaks {
   /** The clip's linear gain — drawn into the waveform when
    *  `<WaveformTracks gainScaled />` is set. */
   gain?: number;
+  isPlaceholder: boolean;
 }
 
 export type TrackClipPeaks = ClipPeaks[];

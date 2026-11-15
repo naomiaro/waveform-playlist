@@ -152,6 +152,14 @@ export interface WaveformPlaylistTheme {
    */
   spectrogramBackgroundColor?: string;
 
+  /**
+   * Opacity (0 to 1) of a clip whose audio is still loading (`Clip` with
+   * `isPlaceholder`), header included. Optional so that a complete theme
+   * object written before the key existed still type-checks; without it, or
+   * with a value that is not a number from 0 to 1, the opacity is 0.5.
+   */
+  placeholderClipOpacity?: number;
+
   // Spacing and sizing
   borderRadius: string;
   fontFamily: string;

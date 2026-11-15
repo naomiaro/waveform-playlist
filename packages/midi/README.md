@@ -89,6 +89,25 @@ interface UseMidiTracksReturn {
 }
 ```
 
+### `loadMidiTracks(src, options)`
+
+A function, not a hook, beside `useMidiTracks` (which is unchanged): no React state. `src` is a URL string, a `File` or a `Blob`; it resolves to `ClipTrack[]` with `kind: 'midi'`, and every call makes new track and clip ids.
+
+```typescript
+function loadMidiTracks(src: string | File | Blob, options: LoadMidiTracksOptions): Promise<ClipTrack[]>;
+
+interface LoadMidiTracksOptions {
+  sampleRate: number; // required — pass AudioContext.sampleRate
+  flatten?: boolean; // merge all tracks in the file into one ClipTrack (default false)
+  start?: number; // clip position on timeline, in seconds (default 0)
+  duration?: number; // clip duration in seconds (default: end of the track's last note)
+  name?: string; // names the track and its clip when the file yields exactly one track
+  signal?: AbortSignal; // an aborted signal rejects with the signal's reason
+}
+```
+
+A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`, with the status text after the code when there is one (`Failed to fetch MIDI file /missing.mid: 404 Not Found`); data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
+
 ### `parseMidiFile(data, options?)` / `parseMidiUrl(url, options?, signal?)`
 
 Re-exported from `@dawcore/midi`.
