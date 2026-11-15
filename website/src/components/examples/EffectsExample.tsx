@@ -650,9 +650,10 @@ export function EffectsExample() {
 
   // Handle delete track
   const handleDeleteTrack = useCallback((trackId: string) => {
-    // Clear effects for this track
+    // Clear effects for this track. The removal is not an undo step: an undo
+    // would bring the track back without the effects cleared here
     clearTrackEffects(trackId);
-    arrangement.removeTrack(trackId);
+    arrangement.removeTrack(trackId, { undoable: false });
   }, [clearTrackEffects, arrangement]);
 
   return (

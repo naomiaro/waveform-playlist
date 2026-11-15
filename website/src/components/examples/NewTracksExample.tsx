@@ -7,7 +7,7 @@
  * - Multiple tracks with independent controls
  */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -32,10 +32,10 @@ import {
   useArrangementTracks,
   useArrangementSources,
 } from '@waveform-playlist/browser';
-import { audioTrack, isLoadingClip } from '@waveform-playlist/core';
-import type { ArrangementTrack, ClipSource, LoadingClip } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -76,15 +76,6 @@ const StyledDropZone = styled(FileDropZone)`
   margin-bottom: 1.5rem;
 `;
 
-interface FailedDrop {
-  name: string;
-  message: string;
-}
-
-/** Whether a clip of `track` is still waiting for a source in `failed`. */
-const waitsForFailed = (track: ArrangementTrack, failed: ReadonlySet<ClipSource>): boolean =>
-  track.clips.some((clip) => isLoadingClip(clip) && failed.has(clip.src));
-
 export function NewTracksExample() {
   const { theme } = useDocusaurusTheme();
   // Starts empty: one track per dropped file, and the arrangement loads each one
@@ -92,29 +83,9 @@ export function NewTracksExample() {
   const tracks = useArrangementTracks(arrangement);
   const sources = useArrangementSources(arrangement);
   const loadingCount = sources.pendingCount;
-  // Files that could not be decoded: their tracks are removed, the list stays
-  const [errors, setErrors] = useState<FailedDrop[]>([]);
-
   // A dropped file whose audio failed is taken out again (not an undo step,
   // so no undo brings it back) and listed with its error
-  useEffect(() => {
-    const failed = new Map(
-      Array.from(sources.sources).filter(([, state]) => state.status === 'failed')
-    );
-    if (failed.size === 0) return;
-    const failedSources = new Set(failed.keys());
-    const removed = arrangement.getTracks().filter((track) => waitsForFailed(track, failedSources));
-    if (removed.length === 0) return;
-    const drops = removed.map((track) => {
-      const clip = track.clips.find(
-        (c): c is LoadingClip => isLoadingClip(c) && failedSources.has(c.src)
-      );
-      const error = clip ? failed.get(clip.src)?.error : undefined;
-      return { name: track.name, message: error?.message ?? 'The audio could not be loaded' };
-    });
-    removed.forEach((track) => arrangement.removeTrack(track.id, { undoable: false }));
-    setErrors((prev) => [...prev, ...drops]);
-  }, [arrangement, sources]);
+  const failedDrops = useFailedDrops(arrangement);
 
   const handleFiles = useCallback(
     (files: File[]) => {
@@ -152,21 +123,7 @@ export function NewTracksExample() {
         <Subtext>Supports MP3, WAV, OGG, and more</Subtext>
       </StyledDropZone>
 
-      {errors.length > 0 && (
-        <div role="alert" style={{
-          padding: '0.75rem 1rem',
-          marginBottom: '1rem',
-          background: 'var(--ifm-color-danger-contrast-background, #fdf0ef)',
-          border: '1px solid var(--ifm-color-danger-dark, #c0392b)',
-          borderRadius: '0.5rem',
-          color: 'var(--ifm-color-danger-darkest, #7f1d1d)',
-          fontSize: '0.875rem',
-        }}>
-          {errors.map((e, i) => (
-            <div key={i}>Failed to load &quot;{e.name}&quot;: {e.message}</div>
-          ))}
-        </div>
-      )}
+      <FailedDropsAlert drops={failedDrops} />
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
