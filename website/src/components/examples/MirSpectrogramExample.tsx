@@ -1,6 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback } from 'react';
 import styled from 'styled-components';
-import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -24,14 +23,17 @@ import {
   WaveformPlayhead,
   WaveformClipHeaders,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementTracks,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import type { AudioTrackConfig } from '@waveform-playlist/browser/tone';
-import type { SpectrogramConfig, RenderMode, ClipTrack } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions, SpectrogramConfig, RenderMode } from '@waveform-playlist/core';
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { SourceLoadError } from './SourceLoadError';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -89,7 +91,7 @@ const DEFAULT_SPECTROGRAM_CONFIG: SpectrogramConfig = {
   labels: false,
 };
 
-const AUDIO_CONFIGS: AudioTrackConfig[] = TRACK_CONFIGS.map((tc) => ({
+const AUDIO_CONFIGS: AudioTrackOptions[] = TRACK_CONFIGS.map((tc) => ({
   src: tc.src,
   name: tc.name,
   renderMode: tc.defaultMode,
@@ -98,43 +100,35 @@ const AUDIO_CONFIGS: AudioTrackConfig[] = TRACK_CONFIGS.map((tc) => ({
 
 export function MirSpectrogramExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const baseTracksLoadedRef = useRef(false);
+  // The arrangement owns the tracks and loads their audio; dropped files are
+  // added to it
+  const arrangement = useCreateArrangement(() => AUDIO_CONFIGS.map((config) => audioTrack(config)));
+  const tracks = useArrangementTracks(arrangement);
+  const { isLoading } = useArrangementSources(arrangement);
+  // Dropped files that could not be decoded: their tracks are removed, the list stays
+  const failedDrops = useFailedDrops(arrangement);
 
-  const { tracks: baseTracks, loading, error } = useAudioTracks(AUDIO_CONFIGS, { immediate: true });
+  const handleRemoveTrack = useCallback(
+    (trackId: string) => arrangement.removeTrack(trackId),
+    [arrangement]
+  );
 
-  // Seed tracks from baseTracks when loading completes (once)
-  useEffect(() => {
-    if (!loading && baseTracks.length > 0 && !baseTracksLoadedRef.current) {
-      baseTracksLoadedRef.current = true;
-      setTracks(baseTracks);
-    }
-  }, [loading, baseTracks]);
+  // ClearAllButton stops playback first
+  const handleClearAll = useCallback(() => arrangement.setTracks([]), [arrangement]);
 
-  const handleRemoveTrack = useCallback((trackId: string) => {
-    setTracks(prev => prev.filter((track) => track.id !== trackId));
-  }, []);
-
-  const handleClearAll = useCallback(() => {
-    setTracks([]);
-  }, []);
-
-  const addFiles = async (files: File[]) => {
-    const audioContext = Tone.getContext().rawContext as AudioContext;
-    const newTracks = await decodeAudioFiles(audioContext, files, {
-      trackDefaults: { spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG },
-    });
-    if (newTracks.length > 0) {
-      setTracks((prev) => [...prev, ...newTracks]);
-    }
-  };
-
-  const handleFiles = useCallback((files: File[]) => {
-    const audioFiles = files.filter(f => f.type.startsWith('audio/'));
-    if (audioFiles.length > 0) addFiles(audioFiles);
-  }, []);
-
-  if (error) return <div>Error: {error}</div>;
+  // One track per file, named after the file without its extension
+  const handleFiles = useCallback(
+    (files: File[]) => {
+      files
+        .filter((f) => f.type.startsWith('audio/'))
+        .forEach((file) =>
+          arrangement.addTrack(
+            audioTrack({ src: file, spectrogramConfig: DEFAULT_SPECTROGRAM_CONFIG })
+          )
+        );
+    },
+    [arrangement]
+  );
 
   return (
     <Container>
@@ -142,12 +136,11 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
-      {loading && <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>}
+      {isLoading && <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>}
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
-          tracks={tracks}
-          onTracksChange={setTracks}
+          arrangement={arrangement}
           sampleRate={48000}
           theme={theme}
           automaticScroll
@@ -166,6 +159,7 @@ export function MirSpectrogramExample() {
             <ZoomOutButton />
             <AutomaticScrollCheckbox />
             <ClearAllButton onClearAll={handleClearAll} />
+            <SourceLoadError arrangement={arrangement} />
           </ControlBar>
           <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
             <WaveformRoot>
@@ -193,6 +187,7 @@ export function MirSpectrogramExample() {
         label="Drop audio files here to add tracks, or click to browse"
         dragLabel="Drop audio files here"
       />
+      <FailedDropsAlert drops={failedDrops} />
     </Container>
   );
 }

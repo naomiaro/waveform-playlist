@@ -7,7 +7,6 @@
 
 import React from 'react';
 import styled from 'styled-components';
-import * as Tone from 'tone';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -28,15 +27,17 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementTracks,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import type { ClipTrack } from '@waveform-playlist/core';
-import { useMidiTracks } from '@waveform-playlist/midi';
-import type { MidiTrackConfig } from '@waveform-playlist/midi';
+import { audioTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
+import { loadMidiTracks } from '@waveform-playlist/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
+import { FailedDropsAlert, useFailedDrops, type FailedDrop } from './FailedDrops';
 
 const darkThemeOverrides: Partial<WaveformPlaylistTheme> = {
   waveformDrawMode: 'inverted',
@@ -263,15 +264,77 @@ function isAudioFile(file: File): boolean {
   return file.type.startsWith('audio/') && !isMidiFile(file);
 }
 
+const fileBaseName = (file: File): string => file.name.replace(/\.[^/.]+$/, '');
+
+const errorMessage = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+type BaseMidiState =
+  | { status: 'loading' }
+  | { status: 'loaded' }
+  | { status: 'failed'; message: string };
+
+/**
+ * Loads the page's own .mid file into `arrangement` once: its tracks are
+ * added, then the undo history is cleared (the first load is not an undo
+ * step), then the status says loaded. A run that is aborted (StrictMode's
+ * first run, an unmount) adds nothing.
+ */
+function useBaseMidi(arrangement: Arrangement): BaseMidiState {
+  const [state, setState] = React.useState<BaseMidiState>({ status: 'loading' });
+  // Set once the tracks are in: a Fast Refresh runs the effect again and must
+  // not add them a second time
+  const addedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (addedRef.current) return undefined;
+    const controller = new AbortController();
+    loadMidiTracks(BASE_MIDI_SRC, {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
+      .then((tracks) => {
+        if (controller.signal.aborted) return;
+        tracks.forEach((track) => arrangement.addTrack(track));
+        arrangement.clearHistory();
+        addedRef.current = true;
+        setState({ status: 'loaded' });
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setState({ status: 'failed', message: errorMessage(err) });
+      });
+    return () => controller.abort();
+  }, [arrangement]);
+
+  return state;
+}
+
 export function MidiExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const gradientTheme = isDarkMode ? darkThemeOverrides : lightThemeOverrides;
   const [useSoundFont, setUseSoundFont] = React.useState(true);
-  const [baseHidden, setBaseHidden] = React.useState(false);
-  const [userMidiConfigs, setUserMidiConfigs] = React.useState<MidiTrackConfig[]>([]);
-  const [removedTrackIds, setRemovedTrackIds] = React.useState<Set<string>>(new Set());
-  const [userAudioTracks, setUserAudioTracks] = React.useState<ClipTrack[]>([]);
-  const objectUrlsRef = React.useRef<string[]>([]);
+
+  // Starts empty; the page's .mid file is added once it has loaded, and the
+  // provider is rendered only then, so "ready" means the MIDI is in
+  const arrangement = useCreateArrangement();
+  const baseMidi = useBaseMidi(arrangement);
+  const trackCount = useArrangementTracks(arrangement).length;
+  // Dropped audio files that could not be decoded: their tracks are removed, the list stays
+  const failedAudioDrops = useFailedDrops(arrangement);
+  // Dropped .mid files that could not be read
+  const [failedMidiDrops, setFailedMidiDrops] = React.useState<readonly FailedDrop[]>([]);
+  const failedDrops = React.useMemo(
+    () => [...failedAudioDrops, ...failedMidiDrops],
+    [failedAudioDrops, failedMidiDrops]
+  );
+
+  // Aborts the loads of dropped .mid files when the page unmounts
+  const dropsAbortRef = React.useRef<AbortController | null>(null);
+  React.useEffect(() => {
+    const controller = new AbortController();
+    dropsAbortRef.current = controller;
+    return () => controller.abort();
+  }, []);
 
   const soundFontUrl = useSoundFont
     ? '/waveform-playlist/media/soundfont/A320U.sf2'
@@ -282,54 +345,31 @@ export function MidiExample() {
     error: soundFontError,
   } = useSoundFontCache(soundFontUrl);
 
-  // Build configs: base (unless hidden) + user-added
-  const midiConfigs = React.useMemo(() => {
-    const configs: MidiTrackConfig[] = [];
-    if (!baseHidden) {
-      configs.push({ src: BASE_MIDI_SRC });
-    }
-    configs.push(...userMidiConfigs);
-    return configs;
-  }, [baseHidden, userMidiConfigs]);
-
-  const { tracks: allTracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs, {
-    sampleRate: getGlobalAudioContext().sampleRate,
-  });
-
-  // Merge MIDI + audio tracks and filter out removed ones
-  const filteredTracks = React.useMemo(
-    () => [...allTracks, ...userAudioTracks].filter((t) => !removedTrackIds.has(t.id)),
-    [allTracks, userAudioTracks, removedTrackIds]
+  // A dropped .mid is added as it is (an undo step, like any added track)
+  const addMidiFiles = React.useCallback(
+    (files: File[]) => {
+      const signal = dropsAbortRef.current?.signal;
+      files.forEach((file) => {
+        const name = fileBaseName(file);
+        loadMidiTracks(file, { sampleRate: getGlobalAudioContext().sampleRate, name, signal })
+          .then((tracks) => {
+            if (signal?.aborted) return;
+            tracks.forEach((track) => arrangement.addTrack(track));
+          })
+          .catch((err: unknown) => {
+            if (signal?.aborted) return;
+            setFailedMidiDrops((prev) => [...prev, { name, message: errorMessage(err) }]);
+          });
+      });
+    },
+    [arrangement]
   );
 
-  // Revoke object URLs on unmount
-  React.useEffect(() => {
-    const urls = objectUrlsRef.current;
-    return () => {
-      urls.forEach(URL.revokeObjectURL);
-    };
-  }, []);
-
-  const addMidiFiles = React.useCallback((files: File[]) => {
-    const midiFiles = files.filter(isMidiFile);
-    if (midiFiles.length === 0) return;
-
-    const newConfigs: MidiTrackConfig[] = midiFiles.map((f) => {
-      const url = URL.createObjectURL(f);
-      objectUrlsRef.current.push(url);
-      return {
-        src: url,
-        name: f.name.replace(/\.[^/.]+$/, ''),
-      };
-    });
-    setUserMidiConfigs((prev) => [...prev, ...newConfigs]);
-  }, []);
-
-  const addAudioFiles = React.useCallback(async (files: File[]) => {
-    const audioContext = Tone.getContext().rawContext as AudioContext;
-    const newTracks = await decodeAudioFiles(audioContext, files);
-    if (newTracks.length > 0) setUserAudioTracks((prev) => [...prev, ...newTracks]);
-  }, []);
+  // One track per audio file, named after the file without its extension
+  const addAudioFiles = React.useCallback(
+    (files: File[]) => files.forEach((file) => arrangement.addTrack(audioTrack({ src: file }))),
+    [arrangement]
+  );
 
   const handleFiles = React.useCallback(
     (files: File[]) => {
@@ -342,51 +382,30 @@ export function MidiExample() {
   );
 
   const handleRemoveTrack = React.useCallback(
-    (trackId: string) => {
-      setRemovedTrackIds((prev) => new Set([...prev, trackId]));
-    },
-    []
+    (trackId: string) => arrangement.removeTrack(trackId),
+    [arrangement]
   );
 
-  const handleClearAll = React.useCallback(() => {
-    objectUrlsRef.current.forEach(URL.revokeObjectURL);
-    objectUrlsRef.current = [];
-    setBaseHidden(true);
-    setUserMidiConfigs([]);
-    setUserAudioTracks([]);
-    setRemovedTrackIds(new Set());
-  }, []);
+  // ClearAllButton stops playback first
+  const handleClearAll = React.useCallback(() => arrangement.setTracks([]), [arrangement]);
 
-  // Mirror engine mutations back to userAudioTracks state.
-  // MIDI tracks (in allTracks) are managed by useMidiTracks; only audio tracks are updated.
-  const handleTracksChange = React.useCallback((updatedTracks: ClipTrack[]) => {
-    const midiTrackIds = new Set(allTracks.map((t) => t.id));
-    const updatedAudioTracks = updatedTracks.filter((t) => !midiTrackIds.has(t.id));
-    setUserAudioTracks(updatedAudioTracks);
-  }, [allTracks]);
-
-  if (error) {
+  if (baseMidi.status === 'failed') {
     return (
       <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>Error loading MIDI: {error}</div>
+        <div style={{ padding: '2rem', color: 'red' }}>Error loading MIDI: {baseMidi.message}</div>
       </Container>
     );
   }
 
-  // Only show loading overlay on initial load (configs present but tracks not ready)
-  const isInitialLoad = midiConfigs.length > 0 && (loading || allTracks.length === 0);
-  const isReady = !soundFontLoading && !isInitialLoad;
+  // The loading overlay is shown on the first load only
+  const isInitialLoad = baseMidi.status === 'loading';
 
-  if (!isReady) {
+  if (soundFontLoading || isInitialLoad) {
     return (
       <Container>
         <LoadingOverlay>
           {soundFontLoading && <div>Loading SoundFont...</div>}
-          {isInitialLoad && (
-            <div>
-              Loading MIDI tracks ({loadedCount}/{totalCount})...
-            </div>
-          )}
+          {isInitialLoad && <div>Loading MIDI tracks...</div>}
         </LoadingOverlay>
       </Container>
     );
@@ -400,15 +419,14 @@ export function MidiExample() {
           : soundFontCache
             ? 'MIDI tracks use SoundFont sample playback for realistic instrument sounds.'
             : 'MIDI tracks are synthesized in the browser using Tone.js PolySynth. Notes may be dropped when exceeding the polyphony limit.'}
-        {filteredTracks.length > 0 &&
-          ` Showing ${filteredTracks.length} individual MIDI track${filteredTracks.length !== 1 ? 's' : ''}.`}
+        {trackCount > 0 &&
+          ` Showing ${trackCount} individual MIDI track${trackCount !== 1 ? 's' : ''}.`}
       </InfoBanner>
 
-      {filteredTracks.length > 0 ? (
+      {trackCount > 0 ? (
         <WaveformPlaylistProvider
-          tracks={filteredTracks}
+          arrangement={arrangement}
           sampleRate={48000}
-          onTracksChange={handleTracksChange}
           samplesPerPixel={2048}
           mono
           theme={{ ...theme, ...gradientTheme }}
@@ -459,6 +477,7 @@ export function MidiExample() {
         label="Drop .mid or audio files here to add tracks, or click to browse"
         dragLabel="Drop MIDI or audio files here"
       />
+      <FailedDropsAlert drops={failedDrops} />
     </Container>
   );
 }
