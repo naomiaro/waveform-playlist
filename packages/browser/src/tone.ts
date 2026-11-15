@@ -3,9 +3,6 @@
 // optional peers `tone` and `@waveform-playlist/playout` (#510 — keeps the core
 // `@waveform-playlist/browser` entry free of any static tone/playout import).
 
-export { useAudioTracks } from './hooks/useAudioTracks';
-export type { AudioTrackConfig } from './hooks/useAudioTracks';
-
 export { useMasterAnalyser } from './hooks/useAudioEffects';
 
 export { useDynamicEffects } from './hooks/useDynamicEffects';
@@ -29,9 +26,6 @@ export type {
   OfflineEffectsFunction,
   OfflineTrackEffectsFunction,
 } from './hooks/useExportWav';
-
-export { useDynamicTracks } from './hooks/useDynamicTracks';
-export type { TrackSource, TrackLoadError, UseDynamicTracksReturn } from './hooks/useDynamicTracks';
 
 export { useOutputMeter } from './hooks/useOutputMeter';
 export type { UseOutputMeterOptions, UseOutputMeterReturn } from './hooks/useOutputMeter';
