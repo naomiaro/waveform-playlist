@@ -1446,7 +1446,7 @@ interface LoadMidiTracksOptions {
 }
 ```
 
-Each track has `kind: 'midi'`, and every call makes new track and clip ids. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`; data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
+Each track has `kind: 'midi'`, and every call makes new track and clip ids. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`, with the status text after the code when there is one (`Failed to fetch MIDI file /missing.mid: 404 Not Found`); data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
 
 ### parseMidiFile / parseMidiUrl
 

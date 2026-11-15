@@ -544,12 +544,12 @@ Returns `arrangement.getTracks()`, loading clips included (narrow a clip with `i
 function useArrangementSources(arrangement: Arrangement): ArrangementSourcesValue;
 ```
 
-Returns `{ sources, pendingCount, failedCount, isLoading }`: `sources` maps each source to `{ status: 'pending' | 'loaded' | 'failed', error }`. It is the same object until a status changes. The argument is required.
+Returns `{ sources, pendingCount, failedCount, isLoading }`: `sources` maps each source to `{ status: 'pending' | 'loaded' | 'failed', error? }`; `error` is there only on a failed source. It is the same object until a status changes. The argument is required.
 
 ```tsx
 import { useEffect } from 'react';
 import { PlaylistEngine } from '@waveform-playlist/engine';
-import type { PlayoutAdapter } from '@waveform-playlist/engine';
+import { createToneAdapter } from '@waveform-playlist/playout';
 import { audioTrack } from '@waveform-playlist/core';
 import {
   useCreateArrangement,
@@ -557,7 +557,7 @@ import {
   useArrangementSources,
 } from '@waveform-playlist/browser';
 
-function Editor({ adapter }: { adapter: PlayoutAdapter }) {
+function Editor() {
   const arrangement = useCreateArrangement(() => [
     audioTrack({ name: 'Drums', src: '/audio/drums.mp3' }),
   ]);
@@ -565,9 +565,10 @@ function Editor({ adapter }: { adapter: PlayoutAdapter }) {
   const { isLoading, failedCount } = useArrangementSources(arrangement);
 
   useEffect(() => {
-    const engine = new PlaylistEngine({ adapter, arrangement });
+    // One adapter per effect run: the engine disposes its adapter.
+    const engine = new PlaylistEngine({ adapter: createToneAdapter(), arrangement });
     return () => engine.dispose();
-  }, [adapter, arrangement]);
+  }, [arrangement]);
 
   return (
     <p>
@@ -577,6 +578,8 @@ function Editor({ adapter }: { adapter: PlayoutAdapter }) {
   );
 }
 ```
+
+The adapter is created inside the effect, next to the engine, because `engine.dispose()` also disposes its adapter, and under StrictMode the effect runs twice. The arrangement outlives both: it keeps its tracks, mix and undo history, and the next engine built on it finds them.
 
 ---
 

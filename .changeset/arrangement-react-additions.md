@@ -1,5 +1,5 @@
 ---
-'@waveform-playlist/browser': minor
+'@waveform-playlist/browser': major
 '@waveform-playlist/ui-components': minor
 '@waveform-playlist/midi': minor
 ---

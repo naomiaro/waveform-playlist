@@ -21,7 +21,7 @@ waveform-playlist/
 │   ├── dawcore-wam/       # @dawcore/wam — WAM 2.0 plugin hosting (host, loader, GUI, library, transport bridge)
 │   ├── engine/            # Framework-agnostic timeline engine
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
-│   ├── midi/              # 📦 OPTIONAL: MIDI file parsing + useMidiTracks hook (parser now in @dawcore/midi)
+│   ├── midi/              # 📦 OPTIONAL: MIDI file parsing + useMidiTracks hook and loadMidiTracks (parser now in @dawcore/midi)
 │   ├── playout/           # Audio playback (Tone.js wrapper)
 │   ├── recording/         # 📦 OPTIONAL: Audio recording hooks (no UI components)
 │   ├── spectrogram/       # 📦 OPTIONAL: React Provider + UI for spectrograms (computation/worker in @dawcore/spectrogram)
@@ -331,10 +331,13 @@ const clip = createClipFromSeconds({
   │   ├── useAnnotationDragHandlers.ts  # Annotation drag logic
   │   ├── useAnnotationKeyboardControls.ts # Annotation navigation & editing
   │   ├── useAnnotationsWithPreview.ts  # The annotations to draw while an edge drag is in progress
+  │   ├── useArrangementSources.ts      # Where each audio source of an Arrangement is (pending, loaded, failed)
+  │   ├── useArrangementTracks.ts       # The tracks of an Arrangement, loading clips included
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useAudioTracks.ts             # Track loading and management
   │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine)
   │   ├── useClipSplitting.ts           # Split clips at playhead (delegates to engine)
+  │   ├── useCreateArrangement.ts       # Makes the engine's Arrangement once per component instance
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
   │   ├── useDynamicEffects.ts          # Master effects chain
   │   ├── useDynamicTracks.ts           # Runtime track additions (placeholder-then-replace)
@@ -391,6 +394,7 @@ const clip = createClipFromSeconds({
   │   ├── trackMixerState.ts            # Mixer state by track id; the positional trackStates array derived from it
   │   ├── stableTemplate.ts             # Keeps the controls part's children while a new render hands it equal ones
   │   ├── derivePeaks.ts                # Peaks per clip, derived during render
+  │   ├── placeholderPeaks.ts           # The drawing record (isPlaceholder) of a clip that is still loading
   │   └── incrementalTrackChange.ts     # Which tracks changes can be applied to a running engine
   ├── playout/                           # Optional-engine resolution (#510)
   │   ├── resolvePlayoutAdapter.ts       # Dynamic-imports @waveform-playlist/playout + tone
@@ -651,7 +655,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Install:** `npm install @waveform-playlist/midi`
 - **Architecture (two-layer):**
   - `parseMidiFile()`/`parseMidiUrl()` — pure functions, re-exported from `@dawcore/midi` as of v13.0.0 (moved during the dawcore framework-split; no React-side API change). Convert a `.mid` ArrayBuffer/URL to `ParsedMidi`.
-  - `useMidiTracks()` — the one original symbol still defined in this package. React hook mirroring `useAudioTracks`, producing `ClipTrack[]` with `clip.midiNotes` for `<WaveformPlaylistProvider tracks={...}>`.
+  - `useMidiTracks()` and `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the original symbols still defined in this package. `useMidiTracks()` is a React hook mirroring `useAudioTracks`, producing `ClipTrack[]` with `clip.midiNotes` for `<WaveformPlaylistProvider tracks={...}>`; `loadMidiTracks()` is the same load without React, a promise of `ClipTrack[]`.
 - **Data pipeline only:** MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
 - **Multi-track expansion:** One MIDI config can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
 - **No native sample rate:** MIDI is event-based — `sampleRate` is required on `useMidiTracks()`'s options (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
