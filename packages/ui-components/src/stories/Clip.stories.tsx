@@ -186,3 +186,38 @@ export const Overlay: Story = {
     </Clip>
   ),
 };
+
+// A clip whose audio is still loading (#812): no drag handle, no trim
+// handles, `data-clip-placeholder="true"` on its container.
+export const PlaceholderWithPeaks: Story = {
+  args: {
+    clipId: 'clip-1',
+    trackIndex: 0,
+    clipIndex: 0,
+    trackName: 'Vocals',
+    startSample: 0,
+    durationSamples: 96000,
+    samplesPerPixel: 500,
+    showHeader: true,
+    isPlaceholder: true,
+  },
+  render: (args) => (
+    <Clip {...args}>
+      <ThemedChannel index={0} data={sampleData} bits={8} length={200} waveHeight={80} />
+    </Clip>
+  ),
+};
+
+export const PlaceholderWithoutPeaks: Story = {
+  args: {
+    clipId: 'clip-1',
+    trackIndex: 0,
+    clipIndex: 0,
+    trackName: 'Vocals',
+    startSample: 0,
+    durationSamples: 96000,
+    samplesPerPixel: 500,
+    showHeader: true,
+    isPlaceholder: true,
+  },
+};

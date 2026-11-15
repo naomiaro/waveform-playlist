@@ -67,8 +67,9 @@ export const EMPTY_PEAKS_CACHE: PeaksCache = {
   result: [],
 };
 
-function extractFromOwnWaveformData(
-  clip: AudioClip,
+/** The slice rule for a clip drawn from its own pre-computed peaks (path A). */
+export function extractFromOwnWaveformData(
+  clip: Pick<AudioClip, 'sampleRate' | 'offsetSamples' | 'durationSamples'>,
   waveformData: WaveformData,
   samplesPerPixel: number,
   mono: boolean
@@ -171,7 +172,8 @@ function sameClipPeaks(a: ClipPeaks, clip: AudioClip, trackName: string, peaks: 
     a.midiNotes === clip.midiNotes &&
     a.sampleRate === clip.sampleRate &&
     a.offsetSamples === clip.offsetSamples &&
-    a.gain === clip.gain
+    a.gain === clip.gain &&
+    !a.isPlaceholder
   );
 }
 
@@ -218,6 +220,7 @@ function deriveClip(
       sampleRate: clip.sampleRate,
       offsetSamples: clip.offsetSamples,
       gain: clip.gain,
+      isPlaceholder: false,
     },
   };
 }

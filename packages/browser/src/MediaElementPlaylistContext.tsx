@@ -335,6 +335,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       durationSamples: trackPeaks.durationSamples,
       fadeIn: trackFadeIn,
       fadeOut: trackFadeOut,
+      isPlaceholder: false,
     };
     return [[clipPeaks]];
   }, [trackPeaks, trackName, trackFadeIn, trackFadeOut]);
