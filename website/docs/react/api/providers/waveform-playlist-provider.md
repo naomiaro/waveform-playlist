@@ -149,7 +149,7 @@ Called with the full new array on every change to the annotations: the release o
 
 **Type:** `(tracks: ClipTrack[]) => void`
 
-Called when engine clip operations (move, trim, split) update the tracks. A trim is called once, on release: while the handle is dragged the clip is previewed in the view and neither this callback nor the engine is called. Use this to keep your parent state in sync with engine mutations:
+Called when engine clip operations (move, trim, split) update the tracks. A trim is called once, on release: while the handle is dragged the clip is previewed in the view, the tracks do not change, and neither this callback nor `engine.trimClip()` is called. Use this to keep your parent state in sync with engine mutations:
 
 ```tsx
 const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);

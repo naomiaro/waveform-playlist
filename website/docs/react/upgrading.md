@@ -3913,16 +3913,23 @@ const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
 
 `useClipSplitting().splitClipAt` was `(trackIndex, clipIndex, splitTime)` and is now `(trackId, clipId, splitTime)`. A track id or a clip id that is not in `tracks` returns `false` and changes nothing. `splitClipAtPlayhead()` is unchanged and picks the same clip as before.
 
-The clip drags find their clip by id too. The drag data of a clip keeps its shape (`clipId`, `trackIndex`, `clipIndex`, and `boundary` for a trim handle), but `useClipDragHandlers` and `ClipCollisionModifier` look the clip up by `clipId` within `tracks[trackIndex]`, and `clipIndex` is no longer read: it is a position in the drawn row, which can hold placeholders that are not in `track.clips`. A drag whose clip id is not in the track does nothing. Code that builds its own drag source for these handlers must put the clip's `clipId` in the data.
+The clip drags find their clip by id too. The drag data of a clip keeps its shape (`clipId`, `trackIndex`, `clipIndex`, and `boundary` for a trim handle), but `useClipDragHandlers` and `ClipCollisionModifier` look the clip up by `clipId` within `tracks[trackIndex]`, and `clipIndex` is no longer read: it is a position in the drawn row, which can hold placeholders that are not in `track.clips`. A trim keeps the track it started on, by id, if the track's row changes during the drag. A trim whose clip id is not in the track does nothing; a move of one is dropped with a console warning (`[waveform-playlist] The move was dropped: track "t1" has no clip "c1".`, with the ids of the drag). Code that builds its own drag source for these handlers must put the clip's `clipId` in the data.
 
 **Find:** `splitClipAt(` with a number as its first argument. TypeScript reports each one (`Argument of type 'number' is not assignable to parameter of type 'string'`); in plain JavaScript the call returns `false`.
 
 **Replace with:**
 
 ```tsx
-import { useClipSplitting, usePlaylistTimeline } from '@waveform-playlist/browser';
+import {
+  useClipSplitting,
+  useEngineRefs,
+  usePlaylistTimeline,
+  usePlaylistZoom,
+} from '@waveform-playlist/browser';
 
 const { tracks } = usePlaylistTimeline();
+const { samplesPerPixel } = usePlaylistZoom();
+const { playoutRef } = useEngineRefs();
 const { splitClipAt } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
 
 // Before
@@ -3937,12 +3944,13 @@ splitClipAt(track.id, track.clips[clipIndex].id, splitTime);
 
 **Package:** `@waveform-playlist/browser`.
 
-While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call and no engine call per pointer move. The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move.
+While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call per pointer move, and `engine.trimClip()` is not called until the release (with an engine attached, each move asks `engine.constrainTrimDelta`, a query that changes nothing). The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move.
 
 The preview is internal to the library. `useClipDragHandlers` and the clip view read it themselves; there is no exported hook or context to read or write it.
 
-- **The width follows a trim dragged past the end.** While the previewed end is past the end of the timeline, the view is as wide as that end rounded up to the next 10 seconds; after the release the width is the exact new duration. The recording layout's own rule is unchanged.
-- **A trimmed edge stops at a neighbouring clip during the drag.** With an engine attached, each move is constrained by `engine.constrainTrimDelta`, after the edge has been snapped to the grid. Before, the snapped edge was drawn without the engine's constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
+- **The width follows a trim dragged past the end.** While the previewed end is past the end of the timeline, the view is as wide as that end rounded up to the next 10 seconds; after the release the width is the exact new duration. The recording layout's own rule is unchanged. When the stepped width shrinks (on the release, or when the edge is dragged back inside), a view scrolled into the spare area is moved back by the browser.
+- **Without `onTracksChange`, the trim is drawn during the drag and undone in the view on release.** The view follows the pointer, then on release returns to the app's `tracks`, which did not change, while the engine keeps the trim; the provider warns "[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider." Before, nothing moved during the drag in that case.
+- **A trimmed edge stops at a neighbouring clip during the drag.** With an engine attached, each move is constrained by `engine.constrainTrimDelta`, after the edge has been snapped to the grid; without one, the bounds the handler captured at the start of the drag decide. Before, the snapped edge was drawn without the engine's constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
 - **A trim, a move or a split made while no engine is attached is dropped, with a console warning.** The clip stays where it was. That is the case before the first build has finished, and while the provider rebuilds the engine after a `tracks` change that did not come from the engine. The warnings read "[waveform-playlist] The trim was dropped: no engine is attached (before the first build, or while it is rebuilt after a change of tracks). The clip stays where it was.", the same with "The move" for a move, and "The split was dropped: … The clip stays whole." for `splitClipAt`. Before, the app's state kept the trim of each pointer move while the engine did not have it.
 
 **Find:** a test or a component that counts `onTracksChange` calls during a trim, or reads `tracks` while a trim handle is dragged to learn the clip's new bounds.

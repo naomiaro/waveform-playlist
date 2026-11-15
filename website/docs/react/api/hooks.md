@@ -1493,7 +1493,7 @@ The hook runs `setRecordingActive` (from `useEditorControls()`) in an effect, wh
 
 ### useClipDragHandlers
 
-Handles clip dragging (move) and boundary trimming. A move is one `engine.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; `tracks`, `onTracksChange` and the engine do not change) and is one `engine.trimClip()` on release, so a trim is one undo step and `onTracksChange` is called once. Escape clears the preview and changes nothing. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. The clip is found by its `clipId` within `tracks[trackIndex]`. Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
+Handles clip dragging (move) and boundary trimming. A move is one `engine.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; `tracks`, `onTracksChange` and the engine do not change) and is one `engine.trimClip()` on release, so a trim is one undo step and `onTracksChange` is called once. Escape clears the preview and changes nothing. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. The clip is found by its `clipId` within `tracks[trackIndex]`; a trim keeps that track, by id, if its row changes during the drag, and a move of a clip id that is not in the track is dropped with a console warning. Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {
@@ -1524,7 +1524,11 @@ import {
   ClipCollisionModifier,
   ClipInteractionOptions,
   WaveformEditor,
+  useClipDragHandlers,
   useDragSensors,
+  useEngineRefs,
+  usePlaylistTimeline,
+  usePlaylistZoom,
 } from '@waveform-playlist/browser';
 
 function EditablePlaylist() {

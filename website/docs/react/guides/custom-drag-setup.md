@@ -311,7 +311,7 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 | `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `useEngineRefs().playoutRef` |
 | `snapSamplePosition` | `(sample: number) => number` | No | Snap function for boundary trims |
 
-The hook finds the dragged clip by its `clipId` within `tracks[trackIndex]`. Each move of a trim handle is constrained by the engine (`engine.constrainTrimDelta`) and drawn as a preview of the dragged clip only; the release makes one `engine.trimClip()`. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. See [A clip trim previews in the view and reaches `onTracksChange` once](/docs/react/upgrading#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once).
+The hook finds the dragged clip by its `clipId` within `tracks[trackIndex]`; a trim keeps that track, by id, if its row changes during the drag, and a move of a clip id that is not in the track is dropped with a console warning. With an engine attached, each move of a trim handle is constrained by the engine (`engine.constrainTrimDelta`); without one, the bounds captured at the start of the drag decide. Each move is drawn as a preview of the dragged clip only; the release makes one `engine.trimClip()`. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. See [A clip trim previews in the view and reaches `onTracksChange` once](/docs/react/upgrading#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once).
 
 ### `ClipCollisionModifier.configure(options)`
 
