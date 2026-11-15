@@ -47,3 +47,8 @@ export type { AnimationFrameLoopControls } from './useAnimationFrameLoop';
 
 export { useWaveformDataCache } from './useWaveformDataCache';
 export type { UseWaveformDataCacheReturn } from './useWaveformDataCache';
+
+export { useCreateArrangement } from './useCreateArrangement';
+export type { UseCreateArrangementOptions } from './useCreateArrangement';
+export { useArrangementTracks } from './useArrangementTracks';
+export { useArrangementSources } from './useArrangementSources';
