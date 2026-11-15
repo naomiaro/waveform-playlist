@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef } from 'react';
 import type { Arrangement } from '@waveform-playlist/engine';
+import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
 
 const arrangementKeys = new WeakMap<Arrangement, number>();
 let lastArrangementKey = 0;
@@ -43,7 +44,7 @@ export function useArrangementKey(arrangement: Arrangement): number {
   useEffect(() => {
     if (key === firstKeyRef.current || warnedRef.current) return;
     warnedRef.current = true;
-    if (process.env.NODE_ENV !== 'production') console.warn(NEW_ARRANGEMENT_WARNING);
+    if (isDevelopmentBuild()) console.warn(NEW_ARRANGEMENT_WARNING);
   }, [key]);
   return key;
 }

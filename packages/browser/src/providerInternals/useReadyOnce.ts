@@ -17,12 +17,14 @@
  *   the console and given to `onError`.
  * - Play does nothing before that first time (maintainer, 2026-11-15):
  *   `refusePlayBeforeFirstReady()` says so to `play()` at call time, and
- *   writes one console warning per mount. It queues nothing, so Play pressed
+ *   writes one console warning per mount in a development build (none in a
+ *   production build). It queues nothing, so Play pressed
  *   during the first load never starts by itself.
  */
 import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import type { Arrangement } from '@waveform-playlist/engine';
 import { useArrangementSources } from '../hooks/useArrangementSources';
+import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
 
 const READY_EVENT = 'waveform-playlist:ready';
 
@@ -68,7 +70,8 @@ export interface ReadyOnce {
   isReady: boolean;
   /**
    * True when the first ready of this mount has not happened yet, so a play
-   * must do nothing; warns the first time per mount. Never changes identity.
+   * must do nothing; warns the first time per mount, in development builds
+   * only. Never changes identity.
    */
   refusePlayBeforeFirstReady: () => boolean;
 }
@@ -96,7 +99,7 @@ export function useReadyOnce(options: UseReadyOnceOptions): ReadyOnce {
 
   const refusePlayBeforeFirstReady = useCallback(() => {
     if (firstReadyRef.current) return false;
-    if (!warnedPlayRef.current) {
+    if (!warnedPlayRef.current && isDevelopmentBuild()) {
       warnedPlayRef.current = true;
       console.warn(PLAY_BEFORE_READY_WARNING);
     }

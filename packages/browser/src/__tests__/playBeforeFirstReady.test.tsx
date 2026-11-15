@@ -191,6 +191,27 @@ describe('Play before the first ready (#812)', () => {
     expect(playBeforeReadyWarnings()).toHaveLength(1);
   });
 
+  it('in a production build an ignored play warns nothing and still does nothing', async () => {
+    // As the test of `warnOnce` does (waveformPublicParts.test.tsx).
+    const before = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const { view } = withPendingSource();
+      await attachedWhilePending(view.adapters);
+      await act(async () => {
+        await probe.controls.play(1, 2);
+      });
+      act(() => probe.controls.playAnnotation(ANNOTATION));
+      await settle();
+      expect(view.factory.latest().count('play')).toBe(0);
+      expect(probe.isPlaying).toBe(false);
+      expect(probe.activeAnnotationId).toBeNull();
+      expect(playBeforeReadyWarnings()).toHaveLength(0);
+    } finally {
+      process.env.NODE_ENV = before;
+    }
+  });
+
   it('a Play pressed before ready does NOT start by itself when ready arrives', async () => {
     const { loads, view } = withPendingSource();
     // While the first engine is still being built: the path that would queue.

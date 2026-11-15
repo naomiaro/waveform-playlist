@@ -3,6 +3,7 @@ import { createValueSource } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import { createAnnotationLookup, type AnnotationLookup } from '../utils/annotationLookup';
+import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
 import type {
   AnnotationOptionsContextValue,
   AnnotationsContextValue,
@@ -93,7 +94,7 @@ export function useAnnotationState({
   // parseAeneas() from @waveform-playlist/annotations before passing them.
   const annotations = useMemo(() => {
     if (!annotationList?.annotations) return [];
-    if (process.env.NODE_ENV !== 'production' && annotationList.annotations.length > 0) {
+    if (isDevelopmentBuild() && annotationList.annotations.length > 0) {
       const first = annotationList.annotations[0] as unknown as Record<string, unknown>;
       if (typeof first.start !== 'number' || typeof first.end !== 'number') {
         console.error(
@@ -157,7 +158,7 @@ export function useAnnotationState({
     (action) => {
       const updated = typeof action === 'function' ? action(annotationsRef.current) : action;
       if (!onAnnotationsChangeRef.current) {
-        if (process.env.NODE_ENV !== 'production') {
+        if (isDevelopmentBuild()) {
           console.warn(
             'waveform-playlist: setAnnotations was called but no onAnnotationsChange callback is provided. ' +
               'Annotation edits will not persist. Pass onAnnotationsChange to ' +

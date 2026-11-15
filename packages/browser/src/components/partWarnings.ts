@@ -4,10 +4,12 @@
  * it does not throw: it draws nothing, or draws in the wrong place), and for a
  * call with an argument of an older signature (#687).
  */
+import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
+
 const warned = new Set<string>();
 
 export function warnOnce(message: string): void {
-  if (process.env.NODE_ENV === 'production') return;
+  if (!isDevelopmentBuild()) return;
   if (warned.has(message)) return;
   warned.add(message);
   console.warn('[waveform-playlist] ' + message);
