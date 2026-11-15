@@ -401,15 +401,69 @@ export const CustomTrackNames: Story = {
 };
 
 const makeBandTracks = (): ClipTrack[] => [
-  { id: 'vocals', kind: 'audio', name: 'Lead Vocals', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-  { id: 'guitar', kind: 'audio', name: 'Electric Guitar', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-  { id: 'bass', kind: 'audio', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-  { id: 'drums', kind: 'audio', name: 'Drums', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+  {
+    id: 'vocals',
+    kind: 'audio',
+    name: 'Lead Vocals',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'guitar',
+    kind: 'audio',
+    name: 'Electric Guitar',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'bass',
+    kind: 'audio',
+    name: 'Bass',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'drums',
+    kind: 'audio',
+    name: 'Drums',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
 ];
 
 const makeViewOptionsTracks = (): ClipTrack[] => [
-  { id: 'vocals', kind: 'audio', name: 'Vocals', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-  { id: 'bass', kind: 'audio', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+  {
+    id: 'vocals',
+    kind: 'audio',
+    name: 'Vocals',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'bass',
+    kind: 'audio',
+    name: 'Bass',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
 ];
 
 /**
