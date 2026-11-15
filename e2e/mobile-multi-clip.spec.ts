@@ -197,19 +197,19 @@ test.describe('Mobile Multi-Clip Example', () => {
       // Set mobile viewport
       await page.setViewportSize({ width: 375, height: 667 });
 
-      // Reload to apply viewport
+      // Reload to apply viewport. A placeholder clip is a
+      // `[data-clip-container]` too (#812): wait for ready, then count the
+      // loaded clips.
       await page.reload();
-      await page.waitForSelector('[data-clip-container]', { timeout: 30000 });
+      await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
 
       // Controls should still be visible
       await expect(page.getByRole('button', { name: /play/i })).toBeVisible();
 
-      // Clips should still be visible
-      const clips = page.locator('[data-clip-container]');
-      await expect(async () => {
-        const clipCount = await clips.count();
-        expect(clipCount).toBeGreaterThan(0);
-      }).toPass({ timeout: 5000 });
+      // Loaded clips are drawn at this size, and no placeholder is left
+      const clips = page.locator('[data-clip-container]:not([data-clip-placeholder="true"])');
+      await expect(clips.first()).toBeVisible();
+      await expect(page.locator('[data-clip-placeholder="true"]')).toHaveCount(0);
     });
 
     test('touch instructions visible on mobile viewport', async ({ page }) => {

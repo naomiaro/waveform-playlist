@@ -456,13 +456,13 @@ test.describe('Stem Tracks Example', () => {
 });
 
 /**
- * The stem page shows placeholder tracks immediately and decodes audio in the
- * background (`useAudioTracks({ immediate: true })` + `deferEngineRebuild`).
- * Until loading finishes the provider has no mixer state for the tracks and the
- * engine does not know them, so the default track controls must be disabled.
+ * The stem page shows its tracks at once (placeholder clips) while the
+ * arrangement decodes their audio. The arrangement owns the mix from the
+ * start, so the track controls work while a track's audio loads (#812), and
+ * what was set before the audio arrived is still set after it.
  */
 test.describe('Stem Tracks Example — track controls while loading', () => {
-  test('mute, solo, volume and pan are disabled until tracks have loaded', async ({
+  test('mute, solo, volume and pan work while the audio loads, and a mute set then stays', async ({
     page,
     baseURL,
   }) => {
@@ -489,22 +489,26 @@ test.describe('Stem Tracks Example — track controls while loading', () => {
 
     await expect(mute).toBeVisible({ timeout: 30000 });
     await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(0);
-    await expect(mute).toBeDisabled();
-    await expect(solo).toBeDisabled();
-    await expect(volume).toBeDisabled();
-    await expect(pan).toBeDisabled();
-
-    release();
-    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
-
     await expect(mute).toBeEnabled();
     await expect(solo).toBeEnabled();
     await expect(volume).toBeEnabled();
     await expect(pan).toBeEnabled();
 
     // Mute is a toggle: its pressed state is exposed, not only its colour.
+    // Pressed while the playlist is still loading, it takes effect at once.
     await expect(mute).toHaveAttribute('aria-pressed', 'false');
     await mute.click();
     await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(0);
+
+    release();
+    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+
+    // The audio arriving does not reset the mix.
+    await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await page.waitForTimeout(500);
+    await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await mute.click();
+    await expect(mute).toHaveAttribute('aria-pressed', 'false');
   });
 });

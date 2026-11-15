@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * BBC Waveform Data example tests
@@ -10,6 +10,120 @@ import { test, expect } from '@playwright/test';
  * - Track controls (mute, solo, volume, pan)
  * - Documentation display
  */
+
+const TRACK_NAMES = ['Kick', 'Bass', 'Synth 1', 'Synth 2'];
+const PEAKS_FILES = '**/media/audio/AlbertKader_Ubiquitous/*.dat';
+const BASS_PEAKS = '08_Bass.dat';
+
+/** Left and width of the clip of row `index`, in CSS pixels. */
+async function clipGeometry(page: Page, index: number) {
+  const clip = page.locator('[data-track-row]').nth(index).locator('[data-clip-container]');
+  await expect(clip).toHaveCount(1);
+  let box: { x: number; width: number } | null = null;
+  await expect(async () => {
+    box = await clip.boundingBox();
+    expect(box).toBeTruthy();
+  }).toPass({ timeout: 5000 });
+  return { left: Math.round(box!.x * 10) / 10, width: Math.round(box!.width * 10) / 10 };
+}
+
+/** Number of canvas pixels with any opacity in the clip of row `index`. */
+function drawnPixels(page: Page, index: number): Promise<number> {
+  return page
+    .locator('[data-track-row]')
+    .nth(index)
+    .locator('[data-clip-container]')
+    .evaluate((clip) =>
+      Array.from(clip.querySelectorAll('canvas')).reduce((sum, canvas) => {
+        const ctx = canvas.getContext('2d');
+        if (!ctx || canvas.width === 0 || canvas.height === 0) return sum;
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let drawn = 0;
+        for (let i = 3; i < data.length; i += 4) if (data[i] > 0) drawn++;
+        return sum + drawn;
+      }, 0)
+    );
+}
+
+/** The page ended with one row and one set of controls per track, in config order. */
+async function expectFourRowsOfFour(page: Page) {
+  await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+  await expect(page.locator('[data-track-row]')).toHaveCount(4);
+  await expect(page.getByRole('button', { name: 'Mute' })).toHaveCount(4);
+  await expect(page.locator('[data-clip-placeholder="true"]')).toHaveCount(0);
+  for (const [index, name] of TRACK_NAMES.entries()) {
+    await expect(page.getByText(name, { exact: true }).nth(0)).toBeVisible();
+    await expect(
+      page.locator('[data-track-row]').nth(index).locator('[data-clip-container]')
+    ).toHaveCount(1);
+  }
+}
+
+// #812: the tracks are added when every peaks request has settled, and the
+// playlist is ready once their audio has decoded.
+test.describe('BBC Waveform Data Example — peaks that arrive late or not at all', () => {
+  test('with every peaks file delayed the page ends with 4 rows of 4', async ({
+    page,
+    baseURL,
+  }) => {
+    // The later in config order, the sooner the file arrives.
+    const order = ['01_Kick', '08_Bass', '09_Synth1', '11_Synth2'];
+    let hits = 0;
+    await page.route(PEAKS_FILES, async (route) => {
+      hits++;
+      const index = order.findIndex((name) => route.request().url().includes(name));
+      await new Promise((resolve) => setTimeout(resolve, 400 * (order.length - index)));
+      await route.continue();
+    });
+
+    await page.goto(`${baseURL}/examples/waveform-data`);
+    await expectFourRowsOfFour(page);
+    expect(hits).toBe(4);
+
+    // Nothing is added or taken away afterwards.
+    await page.waitForTimeout(1000);
+    await expect(page.locator('[data-track-row]')).toHaveCount(4);
+    await expect(page.getByRole('button', { name: 'Mute' })).toHaveCount(4);
+  });
+
+  test('a peaks file that fails falls back to a waveform generated from the audio', async ({
+    page,
+    baseURL,
+  }) => {
+    // Where the Bass clip is drawn with its peaks file.
+    await page.goto(`${baseURL}/examples/waveform-data`);
+    await expectFourRowsOfFour(page);
+    const withPeaks = await clipGeometry(page, 1);
+
+    const warnings: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'warning') warnings.push(message.text());
+    });
+    let aborted = 0;
+    await page.route(PEAKS_FILES, async (route) => {
+      if (route.request().url().includes(BASS_PEAKS)) {
+        aborted++;
+        await route.abort();
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto(`${baseURL}/examples/waveform-data`);
+    await expectFourRowsOfFour(page);
+    expect(aborted).toBe(1);
+
+    // The failed track's clip is drawn, from peaks generated from its audio.
+    await expect(async () => {
+      expect(await drawnPixels(page, 1)).toBeGreaterThan(0);
+    }).toPass({ timeout: 10000 });
+    expect(await clipGeometry(page, 1)).toEqual(withPeaks);
+
+    // One warning names the file that failed; no error banner.
+    expect(warnings.filter((text) => text.includes(BASS_PEAKS))).toHaveLength(1);
+    await expect(page.getByText(/Error loading audio/)).toHaveCount(0);
+  });
+});
 
 test.describe('BBC Waveform Data Example', () => {
   test.beforeEach(async ({ page, baseURL }) => {

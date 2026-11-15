@@ -3,8 +3,9 @@ import { test, expect } from '@playwright/test';
 /**
  * MIDI example tests
  *
- * The page loads one .mid file with `useMidiTracks` from
- * `@waveform-playlist/midi` and renders one piano-roll track per MIDI channel.
+ * The page loads one .mid file with `loadMidiTracks` from
+ * `@waveform-playlist/midi`, adds its tracks to the arrangement and only then
+ * mounts the playlist: one piano-roll track per MIDI channel.
  */
 
 // Tracks in website/static/media/midi/RedHotChiliPeppers-Otherside.mid

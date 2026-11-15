@@ -196,22 +196,16 @@ test.describe('Effects Example', () => {
       await expect(page.getByRole('button', { name: 'FX 1' }).first()).toBeVisible();
     });
 
-    // #752: track effects reach the adapter through the provider's
-    // `trackEffects` prop, so `tracks` is passed as it is and an added file is
-    // applied to the running engine. Only a full engine build dispatches
-    // `waveform-playlist:ready`. (The "loading" state is no signal: a rebuild
-    // that finishes within one React batch never shows it.)
-    test('adding a file does not rebuild the engine', async ({ page }) => {
+    // `waveform-playlist:ready` fires once per provider mount (#812), so it
+    // cannot count engine builds any more; that an added track builds no
+    // engine is a unit test of the browser package (`engineLifetime.test.tsx`).
+    // Here: the added file gets its own track with an FX button, its clip
+    // loads, and the playlist is ready with it.
+    test('an added file gets a track with an FX button, and the playlist is ready with it', async ({
+      page,
+    }) => {
       const fxButtons = page.getByRole('button', { name: /FX/ });
       await expect(fxButtons).toHaveCount(4);
-
-      await page.evaluate(() => {
-        const counter = window as unknown as { __engineBuilds: number };
-        counter.__engineBuilds = 0;
-        window.addEventListener('waveform-playlist:ready', () => {
-          counter.__engineBuilds += 1;
-        });
-      });
 
       await page.locator('input[type="file"]').setInputFiles({
         name: 'tone.wav',
@@ -220,12 +214,13 @@ test.describe('Effects Example', () => {
       });
 
       await expect(fxButtons).toHaveCount(5, { timeout: 10000 });
-      // Give a rebuild, if one were started, time to finish.
-      await page.waitForTimeout(1000);
-      const builds = await page.evaluate(
-        () => (window as unknown as { __engineBuilds: number }).__engineBuilds
-      );
-      expect(builds).toBe(0);
+      const rows = page.locator('[data-track-row]');
+      await expect(rows).toHaveCount(5);
+      await expect(rows.nth(4).locator('[data-clip-container]')).toHaveCount(1);
+      await expect(rows.nth(4).locator('[data-clip-placeholder="true"]')).toHaveCount(0, {
+        timeout: 10000,
+      });
+      await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1);
     });
   });
 

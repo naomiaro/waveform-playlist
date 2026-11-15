@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 /**
  * Multi-clip interaction tests
@@ -902,4 +902,220 @@ test.describe('Multi-Clip Example', () => {
       await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeEnabled();
     });
   });
+});
+
+/**
+ * Holds the page's audio requests (all of them, or those whose URL contains
+ * one of `names`) until `release()` is called. Counts what it held, so a
+ * pattern that matches nothing fails the test instead of passing it.
+ */
+async function holdAudio(page: Page, names: string[] = []) {
+  let release: () => void = () => {};
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let held = 0;
+  await page.route('**/media/audio/AlbertKader_Ubiquitous/*.opus', async (route) => {
+    const url = route.request().url();
+    if (names.length === 0 || names.some((name) => url.includes(name))) {
+      held++;
+      await released;
+    }
+    await route.continue().catch(() => {});
+  });
+  return { release: () => release(), held: () => held };
+}
+
+const PLAY_BEFORE_READY_WARNING = 'playback starts once the playlist is ready';
+const BASS_AUDIO = '08_Bass.opus';
+const timeDisplay = (page: Page) => page.getByText(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
+const ready = (page: Page) => page.locator('[data-playlist-state="ready"]');
+const row = (page: Page, index: number) => page.locator('[data-track-row]').nth(index);
+const KICK_ROW = 0;
+const BASS_ROW = 4;
+
+/** Waits until the clips of row `index` are loaded (no placeholder left in it). */
+async function expectRowLoaded(page: Page, index: number) {
+  await expect(row(page, index).locator('[data-clip-container]').first()).toBeVisible({
+    timeout: 30000,
+  });
+  await expect(row(page, index).locator('[data-clip-placeholder="true"]')).toHaveCount(0, {
+    timeout: 30000,
+  });
+}
+
+/** Left and width of every clip of row `index`, rounded to 0.1 px. */
+const rowClipBoxes = (page: Page, index: number) =>
+  row(page, index)
+    .locator('[data-clip-container]')
+    .evaluateAll((els) =>
+      els.map((el) => {
+        const box = el.getBoundingClientRect();
+        return { left: Math.round(box.left * 10) / 10, width: Math.round(box.width * 10) / 10 };
+      })
+    );
+
+// #812: the arrangement loads each file and the playlist is ready once, when
+// no file is pending. These tests hold requests to act while files load.
+test.describe('Multi-Clip Example — while files are loading', () => {
+  test('Play pressed while the first files are still loading does nothing, and plays after ready', async ({
+    page,
+    baseURL,
+  }) => {
+    const warnings: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'warning') warnings.push(message.text());
+    });
+    const hold = await holdAudio(page);
+    await page.goto(`${baseURL}/examples/multi-clip`);
+    await page.waitForSelector('h1:has-text("Multi-Clip")', { timeout: 30000 });
+
+    const play = page.getByRole('button', { name: 'Play', exact: true });
+    const stop = page.getByRole('button', { name: 'Stop', exact: true });
+    await expect(play).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('[data-clip-placeholder="true"]').first()).toBeVisible();
+    await expect.poll(() => hold.held()).toBeGreaterThan(0);
+    await expect(ready(page)).toHaveCount(0);
+
+    // Two presses while loading: nothing plays, nothing is queued.
+    await play.click();
+    await play.click();
+    await page.waitForTimeout(1000);
+    await expect(stop).toBeDisabled();
+    await expect(play).toBeEnabled();
+    await expect(timeDisplay(page)).toHaveText('00:00:00.000');
+    // One development warning for the mount, however many presses.
+    expect(warnings.filter((text) => text.includes(PLAY_BEFORE_READY_WARNING))).toHaveLength(1);
+
+    hold.release();
+    await expect(ready(page)).toHaveCount(1, { timeout: 30000 });
+    // The early presses did not start playback when the playlist became ready.
+    await page.waitForTimeout(500);
+    await expect(stop).toBeDisabled();
+    await expect(timeDisplay(page)).toHaveText('00:00:00.000');
+
+    await play.click();
+    await expect(stop).toBeEnabled();
+    await expect(async () => {
+      expect(await timeDisplay(page).textContent()).not.toBe('00:00:00.000');
+    }).toPass({ timeout: 10000 });
+    await stop.click();
+  });
+
+  test('undo after an arrival keeps the arrived clip', async ({ page, baseURL }) => {
+    const hold = await holdAudio(page, [BASS_AUDIO]);
+    await page.goto(`${baseURL}/examples/multi-clip`);
+    await expectRowLoaded(page, KICK_ROW);
+    await expect.poll(() => hold.held()).toBe(1);
+    await expect(row(page, BASS_ROW).locator('[data-clip-placeholder="true"]')).toHaveCount(1);
+
+    // Move the first Kick clip while the Bass file is still loading.
+    const before = await rowClipBoxes(page, KICK_ROW);
+    const header = row(page, KICK_ROW).locator('[data-clip-id]').first();
+    await expect(header).toBeVisible();
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      box = await header.boundingBox();
+      expect(box).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width / 2 + 60, box!.y + box!.height / 2, { steps: 10 });
+    await page.mouse.up();
+    let moved: { left: number; width: number }[] = [];
+    // Read once the drop has settled: two reads 300 ms apart agree (during the
+    // drop the dragged element can be in the row twice).
+    await expect(async () => {
+      const first = await rowClipBoxes(page, KICK_ROW);
+      await page.waitForTimeout(300);
+      moved = await rowClipBoxes(page, KICK_ROW);
+      expect(moved).toEqual(first);
+      expect(moved).toHaveLength(before.length);
+      expect(moved[0].left).toBeGreaterThan(before[0].left + 30);
+    }).toPass({ timeout: 5000 });
+
+    // The Bass file arrives: its clip is loaded, and the move is still there.
+    hold.release();
+    await expectRowLoaded(page, BASS_ROW);
+    await expect(ready(page)).toHaveCount(1, { timeout: 30000 });
+    const bassLoaded = await rowClipBoxes(page, BASS_ROW);
+    expect(await rowClipBoxes(page, KICK_ROW)).toEqual(moved);
+
+    // Undo takes back the move, and only the move: the Bass clip stays loaded.
+    await page.keyboard.press('Control+z');
+    await expect(async () => {
+      expect(await rowClipBoxes(page, KICK_ROW)).toEqual(before);
+    }).toPass({ timeout: 5000 });
+    await page.waitForTimeout(500);
+    await expect(row(page, BASS_ROW).locator('[data-clip-placeholder="true"]')).toHaveCount(0);
+    expect(await rowClipBoxes(page, BASS_ROW)).toEqual(bassLoaded);
+    expect(await rowClipBoxes(page, KICK_ROW)).toEqual(before);
+  });
+
+  for (const ending of ['release', 'Escape'] as const) {
+    test(`a source that settles during a trim drag: ${
+      ending === 'release' ? 'release trims' : 'Escape leaves the clip'
+    }`, async ({ page, baseURL }) => {
+      const hold = await holdAudio(page, [BASS_AUDIO]);
+      await page.goto(`${baseURL}/examples/multi-clip`);
+      await expectRowLoaded(page, KICK_ROW);
+      await expect.poll(() => hold.held()).toBe(1);
+      // Settled widths of the Kick row: two reads 300 ms apart agree.
+      let original: { left: number; width: number }[] = [];
+      await expect(async () => {
+        const first = await rowClipBoxes(page, KICK_ROW);
+        await page.waitForTimeout(300);
+        original = await rowClipBoxes(page, KICK_ROW);
+        expect(original).toEqual(first);
+      }).toPass({ timeout: 10000 });
+
+      // Press the right trim handle of the first Kick clip and drag left.
+      const handle = row(page, KICK_ROW)
+        .locator('[data-clip-container]')
+        .first()
+        .locator('[data-boundary-edge="right"]');
+      await expect(handle).toBeVisible();
+      await handle.scrollIntoViewIfNeeded();
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await handle.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const x = box!.x + box!.width / 2;
+      const y = box!.y + box!.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      for (const dx of [10, 20, 30, 45, 60]) {
+        await page.mouse.move(x - dx, y, { steps: 3 });
+      }
+      let preview: { left: number; width: number }[] = [];
+      await expect(async () => {
+        preview = await rowClipBoxes(page, KICK_ROW);
+        expect(preview[0].width).toBeLessThan(original[0].width - 20);
+      }).toPass({ timeout: 5000 });
+
+      // The Bass file arrives while the button is still down.
+      hold.release();
+      await expectRowLoaded(page, BASS_ROW);
+      await expect(ready(page)).toHaveCount(1, { timeout: 30000 });
+      // The preview is unchanged by the arrival.
+      expect(await rowClipBoxes(page, KICK_ROW)).toEqual(preview);
+
+      if (ending === 'release') {
+        await page.mouse.up();
+        await page.waitForTimeout(500);
+        // The trim is what the preview showed.
+        expect(await rowClipBoxes(page, KICK_ROW)).toEqual(preview);
+      } else {
+        await page.keyboard.press('Escape');
+        await expect(async () => {
+          expect(await rowClipBoxes(page, KICK_ROW)).toEqual(original);
+        }).toPass({ timeout: 5000 });
+        await page.mouse.up();
+        await page.waitForTimeout(500);
+        expect(await rowClipBoxes(page, KICK_ROW)).toEqual(original);
+      }
+      await expect(row(page, BASS_ROW).locator('[data-clip-placeholder="true"]')).toHaveCount(0);
+    });
+  }
 });
