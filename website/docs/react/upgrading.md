@@ -3236,7 +3236,7 @@ const { getTrackEffectsFunction } = useTrackDynamicEffects();
 >
 ```
 
-Delete the memo.
+Delete the memo. (With the provider on an arrangement, [below](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed), `tracks={tracks}` becomes `arrangement={arrangement}`; `trackEffects` is unchanged.)
 
 A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. `AudioTrackConfig` has a new optional `id` for this: the track built from the config gets that id (without it an id is generated, as before, and is on `tracks[i].id` once the track exists). Ids must be unique: `useAudioTracks` warns about duplicates but still builds the tracks with the ids as given. An empty string counts as no id. Tracks added with `useDynamicTracks` always get generated ids; read them from `tracks`.
 
@@ -3262,6 +3262,8 @@ const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
 
 <WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
 ```
+
+`useAudioTracks` is removed by a later entry ([`useAudioTracks` and `useDynamicTracks` are removed](#useaudiotracks-and-usedynamictracks-are-removed-a-track-names-its-audio-with-audiotrack)): the id is then `audioTrack({ id: 'vocals', src: 'vocals.mp3' })`.
 
 **When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
 
@@ -3299,21 +3301,9 @@ What sets it:
 
 `PlaylistEngine.setTracks()`, `addTrack()` and `updateTrack(id, track)` throw an `Error` for a track whose clips do not match its kind, before changing anything. The message names the track and the clip.
 
-**In `WaveformPlaylistProvider` the error does not reach React, so an error boundary will not catch it.** The provider reports it instead:
-
-- the `onError` prop is called with the error;
-- `[waveform-playlist] The playlist could not be built and stays in its loading state (it cannot be played). Reason: …` is logged as a console error, with a hint to pass `onError` when the provider has none (when the bad track was appended to a running playlist, `Incremental add failed, falling through to full rebuild: …` is logged first, and none of the tracks appended with it are added);
-- the playlist stays in its loading state (`isReady` false, `data-playlist-state="loading"`) and cannot be played, until `tracks` is valid again. Its waveforms are still drawn from `tracks`. A build that was superseded by a newer one, or whose provider unmounted, logs nothing; `onError` is still called for it, as before.
+**Under `WaveformPlaylistProvider` the throw reaches whoever offered the track.** The provider takes an arrangement (see [the later entry](#a-refused-track-throws-at-the-call-onerror-is-for-an-engine-that-cannot-be-built)), whose `setTracks()`, `addTrack()` and `updateTrack()` check the track the same way: a track refused in the `useCreateArrangement` initializer is a render error for the nearest error boundary above the component that calls it, and one refused by `arrangement.addTrack()` is that call's exception. The provider's `onError` is not called for it.
 
 An `onReady` callback that throws is a separate report: `[waveform-playlist] The onReady callback threw: …` is logged as a console error and `onError` is called with the error, and the playlist is ready.
-
-With `deferEngineRebuild` set, the report comes when the deferral ends, because that is when the engine is next built.
-
-**Pass `onError` to the provider.** Without it, the only sign of a rejected track is the console error and a playlist that never becomes ready.
-
-```tsx
-<WaveformPlaylistProvider tracks={tracks} onError={(error) => showProblem(error.message)}>
-```
 
 If you call a `PlaylistEngine` yourself, the throw is synchronous: wrap the call in `try`/`catch`, or call `assertTrackKind(track)` from `@waveform-playlist/core` first.
 
@@ -3321,7 +3311,7 @@ If you call a `PlaylistEngine` yourself, the throw is synchronous: wrap the call
 
 **Find:**
 
-- Track objects written by hand: object literals typed `ClipTrack`, and anything pushed into the provider's `tracks` that did not come from `createTrack` or one of the loading hooks. TypeScript reports each one (`Property 'kind' is missing`).
+- Track objects written by hand: object literals typed `ClipTrack`, and anything added to the arrangement (or, before it, pushed into the provider's `tracks`) that did not come from `createTrack`, `audioTrack` or `loadMidiTracks`. TypeScript reports each one (`Property 'kind' is missing`).
 - Tracks holding `midiNotes` clips that are built with `createTrack({ … })` and no `kind`.
 - Saved projects: track data stored before this release has no `kind`.
 - Tracks that hold audio clips and MIDI clips together.
@@ -3454,7 +3444,7 @@ if (isRecording && removedTrack.id === selectedTrackId) await stopRecording();
 if (isRecording && removedTrack.id === recordingTrackId) await stopRecording();
 ```
 
-The third argument of `useIntegratedRecording` is still the selected track id: it decides where the _next_ take starts.
+The selected track id decides where the _next_ take starts. A later entry changes the arguments to `(arrangement, selectedTrackId, options)`: see [`useIntegratedRecording` takes the arrangement](#useintegratedrecording-takes-the-arrangement-a-take-is-one-undo-step).
 
 ## `addEffect` and `addEffectToTrack` return a promise
 
@@ -3551,7 +3541,7 @@ Also changed: `EffectDefinition['category']` is now `EffectCategory`, the known 
 
 This entry is for code that calls a `PlaylistEngine` itself: an engine you construct, or the one behind `useEngineRefs().playoutRef`. One part of it reaches every React app: the tracks handed to `onTracksChange` (the first heading below).
 
-The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the seven listed under [Also changed](#also-changed-in-the-engine) at the end. One more heading, [The arrangement's own API](#the-arrangements-own-api-clips-that-are-still-loading), is about code written against the arrangement itself, which is new. `WaveformPlaylistProvider` takes `tracks` and `onTracksChange` as before. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
+The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the seven listed under [Also changed](#also-changed-in-the-engine) at the end. One more heading, [The arrangement's own API](#the-arrangements-own-api-clips-that-are-still-loading), is about code written against the arrangement itself, which is new. `WaveformPlaylistProvider` then takes an arrangement itself instead of `tracks` and `onTracksChange` (see [the later entry](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed)), so the `onTracksChange` part below applies only until you make that change. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
 
 ### `getState().tracks` and the tracks in `onTracksChange` are read-only
 
@@ -3647,7 +3637,7 @@ The undo history holds tracks and clips only. Before, an undo step was a copy of
 - two tracks with the same id (`setTracks`), a track whose id another track has (`addTrack`), or a track given a new id that another track has (`updateTrack`);
 - two clips with the same id on one track. The same clip id on two different tracks is accepted.
 
-Before, such tracks were accepted. In `WaveformPlaylistProvider` the throw comes from the same engine calls as the one for a track of the wrong kind, which the provider catches and reports through `onError`, not to an error boundary (see [A track has a kind](#a-track-has-a-kind-audio-or-midi-never-both)).
+Before, such tracks were accepted. Under `WaveformPlaylistProvider` the arrangement refuses them at the call that offers them, as for a track of the wrong kind (see [A refused track throws at the call](#a-refused-track-throws-at-the-call-onerror-is-for-an-engine-that-cannot-be-built)).
 
 **Find:** places that build track or clip ids by hand (an index, a file name, a copied clip that keeps its id), and saved projects.
 
@@ -3833,7 +3823,7 @@ Also:
 
 **Package:** `@waveform-playlist/browser`.
 
-`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws it without a drag handle and without trim handles. It is also dimmed: the whole clip container, header included, gets `opacity` from the theme key `placeholderClipOpacity` (optional; 0.5 when the theme does not set it or sets something that is not a number from 0 to 1), and its container carries `data-clip-placeholder="true"`. Both providers set it to `false` on every record today, so the dim shows only where an app renders `Clip` with the prop itself. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it. In plain JavaScript a record built without the field is drawn as a loaded clip (`undefined` and `null` both render the loaded clip).
+`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws it without a drag handle and without trim handles. It is also dimmed: the whole clip container, header included, gets `opacity` from the theme key `placeholderClipOpacity` (optional; 0.5 when the theme does not set it or sets something that is not a number from 0 to 1), and its container carries `data-clip-placeholder="true"`. `WaveformPlaylistProvider` produces such records for clips still loading (see [`usePlaylistTimeline()`](#useplaylisttimeline-ontrackschange-is-removed-tracks-is-read-only-and-holds-loaded-clips)); `MediaElementPlaylistProvider` sets it to `false` on every record. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it. In plain JavaScript a record built without the field is drawn as a loaded clip (`undefined` and `null` both render the loaded clip).
 
 **Find:** an object literal typed `ClipPeaks` (or a function returning one), for example in a test or a custom `peaksDataArray`.
 
@@ -3861,7 +3851,7 @@ The provider no longer skips anything while a drag is under way. A `tracks` chan
 
 **Find:** `isDraggingRef`, next to `useEngineRefs` or `usePlaybackRefs`, and a pointer handler of yours that passes a new `tracks` array to `onTracksChange` on every move.
 
-**Replace with:** delete the read. If your own gesture set `isDraggingRef.current = true` to hold the provider back, keep the gesture in your own state while the pointer is down and, on release, make one engine call on `useEngineRefs().playoutRef.current`: `engine.trimClip(trackId, clipId, boundary, deltaSamples)`. The provider then reports the engine's tracks through `onTracksChange` once.
+**Replace with:** delete the read. If your own gesture set `isDraggingRef.current = true` to hold the provider back, keep the gesture in your own state while the pointer is down and, on release, make one call: `engine.trimClip(trackId, clipId, boundary, deltaSamples)` on `useEngineRefs().playoutRef.current`, or, with the provider on an arrangement (a later entry), `useArrangement().trimClip(trackId, clipId, boundary, deltaSamples)`, which also works while no engine is attached.
 
 ```tsx
 // Before
@@ -3875,7 +3865,7 @@ const { playoutRef } = useEngineRefs();
 
 **Package:** `@waveform-playlist/browser`.
 
-The options of `useClipDragHandlers` are now `tracks`, `samplesPerPixel`, `engineRef` and the optional `snapSamplePosition`. `onTracksChange` and `isDraggingRef` are removed: a trim no longer writes the tracks while it is dragged, and a move never did. On release a move is one `engine.moveClip()` and a trim one `engine.trimClip()`; each reaches your state through the provider's `onTracksChange`. Neither opens an engine transaction any more: each is one engine call, and so one undo step.
+The options of `useClipDragHandlers` are now `tracks`, `samplesPerPixel`, `engineRef` and the optional `snapSamplePosition` (a later entry removes `tracks` and `engineRef` too: see [`useClipDragHandlers` and `useClipSplitting` read the arrangement from the provider](#useclipdraghandlers-and-useclipsplitting-read-the-arrangement-from-the-provider)). `onTracksChange` and `isDraggingRef` are removed: a trim no longer writes the tracks while it is dragged, and a move never did. On release a move is one `engine.moveClip()` and a trim one `engine.trimClip()`; each reaches your state through the provider's `onTracksChange`. Neither opens an engine transaction any more: each is one engine call, and so one undo step.
 
 The hook reads the provider's trim preview, so a trim is shown while it is dragged only under `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` there is no preview and the clip rows draw the committed clip.
 
@@ -3920,17 +3910,12 @@ The clip drags find their clip by id too. The drag data of a clip keeps its shap
 **Replace with:**
 
 ```tsx
-import {
-  useClipSplitting,
-  useEngineRefs,
-  usePlaylistTimeline,
-  usePlaylistZoom,
-} from '@waveform-playlist/browser';
+import { useClipSplitting, usePlaylistTimeline, usePlaylistZoom } from '@waveform-playlist/browser';
 
 const { tracks } = usePlaylistTimeline();
 const { samplesPerPixel } = usePlaylistZoom();
-const { playoutRef } = useEngineRefs();
-const { splitClipAt } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
+// The options after the later entry; until then also `tracks` and `engineRef: playoutRef`
+const { splitClipAt } = useClipSplitting({ samplesPerPixel });
 
 // Before
 splitClipAt(trackIndex, clipIndex, splitTime);
@@ -3944,15 +3929,376 @@ splitClipAt(track.id, track.clips[clipIndex].id, splitTime);
 
 **Package:** `@waveform-playlist/browser`.
 
-While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call per pointer move, and `engine.trimClip()` is not called until the release (with an engine attached, each move asks `engine.constrainTrimDelta`, a query that changes nothing). The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move.
+While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call per pointer move, and `engine.trimClip()` is not called until the release (with an engine attached, each move asks `engine.constrainTrimDelta`, a query that changes nothing). The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move. With the provider on an arrangement (a later entry) the release is one `arrangement.trimClip()` and there is no `onTracksChange`.
 
 The preview is internal to the library. `useClipDragHandlers` and the clip view read it themselves; there is no exported hook or context to read or write it.
 
 - **The width follows a trim dragged past the end.** While the previewed end is past the end of the timeline, the view is as wide as that end rounded up to the next 10 seconds; after the release the width is the exact new duration. The recording layout's own rule is unchanged. When the stepped width shrinks (on the release, or when the edge is dragged back inside), a view scrolled into the spare area is moved back by the browser.
-- **Without `onTracksChange`, the trim is drawn during the drag and undone in the view on release.** The view follows the pointer, then on release returns to the app's `tracks`, which did not change, while the engine keeps the trim; the provider warns "[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider." Before, nothing moved during the drag in that case.
+- **The release changes the arrangement**, which the view draws: there is no `onTracksChange` to pass and nothing to revert (see [the arrangement entry](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed)).
 - **A trimmed edge stops at a neighbouring clip during the drag.** With an engine attached, each move is constrained by `engine.constrainTrimDelta`, after the edge has been snapped to the grid; without one, the bounds the handler captured at the start of the drag decide. Before, the snapped edge was drawn without the engine's constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
-- **A trim, a move or a split made while no engine is attached is dropped, with a console warning.** The clip stays where it was. That is the case before the first build has finished, and while the provider rebuilds the engine after a `tracks` change that did not come from the engine. The warnings read "[waveform-playlist] The trim was dropped: no engine is attached (before the first build, or while it is rebuilt after a change of tracks). The clip stays where it was.", the same with "The move" for a move, and "The split was dropped: … The clip stays whole." for `splitClipAt`. Before, the app's state kept the trim of each pointer move while the engine did not have it.
+- **A trim, a move or a split made while no engine is attached is kept** (before the first build, during a rebuild): it changes the arrangement, and the next engine plays it. See [`useClipDragHandlers` and `useClipSplitting` read the arrangement](#useclipdraghandlers-and-useclipsplitting-read-the-arrangement-from-the-provider).
 
 **Find:** a test or a component that counts `onTracksChange` calls during a trim, or reads `tracks` while a trim handle is dragged to learn the clip's new bounds.
 
-**Replace with:** read the tracks after the release, when `onTracksChange` has been called once. Nothing has to draw the trim during the drag: the library's clip view does.
+**Replace with:** read the tracks after the release (from the arrangement: `arrangement.getTracks()`, `useArrangementTracks(arrangement)`). Nothing has to draw the trim during the drag: the library's clip view does.
+
+## `WaveformPlaylistProvider` takes an `arrangement`: `tracks`, `onTracksChange` and `deferEngineRebuild` are removed
+
+**Packages:** `@waveform-playlist/browser`.
+
+The provider no longer takes a tracks array from your state and hands changes back. It takes an **arrangement**, an `Arrangement` from `@waveform-playlist/engine` that you make with `useCreateArrangement` from `@waveform-playlist/browser`. The arrangement owns the tracks and their clips, the mix (volume, mute, solo, pan by track id), the undo history and the loading of the audio the clips name. The provider derives everything it publishes from it and writes nothing back. A clip move, trim or split, a reorder, an undo and a recorded take each change the arrangement, and you read the tracks there.
+
+What goes with it:
+
+- **No copy of the tracks in your state.** Change tracks through the arrangement's methods (`addTrack`, `removeTrack`, `updateTrack`, `setTracks`, `reorderTrack`, the mixer setters, `undo`, `redo`), from a handler or an effect. Below the provider `useArrangement()` returns it. Read the tracks with `useArrangementTracks(arrangement)` (every clip, loading or not) or, below the provider, `usePlaylistTimeline().tracks` (loaded clips only).
+- **One arrangement per playlist.** `useCreateArrangement` reads its initializer once and returns the same object on every render. A new `arrangement` object passed to the provider is a new playlist: everything below the provider mounts again, with a new engine; playback stops, and the zoom, the selection, the loop, the master volume and the scroll position start from their initial values. A development build says so once with a console warning (`WaveformPlaylistProvider was given a new \`arrangement\` prop: everything below it mounts again …`).
+- **A track change never builds a new engine.** Before, a `tracks` array that did not come from the engine (a set of tracks that replaced the previous one) disposed the engine and built a new one, and `deferEngineRebuild` held that back during progressive loading. Now an engine is built when the provider mounts, when `effects` changes identity and when `zoomLevels` changes content; adding, removing or replacing tracks changes the running engine. `deferEngineRebuild` has nothing left to defer.
+- **Not an undo step:** the tracks the initializer returns. Tracks you add later with `addTrack` are; call `arrangement.clearHistory()` once after a first load you make yourself (see [Loading Audio](/docs/react/guides/loading-audio#ready)).
+
+In plain JavaScript a leftover `tracks`, `onTracksChange` or `deferEngineRebuild` prop is ignored: nothing reads it, nothing warns. A provider given no `arrangement` at all throws while it renders (a `TypeError` from the browser, `Invalid value used as weak map key` in Chromium). TypeScript reports each leftover prop and the missing `arrangement`.
+
+**Find:** `<WaveformPlaylistProvider` with `tracks=`, `onTracksChange=` or `deferEngineRebuild=`; the `useState` that holds the tracks you passed to it (often `useState<ClipTrack[]>`), and the `useEffect` that copied loaded tracks into that state.
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks: loadedTracks, loading } = useAudioTracks(configs, { immediate: true });
+const [tracks, setTracks] = useState<ClipTrack[]>([]);
+useEffect(() => {
+  if (!loading) setTracks(loadedTracks);
+}, [loadedTracks, loading]);
+
+const removeTrack = (id: string) => setTracks((prev) => prev.filter((t) => t.id !== id));
+
+<WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} deferEngineRebuild={loading}>
+  <Waveform />
+</WaveformPlaylistProvider>
+
+// After
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
+
+const arrangement = useCreateArrangement(() => configs.map((config) => audioTrack(config)));
+
+const removeTrack = (id: string) => arrangement.removeTrack(id);
+
+<WaveformPlaylistProvider arrangement={arrangement}>
+  <Waveform />
+</WaveformPlaylistProvider>
+```
+
+`configs` above are `audioTrack()` options, not the old `AudioTrackConfig`: see the next entry for the differences (`startTime` is `start`).
+
+Tracks you built yourself as `ClipTrack[]` (decoded `AudioBuffer`s, MIDI tracks) go into the arrangement as they are: `useCreateArrangement(() => myTracks)` for the first ones, `arrangement.addTrack(track)` later, `arrangement.setTracks(tracks)` to replace them all (that also clears the undo history).
+
+The `Arrangement` type is exported by `@waveform-playlist/engine`, a dependency of `@waveform-playlist/browser`. Add it to your own dependencies if you import the type and your package manager is strict (pnpm).
+
+## `useAudioTracks` and `useDynamicTracks` are removed; a track names its audio with `audioTrack()`
+
+**Packages:** `@waveform-playlist/browser`.
+
+Removed from `@waveform-playlist/browser/tone`: `useAudioTracks`, `useDynamicTracks`, and the types `AudioTrackConfig`, `TrackSource`, `TrackLoadError` and `UseDynamicTracksReturn`. A track names its audio itself: `audioTrack(options)` from `@waveform-playlist/core` builds a track whose clip has a `src`, and the arrangement fetches and decodes it once the provider has its first adapter. The provider decodes with its adapter's `AudioContext` (before, the hooks decoded on the Tone.js global context).
+
+A leftover import of a removed name fails the build (`useAudioTracks` is not exported); where a bundler lets it through, the value is `undefined` and the call throws a `TypeError`.
+
+**`AudioTrackConfig` to `audioTrack()` options:**
+
+| `AudioTrackConfig` | `audioTrack()` |
+|---|---|
+| `startTime` | `start` (seconds) |
+| `src` (a URL) | `src`: a URL, a `Blob` or a `File` |
+| `id`, `name`, `audioBuffer`, `waveformData`, `duration`, `offset`, `fadeIn`, `fadeOut`, `color`, `volume`, `muted`, `soloed`, `pan`, `renderMode`, `spectrogramConfig`, `spectrogramColorMap` | the same |
+| (none) | `clipId`, `gain` |
+
+`useAudioTracks`' second argument, `{ immediate }` (and its alias `progressive`), is gone with it: every playlist now loads progressively. The rows are drawn at once, a clip with a `duration` or `waveformData` is drawn as a dimmed placeholder while its audio loads, and a clip that names only its `src` is drawn when it has loaded (see [Placeholders](/docs/react/guides/loading-audio#placeholders-while-audio-loads)). A placeholder is drawn only once the provider knows its real sample rate: pass the provider's `sampleRate` prop to have them from the first render.
+
+**What replaces each returned field:**
+
+| Before | After |
+|---|---|
+| `useAudioTracks().tracks` | `useArrangementTracks(arrangement)`, or `usePlaylistTimeline().tracks` below the provider |
+| `loading` | `useArrangementSources(arrangement).isLoading` (the provider need not wait for it; Play works from the first ready) |
+| `loadedCount`, `totalCount` | `sources.size - pendingCount - failedCount`, `sources.size` of `useArrangementSources(arrangement)` |
+| `error` (a string) | the `error` (an `Error`) of each `failed` entry in `useArrangementSources(arrangement).sources`; `arrangement.retry(src)` starts it again |
+| `useDynamicTracks().addTracks(sources)` | `arrangement.addTrack(audioTrack({ src }))` for each source; a `{ src, name }` source is `audioTrack({ src, name })` |
+| `removeTrack(trackId)` | `arrangement.removeTrack(trackId)` |
+| `loadingCount`, `isLoading` | `pendingCount`, `isLoading` of `useArrangementSources(arrangement)` |
+| `errors` (failed tracks, removed automatically) | the `failed` entries of `useArrangementSources(arrangement).sources`. A failed track is not removed for you: to take a dropped file out again, call `arrangement.removeTrack(id, { undoable: false })` from an effect over that value (not from inside `arrangement.subscribe`) |
+
+**Find:** `useAudioTracks`, `useDynamicTracks`, `AudioTrackConfig`, `TrackSource`, `TrackLoadError`, `UseDynamicTracksReturn`, `startTime:` in a track config, and `URL.createObjectURL` used only to hand a file to `useAudioTracks`.
+
+**Replace with:**
+
+```tsx
+// Before
+import { useAudioTracks, useDynamicTracks } from '@waveform-playlist/browser/tone';
+
+const { tracks, loading, error } = useAudioTracks([
+  { src: '/audio/vocals.mp3', name: 'Vocals' },
+  { src: '/audio/guitar.mp3', name: 'Guitar', startTime: 4, duration: 30 },
+]);
+if (loading) return <div>Loading…</div>;
+if (error) return <div>Error: {error}</div>;
+
+// Runtime additions
+const { tracks, addTracks, removeTrack, isLoading, errors } = useDynamicTracks();
+addTracks(files);
+
+// After
+import { useCreateArrangement, useArrangementSources } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
+
+const arrangement = useCreateArrangement(() => [
+  audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+  audioTrack({ src: '/audio/guitar.mp3', name: 'Guitar', start: 4, duration: 30 }),
+]);
+const { isLoading, failedCount } = useArrangementSources(arrangement);
+
+// Runtime additions
+files.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
+```
+
+Several clips on one track are `LoadingClip` objects (`{ id, src, start, duration, offset }`, seconds) in the track's `clips`; see [Several Clips per Track](/docs/react/guides/loading-audio#several-clips-per-track).
+
+**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` returns a `tracks` array, which the provider no longer takes. Load with `loadMidiTracks(src, { sampleRate })`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+
+## `usePlaylistTimeline()`: `onTracksChange` is removed; `tracks` is read-only and holds loaded clips
+
+**Packages:** `@waveform-playlist/browser`.
+
+The value is `{ tracks, peaksDataArray, duration, isReady }`.
+
+- **`onTracksChange` is removed.** A leftover read is `undefined`, and calling it throws a `TypeError`. Change tracks through the arrangement (`useArrangement()`).
+- **`tracks` is `readonly ClipTrack[]` and holds loaded clips only.** It is the arrangement's tracks without the clips whose audio is still loading. A track whose clips are all loaded is the arrangement's own object, frozen outside production builds; a track that holds a clip still loading is a copy without that clip. Do not write to either. Every track is there, also while all its clips load.
+- **`peaksDataArray` can hold placeholder records.** A clip still loading that has a `duration` or `waveformData` has a record with `isPlaceholder: true` in its track's row, and no clip in `tracks`. So below the track, the two arrays do not line up: find a record by `clipId`. At track level they still do: `tracks[i]`, `peaksDataArray[i]` and `usePlaylistMixer().trackStates[i]` are the same track.
+- **`duration` counts loaded audio only**, and equals the engine's. The view is drawn wide enough for a placeholder that ends later; `seekTo` clamps to `duration`.
+- **An export renders what has loaded.** `ExportWavButton` and `useExportWav().exportWav(tracks, trackStates)` with these `tracks` render the loaded clips; a clip still loading is left out.
+
+**Find:** `onTracksChange` next to `usePlaylistTimeline`; `peaksDataArray[i][j]` read together with `tracks[i].clips[j]`; assignments to `tracks[i]`, `tracks[i].clips` or a clip of them; `duration` used as "the length of every clip".
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks, peaksDataArray, onTracksChange } = usePlaylistTimeline();
+const clip = tracks[i].clips[j];
+const record = peaksDataArray[i][j];
+onTracksChange?.(tracks.map((t) => (t.id === id ? { ...t, name } : t)));
+
+// After
+const { tracks, peaksDataArray } = usePlaylistTimeline();
+const arrangement = useArrangement();
+const clip = tracks[i].clips[j];
+const record = peaksDataArray[i].find((r) => r.clipId === clip.id);
+arrangement.updateTrack(id, (track) => ({ ...track, name }));
+```
+
+## `trackStates` has an entry for every track; `useTrack().isLoading` is removed
+
+**Packages:** `@waveform-playlist/browser`.
+
+`usePlaylistMixer().trackStates` has one entry for every track from the moment it enters the arrangement, also while its audio loads. Before, the entry of a track the provider was still loading was `undefined`. The values are the arrangement's mix (`arrangement.getMixer()`); a track's own `volume`, `muted`, `soloed` and `pan` fields are only the values it entered with.
+
+`useTrack()` (`TrackContextValue`) no longer has `isLoading`. The built-in pieces (mute, solo, the sliders, the move buttons) are enabled while a track loads, and a value set then is kept. A leftover read of `isLoading` is `undefined`, so a `disabled={isLoading}` of your own leaves the control enabled, which is what the built-in pieces do now. `TrackContextValue` has a new required field, `isRecordingArmed` (see [the armed track](#the-armed-track-shows-muted-during-a-take-and-its-mute-button-is-disabled)); TypeScript code that builds a `TrackContextValue` (a test double) adds it.
+
+**Find:** `trackStates[i]?.`, `trackStates.filter(Boolean)`, `if (!state) return null` after `trackStates[i]`, `isLoading` destructured from `useTrack()`.
+
+**Replace with:**
+
+```tsx
+// Before
+const anySolo = trackStates.some((s) => s?.soloed);
+const { muted, isLoading, setMuted } = useTrack();
+<button disabled={isLoading} onClick={() => setMuted(!muted)}>Mute</button>
+
+// After
+const anySolo = trackStates.some((s) => s.soloed);
+const { muted, isRecordingArmed, setMuted } = useTrack();
+<button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>Mute</button>
+```
+
+## Ready comes once per mount, after the first sources; Play does nothing before it
+
+**Packages:** `@waveform-playlist/browser`.
+
+Before, `onReady` was called and the window event `waveform-playlist:ready` dispatched after every engine build: the first load and every full rebuild. Now both happen **once per mount of the provider**: the first time an engine is attached and no source of the arrangement is still pending. A source that failed counts as settled; an empty arrangement is ready when its engine is attached; a file added during the first load extends the wait; a source that never settles means never ready. A later engine build, a StrictMode remount or an `<Activity>` hide and reveal does not repeat them.
+
+`usePlaylistTimeline().isReady` (and `data-playlist-state` on the view) turns true at the same moment. After that it is false only while a later engine is being built (an `effects` or `zoomLevels` change) and true again when that engine is attached, whatever is still loading.
+
+The event's `detail` is `{ trackCount, duration }`: `trackCount` counts every track of the arrangement, loaded or not; `duration` is the length of the loaded audio in seconds.
+
+**Play does nothing before the first ready.** `play()` returns at once and queues nothing: a Play press, Space or an annotation click during the first load does nothing (the annotation is not highlighted either), and does not start later by itself. A development build writes one console warning per mount: `[waveform-playlist] play() was called before the playlist was ready and did nothing: …`; a production build is silent. Edits, the mixer, `seekTo` and `setSelection` work before ready. `play()` called from `onReady`, or from an effect or a layout effect that runs when `isReady` turns true, works. A `play()` made from an app's own `arrangement.sources` listener when the last of the first sources settles runs before React has committed that ready, and is refused: wait for `isReady` or `onReady`.
+
+A page that loads something before its tracks exist (MIDI, peaks files) adds the tracks and then renders the provider, so that its one ready means "the tracks are in".
+
+**Find:** `onReady` and `waveform-playlist:ready` handlers that expect to run again after a rebuild or a change of tracks; code that calls `play()` on mount, from a timer, or from a handler that can run during the first load (autoplay, a "play" deep link); tests that count ready events.
+
+**Replace with:**
+
+```tsx
+// Before: play on mount (queued until the engine was built)
+useEffect(() => {
+  play();
+}, []);
+
+// After: play when the playlist is ready
+const { isReady } = usePlaylistTimeline();
+useEffect(() => {
+  if (isReady) play();
+}, [isReady, play]);
+
+// Or
+<WaveformPlaylistProvider arrangement={arrangement} onReady={() => startPlaybackOnce()}>
+```
+
+:::note Fixed: an inline `onReady` or `onError` no longer rebuilds the engine
+
+Before, a new `onReady` or `onError` function identity (an inline arrow, on every render of the component that renders the provider) made the provider build its engine again. Both are now read when they are called, so an inline arrow is fine.
+
+:::
+
+## A refused track throws at the call; `onError` is for an engine that cannot be built
+
+**Packages:** `@waveform-playlist/browser`.
+
+The arrangement refuses a track whose clips do not match its `kind`, a clip still loading on a MIDI track, two tracks with one id and two clips with one id on a track, before changing anything. Before, such a track reached the engine inside the provider, which caught the throw, called `onError`, and left the playlist in its loading state. Now the throw reaches whoever offered the track:
+
+- from the `useCreateArrangement` initializer it is a render error, thrown by the component that calls the hook: the nearest error boundary **above that component** catches it;
+- from `arrangement.addTrack()`, `setTracks()` or `updateTrack()` it is that call's exception, in your handler or effect.
+
+`onError` now means "the engine or its adapter could not be built" (a missing optional peer, a `createAdapter` that throws, invalid `zoomLevels` / `samplesPerPixel`), plus an `onReady` that throws. It is called only for a build that is still current: not for one replaced by a newer build or a StrictMode remount, nor after the provider unmounted (before, `onError` was called for those too). A source that fails to load does not call it: read `useArrangementSources(arrangement)`.
+
+**Find:** `onError` handlers that show a message for a bad track or a duplicate id; places that add tracks without a `try`.
+
+**Replace with:**
+
+```tsx
+// Before: a bad track came back through onError
+<WaveformPlaylistProvider tracks={tracks} onError={(e) => showProblem(e.message)}>
+
+// After: catch it where the track is offered
+try {
+  arrangement.addTrack(track);
+} catch (error) {
+  showProblem(error instanceof Error ? error.message : String(error));
+}
+
+// …and an error boundary above the component that calls useCreateArrangement
+<PlaylistErrorBoundary fallback={<p>The playlist could not be created.</p>}>
+  <Editor />
+</PlaylistErrorBoundary>
+
+// onError stays for engine build failures
+<WaveformPlaylistProvider arrangement={arrangement} onError={(e) => showProblem(e.message)}>
+```
+
+`PlaylistErrorBoundary` is exported by `@waveform-playlist/ui-components`.
+
+## `useClipDragHandlers` and `useClipSplitting` read the arrangement from the provider
+
+**Packages:** `@waveform-playlist/browser`.
+
+Both hooks lose their `tracks` and `engineRef` options: they work on the arrangement of the nearest `WaveformPlaylistProvider` (`useArrangement()`). `useClipDragHandlers({ samplesPerPixel, snapSamplePosition? })` and `useClipSplitting({ samplesPerPixel })` are the whole options now. Both throw outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (`useArrangement needs WaveformPlaylistProvider, …`).
+
+- A move is one `arrangement.moveClip()` on drop, a trim one `arrangement.trimClip()` on release, a split one `arrangement.splitClip()`: each is one undo step.
+- **A move, trim or split made while no engine is attached is kept** (before the first build, during a rebuild), and the next engine plays it. Before, it was dropped with a console warning. `splitClipAt(trackId, clipId, time)` returns `true` with no engine attached.
+- A clip move finds its track by the id it had at drag start, so a reorder during the drag does not move a clip of another track.
+- A clip still loading cannot be dragged, trimmed or split; `splitClipAt` returns `false` for it.
+
+In plain JavaScript leftover `tracks` and `engineRef` options are ignored. TypeScript reports them (`Object literal may only specify known properties`). `ClipCollisionModifier.configure({ tracks, samplesPerPixel })` still takes tracks: give it `usePlaylistTimeline().tracks`.
+
+**Find:** `useClipDragHandlers({` and `useClipSplitting({` with `tracks` or `engineRef: playoutRef`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks } = usePlaylistTimeline();
+const { playoutRef } = useEngineRefs();
+const handlers = useClipDragHandlers({ tracks, samplesPerPixel, engineRef: playoutRef });
+const { splitClipAtPlayhead } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
+
+// After
+const handlers = useClipDragHandlers({ samplesPerPixel });
+const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
+```
+
+## Edits and undo work with no engine attached; undo never changes the mix
+
+**Packages:** `@waveform-playlist/browser`.
+
+The four mixer setters, `reorderTrack`, `undo` and `redo` of `useEditorControls()` call the provider's arrangement. They work before the first engine is built and while an engine is rebuilt, and the next engine plays what they changed. Before, `reorderTrack`, `undo` and `redo` with no engine did nothing and warned (`reorderTrack: engine not ready, call ignored`), and a mixer value set while a track was loading was not kept.
+
+The undo history is the arrangement's: an undo or a redo changes the tracks and never the mix, and the history survives an engine rebuild (an `effects` or `zoomLevels` change) and an `<Activity>` hide of the provider. Before, a full rebuild started with a new engine and an empty history. Audio arriving for a clip is not an undo step and does not clear the history.
+
+**Find:** code that waits for an engine before calling a setter, `reorderTrack`, `undo` or `redo`; code that expects an undo to restore a fader.
+
+**Replace with:** call them whenever; nothing to wait for.
+
+## `useIntegratedRecording` takes the arrangement; a take is one undo step
+
+**Packages:** `@waveform-playlist/recording`.
+
+`useIntegratedRecording(arrangement, selectedTrackId, options?)` (was `(tracks, setTracks, selectedTrackId, options?)`). The hook keeps no copy of the tracks: it reads the arrangement when a take starts and when it ends, and adds the take with one `arrangement.updateTrack()`, so the take and the clips it trims, removes or splits are one undo step. `@waveform-playlist/recording` now depends on `@waveform-playlist/engine` for the `Arrangement` type.
+
+`startRecording()` refuses (resolves `false`, records nothing, sets `error` with a message that starts `Cannot start recording: ` and names the track or id):
+
+- no track selected (as before);
+- a selected id the arrangement does not hold: `Cannot start recording: the selected track "<id>" is not in the arrangement. Add it with arrangement.addTrack() first.` Before, the take started and was lost at the end;
+- a MIDI track (as before);
+- a track that holds a clip whose audio is still loading, whose load failed, or that cannot be made from its audio (each has its own message).
+
+A take refused at the end (the track's kind changed during the take) sets `error` to `Recording completed but the take could not be saved on track "<id>": …`, with the arrangement's error as `cause`; a track removed during the take gives `Recording completed but track "<id>" no longer exists. The recorded audio could not be saved.`, as before.
+
+In plain JavaScript the old call does not work: the arguments are read in the new order, so with no track selected the hook throws while it renders (the old third argument, `null`, is read as the options), and otherwise `startRecording()` rejects with a `TypeError` (`arrangement.getTracks is not a function`). TypeScript reports the old call.
+
+**Find:** `useIntegratedRecording(` with four arguments, or with `tracks` and `setTracks` first.
+
+**Replace with:**
+
+```tsx
+// Before
+const recording = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+
+// After
+const arrangement = useArrangement(); // under WaveformPlaylistProvider; or the one you made
+const recording = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
+```
+
+## The armed track shows muted during a take, and its Mute button is disabled
+
+**Packages:** `@waveform-playlist/browser`.
+
+While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), that track is muted **in the arrangement's mix**, so what it already holds does not play under the punch-in. Before, the mute was applied to the audio only and the mixer and the Mute button still showed the track unmuted. Now:
+
+- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take;
+- the built-in `<TrackMuteButton />` of that track is disabled during the take; solo, volume and pan stay enabled;
+- `useTrack().isRecordingArmed` is true for that track, for a mute control of your own;
+- when the take ends or the armed track changes, the mute from before the take is written back, whatever was set in between (a mute set on that track during the take does not stay);
+- the provider also writes it back when it unmounts or is hidden by `<Activity>` with a track still armed.
+
+Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal arms the track again from its mute at that moment; removing the armed track during a take as an undo step keeps its mix with the take's mute, so undoing that removal after the take brings the track back muted. `<daw-editor>` is not changed: its armed track still shows unmuted.
+
+**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take; code that mutes or unmutes the armed track during a take.
+
+**Replace with:**
+
+```tsx
+// A mute control of your own, in a track panel
+const { muted, isRecordingArmed, setMuted } = useTrack();
+<button disabled={isRecordingArmed} aria-pressed={muted} onClick={() => setMuted(!muted)}>
+  Mute
+</button>
+```
+
+## Smaller changes of the provider
+
+**Packages:** `@waveform-playlist/browser`.
+
+- **An engine build that fails during playback shows stopped.** When a rebuild started during playback and the new engine cannot be built, `isPlaying` turns false and the cursor stays where it was; nothing starts by itself after a later successful build.
+- **A load in flight across an engine rebuild** carries on with the previous adapter's `AudioContext`. A `createAdapter` whose adapter closes its context in `dispose()` can make such a load fail; `arrangement.retry(src)` loads it again.
+- **Loading is aborted and restarted around an `<Activity>` hide**: the provider gives the arrangement its decode context on mount and takes it back on unmount or a hide; loads in flight are aborted and start again on the reveal.
+- **`useArrangement()`** is new: the provider's arrangement, below `WaveformPlaylistProvider`.
+
+**Find:** nothing to change for these unless your code depended on the old behaviour (a playback that resumed after a failed rebuild, an adapter that closes its context).

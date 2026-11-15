@@ -234,7 +234,7 @@ function App() {
   const masterFx = useDynamicEffects();
 
   return (
-    <WaveformPlaylistProvider effects={masterFx.masterEffects} tracks={tracks}>
+    <WaveformPlaylistProvider effects={masterFx.masterEffects} arrangement={arrangement}>
       <EffectsRack masterFx={masterFx} />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -322,19 +322,22 @@ If a change cannot be wired (for example an effect whose nodes belong to another
 `useTrackDynamicEffects()` keeps one chain per track id. Pass its `getTrackEffectsFunction` to the provider's `trackEffects` prop, and read one track's chain with `useActiveEffects(getTrackEffects(trackId))`.
 
 ```tsx
+import { WaveformPlaylistProvider, Waveform, useArrangementTracks } from '@waveform-playlist/browser';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   useTrackDynamicEffects,
   useActiveEffects,
   type UseTrackDynamicEffectsReturn,
 } from '@waveform-playlist/browser/tone';
 
-function App() {
+function App({ arrangement }: { arrangement: Arrangement }) {
   const trackFx = useTrackDynamicEffects();
+  const tracks = useArrangementTracks(arrangement);
 
-  // The provider looks a track's effects function up by track id. `tracks` is
-  // passed as it is: do not copy the track objects to attach anything to them.
+  // The provider looks a track's effects function up by track id: nothing is
+  // attached to the track objects.
   return (
-    <WaveformPlaylistProvider tracks={tracks} trackEffects={trackFx.getTrackEffectsFunction}>
+    <WaveformPlaylistProvider arrangement={arrangement} trackEffects={trackFx.getTrackEffectsFunction}>
       {tracks.map((track) => (
         <TrackRack key={track.id} trackId={track.id} trackFx={trackFx} />
       ))}

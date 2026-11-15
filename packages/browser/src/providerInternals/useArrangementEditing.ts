@@ -59,7 +59,10 @@ interface ArmedTrack {
  *    (QJ, #812); the arrangement's setter does nothing for a track that is gone.
  * Called by useRecordingSession for the length of a take; overdub flows also
  * call it eagerly before play(), because a render round-trip loses the race
- * against the first animation frame.
+ * against the first animation frame (play() does nothing before the first
+ * ready, so a take started during the first load records without playback).
+ * The provider also writes the mute from before the session back in its own
+ * cleanup (below) when a track is still armed.
  *
  * The armed track is one value source, its owner: the setter reads and
  * writes it synchronously (a start and an end in one handler), and the

@@ -22,7 +22,7 @@ They take `className` only: nothing about what is drawn, no option of a part, an
 ```tsx
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <Waveform />
 </WaveformPlaylistProvider>
 ```
@@ -194,7 +194,7 @@ The row height, the bar style, the playhead width and the filled layout are not 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
     <Waveform />
   </WaveformViewOptions>
@@ -223,7 +223,7 @@ The props are in the [Components reference](/docs/react/api/components#waveformv
 Two roots under one provider draw the same playlist. They share what the provider holds: the zoom, the selection, playback and the cursor. They can differ in the view options, because each root reads the `<WaveformViewOptions>` above it:
 
 ```tsx
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   {/* tall rows, thin bars */}
   <WaveformViewOptions waveHeight={120}>
     <Waveform />

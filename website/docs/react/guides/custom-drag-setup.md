@@ -26,7 +26,7 @@ import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import {
   usePlaylistView,      // Only for the snap examples (sampleRate)
   usePlaylistZoom,
-  useEngineRefs,
+  usePlaylistTimeline,  // The loaded tracks, for the collision modifier
   useEditorControls,
   useClipDragHandlers,
   useDragSensors,
@@ -42,9 +42,9 @@ import {
 The minimal setup for interactive clips with collision detection:
 
 ```tsx
-function PlaylistWithDrag({ tracks }) {
+function PlaylistWithDrag() {
+  const { tracks } = usePlaylistTimeline();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId } = useEditorControls();
 
   // Configure drag sensors (pointer activation with 1px distance threshold)
@@ -55,11 +55,7 @@ function PlaylistWithDrag({ tracks }) {
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-  });
+  } = useClipDragHandlers({ samplesPerPixel });
 
   // Auto-select track when dragging starts
   const onDragStart = (event) => {
@@ -92,7 +88,7 @@ function PlaylistWithDrag({ tracks }) {
 :::note Key Components
 
 - **`useDragSensors()`** — Configures pointer activation. Pass `{ touchOptimized: true }` for mobile (250ms touch delay).
-- **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming. A move is one `engine.moveClip()` on drop; a trim is previewed in the view while it is dragged and is one `engine.trimClip()` on release, so `tracks` changes once per drag and not per pointer move.
+- **`useClipDragHandlers()`** — Returns `onDragStart`, `onDragMove`, `onDragEnd` for clip movement and boundary trimming, on the provider's arrangement (it reads it from context, so the component must be under `WaveformPlaylistProvider`; it throws elsewhere). A move is one `arrangement.moveClip()` on drop; a trim is previewed in the view while it is dragged and is one `arrangement.trimClip()` on release, so the tracks change once per drag and not per pointer move. Each is one undo step, and one made while no engine is attached is kept.
 - **`ClipCollisionModifier`** — Prevents clips from overlapping on the same track. `tracks` can also be a function returning the current tracks, e.g. `ClipCollisionModifier.configure({ tracks: () => tracksRef.current, samplesPerPixel })`, which lets you memoise the `modifiers` array without rebuilding it each time tracks change.
 - **Feedback plugin config is per-entity** — the clip components declare their own `@dnd-kit` Feedback settings (no drop animation on clip moves, no Feedback on trim handles) via `useDraggable({ plugins })`, so a plain `DragDropProvider` needs no `plugins` prop for them.
 - **`RestrictToHorizontalAxis`** — Constrains drag to horizontal movement only.
@@ -115,10 +111,10 @@ import {
 } from '@waveform-playlist/core';
 import { useBeatsAndBars } from '@waveform-playlist/ui-components';
 
-function PlaylistWithBeatsSnap({ tracks }) {
+function PlaylistWithBeatsSnap() {
+  const { tracks } = usePlaylistTimeline();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef } = useEngineRefs();
   const beatsAndBars = useBeatsAndBars();
 
   const { bpm, timeSignature, snapTo } = beatsAndBars;
@@ -137,9 +133,7 @@ function PlaylistWithBeatsSnap({ tracks }) {
 
   const sensors = useDragSensors();
   const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-    tracks,
     samplesPerPixel,
-    engineRef: playoutRef,
     snapSamplePosition, // Snaps boundary trims to grid
   });
 
@@ -306,18 +300,16 @@ A prop you leave out keeps the value from the nearest `ClipInteractionOptions` o
 
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
-| `tracks` | `ClipTrack[]` | Yes | Current tracks state |
 | `samplesPerPixel` | `number` | Yes | Current zoom level |
-| `engineRef` | `RefObject<PlaylistEngine>` | Yes | Engine ref from `useEngineRefs().playoutRef` |
 | `snapSamplePosition` | `(sample: number) => number` | No | Snap function for boundary trims |
 
-The hook finds the dragged clip by its `clipId` within `tracks[trackIndex]`; a trim keeps that track, by id, if its row changes during the drag, and a move of a clip id that is not in the track is dropped with a console warning. With an engine attached, each move of a trim handle is constrained by the engine (`engine.constrainTrimDelta`); without one, the bounds captured at the start of the drag decide. Each move is drawn as a preview of the dragged clip only; the release makes one `engine.trimClip()`. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. See [A clip trim previews in the view and reaches `onTracksChange` once](/docs/react/upgrading#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once).
+The tracks and the engine are not options: the hook works on the arrangement of the nearest `WaveformPlaylistProvider` (`useArrangement()`) and throws outside one and under `MediaElementPlaylistProvider`. It finds the dragged track by the id it had at drag start (so a reorder during the drag does not move a clip of another track) and the clip by its `clipId`; a move of a clip id that is not in the track is dropped with a console warning. Each move of a trim handle is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only; the release makes one `arrangement.trimClip()`. A move or a trim released while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. See [`useClipDragHandlers` and `useClipSplitting` read the arrangement from the provider](/docs/react/upgrading#useclipdraghandlers-and-useclipsplitting-read-the-arrangement-from-the-provider).
 
 ### `ClipCollisionModifier.configure(options)`
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `tracks` | `ClipTrack[] \| (() => ClipTrack[])` | Current tracks for collision detection, or a function returning them (keeps the configured modifier stable while tracks change) |
+| `tracks` | `readonly ClipTrack[] \| (() => readonly ClipTrack[])` | The loaded tracks (`usePlaylistTimeline().tracks`) for collision detection, or a function returning them (keeps the configured modifier stable while tracks change) |
 | `samplesPerPixel` | `number` | Current zoom level |
 
 ### `SnapToGridModifier.configure(options)`

@@ -23,7 +23,7 @@ const myTheme = {
 
 function ThemedPlaylist() {
   return (
-    <WaveformPlaylistProvider tracks={tracks} theme={myTheme}>
+    <WaveformPlaylistProvider arrangement={arrangement} theme={myTheme}>
       <Waveform />
     </WaveformPlaylistProvider>
   );
@@ -175,7 +175,7 @@ const customTheme = {
 };
 
 // Other properties use defaults
-<WaveformPlaylistProvider tracks={tracks} theme={customTheme}>
+<WaveformPlaylistProvider arrangement={arrangement} theme={customTheme}>
 ```
 
 ## Docusaurus Integration
@@ -191,7 +191,7 @@ function DocusaurusExample() {
   const theme = colorMode === 'dark' ? darkTheme : defaultTheme;
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} theme={theme}>
+    <WaveformPlaylistProvider arrangement={arrangement} theme={theme}>
       <Waveform />
     </WaveformPlaylistProvider>
   );
@@ -261,8 +261,9 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 const oceanTheme = {
   // Waveform
@@ -297,15 +298,13 @@ const oceanTheme = {
 };
 
 function OceanThemedPlaylist() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track.mp3', name: 'Track' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track.mp3', name: 'Track' }),
   ]);
-
-  if (loading) return <div>Loading...</div>;
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       theme={oceanTheme}
     >
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>

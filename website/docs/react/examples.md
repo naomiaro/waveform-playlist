@@ -22,18 +22,17 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function MinimalExample() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track.mp3', name: 'Track' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track.mp3', name: 'Track' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <PlayButton />
       <PauseButton />
       <StopButton />
@@ -140,7 +139,7 @@ Host third-party [Web Audio Modules (WAM 2.0)](https://www.webaudiomodules.com/)
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   useDynamicEffects,
   useActiveEffects,
@@ -151,12 +150,12 @@ import {
 const DELAY_URL =
   'https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js';
 
-function App({ tracks }: { tracks: ClipTrack[] }) {
+function App({ arrangement }: { arrangement: Arrangement }) {
   // One useDynamicEffects() call owns the master chain; pass its result down.
   const masterFx = useDynamicEffects();
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+    <WaveformPlaylistProvider arrangement={arrangement} effects={masterFx.masterEffects}>
       <MasterRack masterFx={masterFx} />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -244,23 +243,20 @@ Features:
 
 ```tsx
 function FileUploader() {
-  const [audioConfigs, setAudioConfigs] = useState([]);
-  const { tracks, loading } = useAudioTracks(audioConfigs);
+  const arrangement = useCreateArrangement();
+  const tracks = useArrangementTracks(arrangement);
 
-  const handleFileSelect = (e) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setAudioConfigs([
-        { src: URL.createObjectURL(file), name: file.name },
-      ]);
-    }
+    // The arrangement reads the File itself; the track is named after it
+    if (file) arrangement.addTrack(audioTrack({ src: file }));
   };
 
   return (
     <>
       <input type="file" accept="audio/*" onChange={handleFileSelect} />
-      {!loading && tracks.length > 0 && (
-        <WaveformPlaylistProvider tracks={tracks}>
+      {tracks.length > 0 && (
+        <WaveformPlaylistProvider arrangement={arrangement}>
           <Waveform />
         </WaveformPlaylistProvider>
       )}
@@ -269,13 +265,15 @@ function FileUploader() {
 }
 ```
 
+The provider is mounted with the first file in the arrangement, so its [ready](/docs/react/guides/loading-audio#ready) waits for that file. A file that fails to load stays as a track with no clip drawn; to take it out again, see the [New Tracks example](/examples/newtracks).
+
 ### Keyboard Shortcuts
 
 ```tsx
 import { KeyboardShortcuts } from '@waveform-playlist/browser';
 
 // Declarative — just enable the features you want
-<WaveformPlaylistProvider tracks={tracks} {...}>
+<WaveformPlaylistProvider arrangement={arrangement} {...}>
   <KeyboardShortcuts playback clipSplitting undo />
   <Waveform />
 </WaveformPlaylistProvider>
@@ -296,8 +294,8 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 // zoomOut), so a saved zoom level could not be restored.
 function SaveLoadState() {
   const { tracks } = usePlaylistTimeline();
-  // trackStates[i] is the { name, muted, soloed, volume, pan } of tracks[i];
-  // undefined while that track is still loading
+  // trackStates[i] is the { name, muted, soloed, volume, pan } of tracks[i],
+  // also while that track is still loading
   const { trackStates } = usePlaylistMixer();
   // The ref, not useCurrentTime(): the position is only read when Save is pressed
   const { currentTimeRef } = usePlaybackRefs();
@@ -308,10 +306,7 @@ function SaveLoadState() {
     const state = {
       cursorPosition: currentTimeRef.current ?? 0,
       // Saved by track id: a position is not an identity.
-      mixer: tracks.flatMap((track, i) => {
-        const state = trackStates[i];
-        return state ? [{ id: track.id, ...state }] : [];
-      }),
+      mixer: tracks.map((track, i) => ({ id: track.id, ...trackStates[i] })),
     };
     localStorage.setItem('playlistState', JSON.stringify(state));
   };

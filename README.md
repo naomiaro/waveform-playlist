@@ -39,37 +39,29 @@ npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-play
 >
 > The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
 >
-> **v14:** effects, WAV export, output metering, and the `useAudioTracks`/`useDynamicTracks` loaders import from `@waveform-playlist/browser/tone`.
+> **v14:** effects, WAV export and output metering import from `@waveform-playlist/browser/tone`.
+>
+> **Next major:** `WaveformPlaylistProvider` takes an `arrangement` (from `useCreateArrangement`) instead of `tracks` / `onTracksChange`, and `useAudioTracks` / `useDynamicTracks` are removed: a track names its audio with `audioTrack({ src })`. See the [upgrade guide](https://naomiaro.github.io/waveform-playlist/docs/react/upgrading).
 >
 > **v16:** `@dnd-kit/*` `^0.5.0` is required (`^0.3` is no longer supported). `noDropAnimationPlugins` was removed — `Clip`, `AnnotationBox`, and `SortableTrackControls` (replaced in the next major by `<TrackReorderGrip />` / `useTrackReorderHandle()`) configure their own `@dnd-kit` Feedback behavior, so a custom `DragDropProvider` needs no `plugins` prop. `@dnd-kit/dom` is now a declared peer of `ui-components` and `annotations`.
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform, PlayButton, PauseButton, StopButton } from '@waveform-playlist/browser';
-import { createTrack, createClipFromSeconds } from '@waveform-playlist/core';
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  PlayButton,
+  PauseButton,
+  StopButton,
+  useCreateArrangement,
+} from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 
 function App() {
-  const [tracks, setTracks] = useState([]);
-
-  // Load audio and create tracks
-  useEffect(() => {
-    async function loadAudio() {
-      const response = await fetch('/audio/song.mp3');
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = new AudioContext();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-      const track = createTrack({
-        name: 'My Track',
-        clips: [createClipFromSeconds({ audioBuffer, startTime: 0 })],
-      });
-
-      setTracks([track]);
-    }
-    loadAudio();
-  }, []);
+  // The arrangement owns the tracks; it fetches and decodes the file once the provider has its audio context
+  const arrangement = useCreateArrangement(() => [audioTrack({ src: '/audio/song.mp3', name: 'My Track' })]);
 
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <div>
         <PlayButton />
         <PauseButton />
@@ -98,6 +90,8 @@ function App() {
 
 | Example | Description |
 |---------|-------------|
+| [Minimal](https://naomiaro.github.io/waveform-playlist/examples/minimal) | One track and the transport buttons |
+| [New Tracks](https://naomiaro.github.io/waveform-playlist/examples/newtracks) | Drop audio files to add tracks; remove them again |
 | [Stem Tracks](https://naomiaro.github.io/waveform-playlist/examples/stem-tracks) | Multi-track playback with mute/solo/volume controls |
 | [Effects](https://naomiaro.github.io/waveform-playlist/examples/effects) | 20 Tone.js effects with real-time parameter control |
 | [WAM! Kick It Up a Notch](https://naomiaro.github.io/waveform-playlist/examples/wam-effects) | Host WAM 2.0 plugins with community library, native GUIs, and mixed Tone+WAM chains |
@@ -115,6 +109,8 @@ function App() {
 | [Media Element Annotations](https://naomiaro.github.io/waveform-playlist/examples/media-element-annotations) | Time-synced annotations on streamed audio with pre-computed peaks |
 | [Styling](https://naomiaro.github.io/waveform-playlist/examples/styling) | Bar width, gaps, rounded bars, gradients, and theme colors |
 | [Flexible API](https://naomiaro.github.io/waveform-playlist/examples/flexible-api) | Custom playheads, timestamps, and full UI customization |
+| [Mobile Multi-Clip](https://naomiaro.github.io/waveform-playlist/examples/mobile-multi-clip) | Clip editing with touch: hold to drag |
+| [Mobile Annotations](https://naomiaro.github.io/waveform-playlist/examples/mobile-annotations) | Annotations with touch: tap to play, hold to resize |
 
 ## Packages
 
@@ -131,7 +127,7 @@ function App() {
 
 | Package | Description |
 |---------|-------------|
-| `@waveform-playlist/midi` | React `useMidiTracks` hook, the React-free `loadMidiTracks` function + piano roll visualization with SoundFont/PolySynth playback. Re-exports the parser from `@dawcore/midi`. |
+| `@waveform-playlist/midi` | The `loadMidiTracks` function (its tracks go into the arrangement) and the React `useMidiTracks` hook + piano roll visualization with SoundFont/PolySynth playback. Re-exports the parser from `@dawcore/midi`. |
 | `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
 | `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/docs/react/guides/recording#audioworklet-setup)) |
 | `@waveform-playlist/worklets` | Shared AudioWorklet processors for metering and recording (auto-installed with recording) |
@@ -141,11 +137,17 @@ function App() {
 ## Key Hooks
 
 ```tsx
-// Load audio files into tracks
-const { tracks, loading, error } = useAudioTracks([
-  { src: '/audio/vocals.mp3', name: 'Vocals' },
-  { src: '/audio/drums.mp3', name: 'Drums' },
+// The arrangement owns the tracks and loads their audio: pass it to <WaveformPlaylistProvider arrangement>
+const arrangement = useCreateArrangement(() => [
+  audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+  audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
 ]);
+
+// Where each file is (pending, loaded, failed), and arrangement.retry(src)
+const { pendingCount, failedCount } = useArrangementSources(arrangement);
+
+// Add a dropped file (below the provider, useArrangement() returns the same arrangement)
+arrangement.addTrack(audioTrack({ src: file }));
 
 // Playback controls
 const { play, pause, stop, seekTo } = usePlaybackControls();
@@ -166,9 +168,9 @@ const { masterEffects, toggleBypass, updateParameter } = useDynamicEffects();
 // WAV export
 const { exportWav, isExporting, progress } = useExportWav();
 
-// Recording
+// Recording: the take is added to the arrangement's track (one undo step)
 const { startRecording, stopRecording, isRecording } = useIntegratedRecording(
-  tracks, setTracks, selectedTrackId
+  arrangement, selectedTrackId
 );
 ```
 

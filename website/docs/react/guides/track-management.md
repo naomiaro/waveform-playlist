@@ -12,10 +12,12 @@ Control individual tracks with mute, solo, volume, and pan controls.
 `<Waveform />` draws the built-in track controls panel in a 200 px column:
 
 ```tsx
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <Waveform />
 </WaveformPlaylistProvider>
 ```
+
+The tracks, their mix and the undo history belong to the arrangement (`useCreateArrangement`, see [Loading Audio](/docs/react/guides/loading-audio)). Everything on this page reads it through the provider and changes it through its methods.
 
 The column is a part of the view, `<WaveformTrackControls>`. In your own composition give it a `width`, or leave it out to have no column (see [Composing the View](/docs/react/guides/composing-the-view)):
 
@@ -60,7 +62,7 @@ import {
 </WaveformTrackControls>
 ```
 
-`onRemove` is called with the track's id; removing the track from your `tracks` is yours to do (see [Adding and Removing Tracks](#adding-and-removing-tracks)). The grip's move-up and move-down buttons work with no other setup; dragging by the grip needs a `ClipInteractionProvider` above the view.
+`onRemove` is called with the track's id; removing the track is yours to do, with `arrangement.removeTrack(id)` (see [Adding and Removing Tracks](#adding-and-removing-tracks)). The grip's move-up and move-down buttons work with no other setup; dragging by the grip needs a `ClipInteractionProvider` above the view.
 
 ### Composing a panel from the pieces
 
@@ -103,7 +105,7 @@ import { ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components'
 | `<TrackRemoveButton onRemove />` | a close button at the top left of the slot |
 | `<TrackReorderGrip />` | a drag grip with move-up and move-down buttons at the right edge of the slot |
 
-`Controls`, `Header` and `ButtonGroup` are the layout elements of the default panel, from `@waveform-playlist/ui-components`. While a track is loading, the mute and solo buttons, the sliders and the move buttons are disabled.
+`Controls`, `Header` and `ButtonGroup` are the layout elements of the default panel, from `@waveform-playlist/ui-components`. The pieces work while a track's audio is still loading, and a value set then is kept. While a take is recorded onto a track, its mute button is disabled (see the [Recording guide](/docs/react/guides/recording)).
 
 To add one control to the default panel, pass it as a child of `<DefaultTrackControls>`. It is drawn inside the panel, below the pan slider:
 
@@ -125,17 +127,18 @@ A component among the children reads its track with `useTrack()`: the id, the na
 import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
 
 function CustomTrackControls() {
-  const { name, muted, soloed, volume, pan, isLoading, setMuted, setSoloed, setVolume, setPan } =
+  const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
 
   return (
     // The slot is as wide as the column and as tall as the track's row.
     <div style={{ height: '100%', boxSizing: 'border-box', padding: 8 }}>
       <div>{name}</div>
-      <button disabled={isLoading} onClick={() => setMuted(!muted)}>
+      {/* Muted for a take and put back when it ends: a click meanwhile would not stay */}
+      <button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
         {muted ? 'Unmute' : 'Mute'}
       </button>
-      <button disabled={isLoading} onClick={() => setSoloed(!soloed)}>
+      <button onClick={() => setSoloed(!soloed)}>
         {soloed ? 'Unsolo' : 'Solo'}
       </button>
       <input
@@ -144,7 +147,6 @@ function CustomTrackControls() {
         max="1"
         step="0.01"
         value={volume}
-        disabled={isLoading}
         aria-label="Volume"
         onChange={(e) => setVolume(parseFloat(e.target.value))}
       />
@@ -154,7 +156,6 @@ function CustomTrackControls() {
         max="1"
         step="0.01"
         value={pan}
-        disabled={isLoading}
         aria-label="Pan"
         onChange={(e) => setPan(parseFloat(e.target.value))}
       />
@@ -171,7 +172,7 @@ Four things to know:
 
 - **Size.** Each track has a slot in the column: as wide as the column (the `width` of the part) and as tall as the track's row, with `overflow: hidden`, so a panel taller than the row is cut off. A mono track's row is `waveHeight` tall (80 px by default), plus the clip header's height when the view has `<WaveformClipHeaders />`; the panel above has four lines of controls and does not fit in that, so set a larger `waveHeight` with `<WaveformViewOptions>` (128, say) or lay the controls out in fewer lines. Fill the slot with `height: 100%`. Do not compute the row height yourself: it depends on the number of channels (also of a take being recorded) and on the clip headers.
 - **Selection.** A click anywhere in a slot selects the track, in your own panel too. A control of yours that must not select calls `event.stopPropagation()` in its click handler. `useTrack().isSelected` says whether the track is the selected one.
-- **Loading.** While the provider is still loading a track, `useTrack().isLoading` is true and a value set with the mixer actions is not kept. Disable your controls, or return `null`.
+- **Loading and recording.** The values are the arrangement's mix, also while the track's audio loads, and the actions work then: there is nothing to disable for loading (`isLoading` is removed). While a take is recorded onto the track, `useTrack().isRecordingArmed` is true: the track is muted for the take and its mute from before is written back when the take ends, so disable your mute control then.
 - **Where it works.** `useTrack()` and the pieces work only among the children of `<WaveformTrackControls>`. Anywhere else they throw. For a mixer elsewhere on the page see [Mixer State Outside the Panel](#mixer-state-outside-the-panel).
 
 The complete list of fields is in the [`useTrack` reference](/docs/react/api/hooks#usetrack). For a drag grip of your own there is [`useTrackReorderHandle()`](/docs/react/api/hooks#usetrackreorderhandle).
@@ -187,9 +188,7 @@ A function or an object written inline as a prop is new on every render, and the
 <TrackRemoveButton onRemove={(id) => removeTrack(id)} />
 
 // The panels are left alone
-const removeTrack = useCallback((id: string) => {
-  setTracks((prev) => prev.filter((track) => track.id !== id));
-}, []);
+const removeTrack = useCallback((id: string) => arrangement.removeTrack(id), [arrangement]);
 <TrackRemoveButton onRemove={removeTrack} />
 ```
 
@@ -221,9 +220,8 @@ function MixerStrip() {
   return (
     <div>
       {tracks.map((track, i) => {
-        // The entry of a track that is still loading is undefined.
+        // Every track has its entry, also while its audio loads.
         const state = trackStates[i];
-        if (!state) return null;
         return (
           <div key={track.id}>
             <span>{state.name}</span>
@@ -313,7 +311,7 @@ const { setTrackPan } = useEditorControls();
 setTrackPan(trackId, -1);
 ```
 
-A track keeps its mute, solo, volume and pan for as long as its id is in `tracks`: removing another track, adding tracks in front of it or reordering does not reset it.
+A track keeps its mute, solo, volume and pan for as long as its id is in the arrangement: removing another track, adding tracks in front of it or reordering does not reset it, and an undo or a redo never changes it. The setters work with no engine attached (before the first build, during a rebuild).
 
 ## Track Selection
 
@@ -368,11 +366,10 @@ The selected track's colours come from the theme: `selectedTrackBackground` is t
 
 ## Adding and Removing Tracks
 
-Tracks are added and removed by updating the `tracks` prop of `WaveformPlaylistProvider`: the provider has no `addTrack` or `removeTrack` method, you keep the tracks in your own state. Pass `onTracksChange` so that edits made in the view (a reorder, a clip move) come back to that state:
+Tracks are added and removed through the arrangement: `arrangement.addTrack(track)`, `arrangement.removeTrack(trackId)`, `arrangement.updateTrack(trackId, fn)` and `arrangement.setTracks(tracks)`. Each is an undo step except `setTracks`, which also clears the history. Edits made in the view (a reorder, a clip move, a take) change the same arrangement, so there is nothing to keep in step:
 
 ```tsx
-import { useCallback, useEffect, useState } from 'react';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { useCallback } from 'react';
 import {
   WaveformPlaylistProvider,
   WaveformRoot,
@@ -384,51 +381,46 @@ import {
   WaveformTracks,
   WaveformSelection,
   WaveformPlayhead,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function TrackManagementExample() {
-  const { tracks: initialTracks, loading } = useAudioTracks([
-    { src: '/audio/drums.mp3', name: 'Drums' },
-    { src: '/audio/bass.mp3', name: 'Bass' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
+    audioTrack({ src: '/audio/bass.mp3', name: 'Bass' }),
   ]);
-  const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
-
-  // Update tracks when initial load completes
-  useEffect(() => {
-    if (!loading) setTracks(initialTracks);
-  }, [initialTracks, loading]);
 
   // Stable, so the track panels do not render with this component.
-  const removeTrack = useCallback((trackId: string) => {
-    setTracks((prev) => prev.filter((track) => track.id !== trackId));
-  }, []);
-
-  if (loading) return <div>Loading...</div>;
+  const removeTrack = useCallback((trackId: string) => arrangement.removeTrack(trackId), [arrangement]);
+  const addFile = useCallback((file: File) => arrangement.addTrack(audioTrack({ src: file })), [arrangement]);
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
-      <WaveformRoot>
-        <WaveformTimescale />
-        <WaveformTrackControls>
-          <DefaultTrackControls />
-          <TrackRemoveButton onRemove={removeTrack} />
-          <TrackReorderGrip />
-        </WaveformTrackControls>
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
-    </WaveformPlaylistProvider>
+    <>
+      <input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && addFile(e.target.files[0])} />
+      <WaveformPlaylistProvider arrangement={arrangement}>
+        <WaveformRoot>
+          <WaveformTimescale />
+          <WaveformTrackControls>
+            <DefaultTrackControls />
+            <TrackRemoveButton onRemove={removeTrack} />
+            <TrackReorderGrip />
+          </WaveformTrackControls>
+          <WaveformTracks />
+          <WaveformSelection />
+          <WaveformPlayhead />
+        </WaveformRoot>
+      </WaveformPlaylistProvider>
+    </>
   );
 }
 ```
 
-For files added at runtime, `useDynamicTracks()` from `@waveform-playlist/browser/tone` keeps the list for you and returns `addTracks` and `removeTrack(trackId)`, which can be passed to `onRemove` as it is.
+A track is removed even while its audio loads; its load is dropped once no undo step names it. To read the tracks in your own component, `useArrangementTracks(arrangement)` (every clip, loading or not) or, below the provider, `usePlaylistTimeline().tracks` (loaded clips only). Make track changes from a handler or an effect, not from inside an `arrangement.subscribe()` listener: see [Loading Audio](/docs/react/guides/loading-audio#adding-tracks-at-runtime).
 
 ### Reordering from code
 
-`<TrackReorderGrip />` covers reordering from the view. From code, call `reorderTrack` of `useEditorControls()` with the track's id and its new position; playback is not interrupted, and the new order arrives through `onTracksChange`:
+`<TrackReorderGrip />` covers reordering from the view. From code, call `reorderTrack` of `useEditorControls()` (or `arrangement.reorderTrack`) with the track's id and its new position; playback is not interrupted, and the reorder is an undo step:
 
 ```tsx
 const { reorderTrack } = useEditorControls();
@@ -441,34 +433,29 @@ Inside a track's panel, `useTrack()` has `moveUp()` and `moveDown()`, with `isFi
 
 ## Initial Track Configuration
 
-Set initial track states when loading:
+Set the values a track starts with in `audioTrack()`. They are the values it enters the arrangement with; after that the mix is changed with the setters.
 
 ```tsx
-const { tracks, loading } = useAudioTracks([
-  {
+const arrangement = useCreateArrangement(() => [
+  audioTrack({
     src: '/audio/drums.mp3',
     name: 'Drums',
     volume: 0.8,       // 80% volume
-    muted: false,
-    soloed: false,
     pan: 0,            // Center
-  },
-  {
+  }),
+  audioTrack({
     src: '/audio/bass.mp3',
     name: 'Bass',
     volume: 1.0,       // Full volume
-    muted: false,
-    soloed: false,
     pan: -0.3,         // Slightly left
-  },
-  {
+  }),
+  audioTrack({
     src: '/audio/keys.mp3',
     name: 'Keys',
     volume: 0.7,
     muted: true,       // Start muted
-    soloed: false,
     pan: 0.3,          // Slightly right
-  },
+  }),
 ]);
 ```
 
@@ -477,8 +464,7 @@ const { tracks, loading } = useAudioTracks([
 A horizontal panel of its own for every track, with a remove button:
 
 ```tsx
-import { useCallback, useEffect, useState } from 'react';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { useCallback } from 'react';
 import {
   WaveformPlaylistProvider,
   WaveformRoot,
@@ -489,13 +475,14 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
   useTrack,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 // Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
 function TrackControlRow() {
-  const { name, muted, soloed, volume, pan, isLoading, setMuted, setSoloed, setVolume, setPan } =
+  const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
 
   return (
@@ -512,7 +499,7 @@ function TrackControlRow() {
       <span>{name}</span>
       <div>
         <button
-          disabled={isLoading}
+          disabled={isRecordingArmed}
           aria-pressed={muted}
           onClick={() => setMuted(!muted)}
           style={{ background: muted ? '#ff6b6b' : '#e0e0e0' }}
@@ -520,7 +507,6 @@ function TrackControlRow() {
           M
         </button>
         <button
-          disabled={isLoading}
           aria-pressed={soloed}
           onClick={() => setSoloed(!soloed)}
           style={{ background: soloed ? '#ffd93d' : '#e0e0e0' }}
@@ -536,7 +522,6 @@ function TrackControlRow() {
           max="1"
           step="0.01"
           value={volume}
-          disabled={isLoading}
           onChange={(e) => setVolume(parseFloat(e.target.value))}
         />
       </label>
@@ -548,7 +533,6 @@ function TrackControlRow() {
           max="1"
           step="0.01"
           value={pan}
-          disabled={isLoading}
           onChange={(e) => setPan(parseFloat(e.target.value))}
         />
       </label>
@@ -557,25 +541,16 @@ function TrackControlRow() {
 }
 
 function TrackManagementExample() {
-  const { tracks: loadedTracks, loading } = useAudioTracks([
-    { src: '/audio/drums.mp3', name: 'Drums' },
-    { src: '/audio/bass.mp3', name: 'Bass' },
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
+    audioTrack({ src: '/audio/bass.mp3', name: 'Bass' }),
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
   ]);
-  const [tracks, setTracks] = useState<ClipTrack[]>(loadedTracks);
 
-  useEffect(() => {
-    if (!loading) setTracks(loadedTracks);
-  }, [loadedTracks, loading]);
-
-  const removeTrack = useCallback((trackId: string) => {
-    setTracks((prev) => prev.filter((track) => track.id !== trackId));
-  }, []);
-
-  if (loading) return <div>Loading...</div>;
+  const removeTrack = useCallback((trackId: string) => arrangement.removeTrack(trackId), [arrangement]);
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       {/* Rows of 128 px: the panel below has four lines of controls. */}
       <WaveformViewOptions waveHeight={128}>
         <WaveformRoot>

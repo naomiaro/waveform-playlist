@@ -5,11 +5,12 @@ React components, hooks, and context providers for building a multitrack Web Aud
 ## Features
 
 - **Multitrack editor** — `<Waveform />` renders canvas waveforms, per-track controls (mute/solo/volume/pan), a time ruler, and a playhead for any number of tracks. It is a ready-made composition of exported parts (`WaveformRoot`, `WaveformTimescale`, `WaveformTrackControls`, `WaveformTracks`, `WaveformClipHeaders`, `WaveformFades`, `WaveformPlayhead` and more): compose them yourself to choose what is drawn. The control panel of a track is composed too: the children of `<WaveformTrackControls>` are rendered once per track, from the default panel (`DefaultTrackControls`), its pieces (`TrackName`, `TrackMuteButton`, `TrackSoloButton`, `TrackVolumeSlider`, `TrackPanSlider`, `TrackMenuButton`, `TrackRemoveButton`, `TrackReorderGrip`) or your own component, which reads its track with `useTrack()`
+- **An arrangement owns the tracks** — `WaveformPlaylistProvider` takes an `arrangement` (from `useCreateArrangement`): the tracks, their mix, the undo history and the loading of the audio the clips name. A track names its audio with `audioTrack({ src })` from `@waveform-playlist/core`; the arrangement fetches and decodes it, and the view draws a placeholder for a clip still loading when its length is known
 - **Clip-based editing** — drag-to-move, boundary trimming with collision detection, splitting at the playhead, snap-to-grid (beats/bars or timescale), undo/redo
 - **Split context providers** — `WaveformPlaylistProvider` (multitrack, Tone.js-backed) and `MediaElementPlaylistProvider` (single-track, `<audio>`-backed with pitch-preserving playback rate)
 - **Focused context hooks** — one hook per group of fields that change together (`useIsPlaying`, `useCurrentTime`, `useSelection`, `useAnnotations`, `usePlaybackControls`, `usePlaybackRefs`, `usePlaylistView`, `usePlaylistTimeline`, `usePlaylistMixer`, `useLoop`, `useEditorControls` and more), so a component re-renders only for the group it reads, not on every pointer move, slider step or annotation boundary
 - **Audio effects** — 20 Tone.js effects (reverb, delay, modulation, filter, distortion, dynamics, spatial) with runtime parameter control, master and per-track chains, plus WAM 2.0 plugin hosting
-- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `useRecordingSession({ isRecording, trackId })` (or `setRecordingActive(active, armedTrackId)` directly) suppresses the end-of-timeline auto-stop and transiently mutes the recorded-over track for the take
+- **Recording** — pairs with `@waveform-playlist/recording` for mic input, overdubbing, and live waveform preview; punch-in takes replace overlapped content, and `useRecordingSession({ isRecording, trackId })` (or `setRecordingActive(active, armedTrackId)` directly) suppresses the end-of-timeline auto-stop and mutes the recorded-over track in the mix for the take (its Mute button shows it and is disabled; the mute from before is written back when the take ends)
 - **Annotations & spectrogram** — optional integration contexts for `@waveform-playlist/annotations` and `@waveform-playlist/spectrogram`. Under either provider, `<WaveformAnnotationBoxes>` (a part of the view; it wires the drag of the box edges itself) and `<AnnotationList>` (the text list, anywhere under the provider) draw the annotations
 - **WAV export** — render the full mix (including effects) offline to a downloadable WAV file
 - **MediaElement player mode** — a lightweight single-track player with pitch-preserving speed control, for podcast/audiobook-style use cases that don't need multitrack mixing
@@ -32,10 +33,10 @@ npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-play
 | `@waveform-playlist/media-element-playout` | engine for `MediaElementPlaylistProvider` (optional peer) |
 | `@waveform-playlist/annotations` / `@waveform-playlist/recording` / `@dawcore/wam` | optional, install only if you use those features |
 
-**Engine-free core:** the package's main entry has no static dependency on `tone` or `@waveform-playlist/playout` — a `MediaElementPlaylistProvider`-only consumer, or one supplying a custom `createAdapter`, never resolves either. Tone-coupled exports (`useAudioTracks`, `useDynamicTracks`, effects hooks, `useExportWav`, `useOutputMeter`, `useMasterAnalyser`) live at the **`@waveform-playlist/browser/tone`** subpath:
+**Engine-free core:** the package's main entry has no static dependency on `tone` or `@waveform-playlist/playout` — a `MediaElementPlaylistProvider`-only consumer, or one supplying a custom `createAdapter`, never resolves either. Tone-coupled exports (effects hooks, `useExportWav`, `useOutputMeter`, `useMasterAnalyser`) live at the **`@waveform-playlist/browser/tone`** subpath:
 
 ```typescript
-import { useAudioTracks, useDynamicEffects, useExportWav } from '@waveform-playlist/browser/tone';
+import { useDynamicEffects, useExportWav } from '@waveform-playlist/browser/tone';
 ```
 
 ## Quick Start
@@ -48,20 +49,19 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function MyPlaylist() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
-    { src: '/audio/guitar.mp3', name: 'Guitar' },
+  // One arrangement for the life of the component: it owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+    audioTrack({ src: '/audio/guitar.mp3', name: 'Guitar' }),
   ]);
 
-  if (loading) return <div>Loading audio...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -103,11 +103,12 @@ Under either provider:
 
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
-| `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo, `setRecordingActive` (recording-session suppression + armed-track mute) | never |
+| `useArrangement` | The provider's `Arrangement`: change the tracks through it | never |
+| `useEditorControls` | Actions — track mute/solo/volume/pan (by track id), track order, zoom, loop, undo/redo (on the arrangement, engine or not), `setRecordingActive` (recording-session suppression + armed-track mute) | never |
 | `useEngineRefs` | `playoutRef` (the engine), `getPlaybackTime()`, `getAudioContextTime()`, `getLookAhead()`, `getOutputLatency()`, `playbackStartTimeRef`, `audioStartPositionRef` | never |
-| `usePlaylistTimeline` | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), loading finishing, peaks arriving |
-| `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`; `undefined` for a track that is still loading), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered |
-| `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isLoading`, `isSelected`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |
+| `usePlaylistTimeline` | `tracks` (loaded clips only, read-only), `peaksDataArray` (with placeholder records for clips still loading), `duration` (loaded audio), `isReady` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), audio or peaks arriving, `isReady` changing |
+| `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`, also while a track loads), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed, renamed or reordered |
+| `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isSelected`, `isRecordingArmed`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |
 | `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
 | `useLoop` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | `useSelectedTrackId` | `selectedTrackId` | another track being selected |
@@ -126,9 +127,7 @@ The transport buttons (`PlayButton`, `PauseButton`, `StopButton`, `RewindButton`
 
 ## Arrangement Hooks
 
-`useCreateArrangement(init?, options?)` makes the `Arrangement` (from `@waveform-playlist/engine`) that owns a multitrack editor's tracks, one per component instance; `useArrangementTracks(arrangement)` returns its tracks, loading clips included, and re-renders when they change, not on a mix change; `useArrangementSources(arrangement)` returns where each source is (`pending`, `loaded` or `failed`) with `pendingCount`, `failedCount` and `isLoading`. They are in the core entry.
-
-`WaveformPlaylistProvider` does not take an arrangement yet (it takes `tracks` and `onTracksChange`), and a later release of this work changes that. Today the hooks are for an app that builds a `PlaylistEngine` itself, with `new PlaylistEngine({ adapter, arrangement })`. See the [hooks reference](https://naomiaro.github.io/waveform-playlist/docs/react/api/hooks#arrangement-hooks).
+`useCreateArrangement(init?, options?)` makes the `Arrangement` (from `@waveform-playlist/engine`) that owns a multitrack editor's tracks, one per component instance: pass it to `<WaveformPlaylistProvider arrangement>`. `useArrangementTracks(arrangement)` returns its tracks, loading clips included, and re-renders when they change, not on a mix change; `useArrangementSources(arrangement)` returns where each source is (`pending`, `loaded` or `failed`) with `pendingCount`, `failedCount` and `isLoading`. They are in the core entry. See the [hooks reference](https://naomiaro.github.io/waveform-playlist/docs/react/api/hooks#arrangement-hooks) and the [Loading Audio guide](https://naomiaro.github.io/waveform-playlist/docs/react/guides/loading-audio).
 
 ## Examples & Documentation
 

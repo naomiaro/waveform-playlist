@@ -26,12 +26,12 @@ Peer dependencies: `react` (^19.0.0), `styled-components` (^6.0.0), `@dnd-kit/re
 
 ```tsx
 import { useState } from 'react';
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 
 function AnnotatedPlaylist() {
-  const { tracks, loading } = useAudioTracks([{ src: '/audio/podcast.mp3', name: 'Podcast' }]);
+  const arrangement = useCreateArrangement(() => [audioTrack({ src: '/audio/podcast.mp3', name: 'Podcast' })]);
 
   const [annotations, setAnnotations] = useState([
     { id: '1', start: 0, end: 5, lines: ['Introduction'] },
@@ -39,11 +39,9 @@ function AnnotatedPlaylist() {
     { id: '3', start: 15, end: 30, lines: ['Main Discussion'] },
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       annotationList={{ annotations, editable: true }}
       onAnnotationsChange={setAnnotations} // required for edits to persist
     >

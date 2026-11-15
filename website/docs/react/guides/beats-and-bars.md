@@ -15,7 +15,7 @@ Wrap your playlist content with `BeatsAndBarsProvider` from `@waveform-playlist/
 import { WaveformPlaylistProvider, WaveformEditor } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
     <WaveformEditor />
   </BeatsAndBarsProvider>
@@ -41,7 +41,7 @@ Wrap the view with `ClipInteractionProvider` to enable drag/move/trim with snap-
 import { WaveformPlaylistProvider, WaveformEditor, ClipInteractionProvider } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
     <ClipInteractionProvider snap>
       <WaveformEditor />

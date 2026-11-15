@@ -64,10 +64,12 @@ The roots, the parts and the three ready-made compositions take no option for ro
 The multitrack view, ready-made: the timescale, the loop region, the track controls (a 200 px column), the tracks, the annotation boxes, the selection and the playhead, with the annotation text list below when there are annotations.
 
 ```tsx
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <Waveform />
 </WaveformPlaylistProvider>
 ```
+
+`arrangement` comes from `useCreateArrangement` (see [Loading Audio](/docs/react/guides/loading-audio)).
 
 It renders this composition:
 
@@ -220,7 +222,7 @@ Under `MediaElementWaveformRoot` it draws nothing.
 |------|------|-------------|
 | `recordingState` | `WaveformRecordingState` | The take: `isRecording`, `trackId`, `startSample`, `progress` (from `useIntegratedRecording` / `useRecording`), `bits`, optional `latencyOffset` |
 
-It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes what the armed track already holds for the take. See the [Recording guide](/docs/react/guides/recording).
+It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes the armed track for the take (the mixer shows it muted and its `<TrackMuteButton />` is disabled until the take ends). See the [Recording guide](/docs/react/guides/recording).
 
 #### WaveformAnnotationBoxes
 
@@ -257,7 +259,7 @@ It goes above a root, not inside one. A root reads the options above itself: a `
 import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
 
 <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
-  <WaveformPlaylistProvider tracks={tracks}>
+  <WaveformPlaylistProvider arrangement={arrangement}>
     <Waveform />
   </WaveformPlaylistProvider>
 </WaveformViewOptions>
@@ -592,7 +594,7 @@ The master volume is a number from 0 (silent) to 1 (full): that is what `usePlay
 
 ### Track volume
 
-`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i]?.volume` (the entry of `tracks[i]`; `undefined` while that track is loading) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume)`.
+`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i].volume` (the entry of `tracks[i]`; every track has one, also while its audio loads) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume)`.
 
 ---
 
@@ -722,7 +724,7 @@ import {
 } from '@waveform-playlist/browser';
 ```
 
-While a track is loading (the provider has no mixer state for it yet), the mute and solo buttons, the two sliders and the two move buttons are disabled, and the name is "Track N".
+The pieces work while a track's audio is still loading: the values are the arrangement's mix, and a change made then is kept. While a take is recorded onto a track (`useTrack().isRecordingArmed`), its mute button is disabled: the track is muted for the take and its mute from before is written back when the take ends.
 
 ### DefaultTrackControls
 
@@ -749,15 +751,15 @@ The track's name on one line, cut off with an ellipsis; "Track N" (N is the posi
 
 ### TrackMuteButton and TrackSoloButton
 
-Toggle buttons labelled "Mute" and "Solo", with `aria-pressed`. No props. Disabled while the track is loading.
+Toggle buttons labelled "Mute" and "Solo", with `aria-pressed`. No props. The mute button is disabled while a take is recorded onto the track.
 
 ### TrackVolumeSlider
 
-The track's volume, 0 to 1 in steps of 0.01, between two speaker icons. The input is labelled "Volume". No props. Disabled while the track is loading.
+The track's volume, 0 to 1 in steps of 0.01, between two speaker icons. The input is labelled "Volume". No props.
 
 ### TrackPanSlider
 
-The track's pan, -1 (left) to 1 (right) in steps of 0.01, between "L" and "R". The input is labelled "Pan". No props. Disabled while the track is loading.
+The track's pan, -1 (left) to 1 (right) in steps of 0.01, between "L" and "R". The input is labelled "Pan". No props.
 
 ### TrackMenuButton
 
@@ -775,9 +777,9 @@ Pass a function that keeps its identity (`useCallback`, or a hook's stable funct
 
 ### TrackReorderGrip
 
-A drag grip with a move-up and a move-down button, at the right edge of the track's slot (it positions itself). No props. The default panel makes room for it on both sides when the grip is rendered beside the panel, as a sibling (CSS `:has()`). The buttons work with no other setup; dragging needs a `ClipInteractionProvider` above the view. The up button is disabled for the first track, the down button for the last, both while the track is loading. Neither the grip nor the buttons select the track. The element around them has the attribute `data-track-reorder-grip`.
+A drag grip with a move-up and a move-down button, at the right edge of the track's slot (it positions itself). No props. The default panel makes room for it on both sides when the grip is rendered beside the panel, as a sibling (CSS `:has()`). The buttons work with no other setup; dragging needs a `ClipInteractionProvider` above the view. The up button is disabled for the first track, the down button for the last. Neither the grip nor the buttons select the track. The element around them has the attribute `data-track-reorder-grip`.
 
-A reorder is committed with `useEditorControls().reorderTrack(trackId, toIndex)`; the new order arrives through the provider's `onTracksChange`.
+A reorder is committed with `useEditorControls().reorderTrack(trackId, toIndex)`: an undo step of the arrangement, which the view and the engine follow.
 
 For a grip element of your own, see [`useTrackReorderHandle()`](/docs/react/api/hooks#usetrackreorderhandle).
 
@@ -915,20 +917,20 @@ import {
   AudioPosition,
   TimeFormatSelect,
   AutomaticScrollCheckbox,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { ExportWavButton, useAudioTracks } from '@waveform-playlist/browser/tone';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function FullFeaturedPlaylist() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/track1.mp3', name: 'Track 1' },
-    { src: '/audio/track2.mp3', name: 'Track 2' },
+  // The rows are there at once; each clip is drawn when its file has loaded. Play works once the playlist is ready
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track1.mp3', name: 'Track 1' }),
+    audioTrack({ src: '/audio/track2.mp3', name: 'Track 2' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       {/* Transport Controls */}
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <RewindButton />
