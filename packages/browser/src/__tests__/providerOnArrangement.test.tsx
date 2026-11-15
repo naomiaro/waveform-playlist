@@ -462,18 +462,22 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
   });
 
   it('a click on a placeholder beyond the loaded audio puts the cursor where the click was; the view covers the placeholder; Play from there stops at `duration`', async () => {
-    const view = renderWithArrangement(
-      [track('A', [clip('a1', 0, 1)]), track('B', [loading('LB', { start: 5, duration: 3 })])],
-      {
-        children: (
-          <>
-            <ProbeChild />
-            <Waveform />
-          </>
-        ),
-      }
-    );
-    await engineAttached(view);
+    const view = renderWithArrangement([track('A', [clip('a1', 0, 1)])], {
+      children: (
+        <>
+          <ProbeChild />
+          <Waveform />
+        </>
+      ),
+    });
+    // Play does nothing before the first ready, so the placeholder comes from
+    // a file added after it (its source never settles here).
+    await ready();
+    await act(async () => {
+      view.arrangement.addTrack(track('B', [loading('LB', { start: 5, duration: 3 })]));
+      await flush();
+    });
+    expect(view.arrangement.sources.getSnapshot().pendingCount).toBe(1);
     expect(probe.timeline.duration).toBe(1);
 
     // The timeline is drawn to the end of the placeholder (8 s), not 1 s.
@@ -498,6 +502,8 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     await act(async () => {
       await probe.controls.play();
     });
+    // The play did start (from the click), then stopped at the loaded audio's end.
+    expect(view.factory.latest().count('play')).toBe(1);
     await waitFor(() => expect(probe.isPlaying).toBe(false));
     expect(probe.currentTime).toBeCloseTo(clickTime, 6);
   });

@@ -15,12 +15,21 @@
  * - A failed source counts as settled, and is not reported through `onError`
  *   (QB). An `onReady` that throws is the app's own error: it is written to
  *   the console and given to `onError`.
+ * - Play does nothing before that first time (maintainer, 2026-11-15):
+ *   `refusePlayBeforeFirstReady()` says so to `play()` at call time, and
+ *   writes one console warning per mount. It queues nothing, so Play pressed
+ *   during the first load never starts by itself.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Arrangement } from '@waveform-playlist/engine';
 import { useArrangementSources } from '../hooks/useArrangementSources';
 
 const READY_EVENT = 'waveform-playlist:ready';
+
+const PLAY_BEFORE_READY_WARNING =
+  '[waveform-playlist] play() was called before the playlist was ready and did nothing: ' +
+  'playback starts once the playlist is ready. Wait for `isReady` ' +
+  '(usePlaylistTimeline) or the `onReady` callback before calling play().';
 
 interface ReadyEventDetail {
   trackCount: number;
@@ -55,7 +64,16 @@ function callOnReady({
   }
 }
 
-export function useReadyOnce(options: UseReadyOnceOptions): boolean {
+export interface ReadyOnce {
+  isReady: boolean;
+  /**
+   * True when the first ready of this mount has not happened yet, so a play
+   * must do nothing; warns the first time per mount. Never changes identity.
+   */
+  refusePlayBeforeFirstReady: () => boolean;
+}
+
+export function useReadyOnce(options: UseReadyOnceOptions): ReadyOnce {
   const { isEngineAttached, arrangement, onReadyRef, onErrorRef, trackCount, duration } = options;
   const { pendingCount } = useArrangementSources(arrangement);
   // State, for the render; the ref, so that StrictMode's second run of the
@@ -63,6 +81,24 @@ export function useReadyOnce(options: UseReadyOnceOptions): boolean {
   const [hasBeenReady, setHasBeenReady] = useState(false);
   const firedRef = useRef(false);
   const isReady = isEngineAttached && (hasBeenReady || pendingCount === 0);
+  // "The first ready has happened", for play() at call time. Written where
+  // React commits, so a discarded render cannot leave it true; in a layout
+  // effect, so that it is true before any passive effect of the same commit
+  // (onReady included) can call play(). Never goes back to false.
+  const firstReadyRef = useRef(false);
+  const warnedPlayRef = useRef(false);
+  useLayoutEffect(() => {
+    if (isReady) firstReadyRef.current = true;
+  }, [isReady]);
+
+  const refusePlayBeforeFirstReady = useCallback(() => {
+    if (firstReadyRef.current) return false;
+    if (!warnedPlayRef.current) {
+      warnedPlayRef.current = true;
+      console.warn(PLAY_BEFORE_READY_WARNING);
+    }
+    return true;
+  }, []);
 
   useEffect(() => {
     if (!isReady || firedRef.current) return;
@@ -73,5 +109,5 @@ export function useReadyOnce(options: UseReadyOnceOptions): boolean {
     callOnReady({ onReadyRef, onErrorRef });
   }, [isReady, trackCount, duration, onReadyRef, onErrorRef]);
 
-  return isReady;
+  return { isReady, refusePlayBeforeFirstReady };
 }

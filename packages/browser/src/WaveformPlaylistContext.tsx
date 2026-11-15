@@ -488,7 +488,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   const durationRef = useRef(duration);
   durationRef.current = duration;
 
-  const isReady = useReadyOnce({
+  const { isReady, refusePlayBeforeFirstReady } = useReadyOnce({
     isEngineAttached,
     arrangement,
     onReadyRef,
@@ -948,6 +948,9 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // Playback controls
   const play = useCallback(
     async (startTime?: number, playDuration?: number) => {
+      // Before the first ready of this mount nothing plays and nothing is
+      // queued (#812): no ref, no request id, no pending resume is touched.
+      if (refusePlayBeforeFirstReady()) return;
       const actualStartTime = startTime ?? currentTimeRef.current;
       const endTime = playDuration !== undefined ? actualStartTime + playDuration : undefined;
 
@@ -1066,6 +1069,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       pendingResumeRef,
       audioInitializedRef,
       bumpEngineEpoch,
+      refusePlayBeforeFirstReady,
     ]
   );
 
@@ -1334,6 +1338,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // function never changes.
   const playAnnotation = useCallback(
     (annotation: AnnotationData) => {
+      // Before the first ready the click does nothing, highlight included.
+      if (refusePlayBeforeFirstReady()) return;
       setActiveAnnotationId(annotation.id);
       const playDuration = continuousPlayRef.current
         ? undefined
@@ -1347,7 +1353,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
         );
       });
     },
-    [play, setActiveAnnotationId, continuousPlayRef]
+    [play, setActiveAnnotationId, continuousPlayRef, refusePlayBeforeFirstReady]
   );
 
   // The actions both providers have (#688). Never changes.

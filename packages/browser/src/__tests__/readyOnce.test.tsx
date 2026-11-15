@@ -61,7 +61,7 @@ const Probe: React.FC<ReadyProps> = (props) => {
     onErrorRef,
     trackCount: view.tracks.length,
     duration: view.duration,
-  });
+  }).isReady;
   readyByRender.push(isReady);
   return null;
 };
