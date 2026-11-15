@@ -7,7 +7,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRecording } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
-import { takeRefusal, withTake } from './takeTarget';
+import { takeNotSaved, takeRefusal, withTake } from './takeTarget';
 import type { MicrophoneDevice } from '../types';
 import {
   type AudioClip,
@@ -299,7 +299,9 @@ export function useIntegratedRecording(
         arrangement.updateTrack(trackId, (track) => withTake(track, newClip));
       } catch (err) {
         // The arrangement refused the track (its kind changed during the take).
-        setHookError(err instanceof Error ? err : new Error(String(err)));
+        const notSaved = takeNotSaved(trackId, err);
+        console.warn(`[waveform-playlist] ${notSaved.message}`);
+        setHookError(notSaved);
       }
     }
   }, [arrangement, stopRec, latencyOffset]);

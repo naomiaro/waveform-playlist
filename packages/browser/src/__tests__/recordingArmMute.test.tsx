@@ -113,7 +113,8 @@ const VIEW = (
 
 async function mount(
   tracks: ArrangementTrack[],
-  recorder: React.ReactNode = <Recorder />
+  recorder: React.ReactNode = <Recorder />,
+  wrapper?: React.ComponentType<{ children: React.ReactNode }>
 ): Promise<ArrangementRender> {
   const view = renderWithArrangement(tracks, {
     children: (
@@ -123,6 +124,7 @@ async function mount(
         {recorder}
       </>
     ),
+    wrapper,
   });
   await waitFor(() => expect(probe.isReady).toBe(true));
   return view;
@@ -254,7 +256,10 @@ describe('the armed track shows its mute during a take (QJ, QM)', () => {
     }
   );
 
-  it('unmount during a take restores the value: of the recording component, and of the provider', async () => {
+  // Two things write the pre-take value back when something goes away: the
+  // cleanup of useRecordingSession (its component goes) and the provider's
+  // own cleanup (the provider goes; the arrangement outlives it, F1).
+  it('the recording component unmounting during a take restores the value through its useRecordingSession cleanup; the provider stays', async () => {
     const view = await mount([makeTrack('a'), makeTrack('b')]);
     act(() => setSession({ isRecording: true, trackId: 'a' }));
     expect(muted(view, 'a')).toBe(true);
@@ -270,15 +275,81 @@ describe('the armed track shows its mute during a take (QJ, QM)', () => {
     );
     expect(muted(view, 'a')).toBe(false);
     expect(muteButtonOf('a').disabled).toBe(false);
+  });
 
-    const second = await mount([makeTrack('c')]);
-    act(() => setSession({ isRecording: true, trackId: 'c' }));
-    expect(muted(second, 'c')).toBe(true);
+  it('the provider unmounting while a track was armed directly (no useRecordingSession) puts the pre-take value back', async () => {
+    const view = await mount([makeTrack('a', true)], null);
+    act(() => probe.controls.setRecordingActive(true, 'a'));
+    act(() => view.arrangement.setTrackMute('a', false));
+    const writes = vi.spyOn(view.arrangement, 'setTrackMute');
     await act(async () => {
-      second.unmount();
+      view.unmount();
     });
-    // The arrangement outlives the provider.
-    expect(muted(second, 'c')).toBe(false);
+    // The arrangement outlives the provider: the value from before the take.
+    expect(muted(view, 'a')).toBe(true);
+    expect(writes.mock.calls).toEqual([['a', true]]);
+  });
+
+  it('the provider unmounting with a useRecordingSession child writes the pre-take value back once', async () => {
+    const view = await mount([makeTrack('c')]);
+    act(() => setSession({ isRecording: true, trackId: 'c' }));
+    expect(muted(view, 'c')).toBe(true);
+    const writes = vi.spyOn(view.arrangement, 'setTrackMute');
+    await act(async () => {
+      view.unmount();
+    });
+    expect(muted(view, 'c')).toBe(false);
+    expect(writes.mock.calls).toEqual([['c', false]]);
+  });
+
+  it('StrictMode: arming directly after mount still mutes and releases once; a session armed by useRecordingSession works too', async () => {
+    const view = await mount([makeTrack('a'), makeTrack('b')], <Recorder />, React.StrictMode);
+    const writes = vi.spyOn(view.arrangement, 'setTrackMute');
+
+    act(() => probe.controls.setRecordingActive(true, 'a'));
+    expect(muted(view, 'a')).toBe(true);
+    expect(muteButtonOf('a').disabled).toBe(true);
+    act(() => probe.controls.setRecordingActive(false));
+    expect(muted(view, 'a')).toBe(false);
+    expect(muteButtonOf('a').disabled).toBe(false);
+    expect(writes.mock.calls).toEqual([
+      ['a', true],
+      ['a', false],
+    ]);
+
+    act(() => setSession({ isRecording: true, trackId: 'b' }));
+    expect(muted(view, 'b')).toBe(true);
+    expect(muteButtonOf('b').disabled).toBe(true);
+    act(() => setSession({ isRecording: false, trackId: null }));
+    expect(muted(view, 'b')).toBe(false);
+
+    writes.mockClear();
+    await act(async () => {
+      view.unmount();
+    });
+    // Released already: the provider's cleanup writes nothing.
+    expect(writes).not.toHaveBeenCalled();
+  });
+
+  it('an <Activity> hide of the provider during a take writes the value back once, and the reveal arms again', async () => {
+    let setMode: (mode: 'visible' | 'hidden') => void = () => {};
+    const Hideable: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+      const [mode, set] = useState<'visible' | 'hidden'>('visible');
+      setMode = set;
+      return <React.Activity mode={mode}>{children}</React.Activity>;
+    };
+    const view = await mount([makeTrack('a')], <Recorder />, Hideable);
+    act(() => setSession({ isRecording: true, trackId: 'a' }));
+    const writes = vi.spyOn(view.arrangement, 'setTrackMute');
+
+    act(() => setMode('hidden'));
+    expect(muted(view, 'a')).toBe(false);
+    expect(writes.mock.calls).toEqual([['a', false]]);
+
+    act(() => setMode('visible'));
+    expect(muted(view, 'a')).toBe(true);
+    act(() => setSession({ isRecording: false, trackId: null }));
+    expect(muted(view, 'a')).toBe(false);
   });
 
   it('an <Activity> hide of the recording component restores the value; the reveal arms again from the value then', async () => {

@@ -189,13 +189,20 @@ describe('a take is an edit of the arrangement (#812)', () => {
     act(() => pushSamples(1024));
     act(() => arrangement.updateTrack('track-1', (t) => ({ ...t, kind: 'midi' })));
     const after = arrangement.getTracks();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await act(async () => {
       await rendered.result.current.stopRecording();
     });
 
     expect(arrangement.getTracks()).toBe(after);
-    expect(rendered.result.current.error).toBeInstanceOf(Error);
-    expect(rendered.result.current.error?.message).toMatch(/track-1/);
+    const error = rendered.result.current.error as Error & { cause?: unknown };
+    expect(error.message).toMatch(
+      /^Recording completed but the take could not be saved on track "track-1": \[waveform-playlist\] Track "track-1" is an midi track/
+    );
+    // The arrangement's own error is kept.
+    expect(error.cause).toBeInstanceOf(Error);
+    expect(error.message.endsWith((error.cause as Error).message)).toBe(true);
+    expect(warn).toHaveBeenCalledWith(`[waveform-playlist] ${error.message}`);
   });
 });
 

@@ -89,6 +89,21 @@ export function takeRefusal(arrangement: Arrangement, trackId: string): Error | 
 }
 
 /**
+ * The error for a take the arrangement refused at the end (its track's kind
+ * changed during the take): says the recorded audio is lost, and keeps the
+ * arrangement's error as `cause`.
+ */
+export function takeNotSaved(trackId: string, refusal: unknown): Error {
+  const cause = refusal instanceof Error ? refusal : new Error(String(refusal));
+  return Object.assign(
+    new Error(
+      `Recording completed but the take could not be saved on track "${trackId}": ` + cause.message
+    ),
+    { cause }
+  );
+}
+
+/**
  * The track with the take added: the take owns [start, start + duration) and
  * the loaded clips it overlaps are trimmed, removed or split (#579). A clip
  * that is still loading (one an undo brought back during the take) is kept

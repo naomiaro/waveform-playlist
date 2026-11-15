@@ -9,7 +9,7 @@
  * the life of the provider (the arrangement does not change within a mount).
  * Also the value of `RecordingArmContext`: which track is armed for a take.
  */
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createValueSource } from '@waveform-playlist/core';
 import type { Arrangement } from '@waveform-playlist/engine';
 import { warnOnce } from '../components/partWarnings';
@@ -85,6 +85,18 @@ function useRecordingActive(arrangement: Arrangement) {
       }
     },
     [arrangement, armed]
+  );
+  // The arrangement outlives the provider (maintainer, F1): when the provider
+  // goes (unmount, an <Activity> hide, a StrictMode or Fast Refresh remount)
+  // with a track still armed, its mute from before the take is written back
+  // and the session ends. Nothing happens when the session was already
+  // released (by useRecordingSession's own cleanup) or never armed a track;
+  // a session armed again after a remount or a reveal works as before.
+  useEffect(
+    () => () => {
+      if (armed.source.getSnapshot()) setRecordingActive(false);
+    },
+    [armed, setRecordingActive]
   );
   const getArmedTrackId = useCallback(() => armed.source.getSnapshot()?.trackId ?? null, [armed]);
   const armedTrackId = useSyncExternalStore(armed.source.subscribe, getArmedTrackId);
