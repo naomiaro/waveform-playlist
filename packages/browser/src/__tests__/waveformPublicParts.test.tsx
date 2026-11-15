@@ -8,6 +8,7 @@
 // development warnings for a part that is not where it can work.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { TestProvider } from './helpers/arrangementProvider';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
@@ -75,7 +76,6 @@ vi.mock('../components/visualizationLayout', async (importOriginal) => {
 
 import * as api from '../index';
 import {
-  WaveformPlaylistProvider,
   MediaElementPlaylistProvider,
   Waveform,
   WaveformEditor,
@@ -153,7 +153,7 @@ function createFakeAdapter() {
     } as unknown as AudioContext,
     ppqn: 960,
     async init() {},
-    setTracks() {},
+    setTracks: vi.fn(),
     addTrack() {},
     removeTrack() {},
     updateTrack() {},
@@ -217,7 +217,7 @@ async function mountMultitrack(
   const ui = () => (
     <AnnotationIntegrationContext value={annotations ? ANNOTATION_INTEGRATION : null}>
       <SpectrogramIntegrationContext value={spectrogram ?? null}>
-        <WaveformPlaylistProvider
+        <TestProvider
           tracks={tracks}
           sampleRate={SAMPLE_RATE}
           createAdapter={createAdapter}
@@ -225,7 +225,7 @@ async function mountMultitrack(
         >
           <Probe />
           {tree()}
-        </WaveformPlaylistProvider>
+        </TestProvider>
       </SpectrogramIntegrationContext>
     </AnnotationIntegrationContext>
   );
@@ -974,11 +974,10 @@ describe('the recording session', () => {
       return null;
     };
     const { adapter, rerender } = await mountMultitrack(() => (mounted ? <Session /> : <span />));
-    // The provider was still loading when the effect first ran; a take starts later.
-    await act(async () => {
-      probe.editor.setRecordingActive(true, 't2');
-    });
-    expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t2', true);
+    // The session began before the engine was built: since #812 the mute is
+    // the arrangement's, so the engine was built with the armed track muted.
+    const built = adapter.setTracks.mock.calls[0][0] as ClipTrack[];
+    expect(built.find((track) => track.id === 't2')?.muted).toBe(true);
     mounted = false;
     rerender();
     await act(async () => {});

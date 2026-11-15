@@ -1,19 +1,30 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type ReactNode,
+} from 'react';
 import { ThemeProvider } from 'styled-components';
 import type {
   EffectsFunction,
   TrackEffectsFunction,
   SoundFontCache,
 } from '@waveform-playlist/playout';
-import { resolvePlayoutAdapter } from './playout/resolvePlayoutAdapter';
-import { PlaylistEngine, type EngineState, type PlayoutAdapter } from '@waveform-playlist/engine';
-import { type ClipTrack, type Fade, type MidiNoteData } from '@waveform-playlist/core';
+import type {
+  Arrangement,
+  EngineState,
+  PlaylistEngine,
+  PlayoutAdapter,
+} from '@waveform-playlist/engine';
+import { type Fade, type MidiNoteData } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
-import { assertTrackKind } from '@waveform-playlist/core';
 import {
   useTimeFormat,
   useZoomControls,
@@ -21,9 +32,7 @@ import {
   useSelectionState,
   useLoopState,
   useSelectedTrack,
-  useUndoState,
   useAnimationFrameLoop,
-  useWaveformDataCache,
 } from './hooks';
 import { followAnnotations } from './providerInternals/followAnnotations';
 import {
@@ -34,18 +43,10 @@ import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameC
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
 import { useTrimPreview } from './providerInternals/useTrimPreview';
-import { derivePeaks, EMPTY_PEAKS_CACHE, type PeaksCache } from './utils/derivePeaks';
-import { timelineDuration } from './utils/timelineDuration';
-import { incrementalTrackChange } from './utils/incrementalTrackChange';
-import {
-  EMPTY_TRACK_MIXER,
-  alignTrackStates,
-  mixerForTracks,
-  mixerWithAddedTracks,
-  patchTrackState,
-  type TrackMixer,
-} from './utils/trackMixerState';
-import { warnOnce } from './components/partWarnings';
+import { useEngineLifetime } from './providerInternals/useEngineLifetime';
+import { useArrangementView } from './providerInternals/useArrangementView';
+import { useReadyOnce } from './providerInternals/useReadyOnce';
+import { useArrangementEditing } from './providerInternals/useArrangementEditing';
 
 // Types
 /**
@@ -88,6 +89,7 @@ export interface TrackState {
 import {
   BLOCKED,
   ActiveAnnotationContext,
+  ArrangementContext,
   AnnotationOptionsContext,
   AnnotationsContext,
   CurrentTimeContext,
@@ -131,7 +133,14 @@ import {
 } from './contexts/playlistContexts';
 
 export interface WaveformPlaylistProviderProps {
-  tracks: ClipTrack[]; // Updated to use clip-based model
+  /**
+   * What the provider plays and draws: the tracks, their mix, the undo
+   * history and the loading of their audio (#812). Make it with
+   * `useCreateArrangement` and change it through its methods (or
+   * `useArrangement()` below the provider); the provider follows it. A new
+   * object is a new playlist: everything below the provider mounts again.
+   */
+  arrangement: Arrangement;
   /**
    * Draw and analyse every track as one channel. A provider option, not a
    * view option: the provider computes the peaks with it.
@@ -148,7 +157,7 @@ export interface WaveformPlaylistProviderProps {
    * it in between.
    */
   annotationList?: AnnotationListProp;
-  /** Master effects chain (default Tone.js adapter only). */
+  /** Master effects chain (default Tone.js adapter only). A new function builds a new engine. */
   effects?: EffectsFunction;
   /**
    * Returns the effects function of a track by id, or `undefined` for none:
@@ -162,29 +171,23 @@ export interface WaveformPlaylistProviderProps {
    * built applies the next time that track is built.
    */
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
+  /**
+   * Called once per mount, the first time an engine is attached and no source
+   * of the arrangement is still pending. Read when it is called: a new
+   * function identity builds nothing.
+   */
   onReady?: () => void;
-  /** Called when audio/engine initialization fails (e.g. a missing optional peer,
-   *  a throwing `createAdapter`, or an invalid `zoomLevels`/`samplesPerPixel`). The
+  /** Called when the engine or its adapter cannot be built (e.g. a missing
+   *  optional peer, a throwing `createAdapter`, or an invalid
+   *  `zoomLevels`/`samplesPerPixel`), and when `onReady` throws. A source that
+   *  fails to load is not reported here: see `useArrangementSources`. The
    *  provider already logs the error; use this to surface it in your UI. */
   onError?: (err: Error) => void;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
-  /** Callback when engine clip operations (move, trim, split) change tracks.
-   * The provider calls this so the parent can update its tracks state without
-   * triggering a full engine rebuild.
-   *
-   * **Important:** The parent must pass the received `tracks` reference back as
-   * the `tracks` prop (i.e. `setState(tracks)`). The provider uses reference
-   * identity (`tracks === engineTracksRef.current`) to detect engine-originated
-   * updates and skip the expensive `loadAudio` rebuild. */
-  onTracksChange?: (tracks: ClipTrack[]) => void;
   /** SoundFont cache for sample-based MIDI playback. When provided, MIDI clips
    *  use SoundFont samples instead of PolySynth synthesis. */
   soundFontCache?: SoundFontCache;
-  /** When true, tracks render visually but the engine build is deferred.
-   *  Use this during progressive loading to avoid rebuilding the engine for
-   *  each track — flip to false when all tracks are ready for a single build. */
-  deferEngineRebuild?: boolean;
   /** Disable the automatic stop when the cursor reaches the end of the
    *  longest track — the transport rolls until an explicit stop/pause
    *  (DAW-style). The multitrack view then draws the timeline as wide as its
@@ -200,15 +203,68 @@ export interface WaveformPlaylistProviderProps {
   /** Factory for a custom PlayoutAdapter. When omitted, the Tone.js engine
    *  (@waveform-playlist/playout) is dynamically imported — so a custom adapter
    *  lets a consumer use neither @waveform-playlist/playout nor tone. Called once
-   *  per engine rebuild; the provider owns and disposes the returned instance.
-   *  Pass a stable reference (module-level or useCallback) — it is read directly
-   *  inside the curated `loadAudio` effect, not via its dependency array. */
+   *  per engine build; the provider owns and disposes the returned instance.
+   *  Read when an engine is built: a new function identity builds nothing. */
   createAdapter?: () => PlayoutAdapter;
   children: ReactNode;
 }
 
-export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = ({
-  tracks,
+// Each arrangement object gets a number of its own: the key of the provider's
+// body, so that a new arrangement is a new mount of everything below it.
+const arrangementKeys = new WeakMap<Arrangement, number>();
+let lastArrangementKey = 0;
+function keyOf(arrangement: Arrangement): number {
+  let key = arrangementKeys.get(arrangement);
+  if (key === undefined) {
+    lastArrangementKey += 1;
+    key = lastArrangementKey;
+    arrangementKeys.set(arrangement, key);
+  }
+  return key;
+}
+
+/** Says once per mount, in development, that a new `arrangement` object remounts the playlist. */
+function useWarnOnNewArrangement(arrangement: Arrangement): void {
+  const firstRef = useRef(arrangement);
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (arrangement === firstRef.current || warnedRef.current) return;
+    warnedRef.current = true;
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(
+        '[waveform-playlist] WaveformPlaylistProvider was given a new `arrangement` prop: ' +
+          'everything below it mounts again (a new engine, the view and its state). Keep one ' +
+          'arrangement for the life of the playlist (`useCreateArrangement`) and change it ' +
+          'through its methods.'
+      );
+    }
+  }, [arrangement]);
+}
+
+export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = (props) => {
+  useWarnOnNewArrangement(props.arrangement);
+  return <ProviderOnArrangement key={keyOf(props.arrangement)} {...props} />;
+};
+
+// Resting (non-playing) cursor positions display the raw time unchanged.
+// Latency compensation (outputLatency + lookAhead) models the gap between
+// the Transport's scheduling position and audible output — a property of
+// *playing*, not of position. A seeked/paused/stopped cursor has no audible
+// counterpart; the commanded position is the truth. During playback the
+// animation loop uses engine.getAudibleTime() instead.
+function toVisualTime(rawTime: number): number {
+  return Number.isFinite(rawTime) ? Math.max(0, rawTime) : 0;
+}
+
+/** What a new engine is given and how the provider follows it; set after the hooks that own it. */
+interface EngineFollowers {
+  seed: (engine: PlaylistEngine) => void;
+  follow: (engine: PlaylistEngine) => void;
+  mirror: (state: EngineState) => void;
+}
+
+const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
+  arrangement,
   mono = false,
   samplesPerPixel: initialSamplesPerPixel = 1024,
   zoomLevels,
@@ -220,9 +276,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   onReady,
   onError,
   onAnnotationsChange,
-  onTracksChange,
   soundFontCache,
-  deferEngineRebuild = false,
   indefinitePlayback = false,
   sampleRate: sampleRateProp,
   createAdapter,
@@ -230,9 +284,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 }) => {
   const mergedTheme = useMergedTheme(userThemeProp);
 
-  // Stabilize zoomLevels reference — inline arrays (e.g. zoomLevels={[256, 512]})
-  // create a new reference every render, which would trigger engine rebuild via
-  // loadAudio deps. Content-based comparison avoids spurious rebuilds.
+  // Content-stable: an inline array is new on every render. The engine's
+  // lifetime compares the levels by content too.
   const stableZoomLevels = useMemo(
     () => zoomLevels,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,73 +328,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  // Timeline length in seconds: the end of the last clip. Derived during
-  // render so it never lags `tracks` (#692).
-  const duration = useMemo(() => timelineDuration(tracks), [tracks]);
-  // The animation loop and `seekTo` read the timeline end from here, so that
-  // neither changes identity when it moves: `seekTo` and `play` are in the
-  // controls value, which must not follow `duration` (#767). Written during
-  // render, like `isPlayingRef` and `tracksRef`, so that a child that calls
-  // `seekTo` from a layout effect of the same commit already gets the new end.
-  const durationRef = useRef(duration);
-  durationRef.current = duration;
-  // The mixer state of the tracks, by track id (#687). The public
-  // `trackStates` array is derived from it and `tracks` below.
-  const [trackMixer, setTrackMixer] = useState<TrackMixer>(EMPTY_TRACK_MIXER);
-  const [isReady, setIsReady] = useState(false);
   // Bumped after every track-reorder DRAG interaction (committed or not) —
   // see bumpTrackReorderEpoch below for the full rationale.
   const [trackReorderEpoch, setTrackReorderEpoch] = useState(0);
   // Live track-reorder drag preview (view-level only; see the
   // "Track Reordering" section of packages/browser/CLAUDE.md). Set by
   // ClipInteractionProvider's onDragOver, cleared on drag end/cancel.
-  // The engine's committed order is untouched until drop.
+  // The committed order is untouched until drop.
   const [trackDragPreview, setTrackDragPreview] = useState<TrackDragPreview | null>(null);
 
   // Refs
-  // Engine owns selection, loop, selectedTrackId, zoom, and masterVolume state.
-  // React subscribes to engine statechange and mirrors into useState/refs.
-  // Playback timing (currentTime, isPlaying) remains in React for animation loop.
-  const engineRef = useRef<PlaylistEngine | null>(null);
-  const adapterRef = useRef<PlayoutAdapter | null>(null);
-  const audioInitializedRef = useRef<boolean>(false);
-
   // Ref for animation loop access (avoids adding the prop to useCallback deps)
   const indefinitePlaybackRef = useRef(indefinitePlayback);
   indefinitePlaybackRef.current = indefinitePlayback;
-
-  // Recording session state. While active:
-  // 1. The animation loop's end-of-audio auto-stop is suppressed so overdub
-  //    playback runs past the end of existing material (#589/#590).
-  // 2. The armed track's existing content is transiently muted: punch-in
-  //    replaces whatever the take overlaps (#579), so the doomed material
-  //    must not play under the overdub. Engine-level mute (survives adapter
-  //    rebuilds), captured/restored around the session; the track's UI mute
-  //    state is untouched.
-  // Called by useRecordingSession for the length of a take; overdub
-  // flows also call it eagerly before play() — a render round-trip loses the
-  // race against the first animation frame (empty timeline: time 0 >=
-  // duration 0 would stop playback instantly).
-  const recordingActiveRef = useRef(false);
-  const armedTrackMuteRef = useRef<{ trackId: string; prevMuted: boolean } | null>(null);
-  const setRecordingActive = useCallback((active: boolean, armedTrackId?: string | null) => {
-    recordingActiveRef.current = active;
-    const engine = engineRef.current;
-    if (!engine) return;
-    if (active && armedTrackId) {
-      if (armedTrackMuteRef.current?.trackId === armedTrackId) return; // already armed
-      if (armedTrackMuteRef.current) {
-        // Armed track changed mid-session — restore the previous one first.
-        engine.setTrackMute(armedTrackMuteRef.current.trackId, armedTrackMuteRef.current.prevMuted);
-      }
-      const prevMuted = engine.getState().tracks.find((t) => t.id === armedTrackId)?.muted ?? false;
-      armedTrackMuteRef.current = { trackId: armedTrackId, prevMuted };
-      engine.setTrackMute(armedTrackId, true);
-    } else if (!active && armedTrackMuteRef.current) {
-      engine.setTrackMute(armedTrackMuteRef.current.trackId, armedTrackMuteRef.current.prevMuted);
-      armedTrackMuteRef.current = null;
-    }
-  }, []);
   const isPlayingRef = useRef<boolean>(false);
   isPlayingRef.current = isPlaying;
   const playStartPositionRef = useRef<number>(0);
@@ -350,7 +349,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   // animation loop updates this per frame. Pause/seek/stop paths sync it
   // explicitly so the static playhead reflects the commanded resting position.
   const visualTimeRef = useRef<number>(0);
-  const tracksRef = useRef<ClipTrack[]>(tracks);
   const soundFontCacheRef = useRef(soundFontCache);
   soundFontCacheRef.current = soundFontCache;
   // The adapter keeps ONE lookup for its whole life and calls it whenever it
@@ -362,54 +360,103 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     (trackId: string) => trackEffectsRef.current?.(trackId),
     []
   );
-  const trackMixerRef = useRef<TrackMixer>(trackMixer);
-  // One entry per track, in the order of `tracks`; `undefined` for a track
-  // that is still loading. The previous array is handed back when no entry
-  // changed, so a move of a trim (new `tracks`, same mixer) does not change
-  // the mixer context value.
-  const alignedTrackStatesRef = useRef<TrackState[]>([]);
-  const trackStates = useMemo(() => {
-    const aligned = alignTrackStates(tracks, trackMixer, alignedTrackStatesRef.current);
-    alignedTrackStatesRef.current = aligned;
-    return aligned;
-  }, [tracks, trackMixer]);
+  // The latest committed callbacks (QG): read when they are called, so a new
+  // identity builds nothing.
+  const onReadyRef = useRef(onReady);
+  const onErrorRef = useRef(onError);
+  useLayoutEffect(() => {
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+  });
   const playbackStartTimeRef = useRef<number>(0); // context.currentTime when playback started
   const audioStartPositionRef = useRef<number>(0); // Audio position when playback started
   const playbackEndTimeRef = useRef<number | null>(null); // Audio position where playback should stop (for selections)
   // Suppresses the engine 'stop' mirror (below) around provider-initiated
   // engine.stop() calls that immediately seek/restart playback in the same
-  // synchronous block (play(), setSelection, reschedulePlayback, the
-  // engine-rebuild-with-resume path). Without this, the mirror's ref writes
-  // would race the restart's own writes and briefly show the pre-restart
-  // position/isPlaying=false. Stop paths that don't restart afterward don't
-  // need suppression — see the mirror's own comment for why.
+  // synchronous block (play(), setSelection, reschedulePlayback). Without
+  // this, the mirror's ref writes would race the restart's own writes and
+  // briefly show the pre-restart position/isPlaying=false. Stop paths that
+  // don't restart afterward don't need suppression — see the mirror's own
+  // comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // Engine clip operations guard: tracks reference from the last engine statechange.
-  // When engine methods (moveClip, trimClip, splitClip) mutate tracks, the statechange
-  // handler stores state.tracks here and calls onTracksChange with the same reference.
-  // loadAudio checks tracks === engineTracksRef.current to skip the full rebuild.
-  const engineTracksRef = useRef<ClipTrack[] | null>(null);
-  // Monotonic counter from engine.getState().tracksVersion — used to detect
-  // track mutations (move/trim/split/add/remove) vs other statechange events.
-  const lastTracksVersionRef = useRef(0);
-  // Set while this provider applies a `tracks` prop change to the engine track
-  // by track; the statechange it causes must not be mirrored back to the parent.
-  const suppressTracksMirrorRef = useRef(false);
-  // Flag set during render to prevent the previous effect cleanup from disposing the
-  // engine when we're skipping the rebuild. React runs previous cleanup before the
-  // current effect body, so the flag must be set during render (which precedes cleanup).
-  const skipEngineDisposeRef = useRef(false);
-  // Snapshot of tracks from the previous loadAudio run, used to detect
-  // additive-only changes (new tracks appended, existing unchanged).
-  const prevTracksRef = useRef<ClipTrack[]>([]);
   // Provider-level ref for scroll-position math and animation loop pixel
   // calculation. Distinct from useZoomControls's internal ref (statechange guard).
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
-  // Provisional sample rate until the adapter (which owns the AudioContext) is
-  // created in loadAudio. Reconciled from adapter.audioContext.sampleRate there.
-  // (#510: avoids a static @waveform-playlist/playout import at mount.)
-  const [initialSampleRate] = useState<number>(() => sampleRateProp ?? 48000);
-  const sampleRateRef = useRef<number>(initialSampleRate);
+  // True while the bounded play in progress is the highlighted selection itself
+  // (its start and end are the selection's). Set by play(). Selection playback
+  // ignores continuous play; anything else, including an annotation clicked
+  // while a selection is highlighted elsewhere, follows it.
+  const isSelectionPlayRef = useRef(false);
+  // Incremented by every play(), stop() and pause(). A play() that has been
+  // waiting on engine.init() compares it afterwards: if it moved, the user has
+  // since asked for something else and the older play must not start.
+  const playRequestIdRef = useRef(0);
+
+  const { animationFrameRef, startAnimationFrameLoop, stopAnimationFrameLoop } =
+    useAnimationFrameLoop();
+
+  // A build that fails while playback shows as running (a rebuild began
+  // during playback and queued its resume, which the failure dropped): no
+  // engine is coming, so playback shows stopped where it was. Nothing starts
+  // by itself after a later build (maintainer, D3).
+  const onBuildFailure = useCallback(() => {
+    if (!isPlayingRef.current) return;
+    setIsPlaying(false);
+    stopAnimationFrameLoop();
+    visualTimeRef.current = toVisualTime(currentTimeRef.current);
+    setCurrentTime(currentTimeRef.current);
+  }, [stopAnimationFrameLoop]);
+
+  // The engine's own state is mirrored by the hooks below, which need the
+  // engine ref first; these three reach them through a ref set after them.
+  const followersRef = useRef<EngineFollowers | null>(null);
+  const seedEngine = useCallback(
+    (engine: PlaylistEngine) => followersRef.current?.seed(engine),
+    []
+  );
+  const onEngine = useCallback(
+    (engine: PlaylistEngine) => followersRef.current?.follow(engine),
+    []
+  );
+  const onEngineState = useCallback(
+    (state: EngineState) => followersRef.current?.mirror(state),
+    []
+  );
+
+  // The engine around the arrangement: built on mount and when `effects` or
+  // the zoom levels change, disposed in every cleanup (#812). A track edit
+  // builds nothing.
+  const {
+    engineRef,
+    adapterRef,
+    engineEpoch,
+    bumpEngineEpoch,
+    isEngineAttached,
+    engineBuildInFlightRef,
+    pendingResumeRef,
+    audioInitializedRef,
+    sampleRate,
+    isSampleRateKnown,
+  } = useEngineLifetime({
+    arrangement,
+    createAdapter,
+    effects,
+    resolveTrackEffects,
+    soundFontCacheRef,
+    sampleRateProp,
+    zoomLevels,
+    samplesPerPixelRef,
+    playbackEndTimeRef,
+    seedEngine,
+    onEngine,
+    onEngineState,
+    stopAnimationFrameLoop,
+    onErrorRef,
+    onBuildFailure,
+  });
+  // For the animation loop and the zoom scroll math, which run outside render.
+  const sampleRateRef = useRef(sampleRate);
+  sampleRateRef.current = sampleRate;
 
   // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
   const { timeFormat, setTimeFormat } = useTimeFormat();
@@ -430,11 +477,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
-  // True while the bounded play in progress is the highlighted selection itself
-  // (its start and end are the selection's). Set by play(). Selection playback
-  // ignores continuous play; anything else, including an annotation clicked
-  // while a selection is highlighted elsewhere, follows it.
-  const isSelectionPlayRef = useRef(false);
   const {
     isLoopEnabled,
     loopStart,
@@ -453,48 +495,49 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     onEngineState: onSelectedTrackEngineState,
     selectedTrackIdRef,
   } = useSelectedTrack({ engineRef });
-  const {
-    canUndo,
-    canRedo,
-    undo,
-    redo,
-    onEngineState: onUndoEngineState,
-  } = useUndoState({ engineRef });
-  const { animationFrameRef, startAnimationFrameLoop, stopAnimationFrameLoop } =
-    useAnimationFrameLoop();
 
-  // Worker-based WaveformData cache for fast zoom resampling
+  // Everything the provider publishes about the tracks, derived from the
+  // arrangement during render and never written back (#812).
   const baseScale = useMemo(
     () => Math.min(...(stableZoomLevels ?? [256, 512, 1024, 2048, 4096, 8192])),
     [stableZoomLevels]
   );
-  const { getWaveformData: getGeneratedWaveformData, version: generatedWaveformVersion } =
-    useWaveformDataCache(tracks, baseScale);
+  const view = useArrangementView(arrangement, {
+    samplesPerPixel,
+    mono,
+    baseScale,
+    placeholderSampleRate: isSampleRateKnown ? sampleRate : null,
+  });
+  const { tracks, duration } = view;
+  // The animation loop and `seekTo` read the timeline end from here, so that
+  // neither changes identity when it moves: `seekTo` and `play` are in the
+  // controls value, which must not follow `duration` (#767). Written during
+  // render, like `isPlayingRef`, so that a child that calls `seekTo` from a
+  // layout effect of the same commit already gets the new end.
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
 
-  // Peaks per track and clip, derived during render (#692). The cache in the
-  // ref is what keeps a clip's typed arrays (and its ClipPeaks object, and its
-  // track's array) identical while nothing they depend on changed — see
-  // utils/derivePeaks.ts. `generatedWaveformVersion` is the only signal that a
-  // worker result arrived; the lookup itself goes through a ref.
-  const peaksCacheRef = useRef<PeaksCache>(EMPTY_PEAKS_CACHE);
-  const peaksDataArray = useMemo(() => {
-    const next = derivePeaks(
-      tracks,
-      { samplesPerPixel, mono, getGeneratedWaveformData },
-      peaksCacheRef.current
-    );
-    peaksCacheRef.current = next;
-    return next.result;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- generatedWaveformVersion invalidates the ref-backed lookup
-  }, [tracks, samplesPerPixel, mono, getGeneratedWaveformData, generatedWaveformVersion]);
+  const isReady = useReadyOnce({
+    isEngineAttached,
+    arrangement,
+    onReadyRef,
+    onErrorRef,
+    trackCount: tracks.length,
+    duration,
+  });
 
   // A trim drag in progress (#812): moves go to this source, and only the
   // dragged clip's view follows them. The tracks change once, on release.
   const { trimPreview, trimPreviewPeaks } = useTrimPreview({
     tracks,
-    peaksOptions: { samplesPerPixel, mono, getGeneratedWaveformData },
-    peaksCacheRef,
+    peaksOptions: view.peaksOptions,
+    peaksCacheRef: view.peaksCacheRef,
   });
+
+  // The mixer setters, reorder, undo, redo and the recording session: all
+  // through the arrangement, engine or not.
+  const editing = useArrangementEditing(arrangement);
+  const { recordingActiveRef } = editing;
 
   // Cross-hook concern: reads selection refs to set loop region
   const setLoopRegionFromSelection = useCallback(() => {
@@ -504,32 +547,6 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLoopRegion(start, end);
     }
   }, [setLoopRegion, selectionStartRef, selectionEndRef]);
-
-  // Keep refs in sync with state
-  useEffect(() => {
-    trackMixerRef.current = trackMixer;
-  }, [trackMixer]);
-
-  tracksRef.current = tracks;
-
-  // Render-phase guard: detect when tracks prop came from an engine clip operation.
-  // Must be set before effects run so the previous effect cleanup can skip disposal.
-  const isEngineTracks = tracks === engineTracksRef.current;
-
-  // Detect track changes that can be applied to the running engine: new tracks
-  // appended, or an empty track that got its clips (a placeholder whose audio
-  // arrived). Existing tracks are compared by reference; a changed track that
-  // already had clips makes this null and triggers a full rebuild.
-  const prevTracks = prevTracksRef.current;
-  const incrementalChange =
-    engineRef.current !== null ? incrementalTrackChange(prevTracks, tracks) : null;
-  const isIncrementalAdd = incrementalChange !== null;
-  // Note: prevTracks may be empty here (e.g. recording's first track on a
-  // persistent empty-timeline engine) — that's a valid 0→1 incremental add, so
-  // it must NOT require prevTracks.length > 0. The engineRef !== null guard keeps
-  // it correct: a lazy/no-engine consumer still takes the full build path.
-
-  skipEngineDisposeRef.current = isEngineTracks || isIncrementalAdd;
 
   // Adjust scroll position proportionally when zoom changes
   useEffect(() => {
@@ -556,500 +573,17 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     samplesPerPixelRef.current = newSamplesPerPixel;
   }, [samplesPerPixel, duration, scrollContainerRef]);
 
-  // Track pending playback resume after tracks change
-  // A play that must start once the engine being built is ready: playback
-  // that was running when a rebuild began, or a play() requested while one
-  // was in flight (#675). `endTime` is set for duration-limited playback.
-  const pendingResumeRef = useRef<{ position: number; endTime?: number } | null>(null);
-  // True from the moment a full engine build starts until its engine is
-  // assigned to engineRef (or the build fails / is superseded). While it is
-  // true and engineRef is null, play() queues instead of no-opping.
-  const engineBuildInFlightRef = useRef(false);
-  // Incremented by every play(), stop() and pause(). A play() that has been
-  // waiting on engine.init() compares it afterwards: if it moved, the user has
-  // since asked for something else and the older play must not start.
-  const playRequestIdRef = useRef(0);
-  // Bumped each time a freshly built engine is assigned. The resume effect
-  // depends on it: the `tracks` change that starts a rebuild fires BEFORE the
-  // async build finishes, so `tracks` alone cannot trigger the resume.
-  const [engineEpoch, setEngineEpoch] = useState(0);
-
-  // Dispose the current engine ahead of a rebuild, leaving nothing reachable
-  // through engineRef. If the engine is PLAYING at this moment, queue a resume
-  // for its replacement. The engine is asked directly because isPlayingRef is
-  // only as fresh as the last render: a play() whose init() resolves after
-  // React has committed the new `tracks` but before this effect runs starts
-  // the old engine and calls setIsPlaying(true) — and the effect would still
-  // read isPlayingRef === false (#675).
-  const disposeEngineKeepingPlayback = useCallback(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    if (engine.getState().isPlaying && !pendingResumeRef.current) {
-      pendingResumeRef.current = {
-        position: engine.getCurrentTime(),
-        endTime: playbackEndTimeRef.current ?? undefined,
-      };
-    }
-    engine.dispose();
-    engineRef.current = null;
-    // The adapter went with the engine. Nothing may reach it either: the
-    // failed-load path disposes `adapterRef.current`, and the soundfont sync
-    // and the clock read it (#811).
-    adapterRef.current = null;
-  }, []);
-
-  // Load audio from clips (only when tracks change)
-  useEffect(() => {
-    // Guard: skip full rebuild when tracks came from an engine clip operation
-    // (moveClip, trimClip, splitClip). The engine and adapter already have the
-    // correct tracks — we just need to update duration for the timeline.
-    // With no engine, the engine's tracks are built like any others: the
-    // unmount cleanup below disposes it on an <Activity> hide, and on the
-    // reveal React runs this effect again with the latest render's closure,
-    // which is this path when the clip operation and the hide were one commit.
-    if (isEngineTracks && engineRef.current) {
-      engineTracksRef.current = null;
-      prevTracksRef.current = tracks;
-      return;
-    }
-
-    // Guard: incremental track addition — only new tracks appended, existing
-    // tracks unchanged. Add each new track to the existing engine without
-    // tearing down the playout. This avoids disposing and recreating all
-    // audio nodes when dropping a file or finishing a recording.
-    if (incrementalChange && engineRef.current) {
-      try {
-        // incrementalChange was computed during render from the same prevTracks
-        // snapshot as the guard, not from prevTracksRef.current.
-        const engine = engineRef.current;
-        const { added: addedTracks, filled: filledTracks } = incrementalChange;
-        // The engine rejects a track whose clips do not match its kind (#756).
-        // Check the whole batch before applying any of it, so a bad track
-        // late in the batch does not leave the earlier ones half applied.
-        [...filledTracks, ...addedTracks].forEach(assertTrackKind);
-
-        // Merge current UI state into a track before handing it to the engine
-        const currentTrackMixer = trackMixerRef.current;
-        const withUiState = (track: ClipTrack): ClipTrack => {
-          const trackState = currentTrackMixer.get(track.id);
-          return {
-            ...track,
-            volume: trackState?.volume ?? track.volume,
-            muted: trackState?.muted ?? track.muted,
-            soloed: trackState?.soloed ?? track.soloed,
-            pan: trackState?.pan ?? track.pan,
-          };
-        };
-        // Fills before adds: an add is mirrored to the parent, and what it
-        // mirrors must already hold the filled tracks.
-        if (filledTracks.length > 0) {
-          // The parent already has these tracks, as on the initial setTracks:
-          // do not echo them back through onTracksChange.
-          suppressTracksMirrorRef.current = true;
-          try {
-            for (const track of filledTracks) {
-              engine.updateTrack(track.id, withUiState(track));
-            }
-          } finally {
-            suppressTracksMirrorRef.current = false;
-          }
-          // As a rebuild did: "the audio arrived" is not a step to undo back
-          // to an empty placeholder.
-          engine.clearHistory();
-          // clearHistory emits statechange when there was history; this call
-          // covers the case where there was none.
-          onUndoEngineState(engine.getState());
-        }
-
-        for (const track of addedTracks) {
-          engine.addTrack(withUiState(track));
-        }
-
-        // Initialize track states for the new tracks (preserve existing), and
-        // take the names of the filled ones ("x (loading...)" becomes "x").
-        setTrackMixer((prev) => mixerWithAddedTracks(prev, addedTracks, filledTracks));
-
-        prevTracksRef.current = tracks;
-        return;
-      } catch (err) {
-        console.warn(
-          '[waveform-playlist] Incremental add failed, falling through to full rebuild:',
-          String(err)
-        );
-        // Fall through to full loadAudio path
-      }
-    }
-
-    // Defer engine rebuild during progressive loading — tracks render visually
-    // (controls, clip shapes, peaks via worker) but the engine isn't built yet.
-    // When deferEngineRebuild flips to false, this effect re-runs and builds once.
-    if (deferEngineRebuild) {
-      // No engine (an <Activity> hide disposed it, or none was built yet):
-      // not ready until the deferral ends and the build below runs (#811).
-      if (!engineRef.current) setIsReady(false);
-      return;
-    }
-
-    // Reset ready state for full rebuild
-    setIsReady(false);
-
-    if (tracks.length === 0) {
-      // Clear content state when all tracks are removed.
-      setTrackMixer(EMPTY_TRACK_MIXER);
-
-      // Always keep a persistent engine alive — even with no tracks — so the
-      // Transport is ready before playback/recording starts. Without this the
-      // engine is rebuilt asynchronously when the first track is added, and
-      // play() races that rebuild — intermittently no-opping (frozen
-      // playhead/time) and paying first-record latency. The engine is still
-      // created via dynamic import (lazy module load preserved, #510); only its
-      // lifecycle is eager.
-      if (engineRef.current) {
-        // Keep the existing engine; just clear its tracks.
-        engineRef.current.setTracks([]);
-        prevTracksRef.current = tracks;
-        return;
-      }
-      // No engine yet (initial mount with no tracks): fall through to the
-      // loadAudio path below, which builds a persistent engine for 0 tracks.
-    }
-
-    // Capture playback state before rebuilding playout (read from ref, not state,
-    // so isPlaying can be excluded from the dep array — play/pause must not trigger rebuilds)
-    const wasPlaying = isPlayingRef.current;
-    const resumePosition = currentTimeRef.current;
-
-    // Stop current playback and animation before disposing
-    if (wasPlaying) {
-      // The previous effect's cleanup has usually disposed and cleared the
-      // engine already; stop it only if it is still here.
-      if (engineRef.current) {
-        // Suppressed: resumePlayback() (below) restarts from resumePosition once
-        // the rebuilt engine is ready — an unguarded mirror would clobber the
-        // refs with this (old, about-to-be-replaced) engine's rewound position
-        // in the meantime. See suppressEngineStopMirrorRef declaration.
-        suppressEngineStopMirrorRef.current = true;
-        engineRef.current.stop();
-        suppressEngineStopMirrorRef.current = false;
-      }
-      stopAnimationFrameLoop();
-      // Mark that we need to resume playback after playout is rebuilt. A play
-      // queued during the previous (superseded) build keeps its own request.
-      if (!pendingResumeRef.current) {
-        pendingResumeRef.current = {
-          position: resumePosition,
-          endTime: playbackEndTimeRef.current ?? undefined,
-        };
-      }
-    }
-
-    let cancelled = false;
-
-    const loadAudio = async () => {
-      try {
-        const maxDuration = timelineDuration(tracks);
-
-        // A track the mixer knows keeps what the user set (and takes its
-        // current name); a new one starts from its ClipTrack fields; one that
-        // is gone is dropped. By id: the count and the order do not matter.
-        setTrackMixer((prev) => mixerForTracks(prev, tracks));
-
-        // Dispose old engine before creating new one. Clear the ref with it:
-        // the new adapter is created asynchronously below, and until the new
-        // engine is assigned nothing may reach the disposed one (#675 — a
-        // play() in this window used to run against it and wedge isPlaying).
-        disposeEngineKeepingPlayback();
-
-        // Reset tracks version tracking for the new engine
-        lastTracksVersionRef.current = 0;
-        engineTracksRef.current = null;
-
-        // Create engine adapter — custom if provided, else Tone.js (dynamically imported).
-        // Reset init flag — new adapter needs AudioContext resume on first play.
-        audioInitializedRef.current = false;
-        const adapter = await resolvePlayoutAdapter({
-          createAdapter,
-          effects,
-          trackEffects: resolveTrackEffects,
-          soundFontCache: soundFontCacheRef.current,
-          sampleRate: sampleRateProp,
-        });
-        if (cancelled) {
-          // Superseded: the next effect run owns engineBuildInFlightRef now.
-          adapter.dispose();
-          return;
-        }
-        // Reconcile sample rate from the adapter's own AudioContext. The setState
-        // calls later in loadAudio trigger a re-render that propagates this via
-        // `const sampleRate = sampleRateRef.current` at render.
-        sampleRateRef.current = adapter.audioContext.sampleRate;
-        adapterRef.current = adapter;
-        const engine = new PlaylistEngine({
-          adapter,
-          samplesPerPixel: samplesPerPixelRef.current,
-          zoomLevels: stableZoomLevels,
-        });
-
-        // Seed engine with current UI state so a fresh engine doesn't
-        // reset selection/loop/selectedTrack to defaults on the first statechange emission.
-        engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0);
-        engine.setLoopRegion(loopStartRef.current ?? 0, loopEndRef.current ?? 0);
-        if (isLoopEnabledRef.current) engine.setLoopEnabled(true);
-        engine.setMasterVolume(masterVolumeRef.current ?? 1.0);
-        if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current);
-
-        // Merge current UI state into tracks before passing to engine
-        const currentTrackMixer = trackMixerRef.current;
-        const tracksWithState = tracks.map((track) => {
-          const trackState = currentTrackMixer.get(track.id);
-          return {
-            ...track,
-            volume: trackState?.volume ?? track.volume,
-            muted: trackState?.muted ?? track.muted,
-            soloed: trackState?.soloed ?? track.soloed,
-            pan: trackState?.pan ?? track.pan,
-          };
-        });
-
-        // Subscribe to engine statechange BEFORE setTracks() so the first
-        // emission (which carries correct canZoomIn/canZoomOut) is captured.
-        // Seeding statechanges fired above are harmless — they contain values
-        // that already match the hooks' current state, so onEngineState()
-        // ref guards skip them.
-        // Suppress tracks mirroring during the initial setTracks — the parent
-        // already has these tracks. The flag is local so it becomes false
-        // after setTracks returns (statechange fires synchronously).
-        let suppressTracksMirroring = true;
-        engine.on('statechange', (state: EngineState) => {
-          onSelectionEngineState(state);
-          onLoopEngineState(state);
-          onSelectedTrackEngineState(state);
-          onZoomEngineState(state);
-          onVolumeEngineState(state);
-          onUndoEngineState(state);
-
-          // Mirror engine tracks changes to parent via onTracksChange.
-          // tracksVersion only increments on structural track mutations (move,
-          // trim, split, setTracks, addTrack, removeTrack), not on
-          // selection/zoom/volume changes. Per-track mixer edits bump the
-          // engine's separate mixerVersion (#501) and are persisted here via
-          // trackStates, so they intentionally do not flow through onTracksChange.
-          if (suppressTracksMirrorRef.current) {
-            // A change this provider is applying from its own `tracks` prop.
-            lastTracksVersionRef.current = state.tracksVersion;
-          } else if (
-            !suppressTracksMirroring &&
-            state.tracksVersion !== lastTracksVersionRef.current
-          ) {
-            lastTracksVersionRef.current = state.tracksVersion;
-            // `state.tracks` is the engine's own array (readonly, shared with
-            // its undo history). `onTracksChange` hands the app a `ClipTrack[]`
-            // to keep in its state, so it gets an array of its own; the track
-            // objects in it are still the engine's and must not be written to.
-            const mirrored = [...state.tracks];
-            engineTracksRef.current = mirrored;
-
-            // A reorder needs nothing for the mixer: its state is kept by
-            // track id, and `trackStates` is derived from the new `tracks`.
-            if (onTracksChange) {
-              onTracksChange(mirrored);
-            } else {
-              console.warn(
-                '[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — ' +
-                  'UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider.'
-              );
-            }
-          }
-        });
-
-        // Engine-initiated stop mirror (final-review CRITICAL 1, #608 follow-up).
-        // PlaylistEngine self-stops when a bounded play(start, end) completes on
-        // an adapter that reports onPlaybackEnded (Tone) — see engine CLAUDE.md
-        // "onPlaybackEnded hook". That self-stop rewinds the engine's own current
-        // time to playStartPosition BEFORE the rAF loop's own end-of-playback
-        // checks (below) can observe it, so the loop's `time >= playbackEndTimeRef`
-        // / `time >= duration` comparisons never fire — React isPlaying stays
-        // true and the loop spins forever at the rewound position. Mirroring the
-        // engine's 'stop' event makes React authoritative-from-engine for ANY
-        // engine-initiated stop, closing that race. The engine already rewound
-        // its own time (`_currentTime = _playStartPosition`) — we only mirror
-        // that into React's refs/state, we never seek() again here.
-        //
-        // Suppressed via suppressEngineStopMirrorRef around provider-initiated
-        // engine.stop() calls that immediately seek/restart playback (play(),
-        // setSelection, reschedulePlayback, engine-rebuild-with-resume) — those
-        // already set the correct target position themselves; an unguarded
-        // mirror would clobber it mid-transition with the pre-restart position.
-        // Stop paths that terminate playback (stop(), the rAF loop's own
-        // annotation/selection/duration-end branches) don't need suppression:
-        // they either write the identical value the mirror would (both read
-        // _playStartPosition), or run their own setCurrentTimeRefs call
-        // synchronously right after this listener, which — as plain refs, not
-        // batched state — simply overwrites the mirror's write with no other
-        // code observing the transient value in between.
-        engine.on('stop', () => {
-          if (suppressEngineStopMirrorRef.current) return;
-          setIsPlaying(false);
-          stopAnimationFrameLoop();
-          // The engine rewound to where its play began. For the selection,
-          // return to the selection start instead (see play()): a play that
-          // resumed part-way must not leave the cursor inside the selection.
-          let stoppedAt = engine.getCurrentTime();
-          if (isSelectionPlayRef.current) {
-            stoppedAt = playStartPositionRef.current;
-            engine.seek(stoppedAt);
-          }
-          setCurrentTimeRefs(stoppedAt);
-          setCurrentTime(stoppedAt);
-        });
-
-        engine.setTracks(tracksWithState);
-        suppressTracksMirroring = false;
-        lastTracksVersionRef.current = engine.getState().tracksVersion;
-        engineRef.current = engine;
-        engineBuildInFlightRef.current = false;
-        // Starts any play queued for this engine (see the resume effect).
-        setEngineEpoch((epoch) => epoch + 1);
-
-        setIsReady(true);
-
-        // Dispatch custom event for external listeners
-        const event = new CustomEvent('waveform-playlist:ready', {
-          detail: {
-            trackCount: tracks.length,
-            duration: maxDuration,
-          },
-        });
-        window.dispatchEvent(event);
-
-        prevTracksRef.current = tracks;
-
-        // The playlist is built. A callback that throws is the app's own
-        // error, reported as that and not as a playlist that failed to build.
-        try {
-          onReady?.();
-        } catch (callbackError) {
-          const thrown =
-            callbackError instanceof Error ? callbackError : new Error(String(callbackError));
-          console.error('[waveform-playlist] The onReady callback threw: ' + thrown.message);
-          onError?.(thrown);
-        }
-      } catch (error) {
-        // Dispose an adapter created before the engine failed to build (e.g. invalid
-        // zoomLevels make `new PlaylistEngine` throw) — the cleanup skips it because
-        // engineRef was never assigned, so it would otherwise leak a live AudioContext.
-        if (!engineRef.current && adapterRef.current) {
-          try {
-            adapterRef.current.dispose();
-          } catch (disposeErr) {
-            console.warn(
-              '[waveform-playlist] adapter dispose after load failure threw: ' + String(disposeErr)
-            );
-          }
-          adapterRef.current = null;
-        }
-        if (!cancelled) {
-          // No engine is coming: a queued play would otherwise wait forever
-          // and fire on some later, unrelated rebuild.
-          engineBuildInFlightRef.current = false;
-          pendingResumeRef.current = null;
-        }
-        // An error, not a warning: the playlist cannot be played until a later
-        // build succeeds (its waveforms are still drawn from `tracks`), and
-        // without an `onError` prop the console is the only place that says
-        // why. A build that was superseded or unmounted says nothing here:
-        // the build that replaced it speaks for itself.
-        if (!cancelled) {
-          const reason = error instanceof Error ? error.message : String(error);
-          console.error(
-            '[waveform-playlist] The playlist could not be built and stays in its loading ' +
-              'state (it cannot be played). Reason: ' +
-              reason +
-              (onError
-                ? ''
-                : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
-          );
-        }
-        onError?.(error instanceof Error ? error : new Error(String(error)));
-      }
-    };
-
-    engineBuildInFlightRef.current = true;
-    loadAudio();
-
-    return () => {
-      cancelled = true;
-      engineBuildInFlightRef.current = false;
-      // Skip disposal when the next render's guard will keep the engine alive.
-      // skipEngineDisposeRef is set during the render phase (before this cleanup runs).
-      if (skipEngineDisposeRef.current) {
-        skipEngineDisposeRef.current = false;
-        return;
-      }
-      stopAnimationFrameLoop();
-      // Never leave a disposed engine reachable (#675).
-      disposeEngineKeepingPlayback();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    tracks,
-    // isEngineTracks is intentionally excluded — it's a render-phase guard read
-    // inside the effect body, not a trigger. Including it causes a spurious re-run
-    // when it flips from true→false after engineTracksRef is cleared.
-    // isPlaying is intentionally excluded — read from isPlayingRef inside the
-    // effect body. Including it causes a full engine+playout rebuild on every
-    // play/pause/stop, destroying and recreating all audio Players.
-    // soundFontCache is deliberately excluded — late cache changes are forwarded
-    // to the live adapter by the sync effect below; only adapter creation reads it
-    // (via soundFontCacheRef).
-    onReady,
-    onError,
-    effects,
-    resolveTrackEffects,
-    stopAnimationFrameLoop,
-    onSelectionEngineState,
-    onLoopEngineState,
-    onSelectedTrackEngineState,
-    onZoomEngineState,
-    onVolumeEngineState,
-    onUndoEngineState,
-    onTracksChange,
-    masterVolumeRef,
-    selectionStartRef,
-    selectionEndRef,
-    loopStartRef,
-    loopEndRef,
-    isLoopEnabledRef,
-    stableZoomLevels,
-    deferEngineRebuild,
-  ]);
-
-  // Dispose the engine on unmount, whichever path the loading effect took
-  // last (#811). Only the full-build path returns a cleanup that disposes; the
-  // others (an engine clip operation, an incremental add or fill, the
-  // emptied timeline with the engine kept, a deferred rebuild) return none,
-  // and after one of them an unmount disposed nothing. `skipEngineDisposeRef`
-  // cannot decide here: it describes the next run, and an unmount has none.
-  // The callback is stable, so this cleanup runs only on an unmount, a
-  // StrictMode remount, Fast Refresh or an <Activity> hide. In the last three
-  // the loading effect runs again afterwards and builds a new engine (its
-  // guards check engineRef), and a play that was running resumes on it.
-  useEffect(() => disposeEngineKeepingPlayback, [disposeEngineKeepingPlayback]);
-
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
-  // MIDI tracks upgrade from PolySynth without an engine rebuild. On mount
-  // this may run against a just-created adapter (the loadAudio effect is
-  // declared earlier, runs first, and assigns adapterRef synchronously) or
-  // against null (empty tracks). Both are safe: the helper no-ops on null,
-  // and the adapter skips MIDI tracks whose routing is unchanged.
+  // MIDI tracks upgrade from PolySynth without an engine rebuild. Before the
+  // first adapter exists this runs against null, which the helper ignores;
+  // the build reads the cache from its ref.
   useEffect(() => {
     syncSoundFontCacheToAdapter(adapterRef.current, soundFontCache);
-  }, [soundFontCache]);
+  }, [soundFontCache, adapterRef]);
 
-  // A clip with nothing to draw from is almost always a wiring mistake. Not
-  // while tracks are still streaming in (deferEngineRebuild): then it is expected.
+  // A loaded clip with nothing to draw from is almost always a wiring
+  // mistake. A clip still loading is not in `tracks`, so it is never reported.
   useEffect(() => {
-    if (deferEngineRebuild) return;
     for (const track of tracks) {
       for (const clip of track.clips) {
         if (!clip.audioBuffer && !clip.waveformData && !clip.midiNotes) {
@@ -1057,13 +591,13 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         }
       }
     }
-  }, [tracks, deferEngineRebuild]);
+  }, [tracks]);
 
   // Audio clock from the adapter's own AudioContext (#510 — replaces tone's
   // getContext()). Stable; reads a ref so identity never changes.
   const getAudioContextTime = useCallback(
     () => adapterRef.current?.audioContext.currentTime ?? 0,
-    []
+    [adapterRef]
   );
 
   // Returns current playback time from engine (auto-wraps at loop boundaries).
@@ -1083,42 +617,100 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     }
     const elapsed = getAudioContextTime() - (playbackStartTimeRef.current ?? 0);
     return (audioStartPositionRef.current ?? 0) + elapsed;
-  }, [getAudioContextTime]);
-
-  // Resting (non-playing) cursor positions display the raw time unchanged.
-  // Latency compensation (outputLatency + lookAhead) models the gap between
-  // the Transport's scheduling position and audible output — a property of
-  // *playing*, not of position. A seeked/paused/stopped cursor has no audible
-  // counterpart; the commanded position is the truth. During playback the
-  // animation loop uses engine.getAudibleTime() instead.
-  const toVisualTime = useCallback((rawTime: number): number => {
-    return Number.isFinite(rawTime) ? Math.max(0, rawTime) : 0;
-  }, []);
+  }, [getAudioContextTime, engineRef]);
 
   // Pair-write helper for the dual-ref pattern. Storage stays raw on
   // `currentTimeRef`; display gets the guard-clamped raw version on `visualTimeRef`
   // (compensation happens in the animation loop via engine.getAudibleTime() while playing).
   // Use this at every pause/seek/stop/loop site — never assign one ref alone
   // (browser/CLAUDE.md: "Display uses visualTimeRef").
-  const setCurrentTimeRefs = useCallback(
-    (rawTime: number) => {
-      currentTimeRef.current = rawTime;
-      visualTimeRef.current = toVisualTime(rawTime);
-    },
-    [toVisualTime]
-  );
+  const setCurrentTimeRefs = useCallback((rawTime: number) => {
+    currentTimeRef.current = rawTime;
+    visualTimeRef.current = toVisualTime(rawTime);
+  }, []);
 
   // Read the engine's scheduler lookahead (Tone adapter ~0.1s, native 0).
   // Exposed through PlaybackRefsContextValue so consumers (e.g., recording
   // live preview) compute audible-latency from the same source as the playhead.
   const getLookAhead = useCallback((): number => {
     return engineRef.current?.lookAhead ?? 0;
-  }, []);
+  }, [engineRef]);
 
   const getOutputLatency = useCallback((): number => {
     const audioCtx = adapterRef.current?.audioContext;
     return audioCtx && 'outputLatency' in audioCtx ? (audioCtx as AudioContext).outputLatency : 0;
-  }, []);
+  }, [adapterRef]);
+
+  // Engine-initiated stop mirror (final-review CRITICAL 1, #608 follow-up).
+  // PlaylistEngine self-stops when a bounded play(start, end) completes on
+  // an adapter that reports onPlaybackEnded (Tone) — see engine CLAUDE.md
+  // "onPlaybackEnded hook". That self-stop rewinds the engine's own current
+  // time to playStartPosition BEFORE the rAF loop's own end-of-playback
+  // checks (below) can observe it, so the loop's `time >= playbackEndTimeRef`
+  // / `time >= duration` comparisons never fire — React isPlaying stays
+  // true and the loop spins forever at the rewound position. Mirroring the
+  // engine's 'stop' event makes React authoritative-from-engine for ANY
+  // engine-initiated stop, closing that race. The engine already rewound
+  // its own time (`_currentTime = _playStartPosition`) — we only mirror
+  // that into React's refs/state, we never seek() again here.
+  //
+  // Suppressed via suppressEngineStopMirrorRef around provider-initiated
+  // engine.stop() calls that immediately seek/restart playback (play(),
+  // setSelection, reschedulePlayback) — those already set the correct target
+  // position themselves; an unguarded mirror would clobber it mid-transition
+  // with the pre-restart position. Stop paths that terminate playback
+  // (stop(), the rAF loop's own annotation/selection/duration-end branches)
+  // don't need suppression: they either write the identical value the
+  // mirror would (both read _playStartPosition), or run their own
+  // setCurrentTimeRefs call synchronously right after this listener, which —
+  // as plain refs, not batched state — simply overwrites the mirror's write
+  // with no other code observing the transient value in between.
+  const mirrorEngineStop = useCallback(
+    (engine: PlaylistEngine) => {
+      if (suppressEngineStopMirrorRef.current) return;
+      setIsPlaying(false);
+      stopAnimationFrameLoop();
+      // The engine rewound to where its play began. For the selection,
+      // return to the selection start instead (see play()): a play that
+      // resumed part-way must not leave the cursor inside the selection.
+      let stoppedAt = engine.getCurrentTime();
+      if (isSelectionPlayRef.current) {
+        stoppedAt = playStartPositionRef.current;
+        engine.seek(stoppedAt);
+      }
+      setCurrentTimeRefs(stoppedAt);
+      setCurrentTime(stoppedAt);
+    },
+    [stopAnimationFrameLoop, setCurrentTimeRefs]
+  );
+
+  // What a new engine is given and how the provider follows it. The engine
+  // owns selection, loop, selected track, zoom and master volume; the hooks
+  // mirror them from `statechange`. Seeded so that a fresh engine does not
+  // put them back to defaults.
+  useLayoutEffect(() => {
+    const mirror = (state: EngineState) => {
+      onSelectionEngineState(state);
+      onLoopEngineState(state);
+      onSelectedTrackEngineState(state);
+      onZoomEngineState(state);
+      onVolumeEngineState(state);
+    };
+    followersRef.current = {
+      seed: (engine) => {
+        engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0);
+        engine.setLoopRegion(loopStartRef.current ?? 0, loopEndRef.current ?? 0);
+        if (isLoopEnabledRef.current) engine.setLoopEnabled(true);
+        engine.setMasterVolume(masterVolumeRef.current ?? 1.0);
+        if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current);
+      },
+      follow: (engine) => {
+        engine.on('statechange', mirror);
+        engine.on('stop', () => mirrorEngineStop(engine));
+      },
+      mirror,
+    };
+  });
 
   // Animation loop
   const startAnimationLoop = useCallback(() => {
@@ -1244,6 +836,8 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     isAutomaticScrollRef,
     scrollContainerRef,
     runFrameCallbacks,
+    engineRef,
+    recordingActiveRef,
   ]);
 
   const stopAnimationLoop = stopAnimationFrameLoop;
@@ -1327,9 +921,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     annotationLookup,
     annotationsRef,
     activeAnnotationIdRef,
+    engineRef,
   ]);
 
-  // Resume playback after tracks change (e.g., after splitting a clip during playback)
+  // Start a play that waited for an engine: playback a rebuild interrupted, or a
+  // play() asked for while one was being built (#675). Runs when a freshly
+  // built engine is assigned (and when play() asks for another run).
   useEffect(() => {
     const resumePlayback = async () => {
       // engineRef is null while a rebuild is in flight — the pending play
@@ -1363,11 +960,19 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     };
 
     resumePlayback().catch((err) => {
-      console.warn('[waveform-playlist] Failed to resume playback after track change:', err);
+      console.warn('[waveform-playlist] Failed to resume playback on the new engine:', err);
       setIsPlaying(false);
       stopAnimationLoop();
     });
-  }, [tracks, engineEpoch, startAnimationLoop, stopAnimationLoop, getAudioContextTime]);
+  }, [
+    engineEpoch,
+    startAnimationLoop,
+    stopAnimationLoop,
+    getAudioContextTime,
+    engineRef,
+    pendingResumeRef,
+    audioInitializedRef,
+  ]);
 
   // Playback controls
   const play = useCallback(
@@ -1395,7 +1000,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
 
       const engine = engineRef.current;
       if (!engine) {
-        // The engine is being rebuilt (tracks changed). Queue the play: the
+        // The engine is being built. Queue the play: the
         // resume effect starts it when the new engine is assigned. isPlaying
         // stays false until audio actually starts (#675).
         if (engineBuildInFlightRef.current) {
@@ -1459,7 +1064,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
           if (engineRef.current) {
             pendingResumeRef.current = { position: actualStartTime, endTime };
             // Already assigned, so its epoch run has passed — ask for another.
-            setEngineEpoch((epoch) => epoch + 1);
+            bumpEngineEpoch();
           } else if (engineBuildInFlightRef.current) {
             pendingResumeRef.current = { position: actualStartTime, endTime };
           }
@@ -1485,6 +1090,11 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       getAudioContextTime,
       selectionStartRef,
       selectionEndRef,
+      engineRef,
+      engineBuildInFlightRef,
+      pendingResumeRef,
+      audioInitializedRef,
+      bumpEngineEpoch,
     ]
   );
 
@@ -1508,7 +1118,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     // Update to the calculated pause position
     setCurrentTimeRefs(pauseTime);
     setCurrentTime(pauseTime);
-  }, [stopAnimationLoop, getPlaybackTime, setCurrentTimeRefs]);
+  }, [stopAnimationLoop, getPlaybackTime, setCurrentTimeRefs, engineRef, pendingResumeRef]);
 
   const stop = useCallback(() => {
     // Cancels a play queued behind an engine rebuild or parked in init().
@@ -1528,7 +1138,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     setCurrentTimeRefs(playStartPositionRef.current);
     setCurrentTime(playStartPositionRef.current);
     setActiveAnnotationId(null);
-  }, [stopAnimationLoop, setActiveAnnotationId, setCurrentTimeRefs]);
+  }, [stopAnimationLoop, setActiveAnnotationId, setCurrentTimeRefs, engineRef, pendingResumeRef]);
 
   // Seek to a specific time - works whether playing or stopped
   const seekTo = useCallback(
@@ -1555,72 +1165,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
         play(clampedTime);
       }
     },
-    [play, setCurrentTimeRefs]
-  );
-
-  // Track controls
-  // The four mixer setters take a track id (#687; an index until then).
-  const patchTrack = useCallback(
-    (setter: string, trackId: string, patch: Partial<TrackState>): boolean => {
-      if (typeof trackId !== 'string') {
-        warnOnce(
-          `${setter}() takes a track id since the track controls became parts: ` +
-            `${setter}(tracks[index].id, value). A call with anything but a string is ignored.`
-        );
-        return false;
-      }
-      if (!tracksRef.current.some((track) => track.id === trackId)) return false;
-      setTrackMixer((prev) => patchTrackState(prev, trackId, patch));
-      return true;
-    },
-    []
-  );
-
-  const setTrackMute = useCallback(
-    (trackId: string, muted: boolean) => {
-      if (patchTrack('setTrackMute', trackId, { muted })) {
-        engineRef.current?.setTrackMute(trackId, muted);
-      }
-    },
-    [patchTrack]
-  );
-
-  const setTrackSolo = useCallback(
-    (trackId: string, soloed: boolean) => {
-      if (patchTrack('setTrackSolo', trackId, { soloed })) {
-        engineRef.current?.setTrackSolo(trackId, soloed);
-      }
-    },
-    [patchTrack]
-  );
-
-  const setTrackVolume = useCallback(
-    (trackId: string, volume: number) => {
-      if (patchTrack('setTrackVolume', trackId, { volume })) {
-        engineRef.current?.setTrackVolume(trackId, volume);
-      }
-    },
-    [patchTrack]
-  );
-
-  const setTrackPan = useCallback(
-    (trackId: string, pan: number) => {
-      if (patchTrack('setTrackPan', trackId, { pan })) {
-        engineRef.current?.setTrackPan(trackId, pan);
-      }
-    },
-    [patchTrack]
-  );
-
-  const reorderTrack = useCallback(
-    (trackId: string, toIndex: number) => {
-      if (!engineRef.current) {
-        console.warn('[waveform-playlist] reorderTrack: engine not ready, call ignored');
-        return;
-      }
-      engineRef.current.reorderTrack(trackId, toIndex);
-    },
-    [engineRef]
+    [play, setCurrentTimeRefs, recordingActiveRef]
   );
 
   // @dnd-kit/react's Feedback and OptimisticSortingPlugin sortable plugins
@@ -1725,10 +1270,10 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       isLoopEnabledRef,
       activeAnnotationIdRef,
       getAudioContextTime,
+      engineRef,
+      pendingResumeRef,
     ]
   );
-
-  const sampleRate = sampleRateRef.current;
 
   // Context values, grouped by how often their fields change (#768). A
   // subscription is to a whole value, so a field belongs with the fields that
@@ -1782,6 +1327,7 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     [selectedTrackId]
   );
 
+  const { canUndo, canRedo } = view;
   const undoRedoValue: UndoRedoContextValue = useMemo(
     () => ({ canUndo, canRedo }),
     [canUndo, canRedo]
@@ -1878,12 +1424,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     () => ({
       setCurrentTime: setCurrentTimeControl,
 
-      // Track controls
-      setTrackMute,
-      setTrackSolo,
-      setTrackVolume,
-      setTrackPan,
-      reorderTrack,
+      // Track controls (the arrangement's mix and order)
+      setTrackMute: editing.setTrackMute,
+      setTrackSolo: editing.setTrackSolo,
+      setTrackVolume: editing.setTrackVolume,
+      setTrackPan: editing.setTrackPan,
+      reorderTrack: editing.reorderTrack,
       bumpTrackReorderEpoch,
       setTrackDragPreview,
       setSelectedTrackId: setSelectedTrackIdControl,
@@ -1901,20 +1447,20 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLoopRegionFromSelection,
       clearLoopRegion,
 
-      // Undo/redo
-      undo,
-      redo,
+      // Undo/redo (the arrangement's history)
+      undo: editing.undo,
+      redo: editing.redo,
 
       // Recording
-      setRecordingActive,
+      setRecordingActive: editing.setRecordingActive,
     }),
     [
       setCurrentTimeControl,
-      setTrackMute,
-      setTrackSolo,
-      setTrackVolume,
-      setTrackPan,
-      reorderTrack,
+      editing.setTrackMute,
+      editing.setTrackSolo,
+      editing.setTrackVolume,
+      editing.setTrackPan,
+      editing.reorderTrack,
       bumpTrackReorderEpoch,
       setTrackDragPreview,
       setSelectedTrackIdControl,
@@ -1925,9 +1471,9 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
       setLoopRegion,
       setLoopRegionFromSelection,
       clearLoopRegion,
-      undo,
-      redo,
-      setRecordingActive,
+      editing.undo,
+      editing.redo,
+      editing.setRecordingActive,
     ]
   );
 
@@ -1951,11 +1497,12 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
   );
 
   // Changes on every clip operation (a trim once, on release: its moves are
-  // the trim preview, #812) and on a zoom (the peaks are computed per zoom
-  // level).
+  // the trim preview, #812), on a zoom (the peaks are computed per zoom
+  // level) and when audio arrives for a clip.
+  const { peaksDataArray, trackStates } = view;
   const timelineValue: PlaylistTimelineContextValue = useMemo(
-    () => ({ tracks, peaksDataArray, duration, isReady, onTracksChange }),
-    [tracks, peaksDataArray, duration, isReady, onTracksChange]
+    () => ({ tracks, peaksDataArray, duration, isReady }),
+    [tracks, peaksDataArray, duration, isReady]
   );
 
   // Changes on every mute, solo, volume or pan change.
@@ -1978,53 +1525,57 @@ export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> =
     <ThemeProvider theme={mergedTheme}>
       <PlaybackRateContext value={BLOCKED}>
         <MediaElementTrackContext value={BLOCKED}>
-          <PlaybackRefsContext value={refsValue}>
-            <EngineRefsContext value={engineRefsValue}>
-              <TrimPreviewContext value={trimPreview}>
-                <TrimPreviewPeaksContext value={trimPreviewPeaks}>
-                  <PlaybackControlsContext value={controlsValue}>
-                    <EditorControlsContext value={editorControlsValue}>
-                      <PlaylistViewContext value={viewValue}>
-                        <PlaylistSettingsContext value={settingsValue}>
-                          <PlaylistZoomContext value={zoomValue}>
-                            <UndoRedoContext value={undoRedoValue}>
-                              <SelectedTrackIdContext value={selectedTrackIdValue}>
-                                <SelectedRowContext value={selectedTrackIdValue}>
-                                  <LoopContext value={loopValue}>
-                                    <AnnotationOptionsContext value={annotationOptionsValue}>
-                                      <AnnotationsContext value={annotationsValue}>
-                                        <IsPlayingContext value={isPlayingValue}>
-                                          <ActiveAnnotationContext value={activeAnnotationValue}>
-                                            <CurrentTimeContext value={currentTimeValue}>
-                                              <SelectionContext value={selectionValue}>
-                                                <TrackReorderPreviewContext
-                                                  value={reorderPreviewValue}
-                                                >
-                                                  <PlaylistMixerContext value={mixerValue}>
-                                                    <PlaylistTimelineContext value={timelineValue}>
-                                                      {children}
-                                                    </PlaylistTimelineContext>
-                                                  </PlaylistMixerContext>
-                                                </TrackReorderPreviewContext>
-                                              </SelectionContext>
-                                            </CurrentTimeContext>
-                                          </ActiveAnnotationContext>
-                                        </IsPlayingContext>
-                                      </AnnotationsContext>
-                                    </AnnotationOptionsContext>
-                                  </LoopContext>
-                                </SelectedRowContext>
-                              </SelectedTrackIdContext>
-                            </UndoRedoContext>
-                          </PlaylistZoomContext>
-                        </PlaylistSettingsContext>
-                      </PlaylistViewContext>
-                    </EditorControlsContext>
-                  </PlaybackControlsContext>
-                </TrimPreviewPeaksContext>
-              </TrimPreviewContext>
-            </EngineRefsContext>
-          </PlaybackRefsContext>
+          <ArrangementContext value={arrangement}>
+            <PlaybackRefsContext value={refsValue}>
+              <EngineRefsContext value={engineRefsValue}>
+                <TrimPreviewContext value={trimPreview}>
+                  <TrimPreviewPeaksContext value={trimPreviewPeaks}>
+                    <PlaybackControlsContext value={controlsValue}>
+                      <EditorControlsContext value={editorControlsValue}>
+                        <PlaylistViewContext value={viewValue}>
+                          <PlaylistSettingsContext value={settingsValue}>
+                            <PlaylistZoomContext value={zoomValue}>
+                              <UndoRedoContext value={undoRedoValue}>
+                                <SelectedTrackIdContext value={selectedTrackIdValue}>
+                                  <SelectedRowContext value={selectedTrackIdValue}>
+                                    <LoopContext value={loopValue}>
+                                      <AnnotationOptionsContext value={annotationOptionsValue}>
+                                        <AnnotationsContext value={annotationsValue}>
+                                          <IsPlayingContext value={isPlayingValue}>
+                                            <ActiveAnnotationContext value={activeAnnotationValue}>
+                                              <CurrentTimeContext value={currentTimeValue}>
+                                                <SelectionContext value={selectionValue}>
+                                                  <TrackReorderPreviewContext
+                                                    value={reorderPreviewValue}
+                                                  >
+                                                    <PlaylistMixerContext value={mixerValue}>
+                                                      <PlaylistTimelineContext
+                                                        value={timelineValue}
+                                                      >
+                                                        {children}
+                                                      </PlaylistTimelineContext>
+                                                    </PlaylistMixerContext>
+                                                  </TrackReorderPreviewContext>
+                                                </SelectionContext>
+                                              </CurrentTimeContext>
+                                            </ActiveAnnotationContext>
+                                          </IsPlayingContext>
+                                        </AnnotationsContext>
+                                      </AnnotationOptionsContext>
+                                    </LoopContext>
+                                  </SelectedRowContext>
+                                </SelectedTrackIdContext>
+                              </UndoRedoContext>
+                            </PlaylistZoomContext>
+                          </PlaylistSettingsContext>
+                        </PlaylistViewContext>
+                      </EditorControlsContext>
+                    </PlaybackControlsContext>
+                  </TrimPreviewPeaksContext>
+                </TrimPreviewContext>
+              </EngineRefsContext>
+            </PlaybackRefsContext>
+          </ArrangementContext>
         </MediaElementTrackContext>
       </PlaybackRateContext>
     </ThemeProvider>

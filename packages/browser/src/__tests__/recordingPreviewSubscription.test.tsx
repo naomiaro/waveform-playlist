@@ -49,7 +49,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import { ComposedWaveform } from './testCompositions';
 import { recordingDisplayEnd } from '../hooks/useRecordingLayout';
@@ -175,7 +175,7 @@ async function mountRecording(initial: RecordingProgress) {
     latencyOffset: 0,
   };
   render(
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={tracks}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -183,7 +183,7 @@ async function mountRecording(initial: RecordingProgress) {
     >
       <ProbeChild />
       <ComposedWaveform showClipHeaders recordingState={recordingState} />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   await waitFor(() => expect(isReady).toBe(true));
   await act(async () => {});

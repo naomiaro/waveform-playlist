@@ -2,19 +2,19 @@
 //
 // #812: a clip trim drag shows its moves through a view-only preview that only
 // the dragged clip follows. The tracks change once, on release, through one
-// `engine.trimClip`; Escape clears the preview and changes nothing.
+// `arrangement.trimClip`; Escape clears the preview and changes nothing.
 //
-// The real provider and view with a fake adapter (the harness of
-// trackControlsDisabledWhileLoading.test.tsx). dnd-kit's DragDropProvider is
+// The real provider and view on an arrangement, with a fake adapter. dnd-kit's DragDropProvider is
 // the real one; the test captures the handlers `ClipInteractionProvider` hands
 // it and calls them with drag events, as dnd-kit would.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, renderHook, act, waitFor, cleanup } from '@testing-library/react';
-import React, { startTransition, use, useCallback, useState } from 'react';
+import React, { startTransition, use } from 'react';
 import { createValueSource } from '@waveform-playlist/core';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { PlaylistEngine, PlayoutAdapter } from '@waveform-playlist/engine';
+import type { Arrangement, PlaylistEngine, PlayoutAdapter } from '@waveform-playlist/engine';
+import type { EffectsFunction } from '@waveform-playlist/playout';
 
 const counts = vi.hoisted(() => ({
   clip: {} as Record<string, number>,
@@ -77,8 +77,9 @@ vi.mock('@dnd-kit/react', async (importOriginal) => {
 });
 vi.mock('../hooks/useDragSensors', () => ({ useDragSensors: () => [] }));
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
+  ArrangementContext,
   PlaylistViewContext,
   TrimPreviewContext,
   useEngineRefs,
@@ -96,8 +97,6 @@ import {
   SPP,
   SOURCE_SECONDS,
   makeWaveformData,
-  makeClip,
-  makeTrack,
   initialTracks,
   singleAdapter,
   firstBuildOnly,
@@ -135,23 +134,18 @@ function resetCounts() {
   counts.log = [];
 }
 
-let setAppTracks: (tracks: ClipTrack[]) => void = () => {};
-const onTracksChange = vi.fn();
+// The arrangement of the test (#812), and every change of its tracks.
+let arrangement: Arrangement;
+const tracksChanged = vi.fn();
 
-const App: React.FC<{ initial: ClipTrack[]; createAdapter: () => PlayoutAdapter }> = ({
-  initial,
+const App: React.FC<{ createAdapter: () => PlayoutAdapter; effects?: EffectsFunction }> = ({
   createAdapter,
+  effects,
 }) => {
-  const [tracks, setTracks] = useState(initial);
-  setAppTracks = setTracks;
-  const handleTracksChange = useCallback((next: ClipTrack[]) => {
-    onTracksChange(next);
-    setTracks(next);
-  }, []);
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      onTracksChange={handleTracksChange}
+    <TestProvider
+      arrangement={arrangement}
+      effects={effects}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SPP}
       zoomLevels={[SPP]}
@@ -161,7 +155,7 @@ const App: React.FC<{ initial: ClipTrack[]; createAdapter: () => PlayoutAdapter 
       <ClipInteractionProvider>
         <ComposedWaveform showClipHeaders noControls />
       </ClipInteractionProvider>
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 };
 
@@ -173,11 +167,24 @@ async function mount(
   vi.spyOn(console, 'log').mockImplementation(() => {});
   // jsdom has no canvas: without this every drawn channel logs "Not implemented".
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  onTracksChange.mockClear();
-  render(<App initial={initial} createAdapter={createAdapter} />);
+  tracksChanged.mockClear();
+  arrangement = testArrangement(initial);
+  let version = arrangement.tracksVersion;
+  arrangement.subscribe(() => {
+    if (arrangement.tracksVersion === version) return;
+    version = arrangement.tracksVersion;
+    tracksChanged(arrangement.getTracks());
+  });
+  const view = render(<App createAdapter={createAdapter} />);
   await waitFor(() => expect(probe.timeline.isReady).toBe(true));
   await act(async () => {});
-  return { engine: () => probe.engineRefs.playoutRef.current as PlaylistEngine, warn };
+  // The engine attaching gives every clip its tick (one 'recompute'): not an edit.
+  tracksChanged.mockClear();
+  return {
+    engine: () => probe.engineRefs.playoutRef.current as PlaylistEngine,
+    warn,
+    view,
+  };
 }
 
 type Handler = (event: never) => void;
@@ -189,7 +196,8 @@ const dnd = (name: HandlerName) => counts.dnd[name] as Handler;
  * directly, `onDragMove` and `onDragEnd` inside `startTransition` (its
  * DragDropProvider's `trackRendering`). Inside a transition, a state update
  * is a transition update while a `useSyncExternalStore` change renders at
- * once, which is what the release's `flushSync` is about.
+ * once: the view reads both the arrangement and the preview that way (#812),
+ * so the release's two changes are drawn together.
  */
 function dispatch(name: HandlerName, event: never) {
   act(() => {
@@ -198,15 +206,16 @@ function dispatch(name: HandlerName, event: never) {
   });
 }
 
-function spyOnWrites(engine: PlaylistEngine) {
+/** The arrangement's track edits: what a drag may call, and only on release. */
+function spyOnWrites(target: Arrangement) {
   return {
-    trimClip: vi.spyOn(engine, 'trimClip'),
-    moveClip: vi.spyOn(engine, 'moveClip'),
-    beginTransaction: vi.spyOn(engine, 'beginTransaction'),
-    commitTransaction: vi.spyOn(engine, 'commitTransaction'),
-    abortTransaction: vi.spyOn(engine, 'abortTransaction'),
-    setTracks: vi.spyOn(engine, 'setTracks'),
-    updateTrack: vi.spyOn(engine, 'updateTrack'),
+    trimClip: vi.spyOn(target, 'trimClip'),
+    moveClip: vi.spyOn(target, 'moveClip'),
+    beginTransaction: vi.spyOn(target, 'beginTransaction'),
+    commitTransaction: vi.spyOn(target, 'commitTransaction'),
+    abortTransaction: vi.spyOn(target, 'abortTransaction'),
+    setTracks: vi.spyOn(target, 'setTracks'),
+    updateTrack: vi.spyOn(target, 'updateTrack'),
   };
 }
 
@@ -226,9 +235,9 @@ afterEach(async () => {
 });
 
 describe('a trim previews in the view (#812)', () => {
-  it('each move of a trim publishes a preview and calls neither `onTracksChange` nor the engine', async () => {
-    const { engine } = await mount();
-    const writes = spyOnWrites(engine());
+  it('each move of a trim publishes a preview and changes no track', async () => {
+    await mount();
+    const writes = spyOnWrites(arrangement);
 
     dispatch('onDragStart', trimEvent(0));
     dispatch('onDragMove', trimEvent(10));
@@ -244,7 +253,7 @@ describe('a trim previews in the view (#812)', () => {
     expect(probe.preview()).not.toBe(first);
     expect(probe.preview()?.startSample).toBe(2 * SAMPLE_RATE + 20 * SPP);
 
-    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(tracksChanged).not.toHaveBeenCalled();
     for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
     // The tracks the provider holds are the ones from before the drag.
     expect(clipOf(probe.timeline.tracks, 'b')?.startSample).toBe(2 * SAMPLE_RATE);
@@ -268,9 +277,9 @@ describe('a trim previews in the view (#812)', () => {
     expect(counts.shell).toBe(0);
   });
 
-  it('release calls `engine.trimClip` once with the final delta and clears the preview in the same flush; `onTracksChange` is called once', async () => {
-    const { engine } = await mount();
-    const writes = spyOnWrites(engine());
+  it('release calls `arrangement.trimClip` once with the final delta and clears the preview in the same flush; the tracks change once', async () => {
+    await mount();
+    const writes = spyOnWrites(arrangement);
 
     dispatch('onDragStart', trimEvent(0));
     dispatch('onDragMove', trimEvent(10));
@@ -281,20 +290,20 @@ describe('a trim previews in the view (#812)', () => {
     expect(writes.trimClip).toHaveBeenCalledTimes(1);
     expect(writes.trimClip).toHaveBeenCalledWith('t1', 'b', 'left', 25 * SPP);
     expect(probe.preview()).toBeNull();
-    expect(onTracksChange).toHaveBeenCalledTimes(1);
-    const committed = clipOf(onTracksChange.mock.calls[0][0] as ClipTrack[], 'b');
+    expect(tracksChanged).toHaveBeenCalledTimes(1);
+    const committed = clipOf(tracksChanged.mock.calls[0][0] as ClipTrack[], 'b');
     expect(committed).toMatchObject({
       startSample: 2 * SAMPLE_RATE + 25 * SPP,
       durationSamples: SAMPLE_RATE - 25 * SPP,
       offsetSamples: SAMPLE_RATE + 25 * SPP,
     });
     // No frame after the release shows the clip where it was before the drag.
-    // dnd-kit calls onDragEnd inside `startTransition`: there the app's
-    // `setTracks` (reached through trimClip and the provider's onTracksChange)
-    // is a transition update, while clearing the preview re-renders the clip
-    // at once (`useSyncExternalStore`). Without the handler's `flushSync`
-    // around both, the clip is drawn cleared over the old tracks first: back
-    // at 2 s for a frame, then at its new start.
+    // dnd-kit calls onDragEnd inside `startTransition`. The trim reaches the
+    // view through the arrangement and the cleared preview through its
+    // source, both `useSyncExternalStore`, so they render together and the
+    // clip is never drawn cleared over the old tracks (back at 2 s for a
+    // frame, then at its new start). Until #812 the app's `setTracks` was a
+    // transition update here, and the handler needed a `flushSync`.
     const drawnB = counts.log.filter((entry) => entry.clipId === 'b').map((e) => e.startSample);
     expect(drawnB.length).toBeGreaterThan(0);
     expect(drawnB).not.toContain(2 * SAMPLE_RATE);
@@ -305,8 +314,8 @@ describe('a trim previews in the view (#812)', () => {
   });
 
   it('Escape clears the preview and changes no track', async () => {
-    const { engine } = await mount();
-    const writes = spyOnWrites(engine());
+    await mount();
+    const writes = spyOnWrites(arrangement);
     const before = probe.timeline.tracks;
 
     dispatch('onDragStart', trimEvent(0, 'right'));
@@ -315,7 +324,7 @@ describe('a trim previews in the view (#812)', () => {
     dispatch('onDragEnd', trimEvent(-30, 'right', { canceled: true }));
 
     expect(probe.preview()).toBeNull();
-    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(tracksChanged).not.toHaveBeenCalled();
     for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
     expect(probe.timeline.tracks).toBe(before);
     expect(counts.clipProps.b).toEqual({
@@ -359,27 +368,24 @@ describe('a trim previews in the view (#812)', () => {
     expect(counts.channel.b.data).not.toEqual(committedPeaks);
   });
 
-  it('a new `tracks` prop during the drag (audio arrived for another clip of the track) keeps the preview and the release still trims the dragged clip', async () => {
+  it('a change of another clip of the track during the drag (its peaks arrived) keeps the preview and the release still trims the dragged clip', async () => {
     const { engine } = await mount();
     const engineBefore = engine();
 
     dispatch('onDragStart', trimEvent(0));
     dispatch('onDragMove', trimEvent(10));
 
-    // Clip `a` of the same track gets its audio: a new clip object, so the
-    // track changed and the provider rebuilds the engine.
-    const arrived = { ...makeClip('a', 0, 1), waveformData: makeWaveformData(SOURCE_SECONDS) };
+    // Clip `a` of the same track gets its peaks: the track changes; the
+    // engine follows it and is not rebuilt (#812).
+    const waveformData = makeWaveformData(SOURCE_SECONDS);
     await act(async () => {
-      setAppTracks([
-        makeTrack('t1', [arrived, makeClip('b', 2, 1)]),
-        makeTrack('t2', [makeClip('c', 0, 1)]),
-      ]);
+      arrangement.updateTrack('t1', (track) => ({
+        ...track,
+        clips: track.clips.map((c) => (c.id === 'a' ? { ...c, waveformData } : c)),
+      }));
     });
-    await waitFor(() => {
-      expect(engine()).not.toBeNull();
-      expect(engine()).not.toBe(engineBefore);
-    });
-    await waitFor(() => expect(probe.timeline.isReady).toBe(true));
+    expect(engine()).toBe(engineBefore);
+    tracksChanged.mockClear();
 
     expect(probe.preview()?.startSample).toBe(2 * SAMPLE_RATE + 10 * SPP);
     expect(counts.clipProps.b.startSample).toBe(2 * SAMPLE_RATE + 10 * SPP);
@@ -389,22 +395,21 @@ describe('a trim previews in the view (#812)', () => {
     dispatch('onDragEnd', trimEvent(40));
 
     expect(probe.preview()).toBeNull();
-    expect(onTracksChange).toHaveBeenCalledTimes(1);
-    const tracks = onTracksChange.mock.calls[0][0] as ClipTrack[];
+    expect(tracksChanged).toHaveBeenCalledTimes(1);
+    const tracks = probe.timeline.tracks;
     expect(clipOf(tracks, 'b')).toMatchObject({
       startSample: previewed.startSample,
       durationSamples: previewed.durationSamples,
       offsetSamples: previewed.offsetSamples,
     });
     expect(previewed.startSample).toBe(2 * SAMPLE_RATE + 40 * SPP);
-    // The clip whose audio arrived is still there, with that audio.
-    expect(clipOf(tracks, 'a')?.waveformData).toBe(arrived.waveformData);
-    expect(probe.timeline.tracks).toBe(tracks);
+    // The clip whose peaks arrived is still there, with them.
+    expect(clipOf(tracks, 'a')?.waveformData).toBe(waveformData);
   });
 
-  it('a move drag makes one `engine.moveClip` on drop and opens no transaction', async () => {
-    const { engine } = await mount();
-    const writes = spyOnWrites(engine());
+  it('a move drag makes one `arrangement.moveClip` on drop and opens no transaction', async () => {
+    await mount();
+    const writes = spyOnWrites(arrangement);
 
     dispatch('onDragStart', moveEvent(0));
     dispatch('onDragMove', moveEvent(50));
@@ -416,26 +421,26 @@ describe('a trim previews in the view (#812)', () => {
     expect(writes.commitTransaction).not.toHaveBeenCalled();
     expect(writes.abortTransaction).not.toHaveBeenCalled();
     expect(probe.preview()).toBeNull();
-    expect(onTracksChange).toHaveBeenCalledTimes(1);
+    expect(tracksChanged).toHaveBeenCalledTimes(1);
     expect(clipOf(probe.timeline.tracks, 'b')?.startSample).toBe(2 * SAMPLE_RATE + 50 * SPP);
   });
 
-  it('a cancelled move makes no engine call', async () => {
-    const { engine } = await mount();
-    const writes = spyOnWrites(engine());
+  it('a cancelled move changes no track', async () => {
+    await mount();
+    const writes = spyOnWrites(arrangement);
 
     dispatch('onDragStart', moveEvent(0));
     dispatch('onDragMove', moveEvent(50));
     dispatch('onDragEnd', moveEvent(50, { canceled: true }));
 
     for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
-    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(tracksChanged).not.toHaveBeenCalled();
     expect(clipOf(probe.timeline.tracks, 'b')?.startSample).toBe(2 * SAMPLE_RATE);
   });
 
-  it('a move whose track is gone makes no engine call', async () => {
-    const { engine, warn } = await mount();
-    const writes = spyOnWrites(engine());
+  it('a move whose track is gone changes no track', async () => {
+    const { warn } = await mount();
+    const writes = spyOnWrites(arrangement);
 
     // Two tracks: there is none at index 2.
     dispatch('onDragStart', moveEvent(0, { trackIndex: 2 }));
@@ -443,22 +448,20 @@ describe('a trim previews in the view (#812)', () => {
     dispatch('onDragEnd', moveEvent(50, { trackIndex: 2 }));
 
     for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
-    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(tracksChanged).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('The move was dropped'));
   });
 
-  it('release while no engine is attached drops the trim, clears the preview and warns', async () => {
-    const { engine, warn } = await mount(initialTracks(), firstBuildOnly());
-    const writes = spyOnWrites(engine());
+  it('release while no engine is attached commits the trim to the arrangement and clears the preview', async () => {
+    const createAdapter = firstBuildOnly();
+    const { engine, warn, view } = await mount(initialTracks(), createAdapter);
+    const writes = spyOnWrites(arrangement);
 
     dispatch('onDragStart', trimEvent(0));
     dispatch('onDragMove', trimEvent(10));
-    // A change of the track mid-drag starts a rebuild that does not finish.
+    // A rebuild (new effects) starts mid-drag and does not finish.
     await act(async () => {
-      setAppTracks([
-        makeTrack('t1', [{ ...makeClip('a', 0, 1), gain: 0.5 }, makeClip('b', 2, 1)]),
-        makeTrack('t2', [makeClip('c', 0, 1)]),
-      ]);
+      view.rerender(<App createAdapter={createAdapter} effects={() => undefined} />);
     });
     expect(engine()).toBeNull();
     warn.mockClear();
@@ -467,14 +470,13 @@ describe('a trim previews in the view (#812)', () => {
     dispatch('onDragEnd', trimEvent(20));
 
     expect(probe.preview()).toBeNull();
-    expect(writes.trimClip).not.toHaveBeenCalled();
-    expect(onTracksChange).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toMatch(/The trim was dropped: no engine is attached/);
-    // The clip is drawn where it was before the drag.
+    expect(writes.trimClip).toHaveBeenCalledTimes(1);
+    expect(tracksChanged).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+    // The clip is drawn where the release put it.
     expect(counts.clipProps.b).toEqual({
-      startSample: 2 * SAMPLE_RATE,
-      durationSamples: SAMPLE_RATE,
+      startSample: 2 * SAMPLE_RATE + 20 * SPP,
+      durationSamples: SAMPLE_RATE - 20 * SPP,
     });
   });
 
@@ -559,7 +561,11 @@ function renderHandlers(
 ) {
   const handle = createValueSource<TrimPreview | null>(null);
   const constrain = options.constrainTrimDelta ?? ((delta: number) => delta);
+  const tracks = hookTracks();
+  // The hooks read the arrangement from context (#812): a fake that hands out
+  // the tracks and records the edits.
   const engine = {
+    getTracks: () => tracks,
     constrainTrimDelta: vi.fn((_t: string, _c: string, _b: Boundary, delta: number) =>
       constrain(delta)
     ),
@@ -568,17 +574,16 @@ function renderHandlers(
   };
   const view = { sampleRate: SAMPLE_RATE, mono: false, indefinitePlayback: false };
   const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <PlaylistViewContext value={view}>
-      <TrimPreviewContext value={handle}>{children}</TrimPreviewContext>
-    </PlaylistViewContext>
+    <ArrangementContext value={engine as unknown as Arrangement}>
+      <PlaylistViewContext value={view}>
+        <TrimPreviewContext value={handle}>{children}</TrimPreviewContext>
+      </PlaylistViewContext>
+    </ArrangementContext>
   );
-  const tracks = hookTracks();
   const hook = renderHook(
     () =>
       useClipDragHandlers({
-        tracks,
         samplesPerPixel: SPP,
-        engineRef: { current: engine as unknown as PlaylistEngine },
         snapSamplePosition: options.snapSamplePosition,
       }),
     { wrapper }
@@ -631,8 +636,8 @@ describe('the preview is computed as the release commits', () => {
     });
   });
 
-  it("the engine's constraint decides the preview, and the release sends the delta of the last preview", () => {
-    // The engine allows at most 0.1 s of a trim, either way.
+  it("the arrangement's constraint decides the preview, and the release sends the delta of the last preview", () => {
+    // The arrangement allows at most 0.1 s of a trim, either way.
     const limit = SAMPLE_RATE / 10;
     const { release, engine } = renderHandlers({
       constrainTrimDelta: (delta) => Math.max(-limit, Math.min(limit, delta)),

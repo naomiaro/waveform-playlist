@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { Modifiers } from '@dnd-kit/abstract';
@@ -15,7 +15,6 @@ import {
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
-  useEngineRefs,
   useEditorControls,
 } from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
@@ -49,8 +48,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const touchOptimized = touchOptimizedProp ?? inherited.touchOptimized;
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { tracks, onTracksChange } = usePlaylistTimeline();
-  const { playoutRef } = useEngineRefs();
+  const { tracks } = usePlaylistTimeline();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
     useEditorControls();
   const beatsAndBars = useBeatsAndBars();
@@ -63,16 +61,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     beatsAndBars.scaleMode === 'beats' &&
     beatsAndBars.snapTo !== 'off';
   const useTimescaleSnap = snap && !useBeatsSnap;
-
-  // Warn once if onTracksChange is missing — drag/trim edits will be lost
-  useEffect(() => {
-    if (onTracksChange == null) {
-      console.warn(
-        '[waveform-playlist] ClipInteractionProvider: onTracksChange is not set on ' +
-          'WaveformPlaylistProvider. Drag and trim edits will not be persisted.'
-      );
-    }
-  }, [onTracksChange]);
 
   // Build snapSamplePosition for boundary trim snapping
   const snapSamplePosition = useMemo(() => {
@@ -92,10 +80,10 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     return undefined;
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, sampleRate, samplesPerPixel]);
 
-  // Handlers and modifiers read tracks through this ref, so their identity does
-  // not change when tracks do: keyed on tracks, the handlers and the modifiers
-  // array handed to DragDropProvider would be rebuilt by any clip operation,
-  // also one that lands mid-drag.
+  // The modifiers and the track selection on drag start read the loaded
+  // tracks through this ref, so their identity does not change when tracks
+  // do: keyed on tracks, the modifiers array handed to DragDropProvider would
+  // be rebuilt by any clip operation, also one that lands mid-drag.
   const tracksRef = useRef(tracks);
   tracksRef.current = tracks;
   const getTracks = useCallback(() => tracksRef.current, []);
@@ -108,12 +96,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-    snapSamplePosition,
-  });
+  } = useClipDragHandlers({ samplesPerPixel, snapSamplePosition });
 
   // True from the start of a track-reorder drag to its end. dnd-kit can send
   // one more dragover AFTER the dragend of a canceled drag (the sorting

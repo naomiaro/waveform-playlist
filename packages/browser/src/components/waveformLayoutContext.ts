@@ -32,8 +32,8 @@ export interface WaveformRowsValue {
    * One entry per row, in timeline order, and the peaks of each (same index),
    * as the root read them from its provider. The parts take them from here and
    * do not read a provider's track value themselves: the multitrack timeline
-   * value also changes with things no part draws (`isReady`, the identity of
-   * `onTracksChange`), and a part that read it would render for those too;
+   * value also changes with things no part draws (`isReady`), and a part that
+   * read it would render for those too;
    * and no part then needs a hook only one provider serves.
    */
   rows: ReadonlyArray<WaveformRow>;

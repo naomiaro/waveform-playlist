@@ -10,7 +10,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   usePlaylistTimeline,
@@ -123,11 +123,9 @@ async function mount(automaticScroll = false) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  const onTracksChange = () => {};
   render(
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={TRACKS}
-      onTracksChange={onTracksChange}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createAdapter={createAdapter}
@@ -135,7 +133,7 @@ async function mount(automaticScroll = false) {
       automaticScroll={automaticScroll}
     >
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   await waitFor(() => expect(probe.isReady).toBe(true));
   return adapter;

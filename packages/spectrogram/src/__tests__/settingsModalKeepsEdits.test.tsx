@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { render, act, cleanup, screen, fireEvent } from '@testing-library/react';
 import {
   WaveformPlaylistProvider,
+  useCreateArrangement,
   Waveform,
   SpectrogramIntegrationProvider,
   useEditorControls,
@@ -127,22 +128,32 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
+// The provider on an arrangement of TRACKS, made as an app makes it (#812).
+const Playlist: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const arrangement = useCreateArrangement(() => TRACKS);
+  return (
+    <WaveformPlaylistProvider
+      arrangement={arrangement}
+      sampleRate={SAMPLE_RATE}
+      createAdapter={createAdapter}
+    >
+      {children}
+    </WaveformPlaylistProvider>
+  );
+};
+
 describe('spectrogram settings modal on a track with no config', () => {
   it('keeps unapplied edits when the playlist re-renders', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
-      <WaveformPlaylistProvider
-        tracks={TRACKS}
-        sampleRate={SAMPLE_RATE}
-        createAdapter={createAdapter}
-      >
+      <Playlist>
         <SpectrogramIntegrationProvider value={INTEGRATION}>
           <Probe />
           <Waveform />
         </SpectrogramIntegrationProvider>
-      </WaveformPlaylistProvider>
+      </Playlist>
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Track menu' }));

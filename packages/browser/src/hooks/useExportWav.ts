@@ -84,8 +84,8 @@ export interface ExportResult {
 export interface UseExportWavReturn {
   /** Export the playlist to WAV */
   exportWav: (
-    tracks: ClipTrack[],
-    trackStates: TrackState[],
+    tracks: readonly ClipTrack[],
+    trackStates: readonly TrackState[],
     options?: ExportOptions
   ) => Promise<ExportResult>;
   /** Whether export is in progress */
@@ -115,8 +115,8 @@ export function useExportWav(): UseExportWavReturn {
 
   const exportWav = useCallback(
     async (
-      tracks: ClipTrack[],
-      trackStates: TrackState[],
+      tracks: readonly ClipTrack[],
+      trackStates: readonly TrackState[],
       options: ExportOptions = {}
     ): Promise<ExportResult> => {
       const {
@@ -165,16 +165,9 @@ export function useExportWav(): UseExportWavReturn {
 
         const duration = totalDurationSamples / sampleRate;
 
-        // Determine which tracks to render
-        // A track that is still loading has no entry in `trackStates`
-        // (`undefined` at its position): it is rendered with its own fields.
-        const stateOf = (index: number): TrackState =>
-          trackStates[index] ?? {
-            muted: tracks[index].muted,
-            soloed: tracks[index].soloed,
-            volume: tracks[index].volume,
-            pan: tracks[index].pan,
-          };
+        // Determine which tracks to render. `trackStates[i]` is the mix of
+        // `tracks[i]`: under the provider both have one entry per track.
+        const stateOf = (index: number): TrackState => trackStates[index];
         const tracksToRender =
           mode === 'individual'
             ? [{ track: tracks[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]

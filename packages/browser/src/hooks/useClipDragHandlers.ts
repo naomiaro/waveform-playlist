@@ -1,17 +1,18 @@
 import React from 'react';
-import { flushSync } from 'react-dom';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
-import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
+import { isLoadingClip } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
 import { sortedClipsOf } from '../utils/sortedClips';
-import { usePlaylistView, useTrimPreviewOptional } from '../contexts/playlistContexts';
+import {
+  useArrangement,
+  usePlaylistView,
+  useTrimPreviewOptional,
+} from '../contexts/playlistContexts';
 import type { TrimPreview } from '../providerInternals/useTrimPreview';
 
 interface UseClipDragHandlersOptions {
-  tracks: ClipTrack[];
   samplesPerPixel: number;
-  engineRef: React.RefObject<PlaylistEngine | null>;
   /** Optional function that snaps a sample position to the nearest grid position.
    *  Used for boundary trim snapping (move snapping is handled by the SnapToGridModifier). */
   snapSamplePosition?: (samplePosition: number) => number;
@@ -36,6 +37,24 @@ interface TrimDrag {
   clipId: string;
   boundary: Boundary;
   original: Geometry;
+}
+
+/** A clip move in progress: the track it was picked up on, by id. */
+interface MoveDrag {
+  trackId: string;
+  clipId: string;
+}
+
+// The loaded clips of each arrangement track object (the objects never
+// change, so one array per object): what a drag can pick up and collide with.
+const loadedClipsByTrack = new WeakMap<ArrangementTrack, readonly AudioClip[]>();
+function loadedClipsOf(track: ArrangementTrack): readonly AudioClip[] {
+  let clips = loadedClipsByTrack.get(track);
+  if (!clips) {
+    clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
+    loadedClipsByTrack.set(track, clips);
+  }
+  return clips;
 }
 
 /** A track's clips in timeline order, and where `clip` sits in it. */
@@ -119,27 +138,31 @@ function proposedTrimDelta({
  *
  * Collision detection for clip moves is handled by `ClipCollisionModifier` (passed to DragDropProvider).
  *
- * **Move:** `onDragEnd` makes one `engine.moveClip()`.
+ * It changes the provider's arrangement (`useArrangement()`), so it works
+ * whether an engine is attached or not, and throws outside
+ * `WaveformPlaylistProvider`.
+ *
+ * **Move:** `onDragStart` notes the clip's track by id; `onDragEnd` makes one
+ * `arrangement.moveClip()` on that track, also when the tracks were reordered
+ * meanwhile.
  *
  * **Trim (#812):** each `onDragMove` publishes where the clip would be to the
  * provider's trim preview, which only the dragged clip's view follows; the
- * tracks and the engine are not changed. Each move is computed from the clip
- * as it was when the drag started, constrained by the engine as the release
- * will be (`engine.constrainTrimDelta`), so the preview shows what the
- * release commits. `onDragEnd` makes one `engine.trimClip()` with the delta of
+ * tracks are not changed. Each move is computed from the clip as it was when
+ * the drag started, constrained as the release will be
+ * (`arrangement.constrainTrimDelta`), so the preview shows what the release
+ * commits. `onDragEnd` makes one `arrangement.trimClip()` with the delta of
  * the last preview and clears the preview in the same render; Escape clears
  * the preview only. Each of `moveClip` and `trimClip` is one undo step.
  *
- * The returned handlers keep their identity while `tracks` changes (it is read
- * through a ref), so they are safe to pass straight to `DragDropProvider`.
+ * The returned handlers read the tracks from the arrangement when they run,
+ * so they keep their identity and are safe to pass straight to
+ * `DragDropProvider`.
  *
  * @example
  * ```tsx
- * const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
- *   tracks,
- *   samplesPerPixel,
- *   engineRef: playoutRef,
- * });
+ * const { tracks } = usePlaylistTimeline();
+ * const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ samplesPerPixel });
  *
  * return (
  *   <DragDropProvider
@@ -154,11 +177,10 @@ function proposedTrimDelta({
  * ```
  */
 export function useClipDragHandlers({
-  tracks,
   samplesPerPixel,
-  engineRef,
   snapSamplePosition,
 }: UseClipDragHandlersOptions) {
+  const arrangement = useArrangement();
   const { sampleRate } = usePlaylistView();
   // The provider's trim preview; none under another provider or outside one,
   // and then a trim is committed on release without being shown.
@@ -166,10 +188,6 @@ export function useClipDragHandlers({
   // Store snap function in ref so onDragMove doesn't need it as a dependency
   const snapSamplePositionRef = React.useRef(snapSamplePosition);
   snapSamplePositionRef.current = snapSamplePosition;
-  // Read through a ref, so that the handlers keep their identity when the
-  // tracks change and are not handed to DragDropProvider anew mid-drag.
-  const tracksRef = React.useRef(tracks);
-  tracksRef.current = tracks;
   // The trimmed clip's neighbours in timeline order. Collision constraints
   // keep the clip between the same two neighbours, so the order found at drag
   // start holds for the drag and is not re-sorted on every pointer move.
@@ -182,6 +200,9 @@ export function useClipDragHandlers({
   const trimDragRef = React.useRef<TrimDrag | null>(null);
   // The delta (samples) of the last published preview: what the release sends.
   const lastBoundaryDeltaRef = React.useRef(0);
+  // The move in progress: the clip's track by id, so a reorder before the
+  // drop does not move a clip of another track.
+  const moveDragRef = React.useRef<MoveDrag | null>(null);
 
   // A drag that never ends (its component unmounts mid-drag) must not leave
   // its preview on screen.
@@ -195,32 +216,42 @@ export function useClipDragHandlers({
     };
   }, [preview]);
 
-  const onDragStart = React.useCallback((event: DragStartEvent) => {
-    const data = event.operation.source?.data as ClipDragData | undefined;
-    if (!data || data.kind === 'track-reorder') return;
-    trimDragRef.current = null;
-    trimOrderRef.current = null;
-    lastBoundaryDeltaRef.current = 0;
-    // A move needs nothing until the drop.
-    if (!data.boundary) return;
+  const onDragStart = React.useCallback(
+    (event: DragStartEvent) => {
+      const data = event.operation.source?.data as ClipDragData | undefined;
+      if (!data || data.kind === 'track-reorder') return;
+      trimDragRef.current = null;
+      trimOrderRef.current = null;
+      moveDragRef.current = null;
+      lastBoundaryDeltaRef.current = 0;
+      // The row the drag began on is the arrangement's track at that index.
+      const track = arrangement.getTracks()[data.trackIndex];
+      if (!track) return;
+      // A move needs nothing else until the drop.
+      if (!data.boundary) {
+        moveDragRef.current = { trackId: track.id, clipId: data.clipId };
+        return;
+      }
 
-    const track = tracksRef.current[data.trackIndex];
-    // By id: `clipIndex` is a position in the drawn row, which can hold
-    // placeholders that are not in `track.clips`.
-    const clip = track?.clips.find((c) => c.id === data.clipId);
-    if (!track || !clip) return;
-    trimDragRef.current = {
-      trackId: track.id,
-      clipId: clip.id,
-      boundary: data.boundary,
-      original: {
-        startSample: clip.startSample,
-        durationSamples: clip.durationSamples,
-        offsetSamples: clip.offsetSamples,
-      },
-    };
-    trimOrderRef.current = trimOrderFor(track.clips, clip);
-  }, []);
+      // By id: `clipIndex` is a position in the drawn row, which can hold
+      // placeholders that are not loaded clips.
+      const clips = loadedClipsOf(track);
+      const clip = clips.find((c) => c.id === data.clipId);
+      if (!clip) return;
+      trimDragRef.current = {
+        trackId: track.id,
+        clipId: clip.id,
+        boundary: data.boundary,
+        original: {
+          startSample: clip.startSample,
+          durationSamples: clip.durationSamples,
+          offsetSamples: clip.offsetSamples,
+        },
+      };
+      trimOrderRef.current = trimOrderFor(clips, clip);
+    },
+    [arrangement]
+  );
 
   const onDragMove = React.useCallback(
     (event: DragMoveEvent) => {
@@ -230,7 +261,8 @@ export function useClipDragHandlers({
       // By the id captured at drag start: the track's row can move mid-drag
       // (a reorder), and `data.trackIndex` is the row it had then. While the
       // track is gone, a move does nothing.
-      const currentClips = tracksRef.current.find((t) => t.id === drag.trackId)?.clips;
+      const track = arrangement.getTracks().find((t) => t.id === drag.trackId);
+      const currentClips = track ? loadedClipsOf(track) : undefined;
       const clip = currentClips?.find((c) => c.id === drag.clipId);
       if (!currentClips || !clip) return;
       if (!sameNeighbours(trimOrderRef.current.clips, currentClips, drag.clipId)) {
@@ -250,13 +282,14 @@ export function useClipDragHandlers({
         order: trimOrderRef.current,
         snap: snapSamplePositionRef.current,
       });
-      // What `trimClip` will apply on release: the engine has not been
+      // What `trimClip` will apply on release: the clip has not been
       // changed during the drag, so it constrains from the same bounds.
-      // Without an engine the bounds captured at drag start decide.
-      const engine = engineRef.current;
-      const delta = engine
-        ? engine.constrainTrimDelta(drag.trackId, drag.clipId, drag.boundary, proposed)
-        : proposed;
+      const delta = arrangement.constrainTrimDelta(
+        drag.trackId,
+        drag.clipId,
+        drag.boundary,
+        proposed
+      );
 
       lastBoundaryDeltaRef.current = delta;
       const next: TrimPreview = {
@@ -266,28 +299,20 @@ export function useClipDragHandlers({
       };
       preview?.publish(next);
     },
-    [samplesPerPixel, sampleRate, engineRef, preview]
+    [samplesPerPixel, sampleRate, arrangement, preview]
   );
 
   /** Ends a trim: one `trimClip` with the last preview's delta, the preview cleared with it. */
   const commitTrim = React.useCallback(
     (drag: TrimDrag, delta: number) => {
-      const engine = engineRef.current;
-      if (!engine) {
-        console.warn(
-          '[waveform-playlist] The trim was dropped: no engine is attached (before the first ' +
-            'build, or while it is rebuilt after a change of tracks). The clip stays where it was.'
-        );
-      }
-      // Committed and cleared in one synchronous render, so no frame shows the
-      // clip where it was before the drag: `trimClip` reaches the app's state
-      // through the provider's `onTracksChange` within this call.
-      flushSync(() => {
-        engine?.trimClip(drag.trackId, drag.clipId, drag.boundary, delta);
-        preview?.publish(null);
-      });
+      // No frame shows the clip where it was before the drag: dnd-kit calls
+      // this inside `startTransition`, but the view reads both the
+      // arrangement and the preview with `useSyncExternalStore`, whose
+      // updates React applies at once, together, even inside a transition.
+      arrangement.trimClip(drag.trackId, drag.clipId, drag.boundary, delta);
+      preview?.publish(null);
     },
-    [engineRef, preview]
+    [arrangement, preview]
   );
 
   const onDragEnd = React.useCallback(
@@ -296,9 +321,11 @@ export function useClipDragHandlers({
       if (data?.kind === 'track-reorder') return;
 
       const drag = trimDragRef.current;
+      const move = moveDragRef.current;
       const delta = lastBoundaryDeltaRef.current;
       trimDragRef.current = null;
       trimOrderRef.current = null;
+      moveDragRef.current = null;
       lastBoundaryDeltaRef.current = 0;
 
       // Canceled (Escape, focus loss, unmount): nothing was changed but the
@@ -317,27 +344,25 @@ export function useClipDragHandlers({
       // Clip move: transform.x is modifier-constrained, cached as a plain
       // object in the snapshot.
       const sampleDelta = event.operation.transform.x * samplesPerPixel;
-      const track = tracksRef.current[data.trackIndex];
-      const trackId = track?.id;
-      if (!trackId) {
+      const tracks = arrangement.getTracks();
+      // The track the clip was picked up on; by its row only when the drag
+      // start was not seen (a custom wiring that calls onDragEnd alone).
+      const trackId = move?.clipId === data.clipId ? move.trackId : tracks[data.trackIndex]?.id;
+      const track = trackId === undefined ? undefined : tracks.find((t) => t.id === trackId);
+      if (!track) {
         console.warn(
-          `[waveform-playlist] The move was dropped: there is no track at index ${data.trackIndex}. ` +
-            'The clip stays where it was.'
+          `[waveform-playlist] The move was dropped: the clip's track is not there ` +
+            `(row ${data.trackIndex}). The clip stays where it was.`
         );
-      } else if (!track.clips.some((c) => c.id === data.clipId)) {
+      } else if (!loadedClipsOf(track).some((c) => c.id === data.clipId)) {
         console.warn(
-          `[waveform-playlist] The move was dropped: track "${trackId}" has no clip "${data.clipId}".`
-        );
-      } else if (!engineRef.current) {
-        console.warn(
-          '[waveform-playlist] The move was dropped: no engine is attached (before the first ' +
-            'build, or while it is rebuilt after a change of tracks). The clip stays where it was.'
+          `[waveform-playlist] The move was dropped: track "${track.id}" has no clip "${data.clipId}".`
         );
       } else {
-        engineRef.current.moveClip(trackId, data.clipId, Math.floor(sampleDelta));
+        arrangement.moveClip(track.id, data.clipId, Math.floor(sampleDelta));
       }
     },
-    [samplesPerPixel, engineRef, preview, commitTrim]
+    [samplesPerPixel, arrangement, preview, commitTrim]
   );
 
   return {

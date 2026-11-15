@@ -8,6 +8,7 @@
 // release only).
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { TestProvider } from './helpers/arrangementProvider';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
@@ -668,10 +669,9 @@ describe('the root renders alone', () => {
 
 describe('the selected row is the nearest provider\u2019s', () => {
   it('a MediaElement player inside a multitrack provider draws its own row as selected', async () => {
-    const { WaveformPlaylistProvider } = await import('../WaveformPlaylistContext');
     const fake = createFakePlayout();
     render(
-      <WaveformPlaylistProvider tracks={[]}>
+      <TestProvider tracks={[]}>
         <MediaElementPlaylistProvider
           track={TRACK}
           samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -679,7 +679,7 @@ describe('the selected row is the nearest provider\u2019s', () => {
         >
           <ComposedMediaElementWaveform />
         </MediaElementPlaylistProvider>
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     await waitFor(() => expect(fake.addTrack).toHaveBeenCalled());
     const row = document.querySelector('[data-track-row]') as HTMLElement;

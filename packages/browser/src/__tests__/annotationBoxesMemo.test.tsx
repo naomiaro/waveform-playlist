@@ -7,7 +7,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
@@ -141,7 +141,7 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
   const createAdapter = () => adapter;
   render(
     <AnnotationIntegrationContext value={INTEGRATION}>
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
@@ -151,7 +151,7 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
         <WaveformExtentContext value={EXTENT}>
           <WaveformAnnotationBoxes getLabel={getLabel} />
         </WaveformExtentContext>
-      </WaveformPlaylistProvider>
+      </TestProvider>
     </AnnotationIntegrationContext>
   );
   await waitFor(() => expect(probe.data.isReady).toBe(true));

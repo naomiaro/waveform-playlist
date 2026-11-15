@@ -79,7 +79,7 @@ import {
   AnnotationIntegrationContext,
   type AnnotationIntegration,
 } from '../AnnotationIntegrationContext';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   useEditorControls,
   usePlaylistTimeline,
@@ -220,7 +220,7 @@ async function mount(reset = true) {
     // The annotation components: without them the box part draws nothing
     // (#686), and "the boxes did not render" below would say nothing.
     <AnnotationIntegrationContext value={INTEGRATION}>
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
@@ -228,7 +228,7 @@ async function mount(reset = true) {
       >
         <ProbeChild />
         <ComposedWaveform />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     </AnnotationIntegrationContext>
   );
   const utils = render(ui());
@@ -337,7 +337,7 @@ describe('the root renders alone (#685)', () => {
 });
 
 describe('only the root reads the timeline (#685)', () => {
-  it('a new onTracksChange function renders the root; neither the tracks part nor the track controls follow', async () => {
+  it('a rebuild of the engine renders the root (ready, then not, then ready); neither the tracks part nor the track controls follow', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const adapter = createFakeAdapter();
@@ -348,18 +348,19 @@ describe('only the root reads the timeline (#685)', () => {
       return <i data-custom-panel={useTrack().id} />;
     };
     // One element for the whole test: the component that composes the view
-    // does not render, only the provider gets a new function.
+    // does not render, only the provider gets a new `effects` function, which
+    // builds a new engine on the same arrangement (#812).
     const view = <ComposedWaveform trackControls={<Panel />} />;
-    const ui = () => (
-      <WaveformPlaylistProvider
+    const ui = (effects?: () => undefined) => (
+      <TestProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        onTracksChange={() => {}}
+        effects={effects}
       >
         <ProbeChild />
         {view}
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     const utils = render(ui());
     await waitFor(() => expect(probe.isReady).toBe(true));
@@ -369,19 +370,16 @@ describe('only the root reads the timeline (#685)', () => {
     const calls = panelRenders;
 
     await act(async () => {
-      utils.rerender(ui());
+      utils.rerender(ui(() => undefined));
     });
+    await waitFor(() => expect(probe.isReady).toBe(true));
 
-    // The timeline value is a new object (it carries the function), so its
-    // one reader renders.
+    // The timeline value changes with `isReady`, so its one reader renders.
     expect(counts.shell).toBeGreaterThan(0);
-    // The provider answers a new `onTracksChange` by loading again. Until
-    // #687 that published the mixer state once more (a new array of new
-    // objects) and the track controls rendered once; the mixer state is now
-    // kept by track id and stays the same object when no track changed, so
-    // the controls part does not render at all. Reading the timeline value
-    // themselves, both parts rendered with every one of the root's renders
-    // here (three).
+    // A rebuild changes no track and no mix: the mixer state stays the same
+    // object, so the controls part does not render at all. Reading the
+    // timeline value themselves, both parts would render with every one of
+    // the root's renders here.
     expect(counts.layout).toBe(0);
     expect(panelRenders - calls).toBe(0);
     expect(counts.track).toBe(0);

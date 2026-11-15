@@ -54,13 +54,11 @@ interface TrackControlsSlotProps {
   trackId: string;
   index: number;
   kind: TrackKind;
-  /** `undefined` while the track has no mixer state (it is loading). */
-  name: string | undefined;
+  name: string;
   muted: boolean;
   soloed: boolean;
   volume: number;
   pan: number;
-  isLoading: boolean;
   isSelected: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -92,7 +90,6 @@ function TrackControlsSlotImpl({
   soloed,
   volume,
   pan,
-  isLoading,
   isSelected,
   isFirst,
   isLast,
@@ -155,7 +152,6 @@ function TrackControlsSlotImpl({
       volume,
       pan,
       renderMode,
-      isLoading,
       isSelected,
       isFirst,
       isLast,
@@ -172,7 +168,6 @@ function TrackControlsSlotImpl({
       volume,
       pan,
       renderMode,
-      isLoading,
       isSelected,
       isFirst,
       isLast,
@@ -285,9 +280,8 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
     <TrackControlsSharedContext value={shared}>
       <TracksLayout $height={trackLayout.totalHeight}>
         {tracks.map((track, trackIndex) => {
-          // No mixer state yet means the provider is still loading this
-          // track (deferEngineRebuild): the engine does not know it, so a
-          // mute/solo/volume/pan change could not take effect.
+          // One entry per track, also while its audio loads (#812): a
+          // change made then is kept.
           const state = trackStates[trackIndex];
           return (
             // key includes trackReorderEpoch: forces a remount after every
@@ -300,12 +294,11 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               trackId={track.id}
               index={trackIndex}
               kind={track.kind}
-              name={state?.name}
-              muted={state?.muted ?? false}
-              soloed={state?.soloed ?? false}
-              volume={state?.volume ?? 1.0}
-              pan={state?.pan ?? 0}
-              isLoading={state === undefined}
+              name={state.name}
+              muted={state.muted}
+              soloed={state.soloed}
+              volume={state.volume}
+              pan={state.pan}
               isSelected={track.id === selectedTrackId}
               isFirst={trackIndex === 0}
               isLast={trackIndex === tracks.length - 1}

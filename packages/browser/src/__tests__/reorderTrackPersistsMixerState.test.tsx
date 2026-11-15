@@ -13,14 +13,14 @@
 // volume, and pan — order looked "reordered" only if you read track ids, not if
 // you read what the UI actually renders.
 //
-// The fix re-derives an id->state map from the pre-reorder (tracksRef,
-// trackStatesRef) pairing and re-projects it onto the new track order inside the
-// same statechange handler, so trackStates travels with its track.
+// Since #812 `trackStates` is derived from the arrangement's mix, which is kept
+// by track id, in the order of the arrangement's tracks: it travels with its
+// track by construction.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   useEditorControls,
   usePlaylistTimeline,
@@ -93,7 +93,7 @@ function createFakeAdapter(): PlayoutAdapter {
 }
 
 let probe: {
-  tracks: ClipTrack[];
+  tracks: readonly ClipTrack[];
   trackStates: { name: string; muted: boolean; volume: number }[];
   isReady: boolean;
   reorderTrack: (id: string, i: number) => void;
@@ -115,25 +115,15 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     const t2 = makeTrack('track-2', true, 0.5);
     const t3 = makeTrack('track-3', false, 0.9);
 
-    let externalTracks: ClipTrack[] = [t1, t2, t3];
-    const setExternalTracks = (t: ClipTrack[]) => {
-      externalTracks = t;
-      rerender();
-    };
+    const initial: ClipTrack[] = [t1, t2, t3];
 
     const Wrapper: React.FC = () => (
-      <WaveformPlaylistProvider
-        tracks={externalTracks}
-        onTracksChange={setExternalTracks}
-        sampleRate={SAMPLE_RATE}
-        createAdapter={() => adapter}
-      >
+      <TestProvider tracks={initial} sampleRate={SAMPLE_RATE} createAdapter={() => adapter}>
         <ProbeChild />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
 
-    const { rerender: doRerender } = render(<Wrapper />);
-    const rerender = () => doRerender(<Wrapper />);
+    render(<Wrapper />);
 
     await waitFor(() => expect(probe.isReady).toBe(true));
     expect(probe.tracks.map((t) => t.id)).toEqual(['track-1', 'track-2', 'track-3']);
@@ -162,25 +152,15 @@ describe('reorderTrack keeps trackStates aligned with its track', () => {
     const t1 = makeTrack('track-1', false, 0.2);
     const t2 = makeTrack('track-2', true, 0.5);
 
-    let externalTracks: ClipTrack[] = [t1, t2];
-    const setExternalTracks = (t: ClipTrack[]) => {
-      externalTracks = t;
-      rerender();
-    };
+    const initial: ClipTrack[] = [t1, t2];
 
     const Wrapper: React.FC = () => (
-      <WaveformPlaylistProvider
-        tracks={externalTracks}
-        onTracksChange={setExternalTracks}
-        sampleRate={SAMPLE_RATE}
-        createAdapter={() => adapter}
-      >
+      <TestProvider tracks={initial} sampleRate={SAMPLE_RATE} createAdapter={() => adapter}>
         <ProbeChild />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
 
-    const { rerender: doRerender } = render(<Wrapper />);
-    const rerender = () => doRerender(<Wrapper />);
+    render(<Wrapper />);
 
     await waitFor(() => expect(probe.isReady).toBe(true));
 

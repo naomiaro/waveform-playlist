@@ -1,13 +1,21 @@
-import React, { useCallback } from 'react';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { useCallback } from 'react';
+import { isLoadingClip } from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
-import { usePlaylistView, usePlaybackRefs, useSelectedTrackId } from '../contexts/playlistContexts';
+import {
+  useArrangement,
+  usePlaylistView,
+  usePlaybackRefs,
+  useSelectedTrackId,
+} from '../contexts/playlistContexts';
 
 export interface UseClipSplittingOptions {
-  tracks: ClipTrack[];
   samplesPerPixel: number;
-  engineRef: React.RefObject<PlaylistEngine | null>;
+}
+
+/** A track's clips that have their audio: a clip still loading cannot be split. */
+function loadedClips(track: ArrangementTrack): AudioClip[] {
+  return track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
 }
 
 export interface UseClipSplittingResult {
@@ -18,20 +26,17 @@ export interface UseClipSplittingResult {
 /**
  * Hook for splitting clips at the playhead or at a specific time
  *
- * Splitting delegates to `engine.splitClip()` — the engine handles clip creation,
- * adapter sync, and emits statechange. The provider's statechange handler propagates
- * the updated tracks to the parent via `onTracksChange`.
+ * Splitting is one `arrangement.splitClip()` on the provider's arrangement
+ * (`useArrangement()`): an undo step, engine or not; the engine and the view
+ * follow the arrangement. Throws outside `WaveformPlaylistProvider`.
  *
  * @param options - Configuration options
  * @returns Object with split functions
  *
  * @example
  * ```tsx
- * const { splitClipAtPlayhead } = useClipSplitting({
- *   tracks,
- *   samplesPerPixel,
- *   engineRef: playoutRef,
- * });
+ * const { samplesPerPixel } = usePlaylistZoom();
+ * const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
  *
  * // In keyboard handler
  * const handleKeyPress = (e: KeyboardEvent) => {
@@ -42,7 +47,8 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { tracks, engineRef } = options;
+  const { samplesPerPixel } = options;
+  const arrangement = useArrangement();
   const { sampleRate } = usePlaylistView();
   const { currentTimeRef } = usePlaybackRefs();
   const { selectedTrackId } = useSelectedTrackId();
@@ -53,19 +59,17 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
    * @param trackId - Id of the track containing the clip
    * @param clipId - Id of the clip
    * @param splitTime - Timeline position where to split (in seconds)
-   * @returns true if pre-validation passed and the engine was called, false otherwise
-   * (also for a track id or clip id that is not in `tracks`: nothing changes).
-   * Note: engine.splitClip() returns void so a true here assumes the engine accepted
-   * the split (it performs its own canSplitAt check internally).
+   * @returns true if pre-validation passed and the arrangement was called, false otherwise
+   * (also for a track id or clip id that is not there, or a clip still loading:
+   * nothing changes). Note: splitClip() returns void so a true here assumes the
+   * arrangement accepted the split (it performs its own canSplitAt check).
    */
   const splitClipAt = useCallback(
     (trackId: string, clipId: string, splitTime: number): boolean => {
-      const { samplesPerPixel } = options;
-
-      const track = tracks.find((t) => t.id === trackId);
+      const track = arrangement.getTracks().find((t) => t.id === trackId);
       if (!track) return false;
 
-      const clip = track.clips.find((c) => c.id === clipId);
+      const clip = loadedClips(track).find((c) => c.id === clipId);
       if (!clip) return false;
 
       // Convert split time to sample position, snapped to pixel boundary
@@ -80,20 +84,10 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
         return false;
       }
 
-      // Delegate to engine — handles clip creation, adapter sync, and emits statechange
-      const engine = engineRef.current;
-      if (!engine) {
-        console.warn(
-          '[waveform-playlist] The split was dropped: no engine is attached (before the first ' +
-            'build, or while it is rebuilt after a change of tracks). The clip stays whole.'
-        );
-        return false;
-      }
-
-      engine.splitClip(track.id, clip.id, snappedSplitSample);
+      arrangement.splitClip(track.id, clip.id, snappedSplitSample);
       return true;
     },
-    [tracks, options, engineRef, sampleRate]
+    [arrangement, samplesPerPixel, sampleRate]
   );
 
   /**
@@ -110,7 +104,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     }
 
     // Find the selected track
-    const track = tracks.find((t) => t.id === selectedTrackId);
+    const track = arrangement.getTracks().find((t) => t.id === selectedTrackId);
     if (!track) {
       console.warn('Selected track not found');
       return false;
@@ -120,7 +114,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     const currentTime = currentTimeRef.current ?? 0;
 
     // Find clip at current time on the selected track
-    for (const clip of track.clips) {
+    for (const clip of loadedClips(track)) {
       const clipStartTime = clip.startSample / sampleRate;
       const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
 
@@ -133,7 +127,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
 
     console.warn(`[waveform-playlist] No clip found at playhead position on track "${track.name}"`);
     return false;
-  }, [tracks, currentTimeRef, selectedTrackId, splitClipAt, sampleRate]);
+  }, [arrangement, currentTimeRef, selectedTrackId, splitClipAt, sampleRate]);
 
   return {
     splitClipAtPlayhead,

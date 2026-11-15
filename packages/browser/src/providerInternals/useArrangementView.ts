@@ -26,7 +26,7 @@ import {
   type PeaksCache,
 } from '../utils/derivePeaks';
 import { EMPTY_LOADED_TRACKS, loadedTracks, type LoadedTracksCache } from '../utils/loadedTracks';
-import { placeholderPeaks } from '../utils/placeholderPeaks';
+import { placeholderPeaks, placeholdersEnd as lastPlaceholderEnd } from '../utils/placeholderPeaks';
 import { sameItems } from '../utils/sameItems';
 import { timelineDuration } from '../utils/timelineDuration';
 
@@ -120,18 +120,6 @@ function deriveRows(
     return stable;
   });
   return { byTrackId, result: sameItems(previous.result, rows) ? previous.result : rows };
-}
-
-/** The end in seconds of the last placeholder record, 0 when there is none. */
-function lastPlaceholderEnd(rows: readonly TrackClipPeaks[]): number {
-  let end = 0;
-  for (const row of rows) {
-    for (const record of row) {
-      if (!record.isPlaceholder || !record.sampleRate) continue;
-      end = Math.max(end, (record.startSample + record.durationSamples) / record.sampleRate);
-    }
-  }
-  return end;
 }
 
 function sameState(a: TrackState, name: string, mix: TrackMixerValues): boolean {

@@ -6,6 +6,7 @@
 // resolve them and publish them once, in ui-components' `PlaylistInfoContext`.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { TestProvider } from './helpers/arrangementProvider';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
@@ -21,7 +22,6 @@ import {
 } from '../SpectrogramIntegrationContext';
 import * as api from '../index';
 import {
-  WaveformPlaylistProvider,
   MediaElementPlaylistProvider,
   Waveform,
   MediaElementWaveform,
@@ -141,7 +141,7 @@ async function mountMultitrack(
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter as unknown as PlayoutAdapter;
   const ui = () => (
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={TRACKS}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
@@ -152,7 +152,7 @@ async function mountMultitrack(
       <ProviderProbe />
       <ViewReader />
       {tree()}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   ready = false;
   const result = render(ui());
@@ -815,7 +815,7 @@ describe('WaveformViewOptions (#689)', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const ui = () => (
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
@@ -823,7 +823,7 @@ describe('WaveformViewOptions (#689)', () => {
       >
         <ProviderProbe />
         <ViewReader />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     ready = false;
     const result = render(ui());
@@ -993,13 +993,9 @@ function NestedProvider({ Root }: { Root: typeof WaveformRoot | typeof MediaElem
     </Root>
   );
   return Root === WaveformRoot ? (
-    <WaveformPlaylistProvider
-      tracks={TRACKS}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-    >
+    <TestProvider tracks={TRACKS} sampleRate={SAMPLE_RATE} createAdapter={createAdapter}>
       {tree}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   ) : (
     <MediaElementPlaylistProvider
       track={ME_TRACK}

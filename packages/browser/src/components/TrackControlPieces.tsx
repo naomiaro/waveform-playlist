@@ -37,14 +37,13 @@ export const TrackName: React.FC = () => {
   );
 };
 
-/** Mutes and unmutes the track. Disabled while the track is loading. */
+/** Mutes and unmutes the track. */
 export const TrackMuteButton: React.FC = () => {
-  const { muted, isLoading, setMuted } = useTrack();
+  const { muted, setMuted } = useTrack();
   return (
     <Button
       $variant={muted ? 'danger' : 'outline'}
       aria-pressed={muted}
-      disabled={isLoading}
       onClick={() => setMuted(!muted)}
     >
       Mute
@@ -52,14 +51,13 @@ export const TrackMuteButton: React.FC = () => {
   );
 };
 
-/** Solos and unsolos the track. Disabled while the track is loading. */
+/** Solos and unsolos the track. */
 export const TrackSoloButton: React.FC = () => {
-  const { soloed, isLoading, setSoloed } = useTrack();
+  const { soloed, setSoloed } = useTrack();
   return (
     <Button
       $variant={soloed ? 'info' : 'outline'}
       aria-pressed={soloed}
-      disabled={isLoading}
       onClick={() => setSoloed(!soloed)}
     >
       Solo
@@ -67,9 +65,9 @@ export const TrackSoloButton: React.FC = () => {
   );
 };
 
-/** The track's volume, 0 to 1. Disabled while the track is loading. */
+/** The track's volume, 0 to 1. */
 export const TrackVolumeSlider: React.FC = () => {
-  const { volume, isLoading, setVolume } = useTrack();
+  const { volume, setVolume } = useTrack();
   return (
     <SliderWrapper>
       <VolumeDownIcon />
@@ -79,7 +77,6 @@ export const TrackVolumeSlider: React.FC = () => {
         step="0.01"
         value={volume}
         aria-label="Volume"
-        disabled={isLoading}
         onChange={(e) => setVolume(parseFloat(e.target.value))}
       />
       <VolumeUpIcon />
@@ -87,9 +84,9 @@ export const TrackVolumeSlider: React.FC = () => {
   );
 };
 
-/** The track's pan, -1 (left) to 1 (right). Disabled while the track is loading. */
+/** The track's pan, -1 (left) to 1 (right). */
 export const TrackPanSlider: React.FC = () => {
-  const { pan, isLoading, setPan } = useTrack();
+  const { pan, setPan } = useTrack();
   return (
     <SliderWrapper>
       <span>L</span>
@@ -99,7 +96,6 @@ export const TrackPanSlider: React.FC = () => {
         step="0.01"
         value={pan}
         aria-label="Pan"
-        disabled={isLoading}
         onChange={(e) => setPan(parseFloat(e.target.value))}
       />
       <span>R</span>
@@ -171,15 +167,15 @@ const GRIP_ANCHOR_STYLE = {
  * it. Neither the grip nor the buttons select the track.
  */
 export const TrackReorderGrip: React.FC = () => {
-  const { isFirst, isLast, isLoading, moveUp, moveDown } = useTrack();
+  const { isFirst, isLast, moveUp, moveDown } = useTrack();
   const { handleRef } = useTrackReorderHandle();
   return (
     <span data-track-reorder-grip="" style={GRIP_ANCHOR_STYLE}>
       <ReorderRail
         gripRef={handleRef as React.Ref<HTMLButtonElement>}
         onGripClick={(e) => e.stopPropagation()}
-        upDisabled={isLoading || isFirst}
-        downDisabled={isLoading || isLast}
+        upDisabled={isFirst}
+        downDisabled={isLast}
         onMoveUp={(e) => {
           e.stopPropagation();
           moveUp();

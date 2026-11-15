@@ -67,6 +67,11 @@ export interface UseEngineLifetimeOptions {
   stopAnimationFrameLoop: () => void;
   /** The latest committed `onError` (QG). */
   onErrorRef: React.RefObject<((error: Error) => void) | undefined>;
+  /**
+   * A build that is still current failed: no engine is coming until a later
+   * build. Called before `onError`.
+   */
+  onBuildFailure?: () => void;
 }
 
 export interface EngineLifetime {
@@ -199,6 +204,7 @@ function reportBuildFailure(
   // on some later, unrelated rebuild.
   ctx.engineBuildInFlightRef.current = false;
   ctx.pendingResumeRef.current = null;
+  ctx.latest.current.onBuildFailure?.();
   // An error, not a warning: the playlist cannot be played until a later
   // build succeeds.
   const reason = error instanceof Error ? error.message : String(error);

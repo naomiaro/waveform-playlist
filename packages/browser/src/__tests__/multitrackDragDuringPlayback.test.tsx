@@ -11,7 +11,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   useSelectedTrackId,
   useSelection,
@@ -134,7 +134,7 @@ async function mount({ automaticScroll = false } = {}) {
   const createAdapter = () => adapter;
   const tracks = [makeTrack('one'), makeTrack('two')];
   render(
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={tracks}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -146,7 +146,7 @@ async function mount({ automaticScroll = false } = {}) {
       <WaveformViewOptions waveHeight={WAVE_HEIGHT}>
         <Waveform />
       </WaveformViewOptions>
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   await waitFor(() => {
     expect(document.querySelectorAll('[data-track-row]').length).toBe(2);

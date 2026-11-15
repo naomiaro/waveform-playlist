@@ -8,7 +8,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { usePlaybackControls, usePlaylistTimeline } from '../contexts/playlistContexts';
 import {
   AnnotationIntegrationContext,
@@ -114,7 +114,7 @@ async function mount() {
   const createAdapter = () => adapter;
   render(
     <AnnotationIntegrationContext value={INTEGRATION}>
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
@@ -122,7 +122,7 @@ async function mount() {
       >
         <ProbeChild />
         <AnnotationList />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     </AnnotationIntegrationContext>
   );
   await waitFor(() => expect(probe.data.isReady).toBe(true));

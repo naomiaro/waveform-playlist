@@ -32,7 +32,8 @@ export interface TrimPreviewPeaksValue {
 
 /** What `peaksFor` derives a previewed clip from: the provider's, as of its last render. */
 export interface TrimPreviewInputs {
-  tracks: ClipTrack[];
+  /** The loaded tracks (no loading clip: a placeholder is never trimmed). */
+  tracks: readonly ClipTrack[];
   peaksOptions: DerivePeaksOptions;
   /** The last pass of `derivePeaks`, so an unchanged geometry reuses its record. */
   peaksCacheRef: React.RefObject<PeaksCache>;

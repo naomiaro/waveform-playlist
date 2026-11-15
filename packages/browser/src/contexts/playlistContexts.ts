@@ -12,7 +12,7 @@
  */
 import { createContext, use } from 'react';
 import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
@@ -241,16 +241,17 @@ export interface EditorControlsContextValue {
   setCurrentTime: (time: number) => void;
 
   // Track mixer, by track id (#687; by index until then). An id no track has
-  // is ignored. Inside a track's control panel, `useTrack()` has the same
-  // actions already bound to that track.
+  // is ignored. They change the arrangement's mix, also while no engine is
+  // attached (#812). Inside a track's control panel, `useTrack()` has the
+  // same actions already bound to that track.
   setTrackMute: (trackId: string, muted: boolean) => void;
   setTrackSolo: (trackId: string, soloed: boolean) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   setTrackPan: (trackId: string, pan: number) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
-   *  organizational — playback is not interrupted. The reordered tracks
-   *  array flows back through onTracksChange. */
+   *  organizational — playback is not interrupted. An undo step of the
+   *  arrangement (#812). */
   reorderTrack: (trackId: string, toIndex: number) => void;
 
   /** Internal: call after every track-reorder DRAG interaction ends
@@ -280,7 +281,7 @@ export interface EditorControlsContextValue {
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
 
-  // Undo/redo
+  // Undo/redo: the arrangement's history, engine or not (#812).
   undo: () => void;
   redo: () => void;
 
@@ -350,12 +351,25 @@ export interface UndoRedoContextValue {
  * that draws tracks or needs the timeline length during render.
  */
 export interface PlaylistTimelineContextValue {
-  tracks: ClipTrack[]; // Original tracks array with IDs
-  peaksDataArray: TrackClipPeaks[]; // Array of tracks, each containing array of clip peaks
+  /**
+   * The arrangement's tracks without the clips that are still loading
+   * (#812): derived from the arrangement, never written back. Change them
+   * through `useArrangement()`.
+   */
+  tracks: readonly ClipTrack[];
+  /**
+   * One row per track, in the order of `tracks`. A row also holds the
+   * placeholder record (`isPlaceholder: true`) of each clip still loading,
+   * which `tracks` does not have: find a record by `clipId`, never by position.
+   */
+  peaksDataArray: TrackClipPeaks[];
+  /** The end, in seconds, of the loaded audio. */
   duration: number;
-  /** Whether the playlist has finished loading all tracks */
+  /**
+   * False until an engine is attached and the first sources have settled;
+   * then false while a later engine is being built.
+   */
   isReady: boolean;
-  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
 /** Mixer state (#768). Changes on every mute, solo, volume or pan change. */
@@ -438,6 +452,8 @@ export const PlaylistZoomContext = slot<PlaylistZoomContextValue>();
 export const SelectedRowContext = slot<SelectedTrackIdContextValue>();
 
 // WaveformPlaylistProvider only
+/** The arrangement the provider was given (#812). Never changes for a mount. */
+export const ArrangementContext = slot<Arrangement>();
 export const EditorControlsContext = slot<EditorControlsContextValue>();
 export const EngineRefsContext = slot<EngineRefsContextValue>();
 export const LoopContext = slot<LoopContextValue>();
@@ -551,6 +567,14 @@ export const usePlaylistSettings = () =>
 export const usePlaylistZoom = () => useSlot(PlaylistZoomContext, 'usePlaylistZoom', EITHER);
 
 /**
+ * The arrangement of the nearest WaveformPlaylistProvider: the owner of the
+ * tracks, the mix, the undo history and the loading (#812). Change the tracks
+ * through it; the provider and the engine follow. The value never changes,
+ * so calling this never re-renders.
+ */
+export const useArrangement = () => useSlot(ArrangementContext, 'useArrangement', WEB_AUDIO);
+
+/**
  * The multitrack editor's actions: track mixer and order, zoom, loop, undo,
  * annotation editing settings, recording. WaveformPlaylistProvider only. The
  * value never changes.
@@ -583,9 +607,9 @@ export const useSelectedRow = () => useSlot(SelectedRowContext, 'The tracks of t
 export const useUndoRedo = () => useSlot(UndoRedoContext, 'useUndoRedo', WEB_AUDIO);
 
 /**
- * `{ tracks, peaksDataArray, duration, isReady, onTracksChange }`. A component
- * that calls this re-renders on every clip operation (a trim once, on release)
- * and on a zoom.
+ * `{ tracks, peaksDataArray, duration, isReady }`. A component that calls this
+ * re-renders on every clip operation (a trim once, on release), on a zoom and
+ * when audio arrives for a clip.
  */
 export const usePlaylistTimeline = () =>
   useSlot(PlaylistTimelineContext, 'usePlaylistTimeline', WEB_AUDIO);

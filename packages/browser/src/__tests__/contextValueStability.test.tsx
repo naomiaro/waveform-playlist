@@ -13,7 +13,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import { useTheme } from 'styled-components';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
@@ -28,6 +28,7 @@ import {
   useCurrentTime,
   useActiveAnnotation,
   useEngineRefs,
+  useArrangement,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -196,6 +197,16 @@ const TrimProbeChild: React.FC = () => {
   return null;
 };
 
+// Reads the arrangement (#812).
+let arrangementProbe: { value: ReturnType<typeof useArrangement>; renders: number };
+const ArrangementProbeChild: React.FC = () => {
+  arrangementProbe = {
+    value: useArrangement(),
+    renders: (arrangementProbe?.renders ?? 0) + 1,
+  };
+  return null;
+};
+
 // Calls actions only, as a transport button or a custom control does (#767).
 let controlsProbe: { renders: number };
 const ControlsProbeChild: React.FC = () => {
@@ -232,6 +243,7 @@ const CHILDREN = (
     <ActiveAnnotationProbeChild />
     <ControlsProbeChild />
     <TrimProbeChild />
+    <ArrangementProbeChild />
     <LayoutSeekChild />
   </>
 );
@@ -245,27 +257,25 @@ async function mount({ inlineProps = false } = {}) {
   seekFromLayoutEffect = null;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  let tracks = TRACKS;
+  const arrangement = testArrangement(TRACKS);
   const Wrapper: React.FC = () => (
-    <WaveformPlaylistProvider
-      tracks={tracks}
+    <TestProvider
+      arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       {...(inlineProps ? { theme: { playheadColor: 'red' } } : {})}
     >
       {CHILDREN}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(probe.timeline.isReady).toBe(true));
   return {
     adapter,
+    arrangement,
     rerender: () => utils.rerender(<Wrapper />),
-    // Replaces the `tracks` prop, as a parent does after an edit.
-    setTracks: (next: ClipTrack[]) => {
-      tracks = next;
-      utils.rerender(<Wrapper />);
-    },
+    // Replaces every track of the arrangement (#812: the arrangement owns them).
+    setTracks: (next: ClipTrack[]) => arrangement.setTracks(next),
   };
 }
 
@@ -399,7 +409,7 @@ describe('provider context values keep their identity (#691)', () => {
 // clip are made once; the engine refs lost `isDraggingRef`.
 describe('the trim preview values keep their identity (#812)', () => {
   it('through a mixer change, a selection, play and pause, a zoom, new tracks, a re-render with inline props and a preview', async () => {
-    const { setTracks } = await mount({ inlineProps: true });
+    const { arrangement } = await mount({ inlineProps: true });
     const { preview, peaks, engineRefs, renders } = trimProbe;
     expect(preview).not.toBeNull();
     expect(peaks).not.toBeNull();
@@ -417,7 +427,7 @@ describe('the trim preview values keep their identity (#812)', () => {
       probe.controls.pause();
     });
     await act(async () => {
-      setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]);
+      arrangement.addTrack(makeTrack('track-3', 2));
     });
     await waitFor(() => expect(probe.timeline.duration).toBe(2));
     await act(async () => {
@@ -440,7 +450,7 @@ describe('the trim preview values keep their identity (#812)', () => {
   });
 
   it('the previewed clip is drawn from the latest tracks', async () => {
-    const { setTracks } = await mount();
+    const { arrangement } = await mount();
     const peaksFor = trimProbe.peaks!.peaksFor;
     const preview = {
       trackId: 'track-3',
@@ -452,7 +462,7 @@ describe('the trim preview values keep their identity (#812)', () => {
     expect(peaksFor(preview)).toBeNull();
 
     await act(async () => {
-      setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]);
+      arrangement.addTrack(makeTrack('track-3', 2));
     });
     await waitFor(() => expect(probe.timeline.duration).toBe(2));
 
@@ -462,6 +472,31 @@ describe('the trim preview values keep their identity (#812)', () => {
       trackName: 'track-3',
       durationSamples: SAMPLE_RATE / 2,
     });
+  });
+});
+
+describe('the arrangement value is the one given and never changes (#812)', () => {
+  it('through a mixer change, a clip edit, an undo, play and pause, a zoom, a re-render with inline props', async () => {
+    const { arrangement, rerender } = await mount({ inlineProps: true });
+    const { value, renders } = arrangementProbe;
+    expect(value).toBe(arrangement);
+
+    await act(async () => {
+      probe.editor.setTrackVolume('track-1', 0.4);
+      arrangement.moveClip('track-1', 'track-1-clip', SAMPLE_RATE / 10);
+      probe.editor.undo();
+      probe.editor.zoomIn();
+    });
+    await act(async () => {
+      await probe.controls.play(0);
+    });
+    await act(async () => {
+      probe.controls.pause();
+      rerender();
+    });
+
+    expect(arrangementProbe.value).toBe(arrangement);
+    expect(arrangementProbe.renders).toBe(renders);
   });
 });
 
@@ -768,7 +803,7 @@ describe('the controls value does not follow the timeline length or the time for
   });
 
   it('playback keeps running to the new end when a longer track is appended (no rebuild, no loop restart)', async () => {
-    const { adapter, setTracks } = await mount();
+    const { adapter, arrangement } = await mount();
     const addTrack = vi.spyOn(adapter, 'addTrack');
     const setTracksOnAdapter = vi.spyOn(adapter, 'setTracks');
     await act(async () => {
@@ -777,9 +812,9 @@ describe('the controls value does not follow the timeline length or the time for
     expect(probe.isPlaying).toBe(true);
     const playCalls = (adapter.play as ReturnType<typeof vi.fn>).mock.calls.length;
 
-    // The same two track objects plus one: an incremental add.
+    // One more track: the engine follows with one adapter call.
     await act(async () => {
-      setTracks([...TRACKS, makeTrack('track-3', 2)]);
+      arrangement.addTrack(makeTrack('track-3', 2));
     });
     await waitFor(() => expect(probe.timeline.duration).toBe(2));
     expect(addTrack).toHaveBeenCalledTimes(1);

@@ -23,7 +23,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   usePlaylistTimeline,
@@ -139,14 +139,9 @@ const ProbeChild: React.FC = () => {
 
 function mountProvider(adapter: FakeAdapter, tracks: ClipTrack[]) {
   return render(
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      onTracksChange={() => {}}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={() => adapter}
-    >
+    <TestProvider tracks={tracks} sampleRate={SAMPLE_RATE} createAdapter={() => adapter}>
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 }
 

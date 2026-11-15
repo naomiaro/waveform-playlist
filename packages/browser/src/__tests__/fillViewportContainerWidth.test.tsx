@@ -8,7 +8,7 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { Waveform } from '../components/Waveform';
 import { WaveformViewOptions } from '../components/WaveformViewOptions';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -148,7 +148,7 @@ const App: React.FC<{ fillViewport?: boolean; indefinitePlayback?: boolean; tick
   fillViewport = false,
   indefinitePlayback = false,
 }) => (
-  <WaveformPlaylistProvider
+  <TestProvider
     tracks={TRACKS}
     sampleRate={SAMPLE_RATE}
     samplesPerPixel={SAMPLES_PER_PIXEL}
@@ -158,7 +158,7 @@ const App: React.FC<{ fillViewport?: boolean; indefinitePlayback?: boolean; tick
     <WaveformViewOptions fillViewport={fillViewport}>
       <Waveform />
     </WaveformViewOptions>
-  </WaveformPlaylistProvider>
+  </TestProvider>
 );
 
 /** Width of the tracks area: the first descendant of the scroll container that sets one. */

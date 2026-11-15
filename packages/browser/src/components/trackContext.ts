@@ -32,13 +32,6 @@ export interface TrackContextValue {
   /** How the track is drawn. Always `'waveform'` for a MIDI track. */
   renderMode: RenderMode;
 
-  /**
-   * True while the provider has no mixer state for the track (it is still
-   * loading): the engine does not know it yet, so a value set with the mixer
-   * actions is not kept and a reorder does nothing. The built-in pieces are
-   * disabled then.
-   */
-  isLoading: boolean;
   /** Whether this is the selected track. */
   isSelected: boolean;
   isFirst: boolean;

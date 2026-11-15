@@ -27,6 +27,7 @@ import { useTrimPreviewExtent } from '../hooks/useTrimPreviewView';
 import { trackKind, type RenderMode, type SpectrogramConfig } from '@waveform-playlist/core';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
 import { trackRenderMode } from '../utils/trackRenderMode';
+import { placeholdersEnd } from '../utils/placeholderPeaks';
 import type { SpectrogramTrackHelpers } from './TrackRows';
 import { getTrackChannelCount } from './visualizationLayout';
 import type { WaveformRow, WaveformRowsValue } from './waveformLayoutContext';
@@ -167,8 +168,14 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
   }, [fillsContainer, scrollContainerElement]);
 
   // Calculate dimensions. `duration` is derived from `tracks` in the provider,
-  // so it is already current in this render.
-  let displayDuration = duration > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION;
+  // so it is already current in this render. It is the loaded audio; a clip
+  // still loading is drawn as a placeholder, and the view is as wide as the
+  // last one (#812).
+  const placeholdersEndSeconds = useMemo(() => placeholdersEnd(peaksDataArray), [peaksDataArray]);
+  let displayDuration = Math.max(
+    duration > 0 ? duration : DEFAULT_EMPTY_TRACK_DURATION,
+    placeholdersEndSeconds
+  );
 
   if (fillsContainer) {
     const minContainerDuration = (scrollContainerWidth * samplesPerPixel) / sampleRate;

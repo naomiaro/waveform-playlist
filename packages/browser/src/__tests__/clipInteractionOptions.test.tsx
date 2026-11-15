@@ -46,7 +46,7 @@ vi.mock('../hooks/useDragSensors', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import { Waveform, WaveformEditor } from '../components/Waveform';
 import { ComposedWaveform } from './testCompositions';
@@ -147,13 +147,9 @@ async function mount(tree: (probe: React.ReactNode) => React.ReactNode) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   const Wrapper: React.FC = () => (
-    <WaveformPlaylistProvider
-      tracks={TRACKS}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-    >
+    <TestProvider tracks={TRACKS} sampleRate={SAMPLE_RATE} createAdapter={createAdapter}>
       {tree(<ReadyProbe />)}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(isReady).toBe(true));

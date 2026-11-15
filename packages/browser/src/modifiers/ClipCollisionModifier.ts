@@ -15,7 +15,7 @@ interface ClipCollisionOptions {
    * tracks change, so the modifiers array handed to DragDropProvider is not
    * rebuilt on every edit.
    */
-  tracks: ClipTrack[] | (() => ClipTrack[]);
+  tracks: readonly ClipTrack[] | (() => readonly ClipTrack[]);
   samplesPerPixel: number;
 }
 

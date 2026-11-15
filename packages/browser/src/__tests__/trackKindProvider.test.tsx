@@ -1,15 +1,16 @@
 // @vitest-environment jsdom
 //
-// #756: a track holds one kind of clip, and the engine throws on a track that
-// breaks this. In the provider both places that hand tracks to the engine are
-// inside the async load, so the throw does not reach React (an error boundary
-// never sees it): the provider reports it through `onError`, nothing reaches
-// the adapter, and the playlist does not become ready.
+// #756: a track holds one kind of clip, and #812 refuses two tracks with one
+// id. Since #812 the arrangement checks a track when it enters: a refused
+// track throws to whoever called the arrangement (`createArrangement`,
+// `addTrack`, ...) and the provider's `onError` is not involved (QB). What
+// `onError` still reports is an engine or adapter that cannot be built, with
+// one console error that says the playlist cannot be played.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, waitFor, cleanup } from '@testing-library/react';
+import { render, waitFor, cleanup, act } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, TrackKind } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -77,27 +78,31 @@ const Probe: React.FC = () => {
   return null;
 };
 
-function mount(tracks: ClipTrack[], options: { withOnError?: boolean; onReady?: () => void } = {}) {
-  const { withOnError = true, onReady } = options;
+function mount(
+  tracks: ClipTrack[],
+  options: { withOnError?: boolean; onReady?: () => void; failBuild?: Error } = {}
+) {
+  const { withOnError = true, onReady, failBuild } = options;
   const adapters: ReturnType<typeof createFakeAdapter>[] = [];
   const onError = vi.fn();
-  const view = (next: ClipTrack[]) => (
-    <WaveformPlaylistProvider
-      tracks={next}
+  const arrangement = testArrangement(tracks);
+  render(
+    <TestProvider
+      arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       onError={withOnError ? onError : undefined}
       onReady={onReady}
       createAdapter={() => {
+        if (failBuild) throw failBuild;
         const adapter = createFakeAdapter();
         adapters.push(adapter);
         return adapter;
       }}
     >
       <Probe />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
-  const rendered = render(view(tracks));
-  return { adapters, onError, rerender: (next: ClipTrack[]) => rendered.rerender(view(next)) };
+  return { adapters, onError, arrangement };
 }
 
 afterEach(() => {
@@ -107,49 +112,20 @@ afterEach(() => {
 });
 
 describe('a wrong-kind track in the provider (#756)', () => {
-  it('is reported through onError; the page keeps rendering and the playlist is not ready', async () => {
+  it('a wrong-kind track added to a mounted playlist throws to the caller; onError is not called, nothing reaches the adapter and the playlist stays ready', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const mixed = track('t1', 'audio', [clip('a'), clip('m', true)]);
-
-    const { adapters, onError } = mount([mixed]);
-
-    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
-    expect(onError.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect(onError.mock.calls[0][0].message).toMatch(
-      /"t1" is an audio track[\s\S]*"m" is a midi clip/
-    );
-    expect(isReady).toBe(false);
-    for (const adapter of adapters) {
-      const withTracks = adapter.setTracks.mock.calls.filter(([list]) => list.length > 0);
-      expect(withTracks).toEqual([]);
-    }
-  });
-
-  it('tracks appended to a running playlist: a bad one is reported and none of the batch is added first', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const first = track('a', 'audio', [clip('c1')]);
-    const { adapters, onError, rerender } = mount([first]);
+    const { adapters, onError, arrangement } = mount([track('a', 'audio', [clip('c1')])]);
     await waitFor(() => expect(isReady).toBe(true));
     const running = adapters[adapters.length - 1];
 
-    // Same first track object, two appended: the incremental path.
-    rerender([first, track('b', 'audio', [clip('c2')]), track('m', 'audio', [clip('c3', true)])]);
+    expect(() => act(() => arrangement.addTrack(track('m', 'audio', [clip('c3', true)])))).toThrow(
+      /"m" is an audio track/
+    );
 
-    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
-    expect(onError.mock.calls[0][0].message).toMatch(/"m" is an audio track/);
+    expect(onError).not.toHaveBeenCalled();
     expect(running.addTrack).not.toHaveBeenCalled();
-    expect(isReady).toBe(false);
-  });
-
-  it('a later valid tracks prop recovers', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { onError, rerender } = mount([track('t1', 'audio', [clip('m', true)])]);
-    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
-
-    rerender([track('t1', 'midi', [clip('m', true)])]);
-
-    await waitFor(() => expect(isReady).toBe(true));
-    expect(onError).toHaveBeenCalledTimes(1);
+    expect(adapters).toHaveLength(1);
+    expect(isReady).toBe(true);
   });
 
   it('accepts an audio track and a MIDI track side by side', async () => {
@@ -162,22 +138,16 @@ describe('a wrong-kind track in the provider (#756)', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
-  // #812: the engine refuses two tracks with one id (it used to accept them).
-  // An app that has them goes from "plays, with a warning" to "never finishes
-  // loading", so the console says so as an error, not as a warning.
   describe('a playlist that cannot be built says so as a console error', () => {
-    const twins = () => [
-      track('same', 'audio', [clip('a', false)]),
-      track('same', 'audio', [clip('b', false)]),
-    ];
+    const noEngine = () => new Error('no audio engine here');
 
-    it('duplicate track ids: onError gets the error, and one console.error names the cause and the state', async () => {
+    it('onError gets the error, and one console.error names the cause and the state', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const { onError } = mount(twins());
+      const { onError } = mount([track('a', 'audio', [clip('a')])], { failBuild: noEngine() });
 
       await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
-      expect(onError.mock.calls[0][0].message).toMatch(/Duplicate track id "same"/);
+      expect(onError.mock.calls[0][0].message).toBe('no audio engine here');
       expect(isReady).toBe(false);
 
       const messages = error.mock.calls.map((call) => String(call[0]));
@@ -188,7 +158,7 @@ describe('a wrong-kind track in the provider (#756)', () => {
       // The waveform is drawn from the tracks all the same: only playback is missing.
       expect(ours[0]).toMatch(/cannot be played/);
       expect(ours[0]).not.toMatch(/nothing is drawn/);
-      expect(ours[0]).toMatch(/Duplicate track id "same"/);
+      expect(ours[0]).toMatch(/no audio engine here/);
       // With an onError prop the app is handling it: no hint to add one.
       expect(ours[0]).not.toMatch(/onError/);
     });
@@ -196,7 +166,7 @@ describe('a wrong-kind track in the provider (#756)', () => {
     it('without an onError prop, the message says how to handle it in the app', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mount(twins(), { withOnError: false });
+      mount([track('a', 'audio', [clip('a')])], { withOnError: false, failBuild: noEngine() });
 
       await waitFor(() =>
         expect(
@@ -207,20 +177,8 @@ describe('a wrong-kind track in the provider (#756)', () => {
         .map((call) => String(call[0]))
         .filter((message) => message.startsWith('[waveform-playlist]'));
       expect(ours).toHaveLength(1);
-      expect(ours[0]).toMatch(/Duplicate track id "same"/);
+      expect(ours[0]).toMatch(/no audio engine here/);
       expect(ours[0]).toMatch(/onError/);
-    });
-
-    it('a wrong-kind track is reported the same way', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const { onError } = mount([track('t1', 'audio', [clip('m', true)])]);
-      await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
-      const ours = error.mock.calls
-        .map((call) => String(call[0]))
-        .filter((message) => message.startsWith('[waveform-playlist]'));
-      expect(ours).toHaveLength(1);
-      expect(ours[0]).toMatch(/could not be built[\s\S]*is an audio track/);
     });
 
     it('an onReady callback that throws is reported as that, not as a playlist that could not be built', async () => {

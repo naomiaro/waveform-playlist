@@ -12,7 +12,7 @@
  */
 import type { LoadingClip } from '@waveform-playlist/core';
 import type WaveformData from 'waveform-data';
-import type { ClipPeaks } from '../WaveformPlaylistContext';
+import type { ClipPeaks, TrackClipPeaks } from '../WaveformPlaylistContext';
 import { extractFromOwnWaveformData } from './derivePeaks';
 
 export interface PlaceholderPeaksOptions {
@@ -124,4 +124,16 @@ export function placeholderPeaks(
   const result = build(clip, trackName, options);
   memo.set(clip, { trackName, options: { ...options }, result });
   return result;
+}
+
+/** The end in seconds of the last placeholder record of `rows`, 0 when there is none. */
+export function placeholdersEnd(rows: readonly TrackClipPeaks[]): number {
+  let end = 0;
+  for (const row of rows) {
+    for (const record of row) {
+      if (!record.isPlaceholder || !record.sampleRate) continue;
+      end = Math.max(end, (record.startSample + record.durationSamples) / record.sampleRate);
+    }
+  }
+  return end;
 }

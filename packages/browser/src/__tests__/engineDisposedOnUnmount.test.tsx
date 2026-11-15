@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 //
 // #811: the provider disposed its engine (and the adapter with it) only from
-// the cleanup of the loading effect's full-build path. The other paths of that
-// effect (an engine clip operation, an incremental add or placeholder fill,
-// the emptied timeline with the engine kept, a deferred rebuild) return no
-// cleanup, so after any of them an unmount disposed nothing: the AudioContext
-// stayed open and, on the Tone path, the transport kept running.
+// the cleanup of the loading effect's full-build path; after any of its other
+// paths an unmount disposed nothing. Since #812 there is one path: an engine
+// is built on the arrangement on mount and when `effects` or the zoom levels
+// change, a track edit builds nothing, and every cleanup of the build effect
+// disposes. One case per remaining way the provider can be left: after a
+// build, after track edits, while a build is in flight, after a failed build,
+// StrictMode, an <Activity> hide, and playback across each.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
-import React, { StrictMode, useState } from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import React, { StrictMode } from 'react';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   useEngineRefs,
   useIsPlaying,
@@ -18,7 +20,8 @@ import {
   usePlaylistTimeline,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { PlayoutAdapter, PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement, PlayoutAdapter, PlaylistEngine } from '@waveform-playlist/engine';
+import type { EffectsFunction } from '@waveform-playlist/playout';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -91,7 +94,7 @@ let engineRef: React.RefObject<PlaylistEngine | null>;
 let isReady: boolean;
 let isPlaying: boolean;
 let play: (startTime?: number) => Promise<void>;
-let setAppTracks: (tracks: ClipTrack[]) => void;
+let arrangement: Arrangement;
 
 const Probe: React.FC = () => {
   engineRef = useEngineRefs().playoutRef;
@@ -101,28 +104,21 @@ const Probe: React.FC = () => {
   return null;
 };
 
-// An app that keeps `tracks` in state and stores what the provider reports, so
-// an engine clip operation comes back as the engine's own array.
-const App: React.FC<{
-  initial: ClipTrack[];
-  deferEngineRebuild?: boolean;
-  soundFontCache?: unknown;
-}> = ({ initial, deferEngineRebuild, soundFontCache }) => {
-  const [tracks, setTracks] = useState<ClipTrack[]>(initial);
-  setAppTracks = setTracks;
-  return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      onTracksChange={setTracks}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-      deferEngineRebuild={deferEngineRebuild}
-      soundFontCache={soundFontCache as never}
-    >
-      <Probe />
-    </WaveformPlaylistProvider>
-  );
-};
+// The provider on the test's arrangement; a new `effects` function builds a
+// new engine on it.
+const App: React.FC<{ effects?: EffectsFunction; createAdapter?: () => PlayoutAdapter }> = ({
+  effects,
+  createAdapter: create = createAdapter,
+}) => (
+  <TestProvider
+    arrangement={arrangement}
+    sampleRate={SAMPLE_RATE}
+    createAdapter={create}
+    effects={effects}
+  >
+    <Probe />
+  </TestProvider>
+);
 
 const settle = () =>
   act(async () => {
@@ -132,22 +128,26 @@ const settle = () =>
 const disposeCounts = () => adapters.map((adapter) => adapter.dispose.mock.calls.length);
 
 const drums = () => makeTrack('t1', [makeClip('c1')]);
+const effectsB: EffectsFunction = () => undefined;
+
+function reset() {
+  adapters = [];
+  failNextAdapter = false;
+  isReady = false;
+  isPlaying = false;
+  arrangement = testArrangement([drums()]);
+}
 
 describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () => {
-  beforeEach(() => {
-    adapters = [];
-    failNextAdapter = false;
-    isReady = false;
-  });
+  beforeEach(reset);
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
-  // Control: the path that worked before #811.
   it('after the initial build', async () => {
-    const view = render(<App initial={[drums()]} />);
+    const view = render(<App />);
     await waitFor(() => expect(isReady).toBe(true));
 
     view.unmount();
@@ -155,90 +155,57 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     expect(disposeCounts()).toEqual([1]);
   });
 
-  it('after a track is appended (incremental add)', async () => {
-    const t1 = drums();
-    const view = render(<App initial={[t1]} />);
+  it('after track edits (an add, a clip move, the timeline emptied): one engine, disposed once', async () => {
+    const view = render(<App />);
     await waitFor(() => expect(isReady).toBe(true));
 
     await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c2')]));
+      arrangement.moveClip('t1', 'c1', SAMPLE_RATE);
+      arrangement.removeTrack('t1');
+      arrangement.removeTrack('t2');
     });
     await settle();
     expect(adapters).toHaveLength(1);
     expect(adapters[0].addTrack).toHaveBeenCalledTimes(1);
+    expect(adapters[0].dispose).not.toHaveBeenCalled();
 
     view.unmount();
 
     expect(disposeCounts()).toEqual([1]);
   });
 
-  it('after a placeholder track gets its clips (incremental fill)', async () => {
-    const t1 = drums();
-    const placeholder = makeTrack('t2', []);
-    const view = render(<App initial={[t1, placeholder]} />);
-    await waitFor(() => expect(isReady).toBe(true));
-
-    await act(async () => {
-      setAppTracks([t1, { ...placeholder, clips: [makeClip('c2')] }]);
-    });
+  it('while a build is in flight: the adapter that arrives after the unmount is disposed', async () => {
+    let deliver!: () => void;
+    const held = makeAdapter();
+    const holding = () => {
+      adapters.push(held);
+      return new Promise<FakeAdapter>((resolve) => {
+        deliver = () => resolve(held);
+      }) as unknown as PlayoutAdapter;
+    };
+    const view = render(<App createAdapter={holding} />);
     await settle();
-    expect(adapters).toHaveLength(1);
-    expect(adapters[0].updateTrack).toHaveBeenCalledTimes(1);
+    expect(engineRef.current).toBeNull();
 
     view.unmount();
+    await act(async () => {
+      deliver();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
 
     expect(disposeCounts()).toEqual([1]);
   });
 
-  it('after an engine clip operation (the tracks come back from the engine)', async () => {
-    const view = render(<App initial={[drums()]} />);
+  it('after a failed build: nothing is left to dispose, and the unmount disposes nothing twice', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const view = render(<App />);
     await waitFor(() => expect(isReady).toBe(true));
-
-    await act(async () => {
-      engineRef.current!.moveClip('t1', 'c1', SAMPLE_RATE);
-    });
+    failNextAdapter = true;
+    view.rerender(<App effects={effectsB} />);
     await settle();
-    expect(adapters).toHaveLength(1);
-
-    view.unmount();
-
+    expect(engineRef.current).toBeNull();
     expect(disposeCounts()).toEqual([1]);
-  });
-
-  it('after the timeline is emptied with the engine kept', async () => {
-    const t1 = drums();
-    const view = render(<App initial={[t1]} />);
-    await waitFor(() => expect(isReady).toBe(true));
-    // An incremental change first, so the run before the emptying returned no
-    // cleanup and the emptying takes the keep-the-engine branch.
-    await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
-    });
-    await act(async () => {
-      setAppTracks([]);
-    });
-    await settle();
-    expect(adapters).toHaveLength(1);
-
-    view.unmount();
-
-    expect(disposeCounts()).toEqual([1]);
-  });
-
-  it('while a rebuild is deferred', async () => {
-    const t1 = drums();
-    const view = render(<App initial={[t1]} />);
-    await waitFor(() => expect(isReady).toBe(true));
-    await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
-    });
-    // A change that would rebuild, made while rebuilds are deferred.
-    view.rerender(<App initial={[t1]} deferEngineRebuild />);
-    await act(async () => {
-      setAppTracks([{ ...t1, clips: [makeClip('c1', SAMPLE_RATE)] }]);
-    });
-    await settle();
-    expect(adapters).toHaveLength(1);
 
     view.unmount();
 
@@ -246,10 +213,9 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
   });
 
   it('under StrictMode: the engine survives the mount, cleanup, mount and goes on unmount', async () => {
-    const t1 = drums();
     const view = render(
       <StrictMode>
-        <App initial={[t1]} />
+        <App />
       </StrictMode>
     );
     await waitFor(() => expect(isReady).toBe(true));
@@ -260,7 +226,7 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     expect(adapters.slice(0, -1).every((a) => a.dispose.mock.calls.length === 1)).toBe(true);
 
     await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c2')]));
     });
     expect(adapters[adapters.length - 1]).toBe(live);
     expect(live.dispose).not.toHaveBeenCalled();
@@ -270,22 +236,20 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     expect(disposeCounts().every((count) => count === 1)).toBe(true);
   });
 
-  // An <Activity> hide runs the same cleanups as an unmount. On reveal React
-  // runs each effect again with the closure of the LATEST render, also when
-  // its dependencies did not change. Here that render is the engine clip
-  // operation's (made in the commit of the hide), whose path returns early;
-  // with the engine gone it must build one instead.
-  it('rebuilds on an <Activity> reveal after a hide that disposed it', async () => {
+  // An <Activity> hide runs the same cleanups as an unmount; the reveal runs
+  // the build effect again. A clip edit made in the commit of the hide is the
+  // arrangement's, so the rebuilt engine has it.
+  it('rebuilds on an <Activity> reveal after a hide that disposed it, with the edit made meanwhile', async () => {
     const tree = (mode: 'visible' | 'hidden') => (
       <React.Activity mode={mode}>
-        <App initial={[drums()]} />
+        <App />
       </React.Activity>
     );
     const view = render(tree('visible'));
     await waitFor(() => expect(isReady).toBe(true));
 
     await act(async () => {
-      engineRef.current!.moveClip('t1', 'c1', SAMPLE_RATE);
+      arrangement.moveClip('t1', 'c1', SAMPLE_RATE);
       view.rerender(tree('hidden'));
     });
     await settle();
@@ -299,88 +263,13 @@ describe('WaveformPlaylistProvider disposes its engine on unmount (#811)', () =>
     const given = adapters[1].setTracks.mock.lastCall![0] as ClipTrack[];
     expect(given[0].clips[0].startSample).toBe(SAMPLE_RATE);
   });
-
-  // A deferred rebuild builds nothing, so after a hide that disposed the
-  // engine the view is not ready until the deferral ends, as on a mount with
-  // deferEngineRebuild set (it must not say ready with no engine to play).
-  it('an <Activity> reveal while a rebuild is deferred is not ready until the deferral ends', async () => {
-    const t1 = drums();
-    const tree = (mode: 'visible' | 'hidden', defer: boolean) => (
-      <React.Activity mode={mode}>
-        <App initial={[t1]} deferEngineRebuild={defer} />
-      </React.Activity>
-    );
-    const view = render(tree('visible', false));
-    await waitFor(() => expect(isReady).toBe(true));
-    // An incremental run first (no cleanup), so setting the flag leaves the
-    // engine alive: the deferred path is reached with an engine.
-    await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
-    });
-    view.rerender(tree('visible', true));
-    await settle();
-    expect(engineRef.current).not.toBeNull();
-    expect(isReady).toBe(true);
-
-    view.rerender(tree('hidden', true));
-    await settle();
-    view.rerender(tree('visible', true));
-    await settle();
-    expect(engineRef.current).toBeNull();
-    expect(isReady).toBe(false);
-
-    view.rerender(tree('visible', false));
-    await waitFor(() => expect(isReady).toBe(true));
-    expect(engineRef.current).not.toBeNull();
-    expect(adapters).toHaveLength(2);
-    expect(disposeCounts()).toEqual([1, 0]);
-  });
-});
-
-// Maintainer's choice (2026-11-13): no engine means not ready, also when the
-// flag turns true after a load (an app loading a new set of files with
-// `deferEngineRebuild={loading}`). The flag change disposes the engine; until
-// #811 the view stayed ready with nothing for Play to start.
-describe('deferEngineRebuild turned on after a load (#811)', () => {
-  beforeEach(() => {
-    adapters = [];
-    failNextAdapter = false;
-    isReady = false;
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
-  it('is not ready while there is no engine, and ready again when the build ends', async () => {
-    const t1 = drums();
-    const view = render(<App initial={[t1]} />);
-    await waitFor(() => expect(isReady).toBe(true));
-
-    view.rerender(<App initial={[t1]} deferEngineRebuild />);
-    await settle();
-    expect(engineRef.current).toBeNull();
-    expect(isReady).toBe(false);
-    expect(disposeCounts()).toEqual([1]);
-
-    view.rerender(<App initial={[t1]} />);
-    await waitFor(() => expect(isReady).toBe(true));
-    expect(engineRef.current).not.toBeNull();
-    expect(disposeCounts()).toEqual([1, 0]);
-  });
 });
 
 // Maintainer's choice (2026-11-13): a provider hidden in an <Activity> during
 // playback stops its audio (the engine is disposed with the hide) and resumes
 // from where it was hidden when it is shown again.
 describe('playback across an unmount or an <Activity> hide (#811)', () => {
-  beforeEach(() => {
-    adapters = [];
-    failNextAdapter = false;
-    isReady = false;
-    isPlaying = false;
-  });
+  beforeEach(reset);
 
   afterEach(() => {
     cleanup();
@@ -398,11 +287,10 @@ describe('playback across an unmount or an <Activity> hide (#811)', () => {
   };
 
   it('an unmount during playback disposes the playing adapter', async () => {
-    const t1 = drums();
-    const view = render(<App initial={[t1]} />);
+    const view = render(<App />);
     await waitFor(() => expect(isReady).toBe(true));
     await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c2')]));
     });
     await startPlayingAt(2.5);
 
@@ -412,16 +300,15 @@ describe('playback across an unmount or an <Activity> hide (#811)', () => {
   });
 
   it('a hide during playback stops the audio; the reveal resumes where it was hidden', async () => {
-    const t1 = drums();
     const tree = (mode: 'visible' | 'hidden') => (
       <React.Activity mode={mode}>
-        <App initial={[t1]} />
+        <App />
       </React.Activity>
     );
     const view = render(tree('visible'));
     await waitFor(() => expect(isReady).toBe(true));
     await act(async () => {
-      setAppTracks([t1, makeTrack('t2', [makeClip('c2')])]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c2')]));
     });
     await startPlayingAt(2.5);
 
@@ -439,36 +326,26 @@ describe('playback across an unmount or an <Activity> hide (#811)', () => {
 });
 
 describe('adapterRef never points at a disposed adapter (#811)', () => {
-  beforeEach(() => {
-    adapters = [];
-    failNextAdapter = false;
-    isReady = false;
-  });
+  beforeEach(reset);
 
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
-  // The failed-load path disposes `adapterRef.current` when no engine was
-  // built. A full build's cleanup cleared the ref, but a rebuild that follows
-  // a run with no cleanup (here an incremental add) disposed the old engine
-  // inside loadAudio without clearing it, so a failure to create the
-  // replacement disposed the old adapter a second time.
+  // A failure to create the replacement adapter must not dispose the old one
+  // a second time.
   it('a rebuild whose adapter creation fails does not dispose the old adapter again', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const t1 = drums();
-    const t2 = makeTrack('t2', [makeClip('c2')]);
-    render(<App initial={[t1]} />);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const view = render(<App />);
     await waitFor(() => expect(isReady).toBe(true));
     await act(async () => {
-      setAppTracks([t1, t2]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c2')]));
     });
 
     failNextAdapter = true;
-    await act(async () => {
-      setAppTracks([{ ...t1, clips: [makeClip('c1', SAMPLE_RATE)] }, t2]);
-    });
+    view.rerender(<App effects={effectsB} />);
     await settle();
 
     expect(disposeCounts()).toEqual([1]);

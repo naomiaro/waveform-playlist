@@ -4,14 +4,16 @@
 // `trackEffects` prop (a lookup by track id), not through a field on the track
 // object. Attaching the field meant copying every track on every `tracks`
 // change, which defeated both of the provider's incremental paths: every clip
-// move, trim, split and file drop disposed and rebuilt the whole engine.
+// move, trim, split and file drop disposed and rebuilt the whole engine. Since
+// #812 the arrangement owns the tracks and no edit rebuilds anything; the
+// lookup is still how per-track effects reach the adapter.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { TrackEffectsFunction } from '@waveform-playlist/playout';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 
 const SAMPLE_RATE = 48000;
 
@@ -54,7 +56,7 @@ vi.mock('@waveform-playlist/playout', () => ({
   configureGlobalContext: h.configureGlobalContext,
 }));
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import { useEngineRefs, usePlaylistTimeline } from '../contexts/playlistContexts';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -80,7 +82,7 @@ function makeTrack(id: string, clips: AudioClip[]): ClipTrack {
 
 let engineRef: React.RefObject<PlaylistEngine | null>;
 let isReady = false;
-let setAppTracks: (update: (tracks: ClipTrack[]) => ClipTrack[]) => void;
+let arrangement: Arrangement;
 
 const Probe: React.FC = () => {
   engineRef = useEngineRefs().playoutRef;
@@ -88,30 +90,14 @@ const Probe: React.FC = () => {
   return null;
 };
 
-// What an app does: keep `tracks` in state, store what the provider reports.
-// `copyTracks` is what apps did before #752 to attach `effects` to each track.
+// The provider on the test's arrangement, with the default (Tone) adapter path.
 const App: React.FC<{
   trackEffects?: (trackId: string) => TrackEffectsFunction | undefined;
-  copyTracks?: boolean;
-}> = ({ trackEffects, copyTracks = false }) => {
-  const [tracks, setTracks] = useState<ClipTrack[]>(() => [
-    makeTrack('t1', [makeClip('c1')]),
-    makeTrack('t2', [makeClip('c2', SAMPLE_RATE * 8)]),
-  ]);
-  setAppTracks = setTracks;
-  const passed = useMemo(
-    () => (copyTracks ? tracks.map((track) => ({ ...track })) : tracks),
-    [tracks, copyTracks]
-  );
+}> = ({ trackEffects }) => {
   return (
-    <WaveformPlaylistProvider
-      tracks={passed}
-      onTracksChange={setTracks}
-      sampleRate={SAMPLE_RATE}
-      trackEffects={trackEffects}
-    >
+    <TestProvider arrangement={arrangement} sampleRate={SAMPLE_RATE} trackEffects={trackEffects}>
       <Probe />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 };
 
@@ -131,6 +117,10 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     h.adapters.length = 0;
     h.createToneAdapter.mockClear();
     isReady = false;
+    arrangement = testArrangement([
+      makeTrack('t1', [makeClip('c1')]),
+      makeTrack('t2', [makeClip('c2', SAMPLE_RATE * 8)]),
+    ]);
   });
 
   afterEach(() => {
@@ -149,8 +139,8 @@ describe('WaveformPlaylistProvider trackEffects', () => {
   });
 
   // Guards the design, not a regression: the provider must not implement the
-  // prop by attaching the function to the tracks it hands on (they come back
-  // through onTracksChange).
+  // prop by attaching the function to the tracks it hands on (they are the
+  // arrangement's, and every reader sees them).
   it('does not put a function on the tracks it gives the engine or reports back', async () => {
     const reverb: TrackEffectsFunction = () => undefined;
     render(<App trackEffects={() => reverb} />);
@@ -183,9 +173,8 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(lookup('t1')).toBe(second);
   });
 
-  // The reason for the prop. This case passes with or without `trackEffects`
-  // (tracks passed through were always applied incrementally); the control
-  // case after it shows what copying the tracks costs.
+  // The reason for the prop: no track is copied to carry its effects, and
+  // since #812 no edit of the arrangement rebuilds the engine.
   it('keeps one engine through clip edits and added tracks', async () => {
     const reverb: TrackEffectsFunction = () => undefined;
     render(<App trackEffects={() => reverb} />);
@@ -209,18 +198,16 @@ describe('WaveformPlaylistProvider trackEffects', () => {
 
     // A dropped file that is already decoded.
     await act(async () => {
-      setAppTracks((tracks) => [...tracks, makeTrack('t3', [makeClip('c3')])]);
+      arrangement.addTrack(makeTrack('t3', [makeClip('c3')]));
     });
     await settle();
-    // A placeholder, then its audio (useDynamicTracks).
+    // An empty track, then a clip put on it.
     await act(async () => {
-      setAppTracks((tracks) => [...tracks, makeTrack('t4', [])]);
+      arrangement.addTrack(makeTrack('t4', []));
     });
     await settle();
     await act(async () => {
-      setAppTracks((tracks) =>
-        tracks.map((track) => (track.id === 't4' ? { ...track, clips: [makeClip('c4')] } : track))
-      );
+      arrangement.updateTrack('t4', (track) => ({ ...track, clips: [makeClip('c4')] }));
     });
     await settle();
 
@@ -230,26 +217,6 @@ describe('WaveformPlaylistProvider trackEffects', () => {
     expect(h.createToneAdapter).toHaveBeenCalledTimes(1);
     expect(adapter.dispose).not.toHaveBeenCalled();
     expect(adapter.setTracks).toHaveBeenCalledTimes(1);
-  });
-
-  it('control: copied track objects rebuild the engine on a clip edit and on an added track', async () => {
-    render(<App copyTracks />);
-    await waitFor(() => expect(isReady).toBe(true));
-    expect(h.createToneAdapter).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      engineRef.current!.moveClip('t1', 'c1', SAMPLE_RATE);
-    });
-    await settle();
-    await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(2));
-    expect(h.adapters[0].dispose).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      setAppTracks((tracks) => [...tracks, makeTrack('t3', [makeClip('c3')])]);
-    });
-    await settle();
-    await waitFor(() => expect(h.createToneAdapter).toHaveBeenCalledTimes(3));
-    expect(h.adapters[1].dispose).toHaveBeenCalledTimes(1);
   });
 
   // Checked by `pnpm typecheck` (vitest does not type-check).
