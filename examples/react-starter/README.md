@@ -23,8 +23,10 @@ setup), which means the warning can appear at page load.
 
 What matters is what happens on the first **Play** click:
 
-- Decoding and waveform rendering happen up front (`useAudioTracks`) — that
-  never needs a gesture.
+- Fetching and decoding the audio happens as soon as the provider mounts (the
+  arrangement from `useCreateArrangement` loads the files its `audioTrack({ src })`
+  tracks name, and each row shows a placeholder until its file has decoded) —
+  that never needs a gesture.
 - The first `play()` call *resumes* the suspended context (`Tone.start()`
   internally) — inside the click handler, i.e. a real user gesture. From that
   point audio runs normally.

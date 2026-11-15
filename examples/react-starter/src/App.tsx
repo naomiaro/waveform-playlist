@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -11,9 +10,10 @@ import {
   ZoomOutButton,
   MasterVolumeControl,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
-import type { ClipTrack } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 
 // Audio stems served from website/static (Vite publicDir).
@@ -110,34 +110,15 @@ const Controls = styled.div`
   background: #1d1d26;
 `;
 
-const Status = styled.div`
-  padding: 2rem;
-  text-align: center;
-  color: #9a9aa6;
-`;
-
 export function App() {
-  // Decoding happens up front; the AudioContext stays suspended until the
-  // first user gesture — see "AudioContext and user gestures" in README.md.
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } =
-    useAudioTracks(audioConfigs);
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Sync local track state as peaks fill in; once loading finishes this stops
-  // firing, so later updates come from onTracksChange.
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Page>
-        <Status>Error loading audio: {error}</Status>
-      </Page>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio: each row shows a
+  // placeholder until its file has decoded. The AudioContext stays suspended
+  // until the first user gesture — see "AudioContext and user gestures" in
+  // README.md.
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const failed = [...sources.sources.values()].find((source) => source.status === 'failed');
+  const loadedCount = sources.sources.size - sources.pendingCount - sources.failedCount;
 
   return (
     <Page>
@@ -151,9 +132,7 @@ export function App() {
       </Header>
 
       <WaveformPlaylistProvider
-        tracks={tracks}
-        onTracksChange={setTracks}
-        deferEngineRebuild={loading}
+        arrangement={arrangement}
         sampleRate={48000}
         samplesPerPixel={1024}
         mono
@@ -168,9 +147,14 @@ export function App() {
           <ZoomOutButton />
           <AudioPosition />
           <MasterVolumeControl />
-          {loading && (
+          {sources.isLoading && (
             <span style={{ fontSize: '0.875rem', color: '#9a9aa6' }}>
-              Loading {loadedCount}/{totalCount}…
+              Loading {loadedCount}/{sources.sources.size}…
+            </span>
+          )}
+          {failed && (
+            <span style={{ fontSize: '0.875rem', color: '#d08070' }}>
+              Error loading audio: {failed.error?.message ?? 'the file could not be loaded'}
             </span>
           )}
         </Controls>

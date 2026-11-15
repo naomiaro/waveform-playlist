@@ -35,7 +35,7 @@ interface ErrorBoundaryState {
  * @example
  * ```tsx
  * <PlaylistErrorBoundary>
- *   <WaveformPlaylistProvider tracks={tracks}>
+ *   <WaveformPlaylistProvider arrangement={arrangement}>
  *     <Waveform />
  *   </WaveformPlaylistProvider>
  * </PlaylistErrorBoundary>

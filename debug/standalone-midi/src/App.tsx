@@ -14,10 +14,13 @@ import {
   AudioPosition,
   AutomaticScrollCheckbox,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementTracks,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import { useMidiTracks } from '@waveform-playlist/midi';
-import { SoundFontCache } from '@waveform-playlist/playout';
+import type { Arrangement } from '@waveform-playlist/engine';
+import { loadMidiTracks } from '@waveform-playlist/midi';
+import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 
 const darkThemeOverrides: Partial<WaveformPlaylistTheme> = {
   waveformDrawMode: 'inverted',
@@ -162,24 +165,63 @@ function ScrollMonitor() {
   );
 }
 
+const MIDI_SRC = '/media/midi/RedHotChiliPeppers-Otherside.mid';
+
+type MidiLoad = { status: 'loading' } | { status: 'loaded' } | { status: 'failed'; message: string };
+
+/**
+ * Loads the .mid file into `arrangement`, clears the undo history (the first
+ * load is not an undo step) and only then says 'loaded'. The page renders the
+ * provider after that, so "ready" means the MIDI is in.
+ */
+function useMidiLoad(arrangement: Arrangement): MidiLoad {
+  const [state, setState] = React.useState<MidiLoad>({ status: 'loading' });
+  // Set once the tracks are in: an effect that runs again must not add them twice
+  const addedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (addedRef.current) return undefined;
+    const controller = new AbortController();
+    loadMidiTracks(MIDI_SRC, {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
+      .then((tracks) => {
+        if (controller.signal.aborted) return;
+        tracks.forEach((track) => arrangement.addTrack(track));
+        arrangement.clearHistory();
+        addedRef.current = true;
+        setState({ status: 'loaded' });
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        setState({ status: 'failed', message: err instanceof Error ? err.message : String(err) });
+      });
+    return () => controller.abort();
+  }, [arrangement]);
+
+  return state;
+}
+
 export function App() {
   const soundFontCache = useSoundFontCache('/media/soundfont/A320U.sf2');
 
-  const midiConfigs = React.useMemo(
-    () => [
-      {
-        src: '/media/midi/RedHotChiliPeppers-Otherside.mid',
-      },
-    ],
-    []
-  );
+  const arrangement = useCreateArrangement();
+  const midiLoad = useMidiLoad(arrangement);
+  const trackCount = useArrangementTracks(arrangement).length;
 
-  const { tracks, loading, error, loadedCount, totalCount } = useMidiTracks(midiConfigs);
-
-  if (error) {
+  if (midiLoad.status === 'failed') {
     return (
       <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>Error loading MIDI: {error}</div>
+        <div style={{ padding: '2rem', color: 'red' }}>Error loading MIDI: {midiLoad.message}</div>
+      </Container>
+    );
+  }
+
+  if (midiLoad.status === 'loading') {
+    return (
+      <Container>
+        <div style={{ padding: '2rem', color: '#888' }}>Loading MIDI tracks...</div>
       </Container>
     );
   }
@@ -200,11 +242,11 @@ export function App() {
         {soundFontCache
           ? 'MIDI tracks use SoundFont sample playback.'
           : 'MIDI tracks are synthesized via Tone.js PolySynth.'}
-        {` Showing ${tracks.length} individual MIDI tracks.`}
+        {` Showing ${trackCount} individual MIDI tracks.`}
       </InfoBanner>
 
       <WaveformPlaylistProvider
-        tracks={tracks}
+        arrangement={arrangement}
         samplesPerPixel={2048}
         mono
         theme={darkThemeOverrides}
@@ -216,11 +258,6 @@ export function App() {
           <PauseButton />
           <StopButton />
           <AudioPosition />
-          {loading && (
-            <span style={{ fontSize: '0.875rem', color: '#888' }}>
-              Loading ({loadedCount}/{totalCount})...
-            </span>
-          )}
           <AutomaticScrollCheckbox />
         </Controls>
 

@@ -79,7 +79,7 @@ export default function MidiExamplePage(): React.ReactElement {
           <p>This example demonstrates:</p>
           <ul>
             <li>
-              Loading <code>.mid</code> files with <code>useMidiTracks()</code> from{' '}
+              Loading <code>.mid</code> files with <code>loadMidiTracks()</code> from{' '}
               <code>@waveform-playlist/midi</code>
             </li>
             <li>
