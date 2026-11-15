@@ -4,8 +4,9 @@ on:
   pull_request:
     branches: [main]
     # Nothing below is read by the jobs here (package build, lint of
-    # packages/*/src, unit tests), so a pull request that changes only these
-    # paths starts no run and shows no checks.
+    # packages/*/src, unit tests, the Playwright suite over the example
+    # pages), so a pull request that changes only these paths starts no run
+    # and shows no checks.
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -62,6 +63,51 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:unit
+
+  # The whole Playwright suite (Chromium), against the Docusaurus dev server
+  # and the dawcore-native Vite example, both started by playwright.config.ts.
+  # `pnpm build` first: the website reads worklets, webaudio-peaks and the
+  # @dawcore/* packages from dist. With CI set, the config runs one worker and
+  # retries a failed test twice; the report of a failed run is kept as an
+  # artifact.
+  e2e:
+    runs-on: ubuntu-latest
+    name: E2E (Playwright)
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run the Playwright suite
+        run: pnpm test
+
+      - name: Upload the Playwright report
+        if: ${{ !cancelled() && failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
   # Tone.js's stable line rarely releases; `next` is the 15.5.x prerelease
   # line that the `tone ^15.0.0` peer range also admits (#671). This job
