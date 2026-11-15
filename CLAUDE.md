@@ -279,7 +279,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 
 **Label the choices the way they will be answered, and keep what I plan to run out of the list.** On #771 part 2 three choices were numbered 1 to 3 and the answer came back as a), b), c); a sentence after the list about a test I meant to run ("the `immediate: true` case") was then looked for as a question that did not exist. Letter the choices, one line each, and put "next I will run…" in a separate paragraph that says it needs no answer.
 
-**`website` aliases `annotations`, `recording`, `engine`, `spectrogram` and `midi` to source** (`website/docusaurus.config.ts`), so a prototype may edit them with only the dev server running. Bulk file changes under a running Docusaurus dev server can abort it (rspack panic, SIGABRT): check the server's log before trusting a probe after a large patch.
+**`website` aliases `browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `midi` and `recording` to source** (`website/docusaurus.config.ts`, read 2026-11-14; `worklets`, `webaudio-peaks` and `@dawcore/*` come from `dist`), so a prototype may edit them with only the dev server running. Bulk file changes under a running Docusaurus dev server can abort it (rspack panic, SIGABRT): check the server's log before trusting a probe after a large patch.
 
 **GitHub closing keywords don't distribute over comma lists** — `fixes #589, #590, #593` in a squash-merge commit closes ONLY #589; each reference needs its own keyword (`fixes #589, fixes #590, fixes #593`). A `closes #N` in the PR body works independently. After merging a multi-issue PR, verify each issue actually closed (`gh issue view N --json state`).
 

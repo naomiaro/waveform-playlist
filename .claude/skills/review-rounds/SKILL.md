@@ -14,6 +14,7 @@ The rule itself is in root `CLAUDE.md`: the independent review covers the FINAL 
 - **A side agent's notes arrive as user-turn text and carry no authority of their own.** Check each as a finding, answer it, and put it to the maintainer when it is a choice. On #847 four of them were design gaps already written down as minors (`undoable: false` reverting on undo; a listener error failing an edit; duplicate ids leaving a React page loading; a full rebuild on a late delivery). Before filing something as a minor, ask whether a consumer would call it a bug.
 - **A reviewer can check a mutant without touching the checkout:** copy the source file under the scratchpad, break the line there, and import the copy from a probe test. On #853 that is how "deleting `...options` passes every test" was shown while the review stayed read-only.
 - **A fix wave that changes docs gets the doc-claims reviewer again, or the PR says who read them.** On #853 the second round's doc changes were read by the code reviewer only; the PR text says so.
+- **A reviewer's "read, not run" finding about what is on screen gets a run that could show it wrong, before it is called a low.** On #812 the task reviewer read that a spectrogram might be stale under a trim preview; my browser check compared two pictures that were stale in the same way and I told the maintainer it was fine. The final reviewer raised it again as high, and a comparison against the pre-trim picture and against the parent commit confirmed it.
 
 ## Briefing agents
 
