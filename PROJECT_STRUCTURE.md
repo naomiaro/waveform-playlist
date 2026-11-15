@@ -325,6 +325,7 @@ const clip = createClipFromSeconds({
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
   │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme
+  │   ├── useTrimPreview.ts             # the clip trim preview source and the stable function that draws the previewed clip (internal contexts)
   │   └── useRequiredContext.ts         # a throwing context read (the providers' hooks use useSlot in contexts/playlistContexts.ts)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
@@ -335,7 +336,7 @@ const clip = createClipFromSeconds({
   │   ├── useArrangementTracks.ts       # The tracks of an Arrangement, loading clips included
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useAudioTracks.ts             # Track loading and management
-  │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine)
+  │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine; a trim is a view-only preview, one engine call on release)
   │   ├── useClipSplitting.ts           # Split clips at playhead (delegates to engine)
   │   ├── useCreateArrangement.ts       # Makes the engine's Arrangement once per component instance
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
@@ -355,6 +356,7 @@ const clip = createClipFromSeconds({
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useTrackReorderHandle.ts      # Reorder drag handle for the track whose panel the caller is in (dnd-kit sortable)
+  │   ├── useTrimPreviewView.ts         # What the clip view and the root read of the trim preview: the previewed clip's drawing record, the stepped width past the end
   │   ├── useUndoState.ts              # Undo/redo state (engine delegation + onEngineState)
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
@@ -760,7 +762,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     ├─→ IsPlayingContext (play, pause, stop)
     │   └─→ isPlaying
     ├─→ PlaybackRefsContext (never changes; refs and frame callbacks for 60fps)
-    │   └─→ currentTimeRef, registerFrameCallback(), playoutRef, isDraggingRef, etc.
+    │   └─→ currentTimeRef, visualTimeRef, registerFrameCallback(), unregisterFrameCallback()
     ├─→ AnnotationsContext (annotation edits)
     │   └─→ annotations
     ├─→ AnnotationOptionsContext (the three annotation options)
@@ -785,7 +787,7 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     │   └─→ timeFormat, isAutomaticScroll
     ├─→ PlaylistZoomContext (a zoom)
     │   └─→ samplesPerPixel, canZoomIn, canZoomOut
-    ├─→ PlaylistTimelineContext (every clip operation, every pointer move of a trim, a zoom)
+    ├─→ PlaylistTimelineContext (every clip operation, a zoom)
     │   └─→ tracks, peaksDataArray, duration, isReady, onTracksChange
     ├─→ PlaylistMixerContext (every mute, solo, volume or pan change; tracks added, removed or reordered)
     │   └─→ trackStates, masterVolume
@@ -825,7 +827,7 @@ Provider's statechange handler:
 
 **Context Splitting Architecture:**
 
-`packages/browser/src/contexts/playlistContexts.ts` defines **22 contexts** (21 public and the internal `SelectedRowContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
+`packages/browser/src/contexts/playlistContexts.ts` defines **24 contexts** (21 public and the three internal `SelectedRowContext`, `TrimPreviewContext` and `TrimPreviewPeaksContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
 
 Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (11 public, plus the internal `SelectedRowContext`):
 
@@ -863,11 +865,11 @@ Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (
 
 11. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (fixed under the MediaElement provider)
 
-Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (8):
+Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (10, two of them internal):
 
 12. **EditorControlsContext** (`useEditorControls()`) - The actions only the multitrack editor has; the value never changes
 
-13. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, `isDraggingRef`, the engine's clock refs and functions; the value never changes
+13. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, the engine's clock refs and functions; the value never changes
 
 14. **LoopContext** (`useLoop()`) - Loop enabled flag and loop region
 
@@ -876,7 +878,7 @@ Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistPro
 16. **UndoRedoContext** (`useUndoRedo()`) - Whether undo and redo are available
 
 17. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks, peaks, duration, `isReady`
-    - Changes on every clip operation, on every pointer move of a trim and on a zoom (peaks are computed per zoom level)
+    - Changes on every clip operation (a trim once, on release) and on a zoom (peaks are computed per zoom level)
     - Also when loading finishes and when peaks arrive
 
 18. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states and master volume
@@ -886,11 +888,15 @@ Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistPro
 19. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
     - Changes on every drag-over of a track reorder
 
+20. **TrimPreviewContext** (internal, not exported) - The clip trim drag in progress: a source the drag handlers write on every pointer move; only the dragged clip's view and the root (for the width) subscribe. The value never changes
+
+21. **TrimPreviewPeaksContext** (internal, not exported) - The stable function that draws the previewed clip from the provider's latest tracks; the value never changes
+
 Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistProvider` (2):
 
-20. **PlaybackRateContext** (`usePlaybackRate()`) - The playback speed and its setter
+22. **PlaybackRateContext** (`usePlaybackRate()`) - The playback speed and its setter
 
-21. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks, fades and the player ref of the one track
+23. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks, fades and the player ref of the one track
 
 **Key Files:**
 
@@ -937,7 +943,6 @@ export interface EngineRefsContextValue {
   getLookAhead: () => number;
   getOutputLatency: () => number;
   playoutRef: React.RefObject<PlaylistEngine | null>;
-  isDraggingRef: React.MutableRefObject<boolean>;
 }
 
 // 2. User interaction state, one context per group that changes together
@@ -1053,7 +1058,7 @@ export interface PlaylistZoomContextValue {
   canZoomOut: boolean;
 }
 
-// 4c. Timeline - changes on every clip operation, every pointer move of a trim and a zoom
+// 4c. Timeline - changes on every clip operation (a trim once, on release) and a zoom
 export interface PlaylistTimelineContextValue {
   tracks: ClipTrack[];
   peaksDataArray: TrackClipPeaks[];
@@ -1134,8 +1139,8 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 
 - `useAnimationFrameLoop` - Shared rAF lifecycle for both playlist providers
 - `useAudioTracks` - Declarative track loading (configs-driven)
-- `useClipDragHandlers` - Clip drag-to-move and boundary trimming (delegates to engine, wraps drags in transactions for undo)
-- `useClipSplitting` - Split clips at playhead (delegates to engine)
+- `useClipDragHandlers` - Clip drag-to-move and boundary trimming (delegates to engine on release: one call and one undo step each; a trim is previewed in the view while dragged)
+- `useClipSplitting` - Split clips at playhead; `splitClipAt(trackId, clipId, splitTime)` takes ids (delegates to engine)
 - `useAnnotationDragHandlers` - Annotation edge drag logic (called by `WaveformAnnotationBoxes`; exported for a custom row of boxes)
 - `useAnnotationKeyboardControls` - Annotation navigation & editing
 - `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
@@ -1214,7 +1219,6 @@ const { duration, tracks } = usePlaylistTimeline();
 const playoutRef = useRef<PlaylistEngine | null>(null); // Engine ref (renamed from TonePlayout)
 const currentTimeRef = useRef<number>(0); // For animation loop
 const isSelectingRef = useRef(false); // For mouse interactions
-const isDraggingRef = useRef(false); // Guards loadAudio during boundary trim drags
 ```
 
 ## Build Process
@@ -1297,7 +1301,7 @@ Tone-coupled hooks/effects/export (useAudioTracks, useDynamicEffects, useExportW
 ```
 User drags clip
     ↓
-useClipDragHandlers → engine.moveClip(trackId, clipId, deltaSamples)
+useClipDragHandlers → engine.moveClip(trackId, clipId, deltaSamples)   (a trim: a view-only preview while dragged, then engine.trimClip(trackId, clipId, boundary, delta) on release)
     ↓
 PlaylistEngine:
     ├─ Constrains delta (collision detection)

@@ -149,7 +149,7 @@ Called with the full new array on every change to the annotations: the release o
 
 **Type:** `(tracks: ClipTrack[]) => void`
 
-Called when engine clip operations (move, trim, split) update the tracks. Use this to keep your parent state in sync with engine mutations:
+Called when engine clip operations (move, trim, split) update the tracks. A trim is called once, on release: while the handle is dragged the clip is previewed in the view and neither this callback nor the engine is called. Use this to keep your parent state in sync with engine mutations:
 
 ```tsx
 const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
@@ -273,8 +273,6 @@ interface EngineRefsContextValue {
   getOutputLatency: () => number;
   /** The engine. `current` is null until the first build and during a rebuild. */
   playoutRef: RefObject<PlaylistEngine | null>;
-  /** true during boundary trim drags */
-  isDraggingRef: MutableRefObject<boolean>;
 }
 ```
 
@@ -466,7 +464,7 @@ interface PlaylistZoomContextValue {
 
 ### Timeline (usePlaylistTimeline)
 
-Changes on every clip operation, on every pointer move of a trim and on a zoom (`peaksDataArray` is computed per zoom level); also when loading finishes (`isReady`) and when peaks arrive.
+Changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level); also when loading finishes (`isReady`) and when peaks arrive.
 
 ```typescript
 interface PlaylistTimelineContextValue {

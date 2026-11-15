@@ -474,9 +474,6 @@ interface EngineRefsContextValue {
   getOutputLatency: () => number;
   /** The engine. `current` is null until the first build and during a rebuild. */
   playoutRef: React.RefObject<PlaylistEngine | null>;
-  /** Ref set by useClipDragHandlers during boundary trim drags.
-   *  When true, loadAudio skips engine rebuild — visual updates flow via React state only. */
-  isDraggingRef: React.MutableRefObject<boolean>;
 }
 ```
 
@@ -484,9 +481,10 @@ interface EngineRefsContextValue {
 
 ```typescript
 /**
- * What is on the timeline (#768). Changes on every clip operation, on every
- * pointer move of a trim and on a zoom (the peaks are computed per zoom
- * level), so call `usePlaylistTimeline()` only in a component
+ * What is on the timeline (#768). Changes on every clip operation (a trim once,
+ * on release: its moves are a preview only the dragged clip follows, #812) and
+ * on a zoom (the peaks are computed per zoom level), so call
+ * `usePlaylistTimeline()` only in a component
  * that draws tracks or needs the timeline length during render.
  */
 interface PlaylistTimelineContextValue {
@@ -1306,17 +1304,14 @@ function useClipDragHandlers(options: UseClipDragHandlersOptions): {
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   engineRef: RefObject<PlaylistEngine | null>;
-  /** Ref toggled during boundary trim drags. Obtain from useEngineRefs(). */
-  isDraggingRef: MutableRefObject<boolean>;
   /** Optional snap function for boundary trims — snaps a sample position to nearest grid line */
   snapSamplePosition?: (samplePos: number) => number;
 }
 ```
 
-Delegates move to `engine.moveClip()` and trim to `engine.trimClip()`. During trim drags, `isDraggingRef` prevents engine rebuild. Cancel is handled inside `onDragEnd` via `event.canceled` — reverts React state for boundary trims, resets `isDraggingRef`. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop). The three handlers keep their identity while `tracks` and `onTracksChange` change (they are read through refs); they are re-created only when `samplesPerPixel` or the sample rate changes.
+Delegates move to `engine.moveClip()` on drop and trim to `engine.trimClip()` on release: each is one engine call and one undo step, and neither opens a transaction. While a trim handle is dragged, each move is constrained by `engine.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); `tracks`, `onTracksChange` and the engine do not change until the release, which calls `onTracksChange` once. Escape (`event.canceled`) clears the preview and changes nothing. The clip is found by `clipId` within `tracks[trackIndex]`; `clipIndex` of the drag data is not read. A trim or a move released while `engineRef.current` is `null` is dropped with a console warning. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop). The three handlers keep their identity while `tracks` changes (it is read through a ref); they change only with `samplesPerPixel` or the sample rate.
 
 ### useDragSensors
 
@@ -1378,11 +1373,11 @@ interface UseClipSplittingOptions {
 
 interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
-  splitClipAt: (trackIndex: number, clipIndex: number, splitTime: number) => boolean;
+  splitClipAt: (trackId: string, clipId: string, splitTime: number) => boolean;
 }
 ```
 
-Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync, and statechange emission.
+Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync, and statechange emission. `splitClipAt` takes ids and returns `false`, changing nothing, for a track id or clip id that is not in `tracks`.
 
 ---
 

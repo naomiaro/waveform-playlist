@@ -114,8 +114,8 @@ Both providers use React Context with small contexts for performance (21 in all:
 
 **WaveformPlaylistProvider only** (multi-track, Web Audio API; these throw when the nearest provider is MediaElementPlaylistProvider):
 1. **useEditorControls()** — never changes: setCurrentTime, setTrackMute / setTrackSolo / setTrackVolume / setTrackPan (first argument is the track ID, not an index; a non-string is ignored), reorderTrack(trackId, toIndex), setSelectedTrackId, zoomIn / zoomOut, setMasterVolume, loop setters, undo / redo, setRecordingActive
-2. **useEngineRefs()** — never re-renders: playoutRef (PlaylistEngine), isDraggingRef, playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime, getLookAhead, getOutputLatency
-3. **usePlaylistTimeline()** — tracks, peaksDataArray, duration, isReady, onTracksChange; changes on every clip operation, every pointer move of a trim and a zoom (peaksDataArray is computed per zoom level), and when loading finishes or peaks arrive (call it in the smallest component that needs it)
+2. **useEngineRefs()** — never re-renders: playoutRef (PlaylistEngine), playbackStartTimeRef, audioStartPositionRef, getPlaybackTime, getAudioContextTime, getLookAhead, getOutputLatency
+3. **usePlaylistTimeline()** — tracks, peaksDataArray, duration, isReady, onTracksChange; changes on every clip operation (a trim once, on release) and a zoom (peaksDataArray is computed per zoom level), and when loading finishes or peaks arrive (call it in the smallest component that needs it)
 4. **usePlaylistMixer()** — trackStates (one entry per track in the order of `tracks`; `undefined` at the position of a track that is still loading, so read `trackStates[i]?.muted`; kept by track id, so a track keeps its mute/solo/volume/pan when tracks are removed, added or reordered), masterVolume; changes on every mute, solo, volume or pan change (each step of a slider drag) and when tracks are added, removed or reordered (same advice)
 5. **useTrackReorderPreview()** — trackDragPreview, trackReorderEpoch; changes on every drag-over of a track reorder
 6. **useLoop()** — isLoopEnabled, loopStart, loopEnd
@@ -137,11 +137,11 @@ Removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAn
 
 *From `@waveform-playlist/browser` (core, engine-free):*
 - `useAnnotationDragHandlers(opts)` — Drag handlers for annotation box edges. Pass `preview: annotationPreview` (from `usePlaybackControls()`, under either provider) and each move is published to the preview while `onAnnotationsChange` is called once, on release; without it, once per move. Escape restores every annotation the drag moved. `useAnnotationsWithPreview(annotations, annotationPreview)` returns what to draw in a custom annotation renderer. `WaveformAnnotationBoxes` calls the hook itself inside its own `DragDropProvider`: use it only for a row of boxes you draw yourself.
-- `useClipDragHandlers(opts)` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip()
+- `useClipDragHandlers({ tracks, samplesPerPixel, engineRef, snapSamplePosition? })` — Drag-to-move and boundary trimming, delegates to engine.moveClip()/trimClip() on release (one engine call and one undo step each). A trim is previewed in the view while dragged (tracks, onTracksChange and the engine do not change until release, which calls onTracksChange once); Escape changes nothing. Clips are found by id; a trim or move released with no engine attached is dropped with a console warning
 - `useDragSensors(opts?)` — Configures PointerSensor activation constraints for DragDropProvider (distance-based default, optional touch-optimized mode)
 - `ClipCollisionModifier` — Collision detection modifier for clip moves, prevents overlapping clips
 - `SnapToGridModifier` — Snap-to-grid modifier for clip moves. Two modes: `'beats'` (PPQN tick grid) and `'timescale'` (sample-based grid). Snaps absolute position, not delta.
-- `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip()
+- `useClipSplitting(opts)` — Split clips at playhead, delegates to engine.splitClip(). Returns `splitClipAtPlayhead()` and `splitClipAt(trackId, clipId, splitTime)` (ids, not indexes; an unknown id returns false)
 - `useKeyboardShortcuts(opts)` — Custom keyboard shortcuts
 - `usePlaybackShortcuts(opts)` — Default playback shortcuts (Space, Escape, 0). WaveformPlaylistProvider only (throws under MediaElementPlaylistProvider). Shortcuts never take a key the focused control uses, however it got focus: inputs (incl. sliders, checkboxes) and `<select>` keep all keys, Escape closes an open modal dialog, Space/Enter go to a focused `<button>` or `<summary>` (Enter only for a link) (after clicking Mute, Space toggles Mute; Space is play/pause when focus is not on a control)
 - `useUndoState(opts)` — Undo/redo state (canUndo, canRedo, undo, redo) with engine delegation
