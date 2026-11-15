@@ -109,15 +109,14 @@ export function NewTracksExample() {
         fileFilter={(f) => f.type.startsWith('audio/')}
         label="Drop audio files here to add tracks, or click to browse"
         dragLabel="Drop audio files here"
+        loading={sources.isLoading}
         loadingContent={
-          sources.isLoading ? (
-            <>
-              <p style={{ margin: 0 }}>
-                Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
-              </p>
-              <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
-            </>
-          ) : undefined
+          <>
+            <p style={{ margin: 0 }}>
+              Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
+            </p>
+            <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
+          </>
         }
       >
         <Subtext>Supports MP3, WAV, OGG, and more</Subtext>

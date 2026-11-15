@@ -29,6 +29,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 
 const Controls = styled.div`
   display: flex;
@@ -183,11 +184,12 @@ export function BeatsAndBarsExample() {
               <PauseButton />
               <StopButton />
               <LoopButton />
-              {sources.isLoading && (
-                <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>
-                  Loading: {settledCount}/{sources.sources.size}
-                </span>
-              )}
+              <LoadingText
+                active={sources.isLoading}
+                widest={`Loading: ${sources.sources.size}/${sources.sources.size}`}
+              >
+                Loading: {settledCount}/{sources.sources.size}
+              </LoadingText>
               <SourceLoadError arrangement={arrangement} />
             </ControlGroup>
             <ControlGroup>

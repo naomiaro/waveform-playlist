@@ -45,6 +45,7 @@ import { fetchWamLibrary, fetchWamDescriptor, type WamLibraryEntry } from '@dawc
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { registerDemoTremolo } from './demoTremoloEffect';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 import {
   Container,
   Banner,
@@ -567,11 +568,13 @@ const WamControls: React.FC<WamControlsProps> = ({
           effectsFunction={offlineMaster}
           createOfflineTrackEffects={createOfflineTrackEffects}
         />
-        {sources.isLoading && (
-          <span style={{ fontSize: '0.85rem', color: 'var(--ifm-color-emphasis-600)' }}>
-            Loading: {loadedCount}/{totalCount}
-          </span>
-        )}
+        <LoadingText
+          active={sources.isLoading}
+          widest={`Loading: ${totalCount}/${totalCount}`}
+          style={{ fontSize: '0.85rem', color: 'var(--ifm-color-emphasis-600)' }}
+        >
+          Loading: {loadedCount}/{totalCount}
+        </LoadingText>
         <SourceLoadError arrangement={arrangement} />
       </TransportBar>
       <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>

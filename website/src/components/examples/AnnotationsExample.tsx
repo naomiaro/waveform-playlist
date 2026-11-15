@@ -389,7 +389,8 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           fileFilter={(f) => f.type.startsWith('audio/')}
           label="Drop audio files here or click to browse"
           dragLabel="Drop audio files here"
-          loadingContent={isLoadingAudio ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined}
+          loading={isLoadingAudio}
+          loadingContent={<p style={{ margin: 0 }}>Loading audio...</p>}
         />
         <FailedDropsAlert drops={failedDrops} />
 

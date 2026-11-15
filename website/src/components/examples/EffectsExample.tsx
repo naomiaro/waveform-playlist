@@ -54,6 +54,7 @@ import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 // Track configurations - Albert Kader "Ubiquitous" minimal techno
@@ -479,7 +480,9 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
-          {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+          <LoadingText active={Boolean(isLoading)} widest={`Loading: ${totalCount ?? 0}/${totalCount ?? 0}`}>
+            Loading: {loadedCount}/{totalCount}
+          </LoadingText>
           <SourceLoadError arrangement={arrangement} />
         </ControlsRow>
         <VisualizerWrapper>

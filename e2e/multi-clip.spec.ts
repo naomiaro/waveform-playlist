@@ -1118,4 +1118,27 @@ test.describe('Multi-Clip Example — while files are loading', () => {
       await expect(row(page, BASS_ROW).locator('[data-clip-placeholder="true"]')).toHaveCount(0);
     });
   }
+
+  // #858: a layout change that moves the editor during a clip move leaves the
+  // dragged clip behind, so the page's loading text keeps its space.
+  test('the editor does not move on the page when loading ends', async ({ page, baseURL }) => {
+    const hold = await holdAudio(page, [BASS_AUDIO]);
+    await page.goto(`${baseURL}/examples/multi-clip`);
+    const rowCount = 7;
+    for (let index = 0; index < rowCount; index++) {
+      if (index !== BASS_ROW) await expectRowLoaded(page, index);
+    }
+    await expect.poll(() => hold.held()).toBe(1);
+    const playlist = page.locator('[data-playlist-state]');
+    await expect(page.locator('[data-playlist-state="loading"]')).toHaveCount(1);
+    const before = await playlist.boundingBox();
+    expect(before).toBeTruthy();
+
+    hold.release();
+    await expect(ready(page)).toHaveCount(1, { timeout: 30000 });
+    await expectRowLoaded(page, BASS_ROW);
+    const after = await playlist.boundingBox();
+    expect(after).toBeTruthy();
+    expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(0.5);
+  });
 });

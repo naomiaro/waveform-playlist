@@ -33,6 +33,7 @@ import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
@@ -136,7 +137,11 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
-      {isLoading && <div style={{ padding: '1rem', opacity: 0.7 }}>Loading tracks...</div>}
+      <div style={{ padding: '1rem', opacity: 0.7 }}>
+        <LoadingText active={isLoading} widest="Loading tracks..." style={{}}>
+          Loading tracks...
+        </LoadingText>
+      </div>
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider

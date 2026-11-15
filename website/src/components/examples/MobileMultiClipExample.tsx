@@ -38,6 +38,7 @@ import {
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 
 const Container = styled.div`
   /* Prevent accidental text selection while dragging on mobile */
@@ -235,7 +236,16 @@ export function MobileMultiClipExample() {
   return (
     <Container>
       <Instructions>
-        <strong>Touch Controls {loading && `(Loading: ${loadedCount}/${audioFiles.length} files)`}</strong>
+        <strong>
+          Touch Controls{' '}
+          <LoadingText
+            active={loading}
+            widest={`(Loading: ${audioFiles.length}/${audioFiles.length} files)`}
+            style={{}}
+          >
+            (Loading: {loadedCount}/{audioFiles.length} files)
+          </LoadingText>
+        </strong>
         <ul>
           <li><strong>Scroll:</strong> Swipe left/right on the waveform area</li>
           <li><strong>Move clip:</strong> Touch and hold the clip header (250ms), then drag</li>

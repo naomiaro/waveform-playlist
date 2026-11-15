@@ -28,6 +28,7 @@ import { audioTrack } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 
 const Controls = styled.div`
   display: flex;
@@ -75,7 +76,9 @@ export function StereoExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+        <LoadingText active={sources.isLoading} widest={`Loading: ${totalCount}/${totalCount}`}>
+          Loading: {loadedCount}/{totalCount}
+        </LoadingText>
         <SourceLoadError arrangement={arrangement} />
       </Controls>
 

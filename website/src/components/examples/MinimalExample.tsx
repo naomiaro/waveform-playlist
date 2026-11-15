@@ -28,6 +28,7 @@ import type { AudioTrackOptions } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 
 // Dark mode: Amber/gold gradient waveform on dark brown background
 const darkModeGradientTheme: Partial<WaveformPlaylistTheme> = {
@@ -117,7 +118,9 @@ export function MinimalExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {sources.isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
+        <LoadingText active={sources.isLoading} widest="Loading...">
+          Loading...
+        </LoadingText>
         <SourceLoadError arrangement={arrangement} />
       </Controls>
 

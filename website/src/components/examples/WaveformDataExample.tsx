@@ -214,13 +214,21 @@ export function WaveformDataExample() {
           <strong>{Math.round(totalAudioSize / totalPeaksSize)}x</strong>
           <span>smaller</span>
         </StatBox>
-        {/* Show loading progress from the arrangement's sources */}
-        {sources.isLoading && (
-          <StatBox $variant="audio">
-            <strong>{loadedCount} / {totalCount}</strong>
-            <span>Tracks loaded</span>
-          </StatBox>
-        )}
+        {/* Loading progress from the arrangement's sources. The box is always
+            there and hidden when idle, so the playlist below does not move
+            when loading ends (a clip being dragged would be left behind). */}
+        <StatBox
+          $variant="audio"
+          role="status"
+          aria-hidden={!sources.isLoading}
+          style={{
+            visibility: sources.isLoading ? 'visible' : 'hidden',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          <strong>{loadedCount} / {totalCount}</strong>
+          <span>Tracks loaded</span>
+        </StatBox>
       </StatsContainer>
 
       {!peaksSettled && <div style={MUTED_TEXT_STYLE}>Loading peaks...</div>}

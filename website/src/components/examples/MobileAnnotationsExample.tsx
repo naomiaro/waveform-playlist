@@ -45,6 +45,7 @@ import {
 } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
+import { LoadingText } from './LoadingText';
 
 const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
 
@@ -332,7 +333,9 @@ const MobileAnnotationsContent: React.FC = () => {
             <LinkEndpointsCheckbox />
           </ControlGroup>
 
-          {isLoading && <span>Loading audio with annotations...</span>}
+          <LoadingText active={isLoading} widest="Loading audio with annotations..." style={{}}>
+            Loading audio with annotations...
+          </LoadingText>
           <SourceLoadError arrangement={arrangement} />
         </Controls>
 

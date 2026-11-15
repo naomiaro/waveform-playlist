@@ -32,6 +32,22 @@ const ZoneText = styled.p`
   font-size: 0.9rem;
 `;
 
+// The label and the loading content share one grid cell, so the zone is as
+// tall as the larger of the two whichever is shown: a page whose loading text
+// comes and goes does not move what is below the zone (a clip being dragged
+// in an editor below would be left behind until the release).
+const Stack = styled.div`
+  display: grid;
+
+  & > * {
+    grid-area: 1 / 1;
+  }
+`;
+
+const Layer = styled.div<{ $hidden?: boolean }>`
+  visibility: ${(props) => (props.$hidden ? 'hidden' : 'visible')};
+`;
+
 const HiddenInput = styled.input`
   position: absolute;
   width: 0;
@@ -53,8 +69,10 @@ interface FileDropZoneProps {
   dragLabel?: string;
   /** Additional content below the drop zone (e.g. subtext) */
   children?: React.ReactNode;
-  /** Override content entirely when loading */
+  /** Shown instead of the label and children while `loading`; its space is kept when idle */
   loadingContent?: React.ReactNode;
+  /** Whether `loadingContent` is shown */
+  loading?: boolean;
   /** Additional CSS class */
   className?: string;
 }
@@ -67,6 +85,7 @@ export function FileDropZone({
   dragLabel = 'Drop files here',
   children,
   loadingContent,
+  loading = false,
   className,
 }: FileDropZoneProps) {
   const [isDragging, setIsDragging] = React.useState(false);
@@ -98,6 +117,33 @@ export function FileDropZone({
     [onFiles]
   );
 
+  const idle = (
+    <>
+      <ZoneText>
+        {isDragging ? (
+          <>
+            <FolderOpenIcon
+              size={18}
+              weight="light"
+              style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
+            />
+            {dragLabel}
+          </>
+        ) : (
+          <>
+            <MusicNotesIcon
+              size={18}
+              weight="light"
+              style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
+            />
+            {label}
+          </>
+        )}
+      </ZoneText>
+      {children}
+    </>
+  );
+
   return (
     <Zone
       $isDragging={isDragging}
@@ -121,31 +167,18 @@ export function FileDropZone({
         onChange={handleFileInput}
         onClick={(e) => e.stopPropagation()}
       />
-      {loadingContent || (
-        <>
-          <ZoneText>
-            {isDragging ? (
-              <>
-                <FolderOpenIcon
-                  size={18}
-                  weight="light"
-                  style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
-                />
-                {dragLabel}
-              </>
-            ) : (
-              <>
-                <MusicNotesIcon
-                  size={18}
-                  weight="light"
-                  style={{ marginRight: 6, verticalAlign: 'text-bottom' }}
-                />
-                {label}
-              </>
-            )}
-          </ZoneText>
-          {children}
-        </>
+      {loadingContent === undefined ? (
+        idle
+      ) : (
+        <Stack>
+          <Layer $hidden={loading} aria-hidden={loading || undefined}>
+            {idle}
+          </Layer>
+          <Layer $hidden aria-hidden="true">
+            {loadingContent}
+          </Layer>
+          <Layer role="status">{loading ? loadingContent : null}</Layer>
+        </Stack>
       )}
     </Zone>
   );
