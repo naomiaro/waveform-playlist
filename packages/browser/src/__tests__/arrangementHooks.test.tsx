@@ -10,7 +10,10 @@ import { createTrack } from '@waveform-playlist/core';
 import type { ArrangementTrack, ClipSource, LoadingClip } from '@waveform-playlist/core';
 import { attachDecodeContext, createArrangement } from '@waveform-playlist/engine';
 import type { Arrangement, LoadSource } from '@waveform-playlist/engine';
-import { useCreateArrangement } from '../hooks/useCreateArrangement';
+import {
+  useCreateArrangement,
+  type UseCreateArrangementOptions,
+} from '../hooks/useCreateArrangement';
 import { useArrangementTracks } from '../hooks/useArrangementTracks';
 import { useArrangementSources } from '../hooks/useArrangementSources';
 
@@ -59,6 +62,28 @@ describe('useCreateArrangement', () => {
     expect(seen.length).toBeGreaterThanOrEqual(3);
     expect(new Set(seen).size).toBe(1);
     expect(seen[0].getTracks().map((t) => t.id)).toEqual(['A']);
+  });
+
+  it('a stray tracks key in the options (plain JS) does not replace the initializer\u2019s tracks', () => {
+    let arrangement: Arrangement | undefined;
+    const Probe: React.FC = () => {
+      arrangement = useCreateArrangement(() => [track('A')], {
+        tracks: [track('B')],
+      } as unknown as UseCreateArrangementOptions);
+      return null;
+    };
+    render(<Probe />);
+    expect(arrangement!.getTracks().map((t) => t.id)).toEqual(['A']);
+
+    // Without an initializer it is not read either.
+    const Bare: React.FC = () => {
+      arrangement = useCreateArrangement(undefined, {
+        tracks: [track('B')],
+      } as unknown as UseCreateArrangementOptions);
+      return null;
+    };
+    render(<Bare />);
+    expect(arrangement!.getTracks()).toEqual([]);
   });
 
   it('an initializer that throws (two tracks with one id) throws out of the render', () => {
