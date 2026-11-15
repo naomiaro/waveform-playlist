@@ -188,6 +188,7 @@ const clip = createClipFromSeconds({
   │   ├── Track.tsx              # Individual track
   │   ├── Clip.tsx               # Audio clip (draggable)
   │   ├── ClipHeader.tsx         # Draggable title bar
+  │   ├── ClipPlaceholderBody.tsx # The body of a placeholder clip with no peaks: a box of its extent in the bar colour
   │   ├── ClipBoundary.tsx       # Trim handles (left/right edges)
   │   ├── Channel.tsx            # Waveform canvas rendering
   │   ├── SmartChannel.tsx       # Auto-selects Channel/PianoRoll/Spectrogram

@@ -75,7 +75,11 @@ interface WaveformPlaylistProviderProps {
   createAdapter?: () => PlayoutAdapter;
 }
 // Removed (#812): tracks, onTracksChange, deferEngineRebuild. A leftover one is ignored at
-// runtime (TypeScript reports it). See upgrading.md.
+// runtime (TypeScript reports it). See upgrading.md. Without `arrangement` (or with a value that is
+// not an object) the provider throws an Error while it renders, in every build:
+// "[waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop: an arrangement made with
+// `useCreateArrangement`, which owns the tracks. The `tracks` and `onTracksChange` props were removed.
+// See https://naomiaro.github.io/waveform-playlist/docs/react/upgrading"
 // Before the first ready, play() does nothing and queues nothing (one console.warn per mount
 // in development). Edits, the mixer, seekTo and setSelection work before ready.
 // Window event 'waveform-playlist:ready', once per mount with onReady:
@@ -840,7 +844,7 @@ const arrangement = useCreateArrangement(() => [
 <WaveformPlaylistProvider arrangement={arrangement}><Waveform /></WaveformPlaylistProvider>
 ```
 
-Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else an empty box), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider knows its real sample rate (the `sampleRate` prop, else the first adapter's context). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
+Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else a box of the clip's extent in the colour the waveform's bars are drawn in (`waveFillColor`, `selectedWaveFillColor` on the selected track, `grey` when the theme gives no usable colour), `<ClipPlaceholderBody />` from ui-components, `data-clip-placeholder-body="true"`, with or without clip headers and on spectrogram tracks too; the played-portion tint and fade curves draw over it), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider knows its real sample rate (the `sampleRate` prop, else the first adapter's context). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
 
 Rule for apps: change tracks from a handler, an effect or a `sources` listener, not from inside `arrangement.subscribe()` or an engine `statechange` listener: two or more track edits made inside one listener run make the engine send the adapter every track (`setTracks`), which can interrupt playback.
 
@@ -1311,7 +1315,7 @@ interface UseClipDragHandlersOptions {
 }
 ```
 
-Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. The track is the one the drag started on, by its id (also if its row moves during the drag); the clip is found by `clipId` among its loaded clips (a move of a clip id that is not in the track is dropped with a console warning); `clipIndex` of the drag data is not read. A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). `onDragStart` changes only with the arrangement (never within a mount), `onDragMove` with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
+Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. The track is the one the drag started on, by its id (also if its row moves during the drag); the clip is found by `clipId` among its loaded clips (a move of a clip id that is not in the track is dropped with a console warning); `clipIndex` of the drag data is not read. A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
 
 ### useDragSensors
 
@@ -1333,7 +1337,7 @@ Returns configured PointerSensor descriptors for DragDropProvider's `sensors` pr
 ```typescript
 class ClipCollisionModifier extends Modifier {
   static configure(options: {
-    tracks: ClipTrack[] | (() => ClipTrack[]);
+    tracks: readonly ClipTrack[] | (() => readonly ClipTrack[]);
     samplesPerPixel: number;
   }): PluginDescriptor;
 }
@@ -1979,7 +1983,7 @@ function useExportWav(): UseExportWavReturn;
 
 interface UseExportWavReturn {
   /** Pass usePlaylistTimeline().tracks (loaded clips only: an export during loading renders what has loaded). */
-  exportWav: (tracks: readonly ClipTrack[], trackStates: TrackState[], options?: ExportOptions) => Promise<ExportResult>;
+  exportWav: (tracks: readonly ClipTrack[], trackStates: readonly TrackState[], options?: ExportOptions) => Promise<ExportResult>;
   isExporting: boolean;
   progress: number;
   error: string | null;
@@ -2470,6 +2474,14 @@ const DEFAULT_BAR_GAP = 0;
 // Theme key spectrogramBackgroundColor (optional, '#000' without it): the background of the area a
 // spectrogram is drawn in; it shows until the spectrogram has been drawn and where a chunk is not mounted.
 // Theme key placeholderClipOpacity (optional, 0.5 without it or with a value that is not a number from 0 to 1): the opacity of a Clip with isPlaceholder, header included.
+interface ClipPlaceholderBodyProps {
+  isSelected?: boolean; // the selected bar colour (selectedWaveFillColor). Default false
+}
+// <ClipPlaceholderBody /> (#812): the body of a placeholder Clip with no peaks: a box over the clip's
+// channel area (its width, the height below the header) in the colour of the waveform's bars
+// (waveFillColor; selectedWaveFillColor with isSelected; 'grey' when the theme gives no usable colour).
+// data-clip-placeholder-body="true". Sets no opacity: render it as a child of <Clip isPlaceholder>, which dims it.
+const ClipPlaceholderBody: React.FC<ClipPlaceholderBodyProps>;
 ```
 
 ---

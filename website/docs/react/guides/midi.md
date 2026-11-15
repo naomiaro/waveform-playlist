@@ -203,7 +203,7 @@ capability is `adapter.setSoundFontCache(cache)` on the adapter returned by
 MIDI and audio tracks can be played together: they are tracks of one arrangement. Declare the audio in the initializer and add the MIDI tracks once they have loaded:
 
 ```tsx
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { loadMidiTracks } from '@waveform-playlist/midi';
 import { useCreateArrangement } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
@@ -212,16 +212,21 @@ function useMixedArrangement() {
   const arrangement = useCreateArrangement(() => [
     audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
   ]);
+  // Shown by the page: the MIDI file could not be loaded (the audio plays on)
+  const [midiError, setMidiError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
       .then((tracks) => tracks.forEach((track) => arrangement.addTrack(track)))
-      .catch(() => {}); // an aborted or failed load adds nothing
+      .catch((err: unknown) => {
+        // An abort (unmount, StrictMode's first run) is not an error
+        if (!controller.signal.aborted) setMidiError(err instanceof Error ? err.message : String(err));
+      });
     return () => controller.abort();
   }, [arrangement]);
 
-  return arrangement;
+  return { arrangement, midiError };
 }
 ```
 

@@ -545,7 +545,7 @@ Edges to know:
 
 - A take started during the playlist's first load records without playback: `play()` does nothing before the first [ready](/docs/react/guides/loading-audio#ready).
 - An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the mute is written back); the reveal arms the track again from its mute at that moment.
-- Removing the armed track during a take as an undo step keeps its mix with the take's mute, so undoing that removal after the take brings the track back muted.
+- Removing the armed track during a take as an undo step: the arrangement keeps a removed track's mix for its undo, and an undo of a removal brings the track back with the mix it had when it was removed. That mix has the take's mute in it, and the end of the take writes nothing for a track that is gone, so undoing the removal after the take brings the track back muted.
 - Only the built-in Mute button is disabled. Solo, volume and pan stay enabled.
 
 If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.

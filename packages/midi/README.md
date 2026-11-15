@@ -32,6 +32,7 @@ function MidiPlaylist() {
   // Starts empty; the MIDI tracks are added once the file has loaded
   const arrangement = useCreateArrangement();
   const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -43,10 +44,14 @@ function MidiPlaylist() {
         }
         setLoaded(true);
       })
-      .catch(() => {}); // aborted, or the file could not be loaded: show your own error here
+      .catch((err: unknown) => {
+        // An abort (unmount, StrictMode's first run) is not an error
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err));
+      });
     return () => controller.abort();
   }, [arrangement]);
 
+  if (error) return <p>Error: {error}</p>;
   if (!loaded) return <p>Loading MIDI…</p>;
 
   // Rendered once the tracks are in: the playlist's ready happens once per mount

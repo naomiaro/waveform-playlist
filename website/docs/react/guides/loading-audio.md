@@ -174,14 +174,14 @@ A clip whose audio is still loading is not in `usePlaylistTimeline().tracks` and
 | The loading clip has | What is drawn |
 |---|---|
 | `waveformData` | A placeholder drawn from those peaks, at its place and length |
-| a `duration` (no `waveformData`) | A placeholder box with no waveform in it, at its place and length, filled with the colour the waveform's bars are drawn in (`waveFillColor`, or `selectedWaveFillColor` on the selected track); it carries `data-clip-placeholder-body="true"` and is drawn with or without clip headers |
+| a `duration` (no `waveformData`) | A placeholder box with no waveform in it, at its place and length, filled with the colour the waveform's bars are drawn in (`waveFillColor`, or `selectedWaveFillColor` on the selected track; `grey` when the theme gives no usable colour); it carries `data-clip-placeholder-body="true"` and is drawn with or without clip headers, on a spectrogram track too |
 | only a `src` | Nothing, until its audio has loaded (the track's row and controls are there) |
 
-A placeholder is dimmed (theme key `placeholderClipOpacity`, 0.5 by default), has no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. Its record is in `usePlaylistTimeline().peaksDataArray` with `isPlaceholder: true`; there is no clip for it in `tracks`, so look a record up by `clipId`, not by its position in the row.
+A placeholder is dimmed (theme key `placeholderClipOpacity`, 0.5 by default), has no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. The box of a placeholder without peaks is `<ClipPlaceholderBody />` from `@waveform-playlist/ui-components`, the clip's first child: the played-portion tint (`waveProgressColor`) and the fade curves of `<WaveformFades />` are drawn over it. Its record is in `usePlaylistTimeline().peaksDataArray` with `isPlaceholder: true`; there is no clip for it in `tracks`, so look a record up by `clipId`, not by its position in the row.
 
 No placeholder is drawn until the provider knows its real sample rate: from mount when you pass the provider's `sampleRate` prop, otherwise once its first adapter exists. If the adapter can never be built (a missing optional peer, a `createAdapter` that throws) and no `sampleRate` prop is given, no placeholder is ever drawn. Pass `sampleRate` if placeholders must appear whatever happens to the engine. A placeholder's position and length are at the provider's sample rate, also when its peaks file was made at another rate.
 
-`duration` in `usePlaylistTimeline()` counts loaded audio only. The view is drawn wide enough for a placeholder that ends later. A click on such a placeholder past the end of the loaded audio puts the cursor there, and Play from there stops at once, at the end of the loaded audio; `seekTo` clamps to the loaded audio.
+`duration` in `usePlaylistTimeline()` counts loaded audio only. The view is drawn wide enough for a placeholder that ends later. A click on such a placeholder past the end of the loaded audio puts the cursor there; Play from there starts and stops at once, because the position is past the end of the loaded audio, and the cursor stays where it was. `seekTo` clamps to the loaded audio.
 
 ### Immediate Mode (Progressive Loading)
 

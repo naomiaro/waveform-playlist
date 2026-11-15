@@ -89,7 +89,7 @@ If you render `<PlaylistInfoContext value={…}>` yourself, give it every field 
 
 `SpectrogramChannel` takes the background of its area from the theme key `spectrogramBackgroundColor` (`#000` without it). That background shows until the spectrogram has been drawn and where a chunk is not mounted. A new `waveHeight` mounts new canvases, which are registered again through `onCanvasRegister`.
 
-A `Clip` given `isPlaceholder` (the clip's audio is still loading) is drawn without drag and trim handles, dimmed to the theme key `placeholderClipOpacity` (a number from 0 to 1; 0.5 when not set). A placeholder with no peaks to draw gets `<ClipPlaceholderBody />` as its child: a box over the clip's channel area in the colour of the waveform's bars (`waveFillColor`, `selectedWaveFillColor` with `isSelected`), carrying `data-clip-placeholder-body="true"`; the clip dims it, and it sets no opacity of its own.
+A `Clip` given `isPlaceholder` (the clip's audio is still loading) is drawn without drag and trim handles, dimmed to the theme key `placeholderClipOpacity` (a number from 0 to 1; 0.5 when not set). A placeholder with no peaks to draw gets `<ClipPlaceholderBody />` as its child: a box over the clip's channel area in the colour of the waveform's bars (`waveFillColor`, `selectedWaveFillColor` with `isSelected`, `grey` when the theme gives no usable colour), carrying `data-clip-placeholder-body="true"`; the clip dims it, and it sets no opacity of its own.
 
 ## Theming
 

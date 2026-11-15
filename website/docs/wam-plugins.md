@@ -35,7 +35,7 @@ import { configureGlobalContext } from '@waveform-playlist/playout';
 configureGlobalContext({ nativeAudioContext: true });
 ```
 
-`configureGlobalContext` must run before `getGlobalContext()` is called by anything else (any `WaveformPlaylistProvider` render, or `createToneAdapter()`) — once the context exists, native mode can no longer be applied and a console warning is logged instead.
+`configureGlobalContext` must run before `getGlobalContext()` is called by anything else (`createToneAdapter()`, which `WaveformPlaylistProvider` calls for its default adapter when it builds its first engine, in an effect after its first render; or a call of your own) — once the context exists, native mode can no longer be applied and a console warning is logged instead.
 
 ### Browser support (Tone backends)
 

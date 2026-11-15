@@ -94,7 +94,7 @@ function MicMonitor() {
 
 ### Integrated Recording (into an arrangement)
 
-`useIntegratedRecording` combines microphone access, metering, and recording into one hook that adds the finalized clip to a track of an `Arrangement` — the object `@waveform-playlist/browser`'s `useCreateArrangement` makes and `WaveformPlaylistProvider` plays. This package depends on `@waveform-playlist/engine` for that type only.
+`useIntegratedRecording` combines microphone access, metering, and recording into one hook that adds the finalized clip to a track of an `Arrangement` — the object `@waveform-playlist/browser`'s `useCreateArrangement` makes and `WaveformPlaylistProvider` plays. This package depends on `@waveform-playlist/engine` and imports only types from it.
 
 ```tsx
 import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';

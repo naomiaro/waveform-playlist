@@ -1421,7 +1421,7 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 The hook runs `setRecordingActive` (from `useEditorControls()`) in an effect, which is after the render that follows the start of the take. A handler that starts playback together with the recording should also call `setRecordingActive(true, trackId)` itself, before `play()`. `play()` does nothing before the playlist's first ready (`usePlaylistTimeline().isReady`), so a take started during the first load records without playback.
 
-Edges to know: a removal of the armed track during a take (undoable) keeps its mix entry with the take's mute, so undoing that removal after the take brings the track back muted. An app's own mute control (one that does not use `<TrackMuteButton />`) reads `useTrack().isRecordingArmed` or tracks the armed id itself; a mute set on the armed track during a take is overwritten when it ends.
+Edges to know: the arrangement keeps a removed track's mix for its undo and brings it back with the track; the end of a take writes nothing for a track that is gone. So if the armed track is removed during a take as an undo step, undoing that removal after the take brings the track back muted. An app's own mute control (one that does not use `<TrackMuteButton />`) reads `useTrack().isRecordingArmed` or tracks the armed id itself; a mute set on the armed track during a take is overwritten when it ends.
 
 ---
 
@@ -2152,7 +2152,7 @@ Export the playlist to WAV format using offline rendering.
 
 ```typescript
 function useExportWav(): {
-  exportWav: (tracks: readonly ClipTrack[], trackStates: TrackState[], options?: ExportOptions) => Promise<ExportResult>;
+  exportWav: (tracks: readonly ClipTrack[], trackStates: readonly TrackState[], options?: ExportOptions) => Promise<ExportResult>;
   isExporting: boolean;
   progress: number;
   error: string | null;

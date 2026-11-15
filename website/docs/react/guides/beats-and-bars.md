@@ -134,5 +134,5 @@ The `SmartScale` component (used internally by `Waveform`) checks for `BeatsAndB
 ## See Also
 
 - [Beats & Bars Example](/examples/beats-and-bars) — Interactive demo with BPM, time signature, and snap controls
-- [Loading Audio](/docs/react/guides/loading-audio) — Immediate mode for progressive loading
+- [Loading Audio](/docs/react/guides/loading-audio) — Placeholders while audio loads, pre-computed peaks
 - [Track Management](/docs/react/guides/track-management) — Drag and trim clips

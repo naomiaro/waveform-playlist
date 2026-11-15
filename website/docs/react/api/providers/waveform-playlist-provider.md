@@ -68,6 +68,8 @@ const addFile = (file: File) => arrangement.addTrack(audioTrack({ src: file }));
 <WaveformPlaylistProvider arrangement={arrangement}>
 ```
 
+The prop is required: without it (or with a value that is not an object) the provider throws an `Error` while it renders, in every build, whose message starts `` [waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop `` and links to the [upgrade guide](/docs/react/upgrading).
+
 Keep one arrangement for the life of the playlist. A new `arrangement` object is a new playlist: everything below the provider mounts again, with a new engine. Playback stops, and the zoom, the selection, the loop, the master volume and the scroll position start from their initial values. A development build says so once with a console warning.
 
 A track change (added, removed, replaced, all tracks set) never builds a new engine: the engine follows the arrangement. An engine is built when the provider mounts, when `effects` changes identity and when `zoomLevels` changes content. `createAdapter` and `sampleRate` are read when an engine is built.
