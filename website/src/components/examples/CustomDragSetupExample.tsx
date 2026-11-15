@@ -135,7 +135,8 @@ function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps)
   };
 
   // The collision modifier takes a function for `tracks`, so the modifiers
-  // array is not rebuilt on every pointer move of a trim (tracks change then).
+  // array is not rebuilt when the tracks change (a move or a trim, once each
+  // on release).
   const tracksRef = useRef(tracks);
   tracksRef.current = tracks;
   const getTracks = useCallback(() => tracksRef.current, []);

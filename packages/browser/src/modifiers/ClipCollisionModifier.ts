@@ -25,8 +25,9 @@ interface ClipCollisionOptions {
  * For clip move operations: constrains horizontal transform to valid positions
  * using the engine's collision detection.
  *
- * For boundary trim operations: returns zero transform because visual feedback
- * comes from React state updates resizing the clip, not from CSS translate.
+ * For boundary trim operations: returns zero transform because the trim is
+ * shown by the trim preview, which draws the clip at its previewed geometry,
+ * not by a CSS translate.
  */
 export class ClipCollisionModifier extends Modifier<
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +47,7 @@ export class ClipCollisionModifier extends Modifier<
       clipId: string;
     };
 
-    // Boundary trims: zero transform (visual feedback from React state updates)
+    // Boundary trims: zero transform (the trim preview draws the clip)
     if (boundary) return { x: 0, y: 0 };
 
     const { samplesPerPixel } = this.options;

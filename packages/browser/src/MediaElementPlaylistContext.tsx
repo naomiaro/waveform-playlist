@@ -947,7 +947,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [duration, isReady, peaksDataArray, trackFadeIn, trackFadeOut]
   );
 
-  // The eleven contexts only the WebAudio provider serves are blocked, so that
+  // The ten contexts only the WebAudio provider serves are blocked, so that
   // inside this provider `useLoop()` (say) throws instead of reading a
   // WebAudio provider further out. Outermost: what changes least.
   return (

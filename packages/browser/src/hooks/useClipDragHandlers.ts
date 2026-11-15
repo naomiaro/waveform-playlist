@@ -227,7 +227,10 @@ export function useClipDragHandlers({
       const data = event.operation.source?.data as ClipDragData | undefined;
       const drag = trimDragRef.current;
       if (!data?.boundary || !drag || !trimOrderRef.current) return;
-      const currentClips = tracksRef.current[data.trackIndex]?.clips;
+      // By the id captured at drag start: the track's row can move mid-drag
+      // (a reorder), and `data.trackIndex` is the row it had then. While the
+      // track is gone, a move does nothing.
+      const currentClips = tracksRef.current.find((t) => t.id === drag.trackId)?.clips;
       const clip = currentClips?.find((c) => c.id === drag.clipId);
       if (!currentClips || !clip) return;
       if (!sameNeighbours(trimOrderRef.current.clips, currentClips, drag.clipId)) {
@@ -314,11 +317,16 @@ export function useClipDragHandlers({
       // Clip move: transform.x is modifier-constrained, cached as a plain
       // object in the snapshot.
       const sampleDelta = event.operation.transform.x * samplesPerPixel;
-      const trackId = tracksRef.current[data.trackIndex]?.id;
+      const track = tracksRef.current[data.trackIndex];
+      const trackId = track?.id;
       if (!trackId) {
         console.warn(
           `[waveform-playlist] The move was dropped: there is no track at index ${data.trackIndex}. ` +
             'The clip stays where it was.'
+        );
+      } else if (!track.clips.some((c) => c.id === data.clipId)) {
+        console.warn(
+          `[waveform-playlist] The move was dropped: track "${trackId}" has no clip "${data.clipId}".`
         );
       } else if (!engineRef.current) {
         console.warn(
