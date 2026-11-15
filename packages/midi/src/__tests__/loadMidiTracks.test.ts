@@ -53,6 +53,41 @@ describe('loadMidiTracks', () => {
     expect(tracks[0].clips[0].midiNotes).toHaveLength(3);
   });
 
+  it('name names the track and its clip when the file gives one track', async () => {
+    const midi = new Midi();
+    const only = midi.addTrack();
+    only.name = 'Original';
+    only.addNote({ midi: 60, time: 0, duration: 1 });
+    const bytes = midi.toArray();
+    const copy = new Uint8Array(new ArrayBuffer(bytes.length));
+    copy.set(bytes);
+    const blob = Object.assign(new Blob([copy]), { arrayBuffer: async () => copy.buffer });
+    const [track, ...rest] = await loadMidiTracks(blob, {
+      sampleRate: SAMPLE_RATE,
+      name: 'Renamed',
+    });
+    expect(rest).toHaveLength(0);
+    expect(track.name).toBe('Renamed');
+    expect(track.clips[0].name).toBe('Renamed');
+  });
+
+  it('name is ignored when the file gives several tracks: each keeps its MIDI name', async () => {
+    const tracks = await loadMidiTracks(midiBlob(), { sampleRate: SAMPLE_RATE, name: 'Renamed' });
+    expect(tracks.map((t) => t.name)).toEqual(['Lead', 'Bass']);
+    expect(tracks.map((t) => t.clips[0].name)).toEqual(['Lead', 'Bass']);
+  });
+
+  it('name with flatten names the single track and its clip', async () => {
+    const [track, ...rest] = await loadMidiTracks(midiBlob(), {
+      sampleRate: SAMPLE_RATE,
+      flatten: true,
+      name: 'Merged',
+    });
+    expect(rest).toHaveLength(0);
+    expect(track.name).toBe('Merged');
+    expect(track.clips[0].name).toBe('Merged');
+  });
+
   it('start and duration in seconds become samples at sampleRate', async () => {
     const [track] = await loadMidiTracks(midiBlob(), {
       sampleRate: SAMPLE_RATE,

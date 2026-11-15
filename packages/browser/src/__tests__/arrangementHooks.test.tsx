@@ -112,6 +112,44 @@ describe('useCreateArrangement', () => {
     expect(initCalls).toBeGreaterThanOrEqual(2);
     expect(loadSource).not.toHaveBeenCalled();
   });
+
+  it('the loadSource option loads the arrangement\u2019s sources once a decode context is attached', async () => {
+    const loads = fakeLoads();
+    const loadSource = vi.fn(loads.loadSource);
+    let arrangement: Arrangement | undefined;
+    const Probe: React.FC = () => {
+      arrangement = useCreateArrangement(() => [track('A', [loading('L', 'a.opus')])], {
+        loadSource,
+      });
+      return null;
+    };
+    render(<Probe />);
+    const detach = attachDecodeContext(
+      arrangement!,
+      async () => ({}) as unknown as BaseAudioContext
+    );
+    try {
+      await act(flush);
+      expect(loadSource).toHaveBeenCalledTimes(1);
+      expect(loadSource.mock.calls[0][0]).toBe('a.opus');
+    } finally {
+      detach();
+    }
+  });
+
+  it('the undoLimit option limits the history', () => {
+    let arrangement: Arrangement | undefined;
+    const Probe: React.FC = () => {
+      arrangement = useCreateArrangement(() => [], { undoLimit: 1 });
+      return null;
+    };
+    render(<Probe />);
+    arrangement!.addTrack(track('A'));
+    arrangement!.addTrack(track('B'));
+    arrangement!.undo();
+    expect(arrangement!.canUndo).toBe(false);
+    expect(arrangement!.getTracks().map((t) => t.id)).toEqual(['A']);
+  });
 });
 
 describe('useArrangementTracks', () => {

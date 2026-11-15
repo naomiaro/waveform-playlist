@@ -108,4 +108,22 @@ describe('placeholderPeaks', () => {
     expect(placeholderPeaks(clip, 'T', { ...OPTIONS, mono: true })).not.toBe(first);
     expect(placeholderPeaks(loading({ duration: 1 }), 'T', OPTIONS)).not.toBe(first);
   });
+
+  it('a null duration is read as not given', () => {
+    const wd = waveformData(400, FILE_RATE) as unknown as WaveformData;
+    const withNull = placeholderPeaks(
+      loading({
+        waveformData: wd as unknown as WaveformDataObject,
+        duration: null as unknown as undefined,
+      }),
+      'T',
+      OPTIONS
+    );
+    expect(withNull).not.toBeNull();
+    expect(withNull!.durationSamples).toBe(Math.ceil(wd.duration * FILE_RATE));
+    // Without peaks there is no length: null, as for a missing duration.
+    expect(
+      placeholderPeaks(loading({ duration: null as unknown as undefined }), 'T', OPTIONS)
+    ).toBeNull();
+  });
 });

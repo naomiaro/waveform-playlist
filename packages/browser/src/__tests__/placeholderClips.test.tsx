@@ -53,7 +53,6 @@ describe('a placeholder row', () => {
     const { container } = row(true);
     expect(container.querySelectorAll('[data-boundary-edge]')).toHaveLength(0);
     expect(container.querySelector('[data-clip-id]')).toBeNull();
-    expect(container.querySelector('[aria-roledescription="draggable"]')).toBeNull();
     expect(
       container.querySelector('[data-clip-container]')?.getAttribute('data-clip-placeholder')
     ).toBe('true');

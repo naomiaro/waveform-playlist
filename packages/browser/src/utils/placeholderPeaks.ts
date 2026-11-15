@@ -59,8 +59,11 @@ function build(
   options: PlaceholderPeaksOptions
 ): ClipPeaks | null {
   const wdata = usableWaveformData(clip);
-  if (clip.duration === undefined && !wdata) return null;
-  if (!isTime(clip.start) || !isTime(clip.offset) || !isTime(clip.duration)) return null;
+  // A null duration is "not given", as in the engine's resolveLoadingClip: plain
+  // JavaScript or JSON input can carry one although the type does not.
+  const duration = (clip.duration as number | null | undefined) ?? undefined;
+  if (duration === undefined && !wdata) return null;
+  if (!isTime(clip.start) || !isTime(clip.offset) || !isTime(duration)) return null;
   const rate = wdata ? wdata.sample_rate : options.contextSampleRate;
   if (!(Number.isFinite(rate) && rate > 0)) return null;
 
@@ -71,7 +74,7 @@ function build(
   // which gives null below.
   const total = wdata ? Math.ceil(wdata.duration * rate) : undefined;
   const rest = total === undefined ? undefined : total - offsetSamples;
-  const wanted = clip.duration === undefined ? rest : Math.round(clip.duration * rate);
+  const wanted = duration === undefined ? rest : Math.round(duration * rate);
   const durationSamples =
     rest === undefined ? (wanted as number) : Math.min(wanted as number, rest);
   if (![startSample, offsetSamples, durationSamples, total ?? 0].every(Number.isSafeInteger)) {

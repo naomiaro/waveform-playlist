@@ -96,8 +96,8 @@ export interface LoadMidiTracksOptions {
   /** Clip duration in seconds (default: the end of the track's last note). */
   duration?: number;
   /**
-   * Names the track when the file yields exactly one (a single-track file, or
-   * `flatten`). Several tracks keep their own MIDI names.
+   * Names the track and its clip when the file yields exactly one (a
+   * single-track file, or `flatten`). Several tracks keep their own MIDI names.
    */
   name?: string;
   /** Aborts the fetch and the load; the promise rejects with the signal's reason. */

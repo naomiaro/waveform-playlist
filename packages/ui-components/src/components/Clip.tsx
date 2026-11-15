@@ -10,7 +10,7 @@ import { ClipViewportOriginProvider } from '../contexts/ClipViewportOrigin';
 import type { WaveformPlaylistTheme } from '../wfpl-theme';
 
 /** The opacity of a placeholder clip when the theme sets no `placeholderClipOpacity`. */
-export const DEFAULT_PLACEHOLDER_CLIP_OPACITY = 0.5;
+const DEFAULT_PLACEHOLDER_CLIP_OPACITY = 0.5;
 
 /** The theme's value when it is a number from 0 to 1, else the default (never throws). */
 function placeholderOpacity(theme: Partial<WaveformPlaylistTheme> | undefined): number {
