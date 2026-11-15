@@ -124,6 +124,12 @@ Under either provider:
 
 The transport buttons (`PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`), `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs` and `AutomaticScrollCheckbox` work under either provider. `PlaybackRateSelect` works under `MediaElementPlaylistProvider` only.
 
+## Arrangement Hooks
+
+`useCreateArrangement(init?, options?)` makes the `Arrangement` (from `@waveform-playlist/engine`) that owns a multitrack editor's tracks, one per component instance; `useArrangementTracks(arrangement)` returns its tracks, loading clips included, and re-renders when they change, not on a mix change; `useArrangementSources(arrangement)` returns where each source is (`pending`, `loaded` or `failed`) with `pendingCount`, `failedCount` and `isLoading`. They are in the core entry.
+
+`WaveformPlaylistProvider` does not take an arrangement yet (it takes `tracks` and `onTracksChange`), and a later release of this work changes that. Today the hooks are for an app that builds a `PlaylistEngine` itself, with `new PlaylistEngine({ adapter, arrangement })`. See the [hooks reference](https://naomiaro.github.io/waveform-playlist/docs/react/api/hooks#arrangement-hooks).
+
 ## Examples & Documentation
 
 - [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/) — guides, API reference, and live examples

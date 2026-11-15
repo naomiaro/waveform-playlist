@@ -4,7 +4,7 @@
 
 As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split (see `docs/specs/2026-05-23-dawcore-load-midi-design.md`). React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
 
-`useMidiTracks` is the only original symbol still defined in this package.
+`useMidiTracks` and `loadMidiTracks` are the symbols defined in this package (`loadMidiTracks.ts` also holds the one place a MIDI track is built, `createMidiTrack`, which `useMidiTracks` uses too; it is not exported).
 
 ## Purpose
 
@@ -41,7 +41,7 @@ Provides MIDI file loading, parsing, and React hook integration for waveform-pla
 
 ### Tracks Are MIDI Tracks
 
-`useMidiTracks` builds every track with `createTrack({ kind: 'midi', … })` (#756). A track without it is read as an audio track and the engine rejects its MIDI clip.
+`loadMidiTracks` and `useMidiTracks` build every track with `createTrack({ kind: 'midi', … })` (#756). A track without it is read as an audio track and the engine rejects its MIDI clip.
 
 ### Multi-Track Expansion
 

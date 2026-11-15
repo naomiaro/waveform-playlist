@@ -40,6 +40,11 @@ import {
   usePlaybackRate,
   useMediaElementTrack,
 
+  // Arrangement hooks
+  useCreateArrangement,
+  useArrangementTracks,
+  useArrangementSources,
+
   // Specialized hooks
   useTimeFormat,
 
@@ -494,6 +499,82 @@ interface MediaElementTrackContextValue {
   fadeOut?: FadeConfig;
   /** The player. `current` is null until it has been created. */
   playoutRef: RefObject<MediaElementPlayout | null>;
+}
+```
+
+---
+
+## Arrangement Hooks
+
+Three hooks over an `Arrangement` (from `@waveform-playlist/engine`), the object that owns a multitrack editor's tracks, mix and undo history. They are in the core entry of `@waveform-playlist/browser`, not in `/tone`.
+
+`WaveformPlaylistProvider` does not take an arrangement yet: it still takes `tracks` and `onTracksChange`, and a later release of this work changes that. Today the hooks are for an app that builds a `PlaylistEngine` itself, with `new PlaylistEngine({ adapter, arrangement })`. See [Using the Engine Directly](/docs/framework-agnostic/engine).
+
+### useCreateArrangement
+
+```typescript
+function useCreateArrangement(
+  init?: () => readonly ArrangementTrack[],
+  options?: UseCreateArrangementOptions
+): Arrangement;
+
+interface UseCreateArrangementOptions {
+  loadSource?: LoadSource; // how a clip's source is fetched and decoded
+  undoLimit?: number; // how many undo steps the arrangement keeps
+}
+```
+
+Makes one `Arrangement` per component instance and returns the same one on every render. `init` and `options` are read on the first render only; a later render with other values changes nothing.
+
+An initializer that throws (a track of the wrong kind, a duplicate track id, two clips with one id on a track) throws out of the render, so it lands in the nearest error boundary, not in a provider's `onError`. Under StrictMode the initializer runs twice and one result is kept.
+
+Creating an arrangement fetches nothing. A loading clip's source is fetched and decoded once a decode context is attached: an engine built on the arrangement with an adapter attaches `adapter.audioContext`.
+
+### useArrangementTracks
+
+```typescript
+function useArrangementTracks(arrangement: Arrangement): readonly ArrangementTrack[];
+```
+
+Returns `arrangement.getTracks()`, loading clips included (narrow a clip with `isLoadingClip` from `@waveform-playlist/core`). The component re-renders when the tracks change, not when the mix changes (a volume, mute, solo or pan). Do not write to what it returns. The argument is required.
+
+### useArrangementSources
+
+```typescript
+function useArrangementSources(arrangement: Arrangement): ArrangementSourcesValue;
+```
+
+Returns `{ sources, pendingCount, failedCount, isLoading }`: `sources` maps each source to `{ status: 'pending' | 'loaded' | 'failed', error }`. It is the same object until a status changes. The argument is required.
+
+```tsx
+import { useEffect } from 'react';
+import { PlaylistEngine } from '@waveform-playlist/engine';
+import type { PlayoutAdapter } from '@waveform-playlist/engine';
+import { audioTrack } from '@waveform-playlist/core';
+import {
+  useCreateArrangement,
+  useArrangementTracks,
+  useArrangementSources,
+} from '@waveform-playlist/browser';
+
+function Editor({ adapter }: { adapter: PlayoutAdapter }) {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ name: 'Drums', src: '/audio/drums.mp3' }),
+  ]);
+  const tracks = useArrangementTracks(arrangement);
+  const { isLoading, failedCount } = useArrangementSources(arrangement);
+
+  useEffect(() => {
+    const engine = new PlaylistEngine({ adapter, arrangement });
+    return () => engine.dispose();
+  }, [adapter, arrangement]);
+
+  return (
+    <p>
+      {tracks.length} tracks{isLoading ? ', loading' : ''}
+      {failedCount > 0 ? `, ${failedCount} failed` : ''}
+    </p>
+  );
 }
 ```
 

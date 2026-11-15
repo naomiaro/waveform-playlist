@@ -3827,3 +3827,20 @@ Also:
 - `editor.startRecording()` onto a MIDI track records nothing and dispatches `daw-recording-error`.
 - `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one. The exported `TrackDescriptor` and `TrackWithId` types therefore have a new required field: code that builds one of them by hand must add `kind`.
 
+## `ClipPeaks` has a required `isPlaceholder` field
+
+**Package:** `@waveform-playlist/browser`.
+
+`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. Both providers set it to `false` on every record today. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it.
+
+**Find:** an object literal typed `ClipPeaks` (or a function returning one), for example in a test or a custom `peaksDataArray`.
+
+**Replace with:** the same object with `isPlaceholder: false`.
+
+```ts
+// Before
+const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSamples };
+
+// After
+const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSamples, isPlaceholder: false };
+```

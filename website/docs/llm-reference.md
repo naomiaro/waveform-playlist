@@ -730,6 +730,8 @@ interface ClipPeaks {
   offsetSamples?: number;
   /** The clip's linear gain — drawn into the waveform under `<WaveformTracks gainScaled>`. */
   gain?: number;
+  /** True for the record of a clip whose audio is still loading: drawn without drag or trim handles, container carries data-clip-placeholder="true". Both providers set false on every record today. Required. */
+  isPlaceholder: boolean;
 }
 
 type TrackClipPeaks = ClipPeaks[];
@@ -818,6 +820,31 @@ interface UseDynamicTracksReturn {
 Imperative complement to `useAudioTracks`. Creates placeholder tracks (`clips: []`) immediately when `addTracks()` is called. Placeholders show track controls with empty waveform area while audio decodes in parallel. Each placeholder is atomically replaced with the loaded track (same `id`) on success, or removed on error with the failure recorded in `errors`.
 
 ---
+
+## Arrangement Hooks
+
+*From `@waveform-playlist/browser`*
+
+`WaveformPlaylistProvider` does not take an arrangement yet (it takes `tracks` / `onTracksChange`). Today the hooks go with a `PlaylistEngine` an app builds itself (`new PlaylistEngine({ adapter, arrangement })`, see [Using the Engine Directly](/docs/framework-agnostic/engine)). `Arrangement`, `LoadSource` and `ArrangementSourcesValue` are from `@waveform-playlist/engine`; `ArrangementTrack` is from `@waveform-playlist/core`.
+
+```typescript
+function useCreateArrangement(
+  init?: () => readonly ArrangementTrack[],
+  options?: UseCreateArrangementOptions
+): Arrangement;
+
+interface UseCreateArrangementOptions {
+  loadSource?: LoadSource; // how a clip's source is fetched and decoded
+  undoLimit?: number; // how many undo steps the arrangement keeps
+}
+
+function useArrangementTracks(arrangement: Arrangement): readonly ArrangementTrack[];
+
+function useArrangementSources(arrangement: Arrangement): ArrangementSourcesValue;
+// { sources: Map<src, { status: 'pending' | 'loaded' | 'failed'; error? }>, pendingCount, failedCount, isLoading }
+```
+
+`useCreateArrangement` makes one arrangement per component instance. `init` and `options` are read on the first render only. An initializer that throws (a track of the wrong kind, a duplicate track id, two clips with one id on a track) throws out of the render, to the nearest error boundary, not to a provider's `onError`. Under StrictMode the initializer runs twice and one result is kept. Creating an arrangement fetches nothing: loading starts when a decode context is attached (an engine with an adapter attaches `adapter.audioContext`). `useArrangementTracks` returns `arrangement.getTracks()`, loading clips included, and re-renders when the tracks change, not on a mixer change. `useArrangementSources` returns the same object until a source's status changes.
 
 ## Effects Hooks
 
@@ -1361,7 +1388,7 @@ Delegates to `engine.splitClip()` — engine handles clip creation, adapter sync
 
 ## MIDI (`@waveform-playlist/midi` + `@dawcore/midi`)
 
-Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. As of v13, the parser is framework-agnostic and lives in `@dawcore/midi`; `@waveform-playlist/midi` re-exports it and adds the React `useMidiTracks` hook on top.
+Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. As of v13, the parser is framework-agnostic and lives in `@dawcore/midi`; `@waveform-playlist/midi` re-exports it and adds the React `useMidiTracks` hook and the plain function `loadMidiTracks` on top.
 
 ### useMidiTracks
 
@@ -1398,6 +1425,28 @@ interface UseMidiTracksReturn {
 ```
 
 One `MidiTrackConfig` with `src` can produce multiple `ClipTrack` objects (one per MIDI channel in the file). Configs with `midiNotes` produce exactly one track. All tracks are returned at once after loading completes.
+
+### loadMidiTracks
+
+A function, not a hook: no React state, no loading flags. Beside `useMidiTracks`, which is unchanged.
+
+```typescript
+function loadMidiTracks(
+  src: string | File | Blob, // a URL, or the file itself
+  options: LoadMidiTracksOptions
+): Promise<ClipTrack[]>;
+
+interface LoadMidiTracksOptions {
+  sampleRate: number; // Required — pass AudioContext.sampleRate
+  flatten?: boolean; // Merge all MIDI tracks of the file into one (default false)
+  start?: number; // Clip position in seconds (default 0)
+  duration?: number; // Clip duration in seconds (default: end of the track's last note)
+  name?: string; // Names the track and its clip when the file yields exactly one track; several tracks keep their own MIDI names
+  signal?: AbortSignal; // An aborted signal rejects with the signal's reason
+}
+```
+
+Each track has `kind: 'midi'`, and every call makes new track and clip ids. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`; data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
 
 ### parseMidiFile / parseMidiUrl
 

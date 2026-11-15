@@ -119,6 +119,22 @@ const { tracks } = useMidiTracks(
 );
 ```
 
+### loadMidiTracks
+
+`loadMidiTracks` is a plain function beside the hook: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.
+
+```tsx
+import { loadMidiTracks } from '@waveform-playlist/midi';
+
+const controller = new AbortController();
+const tracks = await loadMidiTracks(file, {
+  sampleRate: audioContext.sampleRate,
+  signal: controller.signal,
+});
+```
+
+The other options are `flatten`, `start` and `duration` (both in seconds) and `name`, which names the track and its clip only when the file yields exactly one track (several tracks keep their own MIDI names). An aborted `signal` rejects with the signal's reason. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`, and data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
+
 ### SoundFont Playback
 
 For realistic instrument sounds, load a SoundFont file and pass the cache to the provider:
