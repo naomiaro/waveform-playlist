@@ -118,16 +118,14 @@ describe('useClipDragHandlers', () => {
     const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
       <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
     );
-    const onTracksChange = vi.fn();
     let tracks = initialTracks;
     const hook = renderHook(
-      () => useClipDragHandlers({ tracks, onTracksChange, samplesPerPixel: 1000, engineRef }),
+      () => useClipDragHandlers({ tracks, samplesPerPixel: 1000, engineRef }),
       { wrapper }
     );
     return {
       hook,
       engine,
-      onTracksChange,
       preview: () => preview.source.getSnapshot(),
       setTracks: (next: ClipTrack[]) => {
         tracks = next;
@@ -138,7 +136,7 @@ describe('useClipDragHandlers', () => {
   }
 
   it('keeps the same handlers through a trim and a change of tracks', () => {
-    const { hook, setTracks, onTracksChange, preview } = setup();
+    const { hook, setTracks, preview } = setup();
     const first = hook.result.current;
 
     act(() => first.onDragStart(trimEvent(0)));
@@ -148,7 +146,6 @@ describe('useClipDragHandlers', () => {
     hook.rerender();
 
     expect(preview()?.startSample).toBe(SAMPLE_RATE + 20_000);
-    expect(onTracksChange).not.toHaveBeenCalled();
     expect(hook.result.current.onDragStart).toBe(first.onDragStart);
     expect(hook.result.current.onDragMove).toBe(first.onDragMove);
     expect(hook.result.current.onDragEnd).toBe(first.onDragEnd);
@@ -216,7 +213,7 @@ describe('useClipDragHandlers', () => {
   });
 
   it('commits the last delta on drop, and a cancel commits nothing', () => {
-    const { hook, engine, preview, onTracksChange } = setup();
+    const { hook, engine, preview } = setup();
     const handlers = hook.result.current;
 
     act(() => handlers.onDragStart(trimEvent(0)));
@@ -232,7 +229,6 @@ describe('useClipDragHandlers', () => {
     act(() => handlers.onDragEnd(trimEvent(30, { canceled: true })));
     expect(preview()).toBeNull();
     expect(engine.trimClip).toHaveBeenCalledTimes(1);
-    expect(onTracksChange).not.toHaveBeenCalled();
   });
 });
 

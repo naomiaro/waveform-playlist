@@ -695,7 +695,6 @@ function renderHandlers(
     () =>
       useClipDragHandlers({
         tracks,
-        onTracksChange: () => {},
         samplesPerPixel: SPP,
         engineRef: { current: engine as unknown as PlaylistEngine },
         snapSamplePosition: options.snapSamplePosition,

@@ -69,7 +69,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 50, y: 10 },
-        sourceData: { boundary: 'left', trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', boundary: 'left', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -86,7 +86,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: -30, y: 5 },
-        sourceData: { boundary: 'right', trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', boundary: 'right', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -103,7 +103,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 100, y: 0 },
-        sourceData: { boundary: 'left', trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', boundary: 'left', trackIndex: 0, clipIndex: 0 },
       });
 
       modifier.apply(op);
@@ -127,7 +127,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 50, y: 10 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -156,7 +156,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: -20, y: 5 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -191,7 +191,7 @@ describe('ClipCollisionModifier', () => {
       // Drag clipA (index 0 in the track's clips array)
       const op = makeOperation({
         transform: { x: 10, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'a', trackIndex: 0, clipIndex: 0 },
       });
 
       modifier.apply(op);
@@ -223,7 +223,7 @@ describe('ClipCollisionModifier', () => {
       // Drag clipB (index 1)
       const op = makeOperation({
         transform: { x: 5, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 1 },
+        sourceData: { clipId: 'b', trackIndex: 0, clipIndex: 1 },
       });
 
       modifier.apply(op);
@@ -246,7 +246,7 @@ describe('ClipCollisionModifier', () => {
       mockedConstrainClipDrag.mockReturnValue(0);
       const operation = makeOperation({
         transform: { x: 1, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       modifier.apply(operation);
@@ -266,7 +266,7 @@ describe('ClipCollisionModifier', () => {
       mockedConstrainClipDrag.mockReturnValue(0);
       const operation = makeOperation({
         transform: { x: 1, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'late', trackIndex: 0, clipIndex: 0 },
       });
 
       modifier.apply(operation);
@@ -317,7 +317,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 10, y: 3 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -336,7 +336,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 15, y: 2 },
-        sourceData: { trackIndex: 5, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 5, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -344,7 +344,7 @@ describe('ClipCollisionModifier', () => {
       expect(mockedConstrainClipDrag).not.toHaveBeenCalled();
     });
 
-    it('returns original transform when clipIndex is out of bounds', () => {
+    it('returns original transform when the clip id is not in the track', () => {
       const clip = makeClip({ id: 'c1' });
       const track = makeTrack([clip]);
 
@@ -355,7 +355,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 15, y: 2 },
-        sourceData: { trackIndex: 0, clipIndex: 99 },
+        sourceData: { clipId: 'missing', trackIndex: 0, clipIndex: 99 },
       });
 
       const result = modifier.apply(op);
@@ -376,7 +376,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 0, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);
@@ -400,7 +400,7 @@ describe('ClipCollisionModifier', () => {
 
       const op = makeOperation({
         transform: { x: 10, y: 0 },
-        sourceData: { trackIndex: 0, clipIndex: 0 },
+        sourceData: { clipId: 'c1', trackIndex: 0, clipIndex: 0 },
       });
 
       const result = modifier.apply(op);

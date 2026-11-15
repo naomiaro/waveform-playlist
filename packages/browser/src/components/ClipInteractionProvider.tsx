@@ -24,9 +24,6 @@ import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
 import { ClipInteractionOptions, useClipInteraction } from '../contexts/ClipInteractionContext';
 
-// Stable noop to avoid creating a new function reference on every render
-const NOOP_TRACKS_CHANGE = () => {};
-
 export interface ClipInteractionProviderProps {
   /** Enable snap-to-grid for clip moves and boundary trims. When true,
    *  auto-detects beats snapping from BeatsAndBarsProvider context
@@ -113,7 +110,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange: onTracksChange ?? NOOP_TRACKS_CHANGE,
     samplesPerPixel,
     engineRef: playoutRef,
     snapSamplePosition,

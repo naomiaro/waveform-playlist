@@ -97,7 +97,6 @@ async function loadTracks(): Promise<ClipTrack[]> {
 
 interface ClipDragSetupProps {
   tracks: ClipTrack[];
-  onTracksChange: (tracks: ClipTrack[]) => void;
   touchOptimized: boolean;
   children: React.ReactNode;
 }
@@ -107,7 +106,7 @@ interface ClipDragSetupProps {
  * own `DragDropProvider`, with the library's sensors, drag handlers and
  * collision modifier.
  */
-function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: ClipDragSetupProps) {
+function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
   const { playoutRef } = useEngineRefs();
   const { setSelectedTrackId } = useEditorControls();
@@ -122,7 +121,6 @@ function ClipDragSetup({ tracks, onTracksChange, touchOptimized, children }: Cli
     onDragEnd,
   } = useClipDragHandlers({
     tracks,
-    onTracksChange,
     samplesPerPixel,
     engineRef: playoutRef,
   });
@@ -185,7 +183,9 @@ export function CustomDragSetupExample() {
   }, []);
 
   if (error) {
-    return <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>;
+    return (
+      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
+    );
   }
 
   return (
@@ -220,7 +220,7 @@ export function CustomDragSetupExample() {
         </Option>
       </Controls>
 
-      <ClipDragSetup tracks={tracks} onTracksChange={setTracks} touchOptimized={touchOptimized}>
+      <ClipDragSetup tracks={tracks} touchOptimized={touchOptimized}>
         {/* The one place the clips learn what they may do. Waveform takes no prop for it. */}
         <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
           <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>

@@ -10,12 +10,6 @@ import type { TrimPreview } from '../providerInternals/useTrimPreview';
 
 interface UseClipDragHandlersOptions {
   tracks: ClipTrack[];
-  /**
-   * Not called by the handlers since #812: a move and a trim reach the engine
-   * on release, and the provider hands the engine's tracks to its own
-   * `onTracksChange` from there.
-   */
-  onTracksChange: (tracks: ClipTrack[]) => void;
   samplesPerPixel: number;
   engineRef: React.RefObject<PlaylistEngine | null>;
   /** Optional function that snaps a sample position to the nearest grid position.
@@ -44,24 +38,20 @@ interface TrimDrag {
   original: Geometry;
 }
 
-/** A track's clips in timeline order, and where the clip at `clipIndex` sits in it. */
-function trimOrderFor(clips: readonly AudioClip[], clipIndex: number) {
+/** A track's clips in timeline order, and where `clip` sits in it. */
+function trimOrderFor(clips: readonly AudioClip[], clip: AudioClip) {
   const sortedClips = sortedClipsOf(clips);
-  return { clips, sortedClips, sortedIndex: sortedClips.indexOf(clips[clipIndex]) };
+  return { clips, sortedClips, sortedIndex: sortedClips.indexOf(clip) };
 }
 
 type TrimOrder = ReturnType<typeof trimOrderFor>;
 
-/** Whether every clip except the one at `clipIndex` is the same object in both arrays. */
-function sameNeighbours(
-  a: readonly AudioClip[],
-  b: readonly AudioClip[],
-  clipIndex: number
-): boolean {
+/** Whether every clip except the one with id `clipId` is the same object in both arrays. */
+function sameNeighbours(a: readonly AudioClip[], b: readonly AudioClip[], clipId: string): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
-    if (i !== clipIndex && a[i] !== b[i]) return false;
+    if (a[i].id !== clipId && a[i] !== b[i]) return false;
   }
   return true;
 }
@@ -147,7 +137,6 @@ function proposedTrimDelta({
  * ```tsx
  * const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
  *   tracks,
- *   onTracksChange: setTracks,
  *   samplesPerPixel,
  *   engineRef: playoutRef,
  * });
@@ -216,11 +205,13 @@ export function useClipDragHandlers({
     if (!data.boundary) return;
 
     const track = tracksRef.current[data.trackIndex];
-    const clip = track?.clips[data.clipIndex];
+    // By id: `clipIndex` is a position in the drawn row, which can hold
+    // placeholders that are not in `track.clips`.
+    const clip = track?.clips.find((c) => c.id === data.clipId);
     if (!track || !clip) return;
     trimDragRef.current = {
       trackId: track.id,
-      clipId: data.clipId ?? clip.id,
+      clipId: clip.id,
       boundary: data.boundary,
       original: {
         startSample: clip.startSample,
@@ -228,7 +219,7 @@ export function useClipDragHandlers({
         offsetSamples: clip.offsetSamples,
       },
     };
-    trimOrderRef.current = trimOrderFor(track.clips, data.clipIndex);
+    trimOrderRef.current = trimOrderFor(track.clips, clip);
   }, []);
 
   const onDragMove = React.useCallback(
@@ -236,13 +227,11 @@ export function useClipDragHandlers({
       const data = event.operation.source?.data as ClipDragData | undefined;
       const drag = trimDragRef.current;
       if (!data?.boundary || !drag || !trimOrderRef.current) return;
-      const { trackIndex, clipIndex } = data;
-
-      const currentClips = tracksRef.current[trackIndex]?.clips;
-      const clip = currentClips?.[clipIndex];
+      const currentClips = tracksRef.current[data.trackIndex]?.clips;
+      const clip = currentClips?.find((c) => c.id === drag.clipId);
       if (!currentClips || !clip) return;
-      if (!sameNeighbours(trimOrderRef.current.clips, currentClips, clipIndex)) {
-        trimOrderRef.current = trimOrderFor(currentClips, clipIndex);
+      if (!sameNeighbours(trimOrderRef.current.clips, currentClips, drag.clipId)) {
+        trimOrderRef.current = trimOrderFor(currentClips, clip);
       }
 
       // The dragmove event is dispatched BEFORE position.current is updated (happens
