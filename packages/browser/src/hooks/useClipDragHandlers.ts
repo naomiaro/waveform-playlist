@@ -130,9 +130,9 @@ function proposedTrimDelta({
  * whether an engine is attached or not, and throws outside
  * `WaveformPlaylistProvider`.
  *
- * **Move:** `onDragStart` notes the clip's track by id; `onDragEnd` makes one
- * `arrangement.moveClip()` on that track, also when the tracks were reordered
- * meanwhile.
+ * **Move:** `onDragStart` notes the clip and its track by id; `onDragEnd`
+ * makes one `arrangement.moveClip()` of that clip on that track, also when
+ * the tracks were reordered or the row's clips changed meanwhile.
  *
  * **Trim (#812):** each `onDragMove` publishes where the clip would be to the
  * provider's trim preview, which only the dragged clip's view follows; the
@@ -324,6 +324,7 @@ export function useClipDragHandlers({
         return;
       }
 
+      // A trim commits the clip captured at drag start (`drag`).
       if (data.boundary) {
         if (drag) commitTrim(drag, delta);
         return;
@@ -333,21 +334,25 @@ export function useClipDragHandlers({
       // object in the snapshot.
       const sampleDelta = event.operation.transform.x * samplesPerPixel;
       const tracks = arrangement.getTracks();
-      // The track the clip was picked up on; by its row only when the drag
-      // start was not seen (a custom wiring that calls onDragEnd alone).
-      const trackId = move?.clipId === data.clipId ? move.trackId : tracks[data.trackIndex]?.id;
+      // The clip and track picked up at drag start, never the clip the drop's
+      // data names: the row can have changed under the drag (a clip arriving
+      // earlier in it shifts every later clip's position). From the drop's
+      // data only when the drag start was not seen (a custom wiring that
+      // calls onDragEnd alone).
+      const clipId = move ? move.clipId : data.clipId;
+      const trackId = move ? move.trackId : tracks[data.trackIndex]?.id;
       const track = trackId === undefined ? undefined : tracks.find((t) => t.id === trackId);
       if (!track) {
         console.warn(
           `[waveform-playlist] The move was dropped: the clip's track is not there ` +
             `(row ${data.trackIndex}). The clip stays where it was.`
         );
-      } else if (!loadedClipsOf(track).some((c) => c.id === data.clipId)) {
+      } else if (!loadedClipsOf(track).some((c) => c.id === clipId)) {
         console.warn(
-          `[waveform-playlist] The move was dropped: track "${track.id}" has no clip "${data.clipId}".`
+          `[waveform-playlist] The move was dropped: track "${track.id}" has no clip "${clipId}".`
         );
       } else {
-        arrangement.moveClip(track.id, data.clipId, Math.floor(sampleDelta));
+        arrangement.moveClip(track.id, clipId, Math.floor(sampleDelta));
       }
     },
     [samplesPerPixel, arrangement, preview, commitTrim]

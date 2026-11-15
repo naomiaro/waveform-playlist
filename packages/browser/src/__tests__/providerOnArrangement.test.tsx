@@ -244,6 +244,25 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     expect(startOf(0, 'b1')).toBe(0);
   });
 
+  it('a move whose drop names another clip moves the clip picked up at drag start', async () => {
+    const view = renderWithArrangement([track('A', [clip('a1', 0, 1), clip('a2', 2, 1)])], {
+      children: CHILDREN,
+    });
+    await ready();
+    const moveClip = vi.spyOn(view.arrangement, 'moveClip');
+    act(() => probe.drag.onDragStart(dragEvent({ clipId: 'a2', trackIndex: 0, clipIndex: 1 })));
+    // The drop's data is another clip's: what a draggable id that changed
+    // hands over when the row shifted under the drag.
+    act(() =>
+      probe.drag.onDragEnd(dragEvent({ clipId: 'a1', trackIndex: 0, clipIndex: 1 }, ONE_SECOND_PX))
+    );
+
+    expect(moveClip).toHaveBeenCalledTimes(1);
+    expect(moveClip.mock.calls[0].slice(0, 2)).toEqual(['A', 'a2']);
+    expect(startOf(0, 'a1')).toBe(0);
+    expect(startOf(0, 'a2')).toBe(3 * RATE);
+  });
+
   it('removing a track during playback makes one `adapter.removeTrack`, builds no engine and keeps `isPlaying` (#798)', async () => {
     const view = renderWithArrangement(
       [track('A', [clip('a1', 0, 4)]), track('B', [clip('b1', 0, 4)])],

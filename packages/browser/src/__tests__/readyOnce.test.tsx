@@ -39,9 +39,12 @@ interface ReadyProps extends LifetimeProps {
 
 let isReady: boolean;
 let readyByRender: boolean[];
+/** The engine ref of the latest Probe render, read by an `onReady` under test. */
+let probeEngineRef: React.RefObject<unknown> | null = null;
 
 const Probe: React.FC<ReadyProps> = (props) => {
   const { lifetime } = useLifetimeForTest(props);
+  probeEngineRef = lifetime.engineRef;
   const onReadyRef = useRef(props.onReady);
   const onErrorRef = useRef(props.onError);
   useLayoutEffect(() => {
@@ -239,6 +242,81 @@ describe('useReadyOnce', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
     expect(events).toEqual([{ trackCount: 1, duration: 2 }]);
   });
+
+  // Found by the final review of #812 (probes H10 / H11): the engine of the
+  // first load is disposed by the hide, the pending source goes away while
+  // hidden, and a hidden render computed "ready" from the attached-state of
+  // the disposed engine; the reveal then fired `onReady` before any engine.
+  const SOURCE_GOES_AWAY: Array<
+    [string, (arrangement: ReturnType<typeof createArrangement>) => void]
+  > = [
+    ['the tracks are replaced without it', (arrangement) => arrangement.setTracks([])],
+    [
+      'a clip carrying its buffer is added',
+      (arrangement) =>
+        arrangement.addTrack(
+          track('U', [
+            { ...clip('c9', 0, 1), src: '/LA.opus', audioBuffer: fakeBuffer(2) } as never,
+          ])
+        ),
+    ],
+  ];
+  it.each(SOURCE_GOES_AWAY)(
+    'an <Activity> hide during the first load whose pending source goes away while hidden (%s): `onReady` fires only once the revealed engine is attached',
+    async (_name, sourceGoesAway) => {
+      const loads = fakeLoads();
+      const arrangement = createArrangement({
+        tracks: [track('A', [loading('LA')])],
+        loadSource: loads.loadSource,
+      });
+      const factory = adapterFactory();
+      const engineAtReady: boolean[] = [];
+      const onReady = vi.fn(() => engineAtReady.push(probeEngineRef?.current != null));
+      const ui = (mode: 'visible' | 'hidden') => (
+        <React.Activity mode={mode}>
+          <Probe
+            arrangement={arrangement}
+            createAdapter={factory.createAdapter}
+            onReady={onReady}
+          />
+        </React.Activity>
+      );
+      const view = render(ui('visible'));
+      await act(flush);
+      expect(factory.adapters).toHaveLength(1);
+      expect(arrangement.sources.getSnapshot().pendingCount).toBe(1);
+      expect(isReady).toBe(false);
+
+      view.rerender(ui('hidden'));
+      await act(flush);
+      await act(async () => {
+        sourceGoesAway(arrangement);
+        await flush();
+      });
+      expect(arrangement.sources.getSnapshot().pendingCount).toBe(0);
+      // A render while hidden.
+      view.rerender(ui('hidden'));
+      await act(flush);
+      expect(onReady).not.toHaveBeenCalled();
+
+      const held = factory.holdNext();
+      view.rerender(ui('visible'));
+      await act(flush);
+      expect(onReady).not.toHaveBeenCalled();
+      expect(events).toEqual([]);
+      expect(isReady).toBe(false);
+
+      await act(async () => {
+        held.open();
+        await flush();
+      });
+      expect(factory.adapters).toHaveLength(2);
+      expect(onReady).toHaveBeenCalledTimes(1);
+      expect(engineAtReady).toEqual([true]);
+      expect(isReady).toBe(true);
+      expect(events).toHaveLength(1);
+    }
+  );
 
   it('under StrictMode `onReady` fires once', async () => {
     const arrangement = createArrangement({ tracks: [track('A', [clip('a1', 0)])] });

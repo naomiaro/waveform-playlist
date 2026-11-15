@@ -81,7 +81,8 @@ export interface EngineLifetime {
   engineEpoch: number;
   /** Ask for another run of what follows `engineEpoch` (a play handed to an engine already assigned). */
   bumpEngineEpoch: () => void;
-  /** False from the start of each build until its engine is assigned. */
+  /** True while an assigned engine is current: false from the start of each
+   *  build until its engine is assigned, and after a cleanup disposed it. */
   isEngineAttached: boolean;
   /** True from the start of a build until its engine is assigned, it fails or it is superseded. */
   engineBuildInFlightRef: React.RefObject<boolean>;
@@ -359,7 +360,15 @@ export function useEngineLifetime(options: UseEngineLifetimeOptions): EngineLife
     adapterRef,
     engineEpoch,
     bumpEngineEpoch,
-    isEngineAttached,
+    // The state goes false only when a build starts, so it is still true
+    // after a cleanup disposed the engine without a new build yet (an
+    // <Activity> hide): a render then must not see an engine. The ref is
+    // non-null only between an assignment (followed by the state's true) and
+    // the dispose that nulls it, which every dispose does; a render can read
+    // a null that is newer than the state, never a stale non-null. Clearing
+    // the state in the cleanup instead left published tracks stale after a
+    // reveal in the final review's random probe (#812).
+    isEngineAttached: isEngineAttached && engineRef.current !== null,
     engineBuildInFlightRef,
     pendingResumeRef,
     audioInitializedRef,
