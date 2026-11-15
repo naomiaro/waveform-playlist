@@ -25,6 +25,27 @@ export interface LoadedTracksCache {
 
 export const EMPTY_LOADED_TRACKS: LoadedTracksCache = { byTrack: new Map(), result: [] };
 
+// The loaded clips of each arrangement track object. The objects never change
+// (a change replaces them), so one array per object is right for its life.
+const loadedClipsByTrack = new WeakMap<ArrangementTrack, AudioClip[]>();
+
+function cachedLoadedClips(track: ArrangementTrack): AudioClip[] {
+  let clips = loadedClipsByTrack.get(track);
+  if (!clips) {
+    clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
+    loadedClipsByTrack.set(track, clips);
+  }
+  return clips;
+}
+
+/**
+ * The clips of `track` that have their audio, in its order: the same array
+ * for the same track object. What a drag can pick up and a split can cut.
+ */
+export function loadedClipsOf(track: ArrangementTrack): readonly AudioClip[] {
+  return cachedLoadedClips(track);
+}
+
 function projection(track: ArrangementTrack, previous: LoadedTracksCache): ClipTrack {
   if (!track.clips.some(isLoadingClip)) {
     // Every clip is loaded: the track is a `ClipTrack` as it is.
@@ -32,8 +53,7 @@ function projection(track: ArrangementTrack, previous: LoadedTracksCache): ClipT
   }
   const known = previous.byTrack.get(track);
   if (known) return known;
-  const clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
-  return { ...track, clips };
+  return { ...track, clips: cachedLoadedClips(track) };
 }
 
 /**

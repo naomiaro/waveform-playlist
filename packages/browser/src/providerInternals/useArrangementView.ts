@@ -26,7 +26,7 @@ import {
   type PeaksCache,
 } from '../utils/derivePeaks';
 import { EMPTY_LOADED_TRACKS, loadedTracks, type LoadedTracksCache } from '../utils/loadedTracks';
-import { placeholderPeaks, placeholdersEnd as lastPlaceholderEnd } from '../utils/placeholderPeaks';
+import { placeholderPeaks } from '../utils/placeholderPeaks';
 import { sameItems } from '../utils/sameItems';
 import { timelineDuration } from '../utils/timelineDuration';
 
@@ -48,8 +48,6 @@ export interface ArrangementView {
   tracks: readonly ClipTrack[];
   /** One row per track, in the arrangement's clip order, placeholders included. */
   peaksDataArray: TrackClipPeaks[];
-  /** The end, in seconds, of the last placeholder record; 0 when there is none. */
-  placeholdersEnd: number;
   /** The end, in seconds, of the loaded audio (placeholders do not count). */
   duration: number;
   /** One entry per track, in order, from the arrangement's mixer. */
@@ -216,7 +214,6 @@ export function useArrangementView(
     return next.result;
   }, [arrangementTracks, loadedPeaks, samplesPerPixel, mono, placeholderSampleRate]);
 
-  const placeholdersEnd = useMemo(() => lastPlaceholderEnd(peaksDataArray), [peaksDataArray]);
   const duration = useMemo(() => timelineDuration(tracks), [tracks]);
 
   const statesCacheRef = useRef<StatesCache>(EMPTY_STATES);
@@ -229,7 +226,6 @@ export function useArrangementView(
   return {
     tracks,
     peaksDataArray,
-    placeholdersEnd,
     duration,
     trackStates,
     canUndo,

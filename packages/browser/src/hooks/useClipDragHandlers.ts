@@ -1,9 +1,9 @@
 import React from 'react';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
-import { isLoadingClip } from '@waveform-playlist/core';
-import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
+import type { AudioClip } from '@waveform-playlist/core';
 import { calculateBoundaryTrim } from '../utils/boundaryTrim';
 import { sortedClipsOf } from '../utils/sortedClips';
+import { loadedClipsOf } from '../utils/loadedTracks';
 import {
   useArrangement,
   usePlaylistView,
@@ -43,18 +43,6 @@ interface TrimDrag {
 interface MoveDrag {
   trackId: string;
   clipId: string;
-}
-
-// The loaded clips of each arrangement track object (the objects never
-// change, so one array per object): what a drag can pick up and collide with.
-const loadedClipsByTrack = new WeakMap<ArrangementTrack, readonly AudioClip[]>();
-function loadedClipsOf(track: ArrangementTrack): readonly AudioClip[] {
-  let clips = loadedClipsByTrack.get(track);
-  if (!clips) {
-    clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
-    loadedClipsByTrack.set(track, clips);
-  }
-  return clips;
 }
 
 /** A track's clips in timeline order, and where `clip` sits in it. */

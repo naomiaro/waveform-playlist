@@ -166,8 +166,16 @@ export function useExportWav(): UseExportWavReturn {
         const duration = totalDurationSamples / sampleRate;
 
         // Determine which tracks to render. `trackStates[i]` is the mix of
-        // `tracks[i]`: under the provider both have one entry per track.
-        const stateOf = (index: number): TrackState => trackStates[index];
+        // `tracks[i]`; under the provider both have one entry per track. A
+        // direct caller may pass fewer states: a track without one is
+        // rendered with its own fields.
+        const stateOf = (index: number): TrackState =>
+          trackStates[index] ?? {
+            muted: tracks[index].muted,
+            soloed: tracks[index].soloed,
+            volume: tracks[index].volume,
+            pan: tracks[index].pan,
+          };
         const tracksToRender =
           mode === 'individual'
             ? [{ track: tracks[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]

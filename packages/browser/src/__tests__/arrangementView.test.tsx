@@ -32,6 +32,7 @@ import {
   useArrangementView,
   type ArrangementViewOptions,
 } from '../providerInternals/useArrangementView';
+import { placeholdersEnd } from '../utils/placeholderPeaks';
 
 const RATE = 48000;
 const OPTIONS: ArrangementViewOptions = {
@@ -180,7 +181,7 @@ describe('useArrangementView', () => {
     expect(after.peaksCacheRef.current.clips.get('L')?.clipPeaks).toBe(row[1]);
   });
 
-  it('`duration` ignores a placeholder that ends later, `placeholdersEnd` reports it', () => {
+  it('`duration` ignores a placeholder that ends later, `placeholdersEnd` of its rows reports it', () => {
     const arrangement = createArrangement({
       tracks: [
         track('A', [clip('a1', 0, 1)]),
@@ -189,10 +190,10 @@ describe('useArrangementView', () => {
     });
     const { result } = view(arrangement);
     expect(result.current.duration).toBe(1);
-    expect(result.current.placeholdersEnd).toBe(5);
+    expect(placeholdersEnd(result.current.peaksDataArray)).toBe(5);
 
     act(() => arrangement.removeTrack('B'));
-    expect(result.current.placeholdersEnd).toBe(0);
+    expect(placeholdersEnd(result.current.peaksDataArray)).toBe(0);
     expect(result.current.duration).toBe(1);
   });
 
@@ -213,7 +214,7 @@ describe('useArrangementView', () => {
       soloed: false,
       pan: 0,
     });
-    expect(result.current.placeholdersEnd).toBe(0);
+    expect(placeholdersEnd(result.current.peaksDataArray)).toBe(0);
   });
 
   it('`canUndo` follows `moveClip`, `undo` and `clearHistory`', () => {
@@ -268,7 +269,7 @@ describe('useArrangementView', () => {
     });
     const { result, rerender } = view(arrangement, { ...OPTIONS, placeholderSampleRate: null });
     expect(rowIds(result.current.peaksDataArray[0])).toEqual(['a1']);
-    expect(result.current.placeholdersEnd).toBe(0);
+    expect(placeholdersEnd(result.current.peaksDataArray)).toBe(0);
 
     const realRate = 44100;
     rerender({ ...OPTIONS, placeholderSampleRate: realRate });
@@ -277,6 +278,6 @@ describe('useArrangementView', () => {
     expect(row[1].isPlaceholder).toBe(true);
     expect(row[1].sampleRate).toBe(realRate);
     expect(row[1].startSample).toBe(2 * realRate);
-    expect(result.current.placeholdersEnd).toBe(3);
+    expect(placeholdersEnd(result.current.peaksDataArray)).toBe(3);
   });
 });

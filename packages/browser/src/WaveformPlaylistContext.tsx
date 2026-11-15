@@ -47,6 +47,7 @@ import { useEngineLifetime } from './providerInternals/useEngineLifetime';
 import { useArrangementView } from './providerInternals/useArrangementView';
 import { useReadyOnce } from './providerInternals/useReadyOnce';
 import { useArrangementEditing } from './providerInternals/useArrangementEditing';
+import { useArrangementKey } from './providerInternals/arrangementIdentity';
 
 // Types
 /**
@@ -209,41 +210,10 @@ export interface WaveformPlaylistProviderProps {
   children: ReactNode;
 }
 
-// Each arrangement object gets a number of its own: the key of the provider's
-// body, so that a new arrangement is a new mount of everything below it.
-const arrangementKeys = new WeakMap<Arrangement, number>();
-let lastArrangementKey = 0;
-function keyOf(arrangement: Arrangement): number {
-  let key = arrangementKeys.get(arrangement);
-  if (key === undefined) {
-    lastArrangementKey += 1;
-    key = lastArrangementKey;
-    arrangementKeys.set(arrangement, key);
-  }
-  return key;
-}
-
-/** Says once per mount, in development, that a new `arrangement` object remounts the playlist. */
-function useWarnOnNewArrangement(arrangement: Arrangement): void {
-  const firstRef = useRef(arrangement);
-  const warnedRef = useRef(false);
-  useEffect(() => {
-    if (arrangement === firstRef.current || warnedRef.current) return;
-    warnedRef.current = true;
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(
-        '[waveform-playlist] WaveformPlaylistProvider was given a new `arrangement` prop: ' +
-          'everything below it mounts again (a new engine, the view and its state). Keep one ' +
-          'arrangement for the life of the playlist (`useCreateArrangement`) and change it ' +
-          'through its methods.'
-      );
-    }
-  }, [arrangement]);
-}
-
 export const WaveformPlaylistProvider: React.FC<WaveformPlaylistProviderProps> = (props) => {
-  useWarnOnNewArrangement(props.arrangement);
-  return <ProviderOnArrangement key={keyOf(props.arrangement)} {...props} />;
+  // A new arrangement object is a new playlist: everything below mounts again.
+  const key = useArrangementKey(props.arrangement);
+  return <ProviderOnArrangement key={key} {...props} />;
 };
 
 // Resting (non-playing) cursor positions display the raw time unchanged.

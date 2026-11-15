@@ -1,6 +1,4 @@
 import { useCallback } from 'react';
-import { isLoadingClip } from '@waveform-playlist/core';
-import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
 import { calculateSplitPoint, canSplitAt } from '@waveform-playlist/engine';
 import {
   useArrangement,
@@ -8,14 +6,10 @@ import {
   usePlaybackRefs,
   useSelectedTrackId,
 } from '../contexts/playlistContexts';
+import { loadedClipsOf } from '../utils/loadedTracks';
 
 export interface UseClipSplittingOptions {
   samplesPerPixel: number;
-}
-
-/** A track's clips that have their audio: a clip still loading cannot be split. */
-function loadedClips(track: ArrangementTrack): AudioClip[] {
-  return track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
 }
 
 export interface UseClipSplittingResult {
@@ -69,7 +63,8 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
       const track = arrangement.getTracks().find((t) => t.id === trackId);
       if (!track) return false;
 
-      const clip = loadedClips(track).find((c) => c.id === clipId);
+      // A clip still loading cannot be split.
+      const clip = loadedClipsOf(track).find((c) => c.id === clipId);
       if (!clip) return false;
 
       // Convert split time to sample position, snapped to pixel boundary
@@ -114,7 +109,7 @@ export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplit
     const currentTime = currentTimeRef.current ?? 0;
 
     // Find clip at current time on the selected track
-    for (const clip of loadedClips(track)) {
+    for (const clip of loadedClipsOf(track)) {
       const clipStartTime = clip.startSample / sampleRate;
       const clipEndTime = (clip.startSample + clip.durationSamples) / sampleRate;
 

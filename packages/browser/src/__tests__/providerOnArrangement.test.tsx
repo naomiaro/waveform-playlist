@@ -34,6 +34,7 @@ import React, { useEffect } from 'react';
 import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
 import { isLoadingClip } from '@waveform-playlist/core';
 import type { EffectsFunction } from '@waveform-playlist/playout';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   useArrangement,
   useCurrentTime,
@@ -149,6 +150,44 @@ async function engineAttached(view: { adapters: Array<{ count(method: string): n
   await waitFor(() => expect(view.adapters[0]?.count('setTracks')).toBe(1));
   await act(flush);
   expect(probe.timeline.isReady).toBe(false);
+}
+
+/** The arrangement's writing methods. */
+const WRITES = [
+  'setTracks',
+  'addTrack',
+  'removeTrack',
+  'updateTrack',
+  'reorderTrack',
+  'moveClip',
+  'trimClip',
+  'splitClip',
+  'undo',
+  'redo',
+  'setTrackVolume',
+  'setTrackMute',
+  'setTrackSolo',
+  'setTrackPan',
+  'clearHistory',
+  'beginTransaction',
+  'commitTransaction',
+  'abortTransaction',
+] as const;
+
+/** Spies on every write; each call of the result gives the writes since the last one. */
+function spyOnWrites(arrangement: Arrangement): () => Record<string, number> {
+  const spies = WRITES.map((method) => [method, vi.spyOn(arrangement, method)] as const);
+  const seen = new Map<string, number>();
+  return () => {
+    const since: Record<string, number> = {};
+    for (const [method, spy] of spies) {
+      const total = spy.mock.calls.length;
+      const count = total - (seen.get(method) ?? 0);
+      if (count > 0) since[method] = count;
+      seen.set(method, total);
+    }
+    return since;
+  };
 }
 
 const effectsA: EffectsFunction = () => undefined;
@@ -315,36 +354,53 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     expect(probe.mixer.trackStates[0].volume).toBe(0.5);
   });
 
-  it('no library subscriber makes a track edit: across load, arrival, drag, split, undo and a recorded take, the adapter receives no `setTracks` after its initial one', async () => {
+  it('no library subscriber makes a track edit: across load, arrival, drag, split, undo and a recorded take, the arrangement gets exactly the writes each step asks for, and the adapter no `setTracks` after its initial one', async () => {
     const loads = fakeLoads();
-    const view = renderWithArrangement(
+    const arrangement = testArrangement(
       [track('A', [clip('a1', 0, 4)]), track('B', [loading('LB', { duration: 2 })])],
-      { children: CHILDREN, loadSource: loads.loadSource }
+      { loadSource: loads.loadSource }
     );
+    const writes = spyOnWrites(arrangement);
+    const view = renderWithArrangement([], { arrangement, children: CHILDREN });
+
+    // Load: the engine is built and attached; nothing writes.
     await act(flush);
     const adapter = view.factory.latest();
     expect(adapter.count('setTracks')).toBe(1);
+    expect(writes()).toEqual({});
 
+    // Arrival: the arrangement switches the clip itself; nothing writes.
     await act(async () => {
       loads.calls[0].resolve(fakeBuffer(2));
       await flush();
     });
     await ready();
+    expect(writes()).toEqual({});
+
+    // A drag: the drop's one move.
     act(() => moveClipByDrag(0, 'a1', ONE_SECOND_PX));
+    expect(writes()).toEqual({ moveClip: 1 });
+
+    // A split: one split.
     act(() => {
       probe.split.splitClipAt('A', 'a1', 2);
     });
+    expect(writes()).toEqual({ splitClip: 1 });
+
+    // An undo: one undo.
     act(() => probe.editor.undo());
-    const versionBeforeTake = view.arrangement.tracksVersion;
+    expect(writes()).toEqual({ undo: 1 });
+
+    // A recorded take, as useIntegratedRecording will put it: the test's one update.
     act(() =>
-      view.arrangement.updateTrack('B', (current) => ({
+      arrangement.updateTrack('B', (current) => ({
         ...current,
         clips: [...current.clips, clip('take', 3, 1)],
       }))
     );
     await act(flush);
+    expect(writes()).toEqual({ updateTrack: 1 });
 
-    expect(view.arrangement.tracksVersion).toBe(versionBeforeTake + 1);
     expect(probe.timeline.tracks[1].clips.map((c) => c.id)).toEqual(['LB', 'take']);
     expect(adapter.count('setTracks')).toBe(1);
     expect(view.adapters).toHaveLength(1);
