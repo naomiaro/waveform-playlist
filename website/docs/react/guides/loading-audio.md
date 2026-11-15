@@ -165,7 +165,7 @@ function LoadingStatus() {
 
 The hook takes the arrangement as its argument, so it also works above the provider, with the arrangement you made. `arrangement.retry(src)` starts a source whose load failed again, and does nothing for any other source. A failed source also shows as `failed` when its audio loaded but a clip could not be made from it (for example an `offset` past the end of the file); its error says which clip, and `retry` changes nothing for it.
 
-Keep the layout above the editor stable while audio loads, for example by reserving the space of a loading indicator: a layout change that moves the editor while a clip is being moved leaves the dragged clip at the vertical position it had when the drag started, until the release (the move itself is committed correctly; issue #858).
+Keep the layout above the editor stable while audio loads, for example by drawing a loading indicator as an overlay that takes no space in the layout: a layout change that moves the editor while a clip is being moved leaves the dragged clip at the vertical position it had when the drag started, until the release (the move itself is committed correctly; issue #858).
 
 Common errors are `Failed to fetch <url>` (a network error or a refused cross-origin request), `Failed to fetch <url>: 404 Not Found` and the browser's own decode error for a format it cannot decode (that one does not name the file). The URL in a message is cut before its query string, and a user name or password in it is left out.
 

@@ -4034,7 +4034,7 @@ The three draggables of a clip had ids built from positions: `clip-<trackIndex>-
 ```tsx
 // Before
 const isTrimHandle = String(source.id).startsWith('clip-boundary-');
-const [, , trackIndex, clipIndex] = String(source.id).split('-');
+const [trackIndex, clipIndex] = String(source.id).split('-').slice(-2);
 
 // After: the data says it all (the id is clip-boundary-left/<trackId>/<clipId>)
 const { boundary, trackIndex, clipId } = source.data;
