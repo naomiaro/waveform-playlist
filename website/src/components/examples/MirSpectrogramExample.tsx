@@ -137,30 +137,32 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
-      {tracks.length > 0 && (
-        <WaveformPlaylistProvider
-          arrangement={arrangement}
-          sampleRate={48000}
-          theme={theme}
-          automaticScroll
-          samplesPerPixel={8192}
-          zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
-        >
-          <SpectrogramProvider colorMap="viridis">
-          <KeyboardShortcuts playback />
-          <ControlBar>
-            <RewindButton />
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-            <AudioPosition />
-            <ZoomInButton />
-            <ZoomOutButton />
-            <AutomaticScrollCheckbox />
-            <ClearAllButton onClearAll={handleClearAll} />
-            <SourceLoadError arrangement={arrangement} />
-          </ControlBar>
-          <LoadingBadgeFrame>
+      {/* The status region is outside the condition, so it exists before a
+          dropped file mounts the editor and its loading text appears */}
+      <LoadingBadgeFrame>
+        {tracks.length > 0 && (
+          <WaveformPlaylistProvider
+            arrangement={arrangement}
+            sampleRate={48000}
+            theme={theme}
+            automaticScroll
+            samplesPerPixel={8192}
+            zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
+          >
+            <SpectrogramProvider colorMap="viridis">
+            <KeyboardShortcuts playback />
+            <ControlBar>
+              <RewindButton />
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+              <AudioPosition />
+              <ZoomInButton />
+              <ZoomOutButton />
+              <AutomaticScrollCheckbox />
+              <ClearAllButton onClearAll={handleClearAll} />
+              <SourceLoadError arrangement={arrangement} />
+            </ControlBar>
             <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
               <WaveformRoot>
                 <WaveformTimescale />
@@ -176,11 +178,13 @@ export function MirSpectrogramExample() {
                 <WaveformPlayhead />
               </WaveformRoot>
             </WaveformViewOptions>
-            <LoadingBadge active={isLoading}>Loading tracks...</LoadingBadge>
-          </LoadingBadgeFrame>
-          </SpectrogramProvider>
-        </WaveformPlaylistProvider>
-      )}
+            </SpectrogramProvider>
+          </WaveformPlaylistProvider>
+        )}
+        <LoadingBadge active={isLoading} placement="frame-bottom">
+          Loading tracks...
+        </LoadingBadge>
+      </LoadingBadgeFrame>
 
       <StyledDropZone
         accept="audio/*"

@@ -1,8 +1,9 @@
 /**
  * Loading Badge
  *
- * The example pages' loading text, drawn as a small badge over the top-right
- * corner of the editor. It takes no layout space, so its appearing and
+ * The example pages' loading text, drawn as a small badge over a corner of
+ * the editor (or of a box the page chooses, see `placement`). It takes no
+ * layout space, so its appearing and
  * disappearing moves nothing on the page: a layout change that moves the
  * editor during a clip drag leaves the dragged clip behind until the release.
  *
@@ -17,11 +18,23 @@ import React from 'react';
 import styled from 'styled-components';
 
 /**
- * Below the default 30 px timescale and the 22 px clip header of the first
- * track, so the badge covers neither: it sits over the first track's waveform.
+ * Where the badge sits in its frame.
+ * - `editor` (default): the frame wraps the editor. Below the default 30 px
+ *   timescale and the 22 px clip header of the first track, so the badge
+ *   covers neither: it sits over the first track's waveform.
+ * - `frame-bottom`: the frame wraps a block that ends with the editor and may
+ *   be empty (an editor that is not mounted yet). Over the last track, above
+ *   the editor's horizontal scrollbar.
+ * - `box-corner`: the top-right corner of a padded box (16 px padding).
  */
-const TOP_OFFSET = '60px';
-const RIGHT_OFFSET = '8px';
+export type LoadingBadgePlacement = 'editor' | 'frame-bottom' | 'box-corner';
+
+const PLACEMENTS: Record<LoadingBadgePlacement, React.CSSProperties> = {
+  editor: { top: '60px', right: '8px' },
+  'frame-bottom': { bottom: '24px', right: '8px' },
+  'box-corner': { top: '10px', right: '12px' },
+};
+
 /** Above the waveform, playhead and selection layers of the editor. */
 const BADGE_Z_INDEX = 110;
 
@@ -31,8 +44,6 @@ export const LoadingBadgeFrame = styled.div`
 
 const Region = styled.div`
   position: absolute;
-  top: ${TOP_OFFSET};
-  right: ${RIGHT_OFFSET};
   z-index: ${BADGE_Z_INDEX};
   pointer-events: none;
 `;
@@ -40,10 +51,10 @@ const Region = styled.div`
 const Badge = styled.span`
   display: inline-block;
   padding: 0.125rem 0.5rem;
-  border: 1px solid var(--ifm-color-emphasis-300);
+  border: 1px solid var(--ifm-color-emphasis-300, #dadde1);
   border-radius: 0.25rem;
-  background: var(--ifm-background-surface-color);
-  color: var(--ifm-color-emphasis-800);
+  background: var(--ifm-background-surface-color, #ffffff);
+  color: var(--ifm-color-emphasis-800, #444950);
   font-family: 'Courier New', monospace;
   font-size: 0.8rem;
   font-weight: 700;
@@ -54,9 +65,21 @@ const Badge = styled.span`
 interface LoadingBadgeProps {
   /** Whether something is loading: the badge is drawn only then. */
   active: boolean;
+  /** Where in its frame the badge sits. Default `editor`. */
+  placement?: LoadingBadgePlacement;
   children: React.ReactNode;
 }
 
-export const LoadingBadge: React.FC<LoadingBadgeProps> = ({ active, children }) => (
-  <Region role="status">{active ? <Badge>{children}</Badge> : null}</Region>
+/**
+ * Render it unconditionally, outside any condition that mounts the editor,
+ * so the status region exists before its text does.
+ */
+export const LoadingBadge: React.FC<LoadingBadgeProps> = ({
+  active,
+  placement = 'editor',
+  children,
+}) => (
+  <Region role="status" style={PLACEMENTS[placement]}>
+    {active ? <Badge>{children}</Badge> : null}
+  </Region>
 );

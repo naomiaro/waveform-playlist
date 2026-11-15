@@ -304,3 +304,41 @@ test.describe('Mobile Multi-Clip Example', () => {
     });
   });
 });
+
+// #858 and the loading badge: the page's one loading text is in a status
+// region that exists before the editor does (the peaks load first), and the
+// same region stays mounted, empty, once loading has ended.
+test.describe('Mobile Multi-Clip Example — while the peaks load', () => {
+  test('the loading status region exists before the editor and stays when loading ends', async ({
+    page,
+    baseURL,
+  }) => {
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route('**/media/audio/AlbertKader_Ubiquitous/*.dat', async (route) => {
+      held++;
+      await released;
+      await route.continue().catch(() => {});
+    });
+
+    await page.goto(`${baseURL}/examples/mobile-multi-clip`);
+    await page.waitForSelector('h1:has-text("Mobile Multi-Clip")', { timeout: 30000 });
+    await expect.poll(() => held).toBe(3);
+
+    // The peaks are held: no editor yet, and the one loading text is shown.
+    const status = page.getByRole('status').filter({ hasText: '(Loading: 0/3 files)' });
+    await expect(status).toHaveCount(1);
+    await expect(page.locator('[data-playlist-state]')).toHaveCount(0);
+    await expect(page.getByText(/Loading:/)).toHaveCount(1);
+    const region = await status.elementHandle();
+
+    release();
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
+    // The same region, still mounted, now empty.
+    expect(await region!.evaluate((el) => el.isConnected)).toBe(true);
+    await expect.poll(() => region!.evaluate((el) => el.textContent)).toBe('');
+  });
+});
