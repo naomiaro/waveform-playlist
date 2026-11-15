@@ -16,7 +16,6 @@ import {
   WaveformViewOptions,
   useCreateArrangement,
   useArrangementSources,
-  useArrangementTracks,
 } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
 // Channel import removed - no longer using preview rendering
@@ -121,14 +120,21 @@ const StatBox = styled.div<{ $variant?: 'peaks' | 'audio' }>`
 
 const MUTED_TEXT_STYLE = { padding: '2rem', color: 'var(--ifm-color-emphasis-600)' } as const;
 
-/** The peaks of each track, in config order (null: its peaks file failed and the track is left out). */
+/**
+ * The peaks of each track, in config order. A peaks file that fails gives
+ * null: that track is added without peaks, and its waveform is generated in
+ * the browser once its audio has decoded.
+ */
 function loadAllPeaks(): Promise<(WaveformData | null)[]> {
   return Promise.all(
     trackConfigs.map(async (config) => {
       try {
         return await loadWaveformData(config.peaksSrc);
       } catch (error) {
-        console.error(`Error loading peaks for ${config.name}:`, error);
+        console.warn(
+          `[waveform-playlist example] Could not load the peaks file ${config.peaksSrc}; the waveform of "${config.name}" will be generated from its audio.`,
+          error
+        );
         return null;
       }
     })
@@ -142,6 +148,9 @@ function loadAllPeaks(): Promise<(WaveformData | null)[]> {
  * (~50KB per track) are fetched first; the tracks are then drawn from them at
  * once while the audio (~3MB) loads in the background.
  *
+ * A track whose peaks file fails is still added: its row stays empty until its
+ * audio has decoded, and then its waveform is generated in the browser.
+ *
  * Key features demonstrated:
  * - Peaks first: every track is drawn from its peaks before its audio arrives
  * - Progressive audio: each track becomes playable when its own audio has decoded
@@ -149,12 +158,12 @@ function loadAllPeaks(): Promise<(WaveformData | null)[]> {
  */
 export function WaveformDataExample() {
   const { theme } = useDocusaurusTheme();
-  // Starts empty: the tracks are added when the peaks files have been fetched,
-  // each with a clip that names its audio and carries its peaks. The playlist
-  // is shown from then on, and it is ready when the audio has decoded.
+  // Starts empty: the tracks are added when every peaks request has settled,
+  // each with a clip that names its audio and carries its peaks (when they
+  // loaded). The playlist is shown from then on, and it is ready when the
+  // audio has decoded.
   const arrangement = useCreateArrangement();
   const [peaksSettled, setPeaksSettled] = useState(false);
-  const tracks = useArrangementTracks(arrangement);
   const sources = useArrangementSources(arrangement);
   const totalCount = sources.sources.size;
   const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
@@ -168,10 +177,9 @@ export function WaveformDataExample() {
       // Tracks already there (an effect run again by Fast Refresh) are not added twice
       if (arrangement.getTracks().length === 0) {
         trackConfigs.forEach((config, index) => {
-          const waveformData = peaks[index];
-          if (waveformData) {
-            arrangement.addTrack(audioTrack({ src: config.audioSrc, name: config.name, waveformData }));
-          }
+          // Without peaks (the file failed) the waveform comes from the audio
+          const waveformData = peaks[index] ?? undefined;
+          arrangement.addTrack(audioTrack({ src: config.audioSrc, name: config.name, waveformData }));
         });
         // The first load is not an undo step
         arrangement.clearHistory();
@@ -216,10 +224,7 @@ export function WaveformDataExample() {
       </StatsContainer>
 
       {!peaksSettled && <div style={MUTED_TEXT_STYLE}>Loading peaks...</div>}
-      {peaksSettled && tracks.length === 0 && (
-        <div style={{ padding: '2rem', color: 'red' }}>Error loading peaks: no peaks file could be loaded</div>
-      )}
-      {peaksSettled && tracks.length > 0 && (
+      {peaksSettled && (
         <WaveformPlaylistProvider
           arrangement={arrangement}
           sampleRate={48000}
