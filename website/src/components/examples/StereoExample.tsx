@@ -88,7 +88,7 @@ export function StereoExample() {
             <WaveformPlayhead />
           </WaveformRoot>
         </WaveformViewOptions>
-        <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+        <LoadingBadge active={sources.isLoading} placement="editor-no-timescale">Loading: {loadedCount}/{totalCount}</LoadingBadge>
       </LoadingBadgeFrame>
     </WaveformPlaylistProvider>
   );

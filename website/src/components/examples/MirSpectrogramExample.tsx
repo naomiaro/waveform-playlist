@@ -137,19 +137,19 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
-      {/* The status region is outside the condition, so it exists before a
-          dropped file mounts the editor and its loading text appears */}
-      <LoadingBadgeFrame>
+      {/* The provider stays mounted when every track is cleared; only the
+          controls and the editor follow the track count. So the badge's
+          status region exists before a dropped file's loading text appears. */}
+      <WaveformPlaylistProvider
+        arrangement={arrangement}
+        sampleRate={48000}
+        theme={theme}
+        automaticScroll
+        samplesPerPixel={8192}
+        zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
+      >
         {tracks.length > 0 && (
-          <WaveformPlaylistProvider
-            arrangement={arrangement}
-            sampleRate={48000}
-            theme={theme}
-            automaticScroll
-            samplesPerPixel={8192}
-            zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}
-          >
-            <SpectrogramProvider colorMap="viridis">
+          <>
             <KeyboardShortcuts playback />
             <ControlBar>
               <RewindButton />
@@ -163,28 +163,31 @@ export function MirSpectrogramExample() {
               <ClearAllButton onClearAll={handleClearAll} />
               <SourceLoadError arrangement={arrangement} />
             </ControlBar>
-            <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
-              <WaveformRoot>
-                <WaveformTimescale />
-                <WaveformLoopRegion />
-                <WaveformTrackControls width={180}>
-                  <DefaultTrackControls />
-                  <TrackRemoveButton onRemove={handleRemoveTrack} />
-                </WaveformTrackControls>
-                <WaveformTracks>
-                  <WaveformClipHeaders />
-                </WaveformTracks>
-                <WaveformSelection />
-                <WaveformPlayhead />
-              </WaveformRoot>
-            </WaveformViewOptions>
-            </SpectrogramProvider>
-          </WaveformPlaylistProvider>
+          </>
         )}
-        <LoadingBadge active={isLoading} placement="frame-bottom">
-          Loading tracks...
-        </LoadingBadge>
-      </LoadingBadgeFrame>
+        <LoadingBadgeFrame>
+          {tracks.length > 0 && (
+            <SpectrogramProvider colorMap="viridis">
+              <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
+                <WaveformRoot>
+                  <WaveformTimescale />
+                  <WaveformLoopRegion />
+                  <WaveformTrackControls width={180}>
+                    <DefaultTrackControls />
+                    <TrackRemoveButton onRemove={handleRemoveTrack} />
+                  </WaveformTrackControls>
+                  <WaveformTracks>
+                    <WaveformClipHeaders />
+                  </WaveformTracks>
+                  <WaveformSelection />
+                  <WaveformPlayhead />
+                </WaveformRoot>
+              </WaveformViewOptions>
+            </SpectrogramProvider>
+          )}
+          <LoadingBadge active={isLoading}>Loading tracks...</LoadingBadge>
+        </LoadingBadgeFrame>
+      </WaveformPlaylistProvider>
 
       <StyledDropZone
         accept="audio/*"

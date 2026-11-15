@@ -19,19 +19,18 @@ import styled from 'styled-components';
 
 /**
  * Where the badge sits in its frame.
- * - `editor` (default): the frame wraps the editor. Below the default 30 px
- *   timescale and the 22 px clip header of the first track, so the badge
- *   covers neither: it sits over the first track's waveform.
- * - `frame-bottom`: the frame wraps a block that ends with the editor and may
- *   be empty (an editor that is not mounted yet). Over the last track, above
- *   the editor's horizontal scrollbar.
+ * - `editor` (default): the frame wraps an editor with a timescale. Below the
+ *   default 30 px timescale and the 22 px clip header of the first track, so
+ *   the badge covers neither: it sits over the first track's waveform.
+ * - `editor-no-timescale`: the frame wraps an editor with no timescale and no
+ *   clip headers: the top-right corner of the first track's waveform.
  * - `box-corner`: the top-right corner of a padded box (16 px padding).
  */
-export type LoadingBadgePlacement = 'editor' | 'frame-bottom' | 'box-corner';
+export type LoadingBadgePlacement = 'editor' | 'editor-no-timescale' | 'box-corner';
 
 const PLACEMENTS: Record<LoadingBadgePlacement, React.CSSProperties> = {
   editor: { top: '60px', right: '8px' },
-  'frame-bottom': { bottom: '24px', right: '8px' },
+  'editor-no-timescale': { top: '8px', right: '8px' },
   'box-corner': { top: '10px', right: '12px' },
 };
 

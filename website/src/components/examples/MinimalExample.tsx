@@ -129,7 +129,7 @@ export function MinimalExample() {
             <WaveformPlayhead />
           </WaveformRoot>
         </WaveformViewOptions>
-        <LoadingBadge active={sources.isLoading}>Loading...</LoadingBadge>
+        <LoadingBadge active={sources.isLoading} placement="editor-no-timescale">Loading...</LoadingBadge>
       </LoadingBadgeFrame>
     </WaveformPlaylistProvider>
   );
