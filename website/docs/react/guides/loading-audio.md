@@ -387,7 +387,16 @@ Waveform Playlist supports all formats supported by the Web Audio API:
 
 - A source that failed counts as settled: a playlist with a failed file is ready, and the error is in `useArrangementSources`.
 - An empty arrangement is ready as soon as its engine is attached. A file added during the first load extends the wait; one added after the first ready does not bring the playlist back to "not ready".
-- A source that never settles means the playlist is never ready.
+- A source that never settles (a request that hangs: there is no load timeout yet, see issue #840) keeps the playlist from ever being ready, and Play does nothing all that time. Show the loading state while it lasts, so the page does not look stuck: `useArrangementSources(arrangement)` has `pendingCount` (sources still loading) and `isLoading` (`pendingCount > 0`).
+
+```tsx
+import { useArrangement, useArrangementSources } from '@waveform-playlist/browser';
+
+function LoadingStatus() {
+  const { pendingCount, isLoading } = useArrangementSources(useArrangement());
+  return isLoading ? <p>Loading {pendingCount} file(s)…</p> : null;
+}
+```
 - **Play does nothing before the first ready**, and nothing is queued: a Play press, Space or an annotation click during the first load does nothing (the annotation is not highlighted either), and in a development build one console warning per mount says so. Edits, the mixer, `seekTo` and the selection work before ready.
 - `play()` called from `onReady`, or from an effect or layout effect that runs when `isReady` turns true, works.
 
@@ -488,6 +497,15 @@ The arrangement refuses a track whose clips do not match its `kind` (a clip stil
 import { PlaylistErrorBoundary } from '@waveform-playlist/ui-components';
 
 // The boundary wraps the component that calls useCreateArrangement
+function MyPlaylist() {
+  const arrangement = useCreateArrangement(() => initialTracks);
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement}>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
 <PlaylistErrorBoundary fallback={<div>The playlist could not be created.</div>}>
   <MyPlaylist />
 </PlaylistErrorBoundary>

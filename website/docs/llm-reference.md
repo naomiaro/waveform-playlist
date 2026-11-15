@@ -82,6 +82,8 @@ interface WaveformPlaylistProviderProps {
 // See https://naomiaro.github.io/waveform-playlist/docs/react/upgrading"
 // Before the first ready, play() does nothing and queues nothing (one console.warn per mount
 // in development). Edits, the mixer, seekTo and setSelection work before ready.
+// A source that never settles (a hanging request; no load timeout yet, #840) keeps the
+// playlist from ready: show useArrangementSources(arrangement).pendingCount / isLoading while > 0.
 // Window event 'waveform-playlist:ready', once per mount with onReady:
 //   detail: { trackCount: number /* every track of the arrangement */, duration: number /* loaded audio, s */ }
 // Not provider props (#689): waveHeight, barWidth, barGap, roundedBars, progressBarWidth,
@@ -1315,7 +1317,7 @@ interface UseClipDragHandlersOptions {
 }
 ```
 
-Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. The track is the one the drag started on, by its id (also if its row moves during the drag); the clip is found by `clipId` among its loaded clips (a move of a clip id that is not in the track is dropped with a console warning); `clipIndex` of the drag data is not read. A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
+Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. A move or a trim commits the clip and track picked up at drag start, by their ids (also if the row moves or other clips change position during the drag); a move whose clip is no longer among the track's loaded clips at the drop is dropped with a console warning; `clipIndex` of the drag data is not read. The draggable ids are `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>` (each part `encodeURIComponent`-encoded). A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
 
 ### useDragSensors
 
@@ -2632,7 +2634,22 @@ interface PlaylistErrorBoundaryProps {
 }
 ```
 
-Catches render errors in child components. Uses plain CSS (works without ThemeProvider).
+Catches render errors in child components. Uses plain CSS (works without ThemeProvider). A track the arrangement refuses in the `useCreateArrangement` initializer is a render error of the component that calls the hook, so the boundary goes around THAT component (a boundary inside it, around the provider, does not catch it):
+
+```tsx
+function Editor() {
+  const arrangement = useCreateArrangement(() => [audioTrack({ src: '/vocals.mp3' })]);
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement}>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+<PlaylistErrorBoundary fallback={<p>The playlist could not be created.</p>}>
+  <Editor />
+</PlaylistErrorBoundary>
+```
 
 ---
 

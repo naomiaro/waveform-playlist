@@ -227,6 +227,12 @@ The sample rate to create the `AudioContext` at (default Tone.js adapter). Pre-c
 
 It also tells the provider its sample rate before the first adapter exists. Placeholders for clips that are still loading are drawn only once the provider knows its real rate: from mount with this prop, otherwise from the first adapter on. Without the prop, and with an adapter that can never be built, no placeholder is drawn.
 
+#### `soundFontCache`
+
+**Type:** `SoundFontCache` (from `@waveform-playlist/playout`)
+
+SoundFont cache for sample-based MIDI playback. When provided, MIDI clips use SoundFont samples instead of PolySynth synthesis. The default Tone.js adapter is given the cache when an engine is built. A cache that arrives or changes later (one loaded after the page has rendered) is handed to the live adapter without a rebuild, through the adapter's `setSoundFontCache` method; an adapter without that method ignores it. See [MIDI](/docs/react/guides/midi).
+
 #### `createAdapter`
 
 **Type:** `() => PlayoutAdapter`
