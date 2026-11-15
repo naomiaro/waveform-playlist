@@ -237,7 +237,7 @@ function sameItems<T>(a: readonly T[] | undefined, b: readonly T[]): a is T[] {
 }
 
 export function derivePeaks(
-  tracks: ClipTrack[],
+  tracks: readonly ClipTrack[],
   options: DerivePeaksOptions,
   previous: PeaksCache
 ): PeaksCache {
