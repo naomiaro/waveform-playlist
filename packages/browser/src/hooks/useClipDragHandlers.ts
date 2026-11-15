@@ -282,7 +282,10 @@ export function useClipDragHandlers({
     (drag: TrimDrag, delta: number) => {
       const engine = engineRef.current;
       if (!engine) {
-        console.warn('[waveform-playlist] engineRef is null — trim not synced to adapter');
+        console.warn(
+          '[waveform-playlist] The trim was dropped: no engine is attached (before the first ' +
+            'build, or while it is rebuilt after a change of tracks). The clip stays where it was.'
+        );
       }
       // Committed and cleared in one synchronous render, so no frame shows the
       // clip where it was before the drag: `trimClip` reaches the app's state
@@ -325,10 +328,14 @@ export function useClipDragHandlers({
       const trackId = tracksRef.current[data.trackIndex]?.id;
       if (!trackId) {
         console.warn(
-          `[waveform-playlist] onDragEnd: track at index ${data.trackIndex} not found — move not synced to adapter`
+          `[waveform-playlist] The move was dropped: there is no track at index ${data.trackIndex}. ` +
+            'The clip stays where it was.'
         );
       } else if (!engineRef.current) {
-        console.warn('[waveform-playlist] engineRef is null — move not synced to adapter');
+        console.warn(
+          '[waveform-playlist] The move was dropped: no engine is attached (before the first ' +
+            'build, or while it is rebuilt after a change of tracks). The clip stays where it was.'
+        );
       } else {
         engineRef.current.moveClip(trackId, data.clipId, Math.floor(sampleDelta));
       }

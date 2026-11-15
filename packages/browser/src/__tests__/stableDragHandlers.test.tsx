@@ -198,7 +198,10 @@ describe('useClipDragHandlers', () => {
     expect(b.startSample + b.durationSamples).toBe(2.5 * SAMPLE_RATE);
   });
 
-  it('sorts the track once per drag, not on every move', () => {
+  // With a real engine `constrainTrimDelta` sorts the track on each move; this
+  // is about the handler's own neighbour order (`trimOrderRef`), which
+  // `calculateBoundaryTrim` reads on every move.
+  it("the handler's own neighbour order is sorted once per drag, not on every move", () => {
     const { hook } = setup();
     const handlers = hook.result.current;
     const sort = vi.spyOn(Array.prototype, 'sort');

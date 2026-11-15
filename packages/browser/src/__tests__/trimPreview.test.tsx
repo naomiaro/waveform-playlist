@@ -11,7 +11,7 @@
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, renderHook, act, waitFor, cleanup } from '@testing-library/react';
-import React, { use, useCallback, useState } from 'react';
+import React, { startTransition, use, useCallback, useState } from 'react';
 import WaveformData from 'waveform-data';
 import { createValueSource } from '@waveform-playlist/core';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -240,16 +240,34 @@ const App: React.FC<{ initial: ClipTrack[]; createAdapter: () => PlayoutAdapter 
   );
 };
 
-async function mount(initial = initialTracks()) {
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
+async function mount(
+  initial = initialTracks(),
+  createAdapter: () => PlayoutAdapter = singleAdapter()
+) {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
+  // jsdom has no canvas: without this every drawn channel logs "Not implemented".
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   onTracksChange.mockClear();
-  const adapter = createFakeAdapter();
-  const createAdapter = () => adapter;
   render(<App initial={initial} createAdapter={createAdapter} />);
   await waitFor(() => expect(probe.timeline.isReady).toBe(true));
   await act(async () => {});
-  return { engine: () => probe.engineRefs.playoutRef.current as PlaylistEngine };
+  return { engine: () => probe.engineRefs.playoutRef.current as PlaylistEngine, warn };
+}
+
+function singleAdapter(): () => PlayoutAdapter {
+  const adapter = createFakeAdapter();
+  return () => adapter;
+}
+
+/** The first build gets an adapter; every later one waits for good (no engine). */
+function firstBuildOnly(): () => PlayoutAdapter {
+  let built = false;
+  return () => {
+    if (built) return new Promise<never>(() => {}) as unknown as PlayoutAdapter;
+    built = true;
+    return createFakeAdapter();
+  };
 }
 
 type Boundary = 'left' | 'right';
@@ -268,12 +286,12 @@ function trimEvent(dx: number, boundary: Boundary = 'left', extra: Record<string
   } as never;
 }
 
-function moveEvent(dx: number) {
+function moveEvent(dx: number, extra: { canceled?: boolean; trackIndex?: number } = {}) {
   return {
-    canceled: false,
+    canceled: extra.canceled ?? false,
     to: { x: 100 + dx, y: 0 },
     operation: {
-      source: { data: { clipId: 'b', trackIndex: 0, clipIndex: 1 } },
+      source: { data: { clipId: 'b', trackIndex: extra.trackIndex ?? 0, clipIndex: 1 } },
       position: { initial: { x: 100, y: 0 }, current: { x: 100, y: 0 } },
       transform: { x: dx, y: 0 },
     },
@@ -281,7 +299,22 @@ function moveEvent(dx: number) {
 }
 
 type Handler = (event: never) => void;
-const dnd = (name: 'onDragStart' | 'onDragMove' | 'onDragEnd') => counts.dnd[name] as Handler;
+type HandlerName = 'onDragStart' | 'onDragMove' | 'onDragEnd';
+const dnd = (name: HandlerName) => counts.dnd[name] as Handler;
+
+/**
+ * Calls a captured handler the way dnd-kit 0.5.0 does: `onDragStart`
+ * directly, `onDragMove` and `onDragEnd` inside `startTransition` (its
+ * DragDropProvider's `trackRendering`). Inside a transition, a state update
+ * is a transition update while a `useSyncExternalStore` change renders at
+ * once, which is what the release's `flushSync` is about.
+ */
+function dispatch(name: HandlerName, event: never) {
+  act(() => {
+    if (name === 'onDragStart') dnd(name)(event);
+    else startTransition(() => dnd(name)(event));
+  });
+}
 
 function spyOnWrites(engine: PlaylistEngine) {
   return {
@@ -315,8 +348,8 @@ describe('a trim previews in the view (#812)', () => {
     const { engine } = await mount();
     const writes = spyOnWrites(engine());
 
-    act(() => dnd('onDragStart')(trimEvent(0)));
-    act(() => dnd('onDragMove')(trimEvent(10)));
+    dispatch('onDragStart', trimEvent(0));
+    dispatch('onDragMove', trimEvent(10));
     expect(probe.preview()).toEqual({
       trackId: 't1',
       clipId: 'b',
@@ -325,7 +358,7 @@ describe('a trim previews in the view (#812)', () => {
       offsetSamples: SAMPLE_RATE + 10 * SPP,
     });
     const first = probe.preview();
-    act(() => dnd('onDragMove')(trimEvent(20)));
+    dispatch('onDragMove', trimEvent(20));
     expect(probe.preview()).not.toBe(first);
     expect(probe.preview()?.startSample).toBe(2 * SAMPLE_RATE + 20 * SPP);
 
@@ -342,11 +375,11 @@ describe('a trim previews in the view (#812)', () => {
 
   it("a move renders the dragged clip's view and no other clip, row or the root", async () => {
     await mount();
-    act(() => dnd('onDragStart')(trimEvent(0)));
-    act(() => dnd('onDragMove')(trimEvent(5)));
+    dispatch('onDragStart', trimEvent(0));
+    dispatch('onDragMove', trimEvent(5));
     resetCounts();
 
-    act(() => dnd('onDragMove')(trimEvent(10)));
+    dispatch('onDragMove', trimEvent(10));
 
     expect(counts.clip).toEqual({ b: 1 });
     expect(counts.track).toEqual({});
@@ -357,11 +390,11 @@ describe('a trim previews in the view (#812)', () => {
     const { engine } = await mount();
     const writes = spyOnWrites(engine());
 
-    act(() => dnd('onDragStart')(trimEvent(0)));
-    act(() => dnd('onDragMove')(trimEvent(10)));
-    act(() => dnd('onDragMove')(trimEvent(25)));
+    dispatch('onDragStart', trimEvent(0));
+    dispatch('onDragMove', trimEvent(10));
+    dispatch('onDragMove', trimEvent(25));
     counts.log = [];
-    act(() => dnd('onDragEnd')(trimEvent(25)));
+    dispatch('onDragEnd', trimEvent(25));
 
     expect(writes.trimClip).toHaveBeenCalledTimes(1);
     expect(writes.trimClip).toHaveBeenCalledWith('t1', 'b', 'left', 25 * SPP);
@@ -373,14 +406,17 @@ describe('a trim previews in the view (#812)', () => {
       durationSamples: SAMPLE_RATE - 25 * SPP,
       offsetSamples: SAMPLE_RATE + 25 * SPP,
     });
-    // No frame between the preview and the committed clip shows the clip
-    // where it was before the drag. (Removing the handler's `flushSync`, or
-    // clearing before committing, passes this too: React renders two updates
-    // made in one synchronous call together, inside `act` or not. The
-    // `flushSync` makes it a guarantee, as on the annotation edge release.)
-    const drawnB = counts.log.filter((entry) => entry.clipId === 'b');
+    // No frame after the release shows the clip where it was before the drag.
+    // dnd-kit calls onDragEnd inside `startTransition`: there the app's
+    // `setTracks` (reached through trimClip and the provider's onTracksChange)
+    // is a transition update, while clearing the preview re-renders the clip
+    // at once (`useSyncExternalStore`). Without the handler's `flushSync`
+    // around both, the clip is drawn cleared over the old tracks first: back
+    // at 2 s for a frame, then at its new start.
+    const drawnB = counts.log.filter((entry) => entry.clipId === 'b').map((e) => e.startSample);
     expect(drawnB.length).toBeGreaterThan(0);
-    for (const entry of drawnB) expect(entry.startSample).toBe(2 * SAMPLE_RATE + 25 * SPP);
+    expect(drawnB).not.toContain(2 * SAMPLE_RATE);
+    expect(new Set(drawnB)).toEqual(new Set([2 * SAMPLE_RATE + 25 * SPP]));
     // No transaction: the trim is one undo step by itself.
     expect(writes.beginTransaction).not.toHaveBeenCalled();
     expect(writes.commitTransaction).not.toHaveBeenCalled();
@@ -391,10 +427,10 @@ describe('a trim previews in the view (#812)', () => {
     const writes = spyOnWrites(engine());
     const before = probe.timeline.tracks;
 
-    act(() => dnd('onDragStart')(trimEvent(0, 'right')));
-    act(() => dnd('onDragMove')(trimEvent(-30, 'right')));
+    dispatch('onDragStart', trimEvent(0, 'right'));
+    dispatch('onDragMove', trimEvent(-30, 'right'));
     expect(counts.clipProps.b.durationSamples).toBe(SAMPLE_RATE - 30 * SPP);
-    act(() => dnd('onDragEnd')(trimEvent(-30, 'right', { canceled: true })));
+    dispatch('onDragEnd', trimEvent(-30, 'right', { canceled: true }));
 
     expect(probe.preview()).toBeNull();
     expect(onTracksChange).not.toHaveBeenCalled();
@@ -410,9 +446,9 @@ describe('a trim previews in the view (#812)', () => {
     await mount();
     const committedPeaks = counts.channel.b.data;
 
-    act(() => dnd('onDragStart')(trimEvent(0)));
+    dispatch('onDragStart', trimEvent(0));
     // 30 px to the left: 0.625 s more of the file, from 0.375 s in.
-    act(() => dnd('onDragMove')(trimEvent(-30)));
+    dispatch('onDragMove', trimEvent(-30));
 
     const preview = probe.preview() as TrimPreview;
     expect(preview).toMatchObject({
@@ -445,8 +481,8 @@ describe('a trim previews in the view (#812)', () => {
     const { engine } = await mount();
     const engineBefore = engine();
 
-    act(() => dnd('onDragStart')(trimEvent(0)));
-    act(() => dnd('onDragMove')(trimEvent(10)));
+    dispatch('onDragStart', trimEvent(0));
+    dispatch('onDragMove', trimEvent(10));
 
     // Clip `a` of the same track gets its audio: a new clip object, so the
     // track changed and the provider rebuilds the engine.
@@ -466,9 +502,9 @@ describe('a trim previews in the view (#812)', () => {
     expect(probe.preview()?.startSample).toBe(2 * SAMPLE_RATE + 10 * SPP);
     expect(counts.clipProps.b.startSample).toBe(2 * SAMPLE_RATE + 10 * SPP);
 
-    act(() => dnd('onDragMove')(trimEvent(40)));
+    dispatch('onDragMove', trimEvent(40));
     const previewed = probe.preview() as TrimPreview;
-    act(() => dnd('onDragEnd')(trimEvent(40)));
+    dispatch('onDragEnd', trimEvent(40));
 
     expect(probe.preview()).toBeNull();
     expect(onTracksChange).toHaveBeenCalledTimes(1);
@@ -488,9 +524,9 @@ describe('a trim previews in the view (#812)', () => {
     const { engine } = await mount();
     const writes = spyOnWrites(engine());
 
-    act(() => dnd('onDragStart')(moveEvent(0)));
-    act(() => dnd('onDragMove')(moveEvent(50)));
-    act(() => dnd('onDragEnd')(moveEvent(50)));
+    dispatch('onDragStart', moveEvent(0));
+    dispatch('onDragMove', moveEvent(50));
+    dispatch('onDragEnd', moveEvent(50));
 
     expect(writes.moveClip).toHaveBeenCalledTimes(1);
     expect(writes.moveClip).toHaveBeenCalledWith('t1', 'b', 50 * SPP);
@@ -502,27 +538,85 @@ describe('a trim previews in the view (#812)', () => {
     expect(clipOf(probe.timeline.tracks, 'b')?.startSample).toBe(2 * SAMPLE_RATE + 50 * SPP);
   });
 
+  it('a cancelled move makes no engine call', async () => {
+    const { engine } = await mount();
+    const writes = spyOnWrites(engine());
+
+    dispatch('onDragStart', moveEvent(0));
+    dispatch('onDragMove', moveEvent(50));
+    dispatch('onDragEnd', moveEvent(50, { canceled: true }));
+
+    for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
+    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(clipOf(probe.timeline.tracks, 'b')?.startSample).toBe(2 * SAMPLE_RATE);
+  });
+
+  it('a move whose track is gone makes no engine call', async () => {
+    const { engine, warn } = await mount();
+    const writes = spyOnWrites(engine());
+
+    // Two tracks: there is none at index 2.
+    dispatch('onDragStart', moveEvent(0, { trackIndex: 2 }));
+    dispatch('onDragMove', moveEvent(50, { trackIndex: 2 }));
+    dispatch('onDragEnd', moveEvent(50, { trackIndex: 2 }));
+
+    for (const spy of Object.values(writes)) expect(spy).not.toHaveBeenCalled();
+    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('The move was dropped'));
+  });
+
+  it('release while no engine is attached drops the trim, clears the preview and warns', async () => {
+    const { engine, warn } = await mount(initialTracks(), firstBuildOnly());
+    const writes = spyOnWrites(engine());
+
+    dispatch('onDragStart', trimEvent(0));
+    dispatch('onDragMove', trimEvent(10));
+    // A change of the track mid-drag starts a rebuild that does not finish.
+    await act(async () => {
+      setAppTracks([
+        makeTrack('t1', [{ ...makeClip('a', 0, 1), gain: 0.5 }, makeClip('b', 2, 1)]),
+        makeTrack('t2', [makeClip('c', 0, 1)]),
+      ]);
+    });
+    expect(engine()).toBeNull();
+    warn.mockClear();
+
+    dispatch('onDragMove', trimEvent(20));
+    dispatch('onDragEnd', trimEvent(20));
+
+    expect(probe.preview()).toBeNull();
+    expect(writes.trimClip).not.toHaveBeenCalled();
+    expect(onTracksChange).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/The trim was dropped: no engine is attached/);
+    // The clip is drawn where it was before the drag.
+    expect(counts.clipProps.b).toEqual({
+      startSample: 2 * SAMPLE_RATE,
+      durationSamples: SAMPLE_RATE,
+    });
+  });
+
   it('a right trim past the end of the timeline widens the view to the next 10 seconds, once per step', async () => {
     await mount();
     expect(counts.scaleDurationMs).toBe(3000);
-    act(() => dnd('onDragStart')(trimEvent(0, 'right')));
+    dispatch('onDragStart', trimEvent(0, 'right'));
     resetCounts();
 
     // 48 px is a second. To 3.5 s: past the end (3 s), so the view is 10 s wide.
-    act(() => dnd('onDragMove')(trimEvent(24, 'right')));
+    dispatch('onDragMove', trimEvent(24, 'right'));
     expect(counts.scaleDurationMs).toBe(10_000);
     expect(counts.shell).toBe(1);
     // To 9 s: the same step, the root does not render.
-    act(() => dnd('onDragMove')(trimEvent(288, 'right')));
+    dispatch('onDragMove', trimEvent(288, 'right'));
     expect(counts.shell).toBe(1);
     // To 12 s: the next step.
-    act(() => dnd('onDragMove')(trimEvent(432, 'right')));
+    dispatch('onDragMove', trimEvent(432, 'right'));
     expect(counts.scaleDurationMs).toBe(20_000);
     expect(counts.shell).toBe(2);
     // Back inside the timeline, then cancelled: the view is 3 s again.
-    act(() => dnd('onDragMove')(trimEvent(-100, 'right')));
+    dispatch('onDragMove', trimEvent(-100, 'right'));
     expect(counts.scaleDurationMs).toBe(3000);
-    act(() => dnd('onDragEnd')(trimEvent(-100, 'right', { canceled: true })));
+    dispatch('onDragEnd', trimEvent(-100, 'right', { canceled: true }));
     expect(counts.scaleDurationMs).toBe(3000);
   });
 
