@@ -3831,7 +3831,7 @@ Also:
 
 **Package:** `@waveform-playlist/browser`.
 
-`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. Both providers set it to `false` on every record today. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it.
+`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws no drag handle and no trim handles, drawn dimmed: the whole clip container, header included, gets `opacity` from the theme key `placeholderClipOpacity` (optional; 0.5 when the theme does not set it or sets something that is not a number from 0 to 1), and its container carries `data-clip-placeholder="true"`. Both providers set it to `false` on every record today, so the dim shows only where an app renders `Clip` with the prop itself. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it.
 
 **Find:** an object literal typed `ClipPeaks` (or a function returning one), for example in a test or a custom `peaksDataArray`.
 

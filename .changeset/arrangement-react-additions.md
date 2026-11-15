@@ -8,6 +8,6 @@ browser: `useCreateArrangement(init?, options?)`, `useArrangementTracks(arrangem
 
 browser: `ClipPeaks` has a new required field, `isPlaceholder: boolean`, true for the record of a clip whose audio is still loading. Both providers set it to `false` on every record. An app that builds a `ClipPeaks` object adds `isPlaceholder: false`.
 
-ui-components: `Clip` takes `isPlaceholder` (default false). A placeholder clip is drawn without a drag handle and without trim handles, and its container carries `data-clip-placeholder="true"`.
+ui-components: `Clip` takes `isPlaceholder` (default false). A placeholder clip is drawn without a drag handle and without trim handles, dimmed (the whole container, header included) to the new optional theme key `placeholderClipOpacity`, 0.5 when the theme does not set it or sets something that is not a number from 0 to 1; its container carries `data-clip-placeholder="true"`. No provider produces a placeholder yet, so the dim shows only where an app renders `Clip` with the prop itself.
 
 midi: `loadMidiTracks(src, { sampleRate, flatten?, start?, duration?, name?, signal? })` loads a URL, a `File` or a `Blob` as `kind: 'midi'` `ClipTrack[]`, without React. `useMidiTracks` is unchanged.

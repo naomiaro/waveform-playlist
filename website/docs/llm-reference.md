@@ -2458,6 +2458,7 @@ const DEFAULT_BAR_GAP = 0;
 // Removed (#689): controls, zoomLevels. A <PlaylistInfoContext value={…}> of your own must give this shape.
 // Theme key spectrogramBackgroundColor (optional, '#000' without it): the background of the area a
 // spectrogram is drawn in; it shows until the spectrogram has been drawn and where a chunk is not mounted.
+// Theme key placeholderClipOpacity (optional, 0.5 without it or with a value that is not a number from 0 to 1): the opacity of a Clip with isPlaceholder, header included.
 ```
 
 ---
