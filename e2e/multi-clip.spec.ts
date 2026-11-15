@@ -623,6 +623,112 @@ test.describe('Multi-Clip Example', () => {
         expect(finalPx).toBeLessThan(initialPx);
       }).toPass({ timeout: 5000 });
     });
+
+    // The page has no undo control; undo and redo are the keyboard shortcuts of
+    // <KeyboardShortcuts undo />, so the tests observe them through clip geometry.
+    const clipWidths = (page: import('@playwright/test').Page) =>
+      page
+        .locator('[data-clip-container]')
+        .evaluateAll((els) =>
+          els.map((el) => Math.round((el as HTMLElement).getBoundingClientRect().width * 10) / 10)
+        );
+
+    // Clips are added as tracks load: read the widths once two reads 300 ms apart agree.
+    const settledWidths = async (page: import('@playwright/test').Page) => {
+      let widths: number[] = [];
+      await expect(async () => {
+        const first = await clipWidths(page);
+        await page.waitForTimeout(300);
+        widths = await clipWidths(page);
+        expect(widths.length).toBeGreaterThan(0);
+        expect(widths).toEqual(first);
+      }).toPass({ timeout: 10000 });
+      return widths;
+    };
+
+    const pressRightHandle = async (page: import('@playwright/test').Page) => {
+      const container = page.locator('[data-clip-container]').first();
+      const handle = container.locator('[data-boundary-edge="right"]');
+      await expect(handle).toBeVisible();
+      await handle.scrollIntoViewIfNeeded();
+      let box: { x: number; y: number; width: number; height: number } | null = null;
+      await expect(async () => {
+        box = await handle.boundingBox();
+        expect(box).toBeTruthy();
+      }).toPass({ timeout: 5000 });
+      const x = box!.x + box!.width / 2;
+      const y = box!.y + box!.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      return { container, x, y };
+    };
+
+    const dragLeft = async (page: import('@playwright/test').Page, x: number, y: number) => {
+      for (const dx of [10, 20, 30, 45, 60]) {
+        await page.mouse.move(x - dx, y, { steps: 3 });
+      }
+    };
+
+    test('Escape during a trim leaves the clip where it was', async ({ page }) => {
+      const original = await settledWidths(page);
+      const { container, x, y } = await pressRightHandle(page);
+      const originalWidth = original[0];
+
+      await dragLeft(page, x, y);
+      // The preview is visible while the button is still down.
+      await expect(async () => {
+        const widths = await clipWidths(page);
+        expect(widths[0]).toBeLessThan(originalWidth - 20);
+      }).toPass({ timeout: 5000 });
+
+      // Focus is on the document body area / the pressed handle (mouse held).
+      await page.keyboard.press('Escape');
+      await expect(async () => {
+        expect(await clipWidths(page)).toEqual(original);
+      }).toPass({ timeout: 5000 });
+
+      await page.mouse.up();
+      await page.waitForTimeout(500);
+      expect(await clipWidths(page)).toEqual(original);
+      await expect(container).toBeVisible();
+
+      // No undo step was made: undo changes no clip geometry.
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(500);
+      expect(await clipWidths(page)).toEqual(original);
+    });
+
+    test('a trim is one undo step', async ({ page }) => {
+      const original = await settledWidths(page);
+      const { x, y } = await pressRightHandle(page);
+      await dragLeft(page, x, y);
+      await page.mouse.up();
+
+      let trimmed: number[] = [];
+      await expect(async () => {
+        trimmed = await clipWidths(page);
+        expect(trimmed[0]).toBeLessThan(original[0] - 20);
+      }).toPass({ timeout: 5000 });
+      // Only the dragged clip changed.
+      await expect(async () => {
+        expect(await clipWidths(page)).toEqual([trimmed[0], ...original.slice(1)]);
+      }).toPass({ timeout: 5000 });
+
+      await page.keyboard.press('Control+z');
+      await expect(async () => {
+        expect(await clipWidths(page)).toEqual(original);
+      }).toPass({ timeout: 5000 });
+
+      // A second undo has nothing left to undo.
+      await page.keyboard.press('Control+z');
+      await page.waitForTimeout(500);
+      expect(await clipWidths(page)).toEqual(original);
+
+      await page.keyboard.press('Control+Shift+z');
+      await expect(async () => {
+        expect(await clipWidths(page)).toEqual(trimmed);
+      }).toPass({ timeout: 5000 });
+    });
   });
 
   // Until 2026-11 a press during playback moved playback at once (and again on
