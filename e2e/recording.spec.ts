@@ -440,6 +440,14 @@ test.describe('Recording example — the arrangement and a take', () => {
     // The other track is not armed: its mute is as it was.
     await expect(other).toBeEnabled();
     await expect(other).toHaveAttribute('aria-pressed', 'false');
+    // The control: the unarmed track's Mute still toggles during the take,
+    // and the armed one stays muted and disabled meanwhile.
+    await other.click();
+    await expect(other).toHaveAttribute('aria-pressed', 'true');
+    await other.click();
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
+    await expect(armed).toBeDisabled();
+    await expect(armed).toHaveAttribute('aria-pressed', 'true');
 
     await stopTake(page);
     // The value from before the take is written back.

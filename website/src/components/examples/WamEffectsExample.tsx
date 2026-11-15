@@ -602,8 +602,9 @@ export function WamEffectsExample() {
   // without a reload, so no state/effect is needed.
   const wamActive = wamSupported && isNativeGlobalContext();
 
-  // The arrangement owns the stems and loads their audio: each row shows a
-  // placeholder until its file has decoded
+  // The arrangement owns the stems and loads their audio: each row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const tracks = useArrangementTracks(arrangement);
   // The track whose rack is shown: the first one to begin with

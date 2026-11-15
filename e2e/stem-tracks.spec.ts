@@ -456,8 +456,9 @@ test.describe('Stem Tracks Example', () => {
 });
 
 /**
- * The stem page shows its tracks at once (placeholder clips) while the
- * arrangement decodes their audio. The arrangement owns the mix from the
+ * The stem page shows its tracks and their controls at once while the
+ * arrangement decodes their audio (a row stays empty until its audio has
+ * loaded: the page gives no `duration`, so no placeholder is drawn). The arrangement owns the mix from the
  * start, so the track controls work while a track's audio loads (#812), and
  * what was set before the audio arrived is still set after it.
  */
@@ -504,8 +505,12 @@ test.describe('Stem Tracks Example — track controls while loading', () => {
     release();
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
 
-    // The audio arriving does not reset the mix.
+    // The audio arriving does not reset the mix, and every control stays enabled.
     await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await expect(mute).toBeEnabled();
+    await expect(solo).toBeEnabled();
+    await expect(volume).toBeEnabled();
+    await expect(pan).toBeEnabled();
     await page.waitForTimeout(500);
     await expect(mute).toHaveAttribute('aria-pressed', 'true');
     await mute.click();

@@ -111,10 +111,10 @@ const Controls = styled.div`
 `;
 
 export function App() {
-  // The arrangement owns the tracks and loads their audio: each row shows a
-  // placeholder until its file has decoded. The AudioContext stays suspended
-  // until the first user gesture — see "AudioContext and user gestures" in
-  // README.md.
+  // The arrangement owns the tracks and loads their audio: each row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks). The AudioContext stays suspended until the first user
+  // gesture — see "AudioContext and user gestures" in README.md.
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const sources = useArrangementSources(arrangement);
   const failed = [...sources.sources.values()].find((source) => source.status === 'failed');

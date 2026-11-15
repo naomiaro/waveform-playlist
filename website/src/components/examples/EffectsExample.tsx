@@ -606,8 +606,9 @@ export function EffectsExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const defaultsAddedRef = useRef(false);
 
-  // The arrangement owns the tracks and loads their audio: each row shows a
-  // placeholder until its file has decoded
+  // The arrangement owns the tracks and loads their audio: each row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const sources = useArrangementSources(arrangement);
   const totalCount = sources.sources.size;

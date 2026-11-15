@@ -25,7 +25,8 @@ What matters is what happens on the first **Play** click:
 
 - Fetching and decoding the audio happens as soon as the provider mounts (the
   arrangement from `useCreateArrangement` loads the files its `audioTrack({ src })`
-  tracks name, and each row shows a placeholder until its file has decoded) —
+  tracks name; each row is empty until its audio has loaded, since a
+  placeholder is drawn only for a clip with a `duration` or peaks) —
   that never needs a gesture.
 - The first `play()` call *resumes* the suspended context (`Tone.start()`
   internally) — inside the click handler, i.e. a real user gesture. From that

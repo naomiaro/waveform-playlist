@@ -486,8 +486,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
 
 export function AnnotationsExample() {
   const { theme } = useDocusaurusTheme();
-  // The arrangement owns the tracks and loads the sonnet: its row shows a
-  // placeholder until the file has decoded
+  // The arrangement owns the tracks and loads the sonnet: its row is empty
+  // until the audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
   const arrangement = useCreateArrangement(() => [audioTrack({ src: SONNET_SRC, name: 'Sonnet' })]);
   const [annotations, setAnnotations] = useState<any[]>(() => defaultNotes.map(parseAeneas));
 

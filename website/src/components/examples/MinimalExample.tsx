@@ -104,8 +104,9 @@ export function MinimalExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const gradientTheme = isDarkMode ? darkModeGradientTheme : lightModeGradientTheme;
 
-  // The arrangement owns the tracks and loads their audio; the waveform
-  // shows a placeholder until it arrives
+  // The arrangement owns the tracks and loads their audio; the row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
   const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
   const sources = useArrangementSources(arrangement);
 

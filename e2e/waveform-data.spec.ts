@@ -24,7 +24,7 @@ async function clipGeometry(page: Page, index: number) {
     box = await clip.boundingBox();
     expect(box).toBeTruthy();
   }).toPass({ timeout: 5000 });
-  return { left: Math.round(box!.x * 10) / 10, width: Math.round(box!.width * 10) / 10 };
+  return { left: box!.x, width: box!.width };
 }
 
 /** Number of canvas pixels with any opacity in the clip of row `index`. */
@@ -117,7 +117,11 @@ test.describe('BBC Waveform Data Example — peaks that arrive late or not at al
     await expect(async () => {
       expect(await drawnPixels(page, 1)).toBeGreaterThan(0);
     }).toPass({ timeout: 10000 });
-    expect(await clipGeometry(page, 1)).toEqual(withPeaks);
+    // Placed and sized as with its peaks file: within 1 px (positions are
+    // whole pixels of the timeline, the box can sit at a fraction of one).
+    const withGenerated = await clipGeometry(page, 1);
+    expect(Math.abs(withGenerated.left - withPeaks.left)).toBeLessThanOrEqual(1);
+    expect(Math.abs(withGenerated.width - withPeaks.width)).toBeLessThanOrEqual(1);
 
     // One warning names the file that failed; no error banner.
     expect(warnings.filter((text) => text.includes(BASS_PEAKS))).toHaveLength(1);

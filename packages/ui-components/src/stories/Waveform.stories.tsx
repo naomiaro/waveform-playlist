@@ -54,7 +54,7 @@ The Waveform component provides the main visualization and interaction surface f
 - Timescale display
 
 **Note:** These stories show the Waveform component with empty tracks.
-To display actual waveforms, name the audio files in an arrangement; each track shows a placeholder until its file has loaded.
+To display actual waveforms, name the audio files in an arrangement; a track's row is empty until its audio has loaded (a placeholder is drawn only for a clip with a \`duration\` or peaks).
 
 \`\`\`tsx
 import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
