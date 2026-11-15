@@ -27,6 +27,7 @@ import {
 } from '../utils/derivePeaks';
 import { EMPTY_LOADED_TRACKS, loadedTracks, type LoadedTracksCache } from '../utils/loadedTracks';
 import { placeholderPeaks } from '../utils/placeholderPeaks';
+import { sameItems } from '../utils/sameItems';
 import { timelineDuration } from '../utils/timelineDuration';
 
 export interface ArrangementViewOptions {
@@ -74,10 +75,6 @@ interface StatesCache {
 const EMPTY_ROWS: RowsCache = { byTrackId: new Map(), result: [] };
 const EMPTY_STATES: StatesCache = { byTrackId: new Map(), result: [] };
 const DEFAULT_MIX: TrackMixerValues = { volume: 1, muted: false, soloed: false, pan: 0 };
-
-function sameItems<T>(a: readonly T[] | undefined, b: readonly T[]): a is T[] {
-  return a !== undefined && a.length === b.length && a.every((item, i) => item === b[i]);
-}
 
 interface RowInputs {
   loadedPeaks: PeaksCache;

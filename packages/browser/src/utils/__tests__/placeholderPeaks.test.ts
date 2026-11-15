@@ -159,6 +159,29 @@ describe('placeholderPeaks', () => {
     }
   });
 
+  it('an offset at or past the end of a 44100 file on a 48000 context gives null', () => {
+    const wd = waveformData(400, FILE_RATE) as unknown as WaveformData;
+    const data = wd as unknown as WaveformDataObject;
+    // The file's end in seconds, and one second past it.
+    for (const offset of [wd.duration, wd.duration + 1]) {
+      expect(placeholderPeaks(loading({ waveformData: data, offset }), 'T', OPTIONS)).toBeNull();
+      expect(
+        placeholderPeaks(loading({ waveformData: data, offset, duration: 1 }), 'T', OPTIONS)
+      ).toBeNull();
+    }
+    // Just before the end there is still a clip, at the context's rate.
+    const before = placeholderPeaks(
+      loading({ waveformData: data, offset: wd.duration - 0.5 }),
+      'T',
+      OPTIONS
+    );
+    expect(before).not.toBeNull();
+    expect(before!.sampleRate).toBe(CONTEXT_RATE);
+    expect(before!.durationSamples).toBe(
+      Math.ceil(wd.duration * CONTEXT_RATE) - Math.round((wd.duration - 0.5) * CONTEXT_RATE)
+    );
+  });
+
   it('no duration and no waveformData gives null', () => {
     expect(placeholderPeaks(loading({ start: 1 }), 'T', OPTIONS)).toBeNull();
   });

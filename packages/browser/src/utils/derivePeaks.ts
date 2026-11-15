@@ -24,6 +24,7 @@ import type { AudioClip, ClipTrack, PeakData } from '@waveform-playlist/core';
 import type WaveformData from 'waveform-data';
 import { extractPeaksFromWaveformDataFull } from '../waveformDataLoader';
 import type { ClipPeaks, TrackClipPeaks } from '../WaveformPlaylistContext';
+import { sameItems } from './sameItems';
 
 export interface DerivePeaksOptions {
   samplesPerPixel: number;
@@ -230,10 +231,6 @@ export function clipPeaksFor(
       isPlaceholder: false,
     },
   };
-}
-
-function sameItems<T>(a: readonly T[] | undefined, b: readonly T[]): a is T[] {
-  return a !== undefined && a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
 export function derivePeaks(

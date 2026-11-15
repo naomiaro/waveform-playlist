@@ -15,6 +15,7 @@
  */
 import { isLoadingClip } from '@waveform-playlist/core';
 import type { ArrangementTrack, AudioClip, ClipTrack } from '@waveform-playlist/core';
+import { sameItems } from './sameItems';
 
 export interface LoadedTracksCache {
   /** The projection of each arrangement track of the last pass. */
@@ -33,10 +34,6 @@ function projection(track: ArrangementTrack, previous: LoadedTracksCache): ClipT
   if (known) return known;
   const clips = track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip));
   return { ...track, clips };
-}
-
-function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
-  return a.length === b.length && a.every((item, i) => item === b[i]);
 }
 
 /**

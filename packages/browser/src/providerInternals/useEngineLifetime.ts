@@ -190,23 +190,24 @@ function reportBuildFailure(
     }
     ctx.adapterRef.current = null;
   }
+  // A build that was superseded or unmounted says nothing, neither to the
+  // console nor to `onError`: the build that replaced it speaks for itself
+  // (maintainer, C1 = b; on `main` `onError` was called for it too).
+  if (run.cancelled) return;
   const onError = ctx.latest.current.onErrorRef.current;
-  if (!run.cancelled) {
-    // No engine is coming: a queued play would otherwise wait forever and
-    // fire on some later, unrelated rebuild.
-    ctx.engineBuildInFlightRef.current = false;
-    ctx.pendingResumeRef.current = null;
-    // An error, not a warning: the playlist cannot be played until a later
-    // build succeeds. A build that was superseded or unmounted says nothing
-    // here: the build that replaced it speaks for itself.
-    const reason = error instanceof Error ? error.message : String(error);
-    console.error(
-      '[waveform-playlist] The playlist could not be built and stays in its loading ' +
-        'state (it cannot be played). Reason: ' +
-        reason +
-        (onError ? '' : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
-    );
-  }
+  // No engine is coming: a queued play would otherwise wait forever and fire
+  // on some later, unrelated rebuild.
+  ctx.engineBuildInFlightRef.current = false;
+  ctx.pendingResumeRef.current = null;
+  // An error, not a warning: the playlist cannot be played until a later
+  // build succeeds.
+  const reason = error instanceof Error ? error.message : String(error);
+  console.error(
+    '[waveform-playlist] The playlist could not be built and stays in its loading ' +
+      'state (it cannot be played). Reason: ' +
+      reason +
+      (onError ? '' : ' Pass `onError` to WaveformPlaylistProvider to show this in your app.')
+  );
   onError?.(error instanceof Error ? error : new Error(String(error)));
 }
 

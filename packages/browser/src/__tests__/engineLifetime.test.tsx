@@ -463,15 +463,118 @@ describe('useEngineLifetime', () => {
     expect(harness.lifetime.engineRef.current).toBeNull();
   });
 
-  it('`bumpEngineEpoch` asks for another run of whatever follows the epoch', async () => {
+  it('`bumpEngineEpoch` runs again what follows the epoch, with no new engine', async () => {
     const arrangement = createArrangement();
     const factory = adapterFactory();
-    render(<Probe arrangement={arrangement} createAdapter={factory.createAdapter} />);
+    // What the provider's resume effect will be: an effect on the epoch that
+    // reads the engine of that moment.
+    const runs: Array<PlaylistEngine | null> = [];
+    const Follower: React.FC<LifetimeProps> = (props) => {
+      harness = useLifetimeForTest(props);
+      const { engineEpoch, engineRef } = harness.lifetime;
+      React.useEffect(() => {
+        runs.push(engineRef.current);
+      }, [engineEpoch, engineRef]);
+      return null;
+    };
+    render(<Follower arrangement={arrangement} createAdapter={factory.createAdapter} />);
     await act(flush);
-    expect(harness.lifetime.engineEpoch).toBe(1);
-    act(() => harness.lifetime.bumpEngineEpoch());
-    expect(harness.lifetime.engineEpoch).toBe(2);
+    // The mount's run (no engine yet) and the assignment's.
+    expect(runs).toHaveLength(2);
+    const engine = harness.lifetime.engineRef.current;
+    expect(runs[1]).toBe(engine);
+    const bump = harness.lifetime.bumpEngineEpoch;
+
+    act(() => bump());
+    expect(runs).toHaveLength(3);
+    expect(runs[2]).toBe(engine);
+    // A stable function, and nothing was rebuilt.
+    expect(harness.lifetime.bumpEngineEpoch).toBe(bump);
     expect(recorded.built).toHaveLength(1);
+    expect(factory.adapters).toHaveLength(1);
+  });
+
+  describe('a failed build is reported only while it is current (C1)', () => {
+    it('StrictMode: a createAdapter that throws calls onError once', async () => {
+      const arrangement = createArrangement();
+      const onError = vi.fn();
+      const createAdapter = (): never => {
+        throw new Error('no adapter, ever');
+      };
+      render(
+        <StrictMode>
+          <Probe arrangement={arrangement} createAdapter={createAdapter} onError={onError} />
+        </StrictMode>
+      );
+      await act(flush);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toMatchObject({ message: 'no adapter, ever' });
+      expect(vi.mocked(console.error)).toHaveBeenCalledTimes(1);
+      expect(harness.lifetime.isEngineAttached).toBe(false);
+    });
+
+    it('a build that fails after unmount calls nothing', async () => {
+      const arrangement = createArrangement();
+      const factory = adapterFactory();
+      const held = factory.holdNext();
+      const onError = vi.fn();
+      const view = render(
+        <Probe arrangement={arrangement} createAdapter={factory.createAdapter} onError={onError} />
+      );
+      await act(flush);
+      view.unmount();
+      await act(async () => {
+        held.fail(new Error('import failed after unmount'));
+        await flush();
+      });
+      expect(onError).not.toHaveBeenCalled();
+      expect(vi.mocked(console.error)).not.toHaveBeenCalled();
+    });
+
+    it('a failed build that a newer build superseded is silent; the newer build\u2019s own failure is reported', async () => {
+      const arrangement = createArrangement();
+      const factory = adapterFactory();
+      const onError = vi.fn();
+      const first = factory.holdNext();
+      const view = render(
+        <Probe
+          arrangement={arrangement}
+          createAdapter={factory.createAdapter}
+          effects={effectsA}
+          onError={onError}
+        />
+      );
+      await act(flush);
+      const second = factory.holdNext();
+      view.rerender(
+        <Probe
+          arrangement={arrangement}
+          createAdapter={factory.createAdapter}
+          effects={effectsB}
+          onError={onError}
+        />
+      );
+      await act(flush);
+      expect(factory.adapters).toHaveLength(2);
+
+      await act(async () => {
+        first.fail(new Error('superseded'));
+        await flush();
+      });
+      expect(onError).not.toHaveBeenCalled();
+      expect(vi.mocked(console.error)).not.toHaveBeenCalled();
+      // The newer build is still waiting for its adapter.
+      expect(harness.lifetime.engineBuildInFlightRef.current).toBe(true);
+
+      await act(async () => {
+        second.fail(new Error('current'));
+        await flush();
+      });
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toMatchObject({ message: 'current' });
+      expect(vi.mocked(console.error)).toHaveBeenCalledTimes(1);
+      expect(harness.lifetime.engineBuildInFlightRef.current).toBe(false);
+    });
   });
 
   describe('unmount disposes the engine and detaches the context on every path', () => {
@@ -549,7 +652,8 @@ describe('useEngineLifetime', () => {
     const undisposed = factory.adapters.filter((adapter) => adapter.disposeCalls === 0);
     expect(undisposed).toEqual([harness.lifetime.adapterRef.current]);
     expect(loads.calls.filter((call) => !call.signal.aborted)).toHaveLength(1);
-    expect(harness.lifetime.engineEpoch).toBeGreaterThanOrEqual(1);
+    // The first run was cancelled before its adapter arrived: one engine assigned.
+    expect(harness.lifetime.engineEpoch).toBe(1);
 
     view.unmount();
     expect(live()).toHaveLength(0);
