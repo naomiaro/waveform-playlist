@@ -32,6 +32,9 @@ Run from the package directory, in a subshell: `(cd packages/<pkg> && npx vitest
 - **jsdom has no `canvas.transferControlToOffscreen`.** Stub it on `HTMLCanvasElement.prototype` to test `SpectrogramChannel`'s registration (`SpectrogramChannelHeight.test.tsx`).
 - **jsdom has no layout: a click test passes on an area of zero height.** Assert the inline height that gives the area its size, and call the click test a control.
 - **An early return that removes a component a test counts makes "it did not render" vacuous.** `WaveformAnnotationBoxes` returns null without the annotation integration; `waveformPartsQuietShell.test.tsx` mounted without it and asserted `counts.boxes === 0`. After adding an early return, grep the tests that count that component and give them what it needs to render.
+- **dnd-kit's `aria-roledescription="draggable"` is not there in a jsdom render, so "it is absent" proves nothing.** On #853 a placeholder test asserted the attribute was missing on the header; a reviewer's probe found 0 matches in 48 renders, loaded and draggable clips included. Assert what the component itself draws: the `[data-clip-id]` handle and the `[data-boundary-edge]` handles, with a loaded clip in the same test that HAS them.
+- **styled-components rules are injected under jsdom:** `getComputedStyle(el).opacity` reads a value that comes from a themed template (`'0.5'`), and `''` when no rule sets it (`clipPlaceholderOpacity.test.tsx` in ui-components). A positive value can only pass when the rule was injected, so such an assertion is not vacuous.
+- **jsdom's `Blob` has no `arrayBuffer()`.** A test of code that reads a `File` or `Blob` adds the method on the instance (`loadMidiTracks.test.ts`); the test then proves the code calls it, nothing about a browser's Blob.
 
 ## What a test proves
 
