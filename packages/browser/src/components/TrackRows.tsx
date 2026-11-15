@@ -139,8 +139,7 @@ const ClipView = React.memo(function ClipView({
       durationSamples={clip.durationSamples}
       samplesPerPixel={samplesPerPixel}
       showHeader={showClipHeaders}
-      // A placeholder is not in the engine (#812): no drag, no trim handles.
-      disableHeaderDrag={!interactiveClips || clip.isPlaceholder}
+      disableHeaderDrag={!interactiveClips}
       isPlaceholder={clip.isPlaceholder}
       isSelected={isSelected}
       trackId={trackId}

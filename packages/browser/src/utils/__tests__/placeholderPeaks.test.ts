@@ -70,6 +70,29 @@ describe('placeholderPeaks', () => {
     expect(Array.from(record!.peaks.data[0])).toEqual(Array.from(expected.data[0]));
   });
 
+  it('a duration past the end of the peaks file is cut to the file\u2019s end', () => {
+    const wd = waveformData(400, FILE_RATE);
+    const total = Math.ceil((wd as unknown as WaveformData).duration * FILE_RATE);
+    const record = placeholderPeaks(
+      loading({ waveformData: wd, offset: 1, duration: 100 }),
+      'T',
+      OPTIONS
+    );
+    expect(record!.offsetSamples).toBe(FILE_RATE);
+    expect(record!.durationSamples).toBe(total - FILE_RATE);
+  });
+
+  it('an offset at or past the end of the peaks file gives null', () => {
+    const wd = waveformData(400, FILE_RATE);
+    const total = Math.ceil((wd as unknown as WaveformData).duration * FILE_RATE);
+    for (const offset of [total / FILE_RATE, total / FILE_RATE + 1]) {
+      expect(placeholderPeaks(loading({ waveformData: wd, offset }), 'T', OPTIONS)).toBeNull();
+      expect(
+        placeholderPeaks(loading({ waveformData: wd, offset, duration: 1 }), 'T', OPTIONS)
+      ).toBeNull();
+    }
+  });
+
   it('no duration and no waveformData gives null', () => {
     expect(placeholderPeaks(loading({ start: 1 }), 'T', OPTIONS)).toBeNull();
   });

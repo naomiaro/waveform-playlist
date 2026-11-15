@@ -66,11 +66,17 @@ function build(
 
   const startSample = Math.round((clip.start ?? 0) * rate);
   const offsetSamples = Math.round((clip.offset ?? 0) * rate);
+  // With peaks the clip cannot be longer than the file: the same cut as the
+  // loaded clip's. An offset at or past the end leaves no samples (`rest` < 1),
+  // which gives null below.
+  const total = wdata ? Math.ceil(wdata.duration * rate) : undefined;
+  const rest = total === undefined ? undefined : total - offsetSamples;
+  const wanted = clip.duration === undefined ? rest : Math.round(clip.duration * rate);
   const durationSamples =
-    clip.duration !== undefined
-      ? Math.round(clip.duration * rate)
-      : Math.ceil((wdata as WaveformData).duration * rate) - offsetSamples;
-  if (![startSample, offsetSamples, durationSamples].every(Number.isSafeInteger)) return null;
+    rest === undefined ? (wanted as number) : Math.min(wanted as number, rest);
+  if (![startSample, offsetSamples, durationSamples, total ?? 0].every(Number.isSafeInteger)) {
+    return null;
+  }
   if (durationSamples < 1) return null;
 
   const drawn = wdata
