@@ -49,7 +49,7 @@ This example resolves the workspace packages from **source** via Vite aliases
 (see `vite.config.ts`) so it always runs against the current checkout. In your
 own app:
 
-- `npm install @waveform-playlist/browser @waveform-playlist/playout tone react react-dom styled-components @dnd-kit/abstract @dnd-kit/dom @dnd-kit/react`
+- `npm install @waveform-playlist/browser @waveform-playlist/core @waveform-playlist/ui-components @waveform-playlist/playout tone react react-dom styled-components @dnd-kit/abstract @dnd-kit/dom @dnd-kit/react`
   and delete the `resolve.alias` / `resolve.dedupe` blocks — package resolution
   is normal outside the monorepo. (`@dnd-kit/*` are required peers of
   `@waveform-playlist/browser` even if you never enable clip dragging — they

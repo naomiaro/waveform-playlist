@@ -18,7 +18,6 @@ import {
   useArrangementTracks,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import type { Arrangement } from '@waveform-playlist/engine';
 import { loadMidiTracks } from '@waveform-playlist/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 
@@ -174,7 +173,7 @@ type MidiLoad = { status: 'loading' } | { status: 'loaded' } | { status: 'failed
  * load is not an undo step) and only then says 'loaded'. The page renders the
  * provider after that, so "ready" means the MIDI is in.
  */
-function useMidiLoad(arrangement: Arrangement): MidiLoad {
+function useMidiLoad(arrangement: ReturnType<typeof useCreateArrangement>): MidiLoad {
   const [state, setState] = React.useState<MidiLoad>({ status: 'loading' });
   // Set once the tracks are in: an effect that runs again must not add them twice
   const addedRef = React.useRef(false);
