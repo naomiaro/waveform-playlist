@@ -38,7 +38,7 @@ import {
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const Container = styled.div`
   /* Prevent accidental text selection while dragging on mobile */
@@ -238,13 +238,7 @@ export function MobileMultiClipExample() {
       <Instructions>
         <strong>
           Touch Controls{' '}
-          <LoadingText
-            active={loading}
-            widest={`(Loading: ${audioFiles.length}/${audioFiles.length} files)`}
-            style={{}}
-          >
-            (Loading: {loadedCount}/{audioFiles.length} files)
-          </LoadingText>
+          {!peaksSettled && `(Loading: ${loadedCount}/${audioFiles.length} files)`}
         </strong>
         <ul>
           <li><strong>Scroll:</strong> Swipe left/right on the waveform area</li>
@@ -283,18 +277,21 @@ export function MobileMultiClipExample() {
             </Controls>
 
             {/* The provider's touchOptimized also widens the clip trim handles */}
-            <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
-              <WaveformRoot>
-                <WaveformTimescale />
-                <WaveformLoopRegion />
-                <WaveformTrackControls width={100} />
-                <WaveformTracks>
-                  <WaveformClipHeaders />
-                </WaveformTracks>
-                <WaveformSelection />
-                <WaveformPlayhead />
-              </WaveformRoot>
-            </WaveformViewOptions>
+            <LoadingBadgeFrame>
+              <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
+                <WaveformRoot>
+                  <WaveformTimescale />
+                  <WaveformLoopRegion />
+                  <WaveformTrackControls width={100} />
+                  <WaveformTracks>
+                    <WaveformClipHeaders />
+                  </WaveformTracks>
+                  <WaveformSelection />
+                  <WaveformPlayhead />
+                </WaveformRoot>
+              </WaveformViewOptions>
+              <LoadingBadge active={loading}>Loading: {loadedCount}/{audioFiles.length} files</LoadingBadge>
+            </LoadingBadgeFrame>
           </ClipInteractionProvider>
         </WaveformPlaylistProvider>
       )}

@@ -517,3 +517,37 @@ test.describe('Stem Tracks Example — track controls while loading', () => {
     await expect(mute).toHaveAttribute('aria-pressed', 'false');
   });
 });
+
+// #858: a layout change that moves the editor during a drag leaves the dragged
+// element behind, so the page's loading text takes no layout space.
+test.describe('Stem Tracks Example — while a file is loading', () => {
+  test('the editor does not move on the page when loading ends', async ({ page, baseURL }) => {
+    // Hold one audio request until the page is measured.
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route('**/media/audio/AlbertKader_Whiptails/12_Vox_Wet.opus', async (route) => {
+      held++;
+      await released;
+      await route.continue().catch(() => {});
+    });
+
+    await page.goto(`${baseURL}/examples/stem-tracks`);
+    await expect(page.locator('[data-playlist-state="loading"]')).toHaveCount(1, {
+      timeout: 30000,
+    });
+    await expect(page.locator('[data-clip-container]').first()).toBeVisible({ timeout: 30000 });
+    await expect.poll(() => held).toBe(1);
+    const playlist = page.locator('[data-playlist-state]');
+    const before = await playlist.boundingBox();
+    expect(before).toBeTruthy();
+
+    release();
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
+    const after = await playlist.boundingBox();
+    expect(after).toBeTruthy();
+    expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(0.5);
+  });
+});

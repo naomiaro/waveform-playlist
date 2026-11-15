@@ -112,7 +112,7 @@ export function NewTracksExample() {
         loading={sources.isLoading}
         loadingContent={
           <>
-            <p style={{ margin: 0 }}>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>
               Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
             </p>
             <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>

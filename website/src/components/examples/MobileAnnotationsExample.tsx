@@ -45,7 +45,7 @@ import {
 } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
 
@@ -333,22 +333,22 @@ const MobileAnnotationsContent: React.FC = () => {
             <LinkEndpointsCheckbox />
           </ControlGroup>
 
-          <LoadingText active={isLoading} widest="Loading audio with annotations..." style={{}}>
-            Loading audio with annotations...
-          </LoadingText>
           <SourceLoadError arrangement={arrangement} />
         </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTracks />
-            <WaveformAnnotationBoxes />
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
-        </WaveformViewOptions>
+        <LoadingBadgeFrame>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTracks />
+              <WaveformAnnotationBoxes />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
+          <LoadingBadge active={isLoading}>Loading audio with annotations...</LoadingBadge>
+        </LoadingBadgeFrame>
         <AnnotationList actions={mobileAnnotationActions} height={200} />
 
         <ActiveAnnotationInfo />

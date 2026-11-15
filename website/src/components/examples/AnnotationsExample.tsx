@@ -390,7 +390,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           label="Drop audio files here or click to browse"
           dragLabel="Drop audio files here"
           loading={isLoadingAudio}
-          loadingContent={<p style={{ margin: 0 }}>Loading audio...</p>}
+          loadingContent={<p style={{ margin: 0, fontSize: '0.9rem' }}>Loading audio...</p>}
         />
         <FailedDropsAlert drops={failedDrops} />
 

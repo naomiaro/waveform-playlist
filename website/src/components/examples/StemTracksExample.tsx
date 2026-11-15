@@ -30,7 +30,7 @@ import { audioTrack } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
 const audioConfigs: AudioTrackOptions[] = [
@@ -141,9 +141,6 @@ export function StemTracksExample() {
               <PlayButton />
               <PauseButton />
               <StopButton />
-              <LoadingText active={sources.isLoading} widest={`Loading: ${totalCount}/${totalCount}`}>
-                Loading: {loadedCount}/{totalCount}
-              </LoadingText>
               <SourceLoadError arrangement={arrangement} />
             </ControlGroup>
 
@@ -166,19 +163,22 @@ export function StemTracksExample() {
 
           </Controls>
 
-          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-            <WaveformRoot>
-              <WaveformTimescale />
-              <WaveformLoopRegion />
-              <WaveformTrackControls>
-                <DefaultTrackControls />
-                <TrackReorderGrip />
-              </WaveformTrackControls>
-              <WaveformTracks />
-              <WaveformSelection />
-              <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
-            </WaveformRoot>
-          </WaveformViewOptions>
+          <LoadingBadgeFrame>
+            <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+              <WaveformRoot>
+                <WaveformTimescale />
+                <WaveformLoopRegion />
+                <WaveformTrackControls>
+                  <DefaultTrackControls />
+                  <TrackReorderGrip />
+                </WaveformTrackControls>
+                <WaveformTracks />
+                <WaveformSelection />
+                <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+              </WaveformRoot>
+            </WaveformViewOptions>
+            <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+          </LoadingBadgeFrame>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

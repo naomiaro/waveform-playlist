@@ -33,7 +33,7 @@ import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
@@ -137,12 +137,6 @@ export function MirSpectrogramExample() {
         Use the <strong>...</strong> menu in each track's controls to change render mode or spectrogram settings per-track.
       </p>
 
-      <div style={{ padding: '1rem', opacity: 0.7 }}>
-        <LoadingText active={isLoading} widest="Loading tracks..." style={{}}>
-          Loading tracks...
-        </LoadingText>
-      </div>
-
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
           arrangement={arrangement}
@@ -166,21 +160,24 @@ export function MirSpectrogramExample() {
             <ClearAllButton onClearAll={handleClearAll} />
             <SourceLoadError arrangement={arrangement} />
           </ControlBar>
-          <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
-            <WaveformRoot>
-              <WaveformTimescale />
-              <WaveformLoopRegion />
-              <WaveformTrackControls width={180}>
-                <DefaultTrackControls />
-                <TrackRemoveButton onRemove={handleRemoveTrack} />
-              </WaveformTrackControls>
-              <WaveformTracks>
-                <WaveformClipHeaders />
-              </WaveformTracks>
-              <WaveformSelection />
-              <WaveformPlayhead />
-            </WaveformRoot>
-          </WaveformViewOptions>
+          <LoadingBadgeFrame>
+            <WaveformViewOptions waveHeight={100} barWidth={1} barGap={0}>
+              <WaveformRoot>
+                <WaveformTimescale />
+                <WaveformLoopRegion />
+                <WaveformTrackControls width={180}>
+                  <DefaultTrackControls />
+                  <TrackRemoveButton onRemove={handleRemoveTrack} />
+                </WaveformTrackControls>
+                <WaveformTracks>
+                  <WaveformClipHeaders />
+                </WaveformTracks>
+                <WaveformSelection />
+                <WaveformPlayhead />
+              </WaveformRoot>
+            </WaveformViewOptions>
+            <LoadingBadge active={isLoading}>Loading tracks...</LoadingBadge>
+          </LoadingBadgeFrame>
           </SpectrogramProvider>
         </WaveformPlaylistProvider>
       )}

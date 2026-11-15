@@ -45,7 +45,7 @@ import { fetchWamLibrary, fetchWamDescriptor, type WamLibraryEntry } from '@dawc
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { registerDemoTremolo } from './demoTremoloEffect';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 import {
   Container,
   Banner,
@@ -568,25 +568,21 @@ const WamControls: React.FC<WamControlsProps> = ({
           effectsFunction={offlineMaster}
           createOfflineTrackEffects={createOfflineTrackEffects}
         />
-        <LoadingText
-          active={sources.isLoading}
-          widest={`Loading: ${totalCount}/${totalCount}`}
-          style={{ fontSize: '0.85rem', color: 'var(--ifm-color-emphasis-600)' }}
-        >
-          Loading: {loadedCount}/{totalCount}
-        </LoadingText>
         <SourceLoadError arrangement={arrangement} />
       </TransportBar>
-      <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          <WaveformTrackControls width={150} />
-          <WaveformTracks />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
-      </WaveformViewOptions>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={150} />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+      </LoadingBadgeFrame>
     </>
   );
 };

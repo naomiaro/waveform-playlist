@@ -21,7 +21,7 @@ import {
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const Controls = styled.div`
   display: flex;
@@ -167,9 +167,6 @@ export function MultiClipExample() {
             <PauseButton />
             <StopButton />
             <LoopButton />
-            <LoadingText active={sources.isLoading} widest={`Loading: ${totalCount}/${totalCount}`}>
-              Loading: {loadedCount}/{totalCount}
-            </LoadingText>
             <SourceLoadError arrangement={arrangement} />
           </ControlGroup>
           <ControlGroup>
@@ -187,9 +184,12 @@ export function MultiClipExample() {
           </ControlGroup>
         </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <WaveformEditor />
-        </WaveformViewOptions>
+        <LoadingBadgeFrame>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformEditor />
+          </WaveformViewOptions>
+          <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+        </LoadingBadgeFrame>
       </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );

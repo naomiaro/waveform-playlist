@@ -28,7 +28,7 @@ import { audioTrack } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const Controls = styled.div`
   display: flex;
@@ -76,20 +76,20 @@ export function StereoExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        <LoadingText active={sources.isLoading} widest={`Loading: ${totalCount}/${totalCount}`}>
-          Loading: {loadedCount}/{totalCount}
-        </LoadingText>
         <SourceLoadError arrangement={arrangement} />
       </Controls>
 
-      <WaveformViewOptions barWidth={2} barGap={0}>
-        <WaveformRoot>
-          <WaveformTrackControls />
-          <WaveformTracks />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
-      </WaveformViewOptions>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions barWidth={2} barGap={0}>
+          <WaveformRoot>
+            <WaveformTrackControls />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+      </LoadingBadgeFrame>
     </WaveformPlaylistProvider>
   );
 }

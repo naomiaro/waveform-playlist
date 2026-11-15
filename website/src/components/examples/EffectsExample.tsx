@@ -54,7 +54,7 @@ import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 // Track configurations - Albert Kader "Ubiquitous" minimal techno
@@ -480,9 +480,6 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
-          <LoadingText active={Boolean(isLoading)} widest={`Loading: ${totalCount ?? 0}/${totalCount ?? 0}`}>
-            Loading: {loadedCount}/{totalCount}
-          </LoadingText>
           <SourceLoadError arrangement={arrangement} />
         </ControlsRow>
         <VisualizerWrapper>
@@ -490,32 +487,35 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         </VisualizerWrapper>
       </TopBar>
 
-      <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          {/* The panel of a track, written once: the pieces are bound to the
-              track they are drawn for. The props are stable, so the panels do
-              not render with this component. */}
-          <WaveformTrackControls width={150}>
-            <TrackRemoveButton onRemove={onDeleteTrack} />
-            <Controls>
-              <Header style={{ justifyContent: 'center' }}>
-                <TrackName />
-              </Header>
-              <ButtonGroup>
-                <TrackMuteButton />
-                <TrackSoloButton />
-              </ButtonGroup>
-              <TrackVolumeSlider />
-              <TrackEffectsButton effectsManager={trackEffectsManager} />
-            </Controls>
-          </WaveformTrackControls>
-          <WaveformTracks />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
-      </WaveformViewOptions>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            {/* The panel of a track, written once: the pieces are bound to the
+                track they are drawn for. The props are stable, so the panels do
+                not render with this component. */}
+            <WaveformTrackControls width={150}>
+              <TrackRemoveButton onRemove={onDeleteTrack} />
+              <Controls>
+                <Header style={{ justifyContent: 'center' }}>
+                  <TrackName />
+                </Header>
+                <ButtonGroup>
+                  <TrackMuteButton />
+                  <TrackSoloButton />
+                </ButtonGroup>
+                <TrackVolumeSlider />
+                <TrackEffectsButton effectsManager={trackEffectsManager} />
+              </Controls>
+            </WaveformTrackControls>
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={Boolean(isLoading)}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+      </LoadingBadgeFrame>
 
       <TimeControlsBar>
         <ControlGroup>

@@ -29,7 +29,7 @@ import {
 } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
-import { LoadingText } from './LoadingText';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const Controls = styled.div`
   display: flex;
@@ -184,12 +184,6 @@ export function BeatsAndBarsExample() {
               <PauseButton />
               <StopButton />
               <LoopButton />
-              <LoadingText
-                active={sources.isLoading}
-                widest={`Loading: ${sources.sources.size}/${sources.sources.size}`}
-              >
-                Loading: {settledCount}/{sources.sources.size}
-              </LoadingText>
               <SourceLoadError arrangement={arrangement} />
             </ControlGroup>
             <ControlGroup>
@@ -286,9 +280,12 @@ export function BeatsAndBarsExample() {
             )}
           </Controls>
 
-          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-            <WaveformEditor />
-          </WaveformViewOptions>
+          <LoadingBadgeFrame>
+            <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+              <WaveformEditor />
+            </WaveformViewOptions>
+            <LoadingBadge active={sources.isLoading}>Loading: {settledCount}/{sources.sources.size}</LoadingBadge>
+          </LoadingBadgeFrame>
         </ClipInteractionProvider>
       </BeatsAndBarsProvider>
     </WaveformPlaylistProvider>
