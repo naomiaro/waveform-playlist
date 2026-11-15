@@ -29,10 +29,10 @@ vi.mock('../hooks/useExportWav', () => ({
   }),
 }));
 
-import { act, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import React, { useEffect } from 'react';
 import type { ArrangementTrack, AudioClip } from '@waveform-playlist/core';
-import { isLoadingClip } from '@waveform-playlist/core';
+import { clipPixelWidth, isLoadingClip } from '@waveform-playlist/core';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import type { Arrangement } from '@waveform-playlist/engine';
 import {
@@ -50,6 +50,7 @@ import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useClipSplitting } from '../hooks/useClipSplitting';
 import { ExportWavButton } from '../components/ExportControls';
 import { Waveform } from '../components/Waveform';
+import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
 import { renderWithArrangement, testArrangement } from './helpers/arrangementProvider';
 import { clip, fakeBuffer, fakeLoads, flush, loading, track, RATE } from './helpers/engineHarness';
 
@@ -446,6 +447,50 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     expect(mounts).toBe(3);
   });
 
+  it('a provider with no arrangement throws an error that names the prop', () => {
+    // console.error is silenced for every test of this file (beforeEach): React
+    // logs the error the boundary catches.
+    let caught: unknown;
+    class Boundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+      state = { failed: false };
+      static getDerivedStateFromError() {
+        return { failed: true };
+      }
+      componentDidCatch(error: unknown) {
+        caught = error;
+      }
+      render() {
+        return this.state.failed ? null : this.props.children;
+      }
+    }
+    const message = (arrangement: unknown) => {
+      caught = undefined;
+      render(
+        <Boundary>
+          <WaveformPlaylistProvider arrangement={arrangement as Arrangement}>
+            <ProbeChild />
+          </WaveformPlaylistProvider>
+        </Boundary>
+      );
+      cleanup();
+      expect(caught).toBeInstanceOf(Error);
+      return (caught as Error).message;
+    };
+    for (const missing of [undefined, null, 'tracks']) {
+      const text = message(missing);
+      expect(text).toMatch(/^\[waveform-playlist\] WaveformPlaylistProvider /);
+      expect(text).toContain('`arrangement`');
+      expect(text).toContain('useCreateArrangement');
+      expect(text).toContain('`tracks` and `onTracksChange`');
+      expect(text).toContain('https://naomiaro.github.io/waveform-playlist/docs/react/upgrading');
+    }
+    // A real arrangement is untouched.
+    caught = undefined;
+    renderWithArrangement([], { children: <ProbeChild />, wrapper: Boundary });
+    expect(caught).toBeUndefined();
+    expect(probe.timeline.tracks).toEqual([]);
+  });
+
   it('`usePlaylistTimeline().tracks` never holds a loading clip; the row of `peaksDataArray[i]` has more records than `tracks[i].clips` while one loads', async () => {
     const view = renderWithArrangement(
       [track('A', [clip('a1', 0, 1), loading('LA', { start: 2 })])],
@@ -506,6 +551,32 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     expect(view.factory.latest().count('play')).toBe(1);
     await waitFor(() => expect(probe.isPlaying).toBe(false));
     expect(probe.currentTime).toBeCloseTo(clickTime, 6);
+  });
+
+  it('under <Waveform /> (no clip headers) a loading clip with a `duration` and no peaks draws its body, as wide as the clip', async () => {
+    const view = renderWithArrangement(
+      [track('A', [clip('a1', 0, 1)]), track('B', [loading('LB', { start: 1, duration: 2 })])],
+      {
+        children: (
+          <>
+            <ProbeChild />
+            <Waveform />
+          </>
+        ),
+      }
+    );
+    await engineAttached(view);
+    const containers = [...view.container.querySelectorAll<HTMLElement>('[data-clip-container]')];
+    const placeholder = containers.find((el) => el.hasAttribute('data-clip-placeholder'));
+    const loadedClip = containers.find((el) => !el.hasAttribute('data-clip-placeholder'));
+    expect(placeholder).toBeDefined();
+    expect(loadedClip).toBeDefined();
+    // No header: the body is the clip's only drawing, and fills its channel area.
+    expect(placeholder!.textContent).toBe('');
+    expect(placeholder!.querySelectorAll('[data-clip-placeholder-body]')).toHaveLength(1);
+    const spp = probe.zoom.samplesPerPixel;
+    expect(placeholder!.style.width).toBe(`${clipPixelWidth(RATE, 2 * RATE, spp)}px`);
+    expect(loadedClip!.querySelector('[data-clip-placeholder-body]')).toBeNull();
   });
 
   it('export while a clip loads renders the loaded clips only', async () => {

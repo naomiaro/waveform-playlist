@@ -16,8 +16,21 @@ import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
 const arrangementKeys = new WeakMap<Arrangement, number>();
 let lastArrangementKey = 0;
 
-/** The arrangement's own number: the same for the same object, new for another one. */
+const MISSING_ARRANGEMENT_ERROR =
+  '[waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop: an ' +
+  'arrangement made with `useCreateArrangement`, which owns the tracks. The `tracks` and ' +
+  '`onTracksChange` props were removed. See ' +
+  'https://naomiaro.github.io/waveform-playlist/docs/react/upgrading';
+
+/**
+ * The arrangement's own number: the same for the same object, new for another
+ * one. Anything that is not an object (plain JavaScript, or code that still
+ * passes only `tracks`) throws: the provider cannot run without one.
+ */
 export function keyOf(arrangement: Arrangement): number {
+  if (typeof arrangement !== 'object' || arrangement === null) {
+    throw new Error(MISSING_ARRANGEMENT_ERROR);
+  }
   let key = arrangementKeys.get(arrangement);
   if (key === undefined) {
     lastArrangementKey += 1;

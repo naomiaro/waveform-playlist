@@ -10,6 +10,7 @@ import { warnMisplacedPart } from './partWarnings';
 import {
   Track as TrackComponent,
   Clip,
+  ClipPlaceholderBody,
   SpectrogramLabels,
   useTheme,
   usePlaylistInfo,
@@ -121,6 +122,10 @@ const ClipView = React.memo(function ClipView({
   const clip = usePreviewedClipPeaks(committedClip, trackId);
   const peaksData = clip.peaks;
   const width = peaksData.length;
+  // A placeholder with no peaks (only its duration is known) has nothing
+  // for its channels to draw: its body shows the clip's extent, also in a
+  // view without clip headers. A placeholder drawn from peaks gets none.
+  const drawsBody = clip.isPlaceholder && width === 0;
 
   // Pressing a clip selects its track, except when the press starts a drag.
   const handleMouseDown = useCallback(
@@ -155,6 +160,7 @@ const ClipView = React.memo(function ClipView({
       touchOptimized={touchOptimized}
       onMouseDown={handleMouseDown}
     >
+      {drawsBody && <ClipPlaceholderBody isSelected={isSelected} />}
       {peaksData.data.map((channelPeaks: Peaks, channelIndex: number) => (
         <ChannelWithProgress
           key={`${clip.clipId}-${channelIndex}`}

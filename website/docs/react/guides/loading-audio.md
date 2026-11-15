@@ -174,7 +174,7 @@ A clip whose audio is still loading is not in `usePlaylistTimeline().tracks` and
 | The loading clip has | What is drawn |
 |---|---|
 | `waveformData` | A placeholder drawn from those peaks, at its place and length |
-| a `duration` (no `waveformData`) | An empty placeholder box, at its place and length |
+| a `duration` (no `waveformData`) | A placeholder box with no waveform in it, at its place and length, filled with the colour the waveform's bars are drawn in (`waveFillColor`, or `selectedWaveFillColor` on the selected track); it carries `data-clip-placeholder-body="true"` and is drawn with or without clip headers |
 | only a `src` | Nothing, until its audio has loaded (the track's row and controls are there) |
 
 A placeholder is dimmed (theme key `placeholderClipOpacity`, 0.5 by default), has no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. Its record is in `usePlaylistTimeline().peaksDataArray` with `isPlaceholder: true`; there is no clip for it in `tracks`, so look a record up by `clipId`, not by its position in the row.
