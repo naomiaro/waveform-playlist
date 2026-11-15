@@ -177,6 +177,9 @@ describe('Play before the first ready (#812)', () => {
     // Nothing was queued: ready starts nothing.
     await settle();
     expect(adapter.count('play')).toBe(0);
+    // Nor did the ignored play set where a Stop returns the cursor.
+    act(() => probe.controls.stop());
+    expect(probe.currentTime).toBe(0);
 
     await act(async () => {
       await probe.controls.play(1, 2);
@@ -364,6 +367,35 @@ describe('Play before the first ready (#812)', () => {
     await ready();
     await settle();
     expect(fromOnReady.factory.latest().count('play')).toBe(1);
+    expect(probe.isPlaying).toBe(true);
+    expect(playBeforeReadyWarnings()).toHaveLength(0);
+  });
+
+  it('a child that calls play() from a layout effect on the first isReady plays', async () => {
+    let playsFromLayout = 0;
+    const PlayWhenReadyInLayout: React.FC = () => {
+      const { isReady } = usePlaylistTimeline();
+      const { play } = usePlaybackControls();
+      React.useLayoutEffect(() => {
+        if (!isReady) return;
+        playsFromLayout += 1;
+        void play(0);
+      }, [isReady, play]);
+      return null;
+    };
+    const view = renderWithArrangement([track('A', [clip('a1', 0, 4)])], {
+      children: (
+        <>
+          <ProbeChild />
+          <PlayWhenReadyInLayout />
+        </>
+      ),
+      indefinitePlayback: true,
+    });
+    await ready();
+    await settle();
+    expect(playsFromLayout).toBe(1);
+    expect(view.factory.latest().count('play')).toBe(1);
     expect(probe.isPlaying).toBe(true);
     expect(playBeforeReadyWarnings()).toHaveLength(0);
   });

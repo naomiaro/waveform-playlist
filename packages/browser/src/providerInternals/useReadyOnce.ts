@@ -20,7 +20,7 @@
  *   writes one console warning per mount. It queues nothing, so Play pressed
  *   during the first load never starts by itself.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useInsertionEffect, useRef, useState } from 'react';
 import type { Arrangement } from '@waveform-playlist/engine';
 import { useArrangementSources } from '../hooks/useArrangementSources';
 
@@ -82,12 +82,15 @@ export function useReadyOnce(options: UseReadyOnceOptions): ReadyOnce {
   const firedRef = useRef(false);
   const isReady = isEngineAttached && (hasBeenReady || pendingCount === 0);
   // "The first ready has happened", for play() at call time. Written where
-  // React commits, so a discarded render cannot leave it true; in a layout
-  // effect, so that it is true before any passive effect of the same commit
-  // (onReady included) can call play(). Never goes back to false.
+  // React commits, so a discarded render cannot leave it true, and never
+  // back to false. In an insertion effect: those run in the commit's mutation
+  // phase, before every layout effect, ref callback and passive effect of the
+  // same commit, so a descendant that calls play() from any of them (or from
+  // onReady) on the first `isReady` is not refused. A layout effect here ran
+  // after the descendants' layout effects and refused theirs.
   const firstReadyRef = useRef(false);
   const warnedPlayRef = useRef(false);
-  useLayoutEffect(() => {
+  useInsertionEffect(() => {
     if (isReady) firstReadyRef.current = true;
   }, [isReady]);
 
