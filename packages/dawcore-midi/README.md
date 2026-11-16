@@ -2,7 +2,7 @@
 
 Framework-agnostic MIDI file loading and parsing for the dawcore family. No React, no DOM, no Lit — pure functions built on `@tonejs/midi`.
 
-Used by `@dawcore/components` (the Lit web component layer, via `editor.loadMidi()`) and `@waveform-playlist/midi` (the React `useMidiTracks` hook).
+Used by `@dawcore/components` (the Lit web component layer, via `editor.loadMidi()`) and `@waveform-playlist/midi` (`loadMidiTracks`, for the React packages).
 
 ## Installation
 

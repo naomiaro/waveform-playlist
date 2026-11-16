@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Use jsdom for React hook tests (@testing-library/react needs DOM)
+    // The tests were written against jsdom (see the Blob note in loadMidiTracks.test.ts).
     environment: 'jsdom',
   },
 });

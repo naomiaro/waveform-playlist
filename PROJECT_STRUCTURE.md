@@ -21,7 +21,7 @@ waveform-playlist/
 │   ├── dawcore-wam/       # @dawcore/wam — WAM 2.0 plugin hosting (host, loader, GUI, library, transport bridge)
 │   ├── engine/            # Framework-agnostic timeline engine
 │   ├── media-element-playout/  # Audio playback (HTMLAudioElement, no Tone.js)
-│   ├── midi/              # 📦 OPTIONAL: MIDI file parsing + useMidiTracks hook and loadMidiTracks (parser now in @dawcore/midi)
+│   ├── midi/              # 📦 OPTIONAL: MIDI file loading: loadMidiTracks (parser in @dawcore/midi)
 │   ├── playout/           # Audio playback (Tone.js wrapper)
 │   ├── recording/         # 📦 OPTIONAL: Audio recording hooks (no UI components)
 │   ├── spectrogram/       # 📦 OPTIONAL: React Provider + UI for spectrograms (computation/worker in @dawcore/spectrogram)
@@ -655,14 +655,14 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 #### `@waveform-playlist/midi`
 
 - **Type:** Optional package (install separately)
-- **Purpose:** MIDI file loading, parsing, and React hook integration. Separates `@tonejs/midi` into an opt-in package so audio-only users don't pay the bundle cost.
+- **Purpose:** MIDI file loading and parsing for the React packages (no React code of its own). Separates `@tonejs/midi` into an opt-in package so audio-only users don't pay the bundle cost.
 - **Install:** `npm install @waveform-playlist/midi`
 - **Architecture (two-layer):**
   - `parseMidiFile()`/`parseMidiUrl()` — pure functions, re-exported from `@dawcore/midi` as of v13.0.0 (moved during the dawcore framework-split; no React-side API change). Convert a `.mid` ArrayBuffer/URL to `ParsedMidi`.
-  - `useMidiTracks()` and `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the original symbols still defined in this package. `useMidiTracks()` is a React hook producing `ClipTrack[]` with `clip.midiNotes`; `loadMidiTracks()` is the same load without React, a promise of `ClipTrack[]`, whose tracks are added to the arrangement `WaveformPlaylistProvider` plays.
+  - `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the symbol defined in this package: loads a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, notes in `clip.midiNotes`), whose tracks are added to the arrangement `WaveformPlaylistProvider` plays.
 - **Data pipeline only:** MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
-- **Multi-track expansion:** One MIDI config can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
-- **No native sample rate:** MIDI is event-based — `sampleRate` is required on the options of `loadMidiTracks()` and `useMidiTracks()` (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
+- **Multi-track expansion:** One file can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
+- **No native sample rate:** MIDI is event-based — `sampleRate` is required on the options of `loadMidiTracks()` (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
 - **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core`
 - **Peer Dependencies:** React ^19.0.0
 - **Location:** `packages/midi/`
@@ -726,7 +726,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 #### `@dawcore/midi`
 
 - **Purpose:** Framework-agnostic MIDI file loading and parsing — no React, no DOM, no Lit. Houses `parseMidiFile()`/`parseMidiUrl()` and the `MidiLoadOptions`/`MidiLoadResult` types.
-- **Consumers:** `@dawcore/components` (optional peer — `editor.loadMidi()` dynamic-imports this package on first call) and `@waveform-playlist/midi` (regular dependency — re-exports the parser and adds the `useMidiTracks` React hook on top).
+- **Consumers:** `@dawcore/components` (optional peer — `editor.loadMidi()` dynamic-imports this package on first call) and `@waveform-playlist/midi` (regular dependency — re-exports the parser and adds `loadMidiTracks()` on top).
 - **Dependencies:** `@waveform-playlist/core` (for the `MidiNoteData` type), `@tonejs/midi`. No peer dependencies — truly framework-agnostic.
 - **Location:** `packages/dawcore-midi/`
 

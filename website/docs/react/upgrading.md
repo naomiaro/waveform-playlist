@@ -13,7 +13,7 @@ Each package is versioned independently, so "the next major" is a different numb
 
 ## React 19 is required
 
-**Packages:** `@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`, `midi`.
+**Packages:** `@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`. (`@waveform-playlist/midi` no longer has a `react` peer dependency: its hook was removed, see [`useMidiTracks` is removed: load with `loadMidiTracks`](#usemiditracks-is-removed-load-with-loadmiditracks).)
 
 The `react` (and, where declared, `react-dom`) peer dependency is now `^19.0.0` in every React package. Previously `browser` accepted `^18.2.0 || ^19.0.0`, `ui-components` accepted `>=17.0.0`, and the others accepted `^18.0.0` only, so the set could not be installed together on React 19 without peer warnings.
 
@@ -3141,7 +3141,7 @@ Also removed:
 What sets it:
 
 - `createTrack({ name, clips })` makes an audio track; pass `kind: 'midi'` for a MIDI track.
-- `audioTrack()` makes an audio track. `loadMidiTracks` and `useMidiTracks` make MIDI tracks.
+- `audioTrack()` makes an audio track. `loadMidiTracks` makes MIDI tracks.
 - A track object you write by hand needs the field. A MIDI track without it is read as an audio track and rejected.
 
 :::danger A track that breaks the rule throws
@@ -3791,7 +3791,7 @@ files.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
 
 Several clips on one track are `LoadingClip` objects (`{ id, src, start, duration, offset }`, seconds) in the track's `clips`; see [Several Clips per Track](/docs/react/guides/loading-audio#several-clips-per-track).
 
-**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` returns a `tracks` array, which the provider no longer takes. Load with `loadMidiTracks(src, { sampleRate })`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` is removed. Load with `loadMidiTracks(src, { sampleRate })`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that: see [`useMidiTracks` is removed: load with `loadMidiTracks`](#usemiditracks-is-removed-load-with-loadmiditracks).
 
 ## `usePlaylistTimeline()`: `onTracksChange` is removed; `tracks` is read-only and holds loaded clips
 
@@ -4123,6 +4123,95 @@ const { muted, isRecordingArmed, setMuted } = useTrack();
 <button disabled={isRecordingArmed} aria-pressed={muted} onClick={() => setMuted(!muted)}>
   Mute
 </button>
+```
+
+## `useMidiTracks` is removed: load with `loadMidiTracks`
+
+**Package:** `@waveform-playlist/midi`.
+
+`useMidiTracks(configs, { sampleRate })` returned `{ tracks, loading, error, loadedCount, totalCount }` for the provider's `tracks` prop, which no longer exists. The hook is removed, with its types `MidiTrackConfig`, `UseMidiTracksOptions` and `UseMidiTracksReturn`. The package now exports `loadMidiTracks`, `LoadMidiTracksOptions` and the parser re-exported from `@dawcore/midi` (`parseMidiFile`, `parseMidiUrl`, `ParsedMidi`, `ParsedMidiTrack`, `ParseMidiOptions`), and it no longer has a `react` peer dependency.
+
+`loadMidiTracks(src, options)` is a function: `src` is one URL, `File` or `Blob`, and it resolves to `ClipTrack[]` with `kind: 'midi'`. The app keeps its own loading and error state and adds the tracks to the arrangement.
+
+What the hook did that the function does not:
+
+| `useMidiTracks` | Now |
+| --- | --- |
+| Several configs in one call, fetched in parallel | One `loadMidiTracks` call per file; `Promise.all` for several, then add the tracks in the order you want |
+| `loading`, `error`, `loadedCount`, `totalCount` | Your own state around the promise; a rejection carries the message |
+| A config's `startTime` | The option `start` (seconds) |
+| A config's `muted`, `soloed`, `volume`, `pan`, `color` | Set them on the returned track before adding it: `arrangement.addTrack({ ...track, volume: 0.8 })` |
+| A config's `name` | The option `name`, which names the track and its clip only when the file yields exactly one track (as before, several tracks keep their own MIDI names) |
+| A config with `midiNotes` (notes you already have, no file) | Build the track with `createClipFromSeconds` and `createTrack({ kind: 'midi' })` from `@waveform-playlist/core` (below) |
+| A reload when a config changed | Call `loadMidiTracks` again and replace the tracks yourself (`arrangement.removeTrack`, `arrangement.addTrack`); every call makes new track and clip ids |
+| The fetched file kept in memory, so a changed option did not fetch again | Not kept. To parse one file several ways, fetch it once and pass the `Blob` |
+
+**Find:** `useMidiTracks`, `MidiTrackConfig`, `UseMidiTracksOptions`, `UseMidiTracksReturn`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks, loading, error } = useMidiTracks([{ src: '/music/song.mid', name: 'Piano' }], {
+  sampleRate: 48000,
+});
+if (loading) return <p>Loading MIDI…</p>;
+if (error) return <p>Error: {error}</p>;
+return <WaveformPlaylistProvider tracks={tracks}>…</WaveformPlaylistProvider>;
+
+// After
+const arrangement = useCreateArrangement();
+const [loaded, setLoaded] = useState(false);
+const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
+  const controller = new AbortController();
+  loadMidiTracks('/music/song.mid', { sampleRate: 48000, name: 'Piano', signal: controller.signal })
+    .then((tracks) => {
+      if (arrangement.getTracks().length === 0) {
+        tracks.forEach((track) => arrangement.addTrack(track));
+        arrangement.clearHistory(); // the first load is not an undo step
+      }
+      setLoaded(true);
+    })
+    .catch((err: unknown) => {
+      // An abort (unmount, StrictMode's first run) is not an error
+      if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err));
+    });
+  return () => controller.abort();
+}, [arrangement]);
+
+if (error) return <p>Error: {error}</p>;
+if (!loaded) return <p>Loading MIDI…</p>;
+return (
+  <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
+    …
+  </WaveformPlaylistProvider>
+);
+```
+
+Render the provider after the tracks are in: the playlist's ready happens once per mount and waits only for audio sources ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+
+Notes you already have, with no file:
+
+```tsx
+// Before
+const { tracks } = useMidiTracks([{ midiNotes: notes, name: 'Synth Lead', duration: 30 }], {
+  sampleRate: 48000,
+});
+
+// After
+import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+
+const clip = createClipFromSeconds({
+  startTime: 0,
+  duration: 30, // seconds; the hook's default was the end of the last note
+  sourceDuration: 30,
+  sampleRate: 48000,
+  midiNotes: notes,
+  name: 'Synth Lead',
+});
+arrangement.addTrack(createTrack({ name: 'Synth Lead', kind: 'midi', clips: [clip] }));
 ```
 
 ## Smaller changes of the provider

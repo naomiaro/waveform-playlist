@@ -14,28 +14,12 @@ export interface MidiTrackShape {
   startTime?: number;
   /** Clip duration in seconds; default is the track's own duration. */
   duration?: number;
-  muted?: boolean;
-  soloed?: boolean;
-  volume?: number;
-  pan?: number;
-  color?: string;
-}
-
-/** End of the last note, in seconds. A loop, not `Math.max(...)`: a spread of a
- * very large note list exceeds the engine's argument limit. */
-export function lastNoteEnd(notes: MidiNoteData[]): number {
-  let end = 0;
-  for (const note of notes) {
-    const noteEnd = note.time + note.duration;
-    if (noteEnd > end) end = noteEnd;
-  }
-  return end;
 }
 
 /**
  * The one place a MIDI track is built: one clip holding `notes`, on a
  * `kind: 'midi'` track. Every call makes new track and clip ids.
- * Shared by `loadMidiTracks` and `useMidiTracks`; not exported from the package.
+ * Not exported from the package.
  */
 export function createMidiTrack(
   shape: MidiTrackShape,
@@ -60,11 +44,6 @@ export function createMidiTrack(
     name,
     kind: 'midi',
     clips: [clip],
-    muted: shape.muted ?? false,
-    soloed: shape.soloed ?? false,
-    volume: shape.volume ?? 1.0,
-    pan: shape.pan ?? 0,
-    color: shape.color,
   });
 }
 
