@@ -34,7 +34,7 @@ Read before adding a field to a context, reading a context in a component, chang
 
 ### Provider internals and the shared context objects: `notes/provider-internals.md`
 
-Read before changing `WaveformPlaylistContext.tsx`, `MediaElementPlaylistContext.tsx` or `providerInternals/`, or moving a hook between the two providers.
+Read before changing `WaveformPlaylistContext.tsx`, `MediaElementPlaylistContext.tsx` or `providerInternals/` (the list of its files, with the hooks `WaveformPlaylistProvider` is made of since #812, is in the first section), or moving a hook between the two providers.
 
 - Provider Internals Exist Once (#769)
 - One Set of Context Objects for Both Providers (#688, part 2)
@@ -76,7 +76,7 @@ Read before changing the annotation list, the annotation boxes, their edge drag 
 
 ### Playback, the engine's lifetime and loading: `notes/playback-and-engine.md`
 
-Read before changing how the provider builds, rebuilds or disposes the engine, how tracks reach it, play / pause / stop / seek, the animation loop, or the end of the timeline.
+Read before changing how the provider builds, rebuilds or disposes the engine, how the arrangement's tracks reach it, ready, play / pause / stop / seek, the animation loop, or the end of the timeline.
 
 - Shared Animation Frame Loop Hook
 - Playlist Loading Detection
@@ -89,7 +89,7 @@ Read before changing how the provider builds, rebuilds or disposes the engine, h
 - SoundFont Late-Load Wiring
 - Error Handling in Playback Callbacks
 - End-of-Timeline Semantics (indefinitePlayback, fillViewport, setRecordingActive)
-- Incremental Track Addition (loadAudio optimization)
+- Per-Track Things That Are Not Plain Data Go Through a Provider Prop (#752) (until #812 this section was "Incremental Track Addition (loadAudio optimization)"; the incremental paths are deleted, the #752 rule is here)
 - Rewind / Seek Without Playback
 - Stop Before Clear
 - `handleStop` During Recording: Use `pause()` Not `stop()`
@@ -137,6 +137,32 @@ Read before writing or changing a test in `src/__tests__` (after the skill `unit
 
 Moved to the project skill `react-patterns` (they are not specific to this package): "Derived State Sync: setState During Render, Not useEffect"; "Hook Isolation for Render Props"; "Debugging State Changes with console.trace"; "React Hook Patterns (cross-cutting)".
 
+## The Provider Plays an Arrangement
+
+`WaveformPlaylistProvider` takes a required `arrangement` prop (an `Arrangement` from `@waveform-playlist/engine`, made with `useCreateArrangement`) and has no `tracks`, `onTracksChange` or `deferEngineRebuild` prop (#812). It is a wrapper that keys its body on the arrangement object, so one mount has one arrangement. Each piece of state has one owner, as built:
+
+| State | Owner | Where it is kept | How it is changed and read |
+| --- | --- | --- | --- |
+| Tracks and clips, clips still loading included | the arrangement | the arrangement | Its methods, reached below the provider with `useArrangement()`; `useClipDragHandlers` and `useClipSplitting` call `moveClip`, `trimClip`, `splitClip`. Read with `useArrangementTracks(arrangement)`, or as the provider's derived `usePlaylistTimeline()` |
+| Mix by track id | the arrangement | its mixer map | `setTrackMute` / `Solo` / `Volume` / `Pan` of `useEditorControls()` call the arrangement's setters (`useArrangementEditing`). `trackStates` is derived |
+| Undo and redo history | the arrangement | the arrangement | `undo`, `redo` of `useEditorControls()` call it; `canUndo` / `canRedo` are read from it. An engine rebuild does not touch it |
+| Loading state: which sources are pending, loaded or failed | the arrangement (`arrangement.sources`) | the arrangement | `arrangement.retry(src)`. Read with `useArrangementSources(arrangement)`; the provider reads only `pendingCount`, for ready |
+| The audio context sources are decoded with | the provider attaches it; the arrangement holds the getter while it is attached | `useDecodeContext` in `useEngineLifetime.ts` | Nobody else. The getter gives the current adapter's context and waits while there is none |
+| The trim preview (a trim drag in progress) | the provider | one value source made by `useTrimPreview` | The drag handlers publish and clear it. The dragged clip's view and the root subscribe |
+| The engine's lifetime (`engineRef`, `adapterRef`) | the provider | the build effect of `useEngineLifetime` | Nobody else builds or disposes. Built on mount, for a new `effects` function and for other zoom levels; never for a track change |
+| `isReady` and "ready has fired" | the provider | `useReadyOnce` (state `hasBeenReady`, refs `firedRef` and `firstReadyRef`) over `isEngineAttached` of `useEngineLifetime` | Nobody. Read as `usePlaylistTimeline().isReady` |
+| The recording arm: which track is armed, and its mute from before the take | the provider | one value source in `useArrangementEditing` (`{ trackId, prevMuted }`), plus `recordingActiveRef` | `setRecordingActive`. The mute itself is the arrangement's: the provider calls `arrangement.setTrackMute` to mute the armed track and to write `prevMuted` back, which always wins when the take ends |
+| Selection, loop, zoom, master volume, selected track | the engine | the engine; the hooks (`useSelectionState`, `useLoopState`, `useZoomControls`, `useMasterVolume`, `useSelectedTrack`) mirror it from `statechange` and seed each new engine from their refs | The hooks' setters |
+| `isPlaying`, the cursor position | the provider | React state and refs in `WaveformPlaylistContext.tsx` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, the animation loop, the engine-stop mirror |
+
+Derived during render and never written back (`providerInternals/useArrangementView.ts`): `usePlaylistTimeline().tracks` (the arrangement's tracks without their loading clips), `peaksDataArray` (with a placeholder record, `isPlaceholder: true`, for a clip still loading), `duration` (loaded audio only), `trackStates`, `canUndo` / `canRedo`. The refs in that hook and the adapter's audio graph are one-way caches.
+
+- The provider's own writes to the arrangement are the ones a caller asked for through `useEditorControls()` (mixer setters, `reorderTrack`, `undo`, `redo`, the arm mute of `setRecordingActive`) and the release of an armed track in its cleanup. Nothing in the library edits tracks from inside `arrangement.subscribe` or a `statechange` listener.
+- The arrangement outlives every engine and the provider itself: an engine rebuild, a StrictMode remount and an `<Activity>` hide keep tracks, mix and history.
+- A track the arrangement refuses throws at the call that offered it (`addTrack`, the `useCreateArrangement` initializer); `onError` is for an engine or adapter that cannot be built, and for an `onReady` that throws. A failed source is in `useArrangementSources`, not in `onError`.
+- An arrangement's methods are class methods: wrap them before handing one to React (`(listener) => arrangement.subscribe(listener)`), as the three hooks do.
+- Where each piece is described: `notes/provider-internals.md` (the hooks), `notes/playback-and-engine.md` ("Playlist Loading Detection", "The Engine Is Disposed on Unmount", "Engine State Subscription Pattern", "End-of-Timeline Semantics"), `notes/clip-drag-and-snap.md` (the trim preview), `notes/track-controls-and-reorder.md` (the mix), `notes/peaks.md` (placeholder records), and `packages/engine/CLAUDE.md`, "The arrangement owns the tracks".
+
 ## Optional Playout Engines (#510)
 
 `@waveform-playlist/playout`, `@waveform-playlist/media-element-playout`, and `tone` are
@@ -154,11 +180,12 @@ Moved to the project skill `react-patterns` (they are not specific to this packa
   `/tone` subpath section below). In-graph modules that couldn't move were decoupled instead:
   `soundFontSync` (structural `setSoundFontCache` check, not `isToneAdapter` from playout) and
   `useAnnotationDragHandlers` (tone-free `sampleRate` default).
-- **Sample rate at mount** is provisional (`sampleRate` prop or 48000) and reconciled from
-  `adapter.audioContext.sampleRate` on first `loadAudio`. A Tone consumer at 44100 Hz that
-  passes no `sampleRate` prop sees 48000 for the brief pre-first-load window.
+- **Sample rate at mount** is provisional (`sampleRate` prop or 48000) and set from
+  `adapter.audioContext.sampleRate` when the first adapter exists (`useEngineLifetime`). A Tone
+  consumer at 44100 Hz that passes no `sampleRate` prop sees 48000 until then; placeholder
+  records are not built before the rate is known (`isSampleRateKnown`).
 - **Removed in 14.0.0:** the `Tone` convenience re-export. Import `tone` directly.
-- **Async effect cancel-race:** making a provider's init effect async (via `await import`) opens a dispose-before-resolve window. Both providers guard with `let cancelled = false`. In **WaveformPlaylistContext** the cleanup sets `cancelled = true`, and an adapter that resolves after that is disposed inside the async `loadAudio` body's `if (cancelled) { adapter.dispose(); return; }` (the live engine is disposed by the cleanup and on unmount: see "The Engine Is Disposed on Unmount"). In **MediaElementPlaylistContext** the cleanup itself disposes the `createdPlayout` capture.
+- **Async effect cancel-race:** making a provider's init effect async (via `await import`) opens a dispose-before-resolve window. Both providers guard with a cancelled flag. For **WaveformPlaylistProvider** it is in `providerInternals/useEngineLifetime.ts`: the build effect's cleanup sets `run.cancelled = true`, and an adapter that resolves after that is disposed inside `buildEngine`'s `if (run.cancelled) { adapter.dispose(); return; }` (the live engine is disposed by the same cleanup: see "The Engine Is Disposed on Unmount"). In **MediaElementPlaylistContext** the cleanup itself disposes the `createdPlayout` capture.
 - **Test the dynamic-import seam, not the provider:** factory-or-dynamic-import logic lives in
   tiny pure async modules (`resolvePlayoutAdapter`/`resolveMediaElementPlayout`), unit-tested
   directly — `vi.doMock(pkg, () => { throw })` simulates a missing peer (no-peer install-hint
@@ -169,11 +196,16 @@ Moved to the project skill `react-patterns` (they are not specific to this packa
 
 The core `@waveform-playlist/browser` entry is structurally free of `tone`/`playout`
 (verified transitively by `coreBarrelEngineFree.test.ts`). All Tone-coupled exports —
-`useAudioTracks`, `useDynamicTracks`, the effects hooks + factory/definitions,
-`useExportWav` + `ExportWavButton`, `useOutputMeter`, `useMasterAnalyser` — live at
-`@waveform-playlist/browser/tone`. A MediaElement-only or custom-adapter consumer never
-resolves `tone`/`playout` under any bundler. `useAudioTracks`/`useDynamicTracks` moved
-here because they decode on the Tone global context.
+the effects hooks (`useDynamicEffects`, `useTrackDynamicEffects`, `useActiveEffects`) +
+factory/definitions, the WAM pieces (`WamEffectGui`, `loadWamModule`,
+`createWamEffectInstance`), `useExportWav` + `ExportWavButton`, `useOutputMeter`,
+`useMasterAnalyser` — live at `@waveform-playlist/browser/tone` (`src/tone.ts`). A
+MediaElement-only or custom-adapter consumer never resolves `tone`/`playout` under any
+bundler. `useAudioTracks` and `useDynamicTracks` were here until #812 removed them (with
+`AudioTrackConfig`, `TrackSource`, `TrackLoadError`): a track now names its audio in a clip
+and the arrangement loads it, decoding with the current adapter's `AudioContext`. The
+arrangement hooks (`useCreateArrangement`, `useArrangementTracks`, `useArrangementSources`,
+`useArrangement`) are in the core entry: `@waveform-playlist/engine` has no Tone dependency.
 
 ## Build (tsup)
 
@@ -185,21 +217,21 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Key Hooks:**
 
-- `useClipDragHandlers` - Drag-to-move and boundary trimming: a trim is a view-only preview, then one `engine.trimClip()` on release; clips found by id
-- `useClipSplitting` - Split clips at playhead; `splitClipAt(trackId, clipId, splitTime)` takes ids
+- `useClipDragHandlers` - Drag-to-move and boundary trimming on the provider's arrangement (`{ samplesPerPixel, snapSamplePosition? }`; no `tracks` or `engineRef` option): a move is one `arrangement.moveClip()` on drop, a trim a view-only preview and then one `arrangement.trimClip()` on release; clips found by id
+- `useClipSplitting` - Split clips at playhead (`{ samplesPerPixel }`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
 - `useTrackDynamicEffects` - Per-track effects management
-- `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
 - `useSelectionState` - Selection state (start/end) with engine delegation
 - `useLoopState` - Loop state (enabled, start, end) with engine delegation
 - `useSelectedTrack` - Selected track ID with engine delegation
 - `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation
 - `useMasterVolume` - Master volume with engine delegation
-- `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources` - Over an engine `Arrangement` (`src/hooks/useCreate*.ts`, `useArrangement*.ts`; core entry). `useCreateArrangement` reads `init` and `options` once and an initializer that throws goes to the render's error boundary; the other two are `useSyncExternalStore` over `arrangement.subscribe` and `arrangement.sources` (`arrangementHooks.test.tsx`). `WaveformPlaylistProvider` does not take an arrangement yet.
-- `ClipPeaks.isPlaceholder` (required) marks the record of a clip that is still loading, built by the internal `placeholderPeaks` (`src/utils/placeholderPeaks.ts`, not exported from the entry); `ui-components`' `Clip` draws it without drag and trim handles. Both providers set it `false` on every record today (`derivePeaks.ts`, `MediaElementPlaylistContext.tsx`), and `sameClipPeaks` compares it.
+- `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources` - Over an engine `Arrangement` (`src/hooks/useCreate*.ts`, `useArrangement*.ts`; core entry). `useCreateArrangement` reads `init` and `options` once and an initializer that throws goes to the render's error boundary; the other two are `useSyncExternalStore` over `arrangement.subscribe` and `arrangement.sources` (`arrangementHooks.test.tsx`). `WaveformPlaylistProvider` takes the arrangement as its `arrangement` prop, and `useArrangement()` returns it below the provider: see "The Provider Plays an Arrangement".
+- `useRecordingSession` - Tells the provider that a take is recorded into a track while `isRecording` (`setRecordingActive` in an effect with cleanup)
+- `ClipPeaks.isPlaceholder` (required) marks the record of a clip that is still loading, built by the internal `placeholderPeaks` (`src/utils/placeholderPeaks.ts`, not exported from the entry); `ui-components`' `Clip` draws it without drag and trim handles. `WaveformPlaylistProvider` puts such a record in a track's row of `peaksDataArray` for each clip still loading that has usable `waveformData` or a `duration` (`deriveRows` in `providerInternals/useArrangementView.ts`); records of loaded clips (`derivePeaks.ts`) and every record of `MediaElementPlaylistProvider` have it `false`, and `sameClipPeaks` compares it.
 - `useTimeFormat`, etc.
 
 **Location:** `src/hooks/`
@@ -207,7 +239,7 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 ## Important Patterns (Browser-Specific)
 
 - **Context Value Memoization** - All context value objects in providers must be wrapped with `useMemo`. Extract inline callbacks into `useCallback` first to avoid dependency churn. A `useMemo` holds only while EVERY dependency keeps its identity, and one unstable entry among ~40 fails silently (#691: a non-memoized `formatTime` from a helper hook rebuilt `controlsValue` on every provider render). Three rules: (1) object props that consumers write inline (`controls`, `theme`) go through `useShallowStable` before being used as a dependency, and defaults are module constants, never inline literals in the destructuring; (2) callbacks in a context value must not depend on state they only read or update — use functional `setState((prev) => …)` and the existing refs (`isPlayingRef`), which also avoids dropped updates when two setters run in one batch; (3) any new field in a context value needs a case in `__tests__/contextValueStability.test.tsx`, which asserts the identities directly. Nothing derived from state belongs in the controls value, only actions, refs and sources (#767 removed two things that moved it, `duration` and a `formatTime` rebuilt per time format; the tests pin it per trigger, not as a whole).
-- **Fetch Cleanup with AbortController** - `useAudioTracks` uses AbortController to cancel in-flight fetches on cleanup. Follow this pattern for any fetch in useEffect. For per-item abort (e.g., removing one loading track), use `Map<id, AbortController>` instead of `Set<AbortController>`.
+- **Fetch Cleanup with AbortController** - No hook of this package fetches audio since #812 (`useAudioTracks` did): the arrangement loads the sources its clips name through core's `createSourceLoader`, which makes one `AbortController` per load and hands the load its signal, and the provider's part is the cleanup of its decode-context effect, which detaches the context and so aborts the loads in flight. For any other fetch in a `useEffect`, abort in the cleanup; for per-item abort use `Map<id, AbortController>` instead of `Set<AbortController>`.
 - **Guard Before State Update in Callbacks** - In callbacks that update both React state and audio engine, validate inputs (e.g., trackId lookup) BEFORE calling `setState`. If the guard is after `setState`, invalid inputs cause UI/audio desync (UI updates but audio doesn't).
 - **RefObject Nullability** - `React.RefObject<T>` has `current: T | null` in React 18 types, even when initialized with a value. Call sites accessing hook-returned refs need `?? 0` (numbers) or `?? false` (booleans) fallbacks to satisfy TypeScript, even though the values are never actually null at runtime.
 - **Provider-Level Concerns Stay in Provider** - Callbacks with cross-cutting side-effects (e.g., `setSelection` updates currentTime and restarts playback, `setLoopRegionFromSelection` reads from selection hook and writes to loop hook) belong in the provider, not in individual state hooks. Hooks handle engine delegation + state mirroring only.

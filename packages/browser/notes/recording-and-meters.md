@@ -6,7 +6,7 @@ Notes of Browser Package (`@waveform-playlist/browser`), moved out of the packag
 
 **Two paths for recording data:**
 
-1. **Live preview** — `RecordingPreviewClip` (`components/TrackRows.tsx`) subscribes to `recordingState.progress` and renders its peaks directly, one `ChannelWithProgress` per channel. Bypasses the `WaveformPlaylistContext` peak generation pipeline entirely.
+1. **Live preview** — `RecordingPreviewClip` (`components/TrackRows.tsx`) subscribes to `recordingState.progress` and renders its peaks directly, one `ChannelWithProgress` per channel. Bypasses the provider's peak pipeline (`useArrangementView` → `derivePeaks`) entirely.
 2. **Post-recording** — clips go through `derivePeaks` (Path A/B/C), which applies `mono` merge via `extractPeaksFromWaveformDataFull`.
 
 Both paths must respect `mono` flag consistently. Live preview slices to first channel when `mono` is true. `recordingState.bits` flows through to the renderer (not hardcoded).

@@ -94,7 +94,8 @@ root `CLAUDE.md` and the skill `e2e-playwright`.
 | Need | Shape | In this codebase |
 | --- | --- | --- |
 | Many readers, few of which care about each change | An owner object with `subscribe` / `getSnapshot`, read with `useSyncExternalStore` and a selector that returns a primitive or a cached object; changed through its methods | `ValueSource` (`packages/core/src/valueSource.ts`), `EffectsRack` (`packages/browser/src/effects/effectsRack.ts`) |
-| Feedback during a gesture, one committed change at the end | A view-only preview that only the affected component follows; the owner is written once, on release; cancel clears the preview | `annotationPreview` (`packages/browser/src/providerInternals/useAnnotationState.ts`) |
+| Feedback during a gesture, one committed change at the end | A view-only preview that only the affected component follows; the owner is written once, on release; cancel clears the preview | `annotationPreview` (`packages/browser/src/providerInternals/useAnnotationState.ts`), the trim preview (`providerInternals/useTrimPreview.ts`) |
+| Data the app, the view and the audio engine all change | An owner object the app creates and hands to the provider; the provider derives what it publishes during render and writes nothing back; every change is a method call on the owner | The `Arrangement` (`packages/engine/src/arrangement/`), made with `useCreateArrangement`, read through `useArrangementView` (`packages/browser/src/providerInternals/`) |
 | State that must survive a remount | The owner lives outside the component; no effect cleanup clears it | `EffectsRack`; the skill `react-patterns`, "A store owned by a hook" |
 | An option several components draw with | One small context, read where it is used; no prop beside it | `WaveformViewOptions` |
 
