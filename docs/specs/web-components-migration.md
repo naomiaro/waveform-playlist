@@ -2312,15 +2312,15 @@ The React packages are **not** being replaced — both surfaces coexist (see Pac
 | `useCurrentTime()`                                 | `element.currentTime`                                                         |
 | `usePlaylistTimeline()`                            | `element.tracks`, `element.duration`, etc.                                    |
 | `usePlaybackRefs()` (frame callbacks)              | `daw-timeupdate` event                                                        |
-| `onTracksChange` prop                              | `daw-tracks-change` event                                                     |
+| `arrangement.subscribe()` / `useArrangementTracks()` | `daw-tracks-change` event                                                     |
 | styled-components theme                            | CSS custom properties                                                         |
 | `@dnd-kit/react`                                   | `@dnd-kit/dom`                                                                |
 | `useDynamicEffects()` / `useTrackDynamicEffects()` | `editor.addEffect()` / `track.addEffect()` (imperative)                       |
 | `SpectrogramProvider` (React context)              | `render-mode="spectrogram"` attribute + `spectrogramConfig` property          |
-| `useMidiTracks()` hook                             | `editor.loadMidi()` method                                                    |
+| `loadMidiTracks()` function                        | `editor.loadMidi()` method                                                    |
 | `<KeyboardShortcuts>` (React component)            | `<daw-keyboard-shortcuts>` element                                            |
 | `useAnnotationKeyboardControls()` hook             | `<daw-annotation-track keyboard-controls>` attribute                          |
-| `useDynamicTracks()` hook (file/blob loading)      | `editor.loadFiles()` method + `file-drop` attribute                           |
+| `arrangement.addTrack(audioTrack({ src: file }))`  | `editor.loadFiles()` method + `file-drop` attribute                           |
 | `useUndoRedo()` hook (planned)                     | `engine.undo()` / `engine.redo()` + `<daw-undo-button>` / `<daw-redo-button>` |
 | `MediaElementPlaylistProvider` (React context)     | `<daw-player>` element                                                        |
 | `usePlaybackControls()` under that provider        | `player.play()`, `player.pause()`, etc.                                       |

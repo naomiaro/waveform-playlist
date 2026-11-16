@@ -7,7 +7,7 @@ Framework-agnostic MIDI file loading and parsing. Houses the pure `parseMidiFile
 **Consumers:**
 
 - `@dawcore/components` — optional peer dep; `editor.loadMidi()` dynamic-imports this package.
-- `@waveform-playlist/midi` — regular dep; re-exports the parser and provides `useMidiTracks` hook on top.
+- `@waveform-playlist/midi` — regular dep; re-exports the parser and provides `loadMidiTracks` on top.
 
 ## Architecture
 

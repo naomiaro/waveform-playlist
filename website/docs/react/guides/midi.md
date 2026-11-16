@@ -77,8 +77,6 @@ The provider is rendered after the tracks are in because the playlist's [ready](
 
 A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI track of the file (e.g., Piano, Bass, Drums).
 
-`useMidiTracks`, the hook that loaded MIDI files into a `tracks` array for the provider's old `tracks` prop, is still exported, but its result cannot be given to the provider: `WaveformPlaylistProvider` takes an arrangement.
-
 ### loadMidiTracks
 
 `loadMidiTracks` is a plain function: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.

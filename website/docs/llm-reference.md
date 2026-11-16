@@ -1387,47 +1387,11 @@ Each split is one `arrangement.splitClip()` on the provider's arrangement (`useA
 
 ## MIDI (`@waveform-playlist/midi` + `@dawcore/midi`)
 
-Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. As of v13, the parser is framework-agnostic and lives in `@dawcore/midi`; `@waveform-playlist/midi` re-exports it and adds the React `useMidiTracks` hook and the plain function `loadMidiTracks` on top.
-
-### useMidiTracks
-
-`configs` is compared by value, so it can be written inline: tracks reload only when a config actually changes. Files are fetched in parallel (a URL shared by several configs once) and tracks keep the config order. If you pass large `midiNotes` arrays, keep each array's identity stable (a constant or `useMemo`); a notes array rebuilt on every render is compared note by note on every render. Treat configs and notes as immutable: mutating one in place does not trigger a reload.
-
-```typescript
-function useMidiTracks(configs: MidiTrackConfig[], options: UseMidiTracksOptions): UseMidiTracksReturn;
-
-interface MidiTrackConfig {
-  src?: string;                    // URL to .mid file
-  midiNotes?: MidiNoteData[];      // Pre-parsed notes (skip fetch+parse)
-  name?: string;                   // Track display name
-  muted?: boolean;
-  soloed?: boolean;
-  volume?: number;                 // Default: 1.0
-  pan?: number;                    // Default: 0
-  color?: string;
-  startTime?: number;              // Clip position in seconds (default 0)
-  duration?: number;               // Override clip duration in seconds
-  flatten?: boolean;               // Merge all MIDI tracks into one (default false)
-}
-
-interface UseMidiTracksOptions {
-  sampleRate: number;              // Required — pass AudioContext.sampleRate
-}
-
-interface UseMidiTracksReturn {
-  tracks: ClipTrack[];             // Loaded tracks with midiNotes on clips
-  loading: boolean;
-  error: string | null;
-  loadedCount: number;
-  totalCount: number;
-}
-```
-
-One `MidiTrackConfig` with `src` can produce multiple `ClipTrack` objects (one per MIDI channel in the file). Configs with `midiNotes` produce exactly one track. All tracks are returned at once after loading completes.
+Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. As of v13, the parser is framework-agnostic and lives in `@dawcore/midi`; `@waveform-playlist/midi` re-exports it and adds the plain function `loadMidiTracks` on top. The package has no React hook and no `react` peer dependency (`useMidiTracks` was removed: see the upgrade guide, "`useMidiTracks` is removed: load with `loadMidiTracks`").
 
 ### loadMidiTracks
 
-A function, not a hook: no React state, no loading flags. Beside `useMidiTracks`, which is unchanged.
+A function, not a hook: no React state, no loading flags.
 
 ```typescript
 function loadMidiTracks(

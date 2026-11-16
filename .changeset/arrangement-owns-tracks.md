@@ -25,6 +25,6 @@ Breaking in the engine:
 - Track, clip, mixer and history methods called on a disposed engine change its arrangement but no longer reach the adapter or emit, and `setTempo` on it does nothing.
 - A change made from inside a `statechange` listener is delivered after the one being handled. Two or more track edits made in one listener run make the engine send the adapter every track once (`setTracks`); one edit is sent as itself.
 
-browser: `onTracksChange` hands the app an array of its own; the track and clip objects in it are the engine's and are frozen in development. When a playlist cannot be built (a duplicate track id, a track of the wrong kind, an adapter that fails), the provider logs a console error that says the playlist stays in its loading state (it cannot be played; its waveforms are still drawn) and why, and suggests `onError` when the prop is missing; it was a console warning.
+browser: type-only changes to follow the engine's readonly tracks. What `WaveformPlaylistProvider` does with an arrangement is in the changeset of its `arrangement` prop.
 
 dawcore: type-only changes to follow the engine's readonly tracks. `<daw-editor>` users see the engine's changes through it: an undo no longer changes the audible mix, and undoing the addition of a track clears the selected track when it was that track.

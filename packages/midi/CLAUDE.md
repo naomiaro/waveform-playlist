@@ -2,13 +2,13 @@
 
 ## Parser Now Lives in `@dawcore/midi`
 
-As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split (see `docs/specs/2026-05-23-dawcore-load-midi-design.md`). React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
+As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split. React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
 
-`useMidiTracks` and `loadMidiTracks` are the symbols defined in this package (`loadMidiTracks.ts` also holds the one place a MIDI track is built, `createMidiTrack`, which `useMidiTracks` uses too; it is not exported).
+`loadMidiTracks` and its options type `LoadMidiTracksOptions` are what this package defines itself (`loadMidiTracks.ts` also holds the one place a MIDI track is built, `createMidiTrack`, which is not exported). The `useMidiTracks` hook, `midiConfigsEqual` and their tests were removed with the last part of #812: the provider takes an arrangement, not a `tracks` array, and the package has no React code and no `react` peer.
 
 ## Purpose
 
-Provides MIDI file loading, parsing, and React hook integration for waveform-playlist. Separates `@tonejs/midi` (~8-12 KB gzipped) into an opt-in package so users who only need audio don't pay the bundle cost.
+Provides MIDI file loading and parsing for waveform-playlist's React packages. Separates `@tonejs/midi` (~8-12 KB gzipped) into an opt-in package so users who only need audio don't pay the bundle cost.
 
 **This package handles the data pipeline only:** `.mid` file → parser → `ClipTrack[]` with `midiNotes`. Actual MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
 
@@ -23,31 +23,29 @@ Provides MIDI file loading, parsing, and React hook integration for waveform-pla
                                                             ▼               ▼
                                                     ParsedMidiTrack   ParsedMidiTrack
                                                             │               │
-                                              useMidiTracks │               │
+                                             loadMidiTracks │               │
                                                             ▼               ▼
                                                       ClipTrack        ClipTrack
                                                    (clip.midiNotes)  (clip.midiNotes)
                                                             │               │
                                                             └───────┬───────┘
                                                                     ▼
-                                                    <WaveformPlaylistProvider tracks={...}>
+                                                    arrangement.addTrack(track)
 ```
 
 ### Two-Layer Design
 
 1. **`parseMidiFile()`** — Pure function, no React. Converts `@tonejs/midi` output to `MidiNoteData[]` format. Can be used standalone (Node.js scripts, non-React apps).
 
-2. **`useMidiTracks()`** — React hook mirroring `useAudioTracks` from `@waveform-playlist/browser`. Handles fetch, parse, and `ClipTrack` construction with loading states.
+2. **`loadMidiTracks()`** — An async function, no React. Takes a URL, a `File` or a `Blob`, parses it and builds one `kind: 'midi'` `ClipTrack` per parsed track (`buildMidiTracks` → `createMidiTrack`). The caller keeps its own loading and error state and adds the tracks to the arrangement.
 
 ### Tracks Are MIDI Tracks
 
-`loadMidiTracks` and `useMidiTracks` build every track with `createTrack({ kind: 'midi', … })` (#756). A track without it is read as an audio track and the engine rejects its MIDI clip.
+`loadMidiTracks` builds every track with `createTrack({ kind: 'midi', … })` (#756). A track without it is read as an audio track and the engine rejects its MIDI clip.
 
 ### Multi-Track Expansion
 
-One MIDI config can produce multiple `ClipTrack` objects. A `.mid` file with N MIDI tracks generates N `ClipTrack`s by default. The `flatten: true` option merges all tracks into one.
-
-The `loadedTracksMap` stores `ClipTrack[]` per config index (not single `ClipTrack`), and `buildTracksArray()` flattens in config order.
+One `loadMidiTracks` call can produce multiple `ClipTrack` objects. A `.mid` file with N MIDI tracks generates N `ClipTrack`s by default. The `flatten: true` option merges all tracks into one.
 
 ### Per-Note Channel Field
 
@@ -55,7 +53,7 @@ The `loadedTracksMap` stores `ClipTrack[]` per config index (not single `ClipTra
 
 ### MIDI Has No Native Sample Rate
 
-MIDI is event-based, not sample-based. `sampleRate` is **required** on `UseMidiTracksOptions` (second arg to `useMidiTracks()`) — pass `getGlobalAudioContext().sampleRate` from playout. Used for sample-based timeline positioning in `createClipFromSeconds()`. The actual audio synthesis sample rate is determined by the `AudioContext` in the playout layer. Never hardcode a default (e.g., 48000) — the real AudioContext rate varies by hardware.
+MIDI is event-based, not sample-based. `sampleRate` is **required** on `LoadMidiTracksOptions` — pass the rate of the playlist's `AudioContext` (`getGlobalAudioContext().sampleRate` from playout with the default adapter). Used for sample-based timeline positioning in `createClipFromSeconds()`. The actual audio synthesis sample rate is determined by the `AudioContext` in the playout layer. Never hardcode a default (e.g., 48000) — the real AudioContext rate varies by hardware.
 
 ## @tonejs/midi Gotchas
 
@@ -92,15 +90,9 @@ MIDI velocity is a 0-127 integer. `@tonejs/midi` normalizes to 0-1 float, but ro
 
 **Run:** `cd packages/midi && npx vitest run`
 
-**Environment:** jsdom (required for `@testing-library/react` in hook tests)
+**Environment:** jsdom (kept from the hook tests; `loadMidiTracks.test.ts` works around jsdom's `Blob` having no `arrayBuffer()`). `parser-parity.test.ts` imports `@waveform-playlist/midi` by name, which resolves to `dist`: run `pnpm --filter @waveform-playlist/midi build` after changing `src/index.ts`, or it tests the old build (after `useMidiTracks` was deleted it failed with `Failed to resolve import "react" from "dist/index.mjs"` until the rebuild).
 
 **Test MIDI data:** Created programmatically with `@tonejs/midi`'s `Midi` constructor — no fixture files needed. Use `midi.header.setTempo()` (never direct assignment).
-
-**`configs` is compared by value (#700):** the load effect is keyed on a copy of `configs` held in state and replaced during render only when `midiConfigsEqual` says a config changed. Inline array literals are fine, in tests and in consumer code. Before #700 the effect was keyed on array identity and an inline literal looped until the process ran out of memory. Rules that keep it that way:
-
-- `midiConfigsEqual` compares a fixed list of `MidiTrackConfig` keys with `Object.is` (NaN equals NaN), and notes by identity first, then field by field. A new field on `MidiTrackConfig` must be added to `SCALAR_CONFIG_KEYS` (the `satisfies` clause rejects a key that is not on the type, but does not flag a missing one).
-- Configs and notes are treated as immutable: mutating one in place and passing a shallow copy does not reload.
-- Tests that pass inline configs count renders with `renderGuard()` (`useMidiTracksInlineConfigs.test.ts`), which throws past 50 renders. Without it a regression exhausts the worker's memory instead of failing.
 
 ### Flatten Is Visual-Only (Planned)
 
@@ -110,18 +102,17 @@ Flatten merges `midiNotes` into one visual track but keeps separate `ClipTrack` 
 
 ## Dependencies
 
-- **`@tonejs/midi`** — Regular dependency (not peer). The whole reason this package exists.
+- **`@tonejs/midi`** — Regular dependency (not peer). Since the parser moved to `@dawcore/midi`, only the tests of this package import it.
 - **`@waveform-playlist/core`** — For `MidiNoteData`, `ClipTrack`, `createClipFromSeconds`, `createTrack`.
-- **`react`** — Peer dependency (for `useMidiTracks` hook).
 - No `tone` dependency — this package only does parsing, not playback.
 
 ## Program Number (GM Instrument)
 
-`ParsedMidiTrack.programNumber` is set from `track.instrument.number` in `@tonejs/midi`. Passed through `useMidiTracks` → `clip.midiProgram` → `SoundFontToneTrack` for correct instrument sample lookup. Defaults to 0 (Acoustic Grand Piano). Preserved in flatten mode.
+`ParsedMidiTrack.programNumber` is set from `track.instrument.number` in `@tonejs/midi`. Passed through `buildMidiTracks` → `clip.midiProgram` → `SoundFontToneTrack` for correct instrument sample lookup. Defaults to 0 (Acoustic Grand Piano). Preserved in flatten mode.
 
 ## Dropped File Track Naming
 
-When a MIDI config has a `name` and the file contains multiple tracks, `useMidiTracks` uses the MIDI track's own name directly (e.g., "Piano", "Drums") — it does NOT prefix with the config name. This keeps clip headers short in narrow controls.
+`loadMidiTracks`'s `name` option renames the track and its clip only when the file yields exactly one track; with several, each keeps the MIDI track's own name (e.g., "Piano", "Drums") and is NOT prefixed. This keeps clip headers short in narrow controls.
 
 ## Track Naming Logic
 

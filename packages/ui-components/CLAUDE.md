@@ -44,7 +44,7 @@ The theme stays on the providers (#689): it is not an option of one view, the co
 
 ```typescript
 // Application level
-<WaveformPlaylistProvider tracks={tracks} theme={darkTheme}>
+<WaveformPlaylistProvider arrangement={arrangement} theme={darkTheme}>
   <Waveform />  {/* Gets theme from context */}
 </WaveformPlaylistProvider>
 ```

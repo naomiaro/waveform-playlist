@@ -127,7 +127,7 @@ function App() {
 
 | Package | Description |
 |---------|-------------|
-| `@waveform-playlist/midi` | The `loadMidiTracks` function (its tracks go into the arrangement) and the React `useMidiTracks` hook + piano roll visualization with SoundFont/PolySynth playback. Re-exports the parser from `@dawcore/midi`. |
+| `@waveform-playlist/midi` | The `loadMidiTracks` function: a `.mid` file as MIDI tracks for the arrangement, drawn as piano rolls and played with SoundFont or PolySynth. Re-exports the parser from `@dawcore/midi`. |
 | `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
 | `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/docs/react/guides/recording#audioworklet-setup)) |
 | `@waveform-playlist/worklets` | Shared AudioWorklet processors for metering and recording (auto-installed with recording) |
