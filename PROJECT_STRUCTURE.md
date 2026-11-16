@@ -659,12 +659,11 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Install:** `npm install @waveform-playlist/midi`
 - **Architecture (two-layer):**
   - `parseMidiFile()`/`parseMidiUrl()` — pure functions, re-exported from `@dawcore/midi` as of v13.0.0 (moved during the dawcore framework-split; no React-side API change). Convert a `.mid` ArrayBuffer/URL to `ParsedMidi`.
-  - `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the symbol defined in this package: loads a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, notes in `clip.midiNotes`), whose tracks are added to the arrangement `WaveformPlaylistProvider` plays.
+  - `loadMidiTracks()` (`src/loadMidiTracks.ts`, with its options type `LoadMidiTracksOptions`) — what this package defines itself: loads a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, notes in `clip.midiNotes`), whose tracks are added to the arrangement `WaveformPlaylistProvider` plays.
 - **Data pipeline only:** MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
 - **Multi-track expansion:** One file can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
 - **No native sample rate:** MIDI is event-based — `sampleRate` is required on the options of `loadMidiTracks()` (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
-- **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core`
-- **Peer Dependencies:** React ^19.0.0
+- **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core` (no peer dependencies)
 - **Location:** `packages/midi/`
 
 ### 🧱 Web Components

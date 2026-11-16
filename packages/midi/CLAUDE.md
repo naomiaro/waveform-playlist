@@ -2,9 +2,9 @@
 
 ## Parser Now Lives in `@dawcore/midi`
 
-As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split (see `docs/specs/2026-05-23-dawcore-load-midi-design.md`). React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
+As of v13.0.0, `parseMidiFile` / `parseMidiUrl` and the `ParsedMidi*` types are re-exported from `@dawcore/midi`. The local copy was removed during the dawcore framework-split. React-side consumers see no API change. The `parser-parity.test.ts` smoke test guards against accidental re-divergence.
 
-`loadMidiTracks` is the one symbol defined in this package (`loadMidiTracks.ts` also holds the one place a MIDI track is built, `createMidiTrack`, which is not exported). The `useMidiTracks` hook, `midiConfigsEqual` and their tests were removed with the last part of #812: the provider takes an arrangement, not a `tracks` array, and the package has no React code and no `react` peer.
+`loadMidiTracks` and its options type `LoadMidiTracksOptions` are what this package defines itself (`loadMidiTracks.ts` also holds the one place a MIDI track is built, `createMidiTrack`, which is not exported). The `useMidiTracks` hook, `midiConfigsEqual` and their tests were removed with the last part of #812: the provider takes an arrangement, not a `tracks` array, and the package has no React code and no `react` peer.
 
 ## Purpose
 
@@ -102,7 +102,7 @@ Flatten merges `midiNotes` into one visual track but keeps separate `ClipTrack` 
 
 ## Dependencies
 
-- **`@tonejs/midi`** — Regular dependency (not peer). The whole reason this package exists.
+- **`@tonejs/midi`** — Regular dependency (not peer). Since the parser moved to `@dawcore/midi`, only the tests of this package import it.
 - **`@waveform-playlist/core`** — For `MidiNoteData`, `ClipTrack`, `createClipFromSeconds`, `createTrack`.
 - No `tone` dependency — this package only does parsing, not playback.
 

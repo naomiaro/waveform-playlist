@@ -42,7 +42,7 @@ waveform-playlist builds browser-based audio editing applications. Use the React
 
 ## Requirements and Upgrading
 
-- The React packages (`@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`, `midi`) require `react` and `react-dom` `^19.0.0` and `styled-components` `^6.0.0`.
+- The React packages (`@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`) require `react` and `react-dom` `^19.0.0` and `styled-components` `^6.0.0`.
 - Upgrading from an earlier major: follow https://naomiaro.github.io/waveform-playlist/docs/react/upgrading — it lists every breaking change with a Find / Replace-with entry, written so a coding agent can apply it mechanically.
 
 ## Quick Start
@@ -175,7 +175,7 @@ Removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAn
 - Removed: `useAudioTracks`, `useDynamicTracks` and the types `AudioTrackConfig`, `TrackSource`, `TrackLoadError`, `UseDynamicTracksReturn` (from `/tone`). A track names its audio with `audioTrack({ src | audioBuffer | waveformData, name, start, duration, offset, … })` from `@waveform-playlist/core` (`start`, not `startTime`); a dropped file is `arrangement.addTrack(audioTrack({ src: file }))`. Guide: https://naomiaro.github.io/waveform-playlist/docs/react/guides/loading-audio
 - The same arrangement can also be played by a `PlaylistEngine` an app builds itself (`new PlaylistEngine({ adapter, arrangement })`), one engine at a time.
 
-### MIDI Hooks (from `@waveform-playlist/midi`)
+### MIDI (from `@waveform-playlist/midi`)
 
 - `loadMidiTracks(src, options)` — A function, not a hook: `src` is a URL string, a `File` or a `Blob`; resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call). `options: { sampleRate (required), flatten?, start? (seconds), duration? (seconds), name?, signal? }`. `name` names the track and its clip only when the file yields exactly one track. An aborted `signal` rejects with the signal's reason.
 - `parseMidiFile(data, options?)` — Pure function: ArrayBuffer → ParsedMidi with tracks, notes, tempo, time signature. No React dependency. Re-exported from `@dawcore/midi`.

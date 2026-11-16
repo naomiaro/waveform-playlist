@@ -4141,7 +4141,7 @@ What the hook did that the function does not:
 | `loading`, `error`, `loadedCount`, `totalCount` | Your own state around the promise; a rejection carries the message |
 | A config's `startTime` | The option `start` (seconds) |
 | A config's `muted`, `soloed`, `volume`, `pan`, `color` | Set them on the returned track before adding it: `arrangement.addTrack({ ...track, volume: 0.8 })` |
-| A config's `name` | The option `name`, which names the track and its clip only when the file yields exactly one track (as before, several tracks keep their own MIDI names) |
+| A config's `name` (used only with `midiNotes`; the tracks of a file always kept their own MIDI names) | For a file, the new option `name` names the track and its clip when the file yields exactly one track; leave it out to keep the file's name, as the hook did. Several tracks keep their own MIDI names |
 | A config with `midiNotes` (notes you already have, no file) | Build the track with `createClipFromSeconds` and `createTrack({ kind: 'midi' })` from `@waveform-playlist/core` (below) |
 | A reload when a config changed | Call `loadMidiTracks` again and replace the tracks yourself (`arrangement.removeTrack`, `arrangement.addTrack`); every call makes new track and clip ids |
 | The fetched file kept in memory, so a changed option did not fetch again | Not kept. To parse one file several ways, fetch it once and pass the `Blob` |
@@ -4152,7 +4152,7 @@ What the hook did that the function does not:
 
 ```tsx
 // Before
-const { tracks, loading, error } = useMidiTracks([{ src: '/music/song.mid', name: 'Piano' }], {
+const { tracks, loading, error } = useMidiTracks([{ src: '/music/song.mid' }], {
   sampleRate: 48000,
 });
 if (loading) return <p>Loading MIDI…</p>;
@@ -4166,7 +4166,7 @@ const [error, setError] = useState<string | null>(null);
 
 useEffect(() => {
   const controller = new AbortController();
-  loadMidiTracks('/music/song.mid', { sampleRate: 48000, name: 'Piano', signal: controller.signal })
+  loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
     .then((tracks) => {
       if (arrangement.getTracks().length === 0) {
         tracks.forEach((track) => arrangement.addTrack(track));

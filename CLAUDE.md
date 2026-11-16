@@ -33,6 +33,8 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Every PR that changes `packages/*/src` adds a changeset** (`pnpm changeset`; pick `patch` for `@dawcore/*` — zerover, never minor/major). Each package follows its own semver independently, and `changeset version` computes the bumps and the dependent cascade at the release.
 
+**A PR that removes or renames public API also greps `.changeset/` for the old names** (bodies and frontmatter). The pending changesets become one changelog: by the last part of #812 fourteen of them named API that later parts had removed, and `react-19-peer-ranges.md` still bumped `midi` for a `react` peer the package no longer had (a reviewer found that one). Removing a peer dependency also touches the requirements line of `website/static/llms.txt` and the package's "Peer Dependencies" line in `PROJECT_STRUCTURE.md`.
+
 **Do not start a release unless the maintainer asks for one.** Everything about releasing (versioning, publishing with the hardware key, the republish cascade, peer floors, the release commit and the GitHub release) is the project skill `release` (`.claude/skills/release/SKILL.md`): load it before any `release:version`, `publish` or `gh release` command.
 
 ---
@@ -85,6 +87,8 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 **Check where an error lands before documenting how to catch it.** For #756 the engine was made to throw on an invalid track, and the first plan was to tell React consumers to use an error boundary. Reading the provider showed both engine calls inside `try`/`catch` in an async function: React never sees the throw, and the provider reports it through `onError` and stays in its loading state. The guide says that instead. Trace the throw to where it stops, in each library, before writing the advice.
 
 **Decide the doc surface in the design, before the first review.** On #762 a new DOM attribute (`data-selected`) was documented only after the review had started; each docs commit needed its own round, and the rounds found a sentence that overclaimed and a CSS example that did not work. When a change adds anything a consumer can see (attribute, prop, theme key), name the guide page in the design message.
+
+**The "Before" half of an upgrade snippet is checked against the old source too.** On #812 part 6 the first `useMidiTracks` snippet had `name: 'Piano'` on a `src` config before and on `loadMidiTracks` after; the hook ignored `name` for a file (`git show main:<file>`), the function applies it, so the two were not equivalent. For each option copied across, read what the removed code did with it.
 
 **Render a CSS or markup example before committing it.** The first `data-selected` example (an `outline` on the row) was invisible in the browser. Inject it with `page.addStyleTag` on an example page and look at a screenshot.
 
@@ -237,6 +241,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 - **A `cd` in one Bash call stays for the next ones.** After `cd packages/browser && npx vitest …` a later `packages/…` path or `git` command resolves from there. Run a package command in a subshell, `(cd packages/browser && npx vitest run …)`, or start each call with `cd` to the repo root.
 - **A script that rewrites an import list drops a comment inside it** (a second time on #685: `// PlayButton, PauseButton, StopButton omitted …` became three names). After a codemod over imports, diff for removed `//` lines.
 - **Quote grep globs: the shell here is zsh.** `grep -rn x packages --include=*.ts` stops with `no matches found: --include=*.ts` when no file in the current directory matches the glob, and in a chained command the output of the other parts still prints, so the search looks complete. On #752 this hid `buildTrackFromConfig.ts`, the one WRITER of the field being removed, until typecheck was run. Write `--include='*.ts'`, and when any part of a command prints an error, run the search again before using its result.
+- **`echo =====X` fails in zsh** (`=name` is expanded as a command path: "=====X not found", and the rest of the chain does not run). Quote separators: `echo '-----'`.
 - **`git grep -E` here has no `\b`:** a pattern with it matches nothing and prints nothing, which reads as "none found". Use `-w`, or a character class before the word. An empty result from a search that should have hits means the search is wrong.
 - **My own `pnpm build` breaks my own dev server too** (the same "Can't resolve '@dawcore/components'" overlay): restart the 3077 server after any build, before a probe or an e2e run.
 - **Keep `examples/*.html` and `debug/` out of a repo-wide attribute grep** (hundreds of page-level ids); scan `packages` and `website/src`.
