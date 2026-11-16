@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { Modifiers } from '@dnd-kit/abstract';
@@ -15,7 +16,6 @@ import {
   usePlaylistView,
   usePlaylistZoom,
   usePlaylistTimeline,
-  useEngineRefs,
   useEditorControls,
 } from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
@@ -49,8 +49,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const touchOptimized = touchOptimizedProp ?? inherited.touchOptimized;
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { tracks, onTracksChange } = usePlaylistTimeline();
-  const { playoutRef } = useEngineRefs();
+  const { tracks } = usePlaylistTimeline();
   const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
     useEditorControls();
   const beatsAndBars = useBeatsAndBars();
@@ -63,16 +62,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     beatsAndBars.scaleMode === 'beats' &&
     beatsAndBars.snapTo !== 'off';
   const useTimescaleSnap = snap && !useBeatsSnap;
-
-  // Warn once if onTracksChange is missing — drag/trim edits will be lost
-  useEffect(() => {
-    if (onTracksChange == null) {
-      console.warn(
-        '[waveform-playlist] ClipInteractionProvider: onTracksChange is not set on ' +
-          'WaveformPlaylistProvider. Drag and trim edits will not be persisted.'
-      );
-    }
-  }, [onTracksChange]);
 
   // Build snapSamplePosition for boundary trim snapping
   const snapSamplePosition = useMemo(() => {
@@ -92,10 +81,10 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     return undefined;
   }, [useBeatsSnap, useTimescaleSnap, beatsAndBars, sampleRate, samplesPerPixel]);
 
-  // Handlers and modifiers read tracks through this ref, so their identity does
-  // not change when tracks do: keyed on tracks, the handlers and the modifiers
-  // array handed to DragDropProvider would be rebuilt by any clip operation,
-  // also one that lands mid-drag.
+  // The modifiers and the track selection on drag start read the loaded
+  // tracks through this ref, so their identity does not change when tracks
+  // do: keyed on tracks, the modifiers array handed to DragDropProvider would
+  // be rebuilt by any clip operation, also one that lands mid-drag.
   const tracksRef = useRef(tracks);
   tracksRef.current = tracks;
   const getTracks = useCallback(() => tracksRef.current, []);
@@ -108,12 +97,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-    snapSamplePosition,
-  });
+  } = useClipDragHandlers({ samplesPerPixel, snapSamplePosition });
 
   // True from the start of a track-reorder drag to its end. dnd-kit can send
   // one more dragover AFTER the dragend of a canceled drag (the sorting
@@ -174,28 +158,36 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind === 'track-reorder') {
         trackReorderDragActiveRef.current = false;
-        // Unconditional, regardless of canceled/committed: @dnd-kit/react's
-        // sortable plugins can splice React-owned DOM nodes (Feedback's
-        // placeholder, OptimisticSortingPlugin's reorder()) during the drag
-        // that just ended, desyncing React's fiber tree from the true DOM.
-        // Bumping this forces the view's track-controls part to remount the
-        // track-controls slots, healing the corruption before the next
-        // reorder (drag or button) needs to touch the DOM. See
-        // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.
-        bumpTrackReorderEpoch();
-        // Clear the preview in the same handler that commits: React batches this
-        // with reorderTrack's state updates, so the columns go straight from
-        // previewed layout to committed layout with no intermediate frame.
-        setTrackDragPreview(null);
-        if (event.canceled || !data.trackId) return;
         const sortable = (
           event.operation.source as unknown as {
             sortable?: { index: number; initialIndex: number };
           }
         ).sortable;
-        if (sortable && sortable.index !== sortable.initialIndex) {
-          reorderTrack(data.trackId, sortable.index);
-        }
+        const trackId = data.trackId;
+        const moves =
+          !event.canceled && trackId && sortable && sortable.index !== sortable.initialIndex;
+        // ONE commit for the three: the reorder, the cleared preview and the
+        // epoch. dnd-kit calls this inside `startTransition`, where the two
+        // state updates would wait as transition updates while the reorder
+        // (the arrangement, read with `useSyncExternalStore`) renders at
+        // once: React would first move the slots under their old keys, which
+        // is what the epoch is there to avoid, and remount them a commit
+        // later. `flushSync` renders all three together.
+        flushSync(() => {
+          // Unconditional, regardless of canceled/committed: @dnd-kit/react's
+          // sortable plugins can splice React-owned DOM nodes (Feedback's
+          // placeholder, OptimisticSortingPlugin's reorder()) during the drag
+          // that just ended, desyncing React's fiber tree from the true DOM.
+          // Bumping this forces the view's track-controls part to remount the
+          // track-controls slots, healing the corruption before the next
+          // reorder (drag or button) needs to touch the DOM. See
+          // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.
+          bumpTrackReorderEpoch();
+          // The columns go straight from the previewed layout to the
+          // committed one, with no frame in between.
+          setTrackDragPreview(null);
+          if (moves) reorderTrack(trackId, sortable.index);
+        });
         return;
       }
       onDragEnd(event);

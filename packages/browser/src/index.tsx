@@ -20,6 +20,7 @@ export {
   usePlaylistSettings,
   usePlaylistZoom,
   // WaveformPlaylistProvider only:
+  useArrangement,
   useEditorControls,
   useEngineRefs,
   usePlaylistTimeline,

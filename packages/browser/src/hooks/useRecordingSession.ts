@@ -11,9 +11,16 @@ export interface RecordingSessionOptions {
 /**
  * Tells the playlist that a take is being recorded into a track, for as long
  * as `isRecording` is true (#685). The provider then keeps playback running
- * past the end of the audio and mutes what the armed track already holds for
- * the take, so a punch-in replaces what it overlaps; the track's own mute
- * state is restored when the take ends or the component unmounts.
+ * past the end of the audio and mutes the armed track in the arrangement for
+ * the take, so what it already holds does not play under a punch-in that
+ * replaces it (#812: the mixer shows the track muted, its built-in Mute
+ * button is disabled and `useTrack().isRecordingArmed` is true). The mute
+ * from before the take is written back when the take ends, the track changes
+ * or the component unmounts, whatever was set in between; the provider also
+ * writes it back in its own cleanup (its unmount or an `<Activity>` hide)
+ * while a track is still armed. An `<Activity>` hide of the component ends
+ * the session the same way, and the reveal starts it again from the track's
+ * mute at that moment.
  *
  * Call it in the component that calls `useIntegratedRecording`, under
  * `WaveformPlaylistProvider`. `<WaveformRecordingPreview>` only draws the
@@ -22,7 +29,9 @@ export interface RecordingSessionOptions {
  * A handler that starts playback together with the recording should also call
  * `setRecordingActive(true, trackId)` (from `useEditorControls()`) before
  * `play()`: this effect runs after the render that follows, which is too late
- * for the first animation frame.
+ * for the first animation frame. `play()` does nothing before the playlist's
+ * first ready (`usePlaylistTimeline().isReady`), so a take started during the
+ * first load records without playback.
  */
 export function useRecordingSession({ isRecording, trackId }: RecordingSessionOptions): void {
   const { setRecordingActive } = useEditorControls();

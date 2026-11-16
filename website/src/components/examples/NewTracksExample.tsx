@@ -28,10 +28,14 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementTracks,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useDynamicTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -74,16 +78,27 @@ const StyledDropZone = styled(FileDropZone)`
 
 export function NewTracksExample() {
   const { theme } = useDocusaurusTheme();
-  const { tracks, addTracks, removeTrack, loadingCount, isLoading, errors } = useDynamicTracks();
+  // Starts empty: one track per dropped file, and the arrangement loads each one
+  const arrangement = useCreateArrangement();
+  const tracks = useArrangementTracks(arrangement);
+  const sources = useArrangementSources(arrangement);
+  const loadingCount = sources.pendingCount;
+  // A dropped file whose audio failed is taken out again (not an undo step,
+  // so no undo brings it back) and listed with its error
+  const failedDrops = useFailedDrops(arrangement);
 
   const handleFiles = useCallback(
     (files: File[]) => {
       const audioFiles = files.filter((file) => file.type.startsWith('audio/'));
-      if (audioFiles.length > 0) {
-        addTracks(audioFiles);
-      }
+      // The track is named after the file, without its extension
+      audioFiles.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
     },
-    [addTracks]
+    [arrangement]
+  );
+
+  const removeTrack = useCallback(
+    (trackId: string) => arrangement.removeTrack(trackId),
+    [arrangement]
   );
 
   return (
@@ -94,39 +109,24 @@ export function NewTracksExample() {
         fileFilter={(f) => f.type.startsWith('audio/')}
         label="Drop audio files here to add tracks, or click to browse"
         dragLabel="Drop audio files here"
+        loading={sources.isLoading}
         loadingContent={
-          isLoading ? (
-            <>
-              <p style={{ margin: 0 }}>
-                Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
-              </p>
-              <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
-            </>
-          ) : undefined
+          <>
+            <p style={{ margin: 0, fontSize: '0.9rem' }}>
+              Decoding {loadingCount} file{loadingCount !== 1 ? 's' : ''}...
+            </p>
+            <Subtext>Placeholder tracks are shown below while audio decodes</Subtext>
+          </>
         }
       >
         <Subtext>Supports MP3, WAV, OGG, and more</Subtext>
       </StyledDropZone>
 
-      {errors.length > 0 && (
-        <div role="alert" style={{
-          padding: '0.75rem 1rem',
-          marginBottom: '1rem',
-          background: 'var(--ifm-color-danger-contrast-background, #fdf0ef)',
-          border: '1px solid var(--ifm-color-danger-dark, #c0392b)',
-          borderRadius: '0.5rem',
-          color: 'var(--ifm-color-danger-darkest, #7f1d1d)',
-          fontSize: '0.875rem',
-        }}>
-          {errors.map((e, i) => (
-            <div key={i}>Failed to load &quot;{e.name}&quot;: {e.error.message}</div>
-          ))}
-        </div>
-      )}
+      <FailedDropsAlert drops={failedDrops} />
 
       {tracks.length > 0 && (
         <WaveformPlaylistProvider
-          tracks={tracks}
+          arrangement={arrangement}
           sampleRate={48000}
           samplesPerPixel={8192}
           zoomLevels={[512, 1024, 2048, 4096, 8192, 16384, 32768]}

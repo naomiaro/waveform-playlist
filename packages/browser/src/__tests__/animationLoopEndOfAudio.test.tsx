@@ -24,7 +24,7 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
@@ -140,15 +140,14 @@ function mountProvider(
   opts: { indefinitePlayback?: boolean } = {}
 ) {
   return render(
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={tracks}
-      onTracksChange={() => {}}
       sampleRate={SAMPLE_RATE}
       createAdapter={() => adapter}
       indefinitePlayback={opts.indefinitePlayback}
     >
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 }
 

@@ -1,14 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
-import * as Tone from 'tone';
-import {
-  createTrack,
-  createClipFromSeconds,
-  keyBelongsToFocusedControl,
-  type ClipTrack,
-} from '@waveform-playlist/core';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { audioTrack, keyBelongsToFocusedControl } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -39,6 +32,9 @@ import {
   usePlaybackRefs,
   useAnnotations,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import {
   AnnotationProvider,
@@ -50,6 +46,10 @@ import {
 } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { sonnetNotes as defaultNotes } from './sonnetAnnotations';
+import { SourceLoadError } from './SourceLoadError';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
+
+const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
 
 
 // Annotation actions for the UI
@@ -206,8 +206,6 @@ const SuccessButton = styled(ActionButton)`
 `;
 
 interface AnnotationsAppContentProps {
-  tracks: ClipTrack[];
-  onTracksChange: React.Dispatch<React.SetStateAction<ClipTrack[]>>;
   onAnnotationsLoaded: (annotations: any[]) => void;
   onClearAll: () => void;
   /** Default duration for new annotations in seconds (default: 3.0) */
@@ -217,8 +215,6 @@ interface AnnotationsAppContentProps {
 }
 
 const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
-  tracks,
-  onTracksChange,
   onAnnotationsLoaded,
   onClearAll,
   defaultAnnotationDuration = 3.0,
@@ -230,8 +226,11 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
   const { currentTimeRef } = usePlaybackRefs();
+  const arrangement = useArrangement();
+  const { isLoading: isLoadingAudio } = useArrangementSources(arrangement);
+  // Dropped files that could not be decoded: their tracks are removed, the list stays
+  const failedDrops = useFailedDrops(arrangement);
 
-  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const jsonInputRef = useRef<HTMLInputElement>(null);
 
   // Find the next available gap for an annotation starting from a given time
@@ -342,19 +341,14 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [addAnnotationAtPlayhead]);
 
-  // Handle dropped/selected audio files
+  // Handle dropped/selected audio files: one track per file, named after the
+  // file without its extension; the arrangement loads each one
   const handleFiles = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       const audioFiles = files.filter((f) => f.type.startsWith('audio/'));
-      if (audioFiles.length === 0) return;
-
-      setIsLoadingAudio(true);
-      const audioContext = Tone.getContext().rawContext as AudioContext;
-      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-      if (newTracks.length > 0) onTracksChange(prevTracks => [...prevTracks, ...newTracks]);
-      setIsLoadingAudio(false);
+      audioFiles.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
     },
-    [onTracksChange]
+    [arrangement]
   );
 
   // Handle JSON upload
@@ -395,8 +389,10 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
           fileFilter={(f) => f.type.startsWith('audio/')}
           label="Drop audio files here or click to browse"
           dragLabel="Drop audio files here"
-          loadingContent={isLoadingAudio ? <p style={{ margin: 0 }}>Loading audio...</p> : undefined}
+          loading={isLoadingAudio}
+          loadingContent={<p style={{ margin: 0, fontSize: '0.9rem' }}>Loading audio...</p>}
         />
+        <FailedDropsAlert drops={failedDrops} />
 
         <TopBar>
           <ControlGroup>
@@ -428,6 +424,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
               Upload JSON
             </ActionButton>
             <ClearAllButton onClearAll={onClearAll} />
+            <SourceLoadError arrangement={arrangement} />
             <HiddenFileInput
               ref={jsonInputRef}
               type="file"
@@ -490,51 +487,11 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
 
 export function AnnotationsExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  // The arrangement owns the tracks and loads the sonnet: its row is empty
+  // until the audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
+  const arrangement = useCreateArrangement(() => [audioTrack({ src: SONNET_SRC, name: 'Sonnet' })]);
   const [annotations, setAnnotations] = useState<any[]>(() => defaultNotes.map(parseAeneas));
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load default audio track on mount
-  React.useEffect(() => {
-    const loadDefaultTrack = async () => {
-      try {
-        const audioContext = Tone.getContext().rawContext as AudioContext;
-        const response = await fetch('/waveform-playlist/media/audio/sonnet.mp3');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch audio: ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          duration: audioBuffer.duration,
-          offset: 0,
-          name: 'Sonnet',
-        });
-
-        const track = createTrack({
-          name: 'Sonnet',
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1,
-          pan: 0,
-        });
-
-        setTracks([track]);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading default track:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setIsLoading(false);
-      }
-    };
-
-    loadDefaultTrack();
-  }, []);
 
   const handleAnnotationsLoaded = useCallback((newAnnotations: any[]) => {
     // Parse from Aeneas format if needed
@@ -544,30 +501,15 @@ export function AnnotationsExample() {
     setAnnotations(parsed);
   }, []);
 
+  // ClearAllButton stops playback first
   const handleClearAll = useCallback(() => {
-    setTracks([]);
+    arrangement.setTracks([]);
     setAnnotations([]);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        Loading audio track with annotations...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error}
-      </div>
-    );
-  }
+  }, [arrangement]);
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
       samplesPerPixel={1024}
       mono
@@ -583,8 +525,6 @@ export function AnnotationsExample() {
     >
       <AnnotationProvider>
         <AnnotationsAppContent
-          tracks={tracks}
-          onTracksChange={setTracks}
           onAnnotationsLoaded={handleAnnotationsLoaded}
           onClearAll={handleClearAll}
         />

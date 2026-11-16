@@ -32,12 +32,23 @@ interface ErrorBoundaryState {
  * processing errors) and displays a fallback UI instead of crashing
  * the entire application.
  *
+ * It catches errors of the components BELOW it only. An arrangement
+ * initializer that throws is a render error of the component that calls
+ * `useCreateArrangement`, so the boundary goes around that component:
+ *
  * @example
  * ```tsx
+ * function Editor() {
+ *   const arrangement = useCreateArrangement(() => [audioTrack({ src: '/vocals.mp3' })]);
+ *   return (
+ *     <WaveformPlaylistProvider arrangement={arrangement}>
+ *       <Waveform />
+ *     </WaveformPlaylistProvider>
+ *   );
+ * }
+ *
  * <PlaylistErrorBoundary>
- *   <WaveformPlaylistProvider tracks={tracks}>
- *     <Waveform />
- *   </WaveformPlaylistProvider>
+ *   <Editor />
  * </PlaylistErrorBoundary>
  * ```
  */

@@ -70,7 +70,7 @@ import type { MediaElementPlayout } from '@waveform-playlist/media-element-playo
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import * as browser from '../index';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
   usePlaybackControls,
@@ -292,7 +292,7 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
   const tree = (content: React.ReactNode, annotationList: AnnotationListProp = firstList) => (
     <AnnotationIntegrationContext value={integration}>
       {kind === 'WaveformPlaylistProvider' ? (
-        <WaveformPlaylistProvider
+        <TestProvider
           tracks={options.tracks ?? TRACKS}
           sampleRate={SAMPLE_RATE}
           samplesPerPixel={882}
@@ -304,7 +304,7 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
           <ProbeChild />
           <TimelineReadyProbe />
           {content}
-        </WaveformPlaylistProvider>
+        </TestProvider>
       ) : (
         <MediaElementPlaylistProvider
           track={MEDIA_TRACK}

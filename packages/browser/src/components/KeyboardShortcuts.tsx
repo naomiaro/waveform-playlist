@@ -7,7 +7,6 @@ import {
   useActiveAnnotation,
   usePlaylistZoom,
   usePlaylistTimeline,
-  useEngineRefs,
   useAnnotations,
   useAnnotationOptions,
   usePlaybackControls,
@@ -33,7 +32,7 @@ export interface KeyboardShortcutsProps {
  *
  * @example
  * ```tsx
- * <WaveformPlaylistProvider tracks={tracks} {...}>
+ * <WaveformPlaylistProvider arrangement={arrangement} {...}>
  *   <KeyboardShortcuts playback clipSplitting />
  *   <Waveform />
  * </WaveformPlaylistProvider>
@@ -48,19 +47,14 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
 }) => {
   // Clip splitting setup
   const { samplesPerPixel } = usePlaylistZoom();
-  const { tracks, duration } = usePlaylistTimeline();
-  const { playoutRef } = useEngineRefs();
+  const { duration } = usePlaylistTimeline();
   const { annotations: annotationList } = useAnnotations();
   const { linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
   const { setAnnotations, setActiveAnnotationId, scrollContainerRef, play } = usePlaybackControls();
   const { undo, redo } = useEditorControls();
 
-  const { splitClipAtPlayhead } = useClipSplitting({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-  });
+  const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
 
   // Build additional shortcuts from enabled features
   const allAdditional: KeyboardShortcut[] = [];

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React, { useState } from 'react';
 import {
   WaveformPlaylistProvider,
+  useCreateArrangement,
   useEditorControls,
   useTimeFormat,
   useKeyboardShortcuts,
@@ -235,11 +236,14 @@ const KeyboardShortcutsDemo: React.FC = () => {
 };
 
 // Provider wrapper for hooks that need context
-const HookDemoWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <WaveformPlaylistProvider tracks={[]} samplesPerPixel={1024}>
-    {children}
-  </WaveformPlaylistProvider>
-);
+const HookDemoWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const arrangement = useCreateArrangement();
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
+      {children}
+    </WaveformPlaylistProvider>
+  );
+};
 
 const meta: Meta = {
   title: 'Browser/Hooks',
@@ -265,7 +269,7 @@ These stories demonstrate how to test and visualize custom React hooks.
 - \`useKeyboardShortcuts\` - Flexible keyboard shortcut system
 
 ### Require Full Context (not demoed)
-- \`useAudioTracks\` - Load audio files
+- \`useCreateArrangement\` / \`useArrangementSources\` - Make the arrangement that owns the tracks and loads their audio
 - \`useClipDragHandlers\` - Drag-to-move and boundary trimming
 - \`useClipSplitting\` - Split clips at cursor position
 - \`useAnnotationDragHandlers\` - Drag annotation boundaries (the \`WaveformAnnotationBoxes\` part calls it for you)

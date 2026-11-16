@@ -2,8 +2,9 @@
 //
 // Play pressed while the engine is being rebuilt (#675).
 //
-// A `tracks` change that needs a full rebuild disposes the old engine, then
-// creates the new adapter asynchronously. In that window the provider used to
+// A rebuild (since #812: a new `effects` function or other zoom levels; a
+// track edit builds nothing) disposes the old engine, then creates the new
+// adapter asynchronously. In that window the provider used to
 // keep pointing at the DISPOSED engine: play() ran against it (a silent
 // no-op on the Tone adapter), set isPlaying=true, and nothing ever started
 // the new engine — "playing" UI, no audio, frozen time display.
@@ -15,14 +16,15 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   usePlaylistTimeline,
   useIsPlaying,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { PlayoutAdapter } from '@waveform-playlist/engine';
+import type { Arrangement, PlayoutAdapter } from '@waveform-playlist/engine';
+import type { EffectsFunction } from '@waveform-playlist/playout';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
   globalThis.requestAnimationFrame = (cb: FrameRequestCallback) =>
@@ -127,11 +129,14 @@ let buildGate: Promise<void> | null;
 /** When set, the NEXT adapter's init() waits for this promise. */
 let nextInitGate: Promise<void> | null;
 
-function Harness({ tracks }: { tracks: ClipTrack[] }) {
+/** The arrangement of the test: it outlives every engine built on it. */
+let arrangement: Arrangement;
+
+function Harness({ effects }: { effects: EffectsFunction }) {
   return (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      onTracksChange={() => {}}
+    <TestProvider
+      arrangement={arrangement}
+      effects={effects}
       sampleRate={SAMPLE_RATE}
       indefinitePlayback
       createAdapter={() => {
@@ -147,17 +152,17 @@ function Harness({ tracks }: { tracks: ClipTrack[] }) {
       }}
     >
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 }
 
 const settle = (ms = 60) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// A different track OBJECT with the same id forces the full-rebuild path
-// (an appended track would take the incremental path and keep the engine).
+// A new `effects` function builds a new engine on the same arrangement.
 const firstTracks = () => [makeTrack('track-a', [makeClip(0, 4, 'clip-a')])];
-const changedTracks = () => [makeTrack('track-a', [makeClip(0, 6, 'clip-a2')])];
-const changedAgainTracks = () => [makeTrack('track-a', [makeClip(0, 8, 'clip-a3')])];
+const firstEffects: EffectsFunction = () => undefined;
+const changedEffects: EffectsFunction = () => undefined;
+const changedAgainEffects: EffectsFunction = () => undefined;
 
 function gate(): { promise: Promise<void>; open: () => void } {
   let open!: () => void;
@@ -167,14 +172,14 @@ function gate(): { promise: Promise<void>; open: () => void } {
   return { promise, open };
 }
 
-/** Re-render with changed tracks and hold the new engine's build open. */
+/** Re-render with new effects and hold the new engine's build open. */
 function startGatedRebuild(view: { rerender: (ui: React.ReactElement) => void }): () => void {
   let open!: () => void;
   buildGate = new Promise<void>((resolve) => {
     open = resolve;
   });
   act(() => {
-    view.rerender(<Harness tracks={changedTracks()} />);
+    view.rerender(<Harness effects={changedEffects} />);
   });
   // The old engine is gone and the new one is not there yet.
   expect(adapters[0].disposed).toBe(true);
@@ -183,7 +188,7 @@ function startGatedRebuild(view: { rerender: (ui: React.ReactElement) => void })
 }
 
 async function mountReady() {
-  const view = render(<Harness tracks={firstTracks()} />);
+  const view = render(<Harness effects={firstEffects} />);
   await waitFor(() => expect(probe.isReady).toBe(true));
   expect(adapters).toHaveLength(1);
   return view;
@@ -192,6 +197,7 @@ async function mountReady() {
 describe('play() while the engine is being rebuilt (#675)', () => {
   beforeEach(() => {
     adapters = [];
+    arrangement = testArrangement(firstTracks());
     buildGate = null;
     nextInitGate = null;
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -371,28 +377,28 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     expect(probe.isPlaying).toBe(false);
   });
 
-  it('a play that starts between the tracks commit and the rebuild effect is carried over', async () => {
-    // React commits the new `tracks` and runs the rebuild effect in a LATER
+  it('a play that starts between the commit of new effects and the rebuild effect is carried over', async () => {
+    // React commits the new `effects` and runs the rebuild effect in a LATER
     // task. A play() whose init() resolves in between starts the old engine,
     // which the effect then disposes. `isPlayingRef` is still a render behind
     // at that point, so "was it playing?" has to come from the engine itself.
     //
     // Reproducing that ordering needs real scheduling (act() flushes effects
-    // before microtasks): the tracks change is made outside act(), and a
+    // before microtasks): the effects change is made outside act(), and a
     // layout effect — which runs inside the commit — releases init().
     let openInit!: () => void;
-    let setTracksOutsideAct!: (tracks: ClipTrack[]) => void;
+    let setEffectsOutsideAct!: (effects: EffectsFunction) => void;
     const StatefulHarness: React.FC = () => {
-      const [tracks, setTracks] = React.useState(firstTracks);
-      setTracksOutsideAct = setTracks;
-      const committed = React.useRef(tracks);
+      const [effects, setEffects] = React.useState<EffectsFunction>(() => firstEffects);
+      setEffectsOutsideAct = (next) => setEffects(() => next);
+      const committed = React.useRef(effects);
       React.useLayoutEffect(() => {
-        if (committed.current !== tracks) {
-          committed.current = tracks;
+        if (committed.current !== effects) {
+          committed.current = effects;
           openInit(); // the play() continuation is now the next microtask
         }
-      }, [tracks]);
-      return <Harness tracks={tracks} />;
+      }, [effects]);
+      return <Harness effects={effects} />;
     };
     render(<StatefulHarness />);
     await waitFor(() => expect(probe.isReady).toBe(true));
@@ -410,7 +416,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     actEnvironment.IS_REACT_ACT_ENVIRONMENT = false;
     try {
       void probe.play(1.5); // parked inside engine.init()
-      setTracksOutsideAct(changedTracks());
+      setEffectsOutsideAct(changedEffects);
       await settle(150);
       // The play reached the old engine before the effect disposed it.
       expect(adapters[0].playCalls).toEqual([
@@ -466,7 +472,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     const initB = gate();
     nextInitGate = initB.promise;
     await act(async () => {
-      view.rerender(<Harness tracks={changedTracks()} />);
+      view.rerender(<Harness effects={changedEffects} />);
       await settle();
     });
     expect(adapters).toHaveLength(2);
@@ -474,7 +480,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
 
     // Rebuild 2 → engine C is built and assigned while B.init() is pending.
     await act(async () => {
-      view.rerender(<Harness tracks={changedAgainTracks()} />);
+      view.rerender(<Harness effects={changedAgainEffects} />);
       await settle();
     });
     expect(adapters).toHaveLength(3);
@@ -567,7 +573,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
     buildGate = Promise.reject(new Error('adapter failed to load'));
     buildGate.catch(() => {});
     await act(async () => {
-      view.rerender(<Harness tracks={changedTracks()} />);
+      view.rerender(<Harness effects={changedEffects} />);
       await settle();
     });
     await act(async () => {
@@ -578,7 +584,7 @@ describe('play() while the engine is being rebuilt (#675)', () => {
 
     // A later, successful rebuild must not start playback by itself.
     await act(async () => {
-      view.rerender(<Harness tracks={changedAgainTracks()} />);
+      view.rerender(<Harness effects={changedAgainEffects} />);
       await settle();
     });
     const last = adapters[adapters.length - 1];

@@ -26,6 +26,14 @@ export function useCreateArrangement(
   init?: () => readonly ArrangementTrack[],
   options?: UseCreateArrangementOptions
 ): Arrangement {
-  const [arrangement] = useState(() => createArrangement({ tracks: init?.(), ...options }));
+  // Only the two documented options: a stray `tracks` key (plain JS) must not
+  // replace what the initializer returns.
+  const [arrangement] = useState(() =>
+    createArrangement({
+      tracks: init?.(),
+      loadSource: options?.loadSource,
+      undoLimit: options?.undoLimit,
+    })
+  );
   return arrangement;
 }

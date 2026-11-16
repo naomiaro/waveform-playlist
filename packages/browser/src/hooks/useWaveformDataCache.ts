@@ -41,7 +41,7 @@ export interface UseWaveformDataCacheReturn {
 const MAX_GENERATION_ATTEMPTS = 3;
 
 function buffersNeedingGeneration(
-  tracks: ClipTrack[],
+  tracks: readonly ClipTrack[],
   generated: WeakMap<AudioBuffer, WaveformData>,
   inflight: WeakMap<AudioBuffer, Promise<void>>,
   failures: WeakMap<AudioBuffer, number>
@@ -60,7 +60,7 @@ function buffersNeedingGeneration(
 }
 
 export function useWaveformDataCache(
-  tracks: ClipTrack[],
+  tracks: readonly ClipTrack[],
   baseScale: number
 ): UseWaveformDataCacheReturn {
   const [version, setVersion] = useState(0);

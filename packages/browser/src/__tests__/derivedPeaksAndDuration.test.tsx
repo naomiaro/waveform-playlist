@@ -15,7 +15,7 @@ import { createPeaksWorker } from '../workers/peaksWorker';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import { usePlaylistTimeline } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -113,17 +113,15 @@ function mount(initialTracks: ClipTrack[]) {
   renders = [];
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  const ui = (tracks: ClipTrack[]) => (
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-    >
+  // The arrangement owns the tracks (#812): a change is one of its calls.
+  const arrangement = testArrangement(initialTracks);
+  const ui = () => (
+    <TestProvider arrangement={arrangement} sampleRate={SAMPLE_RATE} createAdapter={createAdapter}>
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
-  const utils = render(ui(initialTracks));
-  return { setTracks: (tracks: ClipTrack[]) => utils.rerender(ui(tracks)) };
+  const utils = render(ui());
+  return { arrangement, rerender: () => utils.rerender(ui()) };
 }
 
 afterEach(async () => {
@@ -146,14 +144,11 @@ describe('peaks and duration are derived from tracks (#692)', () => {
 
   it('never renders peaks or duration that lag the tracks', async () => {
     const a = makeClip('a');
-    const { setTracks } = mount([makeTrack('t1', [a])]);
+    const { arrangement } = mount([makeTrack('t1', [a])]);
     await waitFor(() => expect(latest().isReady).toBe(true));
 
     await act(async () => {
-      setTracks([
-        makeTrack('t1', [a]),
-        makeTrack('t2', [makeClip('c', { startSample: SAMPLE_RATE * 4 })]),
-      ]);
+      arrangement.addTrack(makeTrack('t2', [makeClip('c', { startSample: SAMPLE_RATE * 4 })]));
     });
     await waitFor(() => expect(latest().isReady).toBe(true));
 
@@ -173,13 +168,12 @@ describe('peaks and duration are derived from tracks (#692)', () => {
     const a = makeClip('a');
     const b = makeClip('b', { startSample: SAMPLE_RATE * 2 });
     const c = makeClip('c');
-    const { setTracks } = mount([makeTrack('t1', [a, b]), makeTrack('t2', [c])]);
+    const { arrangement } = mount([makeTrack('t1', [a, b]), makeTrack('t2', [c])]);
     await waitFor(() => expect(latest().isReady).toBe(true));
     const before = latest().peaksDataArray;
 
-    const trimmed = { ...a, durationSamples: SAMPLE_RATE / 2 };
     await act(async () => {
-      setTracks([makeTrack('t1', [trimmed, b]), makeTrack('t2', [c])]);
+      arrangement.trimClip('t1', 'a', 'right', SAMPLE_RATE / 2 - a.durationSamples);
     });
     await waitFor(() => expect(latest().isReady).toBe(true));
     const after = latest().peaksDataArray;
@@ -190,14 +184,15 @@ describe('peaks and duration are derived from tracks (#692)', () => {
     expect(after[1]).toBe(before[1]);
   });
 
-  it('keeps the whole peaks array when a re-render passes equal tracks', async () => {
+  it('keeps the whole peaks array through a parent re-render and a track replaced with the same clips', async () => {
     const a = makeClip('a');
-    const { setTracks } = mount([makeTrack('t1', [a])]);
+    const { arrangement, rerender } = mount([makeTrack('t1', [a])]);
     await waitFor(() => expect(latest().isReady).toBe(true));
     const before = latest().peaksDataArray;
 
     await act(async () => {
-      setTracks([makeTrack('t1', [a])]);
+      rerender();
+      arrangement.updateTrack('t1', (track) => ({ ...track }));
     });
     await waitFor(() => expect(latest().isReady).toBe(true));
 
@@ -205,11 +200,11 @@ describe('peaks and duration are derived from tracks (#692)', () => {
   });
 
   it('clears peaks and duration when the tracks are removed', async () => {
-    const { setTracks } = mount([makeTrack('t1', [makeClip('a')])]);
+    const { arrangement } = mount([makeTrack('t1', [makeClip('a')])]);
     await waitFor(() => expect(latest().isReady).toBe(true));
 
     await act(async () => {
-      setTracks([]);
+      arrangement.removeTrack('t1');
     });
 
     expect(latest().peaksDataArray).toEqual([]);

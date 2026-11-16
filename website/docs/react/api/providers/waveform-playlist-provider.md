@@ -20,9 +20,21 @@ import { WaveformPlaylistProvider } from '@waveform-playlist/browser';
 ## Basic Usage
 
 ```tsx
-<WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
-  <Waveform />
-</WaveformPlaylistProvider>
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
+
+function Editor() {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+    audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
+  ]);
+
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
 ```
 
 The options that only affect how a view draws (row height, bar style, playhead width, the filled layout) are not provider props. Set them with [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), above or below the provider:
@@ -31,7 +43,7 @@ The options that only affect how a view draws (row height, bar style, playhead w
 import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
 
 <WaveformViewOptions waveHeight={128} barWidth={2} barGap={1}>
-  <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+  <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
     <Waveform />
   </WaveformPlaylistProvider>
 </WaveformViewOptions>
@@ -41,19 +53,28 @@ import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@wavefo
 
 ### Required Props
 
-#### `tracks`
+#### `arrangement`
 
-**Type:** `ClipTrack[]`
+**Type:** `Arrangement` (from `@waveform-playlist/engine`)
 
-Array of track objects to display. Use `useAudioTracks` to create tracks from audio files.
+What the provider plays and draws. The arrangement owns the tracks and their clips, the mix (volume, mute, solo and pan by track id), the undo history and the loading of the audio the clips name. The provider derives everything it publishes from it (`usePlaylistTimeline()`, `usePlaylistMixer()`, `useUndoRedo()`) and never keeps a copy of its own. Make it with [`useCreateArrangement`](/docs/react/api/hooks#usecreatearrangement), declare the first tracks in its initializer, and change it through its methods: `addTrack`, `removeTrack`, `updateTrack`, `setTracks`, the mixer setters, `undo` and so on. Below the provider, `useArrangement()` returns the same object.
 
 ```tsx
-const { tracks, loading } = useAudioTracks([
-  { src: '/audio/track.mp3', name: 'Track' },
-]);
+const arrangement = useCreateArrangement(() => [audioTrack({ src: '/audio/track.mp3', name: 'Track' })]);
 
-<WaveformPlaylistProvider tracks={tracks}>
+// From a handler: the provider and the engine follow
+const addFile = (file: File) => arrangement.addTrack(audioTrack({ src: file }));
+
+<WaveformPlaylistProvider arrangement={arrangement}>
 ```
+
+The prop is required: without it (or with a value that is not an object) the provider throws an `Error` while it renders, in every build, whose message starts `` [waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop `` and links to the [upgrade guide](/docs/react/upgrading).
+
+Keep one arrangement for the life of the playlist. A new `arrangement` object is a new playlist: everything below the provider mounts again, with a new engine. Playback stops, and the zoom, the selection, the loop, the master volume and the scroll position start from their initial values. A development build says so once with a console warning.
+
+A track change (added, removed, replaced, all tracks set) never builds a new engine: the engine follows the arrangement. An engine is built when the provider mounts, when `effects` changes identity and when `zoomLevels` changes content. `createAdapter` and `sampleRate` are read when an engine is built.
+
+Audio starts loading when the provider has its first adapter: nothing is fetched before. See [Loading Audio](/docs/react/guides/loading-audio).
 
 ### Display Props
 
@@ -86,7 +107,7 @@ Theme keys to change. The provider merges the object over `defaultTheme` (`{ ...
 
 ```tsx
 <WaveformPlaylistProvider
-  tracks={tracks}
+  arrangement={arrangement}
   theme={{
     waveFillColor: '#00ff00',
     playheadColor: '#ff0000',
@@ -113,10 +134,10 @@ Returns the effects function of a track, looked up by track id. Pass `getTrackEf
 ```tsx
 const trackFx = useTrackDynamicEffects();
 
-<WaveformPlaylistProvider tracks={tracks} trackEffects={trackFx.getTrackEffectsFunction}>
+<WaveformPlaylistProvider arrangement={arrangement} trackEffects={trackFx.getTrackEffectsFunction}>
 ```
 
-Tracks are plain data and have no `effects` field; pass `tracks` as they are. The provider calls the function when it builds a track's audio graph, using the function from the latest render, so a new function identity (an inline arrow) rebuilds nothing. If it returns a different effects function for a track that is already built, that takes effect the next time the track is built.
+Tracks are plain data and have no `effects` field. The provider calls the function when it builds a track's audio graph, using the function from the latest render, so a new function identity (an inline arrow) rebuilds nothing. If it returns a different effects function for a track that is already built, that takes effect the next time the track is built.
 
 Like `effects`, this prop is used by the default Tone.js adapter only. With `createAdapter`, pass the same function to your own `createToneAdapter({ trackEffects })`.
 
@@ -145,31 +166,25 @@ Called with the full new array on every change to the annotations: the release o
 
 ### Callbacks
 
-#### `onTracksChange`
-
-**Type:** `(tracks: ClipTrack[]) => void`
-
-Called when engine clip operations (move, trim, split) update the tracks. A trim is called once, on release: while the handle is dragged the clip is previewed in the view, the tracks do not change, and neither this callback nor `engine.trimClip()` is called. Use this to keep your parent state in sync with engine mutations:
-
-```tsx
-const [tracks, setTracks] = useState<ClipTrack[]>(initialTracks);
-
-<WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks}>
-```
-
-The array is yours to keep in state. The track and clip objects in it are the engine's own, shared with its undo history: do not write to them. To change a track, put a copy in your state (`{ ...track, name }`). In development the objects are frozen, so a write throws.
+There is no `onTracksChange`: a clip move, trim or split, a reorder, an undo and a take each change the arrangement, and the arrangement is where you read the tracks (`arrangement.getTracks()`, `arrangement.subscribe()`, or `useArrangementTracks(arrangement)` in a component).
 
 #### `onReady`
 
 **Type:** `() => void`
 
-Called when all tracks finish loading. If the callback throws, the provider logs `[waveform-playlist] The onReady callback threw: …` as a console error and calls `onError` with the error; the playlist is ready all the same.
+Called once per mount of the provider: the first time an engine is attached and no source of the arrangement is still pending. A source whose load failed counts as settled. An empty arrangement is ready as soon as its engine is attached. It is not called again after a later engine build, a StrictMode remount or an `<Activity>` hide and reveal. At the same moment the provider dispatches the window event `waveform-playlist:ready` and `usePlaylistTimeline().isReady` turns true (see [Loading Audio](/docs/react/guides/loading-audio#ready)).
+
+`play()` does nothing before that moment. `play()` called from `onReady` itself works.
+
+The function is read when it is called: a new function identity (an inline arrow) builds nothing. If the callback throws, the provider logs `[waveform-playlist] The onReady callback threw: …` as a console error and calls `onError` with the error; the playlist is ready all the same.
 
 #### `onError`
 
 **Type:** `(err: Error) => void`
 
-Called when audio or engine initialization fails, for example a missing optional peer, a `createAdapter` that throws, or an invalid `zoomLevels` / `samplesPerPixel`. The provider already logs the error; use this to show it in your UI.
+Called when the engine or its adapter cannot be built, for example a missing optional peer, a `createAdapter` that throws, or an invalid `zoomLevels` / `samplesPerPixel`, and when `onReady` throws. It is called only for a build that is still current: not for one replaced by a newer build or a remount, nor after the provider unmounted. The provider already logs the error; use this to show it in your UI. Like `onReady`, it is read when it is called.
+
+It is not called for audio that fails to load: that is in `useArrangementSources(arrangement)`, with its error. A track the arrangement refuses (a duplicate id, a clip of the wrong kind) throws at the call that offered it, not here: see [Where errors land](/docs/react/guides/loading-audio#where-errors-land).
 
 ### Other options
 
@@ -204,22 +219,27 @@ Disables the automatic stop at the end of the longest track: the transport rolls
 By default playback **auto-stops** at the end of the timeline and the cursor returns to the play-start position (player style). `indefinitePlayback` opts out — the transport rolls until an explicit `stop()`/`pause()` (DAW style; same semantics as `<daw-editor indefinite-playback>`). Active recording sessions suppress the auto-stop automatically so punch-in takes can run past the end of existing audio. Selection and annotation playback stop at their explicit ends regardless.
 :::
 
-#### `deferEngineRebuild`
+#### `sampleRate`
 
-**Type:** `boolean`
-**Default:** `false`
+**Type:** `number`
 
-When `true`, the provider skips rebuilding the audio engine when `tracks` change. Set this to the `loading` value from `useAudioTracks` when using `{ immediate: true }` mode — placeholder tracks render instantly while audio decodes, then the engine builds once when all tracks are ready.
+The sample rate to create the `AudioContext` at (default Tone.js adapter). Pre-computed peaks (`.dat` files) are drawn from the file when their rate matches; otherwise peaks are generated from the decoded audio. Read when an engine is built.
 
-Turning it on after the playlist has loaded disposes the engine when the last `tracks` change rebuilt it (the first load, or a set of tracks that replaced the previous one). Until the deferral ends and the engine is built again, `isReady` is `false` and the view is `data-playlist-state="loading"`, as on the first load. Tracks appended while it is on are added to the running engine, and the view stays ready.
+It also tells the provider its sample rate before the first adapter exists. Placeholders for clips that are still loading are drawn only once the provider knows its real rate: from mount with this prop, otherwise from the first adapter on. Without the prop, and with an adapter that can never be built, no placeholder is drawn.
 
-```tsx
-const { tracks, loading } = useAudioTracks(configs, { immediate: true });
+#### `soundFontCache`
 
-<WaveformPlaylistProvider tracks={tracks} deferEngineRebuild={loading}>
-  <Waveform />
-</WaveformPlaylistProvider>
-```
+**Type:** `SoundFontCache` (from `@waveform-playlist/playout`)
+
+SoundFont cache for sample-based MIDI playback. When provided, MIDI clips use SoundFont samples instead of PolySynth synthesis. The default Tone.js adapter is given the cache when an engine is built. A cache that arrives or changes later (one loaded after the page has rendered) is handed to the live adapter without a rebuild, through the adapter's `setSoundFontCache` method; an adapter without that method ignores it. See [MIDI](/docs/react/guides/midi).
+
+#### `createAdapter`
+
+**Type:** `() => PlayoutAdapter`
+
+A factory for your own playout adapter. Without it the Tone.js adapter (`@waveform-playlist/playout`) is imported dynamically, so with it an app needs neither that package nor `tone`. It is called once per engine build, and the provider disposes the adapter with its engine. Read when an engine is built: a new function identity builds nothing.
+
+The provider decodes audio with the current adapter's `AudioContext`. A load in flight when an engine is rebuilt carries on with the previous adapter's context, so an adapter whose `dispose()` closes its context can make such a load fail; `arrangement.retry(src)` starts it again.
 
 ## Context Values
 
@@ -392,12 +412,14 @@ interface PlaybackControlsContextValue {
 interface EditorControlsContextValue {
   /** Moves the cursor without touching playback. Use seekTo from a control. */
   setCurrentTime: (time: number) => void;
-  // Track mixer, by track id. A first argument that is not a string, or an
-  // id no track has, is ignored.
+  // Track mixer, by track id: the arrangement's mix, also while no engine is
+  // attached. A first argument that is not a string, or an id no track has,
+  // is ignored.
   setTrackMute: (trackId: string, muted: boolean) => void;
   setTrackSolo: (trackId: string, soloed: boolean) => void;
   setTrackVolume: (trackId: string, volume: number) => void;
   setTrackPan: (trackId: string, pan: number) => void;
+  /** An undo step of the arrangement. */
   reorderTrack: (trackId: string, toIndex: number) => void;
   /** Internal: call after every track-reorder drag interaction ends. */
   bumpTrackReorderEpoch: () => void;
@@ -411,15 +433,19 @@ interface EditorControlsContextValue {
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
+  /** The arrangement's history, engine or not. */
   undo: () => void;
   redo: () => void;
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an armedTrackId, that track's
-   *  existing content is transiently muted — punch-in replaces whatever the
-   *  take overlaps — and restored when the session ends. `useRecordingSession`
-   *  calls it for the life of a take; overdub flows should also call it
-   *  eagerly (before play()). */
+   *  end of existing material, and (2) with an armedTrackId, that track is
+   *  muted in the arrangement's mix: the mixer and the track's Mute button show
+   *  it muted, the built-in <TrackMuteButton /> of that track is disabled and
+   *  useTrack().isRecordingArmed is true for it. The mute from before the
+   *  session is written back when it ends, when the armed track changes and
+   *  when the provider unmounts, whatever was set in between.
+   *  `useRecordingSession` calls it for the life of a take; overdub flows
+   *  should also call it eagerly (before play()). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -464,21 +490,30 @@ interface PlaylistZoomContextValue {
 
 ### Timeline (usePlaylistTimeline)
 
-Changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level); also when loading finishes (`isReady`) and when peaks arrive.
+Changes on every clip operation (a trim once, on release), on a zoom (`peaksDataArray` is computed per zoom level), when audio arrives for a clip, when peaks arrive and when `isReady` changes.
 
 ```typescript
 interface PlaylistTimelineContextValue {
-  tracks: ClipTrack[];
+  /** The arrangement's tracks without the clips that are still loading. Never write to them. */
+  tracks: readonly ClipTrack[];
+  /** One row per track. A row also holds a placeholder record (isPlaceholder: true)
+   *  for each clip still loading that can be drawn. */
   peaksDataArray: TrackClipPeaks[];
+  /** The end, in seconds, of the loaded audio. */
   duration: number;
+  /** False until an engine is attached and the first sources have settled;
+   *  then false while a later engine is being built. */
   isReady: boolean;
-  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 ```
 
+`tracks`, `peaksDataArray` and `trackStates` (from `usePlaylistMixer()`) have one entry per track of the arrangement, in its order, so `tracks[i]`, `peaksDataArray[i]` and `trackStates[i]` are the same track. Below the track, nothing pairs by position: a placeholder record in `peaksDataArray[i]` has no clip in `tracks[i].clips`, so find a clip's record by `clipId`. A track whose clips are all loaded is the arrangement's own object, frozen outside production builds; one that holds a clip still loading is a copy without that clip. Change tracks through the arrangement.
+
+`duration` counts loaded audio only; the view is still drawn wide enough for a placeholder that ends later.
+
 ### Mixer (usePlaylistMixer)
 
-Changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered.
+Changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed, renamed or reordered.
 
 ```typescript
 interface PlaylistMixerContextValue {
@@ -487,7 +522,7 @@ interface PlaylistMixerContextValue {
 }
 ```
 
-`trackStates` has one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` at that track's position (the type does not say so: read `trackStates[i]?.muted`). The provider keeps this state by track id, so a track keeps its mute, solo, volume and pan when other tracks are removed, added or moved; a track with a new id starts from the fields of its `ClipTrack`. Details: [`usePlaylistMixer`](/docs/react/api/hooks#useplaylistmixer). Inside a track's control panel, [`useTrack()`](/docs/react/api/hooks#usetrack) has the state and the setters of that track.
+`trackStates` has one entry per track, in the order of `tracks`, from the moment the track enters the arrangement (also while its audio loads). The values are the arrangement's mix (`arrangement.getMixer()`), kept by track id, so a track keeps its mute, solo, volume and pan when other tracks are removed, added or moved, and an undo never changes them. A track's own `volume`, `muted`, `soloed` and `pan` fields are only the values it entered with. Details: [`usePlaylistMixer`](/docs/react/api/hooks#useplaylistmixer). Inside a track's control panel, [`useTrack()`](/docs/react/api/hooks#usetrack) has the state and the setters of that track.
 
 ### Track reorder preview (useTrackReorderPreview)
 
@@ -507,20 +542,20 @@ Create a custom wrapper with your application's defaults:
 ```tsx
 import type { ComponentProps, ReactNode } from 'react';
 import { WaveformPlaylistProvider, WaveformViewOptions } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 
 // The props type is not exported; take it from the component.
 type ProviderProps = ComponentProps<typeof WaveformPlaylistProvider>;
 
 interface MyPlaylistProps extends Partial<ProviderProps> {
-  tracks: ClipTrack[];
+  arrangement: Arrangement;
   children: ReactNode;
 }
 
-function MyPlaylistProvider({ tracks, children, ...props }: MyPlaylistProps) {
+function MyPlaylistProvider({ arrangement, children, ...props }: MyPlaylistProps) {
   return (
     <WaveformViewOptions waveHeight={100}>
-      <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024} theme={myTheme} {...props}>
+      <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024} theme={myTheme} {...props}>
         {children}
       </WaveformPlaylistProvider>
     </WaveformViewOptions>
@@ -535,7 +570,8 @@ Full type definition:
 ```typescript
 interface WaveformPlaylistProviderProps {
   // Required
-  tracks: ClipTrack[];
+  /** The tracks, the mix, the undo history and the loading. A new object mounts everything below again. */
+  arrangement: Arrangement;
   children: React.ReactNode;
 
   // Display
@@ -555,19 +591,17 @@ interface WaveformPlaylistProviderProps {
   // Annotations
   annotationList?: AnnotationListProp; // { annotations?, editable?, linkEndpoints?, isContinuousPlay? }
 
-  // Callbacks
+  // Callbacks (read when called: a new identity builds nothing)
+  /** Once per mount: the first time an engine is attached and no source is pending. */
   onReady?: () => void;
-  /** Called when audio/engine initialization fails. The provider already logs the error. */
+  /** The engine or its adapter could not be built, or onReady threw. Not for a source that
+   *  fails to load (see useArrangementSources). The provider already logs the error. */
   onError?: (err: Error) => void;
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
-  /** Called when engine clip operations (move/trim/split) update tracks */
-  onTracksChange?: (tracks: ClipTrack[]) => void;
 
   // Advanced
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
-  /** Defer engine build during progressive loading */
-  deferEngineRebuild?: boolean;
   /** Disable automatic stop when the cursor reaches the end of the longest
    *  track — the transport rolls until explicit stop (DAW style, = dawcore's
    *  indefinite-playback). The multitrack view then draws the timeline as wide
@@ -575,9 +609,10 @@ interface WaveformPlaylistProviderProps {
    *  sessions suppress the auto-stop automatically. */
   indefinitePlayback?: boolean;
   /** Desired AudioContext sample rate. Pre-computed peaks (.dat) render
-   *  instantly when they match. On mismatch, falls back to worker. */
+   *  instantly when they match. On mismatch, falls back to worker. Read at build time. */
   sampleRate?: number;
-  /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone */
+  /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone.
+   *  Called once per engine build. Read at build time. */
   createAdapter?: () => PlayoutAdapter;
 }
 ```
@@ -587,5 +622,7 @@ interface WaveformPlaylistProviderProps {
 - [Waveform Component](/docs/react/api/components#waveform)
 - [WaveformViewOptions](/docs/react/api/components#waveformviewoptions)
 - [Core Context Hooks](/docs/react/api/hooks#core-context-hooks)
+- [Arrangement Hooks](/docs/react/api/hooks#arrangement-hooks)
+- [Loading Audio](/docs/react/guides/loading-audio)
 - [usePlaybackControls Hook](/docs/react/api/hooks#useplaybackcontrols)
 - [useEditorControls Hook](/docs/react/api/hooks#useeditorcontrols)

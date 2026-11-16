@@ -10,7 +10,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { createValueSource } from '@waveform-playlist/core';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement } from '@waveform-playlist/engine';
 
 const SAMPLE_RATE = 48000;
 
@@ -25,7 +25,7 @@ vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
 
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useClipSplitting } from '../hooks/useClipSplitting';
-import { TrimPreviewContext } from '../contexts/playlistContexts';
+import { ArrangementContext, TrimPreviewContext } from '../contexts/playlistContexts';
 import type { TrimPreview } from '../providerInternals/useTrimPreview';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 
@@ -62,24 +62,40 @@ function makeTracks(): ClipTrack[] {
   ];
 }
 
-function fakeEngine() {
-  return {
+// The hooks read the arrangement from context (#812): a fake that hands out
+// `tracks` and records the edits.
+function fakeArrangement(initial: ClipTrack[] = makeTracks()) {
+  const fake = {
+    tracks: initial,
+    getTracks: () => fake.tracks,
     constrainTrimDelta: vi.fn((_t: string, _c: string, _b: string, delta: number) => delta),
     trimClip: vi.fn(),
     moveClip: vi.fn(),
     splitClip: vi.fn(),
   };
+  return fake;
+}
+type FakeArrangement = ReturnType<typeof fakeArrangement>;
+
+function withArrangement(
+  fake: FakeArrangement,
+  preview = createValueSource<TrimPreview | null>(null)
+) {
+  const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <ArrangementContext value={fake as unknown as Arrangement}>
+      <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
+    </ArrangementContext>
+  );
+  return wrapper;
 }
 
 describe('splitClipAt by ids', () => {
   function setup() {
-    const engine = fakeEngine();
-    const engineRef = { current: engine as unknown as PlaylistEngine };
-    const tracks = makeTracks();
-    const { result } = renderHook(() =>
-      useClipSplitting({ tracks, samplesPerPixel: 1000, engineRef })
-    );
-    return { engine, result, tracks };
+    const engine = fakeArrangement();
+    const { result } = renderHook(() => useClipSplitting({ samplesPerPixel: 1000 }), {
+      wrapper: withArrangement(engine),
+    });
+    return { engine, result };
   }
 
   it('splits the named clip when it is not the first of its track', () => {
@@ -101,17 +117,6 @@ describe('splitClipAt by ids', () => {
     expect(engine.splitClip).not.toHaveBeenCalled();
   });
 
-  it('says the split was dropped when no engine is attached', () => {
-    const tracks = makeTracks();
-    const engineRef = { current: null };
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { result } = renderHook(() =>
-      useClipSplitting({ tracks, samplesPerPixel: 1000, engineRef })
-    );
-    expect(result.current.splitClipAt('track-1', 'b', 3)).toBe(false);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('The split was dropped'));
-  });
-
   it('the playhead split names the clip under the playhead on the selected track', () => {
     currentTime = 3;
     const { engine, result } = setup();
@@ -122,19 +127,13 @@ describe('splitClipAt by ids', () => {
 
 describe('a drag whose clipIndex does not match the clip', () => {
   function setup(tracks = makeTracks()) {
-    const engine = fakeEngine();
-    const engineRef = { current: engine as unknown as PlaylistEngine };
+    const engine = fakeArrangement(tracks);
     const preview = createValueSource<TrimPreview | null>(null);
-    const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-      <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
-    );
-    let current = tracks;
-    const hook = renderHook(
-      () => useClipDragHandlers({ tracks: current, samplesPerPixel: 1000, engineRef }),
-      { wrapper }
-    );
+    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), {
+      wrapper: withArrangement(engine, preview),
+    });
     const setTracks = (next: ClipTrack[]) => {
-      current = next;
+      engine.tracks = next;
       hook.rerender();
     };
     return { hook, engine, setTracks, preview: () => preview.source.getSnapshot() };
@@ -236,19 +235,14 @@ describe('a drag whose clipIndex does not match the clip', () => {
 });
 
 describe('a drag follows its clip and its track by id', () => {
-  function setup(engine: ReturnType<typeof fakeEngine> | null = fakeEngine()) {
-    const engineRef = { current: engine as unknown as PlaylistEngine | null };
+  function setup() {
+    const engine = fakeArrangement();
     const preview = createValueSource<TrimPreview | null>(null);
-    const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-      <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
-    );
-    let current = makeTracks();
-    const hook = renderHook(
-      () => useClipDragHandlers({ tracks: current, samplesPerPixel: 1000, engineRef }),
-      { wrapper }
-    );
+    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), {
+      wrapper: withArrangement(engine, preview),
+    });
     const setTracks = (next: ClipTrack[]) => {
-      current = next;
+      engine.tracks = next;
       hook.rerender();
     };
     type Name = 'onDragStart' | 'onDragMove' | 'onDragEnd';
@@ -290,7 +284,7 @@ describe('a drag follows its clip and its track by id', () => {
       durationSamples: 2 * SAMPLE_RATE - 20000,
     });
     dispatch('onDragEnd', event(-20, data));
-    expect(engine!.trimClip).toHaveBeenCalledWith('track-1', 'b', 'right', -20000);
+    expect(engine.trimClip).toHaveBeenCalledWith('track-1', 'b', 'right', -20000);
   });
 
   it('a move of a clip id that is not in the track makes no engine call', () => {
@@ -299,18 +293,8 @@ describe('a drag follows its clip and its track by id', () => {
     const data = { clipId: 'placeholder' };
     dispatch('onDragStart', event(0, data));
     dispatch('onDragEnd', event(5, data));
-    expect(engine!.moveClip).not.toHaveBeenCalled();
+    expect(engine.moveClip).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('The move was dropped'));
-  });
-
-  it('a move released while no engine is attached is dropped and warns', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { dispatch } = setup(null);
-    const data = { clipId: 'b' };
-    dispatch('onDragStart', event(0, data));
-    dispatch('onDragEnd', event(5, data));
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toMatch(/The move was dropped: no engine is attached/);
   });
 });
 

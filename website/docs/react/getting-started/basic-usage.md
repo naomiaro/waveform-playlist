@@ -9,7 +9,7 @@ This guide walks you through creating a simple multitrack audio player.
 
 ## Minimal Example
 
-The simplest way to get started is with the `useAudioTracks` hook and the provider pattern:
+The simplest way to get started is an arrangement that names the audio files, and the provider that plays it:
 
 ```tsx
 import {
@@ -19,20 +19,19 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function App() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
-    { src: '/audio/guitar.mp3', name: 'Guitar' },
+  // One arrangement for the life of the component: it owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+    audioTrack({ src: '/audio/guitar.mp3', name: 'Guitar' }),
   ]);
 
-  if (loading) return <div>Loading audio...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -52,18 +51,21 @@ function App() {
 
 The provider is the heart of the application. It manages:
 - Audio playback state
-- Track data and controls
 - Zoom level and scroll position
 - Selection and cursor position
 
+The tracks, their mix (mute, solo, volume, pan) and the undo history belong to the arrangement. The provider plays and draws the arrangement and follows its changes.
+
 ```tsx
 <WaveformPlaylistProvider
-  tracks={tracks}           // Required: array of ClipTrack objects
+  arrangement={arrangement} // Required: from useCreateArrangement
   samplesPerPixel={1024}    // Zoom level (higher = more zoomed out)
 >
   {/* Children have access to playlist context */}
 </WaveformPlaylistProvider>
 ```
+
+Keep one arrangement for the life of the playlist: a new `arrangement` object mounts everything below the provider again.
 
 ### WaveformViewOptions
 
@@ -109,29 +111,27 @@ import {
 
 ## Loading Audio
 
-The `useAudioTracks` hook handles loading and decoding audio files:
+The arrangement fetches and decodes the files its tracks name, once the provider has its audio context. The playlist is drawn at once; each clip appears when its file has decoded (or at once as a placeholder when you give its `duration`), and Play starts working when the first files have settled:
 
 ```tsx
-const { tracks, loading, error, progress } = useAudioTracks([
-  {
-    src: '/audio/vocals.mp3',
-    name: 'Vocals',
-    // Optional: pre-computed waveform data (BBC Peaks)
-    waveformDataUrl: '/audio/vocals.json',
-  },
-  {
-    src: '/audio/guitar.mp3',
-    name: 'Guitar',
-    // Start this track 2 seconds into the timeline
-    startTime: 2,
-  },
+import { useArrangement, useArrangementSources } from '@waveform-playlist/browser';
+
+const arrangement = useCreateArrangement(() => [
+  audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+  // Start this track 2 seconds into the timeline; with a duration it is drawn before it loads
+  audioTrack({ src: '/audio/guitar.mp3', name: 'Guitar', start: 2, duration: 30 }),
 ]);
 
-// Show loading progress
-if (loading) {
-  return <div>Loading... {Math.round(progress * 100)}%</div>;
+// Inside the provider: show loading progress
+function LoadingStatus() {
+  const { pendingCount, failedCount } = useArrangementSources(useArrangement());
+  if (pendingCount > 0) return <div>Loading {pendingCount} file(s)…</div>;
+  if (failedCount > 0) return <div>{failedCount} file(s) could not be loaded</div>;
+  return null;
 }
 ```
+
+See [Loading Audio](/docs/react/guides/loading-audio) for pre-computed peaks, dropped files, errors and `retry`.
 
 ## Adding Volume and Position Display
 
@@ -170,22 +170,20 @@ import {
   ZoomOutButton,
   MasterVolumeControl,
   AudioPosition,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function MyPlaylist() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/drums.mp3', name: 'Drums' },
-    { src: '/audio/bass.mp3', name: 'Bass' },
-    { src: '/audio/keys.mp3', name: 'Keys' },
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
+    audioTrack({ src: '/audio/bass.mp3', name: 'Bass' }),
+    audioTrack({ src: '/audio/keys.mp3', name: 'Keys' }),
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
   ]);
 
-  if (loading) return <div>Loading tracks...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', padding: '1rem' }}>
         <RewindButton />
         <PlayButton />

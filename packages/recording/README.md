@@ -92,13 +92,14 @@ function MicMonitor() {
 
 `meter` is a source, not state: levels change about 60 times a second, and the hook does not re-render for them. `SegmentedVUMeter` draws each reading straight to the DOM. For the numbers in render, use `useMeterLevels(meter)` from `@waveform-playlist/ui-components` (10 updates a second by default), or `meter.subscribe(callback)` to draw them yourself.
 
-### Integrated Recording (with a track list)
+### Integrated Recording (into an arrangement)
 
-`useIntegratedRecording` combines microphone access, metering, and recording into one hook that appends the finalized clip directly to a `ClipTrack[]` — the same array shape used by `@waveform-playlist/browser`'s `WaveformPlaylistProvider`.
+`useIntegratedRecording` combines microphone access, metering, and recording into one hook that adds the finalized clip to a track of an `Arrangement` — the object `@waveform-playlist/browser`'s `useCreateArrangement` makes and `WaveformPlaylistProvider` plays. This package depends on `@waveform-playlist/engine` and imports only types from it.
 
 ```tsx
 import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
-import type { ClipTrack, RecordingProgressSource } from '@waveform-playlist/core';
+import type { RecordingProgressSource } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 
 // Only this label re-renders as the take grows.
 function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
@@ -107,13 +108,11 @@ function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
 }
 
 function Recorder({
-  tracks,
-  setTracks,
+  arrangement,
   selectedTrackId,
   currentTime,
 }: {
-  tracks: ClipTrack[];
-  setTracks: (tracks: ClipTrack[]) => void;
+  arrangement: Arrangement;
   selectedTrackId: string | null;
   currentTime: number;
 }) {
@@ -128,7 +127,7 @@ function Recorder({
     startRecording,
     stopRecording,
     error,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+  } = useIntegratedRecording(arrangement, selectedTrackId, {
     currentTime,
     channelCount: 2,
   });
@@ -151,7 +150,9 @@ function Recorder({
 }
 ```
 
-Stopping adds a new `AudioClip` to `selectedTrackId` at the timeline position captured when recording STARTED (punch-in semantics): the take lands exactly at the playhead and REPLACES any existing clip content it overlaps — partial overlaps are trimmed, fully-covered clips removed, and a clip spanning the take is split in two.
+Stopping adds a new `AudioClip` to the track that was selected when the take STARTED (`recordingTrackId`), at the timeline position captured then (punch-in semantics): the take lands exactly at the playhead and REPLACES any existing clip content it overlaps — partial overlaps are trimmed, fully-covered clips removed, and a clip spanning the take is split in two. The take and that carve are one `arrangement.updateTrack()`: one undo step.
+
+`startRecording()` resolves `false`, records nothing and sets `error` (a message that starts with `Cannot start recording: ` and names the track) when no track is selected, when the arrangement holds no track of the selected id, for a MIDI track, and for a track holding a clip whose audio is not loaded (still loading, failed to load, or a clip that cannot be made from its audio).
 
 ## API Reference
 
@@ -211,12 +212,12 @@ Sample-accurate VU metering via a separate meter AudioWorklet — independent of
 - `resetPeak: () => void` — clears held peak indicators, e.g. on device switch
 - `error: Error | null`
 
-#### `useIntegratedRecording(tracks, setTracks, selectedTrackId, options?)`
+#### `useIntegratedRecording(arrangement, selectedTrackId, options?)`
 
-Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `useRecording` together and appends the finalized recording to `tracks` as a new `AudioClip`.
+Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `useRecording` together and adds the finalized recording to the arrangement's track as a new `AudioClip`, with one `arrangement.updateTrack()` (one undo step). It keeps no copy of the tracks: it reads the arrangement when a take starts and when it ends.
 
 **Parameters:**
-- `tracks: ClipTrack[]`, `setTracks: (tracks: ClipTrack[]) => void`, `selectedTrackId: string | null`
+- `arrangement: Arrangement` (from `@waveform-playlist/engine`; `useCreateArrangement` of `@waveform-playlist/browser`), `selectedTrackId: string | null` (the track the next take is recorded onto)
 - `options?: IntegratedRecordingOptions`
   - `currentTime?: number` — playback/cursor position; the clip is captured at this position at record *start* (not stop), so overdubbing while transport is running lands the clip correctly
   - `audioConstraints?: MediaTrackConstraints`
@@ -224,9 +225,9 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
   - `samplesPerPixel?: number` (default: `1024`)
   - `latencyOffset?: number` — seconds; overrides the auto-computed `outputLatency + lookAhead` compensation applied to the clip's start. `0` disables compensation; omit to auto-compute
 
-**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `recordingTrackId`: the track the running take was started on, `null` when none is running), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
+**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `recordingTrackId`: the track the running take was started on, `null` when none is running), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasPermission`, `selectedDevice`), controls (`startRecording` — resolves `true` when capture actually started, `false` with `error` set when the take is refused, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
 
-**Recording into a `@waveform-playlist/browser` playlist:** call `useRecordingSession({ isRecording, trackId: recordingTrackId })` (from `@waveform-playlist/browser`) in the component that calls `useIntegratedRecording`; the view's `<WaveformRecordingPreview>` only draws the take. For an overdub, also call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track's existing content is transiently muted (punch-in replaces it). Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`.
+**Recording into a `@waveform-playlist/browser` playlist:** call `useRecordingSession({ isRecording, trackId: recordingTrackId })` (from `@waveform-playlist/browser`) in the component that calls `useIntegratedRecording`; the view's `<WaveformRecordingPreview>` only draws the take. For an overdub, also call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track is muted in the arrangement's mix (punch-in replaces what it holds): the mixer and the track's Mute button show it, the built-in `<TrackMuteButton />` is disabled, and `useTrack().isRecordingArmed` is true for it. The mute from before the take is written back when the session ends, whatever was set in between. Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`. `play()` does nothing before the playlist's first ready, so a take started during the first load records without playback.
 
 ### Types
 

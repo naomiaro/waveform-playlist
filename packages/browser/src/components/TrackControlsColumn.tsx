@@ -5,6 +5,7 @@ import { warnMisplacedPart } from './partWarnings';
 import {
   usePlaylistMixer,
   useEditorControls,
+  useRecordingArm,
   useSelectedTrackId,
   useTrackReorderPreview,
 } from '../contexts/playlistContexts';
@@ -54,18 +55,17 @@ interface TrackControlsSlotProps {
   trackId: string;
   index: number;
   kind: TrackKind;
-  /** `undefined` while the track has no mixer state (it is loading). */
-  name: string | undefined;
+  name: string;
   muted: boolean;
   soloed: boolean;
   volume: number;
   pan: number;
-  isLoading: boolean;
   isSelected: boolean;
   isFirst: boolean;
   isLast: boolean;
   renderMode: RenderMode;
   hasSpectrogram: boolean;
+  isRecordingArmed: boolean;
   height: number;
   top: number;
   animate: boolean;
@@ -92,12 +92,12 @@ function TrackControlsSlotImpl({
   soloed,
   volume,
   pan,
-  isLoading,
   isSelected,
   isFirst,
   isLast,
   renderMode,
   hasSpectrogram,
+  isRecordingArmed,
   height,
   top,
   animate,
@@ -155,11 +155,11 @@ function TrackControlsSlotImpl({
       volume,
       pan,
       renderMode,
-      isLoading,
       isSelected,
       isFirst,
       isLast,
       hasSpectrogram,
+      isRecordingArmed,
       ...actions,
     }),
     [
@@ -172,11 +172,11 @@ function TrackControlsSlotImpl({
       volume,
       pan,
       renderMode,
-      isLoading,
       isSelected,
       isFirst,
       isLast,
       hasSpectrogram,
+      isRecordingArmed,
       actions,
     ]
   );
@@ -255,6 +255,8 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
     );
   }
   const { selectedTrackId } = useSelectedTrackId();
+  // The track a take is recorded onto (#812): its slot alone renders when a take starts or ends.
+  const { armedTrackId } = useRecordingArm();
   const { trackReorderEpoch } = useTrackReorderPreview();
   const spectrogram = use(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
@@ -285,9 +287,8 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
     <TrackControlsSharedContext value={shared}>
       <TracksLayout $height={trackLayout.totalHeight}>
         {tracks.map((track, trackIndex) => {
-          // No mixer state yet means the provider is still loading this
-          // track (deferEngineRebuild): the engine does not know it, so a
-          // mute/solo/volume/pan change could not take effect.
+          // One entry per track, also while its audio loads (#812): a
+          // change made then is kept.
           const state = trackStates[trackIndex];
           return (
             // key includes trackReorderEpoch: forces a remount after every
@@ -300,17 +301,17 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               trackId={track.id}
               index={trackIndex}
               kind={track.kind}
-              name={state?.name}
-              muted={state?.muted ?? false}
-              soloed={state?.soloed ?? false}
-              volume={state?.volume ?? 1.0}
-              pan={state?.pan ?? 0}
-              isLoading={state === undefined}
+              name={state.name}
+              muted={state.muted}
+              soloed={state.soloed}
+              volume={state.volume}
+              pan={state.pan}
               isSelected={track.id === selectedTrackId}
               isFirst={trackIndex === 0}
               isLast={trackIndex === tracks.length - 1}
               renderMode={renderModeById.get(track.id) ?? 'waveform'}
               hasSpectrogram={spectrogram !== null && track.kind !== 'midi'}
+              isRecordingArmed={track.id === armedTrackId}
               height={trackHeightById.get(track.id) ?? 0}
               top={trackLayout.topById.get(track.id) ?? 0}
               animate={animateTrackLayout}

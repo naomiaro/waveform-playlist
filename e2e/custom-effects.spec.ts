@@ -27,7 +27,10 @@ function differenceRms(a: Buffer, b: Buffer): number {
 /** The rack of the track chosen in the "Track rack" selector. */
 async function trackRack(page: Page) {
   const selector = page.getByLabel('Track rack');
-  await expect(selector).not.toHaveValue('');
+  // The first track is selected from the first render (#812)
+  const firstId = await selector.locator('option').first().getAttribute('value');
+  expect(firstId).toBeTruthy();
+  await expect(selector).toHaveValue(firstId!);
   const name = await selector.locator('option:checked').textContent();
   return page.getByRole('group', { name: `${name} chain`, exact: true });
 }

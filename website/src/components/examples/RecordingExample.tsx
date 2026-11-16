@@ -6,7 +6,7 @@
  * - Multiple track recording
  * - Drag & drop audio file import
  * - VU meter for input level monitoring
- * - Recording starts from max(cursor position, last clip end)
+ * - Recording starts at the cursor and replaces what the take overlaps (punch-in)
  * - Auto-scroll keeps recording in view
  */
 
@@ -14,9 +14,8 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import styled from 'styled-components';
 import { Theme, Button, Text } from '@radix-ui/themes';
 import '@radix-ui/themes/styles.css';
-import { createTrack, type ClipTrack } from '@waveform-playlist/core';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { audioTrack, createTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   WaveformPlaylistProvider,
   // PlayButton, PauseButton, StopButton omitted — recording example uses
@@ -48,6 +47,8 @@ import {
   WaveformPlayhead,
   useRecordingSession,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementTracks,
 } from '@waveform-playlist/browser';
 import { ExportWavButton, useOutputMeter } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
@@ -67,6 +68,7 @@ import { SegmentedVUMeter, BaseControlButton } from '@waveform-playlist/ui-compo
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { MicrophoneIcon, SpeakerHighIcon } from '@phosphor-icons/react';
 import { FileDropZone } from '../FileDropZone';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
 const Container = styled.div`
   max-width: 1400px;
@@ -172,16 +174,14 @@ const ErrorBanner = styled.div`
 
 // Inner component that uses playlist context
 interface RecordingControlsInnerProps {
-  tracks: ClipTrack[];
-  setTracks: (tracks: ClipTrack[]) => void;
+  arrangement: Arrangement;
   selectedTrackId: string | null;
   setSelectedTrackId: (id: string | null) => void;
   onAddTrack: () => void;
 }
 
 const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
-  tracks,
-  setTracks,
+  arrangement,
   selectedTrackId,
   setSelectedTrackId,
   onAddTrack,
@@ -197,6 +197,9 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   const { isLoopEnabled } = useLoop();
   const { selectedTrackId: providerSelectedTrackId } = useSelectedTrackId();
   const { selectionStart, selectionEnd } = useSelection();
+  const trackCount = useArrangementTracks(arrangement).length;
+  // Dropped files that could not be decoded: their tracks are removed, the list stays
+  const failedDrops = useFailedDrops(arrangement);
 
   // Sync local → provider when local state changes (e.g. auto-create track)
   useEffect(() => {
@@ -243,7 +246,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     changeDevice,
     error,
     recordingTrackId,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+  } = useIntegratedRecording(arrangement, selectedTrackId, {
     currentTime,
     channelCount: 2,
     latencyOffset,
@@ -535,22 +538,19 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     return recordingProgress.subscribe(follow);
   }, [isRecording, isAutomaticScroll, recordingProgress, recordingStartSample, sampleRate, samplesPerPixel, scrollContainerRef]);
 
-  // Handle dropped/selected audio files
+  // Handle dropped/selected audio files: one track per file, named after the
+  // file without its extension; the arrangement loads each one
   const handleFiles = useCallback(
-    async (files: File[]) => {
+    (files: File[]) => {
       const audioFiles = files.filter(file => file.type.startsWith('audio/'));
-      if (audioFiles.length === 0) return;
-
-      const audioContext = getGlobalAudioContext();
-      const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-      if (newTracks.length > 0) setTracks(prev => [...prev, ...newTracks]);
+      audioFiles.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
     },
-    [setTracks]
+    [arrangement]
   );
 
   const handleRemoveTrack = useCallback(
     async (trackId: string) => {
-      const trackToRemove = tracks.find((track) => track.id === trackId);
+      const trackToRemove = arrangement.getTracks().find((track) => track.id === trackId);
       if (!trackToRemove) return;
 
       // Stop recording if we're removing the track being recorded to
@@ -566,20 +566,18 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         setSelectedTrackId(null);
       }
 
-      const remaining = tracks.filter((track) => track.id !== trackId);
-      setTracks(remaining);
+      arrangement.removeTrack(trackId);
 
       // When the timeline is emptied, send the playhead home. Otherwise the
       // stale playhead position (e.g. the end of a prior recording) persists, so
       // the next recording would start from there instead of 0 — and the playhead
       // would be parked off-screen, making the progress bar appear frozen.
-      if (remaining.length === 0) {
+      if (arrangement.getTracks().length === 0) {
         seekTo(0);
       }
     },
     [
-      tracks,
-      setTracks,
+      arrangement,
       selectedTrackId,
       setSelectedTrackId,
       isRecording,
@@ -749,7 +747,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         <AudioPosition />
       </BottomBar>
 
-      {tracks.length === 0 && (
+      {trackCount === 0 && (
         <div style={{ padding: '3rem', color: 'var(--gray-9)', textAlign: 'center' }}>
           <Text size="2">
             Click &quot;+ New Track&quot; in the toolbar to add a track, then start recording!
@@ -765,6 +763,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
         label="Drop audio files or click to browse"
         dragLabel="Drop audio files here"
       />
+      <FailedDropsAlert drops={failedDrops} />
     </>
   );
 };
@@ -772,37 +771,37 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 // Main component
 export function RecordingExample() {
   const { theme, isDarkMode: isDark } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  // Starts empty: a take lands on a track the page adds (or a dropped file's)
+  const arrangement = useCreateArrangement();
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
-  const handleAddTrack = () => {
+  // addTrack is synchronous: a take started right after finds the track
+  const handleAddTrack = useCallback(() => {
     const newTrack = createTrack({
-      name: `Track ${tracks.length + 1}`,
+      name: `Track ${arrangement.getTracks().length + 1}`,
       clips: [],
       muted: false,
       soloed: false,
       volume: 1.0,
       pan: 0,
     });
-    setTracks([...tracks, newTrack]);
+    arrangement.addTrack(newTrack);
     setSelectedTrackId(newTrack.id);
-  };
+  }, [arrangement]);
 
   return (
     <Theme appearance={isDark ? 'dark' : 'light'} accentColor="blue" grayColor="slate" radius="medium">
       <Container>
         <WaveformPlaylistProvider
-          tracks={tracks}
+          arrangement={arrangement}
           sampleRate={48000}
-          onTracksChange={setTracks}
           samplesPerPixel={1024}
           zoomLevels={[256, 512, 1024, 2048, 4096]}
           automaticScroll
           theme={theme}
         >
           <RecordingControlsInner
-            tracks={tracks}
-            setTracks={setTracks}
+            arrangement={arrangement}
             selectedTrackId={selectedTrackId}
             setSelectedTrackId={setSelectedTrackId}
             onAddTrack={handleAddTrack}

@@ -456,13 +456,14 @@ test.describe('Stem Tracks Example', () => {
 });
 
 /**
- * The stem page shows placeholder tracks immediately and decodes audio in the
- * background (`useAudioTracks({ immediate: true })` + `deferEngineRebuild`).
- * Until loading finishes the provider has no mixer state for the tracks and the
- * engine does not know them, so the default track controls must be disabled.
+ * The stem page shows its tracks and their controls at once while the
+ * arrangement decodes their audio (a row stays empty until its audio has
+ * loaded: the page gives no `duration`, so no placeholder is drawn). The arrangement owns the mix from the
+ * start, so the track controls work while a track's audio loads (#812), and
+ * what was set before the audio arrived is still set after it.
  */
 test.describe('Stem Tracks Example — track controls while loading', () => {
-  test('mute, solo, volume and pan are disabled until tracks have loaded', async ({
+  test('mute, solo, volume and pan work while the audio loads, and a mute set then stays', async ({
     page,
     baseURL,
   }) => {
@@ -489,22 +490,64 @@ test.describe('Stem Tracks Example — track controls while loading', () => {
 
     await expect(mute).toBeVisible({ timeout: 30000 });
     await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(0);
-    await expect(mute).toBeDisabled();
-    await expect(solo).toBeDisabled();
-    await expect(volume).toBeDisabled();
-    await expect(pan).toBeDisabled();
-
-    release();
-    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
-
     await expect(mute).toBeEnabled();
     await expect(solo).toBeEnabled();
     await expect(volume).toBeEnabled();
     await expect(pan).toBeEnabled();
 
     // Mute is a toggle: its pressed state is exposed, not only its colour.
+    // Pressed while the playlist is still loading, it takes effect at once.
     await expect(mute).toHaveAttribute('aria-pressed', 'false');
     await mute.click();
     await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(0);
+
+    release();
+    await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+
+    // The audio arriving does not reset the mix, and every control stays enabled.
+    await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await expect(mute).toBeEnabled();
+    await expect(solo).toBeEnabled();
+    await expect(volume).toBeEnabled();
+    await expect(pan).toBeEnabled();
+    await page.waitForTimeout(500);
+    await expect(mute).toHaveAttribute('aria-pressed', 'true');
+    await mute.click();
+    await expect(mute).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+// #858: a layout change that moves the editor during a drag leaves the dragged
+// element behind, so the page's loading text takes no layout space.
+test.describe('Stem Tracks Example — while a file is loading', () => {
+  test('the editor does not move on the page when loading ends', async ({ page, baseURL }) => {
+    // Hold one audio request until the page is measured.
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let held = 0;
+    await page.route('**/media/audio/AlbertKader_Whiptails/12_Vox_Wet.opus', async (route) => {
+      held++;
+      await released;
+      await route.continue().catch(() => {});
+    });
+
+    await page.goto(`${baseURL}/examples/stem-tracks`);
+    await expect(page.locator('[data-playlist-state="loading"]')).toHaveCount(1, {
+      timeout: 30000,
+    });
+    await expect(page.locator('[data-clip-container]').first()).toBeVisible({ timeout: 30000 });
+    await expect.poll(() => held).toBe(1);
+    const playlist = page.locator('[data-playlist-state]');
+    const before = await playlist.boundingBox();
+    expect(before).toBeTruthy();
+
+    release();
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
+    const after = await playlist.boundingBox();
+    expect(after).toBeTruthy();
+    expect(Math.abs(after!.y - before!.y)).toBeLessThanOrEqual(0.5);
   });
 });

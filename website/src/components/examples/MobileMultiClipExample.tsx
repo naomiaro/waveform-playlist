@@ -13,8 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
@@ -34,8 +33,12 @@ import {
   WaveformPlayhead,
   WaveformClipHeaders,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge } from './LoadingBadge';
 
 const Container = styled.div`
   /* Prevent accidental text selection while dragging on mobile */
@@ -73,6 +76,8 @@ const ControlGroup = styled.div`
 `;
 
 const Instructions = styled.div`
+  /* The positioning parent of the loading badge in its top-right corner */
+  position: relative;
   background: var(--ifm-background-surface-color, #f8f9fa);
   border: 1px solid var(--ifm-color-emphasis-300, #dadde1);
   border-radius: 8px;
@@ -146,123 +151,99 @@ const trackConfigs = [
   },
 ];
 
-// Helper to get required file IDs for a track
-const getRequiredFileIds = (trackConfig: typeof trackConfigs[0]): string[] => {
-  return [...new Set(trackConfig.clips.map(clip => clip.fileId))];
+const fileSrc = (fileId: string): string => {
+  const file = audioFiles.find((f) => f.id === fileId);
+  if (!file) throw new Error(`Audio file not found for ID: ${fileId}`);
+  return file.src;
 };
 
-// Helper to create a track when all its required files are loaded
-const createTrackFromConfig = (
-  trackConfig: typeof trackConfigs[0],
-  fileBuffers: Map<string, { buffer: AudioBuffer; waveformData: WaveformData }>
-): ClipTrack => {
-  const clips = trackConfig.clips.map((clipConfig) => {
-    const fileData = fileBuffers.get(clipConfig.fileId);
-    if (!fileData) {
-      throw new Error(`Audio file not found for ID: ${clipConfig.fileId}`);
-    }
-
-    return createClipFromSeconds({
-      audioBuffer: fileData.buffer,
-      startTime: clipConfig.startTime,
-      duration: clipConfig.duration,
-      offset: clipConfig.offset,
-      name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
-      waveformData: fileData.waveformData,
+// Build tracks from config once the peaks are known. Each clip is a loading
+// clip in seconds that names its audio file and carries the file's peaks (when
+// they loaded), so it is drawn at once; the arrangement makes it a playable
+// clip when the file has decoded.
+const buildTracks = (peaks: ReadonlyMap<string, WaveformData>): ArrangementTrack[] =>
+  trackConfigs.map((trackConfig) => {
+    const clips: LoadingClip[] = trackConfig.clips.map((clipConfig, index) => {
+      const waveformData = peaks.get(clipConfig.fileId);
+      return {
+        id: `${clipConfig.fileId}-${index}`,
+        src: fileSrc(clipConfig.fileId),
+        start: clipConfig.startTime,
+        duration: clipConfig.duration,
+        offset: clipConfig.offset,
+        name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
+        ...(waveformData ? { waveformData } : {}),
+      };
     });
+
+    return {
+      ...createTrack({
+        name: trackConfig.name,
+        clips: [],
+        muted: false,
+        soloed: false,
+        volume: 1,
+        pan: 0,
+      }),
+      clips,
+    };
   });
 
-  return createTrack({
-    name: trackConfig.name,
-    clips,
-    muted: false,
-    soloed: false,
-    volume: 1,
-    pan: 0,
-  });
-};
+/** The peaks of every file that has them; a file whose peaks fail is drawn from its audio. */
+async function loadAllPeaks(): Promise<Map<string, WaveformData>> {
+  const results = await Promise.all(
+    audioFiles.map(async (file) => {
+      try {
+        return [file.id, await loadWaveformData(file.peaksSrc)] as const;
+      } catch (err) {
+        console.error(`Failed to load peaks for ${file.id}:`, err);
+        return null;
+      }
+    })
+  );
+  return new Map(
+    results.filter((result): result is readonly [string, WaveformData] => result !== null)
+  );
+}
 
 export function MobileMultiClipExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [loadedFiles, setLoadedFiles] = useState<Map<string, { buffer: AudioBuffer; waveformData: WaveformData }>>(new Map());
-  const [error, setError] = useState<Error | null>(null);
-  const [loadedCount, setLoadedCount] = useState(0);
+  // Starts empty: the tracks are added once every peaks file has been fetched,
+  // and the playlist is shown from then on
+  const arrangement = useCreateArrangement();
+  const [peaksSettled, setPeaksSettled] = useState(false);
+  const sources = useArrangementSources(arrangement);
+  const loadedCount = sources.sources.size - sources.pendingCount - sources.failedCount;
+  const loading = !peaksSettled || sources.isLoading;
 
-  // Load audio files PROGRESSIVELY - each file loads independently
+  // Fetch the peaks first (small), then declare the tracks: the audio loads
+  // in the background while the waveforms are drawn from the peaks
   useEffect(() => {
     let cancelled = false;
-    const audioContext = getGlobalAudioContext();
-
-    // Load each file independently (not Promise.all)
-    audioFiles.forEach(async (file) => {
-      try {
-        // Load audio and peaks in parallel for THIS file
-        const [audioResponse, waveformData] = await Promise.all([
-          fetch(file.src),
-          loadWaveformData(file.peaksSrc),
-        ]);
-
-        if (!audioResponse.ok) {
-          throw new Error(`Failed to fetch ${file.src}: ${audioResponse.statusText}`);
-        }
-
-        const arrayBuffer = await audioResponse.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        if (!cancelled) {
-          // Update loaded files map for THIS file immediately
-          setLoadedFiles(prev => {
-            const newMap = new Map(prev);
-            newMap.set(file.id, { buffer: audioBuffer, waveformData: waveformData as WaveformData });
-            return newMap;
-          });
-          setLoadedCount(prev => prev + 1);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error(`Failed to load ${file.id}:`, err);
-          setError(err as Error);
-        }
+    loadAllPeaks().then((peaks) => {
+      if (cancelled) return;
+      // Tracks already there (an effect run again by Fast Refresh) are not added twice
+      if (arrangement.getTracks().length === 0) {
+        buildTracks(peaks).forEach((track) => arrangement.addTrack(track));
+        // The first load is not an undo step
+        arrangement.clearHistory();
       }
+      setPeaksSettled(true);
     });
-
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Build tracks progressively as files load
-  useEffect(() => {
-    // For each track config, check if all required files are loaded
-    const newTracks: ClipTrack[] = [];
-
-    for (const trackConfig of trackConfigs) {
-      const requiredFileIds = getRequiredFileIds(trackConfig);
-      const allFilesLoaded = requiredFileIds.every(id => loadedFiles.has(id));
-
-      if (allFilesLoaded) {
-        newTracks.push(createTrackFromConfig(trackConfig, loadedFiles));
-      }
-    }
-
-    setTracks(newTracks);
-  }, [loadedFiles]);
-
-  const loading = loadedCount < audioFiles.length;
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error.message}
-      </div>
-    );
-  }
+  }, [arrangement]);
 
   return (
     <Container>
       <Instructions>
-        <strong>Touch Controls {loading && `(Loading: ${loadedCount}/${audioFiles.length} files)`}</strong>
+        <strong>Touch Controls</strong>
+        {/* The page's one loading text, mounted from the first render: the
+            peaks load before the editor exists, then the audio */}
+        <LoadingBadge active={loading} placement="box-corner">
+          (Loading: {loadedCount}/{audioFiles.length} files)
+        </LoadingBadge>
         <ul>
           <li><strong>Scroll:</strong> Swipe left/right on the waveform area</li>
           <li><strong>Move clip:</strong> Touch and hold the clip header (250ms), then drag</li>
@@ -271,46 +252,50 @@ export function MobileMultiClipExample() {
         </ul>
       </Instructions>
 
-      <WaveformPlaylistProvider
-        tracks={tracks}
-        sampleRate={48000}
-        onTracksChange={setTracks}
-        samplesPerPixel={1024}
-        mono
-        automaticScroll={false}
-        theme={theme}
-      >
-        <ClipInteractionProvider touchOptimized>
-          <Controls>
-            <ControlGroup>
-              <PlayButton />
-              <PauseButton />
-              <StopButton />
-            </ControlGroup>
-            <ControlGroup>
-              <ZoomInButton />
-              <ZoomOutButton />
-            </ControlGroup>
-            <ControlGroup>
-              <AudioPosition />
-            </ControlGroup>
-          </Controls>
+      {peaksSettled && (
+        <WaveformPlaylistProvider
+          arrangement={arrangement}
+          sampleRate={48000}
+          samplesPerPixel={1024}
+          mono
+          automaticScroll={false}
+          theme={theme}
+        >
+          <ClipInteractionProvider touchOptimized>
+            <Controls>
+              <ControlGroup>
+                <PlayButton />
+                <PauseButton />
+                <StopButton />
+              </ControlGroup>
+              <ControlGroup>
+                <ZoomInButton />
+                <ZoomOutButton />
+              </ControlGroup>
+              <ControlGroup>
+                <AudioPosition />
+              </ControlGroup>
+              <ControlGroup>
+                <SourceLoadError arrangement={arrangement} />
+              </ControlGroup>
+            </Controls>
 
-          {/* The provider's touchOptimized also widens the clip trim handles */}
-          <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
-            <WaveformRoot>
-              <WaveformTimescale />
-              <WaveformLoopRegion />
-              <WaveformTrackControls width={100} />
-              <WaveformTracks>
-                <WaveformClipHeaders />
-              </WaveformTracks>
-              <WaveformSelection />
-              <WaveformPlayhead />
-            </WaveformRoot>
-          </WaveformViewOptions>
-        </ClipInteractionProvider>
-      </WaveformPlaylistProvider>
+            {/* The provider's touchOptimized also widens the clip trim handles */}
+            <WaveformViewOptions waveHeight={120} barWidth={4} barGap={0}>
+              <WaveformRoot>
+                <WaveformTimescale />
+                <WaveformLoopRegion />
+                <WaveformTrackControls width={100} />
+                <WaveformTracks>
+                  <WaveformClipHeaders />
+                </WaveformTracks>
+                <WaveformSelection />
+                <WaveformPlayhead />
+              </WaveformRoot>
+            </WaveformViewOptions>
+          </ClipInteractionProvider>
+        </WaveformPlaylistProvider>
+      )}
     </Container>
   );
 }

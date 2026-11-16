@@ -343,18 +343,17 @@ import {
   SetLoopRegionButton,
   LoopButton,
   SelectionTimeInputs,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function LoopExample() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track.mp3', name: 'Track' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track.mp3', name: 'Track' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -485,18 +484,17 @@ import {
   AudioPosition,
   TimeFormatSelect,
   AutomaticScrollCheckbox,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function FullPlaybackExample() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track.mp3', name: 'Track' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track.mp3', name: 'Track' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <div style={{ display: 'flex', gap: '1rem', padding: '1rem' }}>
         <RewindButton />
         <PlayButton />

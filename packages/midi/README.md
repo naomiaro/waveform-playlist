@@ -1,12 +1,13 @@
 # @waveform-playlist/midi
 
-MIDI file loading and parsing for waveform-playlist — fetch a `.mid` file (or use pre-parsed notes) and get back `ClipTrack[]` ready to hand to `WaveformPlaylistProvider`.
+MIDI file loading and parsing for waveform-playlist — fetch a `.mid` file (or use pre-parsed notes) and get back `ClipTrack[]` ready to add to the arrangement that `WaveformPlaylistProvider` plays.
 
-This package is the React wrapper over [`@dawcore/midi`](https://www.npmjs.com/package/@dawcore/midi) (the framework-agnostic parser, re-exported here) plus a `useMidiTracks` hook that produces waveform-playlist's clip/track shape. It only handles the data pipeline — `.mid` → notes → `ClipTrack`. Pair it with `@waveform-playlist/browser` for the playlist UI and `@waveform-playlist/playout` (piano-roll rendering + SoundFont/PolySynth playback via Tone.js) for actual MIDI sound.
+This package is the React wrapper over [`@dawcore/midi`](https://www.npmjs.com/package/@dawcore/midi) (the framework-agnostic parser, re-exported here) plus `loadMidiTracks` and a `useMidiTracks` hook that produce waveform-playlist's clip/track shape. It only handles the data pipeline — `.mid` → notes → `ClipTrack`. Pair it with `@waveform-playlist/browser` for the playlist UI and `@waveform-playlist/playout` (piano-roll rendering + SoundFont/PolySynth playback via Tone.js) for actual MIDI sound.
 
 ## Features
 
 - Parse `.mid` files from an `ArrayBuffer` or fetch by URL (`parseMidiFile`, `parseMidiUrl`)
+- `loadMidiTracks` function — loads a URL, a `File` or a `Blob` as `ClipTrack[]`, no React state
 - `useMidiTracks` React hook — loads one or more MIDI configs into `ClipTrack[]` with loading/error state
 - Accepts pre-parsed `midiNotes` to skip fetch+parse entirely
 - Multi-track MIDI files expand to one `ClipTrack` per track by default, or merge into one with `flatten: true`
@@ -23,23 +24,46 @@ npm install @waveform-playlist/midi @waveform-playlist/browser
 ## Usage
 
 ```tsx
-import { useMidiTracks } from '@waveform-playlist/midi';
-import { WaveformPlaylistProvider } from '@waveform-playlist/browser';
+import { useEffect, useState } from 'react';
+import { loadMidiTracks } from '@waveform-playlist/midi';
+import { WaveformPlaylistProvider, useCreateArrangement } from '@waveform-playlist/browser';
 
 function MidiPlaylist() {
-  const audioContext = new AudioContext();
+  // Starts empty; the MIDI tracks are added once the file has loaded
+  const arrangement = useCreateArrangement();
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const { tracks, loading, error } = useMidiTracks(
-    [{ src: '/music/song.mid', name: 'Piano' }],
-    { sampleRate: audioContext.sampleRate }
-  );
+  useEffect(() => {
+    const controller = new AbortController();
+    loadMidiTracks('/music/song.mid', { sampleRate: 48000, name: 'Piano', signal: controller.signal })
+      .then((tracks) => {
+        if (arrangement.getTracks().length === 0) {
+          tracks.forEach((track) => arrangement.addTrack(track));
+          arrangement.clearHistory(); // the first load is not an undo step
+        }
+        setLoaded(true);
+      })
+      .catch((err: unknown) => {
+        // An abort (unmount, StrictMode's first run) is not an error
+        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => controller.abort();
+  }, [arrangement]);
 
-  if (loading) return <p>Loading MIDI…</p>;
   if (error) return <p>Error: {error}</p>;
+  if (!loaded) return <p>Loading MIDI…</p>;
 
-  return <WaveformPlaylistProvider tracks={tracks}>{/* your UI */}</WaveformPlaylistProvider>;
+  // Rendered once the tracks are in: the playlist's ready happens once per mount
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
+      {/* your UI */}
+    </WaveformPlaylistProvider>
+  );
 }
 ```
+
+`sampleRate` positions the clips in samples: pass the rate of the playlist's `AudioContext`.
 
 Parsing without React (e.g. a Node script or a custom loader):
 
@@ -53,6 +77,8 @@ console.log(parsed.tracks.map((t) => t.name)); // ['Piano', 'Drums', ...]
 ## API
 
 ### `useMidiTracks(configs, options)`
+
+It returns a `tracks` array. `WaveformPlaylistProvider` takes an arrangement, not a tracks array, so use `loadMidiTracks` with it and add the tracks to the arrangement.
 
 `configs` is compared by value, so it can be written inline: tracks reload only when a config actually changes. Files are fetched in parallel (a URL shared by several configs once) and tracks keep the config order. If you pass large `midiNotes` arrays, keep each array's identity stable (a constant or `useMemo`); a notes array rebuilt on every render is compared note by note on every render. Treat configs and notes as immutable: mutating one in place does not trigger a reload.
 
@@ -91,7 +117,7 @@ interface UseMidiTracksReturn {
 
 ### `loadMidiTracks(src, options)`
 
-A function, not a hook, beside `useMidiTracks` (which is unchanged): no React state. `src` is a URL string, a `File` or a `Blob`; it resolves to `ClipTrack[]` with `kind: 'midi'`, and every call makes new track and clip ids.
+A function, not a hook: no React state. `src` is a URL string, a `File` or a `Blob`; it resolves to `ClipTrack[]` with `kind: 'midi'`, and every call makes new track and clip ids.
 
 ```typescript
 function loadMidiTracks(src: string | File | Blob, options: LoadMidiTracksOptions): Promise<ClipTrack[]>;

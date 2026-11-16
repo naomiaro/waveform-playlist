@@ -1,9 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionOptions,
@@ -16,11 +15,13 @@ import {
   useDragSensors,
   useEditorControls,
   usePlaylistZoom,
-  useEngineRefs,
+  usePlaylistTimeline,
+  useCreateArrangement,
   WaveformEditor,
   WaveformViewOptions,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
 
 const Controls = styled.div`
   display: flex;
@@ -67,36 +68,31 @@ const trackConfigs = [
   },
 ];
 
-async function loadTracks(): Promise<ClipTrack[]> {
-  const audioContext = getGlobalAudioContext();
-  const buffers = new Map<string, AudioBuffer>();
-  await Promise.all(
-    audioFiles.map(async (file) => {
-      const response = await fetch(file.src);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${file.src}: ${response.statusText}`);
-      }
-      buffers.set(file.id, await audioContext.decodeAudioData(await response.arrayBuffer()));
-    })
-  );
-  return trackConfigs.map((config) =>
-    createTrack({
-      name: config.name,
-      clips: config.clips.map((clip) =>
-        createClipFromSeconds({
-          audioBuffer: buffers.get(clip.fileId)!,
-          startTime: clip.startTime,
-          duration: clip.duration,
-          offset: clip.offset,
-          name: `${config.name} ${clip.offset}-${clip.offset + clip.duration}s`,
-        })
-      ),
-    })
-  );
-}
+const fileSrc = (fileId: string): string => {
+  const file = audioFiles.find((f) => f.id === fileId);
+  if (!file) throw new Error(`Audio file not found for ID: ${fileId}`);
+  return file.src;
+};
+
+// Each clip is a loading clip in seconds that names its file: the arrangement
+// fetches each file once, the waveform draws a placeholder until it has
+// decoded, and the page is ready when every file has.
+const buildTracks = (): ArrangementTrack[] =>
+  trackConfigs.map((config) => ({
+    ...createTrack({ name: config.name, clips: [] }),
+    clips: config.clips.map(
+      (clip, index): LoadingClip => ({
+        id: `${clip.fileId}-${index}`,
+        src: fileSrc(clip.fileId),
+        start: clip.startTime,
+        duration: clip.duration,
+        offset: clip.offset,
+        name: `${config.name} ${clip.offset}-${clip.offset + clip.duration}s`,
+      })
+    ),
+  }));
 
 interface ClipDragSetupProps {
-  tracks: ClipTrack[];
   touchOptimized: boolean;
   children: React.ReactNode;
 }
@@ -106,9 +102,12 @@ interface ClipDragSetupProps {
  * own `DragDropProvider`, with the library's sensors, drag handlers and
  * collision modifier.
  */
-function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps) {
+function ClipDragSetup({ touchOptimized, children }: ClipDragSetupProps) {
   const { samplesPerPixel } = usePlaylistZoom();
-  const { playoutRef } = useEngineRefs();
+  // The arrangement's tracks with their loaded clips: what a drag moves and
+  // collides with, in the order of the rows (the handlers read the
+  // arrangement themselves)
+  const { tracks } = usePlaylistTimeline();
   const { setSelectedTrackId } = useEditorControls();
 
   // With touchOptimized, a touch has to hold for 250ms before a drag starts,
@@ -119,11 +118,7 @@ function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps)
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({
-    tracks,
-    samplesPerPixel,
-    engineRef: playoutRef,
-  });
+  } = useClipDragHandlers({ samplesPerPixel });
 
   // Select the track of the clip that is being dragged.
   const onDragStart: typeof handleDragStart = (event) => {
@@ -163,37 +158,15 @@ function ClipDragSetup({ tracks, touchOptimized, children }: ClipDragSetupProps)
 
 export function CustomDragSetupExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [error, setError] = useState<Error | null>(null);
+  // The arrangement owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(buildTracks);
   const [interactive, setInteractive] = useState(true);
   const [touchOptimized, setTouchOptimized] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    loadTracks().then(
-      (loaded) => {
-        if (!cancelled) setTracks(loaded);
-      },
-      (err) => {
-        if (!cancelled) setError(err instanceof Error ? err : new Error(String(err)));
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>Error loading audio: {error.message}</div>
-    );
-  }
-
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
-      onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
       theme={theme}
@@ -203,6 +176,7 @@ export function CustomDragSetupExample() {
         <PauseButton />
         <StopButton />
         <AudioPosition />
+        <SourceLoadError arrangement={arrangement} />
         <Option>
           <input
             type="checkbox"
@@ -221,7 +195,7 @@ export function CustomDragSetupExample() {
         </Option>
       </Controls>
 
-      <ClipDragSetup tracks={tracks} touchOptimized={touchOptimized}>
+      <ClipDragSetup touchOptimized={touchOptimized}>
         {/* The one place the clips learn what they may do. Waveform takes no prop for it. */}
         <ClipInteractionOptions enabled={interactive} touchOptimized={touchOptimized}>
           <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>

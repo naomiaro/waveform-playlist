@@ -9,6 +9,7 @@ import { render, cleanup, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   WaveformPlaylistProvider,
+  useCreateArrangement,
   MediaElementPlaylistProvider,
   useAnnotationOptions,
   useAnnotationIntegration,
@@ -96,14 +97,21 @@ const OptionsProbe: React.FC = () => {
 
 const noop = () => {};
 
+// The multitrack provider on an empty arrangement, made as an app makes it (#812).
+const MultitrackProvider: React.FC<
+  Omit<React.ComponentProps<typeof WaveformPlaylistProvider>, 'arrangement'>
+> = (props) => {
+  const arrangement = useCreateArrangement();
+  return <WaveformPlaylistProvider arrangement={arrangement} {...props} />;
+};
+
 async function mount(kind: Kind, children: React.ReactNode, annotationList: ListProp = {}) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   const list = { annotations: ANNOTATIONS, ...annotationList };
   const view = render(
     kind === 'WaveformPlaylistProvider' ? (
-      <WaveformPlaylistProvider
-        tracks={[]}
+      <MultitrackProvider
         sampleRate={44100}
         createAdapter={fakeAdapter}
         annotationList={list}
@@ -111,7 +119,7 @@ async function mount(kind: Kind, children: React.ReactNode, annotationList: List
       >
         <OptionsProbe />
         {children}
-      </WaveformPlaylistProvider>
+      </MultitrackProvider>
     ) : (
       <MediaElementPlaylistProvider
         track={MEDIA_TRACK}

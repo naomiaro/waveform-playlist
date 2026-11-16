@@ -20,10 +20,15 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 // Dark mode: Amber/gold gradient waveform on dark brown background
 const darkModeGradientTheme: Partial<WaveformPlaylistTheme> = {
@@ -88,53 +93,44 @@ const Controls = styled.div`
   margin-bottom: 1.5rem;
 `;
 
-const Container = styled.div`
-  max-width: 1400px;
-  margin: 0 auto;
-`;
+// Define your track configuration once, outside the component
+const audioConfigs: AudioTrackOptions[] = [
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    name: 'Bass',
+  },
+];
 
 export function MinimalExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const gradientTheme = isDarkMode ? darkModeGradientTheme : lightModeGradientTheme;
 
-  // Define your track configuration - use useMemo to prevent re-creating on every render
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-      name: 'Bass',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders
-  const { tracks, loading, error } = useAudioTracks(audioConfigs, { immediate: true });
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio; the row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
+    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000} samplesPerPixel={2048} mono theme={{ ...theme, ...gradientTheme }}>
       <Controls>
         <PlayButton />
         <PauseButton />
         <StopButton />
         <AudioPosition />
-        {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading...</span>}
+        <SourceLoadError arrangement={arrangement} />
       </Controls>
 
-      <WaveformViewOptions progressBarWidth={2}>
-        <WaveformRoot>
-          <WaveformTracks />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
-      </WaveformViewOptions>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions progressBarWidth={2}>
+          <WaveformRoot>
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={sources.isLoading} placement="editor-no-timescale">Loading...</LoadingBadge>
+      </LoadingBadgeFrame>
     </WaveformPlaylistProvider>
   );
 }

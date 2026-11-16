@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
 import {
@@ -13,13 +13,14 @@ import {
   AutomaticScrollCheckbox,
   MasterVolumeControl,
   loadWaveformData,
-  waveformDataToPeaks,
-  getWaveformDataMetadata,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 // Channel import removed - no longer using preview rendering
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { findFailedSource } from './SourceLoadError';
 
 // Track configuration with both audio and BBC peaks files
 // Albert Kader "Ubiquitous" minimal techno - Using 8-bit peaks at 30 SPP
@@ -117,97 +118,89 @@ const StatBox = styled.div<{ $variant?: 'peaks' | 'audio' }>`
 
 // Removed preview-related styled components - progressive loading shows tracks directly
 
-interface BBCPeaksData {
-  data: Int8Array | Int16Array;
-  bits: 8 | 16;
-  length: number;
-  sampleRate: number;
-  waveformData: WaveformData; // Keep original for passing to clips
-  metadata: {
-    channels: number;
-    duration: number;
-    samplesPerPixel: number;
-  };
+const MUTED_TEXT_STYLE = { padding: '2rem', color: 'var(--ifm-color-emphasis-600)' } as const;
+
+/**
+ * The peaks of each track, in config order. A peaks file that fails gives
+ * null: that track is added without peaks, and its waveform is generated in
+ * the browser once its audio has decoded.
+ */
+function loadAllPeaks(): Promise<(WaveformData | null)[]> {
+  return Promise.all(
+    trackConfigs.map(async (config) => {
+      try {
+        return await loadWaveformData(config.peaksSrc);
+      } catch (error) {
+        console.warn(
+          `[waveform-playlist example] Could not load the peaks file ${config.peaksSrc}; the waveform of "${config.name}" will be generated from its audio.`,
+          error
+        );
+        return null;
+      }
+    })
+  );
 }
 
 /**
  * WaveformData Example
  *
- * Demonstrates fully progressive loading with BBC pre-computed peaks.
- * Each track appears as soon as its peaks load (~50KB), then audio
- * loads in the background (~3MB). No waiting for all tracks!
+ * Demonstrates progressive loading with BBC pre-computed peaks. The peaks
+ * (~50KB per track) are fetched first; the tracks are then drawn from them at
+ * once while the audio (~3MB) loads in the background.
+ *
+ * A track whose peaks file fails is still added: its row stays empty until its
+ * audio has decoded, and then its waveform is generated in the browser.
  *
  * Key features demonstrated:
- * - Progressive peaks: each track appears as its peaks file loads
- * - Progressive audio: tracks become playable as audio loads
- * - loadedCount/totalCount: real-time progress tracking
+ * - Peaks first: every track is drawn from its peaks before its audio arrives
+ * - Progressive audio: each track becomes playable when its own audio has decoded
+ * - useArrangementSources(): real-time progress tracking
  */
 export function WaveformDataExample() {
   const { theme } = useDocusaurusTheme();
-  const [bbcPeaks, setBbcPeaks] = useState<Map<string, BBCPeaksData>>(new Map());
+  // Starts empty: the tracks are added when every peaks request has settled,
+  // each with a clip that names its audio and carries its peaks (when they
+  // loaded). The playlist is shown from then on, and it is ready when the
+  // audio has decoded.
+  const arrangement = useCreateArrangement();
+  const [peaksSettled, setPeaksSettled] = useState(false);
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
+  const failed = findFailedSource(sources);
 
-  // Load BBC peaks independently - each track appears as its peaks load
+  // Load the BBC peaks of every track, then add the tracks in config order
   useEffect(() => {
-    // Load each track's peaks independently (not Promise.all)
-    trackConfigs.forEach(async (config) => {
-      try {
-        const waveformData = await loadWaveformData(config.peaksSrc);
-        const peaks = waveformDataToPeaks(waveformData, 0);
-        const metadata = await getWaveformDataMetadata(config.peaksSrc);
-
-        // Update state for THIS track immediately - triggers re-render
-        setBbcPeaks(prev => {
-          const newMap = new Map(prev);
-          newMap.set(config.name, {
-            data: peaks.data,
-            bits: peaks.bits,
-            length: peaks.length,
-            sampleRate: peaks.sampleRate,
-            waveformData,
-            metadata: {
-              channels: metadata.channels,
-              duration: metadata.duration,
-              samplesPerPixel: metadata.samplesPerPixel,
-            },
-          });
-          return newMap;
+    let cancelled = false;
+    loadAllPeaks().then((peaks) => {
+      if (cancelled) return;
+      // Tracks already there (an effect run again by Fast Refresh) are not added twice
+      if (arrangement.getTracks().length === 0) {
+        trackConfigs.forEach((config, index) => {
+          // Without peaks (the file failed) the waveform comes from the audio
+          const waveformData = peaks[index] ?? undefined;
+          arrangement.addTrack(audioTrack({ src: config.audioSrc, name: config.name, waveformData }));
         });
-      } catch (error) {
-        console.error(`Error loading peaks for ${config.name}:`, error);
+        // The first load is not an undo step
+        arrangement.clearHistory();
       }
+      setPeaksSettled(true);
     });
-  }, []);
-
-  // Build audio configs - only include tracks that have peaks loaded
-  const audioConfigs = useMemo(() =>
-    trackConfigs
-      .filter(config => bbcPeaks.has(config.name)) // Only tracks with peaks ready
-      .map(config => ({
-        src: config.audioSrc,
-        name: config.name,
-        waveformData: bbcPeaks.get(config.name)?.waveformData,
-      })),
-  [bbcPeaks]);
-
-  // Load audio tracks with PROGRESSIVE LOADING enabled!
-  // Tracks appear one-by-one as they load, with waveforms shown immediately from peaks
-  const { tracks, loading: audioLoading, error: audioError, loadedCount, totalCount } = useAudioTracks(
-    audioConfigs, // Configs added as peaks load
-    { immediate: true } // Immediate placeholders, audio decodes in background
-  );
-
-  if (audioError) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {audioError}
-        </div>
-      </Container>
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [arrangement]);
 
   return (
     <Container>
+      {failed && (
+        <div style={{ padding: '2rem', color: 'red' }}>
+          Error loading audio: {failed.message}{' '}
+          <button type="button" onClick={() => arrangement.retry(failed.src)}>
+            Retry
+          </button>
+        </div>
+      )}
       <StatsContainer>
         <StatBox $variant="peaks">
           <strong>{totalPeaksSize} KB</strong>
@@ -221,8 +214,8 @@ export function WaveformDataExample() {
           <strong>{Math.round(totalAudioSize / totalPeaksSize)}x</strong>
           <span>smaller</span>
         </StatBox>
-        {/* Show loading progress using loadedCount/totalCount */}
-        {audioLoading && (
+        {/* Show loading progress from the arrangement's sources */}
+        {sources.isLoading && (
           <StatBox $variant="audio">
             <strong>{loadedCount} / {totalCount}</strong>
             <span>Tracks loaded</span>
@@ -230,43 +223,46 @@ export function WaveformDataExample() {
         )}
       </StatsContainer>
 
-      <WaveformPlaylistProvider
-        tracks={tracks}
-        sampleRate={48000}
-        samplesPerPixel={1024}
-        mono
-        automaticScroll
-        theme={theme}
-      >
-        <Controls>
-          <ControlGroup>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-          </ControlGroup>
+      {!peaksSettled && <div style={MUTED_TEXT_STYLE}>Loading peaks...</div>}
+      {peaksSettled && (
+        <WaveformPlaylistProvider
+          arrangement={arrangement}
+          sampleRate={48000}
+          samplesPerPixel={1024}
+          mono
+          automaticScroll
+          theme={theme}
+        >
+          <Controls>
+            <ControlGroup>
+              <PlayButton />
+              <PauseButton />
+              <StopButton />
+            </ControlGroup>
 
-          <ControlGroup>
-            <ZoomInButton />
-            <ZoomOutButton />
-          </ControlGroup>
+            <ControlGroup>
+              <ZoomInButton />
+              <ZoomOutButton />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AudioPosition />
-          </ControlGroup>
+            <ControlGroup>
+              <AudioPosition />
+            </ControlGroup>
 
-          <ControlGroup>
-            <MasterVolumeControl />
-          </ControlGroup>
+            <ControlGroup>
+              <MasterVolumeControl />
+            </ControlGroup>
 
-          <ControlGroup>
-            <AutomaticScrollCheckbox />
-          </ControlGroup>
-        </Controls>
+            <ControlGroup>
+              <AutomaticScrollCheckbox />
+            </ControlGroup>
+          </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <Waveform />
-        </WaveformViewOptions>
-      </WaveformPlaylistProvider>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <Waveform />
+          </WaveformViewOptions>
+        </WaveformPlaylistProvider>
+      )}
     </Container>
   );
 }

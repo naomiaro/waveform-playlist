@@ -27,19 +27,17 @@ npm install @waveform-playlist/spectrogram
 Wrap your editor with `<SpectrogramProvider>` and set a track's `renderMode`:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 
 function MyEditor() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/vocals.opus', name: 'Vocals', renderMode: 'spectrogram' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/vocals.opus', name: 'Vocals', renderMode: 'spectrogram' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <SpectrogramProvider config={{ fftSize: 2048, frequencyScale: 'mel' }} colorMap="viridis">
         <Waveform />
       </SpectrogramProvider>

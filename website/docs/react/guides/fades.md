@@ -71,28 +71,26 @@ Volume
 
 ## Basic Usage
 
-### Using useAudioTracks Hook
+### Using audioTrack()
 
-The simplest way to add fades is through the `useAudioTracks` hook:
+The simplest way to add fades is through the options of `audioTrack()`:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 
 function MyPlaylist() {
-  const { tracks, loading } = useAudioTracks([
-    {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({
       src: '/audio/vocals.mp3',
       name: 'Vocals',
       fadeIn: { duration: 2, type: 'linear' },
       fadeOut: { duration: 2, type: 'logarithmic' },
-    },
+    }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <Waveform />
     </WaveformPlaylistProvider>
   );
@@ -189,25 +187,25 @@ const track = createTrack({
 Apply different fade curves to different tracks for varied effects:
 
 ```tsx
-const { tracks, loading } = useAudioTracks([
-  {
+const arrangement = useCreateArrangement(() => [
+  audioTrack({
     src: '/audio/intro.mp3',
     name: 'Intro',
     fadeIn: { duration: 3, type: 'exponential' },   // Dramatic build
     fadeOut: { duration: 1, type: 'sCurve' },       // Smooth transition
-  },
-  {
+  }),
+  audioTrack({
     src: '/audio/main.mp3',
     name: 'Main Section',
     fadeIn: { duration: 0.5, type: 'sCurve' },      // Quick smooth fade in
     fadeOut: { duration: 4, type: 'logarithmic' },  // Natural fade out
-  },
-  {
+  }),
+  audioTrack({
     src: '/audio/outro.mp3',
     name: 'Outro',
     fadeIn: { duration: 1, type: 'linear' },
     fadeOut: { duration: 5, type: 'logarithmic' },  // Long natural ending
-  },
+  }),
 ]);
 ```
 
@@ -275,42 +273,40 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { audioTrack } from '@waveform-playlist/core';
 
 function FadesDemo() {
-  const { tracks, loading, error } = useAudioTracks([
-    {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({
       src: '/audio/vocals.mp3',
       name: 'Linear Fade',
       fadeIn: { duration: 2, type: 'linear' },
       fadeOut: { duration: 2, type: 'linear' },
-    },
-    {
+    }),
+    audioTrack({
       src: '/audio/drums.mp3',
       name: 'Logarithmic Fade',
       fadeIn: { duration: 2, type: 'logarithmic' },
       fadeOut: { duration: 2, type: 'logarithmic' },
-    },
-    {
+    }),
+    audioTrack({
       src: '/audio/guitar.mp3',
       name: 'Exponential Fade',
       fadeIn: { duration: 2, type: 'exponential' },
       fadeOut: { duration: 2, type: 'exponential' },
-    },
-    {
+    }),
+    audioTrack({
       src: '/audio/synth.mp3',
       name: 'S-Curve Fade',
       fadeIn: { duration: 2, type: 'sCurve' },
       fadeOut: { duration: 2, type: 'sCurve' },
-    },
+    }),
   ]);
 
-  if (loading) return <div>Loading audio...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -340,9 +336,9 @@ interface Fade {
   type?: FadeType;
 }
 
-// AudioTrackConfig with fades
-interface AudioTrackConfig {
-  src: string;
+// audioTrack() options with fades (from @waveform-playlist/core)
+interface AudioTrackOptions {
+  src?: ClipSource;
   name?: string;
   fadeIn?: Fade;
   fadeOut?: Fade;

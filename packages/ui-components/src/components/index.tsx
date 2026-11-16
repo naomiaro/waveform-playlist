@@ -5,6 +5,7 @@ export * from './ErrorBoundary';
 export * from './Clip';
 export * from './ClipBoundary';
 export * from './ClipHeader';
+export * from './ClipPlaceholderBody';
 export * from './FadeOverlay';
 export * from './MasterVolumeControl';
 export * from './PianoRollChannel';

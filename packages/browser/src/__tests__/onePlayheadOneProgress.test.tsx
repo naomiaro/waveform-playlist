@@ -23,7 +23,7 @@ import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { ComposedMediaElementWaveform } from './testCompositions';
 import { ComposedWaveform } from './testCompositions';
 import {
@@ -236,11 +236,11 @@ async function mountWebAudio(children: React.ReactNode) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter as unknown as PlayoutAdapter;
   const view = render(
-    <WaveformPlaylistProvider tracks={WA_TRACKS} sampleRate={WA_RATE} createAdapter={createAdapter}>
+    <TestProvider tracks={WA_TRACKS} sampleRate={WA_RATE} createAdapter={createAdapter}>
       <ControlsProbe />
       <ReadyProbe />
       {children}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   await waitFor(() => expect(isReady).toBe(true));
   await act(async () => {});

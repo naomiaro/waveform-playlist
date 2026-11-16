@@ -8,7 +8,7 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { ComposedWaveform } from './testCompositions';
 import { WaveformTimescale } from '../components/waveformParts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
@@ -87,14 +87,14 @@ const createAdapter = () => adapter;
 function mount(waveform: React.ReactElement) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   return render(
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={TRACKS}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createAdapter={createAdapter}
     >
       {waveform}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 }
 

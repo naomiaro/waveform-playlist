@@ -3,9 +3,7 @@ import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 
 import JSZip from 'jszip';
-import { type ClipTrack } from '@waveform-playlist/core';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { decodeAudioFiles } from '../../utils/decodeAudioFiles';
+import { audioTrack, type AudioTrackOptions } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -36,12 +34,14 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import {
   ExportWavButton,
   useDynamicEffects,
   useTrackDynamicEffects,
-  useAudioTracks,
   useExportWav,
 } from '@waveform-playlist/browser/tone';
 import {
@@ -53,6 +53,29 @@ import {
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { EffectRack, TrackEffectControls } from '../effects';
 import type { UseTrackDynamicEffectsReturn } from '@waveform-playlist/browser/tone';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
+import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
+
+// Track configurations - Albert Kader "Ubiquitous" minimal techno
+const audioConfigs: AudioTrackOptions[] = [
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+    name: 'Kick',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+    name: 'Bass',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
+    name: 'HiHat',
+  },
+  {
+    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+    name: 'Synth',
+  },
+];
 
 const Container = styled.div`
   display: flex;
@@ -355,11 +378,7 @@ interface EffectsControlsProps {
   trackEffectsManager: UseTrackDynamicEffectsReturn;
   isDarkMode: boolean;
   onDeleteTrack: (trackId: string) => void;
-  onAddTracks: (newTracks: ClipTrack[]) => void;
-  masterEffectsFunction: any;
-  trackCount: number;
   createOfflineMasterEffects: () => any;
-  tracks: ClipTrack[];
   isLoading?: boolean;
   loadedCount?: number;
   totalCount?: number;
@@ -370,11 +389,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   trackEffectsManager,
   isDarkMode,
   onDeleteTrack,
-  onAddTracks,
-  masterEffectsFunction,
-  trackCount,
   createOfflineMasterEffects,
-  tracks,
   isLoading,
   loadedCount,
   totalCount,
@@ -388,6 +403,9 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   const { tracks: contextTracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
   const { exportWav } = useExportWav();
+  const arrangement = useArrangement();
+  // Dropped files that could not be decoded: their tracks are removed, the list stays
+  const failedDrops = useFailedDrops(arrangement);
 
   // Get the offline effects functions when needed
   // Both are stable: they read the chains when the export runs.
@@ -443,15 +461,12 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
     }
   }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
 
-  // Handle dropped/selected audio files
-  const handleFiles = useCallback(async (files: File[]) => {
+  // Handle dropped/selected audio files: one track per file, named after the
+  // file without its extension; the arrangement loads each one
+  const handleFiles = useCallback((files: File[]) => {
     const audioFiles = files.filter(file => file.type.startsWith('audio/'));
-    if (audioFiles.length === 0) return;
-
-    const audioContext = getGlobalAudioContext();
-    const newTracks = await decodeAudioFiles(audioContext, audioFiles);
-    if (newTracks.length > 0) onAddTracks(newTracks);
-  }, [onAddTracks]);
+    audioFiles.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
+  }, [arrangement]);
 
   return (
     <>
@@ -465,39 +480,42 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           <ZoomOutButton />
           <MasterVolumeControl />
           <AutomaticScrollCheckbox />
-          {isLoading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+          <SourceLoadError arrangement={arrangement} />
         </ControlsRow>
         <VisualizerWrapper>
           <FrequencyVisualizer analyserRef={analyserRef} isDarkMode={isDarkMode} />
         </VisualizerWrapper>
       </TopBar>
 
-      <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
-        <WaveformRoot>
-          <WaveformTimescale />
-          <WaveformLoopRegion />
-          {/* The panel of a track, written once: the pieces are bound to the
-              track they are drawn for. The props are stable, so the panels do
-              not render with this component. */}
-          <WaveformTrackControls width={150}>
-            <TrackRemoveButton onRemove={onDeleteTrack} />
-            <Controls>
-              <Header style={{ justifyContent: 'center' }}>
-                <TrackName />
-              </Header>
-              <ButtonGroup>
-                <TrackMuteButton />
-                <TrackSoloButton />
-              </ButtonGroup>
-              <TrackVolumeSlider />
-              <TrackEffectsButton effectsManager={trackEffectsManager} />
-            </Controls>
-          </WaveformTrackControls>
-          <WaveformTracks />
-          <WaveformSelection />
-          <WaveformPlayhead />
-        </WaveformRoot>
-      </WaveformViewOptions>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            {/* The panel of a track, written once: the pieces are bound to the
+                track they are drawn for. The props are stable, so the panels do
+                not render with this component. */}
+            <WaveformTrackControls width={150}>
+              <TrackRemoveButton onRemove={onDeleteTrack} />
+              <Controls>
+                <Header style={{ justifyContent: 'center' }}>
+                  <TrackName />
+                </Header>
+                <ButtonGroup>
+                  <TrackMuteButton />
+                  <TrackSoloButton />
+                </ButtonGroup>
+                <TrackVolumeSlider />
+                <TrackEffectsButton effectsManager={trackEffectsManager} />
+              </Controls>
+            </WaveformTrackControls>
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={Boolean(isLoading)}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+      </LoadingBadgeFrame>
 
       <TimeControlsBar>
         <ControlGroup>
@@ -535,7 +553,6 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
             >
               {trackStates.map((state, index) => (
                 <option key={index} value={index}>
-                  {/* No entry yet for a track that is still loading. */}
                   {state?.name || `Track ${index + 1}`}
                 </option>
               ))}
@@ -583,6 +600,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           Add your own music to try out the effects! Supports MP3, WAV, OGG, and more.
         </DropZoneHint>
       </StyledDropZone>
+      <FailedDropsAlert drops={failedDrops} />
     </>
   );
 };
@@ -591,10 +609,13 @@ export function EffectsExample() {
   const { theme, isDarkMode } = useDocusaurusTheme();
   const defaultsAddedRef = useRef(false);
 
-  // Mutable tracks state
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // The arrangement owns the tracks and loads their audio: each row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
 
   // Create dynamic effects manager for master effects
   const effectsManager = useDynamicEffects(256);
@@ -604,99 +625,49 @@ export function EffectsExample() {
   const trackEffectsManager = useTrackDynamicEffects();
   const { addEffectToTrack, clearTrackEffects, getTrackEffectsFunction } = trackEffectsManager;
 
-  // Track configurations - Albert Kader "Ubiquitous" minimal techno
-  const audioConfigs = React.useMemo(() => [
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-      name: 'Kick',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-      name: 'Bass',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
-      name: 'HiHat',
-    },
-    {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-      name: 'Synth',
-    },
-  ], []);
-
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-
-  // Update local state as tracks finish loading
+  // Add default effects once the declared files have settled (only once),
+  // keyed by the ids of the tracks the arrangement holds then
   useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-      if (!loading) {
-        setIsLoading(false);
-      }
-    }
-    if (error) {
-      setLoadError(error);
-      setIsLoading(false);
-    }
-  }, [loadedTracks, loading, error]);
+    if (sources.isLoading || defaultsAddedRef.current) return;
+    const tracks = arrangement.getTracks();
+    if (tracks.length === 0) return;
+    defaultsAddedRef.current = true;
 
-  // Add default effects on mount (only once)
-  useEffect(() => {
-    if (!isLoading && tracks.length > 0 && !defaultsAddedRef.current) {
-      defaultsAddedRef.current = true;
+    // Add a reverb to the master effects chain
+    // The add functions return promises and reject if an effect cannot be built.
+    const report = (err: unknown) => console.error('Could not add effect: ' + String(err));
+    addMasterEffect('reverb').catch(report);
 
-      // Add a reverb to the master effects chain
-      // The add functions return promises and reject if an effect cannot be built.
-      const report = (err: unknown) => console.error('Could not add effect: ' + String(err));
-      addMasterEffect('reverb').catch(report);
+    // Add effects to individual tracks for demonstration
+    // Kick: Compressor for punch
+    if (tracks[0]) addEffectToTrack(tracks[0].id, 'compressor').catch(report);
 
-      // Add effects to individual tracks for demonstration
-      // Kick: Compressor for punch
-      if (tracks[0]) addEffectToTrack(tracks[0].id, 'compressor').catch(report);
+    // Bass: Distortion for grit
+    if (tracks[1]) addEffectToTrack(tracks[1].id, 'distortion').catch(report);
 
-      // Bass: Distortion for grit
-      if (tracks[1]) addEffectToTrack(tracks[1].id, 'distortion').catch(report);
+    // HiHat: Reverb for space
+    if (tracks[2]) addEffectToTrack(tracks[2].id, 'reverb').catch(report);
 
-      // HiHat: Reverb for space
-      if (tracks[2]) addEffectToTrack(tracks[2].id, 'reverb').catch(report);
-
-      // Synth: Ping Pong Delay
-      if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay').catch(report);
-    }
-  }, [isLoading, tracks, addMasterEffect, addEffectToTrack]);
+    // Synth: Ping Pong Delay
+    if (tracks[3]) addEffectToTrack(tracks[3].id, 'pingPongDelay').catch(report);
+  }, [sources.isLoading, arrangement, addMasterEffect, addEffectToTrack]);
 
   // Handle delete track
   const handleDeleteTrack = useCallback((trackId: string) => {
-    // Clear effects for this track
+    // Clear effects for this track. The removal is not an undo step: an undo
+    // would bring the track back without the effects cleared here
     clearTrackEffects(trackId);
-    setTracks(prevTracks => prevTracks.filter((track) => track.id !== trackId));
-  }, [clearTrackEffects]);
-
-  // Handle add tracks
-  const handleAddTracks = useCallback((newTracks: ClipTrack[]) => {
-    setTracks(prevTracks => [...prevTracks, ...newTracks]);
-  }, []);
-
-  if (loadError) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {loadError}
-        </div>
-      </Container>
-    );
-  }
+    arrangement.removeTrack(trackId, { undoable: false });
+  }, [clearTrackEffects, arrangement]);
 
   return (
     <Container>
       <EffectRack effectsManager={effectsManager} />
 
       <WaveformPlaylistProvider
-        tracks={tracks}
+        arrangement={arrangement}
         trackEffects={getTrackEffectsFunction}
         sampleRate={48000}
-        onTracksChange={setTracks}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         theme={theme}
@@ -709,12 +680,8 @@ export function EffectsExample() {
           trackEffectsManager={trackEffectsManager}
           isDarkMode={isDarkMode}
           onDeleteTrack={handleDeleteTrack}
-          onAddTracks={handleAddTracks}
-          masterEffectsFunction={masterEffects}
-          trackCount={tracks.length}
           createOfflineMasterEffects={createOfflineEffectsFunction}
-          tracks={tracks}
-          isLoading={loading}
+          isLoading={sources.isLoading}
           loadedCount={loadedCount}
           totalCount={totalCount}
         />

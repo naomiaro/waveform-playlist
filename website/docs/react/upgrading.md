@@ -104,14 +104,14 @@ These three exports were a standalone playback-status context (`progress`, `isPl
 
 **Replace with:** the hooks of the provider you already render, from `@waveform-playlist/browser`. Delete the `<PlayoutProvider>` wrapper.
 
-| Removed                                               | Inside `WaveformPlaylistProvider`                                                 | Inside `MediaElementPlaylistProvider`                         |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `usePlayoutStatus().isPlaying`                        | `usePlaybackAnimation().isPlaying`                                                | `useMediaElementAnimation().isPlaying`                        |
-| `usePlayoutStatus().progress`                         | `useCurrentTime().currentTime` (seconds), or `currentTimeRef` for per-frame reads | `useMediaElementAnimation().currentTime`, or `currentTimeRef` |
-| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `useSelection().selectionStart` / `.selectionEnd`                                 | no selection in this provider                                 |
-| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaylistControls().play()` / `.pause()`                                       | `useMediaElementControls().play()` / `.pause()`               |
-| `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaylistControls().seekTo(t)`                                                 | `useMediaElementControls().seekTo(t)`                         |
-| `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaylistControls().setSelection(start, end)`                                  | no selection in this provider                                 |
+| Removed                                               | Under either provider                                                                                  |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `usePlayoutStatus().isPlaying`                        | `useIsPlaying().isPlaying`                                                                             |
+| `usePlayoutStatus().progress`                         | `useCurrentTime().currentTime` (seconds), or `usePlaybackRefs().currentTimeRef` for per-frame reads    |
+| `usePlayoutStatus().selectionStart` / `.selectionEnd` | `useSelection().selectionStart` / `.selectionEnd`                                                      |
+| `usePlayoutStatusUpdate().setIsPlaying(true / false)` | `usePlaybackControls().play()` / `.pause()`                                                            |
+| `usePlayoutStatusUpdate().setProgress(t)`             | `usePlaybackControls().seekTo(t)`                                                                      |
+| `usePlayoutStatusUpdate().setSelection(start, end)`   | `usePlaybackControls().setSelection(start, end)`                                                       |
 
 ```tsx
 // Before
@@ -123,18 +123,14 @@ function Status() {
 }
 
 // After
-import { usePlaybackAnimation, useSelection } from '@waveform-playlist/browser';
+import { useIsPlaying, useSelection } from '@waveform-playlist/browser';
 
 function Status() {
-  const { isPlaying } = usePlaybackAnimation();
+  const { isPlaying } = useIsPlaying();
   const { selectionStart, selectionEnd } = useSelection();
   // ...
 }
 ```
-
-**Note:** `usePlaybackAnimation()` is removed later in this major. `isPlaying` is now on `useIsPlaying()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
-
-**Note:** `usePlaylistControls()`, `useMediaElementAnimation()` and `useMediaElementControls()`, named in the table above, are also removed later in this major, and `MediaElementPlaylistProvider` now has a selection. Under either provider use `useIsPlaying().isPlaying`, `useCurrentTime().currentTime` (or `currentTimeRef` from `usePlaybackRefs()`), `useSelection()`, and `play`, `pause`, `seekTo` and `setSelection` from `usePlaybackControls()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 If you used the context on its own, without a playlist provider, to hold your own state, replace it with a React context of your own; there is no drop-in export.
 
@@ -152,7 +148,7 @@ If you used the context on its own, without a playlist provider, to hold your ow
 
 **Package:** `@waveform-playlist/browser`.
 
-The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => ReactNode`, but it never received a time in milliseconds: it was given `parseFloat` of the formatted tick label, which is the minutes part (`"0:30"` → `0`, `"1:00"` → `1`), or the bar and beat read as a decimal number in beats mode (`"2.3"` gave `2.3`). It is removed; `renderTick` is the only label callback.
+The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => ReactNode`, but it never received a time in milliseconds: it was given `parseFloat` of the formatted tick label, which is the minutes part (`"0:30"` → `0`, `"1:00"` → `1`), or the bar and beat read as a decimal number in beats mode (`"2.3"` gave `2.3`). It is removed; `renderTick` is the only label callback. It is an option of the timescale part, `<WaveformTimescale renderTick>`, in a composition of the view (see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)).
 
 **Find:** `renderTimestamp=` on `<Waveform>`.
 
@@ -163,7 +159,13 @@ The deprecated `renderTimestamp` prop was typed as `(timeMs, pixelPosition) => R
 <Waveform renderTimestamp={(timeMs, pixelPosition) => <MyLabel time={timeMs} />} />
 
 // After: show the label as it is
-<Waveform renderTick={(label, pixelPosition) => <MyLabel text={label} />} />
+<WaveformRoot>
+  <WaveformTimescale renderTick={(label, pixelPosition) => <MyLabel text={label} />} />
+  <WaveformTrackControls />
+  <WaveformTracks />
+  <WaveformSelection />
+  <WaveformPlayhead />
+</WaveformRoot>
 ```
 
 If the old callback really needs milliseconds, parse the label. In the temporal scale it is always `m:ss` on a whole second:
@@ -174,7 +176,7 @@ function labelToMs(label: string): number {
   return (minutes * 60 + seconds) * 1000;
 }
 
-<Waveform renderTick={(label, pixelPosition) => <MyLabel time={labelToMs(label)} />} />;
+<WaveformTimescale renderTick={(label, pixelPosition) => <MyLabel time={labelToMs(label)} />} />;
 ```
 
 Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat (`"2"`, `"2.3"`), not a time, and `labelToMs` does not apply.
@@ -183,7 +185,7 @@ Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat
 
 **Package:** `@waveform-playlist/browser`.
 
-`usePlaylistData().audioBuffers` was a flat list of every clip's `AudioBuffer`, filled in by an effect, so it lagged `tracks` by at least one render. Nothing in the library read it. The buffers are on the clips.
+`usePlaylistData().audioBuffers` was a flat list of every clip's `AudioBuffer`, filled in by an effect, so it lagged `tracks` by at least one render. Nothing in the library read it. The buffers are on the clips. (`usePlaylistData()` itself is replaced by smaller hooks: see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields). `tracks` is on `usePlaylistTimeline()`.)
 
 **Find:** `audioBuffers` read from `usePlaylistData()`.
 
@@ -194,20 +196,18 @@ Inside `BeatsAndBarsProvider` with `scaleMode="beats"` the label is bar and beat
 const { audioBuffers } = usePlaylistData();
 
 // After
-const { tracks } = usePlaylistData();
+const { tracks } = usePlaylistTimeline();
 const audioBuffers = tracks.flatMap((track) =>
   track.clips.flatMap((clip) => (clip.audioBuffer ? [clip.audioBuffer] : []))
 );
 ```
 
-**Note:** `usePlaylistData()` is removed later in this major. `tracks` is now on `usePlaylistTimeline()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
+Two related values keep their names and types (now on `usePlaylistTimeline()`) but are derived from the tracks during render instead of being set by an effect:
 
-Two related values on `usePlaylistData()` keep their names and types but are now derived from `tracks` during render instead of being set by an effect:
-
-- `duration` and `peaksDataArray` already match `tracks` in the render that receives new tracks. Code that waited a render for them (for example an effect that compared `peaksDataArray.length` with `tracks.length`) no longer needs to.
+- `duration` and `peaksDataArray` already match `tracks` in the render that has the new tracks. Code that waited a render for them (for example an effect that compared `peaksDataArray.length` with `tracks.length`) no longer needs to.
 - `peaksDataArray` keeps the identity of everything that did not change: a clip's `peaks`, its entry, and its track's array. It is safe to use them as memo or effect dependencies.
 - `<Waveform>` no longer renders the text "Loading waveform..." before the first peaks; clips render at once and their waveforms fill in.
-- `<Waveform className="…">` now sets the class on the playlist's outermost element (the one with `data-playlist-state`). Before, the class was only on the "Loading waveform..." placeholder and disappeared once the playlist rendered, so check that a class you pass there has the styles you want on the whole playlist.
+- `<Waveform className="…">` (and `<WaveformRoot className="…">`) now sets the class on the playlist's outermost element (the one with `data-playlist-state`). Before, the class was only on the "Loading waveform..." placeholder and disappeared once the playlist rendered, so check that a class you pass there has the styles you want on the whole playlist.
 
 ## `formatTime` is removed from `usePlaylistControls()`, and `minimumPlaylistHeight` from `usePlaylistData()`
 
@@ -215,11 +215,11 @@ Two related values on `usePlaylistData()` keep their names and types but are now
 
 Nothing in the library read either field.
 
-`usePlaylistControls().formatTime` formatted a time in the playlist's current time format. It was a new function after every `setTimeFormat`, which made the whole controls value change, so every component that calls `usePlaylistControls()` rendered again. The value returned by `usePlaylistControls()` no longer changes with the time format, or with `duration`. The value returned by `useMediaElementControls()` no longer changes when the track's duration arrives.
+`usePlaylistControls().formatTime` formatted a time in the playlist's current time format. It was a new function after every `setTimeFormat`, which made the whole controls value change, so every component that called `usePlaylistControls()` rendered again. The controls that replace it (`usePlaybackControls()`, `useEditorControls()`: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers)) never change, neither with the time format nor with `duration`.
 
 **Find:** `formatTime` read from `usePlaylistControls()`.
 
-**Replace with:** `formatTime` from `@waveform-playlist/ui-components` and the `timeFormat` from `usePlaylistData()`:
+**Replace with:** `formatTime` from `@waveform-playlist/ui-components` and the `timeFormat` from `usePlaylistSettings()`:
 
 ```tsx
 // Before
@@ -229,7 +229,7 @@ const label = formatTime(seconds);
 // After
 import { formatTime } from '@waveform-playlist/ui-components';
 
-const { timeFormat } = usePlaylistData();
+const { timeFormat } = usePlaylistSettings();
 const label = formatTime(seconds, timeFormat);
 ```
 
@@ -237,18 +237,19 @@ const label = formatTime(seconds, timeFormat);
 
 **Find:** `minimumPlaylistHeight` read from `usePlaylistData()`.
 
-**Replace with:** the same sum, from values that are still there:
+**Replace with:** the same sum, from the values that hold it now: the tracks from `usePlaylistTimeline()`, and inside a root of the view the row height and the timescale height from `usePlaylistInfo()` (`@waveform-playlist/ui-components`; `waveHeight` is set with `<WaveformViewOptions>`, see [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)):
 
 ```tsx
 // Before
 const { minimumPlaylistHeight } = usePlaylistData();
 
-// After
-const { tracks, waveHeight, timeScaleHeight } = usePlaylistData();
+// After (in a component drawn inside a root)
+import { usePlaylistInfo } from '@waveform-playlist/ui-components';
+
+const { tracks } = usePlaylistTimeline();
+const { waveHeight, timeScaleHeight } = usePlaylistInfo();
 const minimumPlaylistHeight = tracks.length * waveHeight + timeScaleHeight;
 ```
-
-**Note:** `usePlaylistData()` is removed later in this major. `timeFormat` went to `usePlaylistSettings()` and `tracks` to `usePlaylistTimeline()`. `waveHeight` and `timeScaleHeight` went to `usePlaylistView()` and were removed from it again by later entries: `timeScaleHeight` in [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed), `waveHeight` in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers) (a prop of `<WaveformViewOptions>`; inside a root, `usePlaylistInfo().waveHeight`). See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields). `usePlaylistControls()` and `useMediaElementControls()` are removed later too: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
 ## `interactiveClips` and `touchOptimized` are removed from `<Waveform>`; use `ClipInteractionOptions`
 
@@ -272,9 +273,9 @@ Whether clips can be dragged and trimmed, and whether their trim handles are wid
   <Waveform showClipHeaders interactiveClips touchOptimized />
 </ClipInteractionProvider>
 
-// After
+// After (`<WaveformEditor />` is the view with clip headers and fades: see the view parts entry)
 <ClipInteractionProvider touchOptimized>
-  <Waveform showClipHeaders />
+  <WaveformEditor />
 </ClipInteractionProvider>
 ```
 
@@ -287,11 +288,11 @@ Whether clips can be dragged and trimmed, and whether their trim handles are wid
 </ClipInteractionProvider>
 
 // After
-import { ClipInteractionOptions } from '@waveform-playlist/browser';
+import { ClipInteractionOptions, WaveformEditor } from '@waveform-playlist/browser';
 
 <ClipInteractionProvider>
   <ClipInteractionOptions touchOptimized>
-    <Waveform showClipHeaders />
+    <WaveformEditor />
   </ClipInteractionOptions>
 </ClipInteractionProvider>
 ```
@@ -309,11 +310,11 @@ import { ClipInteractionOptions } from '@waveform-playlist/browser';
 </DragDropProvider>
 
 // After
-import { ClipInteractionOptions } from '@waveform-playlist/browser';
+import { ClipInteractionOptions, WaveformEditor } from '@waveform-playlist/browser';
 
 <DragDropProvider sensors={sensors} /* … */>
   <ClipInteractionOptions enabled touchOptimized>
-    <Waveform showClipHeaders />
+    <WaveformEditor />
   </ClipInteractionOptions>
 </DragDropProvider>
 ```
@@ -325,7 +326,7 @@ Use `enabled` alone where you had `interactiveClips` alone.
 **Behaviour that changes without a code change:**
 
 - `<ClipInteractionProvider touchOptimized>` now also widens the trim handles, from 8px to 24px. If you set the flag on the provider only and want to keep the narrow handles, nest `<ClipInteractionOptions touchOptimized={false}>` inside the provider.
-- `<PlaylistVisualization>` used directly inside a `ClipInteractionProvider` now has interactive clips. Before, only `<Waveform>` picked that up from the provider. To keep them static, nest `<ClipInteractionOptions enabled={false}>`.
+- A view used directly inside a `ClipInteractionProvider` has interactive clips, whatever root or composition it is (`<PlaylistVisualization>` did not pick that up from the provider before; it is replaced by the view's parts). To keep them static, nest `<ClipInteractionOptions enabled={false}>`.
 - `<Waveform interactiveClips={false}>` inside a `ClipInteractionProvider` never switched interaction off (the provider's value won). `<ClipInteractionOptions enabled={false}>` does.
 - A `ClipInteractionProvider` without `touchOptimized` now inherits it from a `ClipInteractionProvider` or `ClipInteractionOptions` above it. If you nest a plain provider inside `<ClipInteractionProvider touchOptimized>`, the inner one used to have mouse-tuned sensors and 8px handles; it now has the 250ms touch-hold sensors and 24px handles. Set `touchOptimized={false}` on the inner provider to keep what you had.
 - A `ClipInteractionProvider` always makes the clips below it interactive, also inside `<ClipInteractionOptions enabled={false}>`. Put `<ClipInteractionOptions enabled={false}>` inside the provider to switch interaction off.
@@ -339,7 +340,7 @@ The selection changes on every pointer move of a selection drag; nothing else in
 
 **Find:** `selectionStart` or `selectionEnd` destructured or read from `usePlaylistState()`.
 
-**Replace with:** `useSelection()`, and keep `usePlaylistState()` for the other fields:
+**Replace with:** `useSelection()`. The other fields of `usePlaylistState()` are on their own hooks too (`isLoopEnabled` on `useLoop()`: see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields)):
 
 ```tsx
 // Before
@@ -348,17 +349,13 @@ import { usePlaylistState } from '@waveform-playlist/browser';
 const { selectionStart, selectionEnd, isLoopEnabled } = usePlaylistState();
 
 // After
-import { usePlaylistState, useSelection } from '@waveform-playlist/browser';
+import { useLoop, useSelection } from '@waveform-playlist/browser';
 
 const { selectionStart, selectionEnd } = useSelection();
-const { isLoopEnabled } = usePlaylistState();
+const { isLoopEnabled } = useLoop();
 ```
 
-**Note:** `usePlaylistState()` is removed later in this major. "Keep `usePlaylistState()` for the other fields" then means: read them from the hook that has them, for example `isLoopEnabled` from `useLoop()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
-
-`setSelection(start, end)` stays on `usePlaylistControls()`. `useSelection()` must be called inside `WaveformPlaylistProvider`; `MediaElementPlaylistProvider` exposes no selection and its hooks are unchanged.
-
-**Note:** both statements are replaced later in this major. `setSelection` is now on `usePlaybackControls()`, and `useSelection()` works under either provider. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+`setSelection(start, end)` is on `usePlaybackControls()`. `useSelection()` works under either provider.
 
 A component that calls `useSelection()` re-renders on every pointer move of a drag, so call it in the smallest component that shows the selection, not in a component that also renders a long list.
 
@@ -372,7 +369,7 @@ Fixed along the way: dragging a selection from right to left now selects the who
 
 **Find:** `currentTime` destructured or read from `usePlaybackAnimation()`.
 
-**Replace with:** `useCurrentTime()`, and keep `usePlaybackAnimation()` for the other fields:
+**Replace with:** `useCurrentTime()`. The other fields of `usePlaybackAnimation()` are on `useIsPlaying()` and `usePlaybackRefs()` (see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields)):
 
 ```tsx
 // Before
@@ -381,20 +378,20 @@ import { usePlaybackAnimation } from '@waveform-playlist/browser';
 const { currentTime, isPlaying } = usePlaybackAnimation();
 
 // After
-import { useCurrentTime, usePlaybackAnimation } from '@waveform-playlist/browser';
+import { useCurrentTime, useIsPlaying } from '@waveform-playlist/browser';
 
 const { currentTime } = useCurrentTime();
-const { isPlaying } = usePlaybackAnimation();
+const { isPlaying } = useIsPlaying();
 ```
 
-If the value is only needed inside an event handler or a callback, do not subscribe at all; read the ref when the handler runs:
+If the value is only needed inside an event handler or a callback, do not subscribe at all; read the ref when the handler runs (`usePlaybackRefs()` never re-renders the component that calls it):
 
 ```tsx
-const { currentTimeRef } = usePlaybackAnimation();
+const { currentTimeRef } = usePlaybackRefs();
 const addMarker = () => createMarkerAt(currentTimeRef.current ?? 0);
 ```
 
-**Also find (no type error, and a search for `currentTime` misses it):** every component that calls `usePlaybackAnimation()` and reads `currentTimeRef.current` (or `visualTimeRef.current`) while rendering, or in an effect without a dependency array, to show the position while stopped. Such a component never mentions `currentTime`, so it still compiles. It used to be re-rendered by `usePlaybackAnimation()` on every seek; it no longer is, so its display stays at the old position after a seek, a pause-and-seek or a selection change, until playback starts or stops. Search for `currentTimeRef.current` and `visualTimeRef.current` and check each use that is not inside an event handler or a frame callback.
+**Also find (a search for `currentTime` misses it):** every component that called `usePlaybackAnimation()` and read `currentTimeRef.current` (or `visualTimeRef.current`) while rendering, or in an effect without a dependency array, to show the position while stopped. It used to be re-rendered by `usePlaybackAnimation()` on every seek; with the ref from `usePlaybackRefs()` it is not, so its display would stay at the old position after a seek, a pause-and-seek or a selection change. Search for `currentTimeRef.current` and `visualTimeRef.current` and check each use that is not inside an event handler or a frame callback.
 
 **Replace with:** a `useCurrentTime()` call in that component, and use its value:
 
@@ -406,18 +403,14 @@ useEffect(() => {
 });
 
 // After
-const { isPlaying } = usePlaybackAnimation();
+const { isPlaying } = useIsPlaying();
 const { currentTime } = useCurrentTime();
 useEffect(() => {
   if (!isPlaying) label.current.textContent = format(currentTime);
 }, [isPlaying, currentTime]);
 ```
 
-**Note:** `usePlaybackAnimation()` is removed later in this major. `isPlaying` is now on `useIsPlaying()` and the refs (`currentTimeRef`, `visualTimeRef`) on `usePlaybackRefs()`, which never re-renders the component that calls it; the advice above about `useCurrentTime()` applies unchanged. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
-
-A custom `renderPlayhead` function needs no change: it is called again with the new `position` after a seek. `setCurrentTime(t)` and `seekTo(t)` stay on `usePlaylistControls()`. `useCurrentTime()` must be called inside `WaveformPlaylistProvider`; `useMediaElementAnimation()` is unchanged and still returns `currentTime`.
-
-**Note:** this paragraph is replaced later in this major. `seekTo(t)` is now on `usePlaybackControls()` and `setCurrentTime(t)` on `useEditorControls()`; `useMediaElementAnimation()` is removed and `useCurrentTime()` works under either provider. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+A custom `renderPlayhead` function needs no change: it is called again with the new `position` after a seek. `seekTo(t)` is on `usePlaybackControls()` and `setCurrentTime(t)` on `useEditorControls()`. `useCurrentTime()` works under either provider.
 
 ## `activeAnnotationId` moves from `usePlaylistState()` to `useActiveAnnotation()`
 
@@ -427,7 +420,7 @@ The active annotation changes at every annotation boundary during playback; noth
 
 **Find:** `activeAnnotationId` destructured or read from `usePlaylistState()`.
 
-**Replace with:** `useActiveAnnotation()`, and keep `usePlaylistState()` for the other fields:
+**Replace with:** `useActiveAnnotation()`. `annotations` is on `useAnnotations()`:
 
 ```tsx
 // Before
@@ -436,17 +429,13 @@ import { usePlaylistState } from '@waveform-playlist/browser';
 const { annotations, activeAnnotationId } = usePlaylistState();
 
 // After
-import { usePlaylistState, useActiveAnnotation } from '@waveform-playlist/browser';
+import { useAnnotations, useActiveAnnotation } from '@waveform-playlist/browser';
 
-const { annotations } = usePlaylistState();
+const { annotations } = useAnnotations();
 const { activeAnnotationId } = useActiveAnnotation();
 ```
 
-**Note:** `usePlaylistState()` is removed later in this major. `annotations` is now on `usePlaylistAnnotations()`. See [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields).
-
-`setActiveAnnotationId(id)` stays on `usePlaylistControls()`. `useActiveAnnotation()` must be called inside `WaveformPlaylistProvider`; `useMediaElementState()` is unchanged and still returns `activeAnnotationId`.
-
-**Note:** this paragraph is replaced later in this major. `setActiveAnnotationId(id)` is now on `usePlaybackControls()`; `useMediaElementState()` is removed and `useActiveAnnotation()` works under either provider. The `annotations` field named in the note above is on `useAnnotations()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+`setActiveAnnotationId(id)` is on `usePlaybackControls()`. `useActiveAnnotation()` works under either provider (under `MediaElementPlaylistProvider` it replaces `useMediaElementState().activeAnnotationId`).
 
 A component that calls `useActiveAnnotation()` re-renders at every annotation boundary during playback, so call it in a small component that shows the active annotation, not in the component that renders the whole page.
 
@@ -456,109 +445,82 @@ A component that calls `useActiveAnnotation()` re-renders at every annotation bo
 
 Four hooks are removed from `@waveform-playlist/browser`: `usePlaylistData()`, `usePlaylistState()`, `usePlaybackAnimation()` and `usePlaylistDataOptional()`. A context subscription is to the whole value, so a component that called `usePlaylistData()` for `sampleRate` also re-rendered on every step of a volume slider and on every pointer move of a trim, and one that called `usePlaybackAnimation()` for a ref re-rendered on play and stop. Each removed hook is replaced by hooks that return one group of fields that change together, so a component re-renders only for the group it reads.
 
-`usePlaylistControls()`, `useSelection()`, `useCurrentTime()` and `useActiveAnnotation()` are unchanged. The MediaElement hooks (`useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()`, `useMediaElementData()`) are unchanged.
-
-This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, `usePlaylistData()`, `usePlaylistState()` or `usePlaybackAnimation()`, use the hook from the tables below.
-
-**Note:** three hooks named in this entry are changed again later in this major, and the four MediaElement hooks are removed. `usePlaylistControls()` is replaced by `usePlaybackControls()` and `useEditorControls()`; `usePlaylistAnnotations()` by `useAnnotations()` and `useAnnotationEditing()`; `usePlaybackRefs()` keeps `currentTimeRef`, `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback`, and its other eight fields (`playoutRef` and `isDraggingRef` among them) are on `useEngineRefs()`, where `isDraggingRef` is removed again later in this major (see [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs)). When migrating in one go, apply the tables below and then [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers), or go straight to the hook that entry names for each field.
+`usePlaylistControls()` and the four MediaElement hooks (`useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()`, `useMediaElementData()`) are removed too: [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers) says where their fields went. Where an entry on this page says to read a field from `usePlaylistData()`, `usePlaylistState()` or `usePlaybackAnimation()`, use the hook from the tables below.
 
 ### The new hooks
 
-All of them are exported from `@waveform-playlist/browser` and must be called inside `WaveformPlaylistProvider`; outside it they throw `<hook name> must be used within WaveformPlaylistProvider`.
+All of them are exported from `@waveform-playlist/browser`. The first group works under either provider; the second needs `WaveformPlaylistProvider`. Outside a provider a hook throws `<hook name> must be used within …`, naming the provider or providers that serve it; under the other kind of provider it throws `<hook name> needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it` (or the reverse).
 
-| Hook                       | Returns                                                                                                                                                                                                                                             | The component re-renders on                        |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| `usePlaylistView()`        | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (`waveHeight`, the four bar and playhead fields and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers))                                                                                    | a provider prop change (and once when the real sample rate is known)|
-| `usePlaylistSettings()`    | `timeFormat`, `isAutomaticScroll`                                                                                                                                                                                                                   | the user changing either setting                                    |
-| `usePlaylistZoom()`        | `samplesPerPixel`, `canZoomIn`, `canZoomOut`                                                                                                                                                                                                        | a zoom                                             |
-| `usePlaylistTimeline()`    | `tracks`, `peaksDataArray`, `duration`, `isReady`, `onTracksChange`                                                                                                                                                                                 | every clip operation, every pointer move of a trim, a zoom (`peaksDataArray` is computed per zoom level), loading finishing (`isReady`), peaks arriving|
-| `usePlaylistMixer()`       | `trackStates`, `masterVolume`                                                                                                                                                                                                                       | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed or reordered|
-| `useTrackReorderPreview()` | `trackDragPreview`, `trackReorderEpoch`                                                                                                                                                                                                             | every drag-over of a track reorder                 |
-| `usePlaylistAnnotations()` | `annotations`, `annotationsEditable`, `linkEndpoints`, `continuousPlay`                                                                                                                                                                             | an annotation edit, an annotation settings toggle  |
-| `useLoop()`                | `isLoopEnabled`, `loopStart`, `loopEnd`                                                                                                                                                                                                             | a loop change                                      |
-| `useSelectedTrackId()`     | `selectedTrackId`                                                                                                                                                                                                                                   | another track being selected                       |
-| `useUndoRedo()`            | `canUndo`, `canRedo`                                                                                                                                                                                                                                | after an edit                                      |
-| `useIsPlaying()`           | `isPlaying`                                                                                                                                                                                                                                         | play, pause, stop                                  |
-| `usePlaybackRefs()`        | `currentTimeRef`, `visualTimeRef`, `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `registerFrameCallback`, `unregisterFrameCallback`, `playoutRef`, `isDraggingRef` | never (the value keeps its identity)               |
+| Hook | Returns | The component re-renders on |
+| --- | --- | --- |
+| `usePlaylistView()` (either provider) | `sampleRate`, `mono`, `indefinitePlayback` | a provider prop change (and once when the real sample rate is known) |
+| `usePlaylistSettings()` (either provider) | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
+| `usePlaylistZoom()` (either provider) | `samplesPerPixel`, `canZoomIn`, `canZoomOut` | a zoom |
+| `useIsPlaying()` (either provider) | `isPlaying` | play, pause, stop |
+| `usePlaybackRefs()` (either provider) | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | never (the value keeps its identity) |
+| `useAnnotations()` (either provider) | `annotations` | an annotation edit |
+| `useAnnotationOptions()` (either provider) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three being toggled |
+| `usePlaylistTimeline()` | `tracks`, `peaksDataArray`, `duration`, `isReady` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), audio or peaks arriving, `isReady` changing |
+| `usePlaylistMixer()` | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed, renamed or reordered |
+| `useTrackReorderPreview()` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
+| `useLoop()` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
+| `useSelectedTrackId()` | `selectedTrackId` | another track being selected |
+| `useUndoRedo()` | `canUndo`, `canRedo` | after an edit |
+| `useEngineRefs()` | `playoutRef`, `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency` | never (the value keeps its identity) |
 
-**Note:** "must be called inside `WaveformPlaylistProvider`" is changed later in this major. `usePlaylistView()`, `usePlaylistSettings()`, `usePlaylistZoom()`, `useIsPlaying()` and `usePlaybackRefs()` can also be called inside `MediaElementPlaylistProvider`, and the message a hook throws names the provider or providers that serve it. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+The value types are exported too: `PlaylistViewContextValue`, `PlaylistSettingsContextValue`, `PlaylistZoomContextValue`, `IsPlayingContextValue`, `PlaybackRefsContextValue`, `AnnotationsContextValue`, `AnnotationOptionsContextValue`, `PlaylistTimelineContextValue`, `PlaylistMixerContextValue`, `TrackReorderPreviewContextValue`, `LoopContextValue`, `SelectedTrackIdContextValue`, `UndoRedoContextValue` and `EngineRefsContextValue`. `ClipPeaks`, `TrackClipPeaks` and `TrackDragPreview` are exported as well, so every field of these values can be named.
 
-The value types are exported too: `PlaylistViewContextValue`, `PlaylistSettingsContextValue`, `PlaylistZoomContextValue`, `PlaylistTimelineContextValue`, `PlaylistMixerContextValue`, `TrackReorderPreviewContextValue`, `PlaylistAnnotationsContextValue`, `LoopContextValue`, `SelectedTrackIdContextValue`, `UndoRedoContextValue`, `IsPlayingContextValue`, `PlaybackRefsContextValue`, and, for the unchanged hooks, `PlaylistControlsContextValue`, `SelectionContextValue`, `CurrentTimeContextValue` and `ActiveAnnotationContextValue`. `ClipPeaks`, `TrackClipPeaks` and `TrackDragPreview` are exported as well, so every field of these values can be named.
-
-`timeFormat` and `isAutomaticScroll`, the two settings a user toggles, have their own hook and are not part of `usePlaylistView()`: every clip's progress overlay and the visualization read the view value, so a toggle there would re-render all of them.
+`timeFormat` and `isAutomaticScroll`, the two settings a user toggles, have their own hook and are not part of `usePlaylistView()`: every clip's progress overlay and the view read the view value, so a toggle there would re-render all of them.
 
 ### Where each field went
 
 **Find:** `usePlaylistData`, `usePlaylistState`, `usePlaybackAnimation` and `usePlaylistDataOptional` (imports and calls).
 
-**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses. (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).)
+**Replace with:** for each field the component reads, the place in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
 
 From `usePlaylistData()`:
 
-| Field               | Now from                   |
-| ------------------- | -------------------------- |
-| `sampleRate`        | `usePlaylistView()`        |
-| `waveHeight`        | `usePlaylistView()`        |
-| `timeScaleHeight`   | `usePlaylistView()`        |
-| `controls`          | `usePlaylistView()`        |
-| `barWidth`          | `usePlaylistView()`        |
-| `barGap`            | `usePlaylistView()`        |
-| `roundedBars`       | `usePlaylistView()`        |
-| `progressBarWidth`  | `usePlaylistView()`        |
-| `mono`              | `usePlaylistView()`        |
-| `timeFormat`        | `usePlaylistSettings()`    |
-| `samplesPerPixel`   | `usePlaylistZoom()`        |
-| `canZoomIn`         | `usePlaylistZoom()`        |
-| `canZoomOut`        | `usePlaylistZoom()`        |
-| `tracks`            | `usePlaylistTimeline()`    |
-| `peaksDataArray`    | `usePlaylistTimeline()`    |
-| `duration`          | `usePlaylistTimeline()`    |
-| `isReady`           | `usePlaylistTimeline()`    |
-| `onTracksChange`    | `usePlaylistTimeline()`    |
-| `trackStates`       | `usePlaylistMixer()`       |
-| `masterVolume`      | `usePlaylistMixer()`       |
-| `trackDragPreview`  | `useTrackReorderPreview()` |
-| `trackReorderEpoch` | `useTrackReorderPreview()` |
-| `playoutRef`        | `usePlaybackRefs()`        |
-| `isDraggingRef`     | `usePlaybackRefs()` (removed later: see the entry on `isDraggingRef`) |
+| Field | Now from |
+| --- | --- |
+| `sampleRate` | `usePlaylistView()` |
+| `mono` | `usePlaylistView()` |
+| `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` | props of `<WaveformViewOptions>`; inside a root of the view, `usePlaylistInfo()` from `@waveform-playlist/ui-components` (see [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) |
+| `timeScaleHeight` | the `height` of `<WaveformTimescale>` (30 px without one); inside a root, `usePlaylistInfo().timeScaleHeight` (see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)) |
+| `controls` | removed: the column is the `<WaveformTrackControls width>` part (same entry) |
+| `timeFormat` | `usePlaylistSettings()` |
+| `samplesPerPixel`, `canZoomIn`, `canZoomOut` | `usePlaylistZoom()` |
+| `tracks`, `peaksDataArray`, `duration`, `isReady` | `usePlaylistTimeline()` |
+| `onTracksChange` | removed: see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed) |
+| `trackStates`, `masterVolume` | `usePlaylistMixer()` |
+| `trackDragPreview`, `trackReorderEpoch` | `useTrackReorderPreview()` |
+| `playoutRef` | `useEngineRefs()` |
+| `isDraggingRef` | removed: see [`isDraggingRef` is removed](#isdraggingref-is-removed) |
 
 From `usePlaylistState()`:
 
-| Field                 | Now from                   |
-| --------------------- | -------------------------- |
-| `annotations`         | `usePlaylistAnnotations()` |
-| `annotationsEditable` | `usePlaylistAnnotations()` |
-| `linkEndpoints`       | `usePlaylistAnnotations()` |
-| `continuousPlay`      | `usePlaylistAnnotations()` |
-| `isLoopEnabled`       | `useLoop()`                |
-| `loopStart`           | `useLoop()`                |
-| `loopEnd`             | `useLoop()`                |
-| `selectedTrackId`     | `useSelectedTrackId()`     |
-| `canUndo`             | `useUndoRedo()`            |
-| `canRedo`             | `useUndoRedo()`            |
-| `isAutomaticScroll`   | `usePlaylistSettings()`    |
-| `indefinitePlayback`  | `usePlaylistView()`        |
-| `fillViewport`        | `usePlaylistView()`        |
+| Field | Now from |
+| --- | --- |
+| `annotations` | `useAnnotations()` |
+| `annotationsEditable` | `useAnnotationOptions().editable` |
+| `linkEndpoints`, `continuousPlay` | `useAnnotationOptions()` |
+| `isLoopEnabled`, `loopStart`, `loopEnd` | `useLoop()` |
+| `selectedTrackId` | `useSelectedTrackId()` |
+| `canUndo`, `canRedo` | `useUndoRedo()` |
+| `isAutomaticScroll` | `usePlaylistSettings()` |
+| `indefinitePlayback` | `usePlaylistView()` |
+| `fillViewport` | a prop of `<WaveformViewOptions>` (no reader) |
 
 From `usePlaybackAnimation()`:
 
-| Field                     | Now from            |
-| ------------------------- | ------------------- |
-| `isPlaying`               | `useIsPlaying()`    |
-| `currentTimeRef`          | `usePlaybackRefs()` |
-| `visualTimeRef`           | `usePlaybackRefs()` |
-| `playbackStartTimeRef`    | `usePlaybackRefs()` |
-| `audioStartPositionRef`   | `usePlaybackRefs()` |
-| `getPlaybackTime`         | `usePlaybackRefs()` |
-| `getAudioContextTime`     | `usePlaybackRefs()` |
-| `getLookAhead`            | `usePlaybackRefs()` |
-| `getOutputLatency`        | `usePlaybackRefs()` |
-| `registerFrameCallback`   | `usePlaybackRefs()` |
-| `unregisterFrameCallback` | `usePlaybackRefs()` |
+| Field | Now from |
+| --- | --- |
+| `isPlaying` | `useIsPlaying()` |
+| `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | `usePlaybackRefs()` |
+| `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency` | `useEngineRefs()` |
 
-The fields that left these hooks in earlier entries stay where those entries put them: `selectionStart` and `selectionEnd` on `useSelection()`, `currentTime` on `useCurrentTime()`, `activeAnnotationId` on `useActiveAnnotation()`. The setters (`setSelectedTrackId`, `setLoopEnabled`, `setMasterVolume`, `zoomIn`, `undo` and the rest) stay on `usePlaylistControls()`.
+The fields that the entries above moved are on `useSelection()` (`selectionStart`, `selectionEnd`), `useCurrentTime()` (`currentTime`) and `useActiveAnnotation()` (`activeAnnotationId`). The setters (`setSelectedTrackId`, `setLoopEnabled`, `setMasterVolume`, `zoomIn`, `undo` and the rest) are on `useEditorControls()`, and `play`, `pause`, `stop`, `seekTo`, `setSelection` on `usePlaybackControls()`: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
 
-`usePlaylistDataOptional()` has no public replacement. It existed so that `useAnnotationKeyboardControls` could run under either provider. Under `WaveformPlaylistProvider` that hook still reads `samplesPerPixel` and `sampleRate` itself; under `MediaElementPlaylistProvider` pass them as options, as before. (Later in this major the hook reads them from `MediaElementPlaylistProvider` too; options that are passed still win. See the Behaviour list of [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).) If your own component called `usePlaylistDataOptional()` to work with or without a provider, take the values it needs as props.
+`usePlaylistDataOptional()` has no public replacement. It existed so that `useAnnotationKeyboardControls` could run under either provider; the hook now reads `samplesPerPixel` and `sampleRate` from either provider itself (options that are passed still win). If your own component called `usePlaylistDataOptional()` to work with or without a provider, take the values it needs as props.
 
 ```tsx
 // Before
@@ -587,13 +549,14 @@ import {
   usePlaylistZoom,
   usePlaylistTimeline,
   usePlaylistMixer,
-  usePlaylistAnnotations,
+  useAnnotations,
   useLoop,
   useSelectedTrackId,
   useUndoRedo,
   useIsPlaying,
   usePlaybackRefs,
-  usePlaylistControls,
+  useEngineRefs,
+  usePlaybackControls,
 } from '@waveform-playlist/browser';
 
 function Toolbar() {
@@ -602,14 +565,14 @@ function Toolbar() {
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks, duration } = usePlaylistTimeline();
   const { trackStates, masterVolume } = usePlaylistMixer();
-  const { annotations } = usePlaylistAnnotations();
+  const { annotations } = useAnnotations();
   const { isLoopEnabled } = useLoop();
   const { selectedTrackId } = useSelectedTrackId();
   const { canUndo, canRedo } = useUndoRedo();
   const { isPlaying } = useIsPlaying();
-  const { currentTimeRef, registerFrameCallback, unregisterFrameCallback, playoutRef } =
-    usePlaybackRefs();
-  const { play, pause } = usePlaylistControls();
+  const { currentTimeRef, registerFrameCallback, unregisterFrameCallback } = usePlaybackRefs();
+  const { playoutRef } = useEngineRefs();
+  const { play, pause } = usePlaybackControls();
   // ...
 }
 ```
@@ -640,17 +603,17 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 2. **In plain JavaScript a call to a removed hook fails loudly.** Under webpack or Rspack the missing import is `undefined` and the call throws at the first render. In native ES modules and the Vite dev server a missing named export fails earlier, when the module is linked ("does not provide an export named …"). Either way nothing fails silently, and TypeScript reports the import.
 
-3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level), and also when loading finishes (`isReady`) and when peaks arrive. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
+3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level), and also when audio or peaks arrive and when `isReady` changes. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed, renamed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
 
-4. **`trackReorderEpoch` and `trackDragPreview`** are in `useTrackReorderPreview()`, not in `usePlaylistData()`. A custom track panel does not need either: `renderTrackControls` and `SortableTrackControls` are removed later in this major, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
+4. **`trackReorderEpoch` and `trackDragPreview`** are in `useTrackReorderPreview()`, not in `usePlaylistData()`. A custom track panel does not need either: `renderTrackControls` and `SortableTrackControls` are removed, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
 
-5. **A small timing difference, nothing to migrate.** A `play()` called while the engine is being rebuilt (the tracks just changed) is queued. The playhead, the clip progress overlays and `AudioPosition` now move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier. If the queued play never starts (the rebuild fails), they now stay where they were until the next seek or stop.
+5. **A small timing difference, nothing to migrate.** A `play()` called while a later engine is being built (an `effects` or `zoomLevels` change; a track change builds none) is queued. The playhead, the clip progress overlays and `AudioPosition` move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier. If the build fails, playback shows stopped and the cursor stays where it was. (Before the playlist's first ready a `play()` does nothing at all: see [Ready comes once per mount](#ready-comes-once-per-mount-after-the-first-sources-play-does-nothing-before-it).)
 
 ### `PlaylistInfoContext` has no `duration`; `SmartScale` takes `durationMs`
 
 **Package:** `@waveform-playlist/ui-components`.
 
-This affects you only if you render `PlaylistInfoContext.Provider` or `<SmartScale>` yourself. `<Waveform>`, `<PlaylistVisualization>` and the MediaElement components do it for you and need no change.
+This affects you only if you render `PlaylistInfoContext` or `<SmartScale>` yourself. The roots of the view (`<WaveformRoot>`, `<MediaElementWaveformRoot>` and the compositions built on them) do it for you and need no change.
 
 The context value no longer has a `duration` field. Every channel and track reads `PlaylistInfoContext`, and the displayed length changes when a clip operation moves the end of the timeline, and in steps of 10 seconds while a trim is dragged past it. `<SmartScale>` now takes the length as a required prop, `durationMs`, in milliseconds (the unit the removed field had).
 
@@ -684,30 +647,30 @@ In TypeScript both are compile errors (an unknown `duration` property, a missing
 
 Two behaviour changes, neither of them a type error:
 
-1. **`MediaElementWaveform` / `MediaElementPlaylist`:** while an annotation edge is dragged, `onAnnotationsChange` (and `onAnnotationUpdate`) used to be called on every pointer move. They are now called once, when the edge is released, with the final annotations. During the drag the boxes and the annotation list follow a preview that does not go through your state.
+1. **The MediaElement player** (`MediaElementWaveform`; `MediaElementPlaylist` is replaced by the view's parts, see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)): while an annotation edge is dragged, `onAnnotationsChange` (and `onAnnotationUpdate`) used to be called on every pointer move. They are now called once, when the edge is released, with the final annotations. During the drag the boxes and the annotation list follow a preview that does not go through your state.
 2. **Escape during the drag** (both players, `useAnnotationDragHandlers`) restores every annotation the drag moved. Before, only the dragged annotation was restored.
 
 **Find:** code that relies on `onAnnotationsChange` firing during a drag in the MediaElement player (for example to show the dragged time somewhere of your own).
 
-**Replace with:** read the preview. `annotationPreview` is on `useMediaElementControls()` and `usePlaylistControls()`:
+**Replace with:** read the preview. `annotationPreview` is on `usePlaybackControls()`, under either provider:
 
 ```tsx
 import {
-  useMediaElementState,
-  useMediaElementControls,
+  useAnnotations,
+  usePlaybackControls,
   useAnnotationsWithPreview,
 } from '@waveform-playlist/browser';
 
 function DraggedTimes() {
-  const { annotations } = useMediaElementState();
-  const { annotationPreview } = useMediaElementControls();
+  const { annotations } = useAnnotations();
+  const { annotationPreview } = usePlaybackControls();
   // The previewed annotations while an edge is dragged, `annotations` otherwise.
   const shown = useAnnotationsWithPreview(annotations, annotationPreview);
   // ...
 }
 ```
 
-**Optional, for `WaveformPlaylistProvider`:** if you call `useAnnotationDragHandlers` yourself, nothing changes until you pass the preview; `onAnnotationsChange` is still called per move. To get one call per drag and stop re-rendering your component on every move:
+**Optional, for a row of boxes of your own:** if you call `useAnnotationDragHandlers` yourself, nothing changes until you pass the preview; `onAnnotationsChange` is still called per move. To get one call per drag and stop re-rendering your component on every move:
 
 ```tsx
 // Before
@@ -721,7 +684,7 @@ const handlers = useAnnotationDragHandlers({
 });
 
 // After
-const { setAnnotations, annotationPreview } = usePlaylistControls();
+const { setAnnotations, annotationPreview } = usePlaybackControls();
 const { sampleRate } = usePlaylistView();
 const { samplesPerPixel } = usePlaylistZoom();
 const { duration } = usePlaylistTimeline();
@@ -736,15 +699,13 @@ const handlers = useAnnotationDragHandlers({
 });
 ```
 
-**Note:** the hooks in the two examples above are replaced later in this major. `annotationPreview` and `setAnnotations` are on `usePlaybackControls()` under either provider, and `annotations` is on `useAnnotations()`. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
-
-The built-in `<Waveform>` annotation boxes and `PlaylistAnnotationList` follow the preview by themselves. A custom annotation renderer needs `useAnnotationsWithPreview` to follow it.
+The built-in annotation boxes (`<WaveformAnnotationBoxes>`) and `<AnnotationList>` follow the preview by themselves. A custom annotation renderer needs `useAnnotationsWithPreview` to follow it.
 
 ## MediaElement player: the provider owns the selection and runs the one animation loop
 
 **Package:** `@waveform-playlist/browser`.
 
-No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the time selection that `MediaElementPlaylist` used to keep in its own state, and its animation loop draws the playhead and the progress overlay, which used to run a `requestAnimationFrame` loop each. Seven things behave differently:
+`MediaElementPlaylistProvider` now keeps the time selection that `MediaElementPlaylist` used to keep in its own state (`MediaElementPlaylist` is replaced by `<MediaElementWaveform />` and the view's parts: see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed); "the view" below is either), and its animation loop draws the playhead and the progress overlay, which used to run a `requestAnimationFrame` loop each. Seven things behave differently:
 
 1. **The selection survives a remount of `MediaElementPlaylist`** (or `MediaElementWaveform`). Before, unmounting the component dropped the highlighted range. It is now kept for as long as the provider is mounted.
 2. **Two `MediaElementPlaylist` under one provider show the same selection.** Before, each had its own. A press on either one while stopped (a click to seek, or the start of a drag) therefore clears the range highlighted in both; during playback the release does.
@@ -752,23 +713,19 @@ No API changes and no type errors. `MediaElementPlaylistProvider` now keeps the 
 4. **Automatic scroll positions are whole pixels**, as under `WaveformPlaylistProvider`.
 5. **When the provider replaces its player during playback, `isPlaying` becomes `false`.** The player is replaced when the track's `source`, `waveformData`, `name`, `fadeIn` or `fadeOut` changes, when the `audioContext`, `playbackRate` or `preservesPitch` prop changes, and when `onReady`, `onError` or `createPlayout` gets a new identity. The audio always stopped at that moment; `isPlaying` used to stay `true`, so a Play button stayed disabled and nothing played. Playback does not resume by itself.
 6. **New audio starts at 0.** When the track's `source` or `waveformData` changes, playing or not, the cursor goes to 0 and the active annotation is cleared; before, both were kept, so the old position was applied to the new audio. When the player is replaced for the same audio (any other reason in item 5), both are kept, `currentTime` is brought up to the position playback had reached, and the next `play()` continues from there. `waveformData` is compared by identity, so pass the same object while the audio is the same. The selection is kept either way. To start new audio somewhere else (a saved position per file), call `seekTo` or `setActiveAnnotationId` from a `useEffect` keyed on the source in a component under the provider, or from `onReady`: both run after the reset. A `useLayoutEffect` runs before it and is overwritten.
-7. **`seekTo` clamps to the length of the current track (`track.waveformData.duration`), not to the `duration` value.** `duration` is 0 until the first player is ready and stays at the previous file's length while the next one loads, so a `seekTo` made before the player was ready went to 0, and a position restored for a longer file was cut off at the old file's length. Both now go where they were asked to: the position is shown at once, the player is moved to it when it is ready, and `play()` starts there. (At the time of that change `duration` still went from 0 to the length when the player was ready; it is the track's length from the first render since the next entry.)
+7. **`seekTo` clamps to the length of the current track (`track.waveformData.duration`), not to the `duration` value.** `duration` is 0 until the first player is ready and stays at the previous file's length while the next one loads, so a `seekTo` made before the player was ready went to 0, and a position restored for a longer file was cut off at the old file's length. Both now go where they were asked to: the position is shown at once, the player is moved to it when it is ready, and `play()` starts there.
 
-What a click, a drag and Play do was not changed by this step; the next entry changes it (the cursor follows the start of a dragged range, and a range can be played).
+What a click, a drag and Play do is in the next entry (the cursor follows the start of a dragged range, and a range can be played).
 
 **Find:** `onReady`, `onError` or `createPlayout` passed to `MediaElementPlaylistProvider` as inline functions (`onReady={() => …}`), or a `track` built with inline `fadeIn` / `fadeOut` objects (`fadeIn: { duration: 1 }`), by a component that re-renders during playback: each render replaces the player, and playback now visibly stops. Also a `renderPlayhead` passed to `MediaElementWaveform` or `MediaElementPlaylist` that reads something of your own during a selection drag and relied on being called per pointer move; code that unmounts and remounts `MediaElementPlaylist` to clear the highlighted range.
 
-**Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `currentTimeRef` (since a later step `visualTimeRef`, the same ref under this provider) in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, remount the provider (a `key` on `MediaElementPlaylistProvider`); that creates a new player, so playback stops, the audio is loaded again, `onReady` is called again, and playback position, playback rate, continuous play, automatic scroll and the active annotation go back to their initial values. The selection is not yet readable or settable from outside the built-in components.
-
-**Note:** it is since a later entry: `useSelection()` reads it and `usePlaybackControls().setSelection` sets it. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+**Replace with:** for the callbacks, a stable function (`useCallback`, or one defined outside the component); for the track, a `useMemo` or a constant, so the fade objects keep their identity. For the playhead, position from `visualTimeRef` of `usePlaybackRefs()` in your own effect or animation frame, as `PlayheadWithMarker` does; it does not need the call. To clear the range, call `usePlaybackControls().setSelection(t, t)` (a collapsed range; it also moves the cursor to `t`); `useSelection()` reads the range.
 
 ## MediaElement player: Stop, the ends of playback, seeking and the selection follow the multitrack player's rules
 
 **Package:** `@waveform-playlist/browser`.
 
-`MediaElementPlaylistProvider` now plays, stops, seeks and selects the way `WaveformPlaylistProvider` does, so that one set of controls can mean the same thing under both. The hooks keep their names in this step. One signature changes (`play`), one field is added (`isReady`), and the meaning of `duration`, `onReady` and `onError` changes.
-
-**Note:** the hook names used in this entry (`useMediaElementControls()`, `useMediaElementData()`) are those of this step. The next entry removes them: the actions are on `usePlaybackControls()`, and `duration`, `isReady` and `playoutRef` on `useMediaElementTrack()`. The behaviour described here is unchanged by that. See [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers).
+`MediaElementPlaylistProvider` now plays, stops, seeks and selects the way `WaveformPlaylistProvider` does, so that one set of controls means the same thing under both. The actions are on `usePlaybackControls()` and `duration`, `isReady` and `playoutRef` on `useMediaElementTrack()` (they replace `useMediaElementControls()` and `useMediaElementData()`: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers)). One signature changes (`play`), one field is added (`isReady`), and the meaning of `duration`, `onReady` and `onError` changes.
 
 | What | Before | Now |
 | --- | --- | --- |
@@ -780,7 +737,7 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 | `seekTo(t)` during playback | moved the media element | restarts playback at `t`, so the track's fades are scheduled again; a range that was playing becomes an open-ended play |
 | A drag on the waveform while stopped | highlighted a range, the cursor stayed | highlights a range and moves the cursor to its start |
 | A press on the waveform during playback | playback moved on release | still on the release; a drag made meanwhile can now select a range when automatic scroll is off (see "During playback, a press on the waveform waits for the release, and a drag selects a range", below) |
-| `duration` from `useMediaElementData()` | 0 until the player was created | the length from `track.waveformData`, from the first render |
+| `duration` (`useMediaElementData()`, now `useMediaElementTrack()`) | 0 until the player was created | the length from `track.waveformData`, from the first render |
 | The waveform | "Loading waveform…" until the peaks effect ran | drawn on the first render |
 | `onReady` | called when the player object was created | called when the media element has loaded its metadata (it knows its length and can be played and seeked) |
 | A source that cannot be loaded or decoded | nothing | `onError` is called with an `Error` ("Media failed to load (code …)"; the provider does not add the URL to the message, because it may carry a token. The text after the code is the browser's own), and the player never becomes ready |
@@ -791,7 +748,7 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 
 **Where playback started** is the `startTime` of the last `play()`, or the cursor when it was called without one; for selection playback it is the start of the selection. A `seekTo` or a click on the waveform replaces it with the new position, during playback as well as while stopped. Wherever playback comes to rest by itself (the end of a range, of an annotation or of the audio, an error) is the new starting point too, so a `stop()` while stopped does not move the cursor. A `stop()` while a play is queued cancels it and leaves the cursor at that play's starting point (the start of the selection for a queued selection playback). To go back to the beginning, call `seekTo(0)`.
 
-**Ranges.** A range rests at its own end, with two exceptions. (1) When an annotation is active and continuous play is off, playback stops at that annotation's end if it comes first, and the cursor returns to where playback started. The annotation keyboard controls (`useAnnotationKeyboardControls` with `onPlay: play`) now play a real range for this reason: their duration argument used to be ignored. (2) Selection playback: a `play(start, duration)` that starts inside the highlighted range and ends at its end stops there and returns the cursor to the START of the selection, also when it was resumed part-way after a pause, and continuous play has no effect on it. The selection cannot be read from outside the built-in components yet, and no built-in control passes a duration, so in this step selection playback is reached only by code that knows the range it highlighted; the shared Play button of the next step uses it. `play()` without a duration is open-ended from the cursor, selection or not.
+**Ranges.** A range rests at its own end, with two exceptions. (1) When an annotation is active and continuous play is off, playback stops at that annotation's end if it comes first, and the cursor returns to where playback started. The annotation keyboard controls (`useAnnotationKeyboardControls` with `onPlay: play`) now play a real range for this reason: their duration argument used to be ignored. (2) Selection playback: a `play(start, duration)` that starts inside the highlighted range and ends at its end stops there and returns the cursor to the START of the selection, also when it was resumed part-way after a pause, and continuous play has no effect on it. The shared Play button plays the selection this way. `play()` without a duration is open-ended from the cursor, selection or not.
 
 **In a hidden tab** animation frames stop while the audio goes on. A range and an annotation are still ended there, from the media element's `timeupdate` event. Browsers fire it about four times a second of real time, so the stop can be late by that much (more audio at a higher playback rate). This path is covered by unit tests that fire the event with no animation frame; it has not been checked in a really hidden tab.
 
@@ -799,8 +756,8 @@ What a click, a drag and Play do was not changed by this step; the next entry ch
 
 **Find:**
 
-- `stop()` from `useMediaElementControls()` used as "rewind": code that reads `currentTime` or `currentTimeRef` after a stop and expects 0.
-- An effect that lists `duration` (from `useMediaElementData()`) as a dependency in order to run again "when the player is ready", or a guard such as `duration === 0` / `duration > 0` used as "is it loaded".
+- `stop()` (from `useMediaElementControls()`, now `usePlaybackControls()`) used as "rewind": code that reads `currentTime` or `currentTimeRef` after a stop and expects 0.
+- An effect that lists `duration` (from `useMediaElementData()`, now `useMediaElementTrack()`) as a dependency in order to run again "when the player is ready", or a guard such as `duration === 0` / `duration > 0` used as "is it loaded".
 - `onReady` used as "the player object exists" (for example to read `playoutRef.current` early). It is now later, and it is not called at all for a source that fails to load.
 - A custom `createPlayout`.
 - Code that awaits or ignores the return value of `play()`: it is a promise now, and a `try { play() } catch` no longer catches anything (use `.catch`).
@@ -828,7 +785,7 @@ useEffect(() => {
 }, [playoutRef, duration]);
 
 // After: `isReady` is the signal
-const { playoutRef, isReady } = useMediaElementData();
+const { playoutRef, isReady } = useMediaElementTrack();
 useEffect(() => {
   const outputNode = playoutRef.current?.outputNode;
   if (!outputNode) return;
@@ -853,21 +810,17 @@ A custom playout created from the package's own `MediaElementPlayout` class need
 
 `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` now publish what they share through the same hooks, so a component written against `useIsPlaying()` or `usePlaybackControls()` works under either. The library's transport buttons, position display, time-format select, selection inputs and automatic-scroll checkbox are such components, and now work under `MediaElementPlaylistProvider` too.
 
-Six hooks are removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()` and `useMediaElementData()`. A leftover call to a removed hook fails at import (the export is missing), not silently: under webpack or Rspack the import is `undefined` and the call throws at the first render; in native ES modules and the Vite dev server the module fails to link ("does not provide an export named …"). TypeScript reports the import.
+Five hooks are removed: `usePlaylistControls()`, `useMediaElementAnimation()`, `useMediaElementState()`, `useMediaElementControls()` and `useMediaElementData()`. A leftover call to a removed hook fails at import (the export is missing), not silently: under webpack or Rspack the import is `undefined` and the call throws at the first render; in native ES modules and the Vite dev server the module fails to link ("does not provide an export named …"). TypeScript reports the import.
 
-`usePlaybackRefs()` keeps its name and loses eight fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` and `isDraggingRef` are on `useEngineRefs()` (`isDraggingRef` is removed there later: [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs)). The value is a plain object with the four fields that remain, so a leftover read of one of the eight is `undefined`, with no error at the read. In plain JavaScript a `const { playoutRef } = usePlaybackRefs()` gives `undefined` and the code fails where it next uses the name ("Cannot read properties of undefined (reading 'current')", or "getPlaybackTime is not a function"). A TypeScript build fails earlier: the property is not on `PlaybackRefsContextValue`. Search for the eight names next to `usePlaybackRefs` before running the app. Under `MediaElementPlaylistProvider` the player is `useMediaElementTrack().playoutRef`.
+The engine and its clock (`playoutRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playbackStartTimeRef`, `audioStartPositionRef`) are on `useEngineRefs()` (`WaveformPlaylistProvider` only), and `usePlaybackRefs()` has the four fields both providers have: `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` (see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields)). Under `MediaElementPlaylistProvider` the player is `useMediaElementTrack().playoutRef`.
 
 | Removed | Replace with |
 | --- | --- |
 | `usePlaylistControls()` | `usePlaybackControls()` (the actions both providers have) and `useEditorControls()` (the rest) |
-| `usePlaylistAnnotations()` | `useAnnotations()` and `useAnnotationEditing()` |
-| eight fields of `usePlaybackRefs()` | `useEngineRefs()`. `usePlaybackRefs()` stays, with four fields |
 | `useMediaElementAnimation()` | `useIsPlaying()`, `useCurrentTime()`, `usePlaybackRefs()` |
-| `useMediaElementState()` | `useAnnotations()`, `useActiveAnnotation()`, `usePlaybackRate()`, `usePlaylistSettings()` |
+| `useMediaElementState()` | `useAnnotations()`, `useAnnotationOptions()`, `useActiveAnnotation()`, `usePlaybackRate()`, `usePlaylistSettings()` |
 | `useMediaElementControls()` | `usePlaybackControls()`, and `usePlaybackRate()` for `setPlaybackRate` |
 | `useMediaElementData()` | `useMediaElementTrack()`, `usePlaylistView()`, `usePlaylistZoom()` |
-
-This entry replaces the hook named in the earlier entries on this page: where an entry above says to read a field from, or to keep, one of the removed hooks, use the hook from the tables below.
 
 ### The hooks after this change
 
@@ -881,10 +834,11 @@ Under either provider:
 | `useCurrentTime()` | `currentTime` (where the cursor rests; it does not advance during playback) |
 | `useSelection()` | `selectionStart`, `selectionEnd` |
 | `useActiveAnnotation()` | `activeAnnotationId` |
-| `useAnnotations()` | `annotations`, `continuousPlay` |
-| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId` |
+| `useAnnotations()` | `annotations` |
+| `useAnnotationOptions()` | `editable`, `linkEndpoints`, `continuousPlay` |
+| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `playAnnotation` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` |
-| `usePlaylistView()` | `sampleRate`, `waveHeight`, `timeScaleHeight`, `controls` (both removed again [further down](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)), `barWidth`, `barGap`, `roundedBars`, `progressBarWidth`, `mono`, `indefinitePlayback`, `fillViewport` (`waveHeight`, the four bar and playhead fields and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) (the last three are always `false` under `MediaElementPlaylistProvider`) |
+| `usePlaylistView()` | `sampleRate`, `mono`, `indefinitePlayback` (the last two are always `false` under `MediaElementPlaylistProvider`) |
 | `usePlaylistSettings()` | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | `samplesPerPixel`, `canZoomIn`, `canZoomOut` (the last two are always `false` under `MediaElementPlaylistProvider`) |
 
@@ -892,10 +846,10 @@ Under either provider:
 
 | Hook | Returns |
 | --- | --- |
-| `useEditorControls()` | `setCurrentTime`, `setTrackMute`, `setTrackSolo`, `setTrackVolume`, `setTrackPan`, `reorderTrack`, `bumpTrackReorderEpoch`, `setTrackDragPreview`, `setSelectedTrackId`, `zoomIn`, `zoomOut`, `setMasterVolume`, `setLinkEndpoints`, `setAnnotationsEditable`, `setLoopEnabled`, `setLoopRegion`, `setLoopRegionFromSelection`, `clearLoopRegion`, `undo`, `redo`, `setRecordingActive` |
-| `useEngineRefs()` | `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef`, `isDraggingRef` |
-| `useAnnotationEditing()` | `annotationsEditable`, `linkEndpoints` |
-| `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()`, `useUndoRedo()` | unchanged |
+| `useArrangement()` | the arrangement the provider plays (see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed)) |
+| `useEditorControls()` | `setCurrentTime`, `setTrackMute`, `setTrackSolo`, `setTrackVolume`, `setTrackPan`, `reorderTrack`, `bumpTrackReorderEpoch`, `setTrackDragPreview`, `setSelectedTrackId`, `zoomIn`, `zoomOut`, `setMasterVolume`, `setLoopEnabled`, `setLoopRegion`, `setLoopRegionFromSelection`, `clearLoopRegion`, `undo`, `redo`, `setRecordingActive` |
+| `useEngineRefs()` | `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` |
+| `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()`, `useUndoRedo()` | see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields) |
 
 `MediaElementPlaylistProvider` only:
 
@@ -906,21 +860,17 @@ Under either provider:
 
 The values of `usePlaybackControls()`, `useEditorControls()`, `usePlaybackRefs()` and `useEngineRefs()` never change, so calling them never re-renders the component.
 
-`isDraggingRef`, in the `useEngineRefs()` row above, is removed later in this major: [`isDraggingRef` is removed from `useEngineRefs()`](#isdraggingref-is-removed-from-useenginerefs).
-
-Type names: `PlaylistControlsContextValue`, `PlaylistAnnotationsContextValue`, `MediaElementAnimationContextValue`, `MediaElementStateContextValue`, `MediaElementControlsContextValue` and `MediaElementDataContextValue` are removed. The new value types are `PlaybackControlsContextValue`, `EditorControlsContextValue`, `AnnotationsContextValue`, `AnnotationEditingContextValue`, `EngineRefsContextValue`, `PlaybackRateContextValue` and `MediaElementTrackContextValue`. `PlaybackRefsContextValue` keeps its name and has the four fields above.
+Type names: `PlaylistControlsContextValue`, `MediaElementAnimationContextValue`, `MediaElementStateContextValue`, `MediaElementControlsContextValue` and `MediaElementDataContextValue` are removed. The new value types are `PlaybackControlsContextValue`, `EditorControlsContextValue`, `AnnotationsContextValue`, `AnnotationOptionsContextValue`, `EngineRefsContextValue`, `PlaybackRefsContextValue`, `PlaybackRateContextValue` and `MediaElementTrackContextValue`.
 
 ### Where each field of the removed hooks went
 
 **Find** (imports and calls; run each as a regular expression over your source):
 
 - `\busePlaylistControls\b`
-- `\busePlaylistAnnotations\b`
-- `\busePlaybackRefs\b` (the hook stays; check which fields each call reads)
 - `\buseMediaElement(Animation|State|Controls|Data)\b`
-- `\b(PlaylistControls|PlaylistAnnotations|MediaElement(Animation|State|Controls|Data))ContextValue\b`
+- `\b(PlaylistControls|MediaElement(Animation|State|Controls|Data))ContextValue\b`
 
-**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses. (`waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` and `fillViewport` moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).)
+**Replace with:** for each field the component reads, the hook in the right-hand column. Call each hook once per component and destructure only the fields that component uses.
 
 From `usePlaylistControls()`:
 
@@ -939,6 +889,8 @@ From `usePlaylistControls()`:
 | `setAnnotations` | `usePlaybackControls()` |
 | `annotationPreview` | `usePlaybackControls()` |
 | `setActiveAnnotationId` | `usePlaybackControls()` |
+| `setLinkEndpoints` | `usePlaybackControls()` |
+| `setAnnotationsEditable` | `usePlaybackControls()` |
 | `setCurrentTime` | `useEditorControls()` |
 | `setTrackMute` | `useEditorControls()` |
 | `setTrackSolo` | `useEditorControls()` |
@@ -951,8 +903,6 @@ From `usePlaylistControls()`:
 | `zoomIn` | `useEditorControls()` |
 | `zoomOut` | `useEditorControls()` |
 | `setMasterVolume` | `useEditorControls()` |
-| `setLinkEndpoints` | `useEditorControls()` |
-| `setAnnotationsEditable` | `useEditorControls()` |
 | `setLoopEnabled` | `useEditorControls()` |
 | `setLoopRegion` | `useEditorControls()` |
 | `setLoopRegionFromSelection` | `useEditorControls()` |
@@ -960,32 +910,6 @@ From `usePlaylistControls()`:
 | `undo` | `useEditorControls()` |
 | `redo` | `useEditorControls()` |
 | `setRecordingActive` | `useEditorControls()` |
-
-From `usePlaylistAnnotations()`:
-
-| Field | Now from |
-| --- | --- |
-| `annotations` | `useAnnotations()` |
-| `continuousPlay` | `useAnnotations()` |
-| `annotationsEditable` | `useAnnotationEditing()` |
-| `linkEndpoints` | `useAnnotationEditing()` |
-
-From `usePlaybackRefs()`:
-
-| Field | Now from |
-| --- | --- |
-| `currentTimeRef` | `usePlaybackRefs()` (unchanged) |
-| `visualTimeRef` | `usePlaybackRefs()` (unchanged) |
-| `registerFrameCallback` | `usePlaybackRefs()` (unchanged) |
-| `unregisterFrameCallback` | `usePlaybackRefs()` (unchanged) |
-| `playbackStartTimeRef` | `useEngineRefs()` |
-| `audioStartPositionRef` | `useEngineRefs()` |
-| `getPlaybackTime` | `useEngineRefs()` |
-| `getAudioContextTime` | `useEngineRefs()` |
-| `getLookAhead` | `useEngineRefs()` |
-| `getOutputLatency` | `useEngineRefs()` |
-| `playoutRef` | `useEngineRefs()` |
-| `isDraggingRef` | `useEngineRefs()` (removed later: see the entry on `isDraggingRef`) |
 
 From `useMediaElementAnimation()`:
 
@@ -1000,7 +924,7 @@ From `useMediaElementState()`:
 | Field | Now from |
 | --- | --- |
 | `annotations` | `useAnnotations()` |
-| `continuousPlay` | `useAnnotations()` |
+| `continuousPlay` | `useAnnotationOptions()` |
 | `activeAnnotationId` | `useActiveAnnotation()` |
 | `playbackRate` | `usePlaybackRate()` |
 | `isAutomaticScroll` | `usePlaylistSettings()` |
@@ -1033,13 +957,9 @@ From `useMediaElementData()`:
 | `fadeOut` | `useMediaElementTrack()` |
 | `playoutRef` | `useMediaElementTrack()` |
 | `sampleRate` | `usePlaylistView()` |
-| `waveHeight` | `usePlaylistView()` |
-| `timeScaleHeight` | `usePlaylistView()` |
-| `controls` | `usePlaylistView()` |
-| `barWidth` | `usePlaylistView()` |
-| `barGap` | `usePlaylistView()` |
-| `roundedBars` | `usePlaylistView()` |
-| `progressBarWidth` | `usePlaylistView()` |
+| `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` | props of `<WaveformViewOptions>`; inside a root, `usePlaylistInfo()` (see [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) |
+| `timeScaleHeight` | the `height` of `<WaveformTimescale>`; inside a root, `usePlaylistInfo().timeScaleHeight` |
+| `controls` | removed (this player has no controls column) |
 | `samplesPerPixel` | `usePlaylistZoom()` |
 
 New under `MediaElementPlaylistProvider`, with no earlier equivalent: `useSelection()`, `usePlaybackControls().setSelection`, `usePlaybackControls().setTimeFormat`, `usePlaylistSettings().timeFormat`, and `visualTimeRef`, `registerFrameCallback` and `unregisterFrameCallback` on `usePlaybackRefs()`. There, `visualTimeRef` is the same ref as `currentTimeRef`.
@@ -1067,28 +987,7 @@ function Toolbar() {
 }
 ```
 
-**A component that reads the engine through `usePlaybackRefs()`:**
-
-```tsx
-// Before
-import { usePlaybackRefs } from '@waveform-playlist/browser';
-
-function LatencyReadout() {
-  const { currentTimeRef, playoutRef, getLookAhead, getOutputLatency } = usePlaybackRefs();
-  // ...
-}
-
-// After
-import { usePlaybackRefs, useEngineRefs } from '@waveform-playlist/browser';
-
-function LatencyReadout() {
-  const { currentTimeRef } = usePlaybackRefs();
-  const { playoutRef, getLookAhead, getOutputLatency } = useEngineRefs();
-  // ...
-}
-```
-
-`useClipDragHandlers({ engineRef, isDraggingRef, … })` takes both of its refs from `useEngineRefs()` now (`engineRef: playoutRef`). `isDraggingRef`, and the hook's `onTracksChange` option, are removed again later in this major: see [`useClipDragHandlers` takes no `onTracksChange` and no `isDraggingRef`](#useclipdraghandlers-takes-no-ontrackschange-and-no-isdraggingref).
+`useClipDragHandlers` takes neither ref any more, nor `tracks` and `onTracksChange`: see [`useClipDragHandlers` and `useClipSplitting` read the arrangement from the provider](#useclipdraghandlers-and-useclipsplitting-read-the-arrangement-from-the-provider).
 
 **A hand-built transport under `MediaElementPlaylistProvider`:** the library's buttons replace it. `AudioPosition` shows the position in the provider's time format and follows playback through the provider's animation loop, so the `requestAnimationFrame` loop goes too.
 
@@ -1186,13 +1085,13 @@ function Info() {
 
 ### Which controls work where
 
-Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, and, inside `<AnnotationProvider>`, `ContinuousPlayCheckbox` and `DownloadAnnotationsButton`. (Later entries change the annotation controls: all four work under either provider, are imported from `@waveform-playlist/annotations` and do not need `<AnnotationProvider>`; see [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed).)
+Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`, `FastForwardButton`, `SkipBackwardButton`, `SkipForwardButton`, `ClearAllButton`, `AudioPosition`, `TimeFormatSelect`, `SelectionTimeInputs`, `AutomaticScrollCheckbox`, `AnnotationList`, and the four annotation controls of `@waveform-playlist/annotations` (`ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `DownloadAnnotationsButton`; see [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed)).
 
 `MediaElementPlaylistProvider` only: `PlaybackRateSelect`.
 
-`WaveformPlaylistProvider` only (they throw under `MediaElementPlaylistProvider`): `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `LinkEndpointsCheckbox`, `EditableCheckbox`, `KeyboardShortcuts`, and `ExportWavButton` from `@waveform-playlist/browser/tone`.
+`WaveformPlaylistProvider` only (they throw under `MediaElementPlaylistProvider`): `LoopButton`, `SetLoopRegionButton`, `ZoomInButton`, `ZoomOutButton`, `MasterVolumeControl`, `KeyboardShortcuts`, and `ExportWavButton` from `@waveform-playlist/browser/tone`.
 
-`MediaElementWaveform`, `MediaElementPlaylist` and `MediaElementAnnotationList` keep their names.
+`MediaElementWaveform` keeps its name. `MediaElementPlaylist` and `MediaElementAnnotationList` are replaced: see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed) and [the annotation UI entry](#the-annotation-ui-is-two-parts-with-their-own-options-the-annotation-options-have-one-home-under-both-providers).
 
 ### Behaviour
 
@@ -1209,7 +1108,7 @@ Under either provider: `PlayButton`, `PauseButton`, `StopButton`, `RewindButton`
 - **`MediaElementPlaylistProvider` has a time format.** Before: none. Now: `usePlaylistSettings().timeFormat` and `usePlaybackControls().setTimeFormat`, default `'hh:mm:ss.uuu'`, read by `AudioPosition` and `TimeFormatSelect`.
 - **`KeyboardShortcuts` and `usePlaybackShortcuts()` are `WaveformPlaylistProvider` only**, before and now: both throw under `MediaElementPlaylistProvider`, also when that provider is nested inside a `WaveformPlaylistProvider` (before, the hook then drove the outer playlist) (now with "usePlaybackShortcuts needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it"). `usePlaybackShortcuts()` listens on the window, and what keys do for the single-track player is not decided ([#723](https://github.com/naomiaro/waveform-playlist/issues/723), [#730](https://github.com/naomiaro/waveform-playlist/issues/730)). `useKeyboardShortcuts()` reads no context, and `useAnnotationKeyboardControls()` does not throw there, so your own component can call either under `MediaElementPlaylistProvider`.
 - **`useAnnotationKeyboardControls()` under `MediaElementPlaylistProvider` reads `samplesPerPixel` and `sampleRate` from the provider.** Before: under that provider the hook scrolled to the active annotation only when `scrollContainerRef`, `samplesPerPixel` and `sampleRate` were all passed as options. Now: with a `scrollContainerRef` and without the other two it reads them from the provider and scrolls the active annotation into view. An option that is passed still wins. Inside nested providers it reads the nearest one.
-- **Some hooks and components that read only shared hooks no longer throw under the other provider**: `useClipDragHandlers()` under `MediaElementPlaylistProvider`, and `MediaElementAnnotationList` under `WaveformPlaylistProvider`. That is a consequence of the shared hooks, not a supported use.
+- **`useClipDragHandlers()` and `useClipSplitting()` need `WaveformPlaylistProvider`**: they work on its arrangement and throw under `MediaElementPlaylistProvider`.
 
 ### What to check after the replacement of the MediaElement hooks
 
@@ -1228,13 +1127,13 @@ A component re-renders only for the hooks it calls. The four removed hooks carri
    ```
 
 2. **A `useMediaElementState()` reader** no longer re-renders when the active annotation changes, unless it calls `useActiveAnnotation()`.
-3. **A `useMediaElementData()` reader of the view fields** (`sampleRate`, `waveHeight`, `samplesPerPixel` and the rest, now on `usePlaylistView()` and `usePlaylistZoom()`; `waveHeight` and the bar fields moved again in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
-4. **Under `WaveformPlaylistProvider`, a `usePlaylistAnnotations()` reader moved to `useAnnotations()`** no longer re-renders on the Editable and Link-endpoints toggles, unless it calls `useAnnotationEditing()`.
-5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is still called on play, pause, stop and every seek. (At this step it was also called on every move of a leftward selection drag; since the next section it is not called while a range is highlighted and playback is stopped or paused, so with a range highlighted only play and a seek during playback call it.)
+3. **A `useMediaElementData()` reader of the view fields** (`sampleRate` and `samplesPerPixel`, now on `usePlaylistView()` and `usePlaylistZoom()`) no longer re-renders when `isReady` or the peaks change. `useMediaElementTrack()` does.
+4. **A `useMediaElementState()` reader of `continuousPlay`** reads `useAnnotationOptions()`, which re-renders when one of the three annotation options is toggled; `useAnnotations()` does not.
+5. **A custom `renderPlayhead` under `MediaElementPlaylistProvider`** is called on play, pause and stop and on a seek; while a range is highlighted and playback is stopped or paused it is not called, so then only play and a seek during playback call it.
 
 ## One playhead and one progress overlay for both providers; `PlayheadProps` has seven props
 
-The playhead, the played-portion overlay of a channel, the selection highlight and the wrapper that calls a custom `renderPlayhead` exist once and are rendered by both `<Waveform>` / `<PlaylistVisualization>` and `<MediaElementWaveform>` / `<MediaElementPlaylist>`. None of these parts was a public export; what changes for an app is the props a `renderPlayhead` function receives and the things listed under "On screen".
+The playhead, the played-portion overlay of a channel, the selection highlight and the wrapper that calls a custom `renderPlayhead` exist once and are rendered by both players (the multitrack view and the MediaElement view; `<PlaylistVisualization>` and `<MediaElementPlaylist>` of the last release are replaced by the view's parts, see [the view is composed from parts](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)). The playhead is the `<WaveformPlayhead renderPlayhead>` part. None of these was a public export in the last release; what changes for an app is the props a `renderPlayhead` function receives and the things listed under "On screen".
 
 ### `PlayheadProps`
 
@@ -1295,7 +1194,7 @@ The props object is a plain object: reading a removed prop gives `undefined`, wi
 - A playhead that needs an engine value calls `useEngineRefs()` itself. The function passed as `renderPlayhead` is called inside a component of its own, so it may call hooks, as long as it calls the same hooks on every render; the simplest form is to return your own component, `(props) => <MyPlayhead {...props} />`. State held by a custom playhead is reset each time the playhead is hidden and shown again (see "On screen").
 - **`PlayheadWithMarker` rendered by your own code** (not through `renderPlayhead`) must be given `visualTimeRef`. It used to fall back to the other props when it was missing; now it fails with "Cannot read properties of undefined (reading 'current')". `Playhead` reads only `position` and `color` and works without it. TypeScript reports the missing prop on both, and each removed one.
 
-`PlayheadWithMarker` places itself from `visualTimeRef`. `<Waveform renderPlayhead={PlayheadWithMarker} />` and `<MediaElementWaveform renderPlayhead={PlayheadWithMarker} />` need no change.
+`PlayheadWithMarker` places itself from `visualTimeRef`, so `renderPlayhead={PlayheadWithMarker}` (now on the `<WaveformPlayhead>` part, under either provider) needs no change of its own.
 
 ### On screen
 
@@ -1352,7 +1251,7 @@ Four things that follow from it:
 
 **Packages:** `@waveform-playlist/browser`. `MediaElementPlaylistProvider` only; nothing changes under `WaveformPlaylistProvider`.
 
-`<MediaElementWaveform>` and `<MediaElementPlaylist>` keep their props. Inside, the waveform is now drawn by the same components as `<Waveform>` (one row of tracks, the timescale, the selection highlight, the playhead), so its markup and a few details follow the multitrack view. No export is added or removed.
+The MediaElement waveform (`<MediaElementWaveform>`, or a composition on `<MediaElementWaveformRoot>`; `<MediaElementPlaylist>` and the show and render props are replaced by the view's parts, see [the next entry](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)) is drawn by the same components as the multitrack view (one row of tracks, the timescale, the selection highlight, the playhead), so its markup and a few details follow the multitrack view.
 
 | | Before | Now |
 | --- | --- | --- |
@@ -1360,12 +1259,12 @@ Four things that follow from it:
 | `theme.playlistBackgroundColor` | ignored; the background was always `waveOutlineColor` | used when set; `waveOutlineColor` otherwise |
 | `data-playlist-state` | absent | on the outermost element, and always `"ready"`: the waveform is drawn from the first render and does not wait for the player. Whether the player has loaded its media is `useMediaElementTrack().isReady`, as before |
 | The track's row | the track's element was a direct child of the tracks container | one `[data-track-row]` element with `data-track-id="media-element-track-0"`, `data-track-kind="audio"` and `data-selected="true"` (the one track is always drawn in the selected colours, as before), inside a positioning container: two more `div`s around the track. The row is positioned absolutely inside that container, which has the row's height |
-| Fades (`showFades`) | the fade-out curve was placed from the length of the peak data | placed from the clip's width, so it ends where the clip ends: up to one pixel further left |
+| Fades (`showFades`, now the `<WaveformFades />` part) | the fade-out curve was placed from the length of the peak data | placed from the clip's width, so it ends where the clip ends: up to one pixel further left |
 | `useMediaElementTrack().peaksDataArray` | the one clip had no fades | the one clip carries the track's `fadeIn` / `fadeOut` (`peaksDataArray[0][0].fadeIn`). The array is a new one when the fades or the name change; the peaks inside (`peaksDataArray[0][0].peaks`) keep their identity then. The fades are compared by value (`duration`, `type`), so a fade written inline (`fadeIn: { duration: 1 }` in a `track` object that is built on every render) changes nothing while its values are the same |
-| The provider's `controls` prop with `show: true` | an empty column of that width to the left of the waveform | no column: there are no track controls for this player. (The prop itself is removed in [the next entry](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed).) |
+| The provider's `controls` prop with `show: true` | an empty column of that width to the left of the waveform | no column: there are no track controls for this player. The prop itself is removed ([the next entry](#the-view-is-composed-from-parts-the-show-and-render-props-and-the-providers-timescale-and-controls-are-removed)) |
 | Peak data that cannot be read (the provider logs a warning) | the text "Loading waveform..." in a `div`, for good | the track's row, empty: as long as the audio and one `waveHeight` tall, under the timescale when there is one. `useMediaElementTrack().peaksDataArray` is still `[]` |
-| A custom `renderPlayhead` | also called on every press and release on the waveform and when the player became ready | called on play, pause and stop, a seek, a selection change, a view-setting, zoom or theme change, and when the component that renders `<MediaElementWaveform>` re-renders (and, as before, not while a range is highlighted at rest) |
-| `getAnnotationBoxLabel` | also called for every annotation on every press and release on the waveform, on play, pause and stop, and when the player became ready | called when the row of boxes itself renders: when the annotations (also each move of an edge drag), the active annotation, the view settings, the zoom or the length of the timeline change, or when one of `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` is a new value |
+| A custom `renderPlayhead` | also called on every press and release on the waveform and when the player became ready | called on play, pause and stop, a seek, a selection change, a view-setting, zoom or theme change, and when the component that renders the view re-renders (and, as before, not while a range is highlighted at rest) |
+| `getAnnotationBoxLabel` (now on `<WaveformAnnotationBoxes>`) | also called for every annotation on every press and release on the waveform, on play, pause and stop, and when the player became ready | called when the row of boxes itself renders: when the annotations (also each move of an edge drag), the active annotation, the view settings, the zoom or the length of the timeline change, or when one of `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` is a new value |
 
 **Find:** nothing in code. Check:
 
@@ -1396,7 +1295,7 @@ import {
   WaveformAnnotationBoxes,
   WaveformSelection,
   WaveformPlayhead,
-  PlaylistAnnotationList,
+  AnnotationList,
 } from '@waveform-playlist/browser';
 
 <WaveformRoot className="my-playlist">
@@ -1411,7 +1310,7 @@ import {
   <WaveformSelection />
   <WaveformPlayhead renderPlayhead={renderPlayhead} />
 </WaveformRoot>
-<PlaylistAnnotationList />
+<AnnotationList />
 ```
 
 | Part | Draws | Options | Provider |
@@ -1425,12 +1324,11 @@ import {
 | `WaveformClipHeaders` | a header on every clip; inside a `ClipInteractionProvider` it is what a clip is dragged by, and the trim handles come with it | none | either (under the MediaElement provider the header shows the track's `name`, or "Track" without one; nothing there supports dragging the clip, so leave clip interaction off above that provider) |
 | `WaveformFades` | each clip's fade-in and fade-out curves | none | either |
 | `WaveformRecordingPreview` | the take being recorded, in its track | `recordingState` | `WaveformPlaylistProvider` |
-| `WaveformAnnotationBoxes` | the row of annotation boxes | `getAnnotationBoxLabel` | `WaveformPlaylistProvider` |
-| `MediaElementAnnotationBoxes` | the same for the MediaElement player, with its edge drag | `getAnnotationBoxLabel`, `editable`, `linkEndpoints`, `onAnnotationUpdate` | `MediaElementPlaylistProvider` |
+| `WaveformAnnotationBoxes` | the row of annotation boxes, with the drag of their edges | `getLabel`, `height` (see [the annotation UI entry](#the-annotation-ui-is-two-parts-with-their-own-options-the-annotation-options-have-one-home-under-both-providers)) | either |
 | `WaveformSelection` | the highlighted selection | none | either |
 | `WaveformPlayhead` | the playhead | `renderPlayhead` | either |
 
-Three compositions are ready-made. They take `className` and the annotation options they took before, and nothing else:
+Three compositions are ready-made. They take `className` and nothing else:
 
 | Component | Is |
 | --- | --- |
@@ -1471,21 +1369,21 @@ Decide per `<Waveform>` (or `<MediaElementWaveform>`) from the props it has and 
   <WaveformLoopRegion />
   <WaveformTrackControls />
   <WaveformTracks />
-  <WaveformAnnotationBoxes getAnnotationBoxLabel={getAnnotationBoxLabel} />
+  <WaveformAnnotationBoxes getLabel={getAnnotationBoxLabel} />
   <WaveformSelection />
   <WaveformPlayhead />
 </WaveformRoot>
-<PlaylistAnnotationList
+<AnnotationList
   height={annotationTextHeight}
-  controls={annotationControls}
-  annotationListConfig={annotationListConfig}
-  renderAnnotationItem={renderAnnotationItem}
+  actions={annotationControls}
   scrollActivePosition={scrollActivePosition}
   scrollActiveContainer={scrollActiveContainer}
-/>
+>
+  {renderAnnotationItem}
+</AnnotationList>
 ```
 
-then apply each row that matches. The two annotation elements belong to a playlist with annotations: `<PlaylistAnnotationList>` throws without the `AnnotationProvider` of `@waveform-playlist/annotations`, and it renders its (empty) list when there are no annotations, where `<Waveform />` leaves the list out. Without annotations delete both elements; to keep the list conditional, render it when `useAnnotations().annotations.length > 0`.
+then apply each row that matches. The annotation props of the last release's `<Waveform>` map as shown (`annotationListConfig` has no replacement: the provider's options are used); the details are in [the annotation UI entry](#the-annotation-ui-is-two-parts-with-their-own-options-the-annotation-options-have-one-home-under-both-providers). Without annotations both annotation elements draw nothing (the list writes one development warning when there is no `<AnnotationProvider>`), so they can stay or go.
 
 | Was | Becomes |
 | --- | --- |
@@ -1502,7 +1400,7 @@ then apply each row that matches. The two annotation elements belong to a playli
 | `showClipHeaders={flag}` (a variable) | `<WaveformTracks>{flag ? <WaveformClipHeaders /> : null}</WaveformTracks>` |
 | `renderPlayhead={f}` | `<WaveformPlayhead renderPlayhead={f} />` |
 | `recordingState={state}` | `<WaveformTracks>{state ? <WaveformRecordingPreview recordingState={state} /> : null}</WaveformTracks>`, **and** `useRecordingSession` (below) |
-| `<PlaylistVisualization …props />` | the same composition without `<PlaylistAnnotationList>` |
+| `<PlaylistVisualization …props />` | the same composition without `<AnnotationList>` |
 
 **5. `<MediaElementWaveform>`** with neither removed prop, under a provider that had `timescale`: keep it. Otherwise write the composition, which is what `<MediaElementWaveform />` renders:
 
@@ -1510,24 +1408,17 @@ then apply each row that matches. The two annotation elements belong to a playli
 <MediaElementWaveformRoot className={className}>
   <WaveformTimescale />
   <WaveformTracks />
-  <MediaElementAnnotationBoxes
-    getAnnotationBoxLabel={getAnnotationBoxLabel}
-    editable={editable}
-    linkEndpoints={linkEndpoints}
-    onAnnotationUpdate={onAnnotationUpdate}
-  />
+  <WaveformAnnotationBoxes getLabel={getAnnotationBoxLabel} />
   <WaveformSelection />
   <WaveformPlayhead />
 </MediaElementWaveformRoot>
-<MediaElementAnnotationList
+<AnnotationList
   height={annotationTextHeight}
-  renderAnnotationItem={renderAnnotationItem}
-  editable={editable}
-  onAnnotationUpdate={onAnnotationUpdate}
-  annotationListConfig={{ linkEndpoints, continuousPlay: false }}
   scrollActivePosition={scrollActivePosition}
   scrollActiveContainer={scrollActiveContainer}
-/>
+>
+  {renderAnnotationItem}
+</AnnotationList>
 ```
 
 | Was | Becomes |
@@ -1535,9 +1426,10 @@ then apply each row that matches. The two annotation elements belong to a playli
 | the provider had no `timescale` | delete `<WaveformTimescale />` |
 | `showFades` | `<WaveformTracks><WaveformFades /></WaveformTracks>` |
 | `renderPlayhead={f}` | `<WaveformPlayhead renderPlayhead={f} />` |
-| `<MediaElementPlaylist …props />` | the same composition without `<MediaElementAnnotationList>` |
+| `<MediaElementPlaylist …props />` | the same composition without `<AnnotationList>` |
+| `editable`, `linkEndpoints`, `onAnnotationUpdate` | the provider's `annotationList={{ …, editable, linkEndpoints }}` and `onAnnotationsChange` (see the annotation UI entry) |
 
-The same holds for the two annotation elements here: without annotations delete both, or render `<MediaElementAnnotationList>` when `useAnnotations().annotations.length > 0`, as `<MediaElementWaveform />` does.
+The same holds for the two annotation elements here.
 
 **6. A recording.** The view used to tell the provider that a take was running: for as long as `recordingState.isRecording` was true, the provider kept playback running past the end of the audio and muted what the armed track already held. `<WaveformRecordingPreview>` only draws the take. Call the hook in the component that calls `useIntegratedRecording` (it must be under `WaveformPlaylistProvider`):
 
@@ -1573,9 +1465,8 @@ The root recognises a part by the type of the element, and so does `<WaveformTra
 - One `<WaveformTracks>` per root, and it must be the root's own child (not wrapped): the root reads the clip headers from it for the row heights, and the recording preview for the length of the timeline during a take. Text among its children is dropped without a warning.
 - `<WaveformTrackControls width>` must be a positive number: with `0`, a negative number or `NaN` no column is drawn. One `<WaveformTrackControls>` per root: a second one draws a second panel for every track in the same column.
 - Each root throws under the other provider (`useEditorControls needs WaveformPlaylistProvider, …` for `<WaveformRoot>`, `useMediaElementTrack needs MediaElementPlaylistProvider, …` for `<MediaElementWaveformRoot>`).
-- `<WaveformLoopRegion>`, `<WaveformTrackControls>`, `<WaveformRecordingPreview>` and `<WaveformAnnotationBoxes>` need `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` the loop region throws (`useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`) and so do the annotation boxes (the same message for `useAnnotationEditing`); the track controls draw nothing as a child of the root, and throw the same kind of message when they are wrapped in a component and so rendered among the tracks; the recording preview throws once a take runs into the player's track.
-- `<MediaElementAnnotationBoxes>` is for `MediaElementPlaylistProvider`. Under `WaveformPlaylistProvider` it draws, but an edge can be dragged past the end of the audio to the end of the drawn timeline: use `<WaveformAnnotationBoxes>` there.
-- `<WaveformTimescale>`, `<WaveformTracks>`, `<WaveformLoopRegion>`, `<WaveformTrackControls>` and both annotation rows throw outside a root (`The timescale must be rendered inside the waveform root`). `<WaveformSelection>` and `<WaveformPlayhead>` draw wherever they are rendered under a provider; they are positioned for the tracks area.
+- `<WaveformLoopRegion>`, `<WaveformTrackControls>` and `<WaveformRecordingPreview>` need `WaveformPlaylistProvider` (`<WaveformAnnotationBoxes>` works under either). Under `MediaElementPlaylistProvider` the loop region throws (`useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`); the track controls draw nothing as a child of the root, and throw the same kind of message when they are wrapped in a component and so rendered among the tracks; the recording preview throws once a take runs into the player's track.
+- `<WaveformTimescale>`, `<WaveformTracks>`, `<WaveformLoopRegion>`, `<WaveformTrackControls>` and `<WaveformAnnotationBoxes>` throw outside a root (`The timescale must be rendered inside the waveform root`). `<WaveformSelection>` and `<WaveformPlayhead>` draw wherever they are rendered under a provider; they are positioned for the tracks area.
 - Switching a part on and off: write `{flag ? <Part /> : null}` (or `flag && <Part />`). The parts after it then keep their state. A list whose length changes (`parts.filter(Boolean)`) remounts the parts after the one that went, unless they have keys.
 - Two roots under one provider both draw the playlist, each with its own playhead and selection drag; automatic scroll follows the root that mounted last.
 
@@ -1608,9 +1499,7 @@ In development a part that is not where it can work says so once in the console 
 
 **Packages:** `@waveform-playlist/browser`. `WaveformPlaylistProvider` only.
 
-Apply this entry after the one above: it replaces the three options that entry put on `<WaveformTrackControls>` (#687).
-
-The control panel of a track is no longer described by props of `<WaveformTrackControls>`. The **children** of the part are the panel of ONE track. The part renders them once per track, each copy inside that track's context, and a component in the panel reads its track with `useTrack()`. The built-in pieces do that already and take no prop for the track:
+The control panel of a track is no longer described by props of `<Waveform>` (`renderTrackControls`, `onRemoveTrack`, `trackReordering` in the last release). The **children** of the part are the panel of ONE track. The part renders them once per track, each copy inside that track's context, and a component in the panel reads its track with `useTrack()`. The built-in pieces do that already and take no prop for the track:
 
 ```tsx
 import {
@@ -1628,15 +1517,15 @@ import {
 </WaveformTrackControls>
 ```
 
-`<WaveformTrackControls />` without children draws `<DefaultTrackControls />`, as before. Its props are now `width` and `children`.
+`<WaveformTrackControls />` without children draws `<DefaultTrackControls />`. Its props are `width` and `children`.
 
-At the same time the four mixer setters of `useEditorControls()` take a track **id** where they took an index, and the provider keeps mixer state (mute, solo, volume, pan) by track id.
+At the same time the four mixer setters (on `useEditorControls()`; they were on `usePlaylistControls()`) take a track **id** where they took an index, and the mixer state (mute, solo, volume, pan) is kept by track id: it is the arrangement's mix (see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed)).
 
 ### New exports
 
 | Export | Is |
 | --- | --- |
-| `useTrack()` | the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isLoading`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, and the actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`. Type: `TrackContextValue` |
+| `useTrack()` | the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, `isRecordingArmed`, and the actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`. Type: `TrackContextValue` |
 | `<DefaultTrackControls>` | the default panel: name, track menu, mute, solo, volume, pan. Its `children` are drawn inside the panel, below the pan slider. Type: `DefaultTrackControlsProps` |
 | `<TrackName />` | the track's name on one line |
 | `<TrackMuteButton />`, `<TrackSoloButton />` | the two toggle buttons |
@@ -1652,13 +1541,13 @@ All of them work only among the children of `<WaveformTrackControls>`.
 
 | Removed | Replacement |
 | --- | --- |
-| `renderTrackControls` prop of `<WaveformTrackControls>` | the panel as children; a component in it calls `useTrack()` |
-| `onRemoveTrack` prop | `<TrackRemoveButton onRemove={f} />` among the children. `f` gets the track **id**, not the index |
-| `trackReordering` prop | `<TrackReorderGrip />` among the children |
+| `renderTrackControls` prop of `<Waveform>` | the panel as children of `<WaveformTrackControls>`; a component in it calls `useTrack()` |
+| `onRemoveTrack` prop of `<Waveform>` | `<TrackRemoveButton onRemove={f} />` among the children. `f` gets the track **id**, not the index |
+| `trackReordering` prop of `<Waveform>` | `<TrackReorderGrip />` among the children |
 | `SortableTrackControls`, `SortableTrackControlsProps`, `SortableTrackControlsRenderProps` | `<TrackReorderGrip />`, or `useTrackReorderHandle()` for your own grip element |
 | `setTrackMute(trackIndex, muted)`, `setTrackSolo(trackIndex, soloed)`, `setTrackVolume(trackIndex, volume)`, `setTrackPan(trackIndex, pan)` | the same names with a track id: `setTrackMute(trackId, muted)` and so on; inside a panel, `useTrack().setMuted(muted)` and so on |
 
-Nothing throws for a removed name. A removed prop that is still passed in plain JavaScript is ignored: the part draws the default panel, with no remove button and no grip. A setter called with an index does nothing (see the behaviour table). An import of `SortableTrackControls` is `undefined` (or fails when the module is linked, in native ES modules). TypeScript reports all of them.
+Nothing throws for a removed name. A removed prop that is still passed in plain JavaScript is ignored: the default panel is drawn, with no remove button and no grip. A setter called with an index does nothing (see the behaviour table). An import of `SortableTrackControls` is `undefined` (or fails when the module is linked, in native ES modules). TypeScript reports all of them.
 
 ### Find and replace
 
@@ -1668,9 +1557,9 @@ Nothing throws for a removed name. A removed prop that is still passed in plain 
 
 ```tsx
 // Before
-<WaveformTrackControls trackReordering />
+<Waveform trackReordering />
 
-// After
+// After (in a composition of the view: see the view entry above)
 <WaveformTrackControls>
   <DefaultTrackControls />
   <TrackReorderGrip />
@@ -1687,12 +1576,10 @@ const removeTrack = useCallback((trackIndex: number) => {
   setTracks((prev) => prev.filter((_, i) => i !== trackIndex));
 }, []);
 
-<WaveformTrackControls onRemoveTrack={removeTrack} />
+<Waveform onRemoveTrack={removeTrack} />
 
 // After: the callback gets the id
-const removeTrack = useCallback((trackId: string) => {
-  setTracks((prev) => prev.filter((track) => track.id !== trackId));
-}, []);
+const removeTrack = useCallback((trackId: string) => arrangement.removeTrack(trackId), [arrangement]);
 
 <WaveformTrackControls>
   <DefaultTrackControls />
@@ -1707,8 +1594,8 @@ const removeTrack = useCallback((trackId: string) => {
 import { Button, ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
 
 function MyTrackPanel({ trackIndex }: { trackIndex: number }) {
-  const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackVolume } = useEditorControls();
+  const { trackStates } = usePlaylistData();
+  const { setTrackMute, setTrackVolume } = usePlaylistControls();
   const state = trackStates[trackIndex];
   if (!state) return null;
   return (
@@ -1731,10 +1618,7 @@ function MyTrackPanel({ trackIndex }: { trackIndex: number }) {
   );
 }
 
-<WaveformTrackControls
-  width={180}
-  renderTrackControls={(trackIndex) => <MyTrackPanel trackIndex={trackIndex} />}
-/>
+<Waveform renderTrackControls={(trackIndex) => <MyTrackPanel trackIndex={trackIndex} />} />
 ```
 
 ```tsx
@@ -1743,12 +1627,12 @@ import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
 import { Button, ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
 
 function MyTrackPanel() {
-  const { name, muted, volume, isLoading, setMuted, setVolume } = useTrack();
+  const { name, muted, volume, isRecordingArmed, setMuted, setVolume } = useTrack();
   return (
     <Controls>
       <Header>{name}</Header>
       <ButtonGroup>
-        <Button disabled={isLoading} onClick={() => setMuted(!muted)}>
+        <Button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
           {muted ? 'Unmute' : 'Mute'}
         </Button>
       </ButtonGroup>
@@ -1758,7 +1642,6 @@ function MyTrackPanel() {
         max="1"
         step="0.01"
         value={volume}
-        disabled={isLoading}
         onChange={(e) => setVolume(parseFloat(e.target.value))}
       />
     </Controls>
@@ -1770,7 +1653,7 @@ function MyTrackPanel() {
 </WaveformTrackControls>
 ```
 
-`useTrack()` always returns a value: `name` is "Track N" (N is the position, from 1) for a track without a name, and while the track is loading `isLoading` is true and `muted`, `soloed`, `volume` and `pan` are `false`, `false`, `1` and `0`. A panel that returned `null` for a missing `trackStates[trackIndex]` can return `null` for `isLoading`. The props a panel took from the closure of `renderTrackControls` (a callback, a manager object) are props of the element among the children now; keep them stable (see the behaviour table).
+`useTrack()` always returns a value: `name` is "Track N" (N is the position, from 1) for a track without a name. While a track's audio is still loading, its panel is drawn and works: the values are the arrangement's mix for the track and a value set then is kept, so a panel needs no loading case (the `if (!state) return null` of the "Before" goes). While a take is recorded onto the track, `isRecordingArmed` is true: the built-in mute button is disabled then, and a mute control of your own can do the same. The props a panel took from the closure of `renderTrackControls` (a callback, a manager object) are props of the element among the children now; keep them stable (see the behaviour table).
 
 Where the panel was the default one rebuilt by hand with one change, compose it from the pieces:
 
@@ -1897,48 +1780,43 @@ There is no `ref` for the item any more: the element that moves is the slot the 
 | `setTrackMute(0, true)` (an index; the same for the other three) | muted the first track | does nothing. In development each of the four setters warns once in the console (`[waveform-playlist] setTrackMute() takes a track id…`). A string that is no track's id is ignored without a warning |
 | A track is removed, or one is added in front of the others (the number of tracks changes and the provider rebuilds) | the panels showed every remaining track back at the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack`, and the rebuilt engine took its values from the old list by position, so a track could sound with a neighbour's values (read from the code, not reproduced as audio) | the other tracks keep what the user set |
 | The list is replaced by one of the same length with other tracks, or the same tracks in another order | state stayed at its position | a track keeps its mixer state for as long as its id is in `tracks`; a new id starts from the fields of its `ClipTrack` |
-| `usePlaylistMixer().trackStates` while tracks are loading (`deferEngineRebuild`, or tracks appended to a running playlist) | filled by position: shorter than `tracks` | one entry per track, in the order of `tracks`. The entry of a track that is still loading is `undefined` **at its own position**, which can be in the middle. `trackStates.length` equals `tracks.length` |
-| The identity of the `trackStates` array | a new array with new state objects whenever the provider loaded `tracks` again (also when only `onTracksChange` was a new function) | the same array while no entry changed: a trim, a clip edit or a re-load for a new `onTracksChange` does not change it, and a mute changes the object of that track only |
+| `usePlaylistMixer().trackStates` while tracks are loading | filled by position: shorter than `tracks` | one entry per track of the arrangement, in the order of `tracks`, from the moment the track enters it: `trackStates.length` equals `tracks.length`, and no entry is `undefined` |
+| The identity of the `trackStates` array | a new array with new state objects whenever the provider loaded `tracks` again | the same array while no entry changed: a trim or another clip edit does not change it, and a mute changes the object of that track only |
 | A click in a panel of your own | selected nothing (only the default panel selected its track) | a click anywhere in a track's slot selects the track. `<TrackRemoveButton>`, the button of `<TrackMenuButton>` and the grip and buttons of `<TrackReorderGrip>` do not select. A render-mode choice in the open track menu selects the track, as it did in the default panel |
 | The remove callback | `onRemoveTrack(trackIndex)` | `onRemove(trackId)` |
 | The element a reorder drag moves | the element you gave `ref` from `SortableTrackControls` | the slot the part draws; your grip only starts the drag |
 | Children written inline | (the equivalent: an unstable `renderTrackControls` or `onRemoveTrack` rendered every panel on each render of your component) | the part compares the children with the previous ones (element types, keys and props, `children` recursively, `style` one level deep) and keeps the previous ones while they are equal, so inline children cost nothing while their props are stable. A function or an object written inline as a prop (other than `style`) makes every panel render on each render of the component that composes the view |
 | `useTrack()` outside the children of `<WaveformTrackControls>` | (new) | throws `useTrack must be used within <WaveformTrackControls>…`. For a mixer strip elsewhere on the page use `usePlaylistMixer()` and the id setters of `useEditorControls()`. Under `MediaElementPlaylistProvider` those two throw as well: it has one track and no mixer |
-| A track that is still loading | the default panel's controls were disabled | the pieces: mute, solo, volume, pan and the two move buttons are disabled, the name is "Track N", `useTrack().isLoading` is true. The remove button and the track menu stay enabled |
+| A track whose audio is still loading | the default panel's controls were disabled | the panel works: the values are the arrangement's mix for the track, a value set then is kept, and every piece is enabled. While a take is recorded onto a track its mute button is disabled (`useTrack().isRecordingArmed`) |
 | `<DefaultTrackControls>` | drew the close button and the grip itself, from props of the part | has neither. `<TrackRemoveButton>` places itself at the top left of the slot and `<TrackReorderGrip>` at its right edge; the default panel makes room for the grip on both sides (CSS `:has()`) |
 | The size of a custom panel | the slot, as now | the slot is as wide as the column (`width` of the part) and as tall as the track's row, with `overflow: hidden`. Fill it with `height: 100%`; do not compute the row height |
 | Selecting a track | changed the background of the two slots concerned without rendering their default panels, and called `renderTrackControls` for every track | renders the pieces of the two panels concerned (the one that stops being selected and the one that becomes selected): `isSelected` is in the value of `useTrack()` |
 | A mute, solo, volume or pan change | called `renderTrackControls` for every track | renders the components of that track's panel that call `useTrack()` |
-| `exportWav` (`useExportWav`) with a track that is still loading | failed with a `TypeError` (the track had no state) | the track is rendered with the `muted`, `soloed`, `volume` and `pan` of its `ClipTrack` (its `soloed` counts for the solo rule like any other) |
+| `exportWav` (`useExportWav`) while audio is still loading | failed with a `TypeError` (the track had no state) | renders the loaded clips, each track with its mix from `trackStates` |
 | Children that are `false`, `0` or `''` (`{flag && <Panel />}` with a false flag) | (new) | empty panels. Only `null` and `undefined` mean "the default panel": write `{flag ? <Panel /> : undefined}` |
 | Two reorder handles in one panel (two `<TrackReorderGrip />`, or the grip and `useTrackReorderHandle()`) | (new) | both register the track as the same sortable item; a warning in the console in development. Render one |
 | `<TrackReorderGrip />` as a child of `<DefaultTrackControls>`, or alone inside an element of yours | (new) | the default panel makes room for the grip only when the two are siblings; elsewhere the grip lies over the sliders |
 | A browser without CSS `:has()` | the room for the grip was an inline style | no room is made: the grip lies over the edges of the sliders |
 | `<TrackRemoveButton>` without `onRemove`, in plain JavaScript | (the close button was drawn only with `onRemoveTrack`) | the button is drawn and a click throws |
 | Markup of the default panel | the close button was inside the panel's `<header>`, the reorder rail inside the panel, and the panel handled the click that selects | every slot has a `div` (`[data-track-controls]`) around the panel (before, only with `trackReordering`, and without the attribute); the remove button and the grip are siblings of the panel inside it; the slot handles the click. A selector such as `header button[title="Remove track"]` no longer matches |
-| A reorder (`reorderTrack`, the move buttons, a drag) under a provider without `onTracksChange` | the mixer states were put in the new order while `tracks` stayed as it was, so the panels between the old and the new position showed another track's values | nothing changes on screen (the console warning about the missing `onTracksChange` is as before) |
-| The same ids with other `muted`, `soloed`, `volume` or `pan` fields on the `ClipTrack`, in a list with another number of tracks | the fields were applied (every state was re-created) | the fields of a known id are ignored: the user's values stay. Set them with the setters |
-| Tracks re-created with new ids on each change (`createTrack()` makes an id) | a list of the same length kept the mixer state by position | a new id starts from its `ClipTrack` fields: keep the ids of tracks that are the same track |
-| An id removed while `deferEngineRebuild` is true and added again | (by position) | gets the state it had: entries are dropped at the next full build |
-| Two tracks with the same id | two states, by position | one state for both |
+| A reorder (`reorderTrack`, the move buttons, a drag) | the mixer states followed the provider's `tracks` | an undo step of the arrangement; each track keeps its mix |
+| A track given again (`arrangement.setTracks`, `updateTrack`) with other `muted`, `soloed`, `volume` or `pan` fields | the fields were applied (every state was re-created) | the mix of a known id stays: the fields are only the values a track enters with. Set them with the setters |
+| Tracks re-created with new ids on each change (`createTrack()` and `audioTrack()` make an id) | a list of the same length kept the mixer state by position | a new id starts from its own fields: keep the ids of tracks that are the same track |
+| A track removed and added again while its removal can still be undone | (by position) | gets the mix it had |
+| Two tracks with the same id | two states, by position | refused: the arrangement throws at the call that offered them |
 
-### `trackStates` may hold `undefined`
+### `trackStates` is complete from the start
 
-The TypeScript type is still `TrackState[]`, so the compiler does not point at these. Search for every read of `trackStates`:
+In the last release `trackStates` was filled by position while tracks loaded, so it could be shorter than `tracks`. It now has one entry per track from the moment the track enters the arrangement. Code that waited for `trackStates.length === tracks.length` to know that loading had finished is always true now: read `useArrangementSources(arrangement).isLoading` (or `pendingCount`) for the audio, or `usePlaylistTimeline().isReady` for the first ready.
 
 ```tsx
 // Before
-const anySolo = trackStates.some((s) => s.soloed);
-const volumes = trackStates.map((s) => s.volume);
-const loadedCount = trackStates.length;
+const loadingDone = trackStates.length === tracks.length;
 
 // After
-const anySolo = trackStates.some((s) => s?.soloed);
-const volumes = trackStates.map((s) => s?.volume ?? 1);
-const loadedCount = trackStates.filter(Boolean).length;
+const { isLoading } = useArrangementSources(useArrangement());
+const loadingDone = !isLoading;
 ```
-
-Code that waited for `trackStates.length === tracks.length` to know that loading had finished is now always true: use `trackStates.every(Boolean)`, or `usePlaylistTimeline().isReady` (which says the engine is built for the current tracks).
 
 ### New attributes
 
@@ -1962,9 +1840,7 @@ Code that waited for `trackStates.length === tracks.length` to know that loading
 
 **Packages:** `@waveform-playlist/browser` (major), `@waveform-playlist/annotations` and `@waveform-playlist/ui-components` (additions). Both providers.
 
-Apply this entry after the two above (#686).
-
-It replaces names that earlier entries on this page send you to. Where an earlier entry says `useAnnotationEditing()`, `useAnnotations().continuousPlay`, `useEditorControls().setLinkEndpoints` / `.setAnnotationsEditable`, `getAnnotationBoxLabel`, `PlaylistAnnotationList`, `MediaElementAnnotationList` (with their `controls`, `annotationListConfig` and `renderAnnotationItem` props), `MediaElementAnnotationBoxes` or `onAnnotationUpdate`, says the ready-made views "take `className` and the annotation options they took before", or advises calling `useAnnotationDragHandlers` yourself, rendering the list only when there are annotations, or treating `WaveformAnnotationBoxes`, `LinkEndpointsCheckbox` and `EditableCheckbox` as `WaveformPlaylistProvider` only, go straight to what this entry says.
+It covers the annotation props of the last release's `<Waveform>` and `<MediaElementWaveform>`, `PlaylistAnnotationList`, `MediaElementAnnotationList` (with their `controls`, `annotationListConfig` and `renderAnnotationItem` props) and `onAnnotationUpdate`. The view entry above lists the parts; this one says where the annotation options went.
 
 The annotation options no longer sit on the ready-made views. There are two components, the same under `WaveformPlaylistProvider` and `MediaElementPlaylistProvider`, and each takes its own options:
 
@@ -2003,7 +1879,7 @@ The row of boxes wires the drag of its edges itself. `<Waveform />`, `<WaveformE
 
 | Export | Is |
 | --- | --- |
-| `<WaveformAnnotationBoxes>` | the row of annotation boxes, a part of `WaveformRoot` and of `MediaElementWaveformRoot`. Props: `getLabel` (the label of a box; default: the annotation's id), `height` (pixels; default 30). It owns the `DragDropProvider` for its edges. The name existed (multitrack only, one prop); the part now serves both providers. Type: `WaveformAnnotationBoxesProps` |
+| `<WaveformAnnotationBoxes>` | the row of annotation boxes, a part of `WaveformRoot` and of `MediaElementWaveformRoot`. Props: `getLabel` (the label of a box; default: the annotation's id), `height` (pixels; default 30). It owns the `DragDropProvider` for its edges. It serves both providers. Type: `WaveformAnnotationBoxesProps` |
 | `<AnnotationList>` | the annotation text list, anywhere under either provider. Props: `height` (pixels; without it at most 200), `actions` (buttons on each row while editable), `scrollActivePosition` (`'center'` by default, `'start'`, `'end'`, `'nearest'`, or `'none'` for a list that does not follow playback), `scrollActiveContainer` (`'nearest'` by default, or `'all'`), and a function child that draws a row. Type: `AnnotationListProps` |
 | `useAnnotationOptions()` | `{ editable, linkEndpoints, continuousPlay }`. Both providers. Type: `AnnotationOptionsContextValue` |
 | `usePlaybackControls().setAnnotationsEditable`, `.setLinkEndpoints` | next to `setContinuousPlay`, under both providers |
@@ -2020,12 +1896,8 @@ The row of boxes wires the drag of its edges itself. `<Waveform />`, `<WaveformE
 | `annotationListConfig` (`<Waveform>`, `<WaveformEditor>`, the two list components) | nothing: an action's fourth argument is always the provider's `{ linkEndpoints, continuousPlay }` |
 | `<MediaElementWaveform>` props `annotationTextHeight`, `renderAnnotationItem`, `scrollActivePosition`, `scrollActiveContainer` | compose the view; the props of `<AnnotationList>` |
 | `<MediaElementWaveform>` props `editable`, `linkEndpoints` | `annotationList={{ …, editable, linkEndpoints }}` on the provider |
-| `onAnnotationUpdate` on `<MediaElementWaveform>`, `<MediaElementAnnotationBoxes>`, the two list components, and (deprecated, never called) on `WaveformPlaylistProvider`; the type `OnAnnotationUpdateFn` | `onAnnotationsChange` on the provider: the one report of an annotation change |
-| `MediaElementAnnotationBoxes`, `MediaElementAnnotationBoxesProps` | `WaveformAnnotationBoxes` |
+| `onAnnotationUpdate` on `<MediaElementWaveform>`, the two list components, and (deprecated, never called) on `WaveformPlaylistProvider`; the type `OnAnnotationUpdateFn` | `onAnnotationsChange` on the provider: the one report of an annotation change |
 | `PlaylistAnnotationList`, `MediaElementAnnotationList`, their props types | `AnnotationList` (`controls` is `actions`; `renderAnnotationItem` is the child; `editable` is the provider's) |
-| `useAnnotationEditing()`, `AnnotationEditingContextValue` | `useAnnotationOptions()` (`annotationsEditable` is `editable`) |
-| `useAnnotations().continuousPlay` | `useAnnotationOptions().continuousPlay` |
-| `useEditorControls().setLinkEndpoints`, `.setAnnotationsEditable` | the same two on `usePlaybackControls()` |
 | `annotationList.controls` on `WaveformPlaylistProvider` (declared, never read) | `<AnnotationList actions>` |
 
 Removed names do not throw and have no shim. In plain JavaScript a leftover prop is ignored, a leftover field read is `undefined`, and a leftover call of a removed setter is a `TypeError`; TypeScript reports each of them.
@@ -2067,7 +1939,7 @@ For `<WaveformEditor>`, `<WaveformTracks>` holds `<WaveformClipHeaders />` and `
 
 **Replace with:** delete it. If it carried values other than the provider's, set the provider's options to them (`annotationList`, or the setters).
 
-**Find:** `editable` or `linkEndpoints` on `<MediaElementWaveform>` or `<MediaElementAnnotationBoxes>`; `editable` on `<MediaElementAnnotationList>`.
+**Find:** `editable` or `linkEndpoints` on `<MediaElementWaveform>`; `editable` on `<MediaElementAnnotationList>`.
 
 **Replace with:** the same values in the provider's `annotationList`. The provider follows the prop, so values kept in your own state keep working:
 
@@ -2093,10 +1965,6 @@ Or drop your own state and render `<EditableCheckbox />` and `<LinkEndpointsChec
 
 **Replace with:** `onAnnotationsChange` on the provider. If both were passed, keep one: every change (an edge drag, a text or id edit, an action button) is reported once, there.
 
-**Find:** `MediaElementAnnotationBoxes`.
-
-**Replace with:** `WaveformAnnotationBoxes`; `getAnnotationBoxLabel` is `getLabel`; delete `editable`, `linkEndpoints`, `onAnnotationUpdate` (see above).
-
 **Find:** `PlaylistAnnotationList`, `MediaElementAnnotationList`.
 
 **Replace with:** `AnnotationList`.
@@ -2113,24 +1981,19 @@ Or drop your own state and render `<EditableCheckbox />` and `<LinkEndpointsChec
 
 A wrapper of yours that rendered the list only when there are annotations (`annotations.length > 0 ? <PlaylistAnnotationList /> : null`) can go: the list draws nothing without annotations.
 
-**Find:** `useAnnotationEditing`.
+**Find:** `annotationsEditable`, `linkEndpoints` and `continuousPlay` read from `usePlaylistState()`, and `setLinkEndpoints`, `setAnnotationsEditable`, `setContinuousPlay` from `usePlaylistControls()`.
 
 **Replace with:**
 
 ```tsx
 // Before
-const { annotationsEditable, linkEndpoints } = useAnnotationEditing();
-const { continuousPlay } = useAnnotations();
-const { setLinkEndpoints, setAnnotationsEditable } = useEditorControls();
+const { annotationsEditable, linkEndpoints, continuousPlay } = usePlaylistState();
+const { setLinkEndpoints, setAnnotationsEditable, setContinuousPlay } = usePlaylistControls();
 
 // After
 const { editable, linkEndpoints, continuousPlay } = useAnnotationOptions();
 const { setLinkEndpoints, setAnnotationsEditable, setContinuousPlay } = usePlaybackControls();
 ```
-
-**Find:** `continuousPlay` next to `useAnnotations(`, including destructurings (`const { annotations, continuousPlay } = useAnnotations()`).
-
-**Replace with:** `useAnnotationOptions().continuousPlay`.
 
 **Find:** `useAnnotationDragHandlers` together with a `DragDropProvider` of yours around the view (the wiring the annotation examples had).
 
@@ -2179,7 +2042,7 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | `WaveformPlaylistProvider`, `editable` on, no drag wiring of your own | handles shown, an edge could not be dragged | an edge can be dragged |
 | Your own `DragDropProvider` + `useAnnotationDragHandlers` around the view | moved the edges | receives no annotation drag; the part's own wiring moves them. Harmless, and dead code |
 | Touch drag of an edge | `MediaElementPlaylistProvider`: dnd-kit's default sensors. `WaveformPlaylistProvider`: the sensors of your own wiring | a pointer sensor that activates after 1 px; with `ClipInteractionOptions touchOptimized` above, a touch must be held 250 ms |
-| `useAnnotationOptions()`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` under `MediaElementPlaylistProvider` | the two checkboxes threw (`useAnnotationEditing needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`) | work |
+| `useAnnotationOptions()`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` under `MediaElementPlaylistProvider` | the two checkboxes threw (they read `usePlaylistState()`) | work |
 | The annotation list under `MediaElementPlaylistProvider`, link endpoints | an action always got `linkEndpoints: false` from the list used on its own; the composition's prop from `<MediaElementWaveform>` | the provider's value |
 | An action's `continuousPlay` under `<MediaElementWaveform>` | always `false` (and no action could be given there) | the provider's value |
 | A click on a row of the list | nothing; the `onClick` given to a custom row did nothing | the annotation becomes active and plays from its start, as a click on its box does. In the default row a click in a field that is being edited, or on an action button, does not |
@@ -2196,9 +2059,6 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | Two annotation lists on one page | (one list) | each scrolls its own container to the active annotation. In a browser where `scrollIntoView` has no `container` option, both also scroll the page; give one of them `scrollActivePosition="none"` |
 | A row of the list and the keyboard | (a row did nothing) | a row is played with the pointer only: it cannot be focused. The annotation shortcuts of `<KeyboardShortcuts annotations>` (arrows, Enter) play and move between annotations, under `WaveformPlaylistProvider` |
 | `WaveformPlaylistTheme` | no `annotationTextItemActiveColor` | the key is optional in the type, so a complete theme object of yours still compiles; without it the colour is `#ff9800` |
-| The continuous-play toggle | rendered every reader of `useAnnotations()` | renders the readers of `useAnnotationOptions()`; readers of `useAnnotations()` stand still |
-| Toggling editable or link endpoints under `WaveformPlaylistProvider` | rendered readers of `useAnnotationEditing()` | renders readers of `useAnnotationOptions()`, which now include every reader of `continuousPlay` |
-| `WaveformAnnotationBoxes` under `MediaElementPlaylistProvider` | threw | works |
 | The ids of the three checkboxes | `continuous-play`, `link-endpoints`, `editable-annotations` | generated (two of one checkbox no longer share an id) |
 | Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | the same: the part gained its `DragDropProvider` and the list lost a wrapper. A view with boxes and no list renders one component more per move and per boundary |
 
@@ -2208,17 +2068,13 @@ Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnot
 
 **Packages:** `@waveform-playlist/browser` (major), `@waveform-playlist/ui-components` (major: the shape of `PlaylistInfoContext`), `@waveform-playlist/spectrogram`. Both providers.
 
-Apply this entry after the ones above (#689).
-
-It replaces names that earlier entries on this page send you to. Where an earlier entry says `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` or `fillViewport` is on `usePlaylistView()`, or passes one of them to a provider, go straight to what this entry says.
-
 The row height, the bar style, the playhead width and the filled layout are no longer props of `WaveformPlaylistProvider` and `MediaElementPlaylistProvider`. One component sets them, for every waveform root below it, under either provider:
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform, WaveformViewOptions } from '@waveform-playlist/browser';
 
 <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars>
-  <WaveformPlaylistProvider tracks={tracks}>
+  <WaveformPlaylistProvider arrangement={arrangement}>
     <Waveform />
   </WaveformPlaylistProvider>
 </WaveformViewOptions>
@@ -2282,8 +2138,8 @@ Removed names do not throw and have no shim. In plain JavaScript a leftover prov
   <Waveform />
 </WaveformPlaylistProvider>
 
-// After
-<WaveformPlaylistProvider tracks={tracks} mono theme={theme}>
+// After (`arrangement` replaces `tracks`: see the arrangement entry below)
+<WaveformPlaylistProvider arrangement={arrangement} mono theme={theme}>
   <WaveformViewOptions waveHeight={100} barWidth={3} barGap={1} roundedBars fillViewport>
     <Waveform />
   </WaveformViewOptions>
@@ -2409,10 +2265,6 @@ Not changed: `theme`, `samplesPerPixel` and `automaticScroll` on both providers;
 
 **Packages:** `@waveform-playlist/annotations` (major), `@waveform-playlist/browser` (major), `@waveform-playlist/ui-components` (major), `@waveform-playlist/spectrogram` (major), `@waveform-playlist/core` (major: `getShortcutLabel` is removed; one type added). Both providers.
 
-Apply this entry after the ones above (#770).
-
-It replaces names that earlier entries on this page send you to. Where an earlier entry imports `ClipTrack`, `AudioClip`, `Fade` or `AnnotationData` from `@waveform-playlist/browser`, tells you to render `<ContinuousPlayCheckbox />`, `<LinkEndpointsCheckbox />`, `<EditableCheckbox />` or `<DownloadAnnotationsButton />` of `@waveform-playlist/browser`, or says they need `<AnnotationProvider>`, go straight to what this entry says.
-
 Among the React packages a name is now exported by one package. `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package: import a name from the package that owns it. Five names remain in two entry points, on purpose: `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`. The one in `@waveform-playlist/ui-components` is driven by props; the one in `@waveform-playlist/browser` reads the provider and renders it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) This holds for the main entries of those five packages, for `@waveform-playlist/browser/tone` and for `@waveform-playlist/core`, which a test compares. One pair is left and tracked: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and another in `@waveform-playlist/core`. The other packages (`midi`, `engine`, `playout`, `media-element-playout`, the web components) are not covered.
 
 The four annotation controls are owned by `@waveform-playlist/annotations` and are bound to the playlist provider there:
@@ -2523,7 +2375,7 @@ const [linkEndpoints, setLinkEndpoints] = useState(true);
 <LinkEndpointsCheckbox checked={linkEndpoints} onChange={setLinkEndpoints} />
 
 // After
-<WaveformPlaylistProvider tracks={tracks} annotationList={{ annotations, linkEndpoints: true }}>
+<WaveformPlaylistProvider arrangement={arrangement} annotationList={{ annotations, linkEndpoints: true }}>
   <LinkEndpointsCheckbox />
 </WaveformPlaylistProvider>
 ```
@@ -2880,7 +2732,7 @@ const { isRecording, progress, audioBuffer } = useRecording(stream);
 const { duration, peaks } = useRecordingProgress(progress);
 ```
 
-`useRecordingProgress` re-renders its component 10 times a second by default. If you only passed the values to `<Waveform recordingState>`, do not call it; pass `progress` itself (see below). After a stop, `progress.getSnapshot().duration` is the length of the recorded buffer, the same as `audioBuffer.duration`.
+`useRecordingProgress` re-renders its component 10 times a second by default. If you only passed the values to the preview's `recordingState`, do not call it; pass `progress` itself (see below). After a stop, `progress.getSnapshot().duration` is the length of the recorded buffer, the same as `audioBuffer.duration`.
 
 ### `useIntegratedRecording`
 
@@ -2938,7 +2790,7 @@ useEffect(() => {
 
 ### `<Waveform recordingState>`
 
-Applies to the `recordingState` prop of `<Waveform>` and `<PlaylistVisualization>`. `durationSamples` and `peaks` are removed; pass the `progress` source from `useRecording` or `useIntegratedRecording` instead. Only the live preview clip follows it frame by frame.
+Applies to the `recordingState` prop of the last release's `<Waveform>` and `<PlaylistVisualization>`, which is now the `recordingState` of the `<WaveformRecordingPreview>` part (see the view entry). `durationSamples` and `peaks` are removed; pass the `progress` source from `useRecording` or `useIntegratedRecording` instead. Only the live preview clip follows it frame by frame.
 
 **Find:** `recordingState=`.
 
@@ -2962,21 +2814,22 @@ Applies to the `recordingState` prop of `<Waveform>` and `<PlaylistVisualization
   }
 />
 
-// After
-<Waveform
-  recordingState={
-    isRecording && recordingTrackId
-      ? {
-          isRecording: true,
-          trackId: recordingTrackId, // NOT the selected track id: see "a take stays on its track" below
-          startSample,
-          progress,
-          bits: 16,
-          latencyOffset,
-        }
-      : undefined
-  }
-/>
+// After: the preview is a part of the view's tracks (see the view entry); the take's
+// session is useRecordingSession({ isRecording, trackId: recordingTrackId })
+<WaveformTracks>
+  {isRecording && recordingTrackId ? (
+    <WaveformRecordingPreview
+      recordingState={{
+        isRecording: true,
+        trackId: recordingTrackId, // NOT the selected track id: see "a take stays on its track" below
+        startSample,
+        progress,
+        bits: 16,
+        latencyOffset,
+      }}
+    />
+  ) : null}
+</WaveformTracks>
 ```
 
 If you produce the take's data yourself instead of using the recording hooks, build a source with `createValueSource` from `@waveform-playlist/core` and publish a new `{ duration, peaks }` object for each update:
@@ -3022,18 +2875,18 @@ Both versions are lines from the body of one component. That is the smallest cha
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   useDynamicEffects,
   useActiveEffects,
   type UseDynamicEffectsReturn,
 } from '@waveform-playlist/browser/tone';
 
-function App({ tracks }: { tracks: ClipTrack[] }) {
+function App({ arrangement }: { arrangement: Arrangement }) {
   const masterFx = useDynamicEffects();
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+    <WaveformPlaylistProvider arrangement={arrangement} effects={masterFx.masterEffects}>
       <MasterRack masterFx={masterFx} />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -3205,15 +3058,15 @@ The "Before" lines are from the body of the component that called the hook. Keep
 
 **Packages:** `@waveform-playlist/core`, `@waveform-playlist/playout`, `@waveform-playlist/browser`.
 
-A track no longer carries its effects function. `ClipTrack.effects` is removed, and so is `effects` in `AudioTrackConfig` (the configs of `useAudioTracks`). The provider has a `trackEffects` prop instead, and `createToneAdapter` a `trackEffects` option: a function from a track id to that track's effects function (or `undefined` for none).
+A track no longer carries its effects function. `ClipTrack.effects` is removed, and so is `effects` in `AudioTrackConfig` (the configs of the removed `useAudioTracks`). The provider has a `trackEffects` prop instead, and `createToneAdapter` a `trackEffects` option: a function from a track id to that track's effects function (or `undefined` for none).
 
-Why: attaching the function meant copying every track object whenever `tracks` changed. The provider recognises a change it can apply to the running engine by the identity of the track objects, so with the copies every clip move, trim and split, and every added file, disposed the engine and built a new one.
+Why: attaching the function meant copying every track object whenever the tracks changed, and in the last release every such copy disposed the engine and built a new one.
 
 An `effects` field left on a track object is ignored at runtime: the chain is silently not connected. TypeScript reports it only where the object is checked against `ClipTrack` directly.
 
 **Find:** `effects:` inside a `tracks.map(` (usually a `tracksWithEffects` memo), `effects` in an `AudioTrackConfig`, and `.effects` read from a track.
 
-**Replace with:** the `trackEffects` prop, and `tracks` passed through unchanged:
+**Replace with:** the `trackEffects` prop:
 
 ```tsx
 // Before
@@ -3229,16 +3082,12 @@ const tracksWithEffects = useMemo(
 // After
 const { getTrackEffectsFunction } = useTrackDynamicEffects();
 
-<WaveformPlaylistProvider
-  tracks={tracks}
-  trackEffects={getTrackEffectsFunction}
-  onTracksChange={setTracks}
->
+<WaveformPlaylistProvider arrangement={arrangement} trackEffects={getTrackEffectsFunction}>
 ```
 
-Delete the memo.
+Delete the memo. (`arrangement` replaces `tracks` and `onTracksChange`: see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed).)
 
-A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. `AudioTrackConfig` has a new optional `id` for this: the track built from the config gets that id (without it an id is generated, as before, and is on `tracks[i].id` once the track exists). Ids must be unique: `useAudioTracks` warns about duplicates but still builds the tracks with the ids as given. An empty string counts as no id. Tracks added with `useDynamicTracks` always get generated ids; read them from `tracks`.
+A fixed effects function per track, which used to be `effects` in the track config, is keyed by track id as well. Give the track an id you know, `audioTrack({ id, src })` (without it an id is generated and is on the track once it is in the arrangement; an empty string counts as no id). Ids must be unique: the arrangement refuses a duplicate track id.
 
 ```tsx
 // Before
@@ -3250,9 +3099,9 @@ const { tracks } = useAudioTracks([
 <WaveformPlaylistProvider tracks={tracks}>
 
 // After
-const { tracks } = useAudioTracks([
-  { id: 'vocals', src: 'vocals.mp3', name: 'Vocals' },
-  { id: 'drums', src: 'drums.mp3', name: 'Drums' },
+const arrangement = useCreateArrangement(() => [
+  audioTrack({ id: 'vocals', src: 'vocals.mp3', name: 'Vocals' }),
+  audioTrack({ id: 'drums', src: 'drums.mp3', name: 'Drums' }),
 ]);
 
 // Module level, or memoized: any stable object.
@@ -3260,7 +3109,7 @@ const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
   vocals: vocalReverb,
 };
 
-<WaveformPlaylistProvider tracks={tracks} trackEffects={(trackId) => effectsByTrackId[trackId]}>
+<WaveformPlaylistProvider arrangement={arrangement} trackEffects={(trackId) => effectsByTrackId[trackId]}>
 ```
 
 **When the function is called:** each time a track's audio graph is built, with the `trackEffects` function from the latest render. Passing a new function identity rebuilds nothing, so an inline arrow is fine. Returning a different effects function for a track that is already built takes effect the next time that track is built. So return the same function for the same track id for as long as the track exists; to change what a track's chain does while it plays, change the chain behind a stable function, which is what `useTrackDynamicEffects()` does.
@@ -3273,7 +3122,7 @@ const effectsByTrackId: Record<string, TrackEffectsFunction | undefined> = {
 
 // After
 <WaveformPlaylistProvider
-  tracks={tracks}
+  arrangement={arrangement}
   createAdapter={() => createToneAdapter({ trackEffects: getTrackEffectsFunction })}
 >
 ```
@@ -3292,28 +3141,16 @@ Also removed:
 What sets it:
 
 - `createTrack({ name, clips })` makes an audio track; pass `kind: 'midi'` for a MIDI track.
-- `useAudioTracks` and `useDynamicTracks` make audio tracks. `useMidiTracks` makes MIDI tracks.
+- `audioTrack()` makes an audio track. `loadMidiTracks` and `useMidiTracks` make MIDI tracks.
 - A track object you write by hand needs the field. A MIDI track without it is read as an audio track and rejected.
 
 :::danger A track that breaks the rule throws
 
 `PlaylistEngine.setTracks()`, `addTrack()` and `updateTrack(id, track)` throw an `Error` for a track whose clips do not match its kind, before changing anything. The message names the track and the clip.
 
-**In `WaveformPlaylistProvider` the error does not reach React, so an error boundary will not catch it.** The provider reports it instead:
-
-- the `onError` prop is called with the error;
-- `[waveform-playlist] The playlist could not be built and stays in its loading state (it cannot be played). Reason: …` is logged as a console error, with a hint to pass `onError` when the provider has none (when the bad track was appended to a running playlist, `Incremental add failed, falling through to full rebuild: …` is logged first, and none of the tracks appended with it are added);
-- the playlist stays in its loading state (`isReady` false, `data-playlist-state="loading"`) and cannot be played, until `tracks` is valid again. Its waveforms are still drawn from `tracks`. A build that was superseded by a newer one, or whose provider unmounted, logs nothing; `onError` is still called for it, as before.
+**Under `WaveformPlaylistProvider` the throw reaches whoever offered the track.** The provider takes an arrangement (see [A refused track throws at the call](#a-refused-track-throws-at-the-call-onerror-is-for-an-engine-that-cannot-be-built)), whose `setTracks()`, `addTrack()` and `updateTrack()` check the track the same way: a track refused in the `useCreateArrangement` initializer is a render error for the nearest error boundary above the component that calls it, and one refused by `arrangement.addTrack()` is that call's exception. The provider's `onError` is not called for it.
 
 An `onReady` callback that throws is a separate report: `[waveform-playlist] The onReady callback threw: …` is logged as a console error and `onError` is called with the error, and the playlist is ready.
-
-With `deferEngineRebuild` set, the report comes when the deferral ends, because that is when the engine is next built.
-
-**Pass `onError` to the provider.** Without it, the only sign of a rejected track is the console error and a playlist that never becomes ready.
-
-```tsx
-<WaveformPlaylistProvider tracks={tracks} onError={(error) => showProblem(error.message)}>
-```
 
 If you call a `PlaylistEngine` yourself, the throw is synchronous: wrap the call in `try`/`catch`, or call `assertTrackKind(track)` from `@waveform-playlist/core` first.
 
@@ -3321,7 +3158,7 @@ If you call a `PlaylistEngine` yourself, the throw is synchronous: wrap the call
 
 **Find:**
 
-- Track objects written by hand: object literals typed `ClipTrack`, and anything pushed into the provider's `tracks` that did not come from `createTrack` or one of the loading hooks. TypeScript reports each one (`Property 'kind' is missing`).
+- Track objects written by hand: object literals typed `ClipTrack`, and anything added to the arrangement (or, before it, pushed into the provider's `tracks`) that did not come from `createTrack`, `audioTrack` or `loadMidiTracks`. TypeScript reports each one (`Property 'kind' is missing`).
 - Tracks holding `midiNotes` clips that are built with `createTrack({ … })` and no `kind`.
 - Saved projects: track data stored before this release has no `kind`.
 - Tracks that hold audio clips and MIDI clips together.
@@ -3405,7 +3242,7 @@ In a page rendered by `<Waveform>`, the channel element of each MIDI clip has th
 
 :::warning Change `recordingState.trackId` in every recording UI
 
-`useIntegratedRecording` returns a new field, **`recordingTrackId`**. Pass it as `recordingState.trackId` on `<Waveform>` in place of the selected track id. If you keep passing the selected track id, the live preview is drawn on whichever track the user selects during a take, while the finished clip is added to the track the take was started on.
+`useIntegratedRecording` returns a new field, **`recordingTrackId`**. Pass it as `recordingState.trackId` (now on `<WaveformRecordingPreview>`, see the view entry) in place of the selected track id. If you keep passing the selected track id, the live preview is drawn on whichever track the user selects during a take, while the finished clip is added to the track the take was started on.
 
 :::
 
@@ -3422,28 +3259,29 @@ What changed:
 
 ```tsx
 // Before
-const { isRecording, progress, startRecording, stopRecording } =
+const { isRecording, startRecording, stopRecording } =
   useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
 
 <Waveform
   recordingState={
     isRecording && selectedTrackId
-      ? { isRecording: true, trackId: selectedTrackId, startSample, progress, bits: 16 }
+      ? { isRecording: true, trackId: selectedTrackId, startSample /* … */ }
       : undefined
   }
 />
 
 // After
 const { isRecording, progress, recordingTrackId, startRecording, stopRecording } =
-  useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+  useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
+useRecordingSession({ isRecording, trackId: recordingTrackId });
 
-<Waveform
-  recordingState={
-    isRecording && recordingTrackId
-      ? { isRecording: true, trackId: recordingTrackId, startSample, progress, bits: 16 }
-      : undefined
-  }
-/>
+<WaveformTracks>
+  {isRecording && recordingTrackId ? (
+    <WaveformRecordingPreview
+      recordingState={{ isRecording: true, trackId: recordingTrackId, startSample, progress, bits: 16 }}
+    />
+  ) : null}
+</WaveformTracks>
 ```
 
 ```tsx
@@ -3454,7 +3292,7 @@ if (isRecording && removedTrack.id === selectedTrackId) await stopRecording();
 if (isRecording && removedTrack.id === recordingTrackId) await stopRecording();
 ```
 
-The third argument of `useIntegratedRecording` is still the selected track id: it decides where the _next_ take starts.
+The selected track id decides where the _next_ take starts. The hook's first arguments change too: [`useIntegratedRecording` takes the arrangement](#useintegratedrecording-takes-the-arrangement-a-take-is-one-undo-step).
 
 ## `addEffect` and `addEffectToTrack` return a promise
 
@@ -3549,22 +3387,22 @@ Also changed: `EffectDefinition['category']` is now `EffectCategory`, the known 
 
 **Packages:** `@waveform-playlist/engine`, `@waveform-playlist/browser`.
 
-This entry is for code that calls a `PlaylistEngine` itself: an engine you construct, or the one behind `useEngineRefs().playoutRef`. One part of it reaches every React app: the tracks handed to `onTracksChange` (the first heading below).
+This entry is for code that calls a `PlaylistEngine` itself: an engine you construct, or the one behind `useEngineRefs().playoutRef`. A React app on `WaveformPlaylistProvider` makes the arrangement itself and gives it to the provider: see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed).
 
-The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the seven listed under [Also changed](#also-changed-in-the-engine) at the end. One more heading, [The arrangement's own API](#the-arrangements-own-api-clips-that-are-still-loading), is about code written against the arrangement itself, which is new. `WaveformPlaylistProvider` takes `tracks` and `onTracksChange` as before. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
+The tracks, the per-track mix and the undo history now have one owner, the arrangement (`createArrangement()` from `@waveform-playlist/engine`). An engine built without the new `arrangement` option makes its own, so constructing and calling an engine works as before, except for the seven changes that have a heading below and the seven listed under [Also changed](#also-changed-in-the-engine) at the end. One more heading, [The arrangement's own API](#the-arrangements-own-api-clips-that-are-still-loading), is about code written against the arrangement itself, which is new. The [engine guide](/docs/framework-agnostic/engine#the-arrangement) describes the arrangement.
 
-### `getState().tracks` and the tracks in `onTracksChange` are read-only
+### `getState().tracks` is read-only
 
 `EngineState.tracks` is now `readonly ClipTrack[]` and is no longer a copy: it is the engine's own array, shared with the undo history. Before, every `getState()` and every `statechange` carried a fresh copy of each track and of its `clips` array, so a write to a track or to the array of clips changed only your copy; the clip objects were already the engine's. `PlayoutAdapter.setTracks` receives a `readonly ClipTrack[]` too.
 
-In `WaveformPlaylistProvider`, the array passed to `onTracksChange` is a new array you may keep in state, but the track and clip objects in it are the engine's.
+Under `WaveformPlaylistProvider` the tracks you read (`arrangement.getTracks()`, `useArrangementTracks(arrangement)`, `usePlaylistTimeline().tracks`) are read-only too. The arrangement's own tracks are frozen as described next; in `usePlaylistTimeline().tracks` a track that holds a clip still loading is a copy without that clip, not frozen itself (its clips are). Do not write to either.
 
 Outside production builds (`process.env.NODE_ENV` is not `'production'`) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws a `TypeError` in a module. In a production build nothing is frozen and a write silently changes the engine's state and its undo history. What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen.
 
 **Find:**
 
-- Assignments to a track or clip that came from `engine.getState().tracks`, from a `statechange` listener's `state.tracks`, or from the argument of `onTracksChange`: `track.name = …`, `track.clips.push(…)`, `clip.startSample = …`.
-- `tracks.sort(…)`, `tracks.splice(…)` and other writes to the array itself, for `engine.getState().tracks` and a listener's `state.tracks`. The array passed to `onTracksChange` is your own and may be sorted or spliced; only the track and clip objects in it are affected.
+- Assignments to a track or clip that came from `engine.getState().tracks`, from a `statechange` listener's `state.tracks`, or from the arrangement: `track.name = …`, `track.clips.push(…)`, `clip.startSample = …`.
+- `tracks.sort(…)`, `tracks.splice(…)` and other writes to the array itself, for `engine.getState().tracks`, a listener's `state.tracks` and the arrangement's tracks.
 - Variables typed `ClipTrack[]` that are assigned `engine.getState().tracks`. TypeScript reports each one (`The type 'readonly ClipTrack[]' is 'readonly' and cannot be assigned to the mutable type 'ClipTrack[]'`).
 - A custom `PlayoutAdapter` whose `setTracks`, `addTrack` or `updateTrack` writes to the tracks it is given.
 
@@ -3585,16 +3423,8 @@ if (track) {
 ```
 
 ```tsx
-// Before
-onTracksChange={(next) => {
-  next[0].name = 'Bass';
-  setTracks(next);
-}}
-
-// After
-onTracksChange={(next) => {
-  setTracks(next.map((track, i) => (i === 0 ? { ...track, name: 'Bass' } : track)));
-}}
+// Under WaveformPlaylistProvider: change a track through the arrangement
+arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }));
 ```
 
 ```typescript
@@ -3647,7 +3477,7 @@ The undo history holds tracks and clips only. Before, an undo step was a copy of
 - two tracks with the same id (`setTracks`), a track whose id another track has (`addTrack`), or a track given a new id that another track has (`updateTrack`);
 - two clips with the same id on one track. The same clip id on two different tracks is accepted.
 
-Before, such tracks were accepted. In `WaveformPlaylistProvider` the throw comes from the same engine calls as the one for a track of the wrong kind, which the provider catches and reports through `onError`, not to an error boundary (see [A track has a kind](#a-track-has-a-kind-audio-or-midi-never-both)).
+Before, such tracks were accepted. Under `WaveformPlaylistProvider` the arrangement refuses them at the call that offers them, as for a track of the wrong kind (see [A refused track throws at the call](#a-refused-track-throws-at-the-call-onerror-is-for-an-engine-that-cannot-be-built)).
 
 **Find:** places that build track or clip ids by hand (an index, a file name, a copied clip that keeps its id), and saved projects.
 
@@ -3829,11 +3659,268 @@ Also:
 - `editor.startRecording()` onto a MIDI track records nothing and dispatches `daw-recording-error`.
 - `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one. The exported `TrackDescriptor` and `TrackWithId` types therefore have a new required field: code that builds one of them by hand must add `kind`.
 
+## `WaveformPlaylistProvider` takes an `arrangement`: `tracks`, `onTracksChange` and `deferEngineRebuild` are removed
+
+**Packages:** `@waveform-playlist/browser`.
+
+The provider no longer takes a tracks array from your state and hands changes back. It takes an **arrangement**, an `Arrangement` from `@waveform-playlist/engine` that you make with `useCreateArrangement` from `@waveform-playlist/browser`. The arrangement owns the tracks and their clips, the mix (volume, mute, solo, pan by track id), the undo history and the loading of the audio the clips name. The provider derives everything it publishes from it and writes nothing back. A clip move, trim or split, a reorder, an undo and a recorded take each change the arrangement, and you read the tracks there.
+
+What goes with it:
+
+- **No copy of the tracks in your state.** Change tracks through the arrangement's methods (`addTrack`, `removeTrack`, `updateTrack`, `setTracks`, `reorderTrack`, the mixer setters, `undo`, `redo`), from a handler or an effect. Below the provider `useArrangement()` returns it. Read the tracks with `useArrangementTracks(arrangement)` (every clip, loading or not) or, below the provider, `usePlaylistTimeline().tracks` (loaded clips only).
+- **One arrangement per playlist.** `useCreateArrangement` reads its initializer once and returns the same object on every render. A new `arrangement` object passed to the provider is a new playlist: everything below the provider mounts again, with a new engine; playback stops, and the zoom, the selection, the loop, the master volume and the scroll position start from their initial values. A development build says so once with a console warning (`WaveformPlaylistProvider was given a new \`arrangement\` prop: everything below it mounts again …`).
+- **A track change never builds a new engine.** Before, a `tracks` array that did not come from the engine (a set of tracks that replaced the previous one) disposed the engine and built a new one, and `deferEngineRebuild` held that back during progressive loading. Now an engine is built when the provider mounts, when `effects` changes identity and when `zoomLevels` changes content; adding, removing or replacing tracks changes the running engine. `deferEngineRebuild` has nothing left to defer.
+- **Not an undo step:** the tracks the initializer returns. Tracks you add later with `addTrack` are; call `arrangement.clearHistory()` once after a first load you make yourself (see [Loading Audio](/docs/react/guides/loading-audio#ready)).
+
+In plain JavaScript a leftover `tracks`, `onTracksChange` or `deferEngineRebuild` prop is ignored: nothing reads it, nothing warns. A provider given no `arrangement` at all (or anything that is not an object, `null` included) throws an `Error` while it renders, in development and production builds alike, with this message:
+
+```text
+[waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop: an arrangement made with `useCreateArrangement`, which owns the tracks. The `tracks` and `onTracksChange` props were removed. See https://naomiaro.github.io/waveform-playlist/docs/react/upgrading
+```
+
+The nearest error boundary above the provider catches it. TypeScript reports each leftover prop and the missing `arrangement`.
+
+**Find:** `<WaveformPlaylistProvider` with `tracks=`, `onTracksChange=` or `deferEngineRebuild=`; the `useState` that holds the tracks you passed to it (often `useState<ClipTrack[]>`), and the `useEffect` that copied loaded tracks into that state.
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks: loadedTracks, loading } = useAudioTracks(configs, { immediate: true });
+const [tracks, setTracks] = useState<ClipTrack[]>([]);
+useEffect(() => {
+  if (!loading) setTracks(loadedTracks);
+}, [loadedTracks, loading]);
+
+const removeTrack = (id: string) => setTracks((prev) => prev.filter((t) => t.id !== id));
+
+<WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} deferEngineRebuild={loading}>
+  <Waveform />
+</WaveformPlaylistProvider>
+
+// After
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
+
+const arrangement = useCreateArrangement(() => configs.map((config) => audioTrack(config)));
+
+const removeTrack = (id: string) => arrangement.removeTrack(id);
+
+<WaveformPlaylistProvider arrangement={arrangement}>
+  <Waveform />
+</WaveformPlaylistProvider>
+```
+
+`configs` above are `audioTrack()` options, not the old `AudioTrackConfig`: see the next entry for the differences (`startTime` is `start`).
+
+Tracks you built yourself as `ClipTrack[]` (decoded `AudioBuffer`s, MIDI tracks) go into the arrangement as they are: `useCreateArrangement(() => myTracks)` for the first ones, `arrangement.addTrack(track)` later, `arrangement.setTracks(tracks)` to replace them all (that also clears the undo history).
+
+The `Arrangement` type is exported by `@waveform-playlist/engine`, a dependency of `@waveform-playlist/browser`. Add it to your own dependencies if you import the type and your package manager is strict (pnpm).
+
+## `useAudioTracks` and `useDynamicTracks` are removed; a track names its audio with `audioTrack()`
+
+**Packages:** `@waveform-playlist/browser`.
+
+Removed from `@waveform-playlist/browser/tone`: `useAudioTracks`, `useDynamicTracks`, and the types `AudioTrackConfig`, `TrackSource`, `TrackLoadError` and `UseDynamicTracksReturn`. A track names its audio itself: `audioTrack(options)` from `@waveform-playlist/core` builds a track whose clip has a `src`, and the arrangement fetches and decodes it once the provider has its first adapter. The provider decodes with its adapter's `AudioContext` (before, the hooks decoded on the Tone.js global context).
+
+A leftover import of a removed name fails the build (`useAudioTracks` is not exported); where a bundler lets it through, the value is `undefined` and the call throws a `TypeError`.
+
+**`AudioTrackConfig` to `audioTrack()` options:**
+
+| `AudioTrackConfig` | `audioTrack()` |
+|---|---|
+| `startTime` | `start` (seconds) |
+| `src` (a URL) | `src`: a URL, a `Blob` or a `File` |
+| `name`, `audioBuffer`, `waveformData`, `duration`, `offset`, `fadeIn`, `fadeOut`, `color`, `volume`, `muted`, `soloed`, `pan`, `renderMode`, `spectrogramConfig`, `spectrogramColorMap` | the same |
+| `effects` | removed: the provider's `trackEffects` prop, keyed by track id (see [track effects are passed to the provider](#track-effects-are-passed-to-the-provider-not-set-on-tracks)) |
+| (none) | `id` (the track's id), `clipId`, `gain` |
+
+`useAudioTracks`' second argument, `{ immediate }` (and its alias `progressive`), is gone with it: every playlist now loads progressively. The rows are drawn at once, a clip with a `duration` or `waveformData` is drawn as a dimmed placeholder while its audio loads, and a clip that names only its `src` is drawn when it has loaded (see [Placeholders](/docs/react/guides/loading-audio#placeholders-while-audio-loads)). A placeholder is drawn only once the provider knows its real sample rate: pass the provider's `sampleRate` prop to have them from the first render.
+
+**What replaces each returned field:**
+
+| Before | After |
+|---|---|
+| `useAudioTracks().tracks` | `useArrangementTracks(arrangement)`, or `usePlaylistTimeline().tracks` below the provider |
+| `loading` | `useArrangementSources(arrangement).isLoading` (the provider need not wait for it; Play works from the first ready) |
+| `loadedCount`, `totalCount` | `sources.size - pendingCount - failedCount`, `sources.size` of `useArrangementSources(arrangement)` |
+| `error` (a string) | the `error` (an `Error`) of each `failed` entry in `useArrangementSources(arrangement).sources`; `arrangement.retry(src)` starts it again |
+| `useDynamicTracks().addTracks(sources)` | `arrangement.addTrack(audioTrack({ src }))` for each source; a `{ src, name }` source is `audioTrack({ src, name })` |
+| `removeTrack(trackId)` | `arrangement.removeTrack(trackId)` |
+| `loadingCount`, `isLoading` | `pendingCount`, `isLoading` of `useArrangementSources(arrangement)` |
+| `errors` (failed tracks, removed automatically) | the `failed` entries of `useArrangementSources(arrangement).sources`. A failed track is not removed for you: to take a dropped file out again, call `arrangement.removeTrack(id, { undoable: false })` from an effect over that value (not from inside `arrangement.subscribe`) |
+
+**A dropped file's track looks different while it loads.** `useDynamicTracks` added a placeholder track with `clips: []` and a name ending in `" (loading...)"`, and replaced it with the loaded track (same id). `arrangement.addTrack(audioTrack({ src: file }))` adds the track at once with its plain name (the file name without its extension) and one clip that is still loading (`isLoadingClip(clip)` is true); when the file has decoded, that clip becomes a loaded clip of the same id, in place. Code that recognised a loading track by `clips.length === 0` or by the `" (loading...)"` suffix reads `isLoadingClip` or `useArrangementSources(arrangement)` instead.
+
+**The load error messages changed.** The hooks threw `Failed to fetch <src>: <statusText>` (with the whole `src`) and `Invalid audio buffer for <src>`. The arrangement's loader gives `Failed to fetch <label>: <status> <statusText>` for a response that is not OK, `Failed to fetch <label>` for a network failure or a refused cross-origin request, `Decoded audio is empty: <label>`, and the browser's own error, unchanged, when the decoder rejects the data. `<label>` is the URL without its query string, its fragment and a user name or password, `data: URL` / `blob: URL` for those, a `File`'s name, or `Blob`. Code that matches on the text of the old messages has to match the new ones.
+
+**`useCreateArrangement` reads two options.** `useCreateArrangement(init?, { loadSource?, undoLimit? })` reads `init` and those two options on the first render only; any other key is not read (a `tracks` key left in the options from plain JavaScript does nothing: declare the tracks in `init`).
+
+**Find:** `useAudioTracks`, `useDynamicTracks`, `AudioTrackConfig`, `TrackSource`, `TrackLoadError`, `UseDynamicTracksReturn`, `startTime:` in a track config, `URL.createObjectURL` used only to hand a file to `useAudioTracks`, `" (loading...)"`, and code that matches on `Failed to fetch` or `Invalid audio buffer`.
+
+**Replace with:**
+
+```tsx
+// Before
+import { useAudioTracks, useDynamicTracks } from '@waveform-playlist/browser/tone';
+
+const { tracks, loading, error } = useAudioTracks([
+  { src: '/audio/vocals.mp3', name: 'Vocals' },
+  { src: '/audio/guitar.mp3', name: 'Guitar', startTime: 4, duration: 30 },
+]);
+if (loading) return <div>Loading…</div>;
+if (error) return <div>Error: {error}</div>;
+
+// Runtime additions
+const { tracks, addTracks, removeTrack, isLoading, errors } = useDynamicTracks();
+addTracks(files);
+
+// After
+import { useCreateArrangement, useArrangementSources } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
+
+const arrangement = useCreateArrangement(() => [
+  audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
+  audioTrack({ src: '/audio/guitar.mp3', name: 'Guitar', start: 4, duration: 30 }),
+]);
+const { isLoading, failedCount } = useArrangementSources(arrangement);
+
+// Runtime additions
+files.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
+```
+
+Several clips on one track are `LoadingClip` objects (`{ id, src, start, duration, offset }`, seconds) in the track's `clips`; see [Several Clips per Track](/docs/react/guides/loading-audio#several-clips-per-track).
+
+**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` returns a `tracks` array, which the provider no longer takes. Load with `loadMidiTracks(src, { sampleRate })`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+
+## `usePlaylistTimeline()`: `onTracksChange` is removed; `tracks` is read-only and holds loaded clips
+
+**Packages:** `@waveform-playlist/browser`.
+
+In the last release these four values and `onTracksChange` were on `usePlaylistData()`. They are on `usePlaylistTimeline()` now ([one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields)), whose value is `{ tracks, peaksDataArray, duration, isReady }`, and what they hold changed:
+
+- **`onTracksChange` is removed.** It is on no hook; a leftover read from the value is `undefined`, and calling it throws a `TypeError`. Change tracks through the arrangement (`useArrangement()`).
+- **`tracks` is `readonly ClipTrack[]` and holds loaded clips only.** It is the arrangement's tracks without the clips whose audio is still loading. A track whose clips are all loaded is the arrangement's own object, frozen outside production builds; a track that holds a clip still loading is a copy without that clip. Do not write to either. Every track is there, also while all its clips load.
+- **`peaksDataArray` can hold placeholder records.** A clip still loading that has a `duration` or `waveformData` has a record with `isPlaceholder: true` in its track's row, and no clip in `tracks`. So below the track, the two arrays do not line up: find a record by `clipId`. At track level they still do: `tracks[i]`, `peaksDataArray[i]` and `usePlaylistMixer().trackStates[i]` are the same track.
+- **`duration` counts loaded audio only**, and equals the engine's. The view is drawn wide enough for a placeholder that ends later; `seekTo` clamps to `duration`.
+- **An export renders what has loaded.** `ExportWavButton` and `useExportWav().exportWav(tracks, trackStates)` with these `tracks` render the loaded clips; a clip still loading is left out.
+- **Read-only parameters (not breaking).** `useExportWav().exportWav(tracks, trackStates, options?)` now takes `readonly ClipTrack[]` and `readonly TrackState[]`, and `ClipCollisionModifier.configure({ tracks })` takes `readonly ClipTrack[]` (or a function returning one), so these `tracks` can be passed as they are; a mutable array is still accepted.
+
+**Find:** `onTracksChange` next to `usePlaylistData`; `peaksDataArray[i][j]` read together with `tracks[i].clips[j]`; assignments to `tracks[i]`, `tracks[i].clips` or a clip of them; `duration` used as "the length of every clip".
+
+**Replace with:**
+
+```tsx
+// Before
+const { tracks, peaksDataArray, onTracksChange } = usePlaylistData();
+const clip = tracks[i].clips[j];
+const record = peaksDataArray[i][j];
+onTracksChange?.(tracks.map((t) => (t.id === id ? { ...t, name } : t)));
+
+// After
+const { tracks, peaksDataArray } = usePlaylistTimeline();
+const arrangement = useArrangement();
+const clip = tracks[i].clips[j];
+const record = peaksDataArray[i].find((r) => r.clipId === clip.id);
+arrangement.updateTrack(id, (track) => ({ ...track, name }));
+```
+
+## Ready comes once per mount, after the first sources; Play does nothing before it
+
+**Packages:** `@waveform-playlist/browser`.
+
+Before, `onReady` was called and the window event `waveform-playlist:ready` dispatched after every engine build: the first load and every full rebuild. Now both happen **once per mount of the provider**: the first time an engine is attached and no source of the arrangement is still pending. A source that failed counts as settled; an empty arrangement is ready when its engine is attached; a file added during the first load extends the wait; a source that never settles means never ready. A later engine build, a StrictMode remount or an `<Activity>` hide and reveal does not repeat them.
+
+`usePlaylistTimeline().isReady` (and `data-playlist-state` on the view) turns true at the same moment. After that it is false only while a later engine is being built (an `effects` or `zoomLevels` change) and true again when that engine is attached, whatever is still loading.
+
+The event's `detail` is `{ trackCount, duration }`: `trackCount` counts every track of the arrangement, loaded or not; `duration` is the length of the loaded audio in seconds.
+
+**Play does nothing before the first ready.** `play()` returns at once and queues nothing: a Play press, Space or an annotation click during the first load does nothing (the annotation is not highlighted either), and does not start later by itself. A development build writes one console warning per mount: `[waveform-playlist] play() was called before the playlist was ready and did nothing: …`; a production build is silent. Edits, the mixer, `seekTo` and `setSelection` work before ready. `play()` called from `onReady`, or from an effect or a layout effect that runs when `isReady` turns true, works. A `play()` made from an app's own `arrangement.sources` listener when the last of the first sources settles runs before React has committed that ready, and is refused: wait for `isReady` or `onReady`.
+
+A page that loads something before its tracks exist (MIDI, peaks files) adds the tracks and then renders the provider, so that its one ready means "the tracks are in".
+
+**Find:** `onReady` and `waveform-playlist:ready` handlers that expect to run again after a rebuild or a change of tracks; code that calls `play()` on mount, from a timer, or from a handler that can run during the first load (autoplay, a "play" deep link); tests that count ready events.
+
+**Replace with:**
+
+```tsx
+// Before: play on mount (queued until the engine was built)
+useEffect(() => {
+  play();
+}, []);
+
+// After: play when the playlist is ready
+const { isReady } = usePlaylistTimeline();
+useEffect(() => {
+  if (isReady) play();
+}, [isReady, play]);
+
+// Or
+<WaveformPlaylistProvider arrangement={arrangement} onReady={() => startPlaybackOnce()}>
+```
+
+:::note Fixed: an inline `onReady` or `onError` no longer rebuilds the engine
+
+Before, a new `onReady` or `onError` function identity (an inline arrow, on every render of the component that renders the provider) made the provider build its engine again. Both are now read when they are called, so an inline arrow is fine.
+
+:::
+
+## A refused track throws at the call; `onError` is for an engine that cannot be built
+
+**Packages:** `@waveform-playlist/browser`.
+
+The arrangement refuses a track whose clips do not match its `kind`, a clip still loading on a MIDI track, two tracks with one id and two clips with one id on a track, before changing anything. Before, such a track reached the engine inside the provider, which caught the throw, called `onError`, and left the playlist in its loading state. Now the throw reaches whoever offered the track:
+
+- from the `useCreateArrangement` initializer it is a render error, thrown by the component that calls the hook: the nearest error boundary **above that component** catches it;
+- from `arrangement.addTrack()`, `setTracks()` or `updateTrack()` it is that call's exception, in your handler or effect.
+
+`onError` now means "the engine or its adapter could not be built" (a missing optional peer, a `createAdapter` that throws, invalid `zoomLevels` / `samplesPerPixel`), plus an `onReady` that throws. It is called only for a build that is still current: not for one replaced by a newer build or a StrictMode remount, nor after the provider unmounted (before, `onError` was called for those too). A source that fails to load does not call it: read `useArrangementSources(arrangement)`.
+
+**Find:** `onError` handlers that show a message for a bad track or a duplicate id; places that add tracks without a `try`.
+
+**Replace with:**
+
+```tsx
+// Before: a bad track came back through onError
+<WaveformPlaylistProvider tracks={tracks} onError={(e) => showProblem(e.message)}>
+
+// After: catch it where the track is offered
+try {
+  arrangement.addTrack(track);
+} catch (error) {
+  showProblem(error instanceof Error ? error.message : String(error));
+}
+
+// …and an error boundary AROUND the component that calls useCreateArrangement:
+// a boundary inside that component (around its provider) does not catch the initializer's throw
+function Editor() {
+  const arrangement = useCreateArrangement(() => initialTracks);
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement}>
+      <Waveform />
+    </WaveformPlaylistProvider>
+  );
+}
+
+<PlaylistErrorBoundary fallback={<p>The playlist could not be created.</p>}>
+  <Editor />
+</PlaylistErrorBoundary>
+
+// onError stays for engine build failures
+<WaveformPlaylistProvider arrangement={arrangement} onError={(e) => showProblem(e.message)}>
+```
+
+`PlaylistErrorBoundary` is exported by `@waveform-playlist/ui-components`.
+
 ## `ClipPeaks` has a required `isPlaceholder` field
 
-**Package:** `@waveform-playlist/browser`.
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/ui-components`.
 
-`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading; `Clip` then draws it without a drag handle and without trim handles. It is also dimmed: the whole clip container, header included, gets `opacity` from the theme key `placeholderClipOpacity` (optional; 0.5 when the theme does not set it or sets something that is not a number from 0 to 1), and its container carries `data-clip-placeholder="true"`. Both providers set it to `false` on every record today, so the dim shows only where an app renders `Clip` with the prop itself. Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without it. In plain JavaScript a record built without the field is drawn as a loaded clip (`undefined` and `null` both render the loaded clip).
+`ClipPeaks` has a new required field, `isPlaceholder: boolean`. It is true for the record of a clip whose audio is still loading: `WaveformPlaylistProvider` puts such a record in `usePlaylistTimeline().peaksDataArray` for each clip still loading that has a `duration` or `waveformData` (see [`usePlaylistTimeline()`](#useplaylisttimeline-ontrackschange-is-removed-tracks-is-read-only-and-holds-loaded-clips)); `MediaElementPlaylistProvider` sets it to `false` on every record.
+
+`Clip` (`@waveform-playlist/ui-components`) takes the matching `isPlaceholder?: boolean` (default `false`). A placeholder clip is drawn without a drag handle and without trim handles, and dimmed: the whole clip container, header included, gets `opacity` from the theme key `placeholderClipOpacity` (optional; 0.5 when the theme does not set it or sets something that is not a number from 0 to 1), and its container carries `data-clip-placeholder="true"`. A placeholder that has no peaks (only a `duration`) is drawn by the multitrack view with the new `<ClipPlaceholderBody />` (`@waveform-playlist/ui-components`) as its first child: a box of the clip's extent in the colour of the waveform's bars, `data-clip-placeholder-body="true"`.
+
+Code that only reads `ClipPeaks` is not affected; TypeScript code that builds a `ClipPeaks` object no longer compiles without the field. In plain JavaScript a record built without it is drawn as a loaded clip (`undefined` and `null` both render the loaded clip).
 
 **Find:** an object literal typed `ClipPeaks` (or a function returning one), for example in a test or a custom `peaksDataArray`.
 
@@ -3847,90 +3934,84 @@ const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSampl
 const record: ClipPeaks = { clipId, trackName, peaks, startSample, durationSamples, isPlaceholder: false };
 ```
 
-## `isDraggingRef` is removed from `useEngineRefs()`
+## `isDraggingRef` is removed
 
 **Package:** `@waveform-playlist/browser`.
 
-`useEngineRefs()` no longer returns `isDraggingRef`. It has no replacement: it existed to make `WaveformPlaylistProvider` ignore changes to `tracks` while a clip trim was dragged, and a trim no longer changes `tracks` while it is dragged (see [A clip trim previews in the view and reaches `onTracksChange` once](#a-clip-trim-previews-in-the-view-and-reaches-ontrackschange-once)). `useEngineRefs()` has seven fields now: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency` and `playoutRef`. `EngineRefsContextValue` has no `isDraggingRef` either.
+In the last release `usePlaylistData()` returned `isDraggingRef`, and `useClipDragHandlers` took it as an option: while it was true, `WaveformPlaylistProvider` ignored changes to `tracks`, so that the per-move `onTracksChange` of a trim did not rebuild the engine. It is removed and has no replacement: a trim no longer changes the tracks while it is dragged (see [A clip trim previews in the view and is one undo step](#a-clip-trim-previews-in-the-view-and-is-one-undo-step)), and the provider has no `tracks` prop to hold back. `EngineRefsContextValue` (`useEngineRefs()`) has seven fields: `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency` and `playoutRef`.
 
-The value is a plain object, so a leftover read of `isDraggingRef` is `undefined`, with no error at the read; code that sets `isDraggingRef.current` throws where it does. A TypeScript build reports the property as missing.
+A leftover read of `isDraggingRef` is `undefined`, with no error at the read; code that sets `isDraggingRef.current` throws where it does. A TypeScript build reports the property as missing.
 
-The provider no longer skips anything while a drag is under way. A `tracks` change that arrives during a trim is handled like any other `tracks` change that did not come from the engine. Before, the provider ignored a `tracks` change while `isDraggingRef.current` was true.
+**An app with its own trim gesture** (one that does not use `useClipDragHandlers`): keep the gesture in your own state while the pointer is down and, on release, make one call on the arrangement, `arrangement.trimClip(trackId, clipId, boundary, deltaSamples)` (`useArrangement()` below the provider). It is one undo step, and it works while no engine is attached.
 
-**An app with its own trim gesture** (one that does not use `useClipDragHandlers`) and calls `onTracksChange` on every pointer move: `isDraggingRef` is gone and the library has no public trim preview, so each of those writes is an ordinary `tracks` change to the provider.
+**Find:** `isDraggingRef`, next to `usePlaylistData`, or in the options of `useClipDragHandlers`.
 
-**Find:** `isDraggingRef`, next to `useEngineRefs` or `usePlaybackRefs`, and a pointer handler of yours that passes a new `tracks` array to `onTracksChange` on every move.
-
-**Replace with:** delete the read. If your own gesture set `isDraggingRef.current = true` to hold the provider back, keep the gesture in your own state while the pointer is down and, on release, make one engine call on `useEngineRefs().playoutRef.current`: `engine.trimClip(trackId, clipId, boundary, deltaSamples)`. The provider then reports the engine's tracks through `onTracksChange` once.
+**Replace with:** delete it.
 
 ```tsx
 // Before
-const { playoutRef, isDraggingRef } = useEngineRefs();
+const { playoutRef, isDraggingRef } = usePlaylistData();
 
 // After
 const { playoutRef } = useEngineRefs();
 ```
 
-## `useClipDragHandlers` takes no `onTracksChange` and no `isDraggingRef`
+## `useClipDragHandlers` and `useClipSplitting` read the arrangement from the provider
 
 **Package:** `@waveform-playlist/browser`.
 
-The options of `useClipDragHandlers` are now `tracks`, `samplesPerPixel`, `engineRef` and the optional `snapSamplePosition`. `onTracksChange` and `isDraggingRef` are removed: a trim no longer writes the tracks while it is dragged, and a move never did. On release a move is one `engine.moveClip()` and a trim one `engine.trimClip()`; each reaches your state through the provider's `onTracksChange`. Neither opens an engine transaction any more: each is one engine call, and so one undo step.
+In the last release `useClipDragHandlers` took `{ tracks, onTracksChange, samplesPerPixel, engineRef, isDraggingRef, snapSamplePosition? }` and `useClipSplitting` took `{ tracks, samplesPerPixel, engineRef }`. Now the options are `useClipDragHandlers({ samplesPerPixel, snapSamplePosition? })` and `useClipSplitting({ samplesPerPixel })`: both hooks work on the arrangement of the nearest `WaveformPlaylistProvider` (`useArrangement()`), and both throw outside it (`useArrangement must be used within WaveformPlaylistProvider`) and under `MediaElementPlaylistProvider` (`useArrangement needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`).
 
-The hook reads the provider's trim preview, so a trim is shown while it is dragged only under `WaveformPlaylistProvider`. Under `MediaElementPlaylistProvider` there is no preview and the clip rows draw the committed clip.
+- **One call per gesture, one undo step each.** A move is one `arrangement.moveClip()` on drop, a trim one `arrangement.trimClip()` on release (see [the trim entry](#a-clip-trim-previews-in-the-view-and-is-one-undo-step)), a split one `arrangement.splitClip()`. Before, a drag opened an engine transaction at its start and committed it at its end, and a trim called `onTracksChange` on every pointer move.
+- **A move, trim or split made while no engine is attached is kept** (before the first build, during a rebuild), and the next engine plays it. Before, it was not synced and a console warning said so (`engineRef is null — move not synced to adapter`, and the same for a trim and a split). `splitClipAt(trackId, clipId, time)` returns `true` with no engine attached.
+- **The clip and track are the ones picked up.** A move or a trim commits the clip and track captured at drag start (by their ids), also if the row moves or other clips change position during the drag; the clip index in the drop's data is not read. A move whose clip is no longer in that track at the drop is dropped with a console warning (`[waveform-playlist] The move was dropped: track "t1" has no clip "c1".`).
+- **A clip still loading** cannot be dragged, trimmed or split: its placeholder has no handles, and `splitClipAt` returns `false` for it.
+- **The handlers' identity:** within one mount of the provider (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate, and `onDragEnd` with `samplesPerPixel`.
 
-The handlers keep their identity while `tracks` changes, as before.
+In plain JavaScript leftover `tracks`, `onTracksChange`, `engineRef` and `isDraggingRef` options are ignored. TypeScript reports them (`Object literal may only specify known properties`). `ClipCollisionModifier.configure({ tracks, samplesPerPixel })` still takes tracks: give it `usePlaylistTimeline().tracks` (its `tracks` is typed `readonly ClipTrack[]` or a function returning one).
 
-**Find:** `useClipDragHandlers({` with `onTracksChange` or `isDraggingRef` in its argument. TypeScript reports each one (`Object literal may only specify known properties`).
+**Find:** `useClipDragHandlers({` and `useClipSplitting({` with `tracks`, `onTracksChange`, `engineRef` or `isDraggingRef`.
 
-**Replace with:** the same call without the two options.
+**Replace with:**
 
 ```tsx
-import { useClipDragHandlers, useEngineRefs, usePlaylistZoom } from '@waveform-playlist/browser';
+import { useClipDragHandlers, useClipSplitting, usePlaylistZoom } from '@waveform-playlist/browser';
 
 // Before
-const { playoutRef, isDraggingRef } = useEngineRefs();
-const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
+const { tracks, playoutRef, isDraggingRef } = usePlaylistData();
+const handlers = useClipDragHandlers({
   tracks,
   onTracksChange: setTracks,
   samplesPerPixel,
   engineRef: playoutRef,
   isDraggingRef,
 });
+const { splitClipAtPlayhead } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
 
 // After
-const { playoutRef } = useEngineRefs();
-const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({
-  tracks,
-  samplesPerPixel,
-  engineRef: playoutRef,
-});
+const { samplesPerPixel } = usePlaylistZoom();
+const handlers = useClipDragHandlers({ samplesPerPixel });
+const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
 ```
 
 ## `splitClipAt` takes a track id and a clip id; the clip drags find clips by id
 
 **Package:** `@waveform-playlist/browser`.
 
-`useClipSplitting().splitClipAt` was `(trackIndex, clipIndex, splitTime)` and is now `(trackId, clipId, splitTime)`. A track id or a clip id that is not in `tracks` returns `false` and changes nothing. `splitClipAtPlayhead()` is unchanged and picks the same clip as before.
+`useClipSplitting().splitClipAt` was `(trackIndex, clipIndex, splitTime)` in the last release and is now `(trackId, clipId, splitTime)`. A track id or a clip id that is not in the arrangement, and a clip still loading, return `false` and change nothing. `splitClipAtPlayhead()` picks the loaded clip under the playhead on the selected track, as before.
 
-The clip drags find their clip by id too. The drag data of a clip keeps its shape (`clipId`, `trackIndex`, `clipIndex`, and `boundary` for a trim handle), but `useClipDragHandlers` and `ClipCollisionModifier` look the clip up by `clipId` within `tracks[trackIndex]`, and `clipIndex` is no longer read: it is a position in the drawn row, which can hold placeholders that are not in `track.clips`. A trim keeps the track it started on, by id, if the track's row changes during the drag. A trim whose clip id is not in the track does nothing; a move of one is dropped with a console warning (`[waveform-playlist] The move was dropped: track "t1" has no clip "c1".`, with the ids of the drag). Code that builds its own drag source for these handlers must put the clip's `clipId` in the data.
+The clip drags find their clip by id too. The drag data of a clip keeps its shape (`clipId`, `trackIndex`, `clipIndex`, and `boundary` for a trim handle), but `useClipDragHandlers` and `ClipCollisionModifier` look the clip up by `clipId` among the loaded clips of its track, and `clipIndex` is not read: it is a position in the drawn row, which can hold placeholders that are not loaded clips. Code that builds its own drag source for these handlers must put the clip's `clipId` in the data.
 
 **Find:** `splitClipAt(` with a number as its first argument. TypeScript reports each one (`Argument of type 'number' is not assignable to parameter of type 'string'`); in plain JavaScript the call returns `false`.
 
 **Replace with:**
 
 ```tsx
-import {
-  useClipSplitting,
-  useEngineRefs,
-  usePlaylistTimeline,
-  usePlaylistZoom,
-} from '@waveform-playlist/browser';
+import { useClipSplitting, usePlaylistTimeline, usePlaylistZoom } from '@waveform-playlist/browser';
 
 const { tracks } = usePlaylistTimeline();
 const { samplesPerPixel } = usePlaylistZoom();
-const { playoutRef } = useEngineRefs();
-const { splitClipAt } = useClipSplitting({ tracks, samplesPerPixel, engineRef: playoutRef });
+const { splitClipAt } = useClipSplitting({ samplesPerPixel });
 
 // Before
 splitClipAt(trackIndex, clipIndex, splitTime);
@@ -3940,19 +4021,117 @@ const track = tracks[trackIndex];
 splitClipAt(track.id, track.clips[clipIndex].id, splitTime);
 ```
 
-## A clip trim previews in the view and reaches `onTracksChange` once
+## The draggable ids of a clip are its track id and clip id
+
+**Package:** `@waveform-playlist/ui-components` (major; the clips `@waveform-playlist/browser` draws use it).
+
+The three draggables of a clip had ids built from positions: `clip-<trackIndex>-<clipIndex>` for the move, `clip-boundary-left-<trackIndex>-<clipIndex>` and `clip-boundary-right-<trackIndex>-<clipIndex>` for the trim handles. A clip with a `trackId` (every clip the library draws) now has ids built from identity: `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>`, each part `encodeURIComponent`-encoded. A position changes when a clip arrives earlier in the row (a placeholder that finishes loading) or a track is reordered; an id built from it then named another clip while a drag was under way. A `Clip` drawn on its own without a `trackId` keeps the positional ids. The drag data (`clipId`, `trackIndex`, `clipIndex`, `startSample`, `durationSamples`, and `boundary` on a handle) is unchanged, and the handlers read the data, not the id.
+
+**Find:** `clip-boundary-left-`, `clip-boundary-right-`, `` `clip-${`` (or `'clip-' +`) in your own drag handlers, collision detectors, sensors or test selectors.
+
+**Replace with:** read `event.operation.source.data` instead of parsing the id; where the id itself is matched, use the new form.
+
+```tsx
+// Before
+const isTrimHandle = String(source.id).startsWith('clip-boundary-');
+const [trackIndex, clipIndex] = String(source.id).split('-').slice(-2);
+
+// After: the data says it all (the id is clip-boundary-left/<trackId>/<clipId>)
+const { boundary, trackIndex, clipId } = source.data;
+const isTrimHandle = boundary !== undefined;
+```
+
+## A clip trim previews in the view and is one undo step
 
 **Package:** `@waveform-playlist/browser`.
 
-While a trim handle is dragged, the tracks do not change: there is no `onTracksChange` call per pointer move, and `engine.trimClip()` is not called until the release (with an engine attached, each move asks `engine.constrainTrimDelta`, a query that changes nothing). The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `engine.trimClip(trackId, clipId, boundary, delta)` once, and the provider reports the engine's tracks through `onTracksChange` once, as it does for a clip move. A trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing. Before, `onTracksChange` was called on every pointer move.
+In the last release a trim changed the tracks on every pointer move: `useClipDragHandlers` called `onTracksChange` per move, `isDraggingRef` kept the provider from rebuilding the engine meanwhile, and `engine.trimClip()` committed the delta on release. Now the tracks do not change while a trim handle is dragged. The dragged clip is drawn at the previewed start, length and offset, with the waveform for that slice, and only that clip's view follows the pointer. On release the handler calls `arrangement.trimClip(trackId, clipId, boundary, delta)` once: a trim is one undo step. Escape (a cancelled drag) clears the preview and changes nothing.
 
 The preview is internal to the library. `useClipDragHandlers` and the clip view read it themselves; there is no exported hook or context to read or write it.
 
 - **The width follows a trim dragged past the end.** While the previewed end is past the end of the timeline, the view is as wide as that end rounded up to the next 10 seconds; after the release the width is the exact new duration. The recording layout's own rule is unchanged. When the stepped width shrinks (on the release, or when the edge is dragged back inside), a view scrolled into the spare area is moved back by the browser.
-- **Without `onTracksChange`, the trim is drawn during the drag and undone in the view on release.** The view follows the pointer, then on release returns to the app's `tracks`, which did not change, while the engine keeps the trim; the provider warns "[waveform-playlist] Engine tracks changed but onTracksChange prop is not set — UI will revert on next render. Pass onTracksChange to WaveformPlaylistProvider." Before, nothing moved during the drag in that case.
-- **A trimmed edge stops at a neighbouring clip during the drag.** With an engine attached, each move is constrained by `engine.constrainTrimDelta`, after the edge has been snapped to the grid; without one, the bounds the handler captured at the start of the drag decide. Before, the snapped edge was drawn without the engine's constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
-- **A trim, a move or a split made while no engine is attached is dropped, with a console warning.** The clip stays where it was. That is the case before the first build has finished, and while the provider rebuilds the engine after a `tracks` change that did not come from the engine. The warnings read "[waveform-playlist] The trim was dropped: no engine is attached (before the first build, or while it is rebuilt after a change of tracks). The clip stays where it was.", the same with "The move" for a move, and "The split was dropped: … The clip stays whole." for `splitClipAt`. Before, the app's state kept the trim of each pointer move while the engine did not have it.
+- **A trimmed edge stops at a neighbouring clip during the drag.** Each move is constrained by `arrangement.constrainTrimDelta`, after the edge has been snapped to the grid. Before, the snapped edge was drawn without that constraint and the engine applied it on release, so with snapping on an edge could be drawn past a neighbour. The committed result is the same.
+- **With no engine attached** (before the first build, during a rebuild) the trim is kept, and the next engine plays it.
 
-**Find:** a test or a component that counts `onTracksChange` calls during a trim, or reads `tracks` while a trim handle is dragged to learn the clip's new bounds.
+**Find:** a test or a component that counts track changes during a trim (`onTracksChange` calls in the last release), or reads the tracks while a trim handle is dragged to learn the clip's new bounds.
 
-**Replace with:** read the tracks after the release, when `onTracksChange` has been called once. Nothing has to draw the trim during the drag: the library's clip view does.
+**Replace with:** read the tracks after the release, from the arrangement (`arrangement.getTracks()`, `useArrangementTracks(arrangement)`) or `usePlaylistTimeline().tracks`. Nothing has to draw the trim during the drag: the library's clip view does.
+
+## Edits and undo work with no engine attached; undo never changes the mix
+
+**Packages:** `@waveform-playlist/browser`.
+
+The four mixer setters, `reorderTrack`, `undo` and `redo` of `useEditorControls()` call the provider's arrangement. They work before the first engine is built and while an engine is rebuilt, and the next engine plays what they changed. Before, `reorderTrack`, `undo` and `redo` with no engine did nothing and warned (`reorderTrack: engine not ready, call ignored`, and the same for `undo` and `redo`).
+
+The undo history is the arrangement's: an undo or a redo changes the tracks and never the mix, and the history survives an engine rebuild (an `effects` or `zoomLevels` change) and an `<Activity>` hide of the provider. Before, a full rebuild started with a new engine and an empty history. Audio arriving for a clip is not an undo step and does not clear the history.
+
+**Find:** code that waits for an engine before calling a setter, `reorderTrack`, `undo` or `redo`; code that expects an undo to restore a fader.
+
+**Replace with:** call them whenever; nothing to wait for.
+
+## `useIntegratedRecording` takes the arrangement; a take is one undo step
+
+**Packages:** `@waveform-playlist/recording`.
+
+`useIntegratedRecording(arrangement, selectedTrackId, options?)` (was `(tracks, setTracks, selectedTrackId, options?)`). The hook keeps no copy of the tracks: it reads the arrangement when a take starts and when it ends, and adds the take with one `arrangement.updateTrack()`, so the take and the clips it trims, removes or splits are one undo step. `@waveform-playlist/recording` now depends on `@waveform-playlist/engine` for the `Arrangement` type.
+
+`startRecording()` refuses (resolves `false`, records nothing, sets `error` with a message that starts `Cannot start recording: ` and names the track or id):
+
+- no track selected (as before);
+- a selected id the arrangement does not hold: `Cannot start recording: the selected track "<id>" is not in the arrangement. Add it with arrangement.addTrack() first.` Before, the take started and was lost at the end;
+- a MIDI track (as before);
+- a track that holds a clip whose audio is still loading, whose load failed, or that cannot be made from its audio (each has its own message).
+
+A take refused at the end (the track's kind changed during the take) sets `error` to `Recording completed but the take could not be saved on track "<id>": …`, with the arrangement's error as `cause`; a track removed during the take gives `Recording completed but track "<id>" no longer exists. The recorded audio could not be saved.`, as before.
+
+In plain JavaScript the old call does not work: the arguments are read in the new order, so with no track selected the hook throws while it renders (the old third argument, `null`, is read as the options), and otherwise `startRecording()` rejects with a `TypeError` (`arrangement.getTracks is not a function`). TypeScript reports the old call.
+
+**Find:** `useIntegratedRecording(` with four arguments, or with `tracks` and `setTracks` first.
+
+**Replace with:**
+
+```tsx
+// Before
+const recording = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+
+// After
+const arrangement = useArrangement(); // under WaveformPlaylistProvider; or the one you made
+const recording = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
+```
+
+## The armed track shows muted during a take, and its Mute button is disabled
+
+**Packages:** `@waveform-playlist/browser`.
+
+While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), that track is muted **in the arrangement's mix**, so what it already holds does not play under the punch-in. Before, the mute was applied to the audio only and the mixer and the Mute button still showed the track unmuted. Now:
+
+- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take;
+- the built-in `<TrackMuteButton />` of that track is disabled during the take; solo, volume and pan stay enabled;
+- `useTrack().isRecordingArmed` is true for that track, for a mute control of your own;
+- when the take ends or the armed track changes, the mute from before the take is written back, whatever was set in between (a mute set on that track during the take does not stay);
+- the provider also writes it back when it unmounts or is hidden by `<Activity>` with a track still armed.
+
+Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal arms the track again from its mute at that moment; removing the armed track during a take as an undo step, and undoing that removal after the take, brings the track back muted (the arrangement brings a track back with the mix it had when removed, and the end of the take writes nothing for a track that is gone). `<daw-editor>` is not changed: its armed track still shows unmuted.
+
+**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take; code that mutes or unmutes the armed track during a take.
+
+**Replace with:**
+
+```tsx
+// A mute control of your own, in a track panel
+const { muted, isRecordingArmed, setMuted } = useTrack();
+<button disabled={isRecordingArmed} aria-pressed={muted} onClick={() => setMuted(!muted)}>
+  Mute
+</button>
+```
+
+## Smaller changes of the provider
+
+**Packages:** `@waveform-playlist/browser`.
+
+- **An engine build that fails during playback shows stopped.** When a rebuild started during playback and the new engine cannot be built, `isPlaying` turns false and the cursor stays where it was; nothing starts by itself after a later successful build.
+- **A load in flight across an engine rebuild** carries on with the previous adapter's `AudioContext`. A `createAdapter` whose adapter closes its context in `dispose()` can make such a load fail; `arrangement.retry(src)` loads it again.
+- **Loading is aborted and restarted around an `<Activity>` hide**: the provider gives the arrangement its decode context on mount and takes it back on unmount or a hide; loads in flight are aborted and start again on the reveal.
+- **`useArrangement()`** is new: the provider's arrangement, below `WaveformPlaylistProvider`.
+
+**Find:** nothing to change for these unless your code depended on the old behaviour (a playback that resumed after a failed rebuild, an adapter that closes its context).

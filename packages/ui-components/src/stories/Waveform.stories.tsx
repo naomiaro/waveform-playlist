@@ -21,6 +21,7 @@ import {
   TrackReorderGrip,
   TrackRemoveButton,
   useTrack,
+  useCreateArrangement,
   PlayButton,
   PauseButton,
   StopButton,
@@ -53,22 +54,20 @@ The Waveform component provides the main visualization and interaction surface f
 - Timescale display
 
 **Note:** These stories show the Waveform component with empty tracks.
-To display actual waveforms, use the \`useAudioTracks\` hook to load real audio files.
+To display actual waveforms, name the audio files in an arrangement; a track's row is empty until its audio has loaded (a placeholder is drawn only for a clip with a \`duration\` or peaks).
 
 \`\`\`tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 
 function MyPlaylist() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/track1.mp3', name: 'Vocals' },
-    { src: '/audio/track2.mp3', name: 'Guitar' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/track1.mp3', name: 'Vocals' }),
+    audioTrack({ src: '/audio/track2.mp3', name: 'Guitar' }),
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <Waveform />
     </WaveformPlaylistProvider>
   );
@@ -88,6 +87,7 @@ type Story = StoryObj<typeof Waveform>;
 const createEmptyTracks = (count: number): ClipTrack[] => {
   return Array.from({ length: count }, (_, i) => ({
     id: `track-${i + 1}`,
+    kind: 'audio',
     name: `Track ${i + 1}`,
     clips: [],
     muted: false,
@@ -97,9 +97,34 @@ const createEmptyTracks = (count: number): ClipTrack[] => {
   }));
 };
 
+type ProviderProps = Omit<
+  React.ComponentProps<typeof WaveformPlaylistProvider>,
+  'arrangement' | 'children'
+>;
+
+/**
+ * A provider over an arrangement of tracks with no clips. The arrangement is
+ * made once, by the first render, from `makeTracks` (a hook needs a component,
+ * so a story cannot make it in its `render` arrow).
+ */
+const EmptyTracksProvider: React.FC<
+  ProviderProps & { makeTracks: () => ClipTrack[]; children: React.ReactNode }
+> = ({ makeTracks, children, ...providerProps }) => {
+  const arrangement = useCreateArrangement(makeTracks);
+  return (
+    <WaveformPlaylistProvider arrangement={arrangement} {...providerProps}>
+      {children}
+    </WaveformPlaylistProvider>
+  );
+};
+
+const makeOneTrack = () => createEmptyTracks(1);
+const makeTwoTracks = () => createEmptyTracks(2);
+const makeThreeTracks = () => createEmptyTracks(3);
+
 export const EmptyPlaylist: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={createEmptyTracks(1)} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeOneTrack} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <PlayButton />
@@ -109,7 +134,7 @@ export const EmptyPlaylist: Story = {
         </div>
         <Waveform />
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {
@@ -122,7 +147,7 @@ export const EmptyPlaylist: Story = {
 
 export const MultipleEmptyTracks: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={createEmptyTracks(3)} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeThreeTracks} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <PlayButton />
@@ -132,7 +157,7 @@ export const MultipleEmptyTracks: Story = {
         </div>
         <Waveform />
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {
@@ -145,7 +170,7 @@ export const MultipleEmptyTracks: Story = {
 
 export const WithoutTimescale: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeTwoTracks} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           <PlayButton />
@@ -160,7 +185,7 @@ export const WithoutTimescale: Story = {
           <WaveformPlayhead />
         </WaveformRoot>
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {
@@ -174,7 +199,7 @@ export const WithoutTimescale: Story = {
 
 export const Bare: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={createEmptyTracks(2)} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeTwoTracks} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         {/* Only the tracks, the selection and the playhead: no ruler, no controls column. */}
         <WaveformRoot>
@@ -183,7 +208,7 @@ export const Bare: Story = {
           <WaveformPlayhead />
         </WaveformRoot>
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {
@@ -208,13 +233,14 @@ const TrackSummary: React.FC = () => {
 const TracksThatCanBeRemoved: React.FC<{
   children: (remove: (id: string) => void) => React.ReactNode;
 }> = ({ children }) => {
-  const [tracks, setTracks] = React.useState(() => createEmptyTracks(3));
+  // The arrangement owns the tracks: removing one is a call to it
+  const arrangement = useCreateArrangement(makeThreeTracks);
   const remove = React.useCallback(
-    (trackId: string) => setTracks((current) => current.filter((track) => track.id !== trackId)),
-    []
+    (trackId: string) => arrangement.removeTrack(trackId),
+    [arrangement]
   );
   return (
-    <WaveformPlaylistProvider tracks={tracks} onTracksChange={setTracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       {/* Handles a drag by the reorder grip. */}
       <ClipInteractionProvider>
         <div style={{ padding: '1rem' }}>{children(remove)}</div>
@@ -255,7 +281,7 @@ export const TrackControlsWithRemoveAndReorder: Story = {
 
 export const TrackControlsFromPieces: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={createEmptyTracks(3)} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeThreeTracks} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <WaveformRoot>
           <WaveformTrackControls width={140}>
@@ -273,7 +299,7 @@ export const TrackControlsFromPieces: Story = {
           <WaveformPlayhead />
         </WaveformRoot>
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {
@@ -309,8 +335,8 @@ const compactRow = ({ annotation, isActive, onClick, formatTime }: RenderAnnotat
 export const AnnotationParts: Story = {
   render: () => (
     <AnnotationProvider>
-      <WaveformPlaylistProvider
-        tracks={createEmptyTracks(1)}
+      <EmptyTracksProvider
+        makeTracks={makeOneTrack}
         samplesPerPixel={1024}
         annotationList={STORY_ANNOTATION_LIST}
         onAnnotationsChange={() => {}}
@@ -338,7 +364,7 @@ export const AnnotationParts: Story = {
             </div>
           </div>
         </div>
-      </WaveformPlaylistProvider>
+      </EmptyTracksProvider>
     </AnnotationProvider>
   ),
   parameters: {
@@ -352,44 +378,19 @@ export const AnnotationParts: Story = {
 };
 
 export const CustomTrackNames: Story = {
-  render: () => {
-    const tracks: ClipTrack[] = [
-      {
-        id: 'vocals',
-        name: 'Lead Vocals',
-        clips: [],
-        muted: false,
-        soloed: false,
-        volume: 1,
-        pan: 0,
-      },
-      {
-        id: 'guitar',
-        name: 'Electric Guitar',
-        clips: [],
-        muted: false,
-        soloed: false,
-        volume: 1,
-        pan: 0,
-      },
-      { id: 'bass', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-      { id: 'drums', name: 'Drums', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-    ];
-
-    return (
-      <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
-        <div style={{ padding: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-            <PlayButton />
-            <PauseButton />
-            <StopButton />
-            <AudioPosition />
-          </div>
-          <Waveform />
+  render: () => (
+    <EmptyTracksProvider makeTracks={makeBandTracks} samplesPerPixel={1024}>
+      <div style={{ padding: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          <PlayButton />
+          <PauseButton />
+          <StopButton />
+          <AudioPosition />
         </div>
-      </WaveformPlaylistProvider>
-    );
-  },
+        <Waveform />
+      </div>
+    </EmptyTracksProvider>
+  ),
   parameters: {
     docs: {
       description: {
@@ -399,9 +400,70 @@ export const CustomTrackNames: Story = {
   },
 };
 
-const VIEW_OPTIONS_TRACKS: ClipTrack[] = [
-  { id: 'vocals', name: 'Vocals', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
-  { id: 'bass', name: 'Bass', clips: [], muted: false, soloed: false, volume: 1, pan: 0 },
+const makeBandTracks = (): ClipTrack[] => [
+  {
+    id: 'vocals',
+    kind: 'audio',
+    name: 'Lead Vocals',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'guitar',
+    kind: 'audio',
+    name: 'Electric Guitar',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'bass',
+    kind: 'audio',
+    name: 'Bass',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'drums',
+    kind: 'audio',
+    name: 'Drums',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+];
+
+const makeViewOptionsTracks = (): ClipTrack[] => [
+  {
+    id: 'vocals',
+    kind: 'audio',
+    name: 'Vocals',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
+  {
+    id: 'bass',
+    kind: 'audio',
+    name: 'Bass',
+    clips: [],
+    muted: false,
+    soloed: false,
+    volume: 1,
+    pan: 0,
+  },
 ];
 
 /**
@@ -411,7 +473,7 @@ const VIEW_OPTIONS_TRACKS: ClipTrack[] = [
  */
 export const ViewOptions: Story = {
   render: () => (
-    <WaveformPlaylistProvider tracks={VIEW_OPTIONS_TRACKS} samplesPerPixel={1024}>
+    <EmptyTracksProvider makeTracks={makeViewOptionsTracks} samplesPerPixel={1024}>
       <div style={{ padding: '1rem' }}>
         <WaveformViewOptions waveHeight={24}>
           <WaveformRoot>
@@ -431,7 +493,7 @@ export const ViewOptions: Story = {
           </WaveformRoot>
         </WaveformViewOptions>
       </div>
-    </WaveformPlaylistProvider>
+    </EmptyTracksProvider>
   ),
   parameters: {
     docs: {

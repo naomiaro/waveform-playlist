@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { type ClipTrack } from '@waveform-playlist/core';
+import React, { useCallback, useState } from 'react';
+import { audioTrack, type AudioTrackOptions } from '@waveform-playlist/core';
 import {
   configureGlobalContext,
   isNativeGlobalContext,
@@ -25,9 +25,12 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangement,
+  useArrangementTracks,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import {
-  useAudioTracks,
   useDynamicEffects,
   useTrackDynamicEffects,
   useActiveEffects,
@@ -41,6 +44,8 @@ import {
 import { fetchWamLibrary, fetchWamDescriptor, type WamLibraryEntry } from '@dawcore/wam';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { registerDemoTremolo } from './demoTremoloEffect';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 import {
   Container,
   Banner,
@@ -106,7 +111,7 @@ const QUICK_ADD_URL =
 const QUICK_ADD_LABEL = 'Simple Delay';
 
 // Whiptails stems — a manageable subset so per-track racks stay readable.
-const audioConfigs = [
+const audioConfigs: AudioTrackOptions[] = [
   { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus', name: 'Kick' },
   { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus', name: 'Bass' },
   { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus', name: 'Synth' },
@@ -529,9 +534,6 @@ const LibraryBrowser: React.FC<LibraryBrowserProps> = ({
 // ---------------------------------------------------------------------------
 
 interface WamControlsProps {
-  loading: boolean;
-  loadedCount: number;
-  totalCount: number;
   offlineMaster: ReturnType<ReturnType<typeof useDynamicEffects>['createOfflineEffectsFunction']>;
   createOfflineTrackEffects: ReturnType<
     typeof useTrackDynamicEffects
@@ -539,49 +541,51 @@ interface WamControlsProps {
 }
 
 const WamControls: React.FC<WamControlsProps> = ({
-  loading,
-  loadedCount,
-  totalCount,
   offlineMaster,
   createOfflineTrackEffects,
-}) => (
-  <>
-    <TransportBar>
-      <PlayButton />
-      <PauseButton />
-      <StopButton />
-      <LoopButton />
-      <ZoomInButton />
-      <ZoomOutButton />
-      <MasterVolumeControl />
-      <AutomaticScrollCheckbox />
-      <AudioPosition />
-      <ExportWavButton
-        label="Export Mix"
-        filename="wam-mix"
-        mode="master"
-        applyEffects
-        effectsFunction={offlineMaster}
-        createOfflineTrackEffects={createOfflineTrackEffects}
-      />
-      {loading && (
-        <span style={{ fontSize: '0.85rem', color: 'var(--ifm-color-emphasis-600)' }}>
-          Loading: {loadedCount}/{totalCount}
-        </span>
-      )}
-    </TransportBar>
-    <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
-      <WaveformRoot>
-        <WaveformTimescale />
-        <WaveformLoopRegion />
-        <WaveformTrackControls width={150} />
-        <WaveformTracks />
-        <WaveformSelection />
-        <WaveformPlayhead />
-      </WaveformRoot>
-    </WaveformViewOptions>
-  </>
-);
+}) => {
+  const arrangement = useArrangement();
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
+  return (
+    <>
+      <TransportBar>
+        <PlayButton />
+        <PauseButton />
+        <StopButton />
+        <LoopButton />
+        <ZoomInButton />
+        <ZoomOutButton />
+        <MasterVolumeControl />
+        <AutomaticScrollCheckbox />
+        <AudioPosition />
+        <ExportWavButton
+          label="Export Mix"
+          filename="wam-mix"
+          mode="master"
+          applyEffects
+          effectsFunction={offlineMaster}
+          createOfflineTrackEffects={createOfflineTrackEffects}
+        />
+        <SourceLoadError arrangement={arrangement} />
+      </TransportBar>
+      <LoadingBadgeFrame>
+        <WaveformViewOptions waveHeight={100} barWidth={2} barGap={0}>
+          <WaveformRoot>
+            <WaveformTimescale />
+            <WaveformLoopRegion />
+            <WaveformTrackControls width={150} />
+            <WaveformTracks />
+            <WaveformSelection />
+            <WaveformPlayhead />
+          </WaveformRoot>
+        </WaveformViewOptions>
+        <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+      </LoadingBadgeFrame>
+    </>
+  );
+};
 
 // ---------------------------------------------------------------------------
 // Main example
@@ -597,28 +601,20 @@ export function WamEffectsExample() {
   // without a reload, so no state/effect is needed.
   const wamActive = wamSupported && isNativeGlobalContext();
 
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [selectedTrackId, setSelectedTrackId] = useState<string>('');
+  // The arrangement owns the stems and loads their audio: each row is empty
+  // until its audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const tracks = useArrangementTracks(arrangement);
+  // The track whose rack is shown: the first one to begin with
+  const [selectedTrackId, setSelectedTrackId] = useState<string>(
+    () => arrangement.getTracks()[0]?.id ?? ''
+  );
   const [addingKey, setAddingKey] = useState<string | null>(null);
   const [status, setStatus] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
   const masterFx = useDynamicEffects(256);
   const trackFx = useTrackDynamicEffects();
-
-  const {
-    tracks: loadedTracks,
-    loading,
-    error,
-    loadedCount,
-    totalCount,
-  } = useAudioTracks(audioConfigs, { immediate: true });
-
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-      setSelectedTrackId((prev) => prev || loadedTracks[0].id);
-    }
-  }, [loadedTracks]);
 
   const selectedTrack = tracks.find((t) => t.id === selectedTrackId);
   const selectedTrackName = selectedTrack?.name ?? 'Track';
@@ -675,14 +671,6 @@ export function WamEffectsExample() {
         'Could not add "' + effectId + '": ' + (err instanceof Error ? err.message : String(err)),
     });
   }, []);
-
-  if (error) {
-    return (
-      <Container>
-        <StatusLine $tone="error">Error loading audio: {error}</StatusLine>
-      </Container>
-    );
-  }
 
   return (
     <Container>
@@ -745,11 +733,9 @@ export function WamEffectsExample() {
       </RacksRow>
 
       <WaveformPlaylistProvider
-        tracks={tracks}
+        arrangement={arrangement}
         trackEffects={trackFx.getTrackEffectsFunction}
         sampleRate={48000}
-        onTracksChange={setTracks}
-        deferEngineRebuild={loading}
         samplesPerPixel={512}
         zoomLevels={[256, 512, 1024, 2048, 4096]}
         theme={theme}
@@ -758,9 +744,6 @@ export function WamEffectsExample() {
       >
         <KeyboardShortcuts playback />
         <WamControls
-          loading={loading}
-          loadedCount={loadedCount}
-          totalCount={totalCount}
           offlineMaster={offlineMaster}
           createOfflineTrackEffects={trackFx.createOfflineTrackEffectsFunction}
         />

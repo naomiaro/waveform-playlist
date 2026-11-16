@@ -18,12 +18,11 @@ npm install @waveform-playlist/recording
 ## Basic Recording
 
 ```tsx
-import { useState } from 'react';
 import {
   WaveformPlaylistProvider,
   Waveform,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import {
   useRecording,
   useMicrophoneAccess,
@@ -53,10 +52,11 @@ function RecordButton() {
 }
 
 function RecordingExample() {
-  const { tracks } = useAudioTracks([]);
+  // An empty arrangement: this example only captures; see below for adding the take to a track
+  const arrangement = useCreateArrangement();
 
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <RecordButton />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -385,15 +385,15 @@ function ClippingIndicator({ stream }: { stream: MediaStream | null }) {
 
 ## Adding Recorded Audio to Playlist
 
-For multi-track recording with automatic track management, use the `useIntegratedRecording` hook from `@waveform-playlist/recording`:
+For multi-track recording with automatic track management, use the `useIntegratedRecording` hook from `@waveform-playlist/recording`. It takes the arrangement that owns the tracks and the id of the track to record onto:
 
 ```tsx
+import { useArrangement } from '@waveform-playlist/browser';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
-import type { ClipTrack } from '@waveform-playlist/core';
 
-function RecordToPlaylist() {
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+// Under <WaveformPlaylistProvider arrangement={arrangement}>
+function RecordToPlaylist({ selectedTrackId }: { selectedTrackId: string | null }) {
+  const arrangement = useArrangement();
 
   const {
     isRecording,
@@ -401,7 +401,8 @@ function RecordToPlaylist() {
     stopRecording,
     requestMicAccess,
     hasPermission,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId);
+    error,
+  } = useIntegratedRecording(arrangement, selectedTrackId);
 
   const handleRecord = async () => {
     if (!hasPermission) {
@@ -418,12 +419,30 @@ function RecordToPlaylist() {
   };
 
   return (
-    <button onClick={handleRecord}>
-      {isRecording ? 'Stop & Add to Playlist' : 'Start Recording'}
-    </button>
+    <>
+      <button onClick={handleRecord}>
+        {isRecording ? 'Stop & Add to Playlist' : 'Start Recording'}
+      </button>
+      {error && <span role="alert">{error.message}</span>}
+    </>
   );
 }
 ```
+
+The hook keeps no copy of the tracks: it reads the arrangement when the take starts and when it ends. The take is added to the track it was started on (whatever is selected by then) with one `arrangement.updateTrack()`, so the take and the clips it trims, removes or splits are **one undo step**.
+
+`startRecording()` resolves `false`, records nothing and sets `error` when the take cannot start. Each message starts with `Cannot start recording: ` and names the track:
+
+| Case | Message |
+|---|---|
+| No track selected | `Cannot start recording: no track selected. Select or create a track first.` |
+| The arrangement has no track of the selected id | `Cannot start recording: the selected track "<id>" is not in the arrangement. Add it with arrangement.addTrack() first.` |
+| A MIDI track | `Cannot start recording: "<name>" is a MIDI track. Select or create an audio track first.` |
+| The track holds a clip still loading | `Cannot start recording: "<name>" holds a clip whose audio is still loading ("<clip id>"). Start the take once it has loaded.` |
+| A clip of the track failed to load | `Cannot start recording: the audio of clip "<clip id>" on "<name>" could not be loaded (<reason>). Retry it with arrangement.retry(), or remove the clip.` |
+| A clip of the track cannot be made from its audio | `Cannot start recording: a clip on "<name>" cannot be made from its audio (<reason>). Correct or remove the clip.` |
+
+At the end of a take, a track that was removed meanwhile gives `Recording completed but track "<id>" no longer exists. The recorded audio could not be saved.`, and a track the arrangement refuses the take on gives `Recording completed but the take could not be saved on track "<id>": <reason>` (with the arrangement's error as `cause`). Both are logged as console warnings and set `error`; the take is not kept.
 
 ## Latency Compensation
 
@@ -438,7 +457,7 @@ The [recording example](pathname:///waveform-playlist/examples/recording) has a 
 If you have measured the actual round-trip latency of your audio interface (for example via a loopback test), you can supply that value directly with the `latencyOffset` option (in **seconds**):
 
 ```tsx
-const recording = useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+const recording = useIntegratedRecording(arrangement, selectedTrackId, {
   currentTime,
   latencyOffset: 0.023, // 23 ms externally-measured round-trip latency
 });
@@ -474,13 +493,13 @@ import {
 const LATENCY = 0.023; // your measured latency, in seconds
 
 const { isRecording, progress, recordingTrackId, ... } =
-  useIntegratedRecording(tracks, setTracks, selectedTrackId, {
+  useIntegratedRecording(arrangement, selectedTrackId, {
     currentTime,
     latencyOffset: LATENCY,
   });
 
-// While the take runs: playback continues past the end of the audio, and what
-// the armed track already holds is muted (a punch-in replaces it).
+// While the take runs: playback continues past the end of the audio, and the
+// armed track is muted in the mix (a punch-in replaces what it holds).
 useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 <WaveformRoot>
@@ -513,6 +532,22 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 `<WaveformRecordingPreview>` only draws the take. [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) is what tells the provider that a take is running; call it in the component that calls `useIntegratedRecording`, under `WaveformPlaylistProvider`. A handler that starts playback together with the recording (an overdub) should also call `useEditorControls().setRecordingActive(true, trackId)` before `play()`, because the hook's effect runs a render later.
 
+### The Armed Track Is Muted for the Take
+
+While a take records, the armed track is muted in the arrangement's mix, so what it already holds does not play under the punch-in that replaces it:
+
+- the mixer (`usePlaylistMixer().trackStates`) and the track's Mute button show it muted;
+- the built-in `<TrackMuteButton />` of that track is disabled, and `useTrack().isRecordingArmed` is true for it, for a mute control of your own;
+- when the take ends, or the armed track changes, the mute from before the take is written back, whatever was set in between (a `setTrackMute` on that track during the take does not stay);
+- the provider also writes it back when it unmounts or is hidden by `<Activity>` with a track still armed.
+
+Edges to know:
+
+- A take started during the playlist's first load records without playback: `play()` does nothing before the first [ready](/docs/react/guides/loading-audio#ready).
+- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the mute is written back); the reveal arms the track again from its mute at that moment.
+- Removing the armed track during a take as an undo step: the arrangement keeps a removed track's mix for its undo, and an undo of a removal brings the track back with the mix it had when it was removed. That mix has the take's mute in it, and the end of the take writes nothing for a track that is gone, so undoing the removal after the take brings the track back muted.
+- Only the built-in Mute button is disabled. Solo, volume and pan stay enabled.
+
 If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.
 
 ---
@@ -528,7 +563,7 @@ import { ExportWavButton } from '@waveform-playlist/browser/tone';
 
 function RecordingWithExport() {
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       {/* Recording controls... */}
       <ExportWavButton
         label="Download Recording"
@@ -595,7 +630,7 @@ When exporting recordings, you can choose:
 This example uses `useIntegratedRecording` for automatic track management. Recorded audio is automatically added as a clip to the selected track:
 
 ```tsx
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -603,17 +638,15 @@ import {
   PlayButton,
   PauseButton,
   StopButton,
+  useCreateArrangement,
   useCurrentTime,
   useRecordingSession,
 } from '@waveform-playlist/browser';
 import { ExportWavButton } from '@waveform-playlist/browser/tone';
 import { useIntegratedRecording, useRecordingProgress } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
-import {
-  createTrack,
-  type ClipTrack,
-  type RecordingProgressSource,
-} from '@waveform-playlist/core';
+import { createTrack, type RecordingProgressSource } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 
 // Only this label re-renders as the take grows (10 times a second).
 function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
@@ -622,15 +655,13 @@ function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
 }
 
 function RecordingControls({
-  tracks,
-  setTracks,
+  arrangement,
   selectedTrackId,
-  setSelectedTrackId,
+  onAddTrack,
 }: {
-  tracks: ClipTrack[];
-  setTracks: (tracks: ClipTrack[]) => void;
+  arrangement: Arrangement;
   selectedTrackId: string | null;
-  setSelectedTrackId: (id: string | null) => void;
+  onAddTrack: () => void;
 }) {
   const { currentTime } = useCurrentTime();
 
@@ -643,19 +674,11 @@ function RecordingControls({
     stopRecording,
     requestMicAccess,
     recordingTrackId,
-  } = useIntegratedRecording(tracks, setTracks, selectedTrackId, { currentTime });
+    error,
+  } = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
 
   // Tell the playlist a take is running (see "Keeping Preview and Clip in Sync").
   useRecordingSession({ isRecording, trackId: recordingTrackId });
-
-  const handleAddTrack = () => {
-    const newTrack = createTrack({
-      name: `Track ${tracks.length + 1}`,
-      clips: [],
-    });
-    setTracks([...tracks, newTrack]);
-    setSelectedTrackId(newTrack.id);
-  };
 
   const handleRecord = async () => {
     if (!hasPermission) {
@@ -663,19 +686,16 @@ function RecordingControls({
     }
 
     if (isRecording) {
-      stopRecording();
+      stopRecording(); // the take lands on its track: one undo step
     } else {
-      // Create track if none selected
-      if (!selectedTrackId) {
-        handleAddTrack();
-      }
-      startRecording();
+      // Refused (false, and `error` set) when no track is selected
+      await startRecording();
     }
   };
 
   return (
     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-      <button onClick={handleRecord}>
+      <button onClick={handleRecord} disabled={!isRecording && !selectedTrackId}>
         {isRecording ? (
           <>
             Stop (<ElapsedTime progress={progress} />)
@@ -684,20 +704,29 @@ function RecordingControls({
           'Record'
         )}
       </button>
-      <button onClick={handleAddTrack}>+ Add Track</button>
+      <button onClick={onAddTrack}>+ Add Track</button>
       {hasPermission && (
         <SegmentedVUMeter meter={meter} />
       )}
+      {error && <span role="alert">{error.message}</span>}
     </div>
   );
 }
 
 function RecordingExample() {
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  // Starts empty: a take lands on a track added with "+ Add Track"
+  const arrangement = useCreateArrangement();
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
 
+  // addTrack is synchronous: the next take finds the track
+  const handleAddTrack = useCallback(() => {
+    const newTrack = createTrack({ name: `Track ${arrangement.getTracks().length + 1}` });
+    arrangement.addTrack(newTrack);
+    setSelectedTrackId(newTrack.id);
+  }, [arrangement]);
+
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
         <PlayButton />
         <PauseButton />
@@ -705,10 +734,9 @@ function RecordingExample() {
         <ExportWavButton label="Export" filename="recording" />
       </div>
       <RecordingControls
-        tracks={tracks}
-        setTracks={setTracks}
+        arrangement={arrangement}
         selectedTrackId={selectedTrackId}
-        setSelectedTrackId={setSelectedTrackId}
+        onAddTrack={handleAddTrack}
       />
       <WaveformViewOptions waveHeight={100}>
         <Waveform />

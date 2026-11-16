@@ -191,7 +191,7 @@ function App({ tracks }) {
   };
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterEffects}>
+    <WaveformPlaylistProvider arrangement={arrangement} effects={masterEffects}>
       <button onClick={addTremolo}>Add tremolo</button>
       <Waveform />
     </WaveformPlaylistProvider>
@@ -274,7 +274,7 @@ function App({ tracks }) {
   };
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterEffects}>
+    <WaveformPlaylistProvider arrangement={arrangement} effects={masterEffects}>
       <button onClick={addTremolo}>Add tremolo</button>
       {/* The plugin's own GUI, or the generic parameter panel when it has none. */}
       {instanceId && <WamEffectGui plugin={getWamPlugin(instanceId)} />}

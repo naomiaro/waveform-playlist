@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
-import { getGlobalAudioContext } from '@waveform-playlist/playout';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
@@ -17,8 +16,12 @@ import {
   MasterVolumeControl,
   WaveformEditor,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 const Controls = styled.div`
   display: flex;
@@ -40,7 +43,8 @@ const ControlGroup = styled.div`
   }
 `;
 
-// Audio files - each file is loaded and decoded once
+// Audio files - each file is loaded and decoded once by the arrangement,
+// however many clips name it
 // All from Ubiquitous for consistency
 const audioFiles = [
   { id: 'kick', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus' },
@@ -84,7 +88,8 @@ const trackConfigs = [
   {
     name: 'Bass',
     clips: [
-      { fileId: 'bass', startTime: 0, duration: 20, offset: 0 },
+      // The whole file: it decodes to 16.645 s (48 kHz), so the clip ends with it.
+      { fileId: 'bass', startTime: 0, duration: 16.64, offset: 0 },
     ],
   },
   {
@@ -104,118 +109,51 @@ const trackConfigs = [
   },
 ];
 
-// Helper to get required file IDs for a track
-const getRequiredFileIds = (trackConfig: typeof trackConfigs[0]): string[] => {
-  return [...new Set(trackConfig.clips.map(clip => clip.fileId))];
+const fileSrc = (fileId: string): string => {
+  const file = audioFiles.find((f) => f.id === fileId);
+  if (!file) throw new Error(`Audio file not found for ID: ${fileId}`);
+  return file.src;
 };
 
-// Helper to create a track when all its required files are loaded
-const createTrackFromConfig = (
-  trackConfig: typeof trackConfigs[0],
-  fileBuffers: Map<string, AudioBuffer>
-): ClipTrack => {
-  const clips = trackConfig.clips.map((clipConfig) => {
-    const audioBuffer = fileBuffers.get(clipConfig.fileId);
-    if (!audioBuffer) {
-      throw new Error(`Audio file not found for ID: ${clipConfig.fileId}`);
-    }
-
-    return createClipFromSeconds({
-      audioBuffer,
-      startTime: clipConfig.startTime,
+// Build tracks from config. Each clip is a loading clip in seconds that names
+// its file; its duration lets the waveform draw it as a placeholder at once,
+// and the arrangement makes it a playable clip when the file has decoded.
+const buildTracks = (): ArrangementTrack[] =>
+  trackConfigs.map((trackConfig) => {
+    const clips: LoadingClip[] = trackConfig.clips.map((clipConfig, index) => ({
+      id: `${clipConfig.fileId}-${index}`,
+      src: fileSrc(clipConfig.fileId),
+      start: clipConfig.startTime,
       duration: clipConfig.duration,
       offset: clipConfig.offset,
       name: `${trackConfig.name} ${clipConfig.offset}-${clipConfig.offset + clipConfig.duration}s`,
-    });
-  });
+    }));
 
-  return createTrack({
-    name: trackConfig.name,
-    clips,
-    muted: false,
-    soloed: false,
-    volume: 1,
-    pan: 0,
+    return {
+      ...createTrack({
+        name: trackConfig.name,
+        clips: [],
+        muted: false,
+        soloed: false,
+        volume: 1,
+        pan: 0,
+      }),
+      clips,
+    };
   });
-};
 
 export function MultiClipExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-  const [loadedFiles, setLoadedFiles] = useState<Map<string, AudioBuffer>>(new Map());
-  const [error, setError] = useState<Error | null>(null);
-  const [loadedCount, setLoadedCount] = useState(0);
-
-  // Load audio files PROGRESSIVELY - each file loads independently
-  useEffect(() => {
-    let cancelled = false;
-    const audioContext = getGlobalAudioContext();
-
-    // Load each file independently (not Promise.all)
-    audioFiles.forEach(async (file) => {
-      try {
-        const response = await fetch(file.src);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ${file.src}: ${response.statusText}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        if (!cancelled) {
-          // Update loaded files map for THIS file immediately
-          setLoadedFiles(prev => {
-            const newMap = new Map(prev);
-            newMap.set(file.id, audioBuffer);
-            return newMap;
-          });
-          setLoadedCount(prev => prev + 1);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error(`Failed to load ${file.id}:`, err);
-          setError(err as Error);
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Build tracks progressively as files load
-  useEffect(() => {
-    // For each track config, check if all required files are loaded
-    const newTracks: ClipTrack[] = [];
-
-    for (const trackConfig of trackConfigs) {
-      const requiredFileIds = getRequiredFileIds(trackConfig);
-      const allFilesLoaded = requiredFileIds.every(id => loadedFiles.has(id));
-
-      if (allFilesLoaded) {
-        newTracks.push(createTrackFromConfig(trackConfig, loadedFiles));
-      }
-    }
-
-    setTracks(newTracks);
-  }, [loadedFiles]);
-
-  const loading = loadedCount < audioFiles.length;
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error.message}
-      </div>
-    );
-  }
+  // The arrangement owns the tracks and loads their audio
+  const arrangement = useCreateArrangement(buildTracks);
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
-      onTracksChange={setTracks}
       samplesPerPixel={1024}
       mono
       automaticScroll={true}
@@ -229,7 +167,7 @@ export function MultiClipExample() {
             <PauseButton />
             <StopButton />
             <LoopButton />
-            {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{audioFiles.length}</span>}
+            <SourceLoadError arrangement={arrangement} />
           </ControlGroup>
           <ControlGroup>
             <ZoomInButton />
@@ -246,9 +184,12 @@ export function MultiClipExample() {
           </ControlGroup>
         </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <WaveformEditor />
-        </WaveformViewOptions>
+        <LoadingBadgeFrame>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformEditor />
+          </WaveformViewOptions>
+          <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+        </LoadingBadgeFrame>
       </ClipInteractionProvider>
     </WaveformPlaylistProvider>
   );

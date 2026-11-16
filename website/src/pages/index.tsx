@@ -303,12 +303,17 @@ function CodeExample() {
           </div>
           <div className="col col--6">
             <pre className={styles.codeBlock}>
-              <code>{`import { WaveformPlaylistProvider, Waveform }
+              <code>{`import { WaveformPlaylistProvider, Waveform, PlayButton, useCreateArrangement }
   from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 
 function App() {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/drums.mp3', name: 'Drums' }),
+  ]);
+
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <PlayButton />
       <Waveform />
     </WaveformPlaylistProvider>

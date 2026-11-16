@@ -35,7 +35,7 @@ import { configureGlobalContext } from '@waveform-playlist/playout';
 configureGlobalContext({ nativeAudioContext: true });
 ```
 
-`configureGlobalContext` must run before `getGlobalContext()` is called by anything else (any `useAudioTracks`/`WaveformPlaylistProvider` render, or `createToneAdapter()`) — once the context exists, native mode can no longer be applied and a console warning is logged instead.
+`configureGlobalContext` must run before `getGlobalContext()` is called by anything else (`createToneAdapter()`, which `WaveformPlaylistProvider` calls for its default adapter when it builds its first engine, in an effect after its first render; or a call of your own) — once the context exists, native mode can no longer be applied and a console warning is logged instead.
 
 ### Browser support (Tone backends)
 
@@ -72,7 +72,7 @@ WAM support is layered onto the existing effects hooks — `useDynamicEffects()`
 
 ```tsx
 import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import {
   useDynamicEffects,
   useActiveEffects,
@@ -82,13 +82,13 @@ import {
 const DELAY_URL =
   'https://www.webaudiomodules.com/community/plugins/burns-audio/delay/index.js';
 
-function App({ tracks }: { tracks: ClipTrack[] }) {
+function App({ arrangement }: { arrangement: Arrangement }) {
   // One call: it owns the master chain. A second call would create a second,
   // empty chain, so pass this object down instead of calling the hook again.
   const masterFx = useDynamicEffects();
 
   return (
-    <WaveformPlaylistProvider tracks={tracks} effects={masterFx.masterEffects}>
+    <WaveformPlaylistProvider arrangement={arrangement} effects={masterFx.masterEffects}>
       <MasterRack masterFx={masterFx} />
       <Waveform />
     </WaveformPlaylistProvider>

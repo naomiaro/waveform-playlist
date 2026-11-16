@@ -17,14 +17,14 @@ If you already have React and styled-components in your project, you're ready to
 
 ### Types and helpers come from `@waveform-playlist/core`
 
-`@waveform-playlist/browser` exports its own components, hooks and types and re-exports nothing from the other packages. The types of the data you pass in (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`) and the helpers that build it (`createTrack`, `createClipFromSeconds`) are exports of `@waveform-playlist/core`, and the pages of this documentation import them from there:
+`@waveform-playlist/browser` exports its own components, hooks and types and re-exports nothing from the other packages. The types of the data you pass in (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`) and the helpers that build it (`audioTrack`, `createTrack`, `createClipFromSeconds`) are exports of `@waveform-playlist/core`, and the pages of this documentation import them from there:
 
 ```tsx
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { createTrack, type ClipTrack } from '@waveform-playlist/core';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack, type ClipTrack } from '@waveform-playlist/core';
 ```
 
-`@waveform-playlist/core` is a dependency of `@waveform-playlist/browser`, so it is always installed with it. An import of it in your own code resolves under a package manager with a flat `node_modules` (npm) even when your project does not list it; under a strict one (pnpm) it does not. The install line above therefore names it. The same holds for `@waveform-playlist/ui-components`, also a dependency of browser, when you import from it (for example the `TimeFormat` type or `usePlaylistInfo`): add it to your project then. Keep all `@waveform-playlist/*` packages on the versions of one release, so that a single copy of each is installed.
+`@waveform-playlist/core` is a dependency of `@waveform-playlist/browser`, so it is always installed with it. An import of it in your own code resolves under a package manager with a flat `node_modules` (npm) even when your project does not list it; under a strict one (pnpm) it does not. The install line above therefore names it. The same holds for `@waveform-playlist/ui-components`, also a dependency of browser, when you import from it (for example the `TimeFormat` type or `usePlaylistInfo`), and for `@waveform-playlist/engine` when you import the `Arrangement` type (the object `useCreateArrangement` returns): add it to your project then. Keep all `@waveform-playlist/*` packages on the versions of one release, so that a single copy of each is installed.
 
 ## Peer Dependencies
 
@@ -65,7 +65,7 @@ Render `AnnotationProvider` above the view. Without it the annotation boxes and 
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 
 <WaveformPlaylistProvider
-  tracks={tracks}
+  arrangement={arrangement}
   annotationList={{ annotations, editable: true }}
   onAnnotationsChange={setAnnotations}
 >
@@ -88,12 +88,16 @@ This automatically installs `@waveform-playlist/worklets`, which provides the Au
 Use `useIntegratedRecording` inside a `WaveformPlaylistProvider` to combine mic access, recording, and track management:
 
 ```tsx
+import { useArrangement, useSelectedTrackId } from '@waveform-playlist/browser';
 import { useIntegratedRecording } from '@waveform-playlist/recording';
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
-function RecordingControls({ tracks, setTracks, selectedTrackId }) {
+function RecordingControls() {
+  const arrangement = useArrangement();
+  const { selectedTrackId } = useSelectedTrackId();
+  // The take is added to the arrangement's track: one undo step
   const { isRecording, meter, startRecording, stopRecording, requestMicAccess } =
-    useIntegratedRecording(tracks, setTracks, selectedTrackId);
+    useIntegratedRecording(arrangement, selectedTrackId);
 
   return (
     <>
@@ -106,8 +110,8 @@ function RecordingControls({ tracks, setTracks, selectedTrackId }) {
   );
 }
 
-<WaveformPlaylistProvider tracks={tracks}>
-  <RecordingControls tracks={tracks} setTracks={setTracks} selectedTrackId={selectedTrackId} />
+<WaveformPlaylistProvider arrangement={arrangement}>
+  <RecordingControls />
   <Waveform />
 </WaveformPlaylistProvider>
 ```
@@ -125,7 +129,7 @@ Wrap your playlist with `SpectrogramProvider` to enable spectrogram features:
 ```tsx
 import { SpectrogramProvider } from '@waveform-playlist/spectrogram';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <SpectrogramProvider config={spectrogramConfig} colorMap="viridis">
     <Waveform />
   </SpectrogramProvider>

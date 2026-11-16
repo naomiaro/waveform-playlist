@@ -7,7 +7,7 @@ description: "Load MIDI files for piano roll visualization with SoundFont or syn
 
 Waveform Playlist supports MIDI file loading and playback in two flavors:
 
-- **React** — the `@waveform-playlist/midi` package provides the `useMidiTracks` hook, which integrates with `WaveformPlaylistProvider`.
+- **React** — the `@waveform-playlist/midi` package provides `loadMidiTracks`, which loads a `.mid` file as tracks for the arrangement of `WaveformPlaylistProvider`.
 - **Web Components** — `<daw-editor>` from `@dawcore/components` exposes an `editor.loadMidi(source, options)` method, backed by the optional `@dawcore/midi` peer dep.
 
 Both paths use the same framework-agnostic parser (`@dawcore/midi`) under the hood — the React package re-exports it. MIDI tracks render as piano roll visualizations and play back using SoundFont samples or Tone.js PolySynth synthesis.
@@ -24,23 +24,46 @@ npm install @waveform-playlist/midi @tonejs/midi
 
 ### Basic Usage
 
-Use the `useMidiTracks` hook to load `.mid` files:
+Load the `.mid` file with `loadMidiTracks`, add its tracks to the arrangement, and render the provider once they are in:
 
 ```tsx
-import { useMidiTracks } from '@waveform-playlist/midi';
-import { WaveformPlaylistProvider, Waveform, PlayButton, StopButton } from '@waveform-playlist/browser';
+import { useEffect, useState } from 'react';
+import { loadMidiTracks } from '@waveform-playlist/midi';
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  PlayButton,
+  StopButton,
+  useCreateArrangement,
+} from '@waveform-playlist/browser';
 
 function MidiPlayer() {
-  const { tracks, loading, error } = useMidiTracks(
-    [{ src: '/music/song.mid' }],
-    { sampleRate: 48000 },
-  );
+  // Starts empty: the MIDI tracks are added once the file has loaded
+  const arrangement = useCreateArrangement();
+  const [status, setStatus] = useState<'loading' | 'loaded' | string>('loading');
 
-  if (loading) return <div>Loading MIDI...</div>;
-  if (error) return <div>Error: {error}</div>;
+  useEffect(() => {
+    const controller = new AbortController();
+    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+      .then((tracks) => {
+        // An effect run again (StrictMode, Fast Refresh) must not add them twice
+        if (arrangement.getTracks().length === 0) {
+          tracks.forEach((track) => arrangement.addTrack(track));
+          arrangement.clearHistory(); // the first load is not an undo step
+        }
+        setStatus('loaded');
+      })
+      .catch((err: unknown) => {
+        if (!controller.signal.aborted) setStatus(err instanceof Error ? err.message : String(err));
+      });
+    return () => controller.abort();
+  }, [arrangement]);
+
+  if (status === 'loading') return <div>Loading MIDI...</div>;
+  if (status !== 'loaded') return <div>Error: {status}</div>;
 
   return (
-    <WaveformPlaylistProvider tracks={tracks}>
+    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
       <PlayButton /> <StopButton />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -48,80 +71,17 @@ function MidiPlayer() {
 }
 ```
 
-`configs` is compared by value, so the array can be written inline as above: tracks reload only when a config actually changes. Several files are fetched in parallel and the tracks keep the order of the configs.
+The provider is rendered after the tracks are in because the playlist's [ready](/docs/react/guides/loading-audio#ready) happens once per mount and waits only for audio sources: a provider mounted over the empty arrangement would be ready at once. A dropped `.mid` file later is `loadMidiTracks(file, …)` followed by `arrangement.addTrack(track)` for each track, an undo step like any added track.
 
-A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI channel (e.g., Piano, Bass, Drums). All tracks are returned at once after loading completes.
+`sampleRate` is the rate the clips are positioned at: pass the rate of the provider's `AudioContext` (48000 here, set with the provider's `sampleRate` prop).
 
-### MidiTrackConfig Options
+A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI track of the file (e.g., Piano, Bass, Drums).
 
-```typescript
-interface MidiTrackConfig {
-  src?: string;               // URL to .mid file
-  midiNotes?: MidiNoteData[]; // Pre-parsed notes (skip fetch+parse)
-  name?: string;              // Track display name
-  muted?: boolean;
-  soloed?: boolean;
-  volume?: number;            // Default: 1.0
-  pan?: number;               // Default: 0
-  color?: string;
-  startTime?: number;         // Clip position in seconds (default: 0)
-  duration?: number;          // Override clip duration in seconds
-  flatten?: boolean;          // Merge all MIDI tracks into one (default: false)
-}
-
-interface UseMidiTracksOptions {
-  sampleRate: number;         // Required — pass AudioContext.sampleRate
-}
-```
-
-### MIDI Tracks
-
-Every track `useMidiTracks` returns is a MIDI track (`kind: 'midi'`). A track holds one kind of clip: MIDI clips go on MIDI tracks and audio clips on audio tracks, so put a `.mid` part and an audio stem on separate tracks. A MIDI track is always drawn as a piano roll.
-
-If you build a MIDI track yourself, set the kind:
-
-```tsx
-import { createTrack } from '@waveform-playlist/core';
-
-const keys = createTrack({ name: 'Keys', kind: 'midi', clips: [midiClip] });
-```
-
-A track whose clips do not match its kind is rejected. The provider reports it through its `onError` prop (an error boundary does not see it) and the playlist stays in its loading state, so pass `onError`.
-
-### Pre-Parsed Notes
-
-If you already have note data (e.g., from a custom parser or algorithm), skip the fetch step:
-
-```tsx
-const { tracks } = useMidiTracks(
-  [
-    {
-      midiNotes: [
-        { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
-        { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
-      ],
-      name: 'Melody',
-      duration: 4,
-    },
-  ],
-  { sampleRate: 48000 },
-);
-```
-
-### Flatten Mode
-
-By default, each MIDI channel becomes a separate track. Use `flatten: true` to merge all channels into one visual track:
-
-```tsx
-const { tracks } = useMidiTracks(
-  [{ src: '/music/song.mid', flatten: true }],
-  { sampleRate: 48000 },
-);
-```
+`useMidiTracks`, the hook that loaded MIDI files into a `tracks` array for the provider's old `tracks` prop, is still exported, but its result cannot be given to the provider: `WaveformPlaylistProvider` takes an arrangement.
 
 ### loadMidiTracks
 
-`loadMidiTracks` is a plain function beside the hook: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.
+`loadMidiTracks` is a plain function: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.
 
 ```tsx
 import { loadMidiTracks } from '@waveform-playlist/midi';
@@ -131,9 +91,60 @@ const tracks = await loadMidiTracks(file, {
   sampleRate: audioContext.sampleRate,
   signal: controller.signal,
 });
+tracks.forEach((track) => arrangement.addTrack(track));
 ```
 
-The other options are `flatten`, `start` and `duration` (both in seconds) and `name`, which names the track and its clip only when the file yields exactly one track (several tracks keep their own MIDI names). An aborted `signal` rejects with the signal's reason. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`, with the status text after the code when there is one (`Failed to fetch MIDI file /missing.mid: 404 Not Found`), and data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
+The other options are `flatten` (merge all MIDI tracks of the file into one), `start` and `duration` (both in seconds) and `name`, which names the track and its clip only when the file yields exactly one track (several tracks keep their own MIDI names). An aborted `signal` rejects with the signal's reason. A URL that does not answer with an OK status rejects with `Failed to fetch MIDI file <url>: <status>`, with the status text after the code when there is one (`Failed to fetch MIDI file /missing.mid: 404 Not Found`), and data that is not a MIDI file rejects with `parseMidiFile: invalid or corrupt MIDI data (<n> bytes): …`.
+
+### MIDI Tracks
+
+Every track `loadMidiTracks` returns is a MIDI track (`kind: 'midi'`). A track holds one kind of clip: MIDI clips go on MIDI tracks and audio clips on audio tracks, so put a `.mid` part and an audio stem on separate tracks. A MIDI track is always drawn as a piano roll.
+
+If you build a MIDI track yourself, set the kind:
+
+```tsx
+import { createTrack } from '@waveform-playlist/core';
+
+const keys = createTrack({ name: 'Keys', kind: 'midi', clips: [midiClip] });
+```
+
+The arrangement refuses a track whose clips do not match its kind, and a clip that is still loading (an audio clip naming its `src`) on a MIDI track. The throw reaches the caller: from the `useCreateArrangement` initializer it is a render error for an error boundary, from `arrangement.addTrack()` it is your handler's exception (see [Where Errors Land](/docs/react/guides/loading-audio#where-errors-land)).
+
+### Pre-Parsed Notes
+
+If you already have note data (e.g., from a custom parser or algorithm), build the clip and the track with `@waveform-playlist/core`:
+
+```tsx
+import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+
+const melody = createTrack({
+  name: 'Melody',
+  kind: 'midi',
+  clips: [
+    createClipFromSeconds({
+      startTime: 0,
+      duration: 4,
+      sampleRate: 48000,
+      sourceDuration: 4,
+      name: 'Melody',
+      midiNotes: [
+        { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+        { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+      ],
+    }),
+  ],
+});
+
+const arrangement = useCreateArrangement(() => [melody]);
+```
+
+### Flatten Mode
+
+By default, each MIDI track of the file becomes a separate track. Use `flatten: true` to merge them into one:
+
+```tsx
+const tracks = await loadMidiTracks('/music/song.mid', { sampleRate: 48000, flatten: true });
+```
 
 ### SoundFont Playback
 
@@ -148,7 +159,7 @@ const cache = await SoundFontCache.fromUrl('/soundfonts/piano.sf2');
 
 // Pass to provider — MIDI tracks automatically use the SoundFont samples
 <WaveformPlaylistProvider
-  tracks={tracks}
+  arrangement={arrangement}
   soundFontCache={cache}
 >
   <Waveform />
@@ -175,7 +186,7 @@ useEffect(() => {
     });
 }, []);
 
-<WaveformPlaylistProvider soundFontCache={cache} tracks={tracks} />
+<WaveformPlaylistProvider soundFontCache={cache} arrangement={arrangement} />
 ```
 
 With `fromUrl` an unloaded cache never reaches your state. The provider reacts to the
@@ -189,34 +200,37 @@ capability is `adapter.setSoundFontCache(cache)` on the adapter returned by
 
 ### Mixing MIDI and Audio Tracks
 
-MIDI and audio tracks can be played together. Both `useMidiTracks` and `useAudioTracks` return `ClipTrack[]`, so merge them into a single array:
+MIDI and audio tracks can be played together: they are tracks of one arrangement. Declare the audio in the initializer and add the MIDI tracks once they have loaded:
 
 ```tsx
-import { useMidiTracks } from '@waveform-playlist/midi';
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { useEffect, useState } from 'react';
+import { loadMidiTracks } from '@waveform-playlist/midi';
+import { useCreateArrangement } from '@waveform-playlist/browser';
+import { audioTrack } from '@waveform-playlist/core';
 
-function MixedPlayer() {
-  const { tracks: midiTracks, loading: midiLoading } = useMidiTracks(
-    [{ src: '/music/song.mid' }],
-    { sampleRate: 48000 },
-  );
-
-  const { tracks: audioTracks, loading: audioLoading } = useAudioTracks([
-    { src: '/audio/vocals.mp3', name: 'Vocals' },
+function useMixedArrangement() {
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/vocals.mp3', name: 'Vocals' }),
   ]);
+  // Shown by the page: the MIDI file could not be loaded (the audio plays on)
+  const [midiError, setMidiError] = useState<string | null>(null);
 
-  if (midiLoading || audioLoading) return <div>Loading...</div>;
+  useEffect(() => {
+    const controller = new AbortController();
+    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+      .then((tracks) => tracks.forEach((track) => arrangement.addTrack(track)))
+      .catch((err: unknown) => {
+        // An abort (unmount, StrictMode's first run) is not an error
+        if (!controller.signal.aborted) setMidiError(err instanceof Error ? err.message : String(err));
+      });
+    return () => controller.abort();
+  }, [arrangement]);
 
-  const allTracks = [...midiTracks, ...audioTracks];
-
-  return (
-    <WaveformPlaylistProvider tracks={allTracks}>
-      <Waveform />
-    </WaveformPlaylistProvider>
-  );
+  return { arrangement, midiError };
 }
 ```
+
+Here the MIDI tracks may arrive after the playlist's first ready (which waits for the vocals); they are added to the playing arrangement as they come. To have them in before the provider mounts, load them first as in [Basic Usage](#basic-usage).
 
 ## Web Components
 

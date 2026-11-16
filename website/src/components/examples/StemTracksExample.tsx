@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import {
   WaveformPlaylistProvider,
@@ -22,14 +22,18 @@ import {
   WaveformSelection,
   WaveformPlayhead,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import { PlayheadWithMarker } from '@waveform-playlist/ui-components';
-import { type ClipTrack } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
+import type { AudioTrackOptions } from '@waveform-playlist/core';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
-const audioConfigs = [
+const audioConfigs: AudioTrackOptions[] = [
   {
     src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/01_Loop1.opus',
     name: 'Loop 1',
@@ -112,34 +116,18 @@ const ControlGroup = styled.div`
 export function StemTracksExample() {
   const { theme } = useDocusaurusTheme();
 
-  // Load audio tracks with immediate placeholders - peaks fill in as files decode
-  const { tracks: loadedTracks, loading, error, loadedCount, totalCount } = useAudioTracks(audioConfigs, { immediate: true });
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
-
-  // Sync local track state as peaks fill in; once loading finishes this stops
-  // firing, so subsequent updates (e.g. track reordering) come from onTracksChange.
-  useEffect(() => {
-    if (loadedTracks.length > 0) {
-      setTracks(loadedTracks);
-    }
-  }, [loadedTracks]);
-
-  if (error) {
-    return (
-      <Container>
-        <div style={{ padding: '2rem', color: 'red' }}>
-          Error loading audio: {error}
-        </div>
-      </Container>
-    );
-  }
+  // The arrangement owns the tracks (reordering included) and loads their audio
+  // - each row is empty until its audio has loaded (a placeholder is drawn only
+  // for a clip with a `duration` or peaks)
+  const arrangement = useCreateArrangement(() => audioConfigs.map((config) => audioTrack(config)));
+  const sources = useArrangementSources(arrangement);
+  const totalCount = sources.sources.size;
+  const loadedCount = totalCount - sources.pendingCount - sources.failedCount;
 
   return (
     <Container>
       <WaveformPlaylistProvider
-        tracks={tracks}
-        onTracksChange={setTracks}
-        deferEngineRebuild={loading}
+        arrangement={arrangement}
         sampleRate={48000}
         samplesPerPixel={512}
         mono
@@ -153,7 +141,7 @@ export function StemTracksExample() {
               <PlayButton />
               <PauseButton />
               <StopButton />
-              {loading && <span style={{ fontSize: '0.875rem', color: 'var(--ifm-color-emphasis-600)' }}>Loading: {loadedCount}/{totalCount}</span>}
+              <SourceLoadError arrangement={arrangement} />
             </ControlGroup>
 
             <ControlGroup>
@@ -175,19 +163,22 @@ export function StemTracksExample() {
 
           </Controls>
 
-          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-            <WaveformRoot>
-              <WaveformTimescale />
-              <WaveformLoopRegion />
-              <WaveformTrackControls>
-                <DefaultTrackControls />
-                <TrackReorderGrip />
-              </WaveformTrackControls>
-              <WaveformTracks />
-              <WaveformSelection />
-              <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
-            </WaveformRoot>
-          </WaveformViewOptions>
+          <LoadingBadgeFrame>
+            <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+              <WaveformRoot>
+                <WaveformTimescale />
+                <WaveformLoopRegion />
+                <WaveformTrackControls>
+                  <DefaultTrackControls />
+                  <TrackReorderGrip />
+                </WaveformTrackControls>
+                <WaveformTracks />
+                <WaveformSelection />
+                <WaveformPlayhead renderPlayhead={PlayheadWithMarker} />
+              </WaveformRoot>
+            </WaveformViewOptions>
+            <LoadingBadge active={sources.isLoading}>Loading: {loadedCount}/{totalCount}</LoadingBadge>
+          </LoadingBadgeFrame>
         </ClipInteractionProvider>
       </WaveformPlaylistProvider>
     </Container>

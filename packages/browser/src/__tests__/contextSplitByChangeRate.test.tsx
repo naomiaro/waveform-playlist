@@ -11,8 +11,9 @@ import { render, act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
 import * as contextModule from '../WaveformPlaylistContext';
 import * as publicApi from '../index';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
+  useArrangement,
   usePlaybackControls,
   useEditorControls,
   useEngineRefs,
@@ -32,6 +33,7 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
+  useRecordingArm,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -117,11 +119,15 @@ const HOOKS = {
   activeAnnotation: useActiveAnnotation,
   controls: usePlaybackControls,
   editorControls: useEditorControls,
+  // The arrangement (#812): the same object for the life of the mount.
+  arrangement: useArrangement,
   // Internal (#812): the trim preview source and the previewed clip's drawing.
   // Both values are stable; what changes during a trim is the source's value,
   // which only the dragged clip's view and the root subscribe to.
   trimPreview: useTrimPreviewOptional,
   trimPreviewPeaks: useTrimPreviewPeaksOptional,
+  // Internal (#812): the track a take is recorded onto.
+  recordingArm: useRecordingArm,
 } as const;
 
 // The hooks both providers serve (#688); the rest need WaveformPlaylistProvider.
@@ -176,11 +182,10 @@ async function mount() {
   for (const name of HOOK_NAMES) renders[name] = 0;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  let tracks = TRACKS;
   let annotationList = { annotations: ANNOTATIONS };
   const Wrapper: React.FC = () => (
-    <WaveformPlaylistProvider
-      tracks={tracks}
+    <TestProvider
+      tracks={TRACKS}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={1000}
       zoomLevels={ZOOM_LEVELS}
@@ -188,15 +193,13 @@ async function mount() {
       annotationList={annotationList}
     >
       {CHILDREN}
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   const utils = render(<Wrapper />);
   await waitFor(() => expect(values.timeline.isReady).toBe(true));
   return {
-    setTracks: (next: ClipTrack[]) => {
-      tracks = next;
-      utils.rerender(<Wrapper />);
-    },
+    // A track edit is the arrangement's (#812).
+    addTrack: (track: ClipTrack) => values.arrangement.addTrack(track),
     // Annotations are a controlled prop: an edit arrives as a new array.
     setAnnotations: (next: AnnotationData[]) => {
       annotationList = { annotations: next };
@@ -230,9 +233,7 @@ describe('each hook returns its own group of fields (#768)', () => {
     expect(keys('view')).toEqual(['indefinitePlayback', 'mono', 'sampleRate']);
     expect(keys('settings')).toEqual(['isAutomaticScroll', 'timeFormat']);
     expect(keys('zoom')).toEqual(['canZoomIn', 'canZoomOut', 'samplesPerPixel']);
-    expect(keys('timeline')).toEqual(
-      ['duration', 'isReady', 'onTracksChange', 'peaksDataArray', 'tracks'].sort()
-    );
+    expect(keys('timeline')).toEqual(['duration', 'isReady', 'peaksDataArray', 'tracks'].sort());
     expect(keys('mixer')).toEqual(['masterVolume', 'trackStates']);
     expect(keys('reorder')).toEqual(['trackDragPreview', 'trackReorderEpoch']);
     expect(keys('annotations')).toEqual(['annotations']);
@@ -300,6 +301,10 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('trimPreview')).toEqual(['publish', 'source']);
     expect(keys('trimPreviewPeaks')).toEqual(['peaksFor']);
+    expect(keys('recordingArm')).toEqual(['armedTrackId']);
+    // The arrangement itself, not a value made for it.
+    expect(typeof values.arrangement.getTracks).toBe('function');
+    expect(values.arrangement.getTracks().map((t) => t.id)).toEqual(['track-1', 'track-2']);
   });
 
   it('carries the values the provider was given', async () => {
@@ -450,6 +455,29 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     ]);
   });
 
+  // #812: the arm mute goes through the arrangement's mix, so the mixer
+  // follows; the armed track is its own value, read by the track controls.
+  it('arming a track for a take, moving the arm and ending the take: the recording arm and the mixer', async () => {
+    await mount();
+    expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-1'))).toEqual(
+      ['mixer', 'recordingArm']
+    );
+    expect(values.recordingArm.armedTrackId).toBe('track-1');
+    expect(values.mixer.trackStates[0].muted).toBe(true);
+    expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-2'))).toEqual(
+      ['mixer', 'recordingArm']
+    );
+    expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([
+      'mixer',
+      'recordingArm',
+    ]);
+    expect(values.recordingArm.armedTrackId).toBeNull();
+    expect(values.mixer.trackStates.map((s) => s.muted)).toEqual([false, false]);
+    // A session without an armed track: no reader renders.
+    expect(await rendered(() => values.editorControls.setRecordingActive(true))).toEqual([]);
+    expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([]);
+  });
+
   it('play: isPlaying only; pause: isPlaying and the resting position', async () => {
     await mount();
     expect(await rendered(() => values.controls.play(0))).toEqual(['isPlaying']);
@@ -490,8 +518,8 @@ describe('an action re-renders only the readers of the group it changes (#768)',
   });
 
   it('a longer timeline: the timeline, and none of the view, zoom, loop, selection or annotation readers', async () => {
-    const { setTracks } = await mount();
-    const names = await rendered(() => setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]));
+    const { addTrack } = await mount();
+    const names = await rendered(() => addTrack(makeTrack('track-3', 2)));
     await waitFor(() => expect(values.timeline.duration).toBe(2));
     expect(names).toContain('timeline');
     // The mixer follows too: the new track gets its mixer state.
@@ -514,6 +542,8 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'editorControls',
       'trimPreview',
       'trimPreviewPeaks',
+      'arrangement',
+      'recordingArm',
     ] as HookName[]) {
       expect(names).not.toContain(quiet);
     }
@@ -522,8 +552,10 @@ describe('an action re-renders only the readers of the group it changes (#768)',
 
 describe('the refs values never change (#768)', () => {
   it('keep their identity through every kind of change', async () => {
-    const { setTracks } = await mount();
+    const { addTrack } = await mount();
     const before = values.refs;
+    const arrangementBefore = values.arrangement;
+    const arrangementRendersBefore = renders.arrangement;
     const rendersBefore = renders.refs;
     const engineBefore = values.engineRefs;
     const engineRendersBefore = renders.engineRefs;
@@ -545,7 +577,7 @@ describe('the refs values never change (#768)', () => {
       values.controls.stop();
     });
     await act(async () => {
-      setTracks([TRACKS[0], TRACKS[1], makeTrack('track-3', 2)]);
+      addTrack(makeTrack('track-3', 2));
     });
     await waitFor(() => expect(values.timeline.duration).toBe(2));
 
@@ -556,6 +588,8 @@ describe('the refs values never change (#768)', () => {
     expect(values.trimPreview).toBe(trimPreviewBefore);
     expect(values.trimPreviewPeaks).toBe(trimPreviewPeaksBefore);
     expect(renders.trimPreview + renders.trimPreviewPeaks).toBe(trimRendersBefore);
+    expect(values.arrangement).toBe(arrangementBefore);
+    expect(renders.arrangement).toBe(arrangementRendersBefore);
   });
 });
 
@@ -588,6 +622,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     'useUndoRedo',
     'useIsPlaying',
     'usePlaybackRefs',
+    'useArrangement',
   ])('%s is exported from the package entry', (name) => {
     expect(typeof (publicApi as Record<string, unknown>)[name]).toBe('function');
   });
@@ -597,6 +632,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     expect('usePlaylistZoomOptional' in publicApi).toBe(false);
     expect('useTrimPreviewOptional' in publicApi).toBe(false);
     expect('useTrimPreviewPeaksOptional' in publicApi).toBe(false);
+    expect('useRecordingArm' in publicApi).toBe(false);
   });
 
   it('the trim preview readers are null outside a provider', () => {

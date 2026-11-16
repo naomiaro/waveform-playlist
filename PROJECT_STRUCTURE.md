@@ -165,7 +165,7 @@ const clip = createClipFromSeconds({
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
 - **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
-- **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider mirrors updated tracks back to the parent via `onTracksChange`.
+- **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider is given the arrangement (`arrangement` prop) and derives what it publishes from it; nothing is mirrored back.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.
   - `trimClip()` accepts optional `skipAdapter` parameter.
   - `getClipBounds()` — returns clip boundary info for constraint calculations.
@@ -188,6 +188,7 @@ const clip = createClipFromSeconds({
   │   ├── Track.tsx              # Individual track
   │   ├── Clip.tsx               # Audio clip (draggable)
   │   ├── ClipHeader.tsx         # Draggable title bar
+  │   ├── ClipPlaceholderBody.tsx # The body of a placeholder clip with no peaks: a box of its extent in the bar colour
   │   ├── ClipBoundary.tsx       # Trim handles (left/right edges)
   │   ├── Channel.tsx            # Waveform canvas rendering
   │   ├── SmartChannel.tsx       # Auto-selects Channel/PianoRoll/Spectrogram
@@ -320,6 +321,11 @@ const clip = createClipFromSeconds({
   │   ├── playlistContexts.ts           # The context objects, value types and hooks of both providers (imports no provider and no engine)
   │   └── ClipInteractionContext.tsx    # Clip interaction options (ClipInteractionOptions)
   ├── providerInternals/                # What both providers are built from (internal; only the FrameData type is exported)
+  │   ├── arrangementIdentity.ts        # WaveformPlaylistProvider: the key of its body per arrangement object (a new object remounts everything below), warned once in development
+  │   ├── useEngineLifetime.ts          # WaveformPlaylistProvider: builds an engine on the arrangement (mount, effects, zoomLevels), disposes it, attaches the decode context once per mount; the provider's sample rate
+  │   ├── useArrangementView.ts         # WaveformPlaylistProvider: what it publishes, derived from the arrangement: loaded tracks, peaks rows with placeholder records, duration, trackStates, canUndo/canRedo
+  │   ├── useArrangementEditing.ts      # WaveformPlaylistProvider: mixer setters, reorder, undo, redo and setRecordingActive on the arrangement; the armed track (RecordingArmContext)
+  │   ├── useReadyOnce.ts               # WaveformPlaylistProvider: isReady, onReady and the ready event once per mount; Play refused before the first ready
   │   ├── useAnnotationState.ts         # annotations, setAnnotations, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
@@ -335,13 +341,11 @@ const clip = createClipFromSeconds({
   │   ├── useArrangementSources.ts      # Where each audio source of an Arrangement is (pending, loaded, failed)
   │   ├── useArrangementTracks.ts       # The tracks of an Arrangement, loading clips included
   │   ├── useAudioEffects.ts            # Audio effects management
-  │   ├── useAudioTracks.ts             # Track loading and management
-  │   ├── useClipDragHandlers.ts        # Clip drag/move/trim (delegates to engine; a trim is a view-only preview, one engine call on release)
-  │   ├── useClipSplitting.ts           # Split clips at playhead (delegates to engine)
+  │   ├── useClipDragHandlers.ts        # Clip drag/move/trim on the provider's arrangement (a trim is a view-only preview, one call on release)
+  │   ├── useClipSplitting.ts           # Split clips at playhead (arrangement.splitClip)
   │   ├── useCreateArrangement.ts       # Makes the engine's Arrangement once per component instance
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
   │   ├── useDynamicEffects.ts          # Master effects chain
-  │   ├── useDynamicTracks.ts           # Runtime track additions (placeholder-then-replace)
   │   ├── useExportWav.ts               # WAV export via Tone.Offline
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
   │   ├── useLoopState.ts               # Loop state (engine delegation + onEngineState)
@@ -357,7 +361,6 @@ const clip = createClipFromSeconds({
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useTrackReorderHandle.ts      # Reorder drag handle for the track whose panel the caller is in (dnd-kit sortable)
   │   ├── useTrimPreviewView.ts         # What the clip view and the root read of the trim preview: the previewed clip's drawing record, the stepped width past the end
-  │   ├── useUndoState.ts              # Undo/redo state (engine delegation + onEngineState)
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
   │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
   ├── components/                       # React components
@@ -393,11 +396,10 @@ const clip = createClipFromSeconds({
   │   ├── ClipCollisionModifier.ts      # Prevents overlapping clips during drag
   │   └── SnapToGridModifier.ts         # Snap-to-grid (beats or timescale mode)
   ├── utils/                            # Pure helpers (among them:)
-  │   ├── trackMixerState.ts            # Mixer state by track id; the positional trackStates array derived from it
   │   ├── stableTemplate.ts             # Keeps the controls part's children while a new render hands it equal ones
   │   ├── derivePeaks.ts                # Peaks per clip, derived during render
   │   ├── placeholderPeaks.ts           # The drawing record (isPlaceholder) of a clip that is still loading
-  │   └── incrementalTrackChange.ts     # Which tracks changes can be applied to a running engine
+  │   └── loadedTracks.ts               # An arrangement's tracks without their loading clips (what the provider publishes as tracks)
   ├── playout/                           # Optional-engine resolution (#510)
   │   ├── resolvePlayoutAdapter.ts       # Dynamic-imports @waveform-playlist/playout + tone
   │   └── resolveMediaElementPlayout.ts  # Dynamic-imports @waveform-playlist/media-element-playout
@@ -412,7 +414,7 @@ const clip = createClipFromSeconds({
   ```
 - **Build:** tsup, two entry points (`src/index.tsx`, `src/tone.ts`) → core bundle + `/tone` subpath bundle. (Migrated off Vite; tsup auto-externalizes `dependencies`/`peerDependencies`, see root CLAUDE.md pattern 5.)
 - **Optional playout engines (#510):** `@waveform-playlist/playout`, `@waveform-playlist/media-element-playout`, and `tone` are optional `peerDependencies`, not static imports. `WaveformPlaylistProvider`/`MediaElementPlaylistProvider` resolve the default engine via dynamic `import()` (`src/playout/resolvePlayoutAdapter.ts` / `resolveMediaElementPlayout.ts`, factory-or-dynamic with install-hint rethrow) or accept a consumer-supplied `createAdapter?`/`createPlayout?` factory that skips the import entirely.
-- **`/tone` subpath is the Tone-coupled surface:** the core `@waveform-playlist/browser` entry is structurally free of any static `tone`/`playout` import (enforced by `coreBarrelEngineFree.test.ts`). Tone-dependent exports — `useAudioTracks`, `useDynamicTracks`, the effects hooks/factory/definitions, `useExportWav` + `ExportWavButton`, `useOutputMeter`, `useMasterAnalyser`, WAM effect GUI helpers — live at `@waveform-playlist/browser/tone` only. A MediaElement-only or custom-adapter consumer never resolves `tone`/`playout` under any bundler.
+- **`/tone` subpath is the Tone-coupled surface:** the core `@waveform-playlist/browser` entry is structurally free of any static `tone`/`playout` import (enforced by `coreBarrelEngineFree.test.ts`). Tone-dependent exports — the effects hooks/factory/definitions, `useExportWav` + `ExportWavButton`, `useOutputMeter`, `useMasterAnalyser`, WAM effect GUI helpers — live at `@waveform-playlist/browser/tone` only. A MediaElement-only or custom-adapter consumer never resolves `tone`/`playout` under any bundler.
 
 ### 🔊 Audio Layer
 
@@ -636,14 +638,14 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - When no provider present, all spectrogram features are skipped (zero runtime cost)
   ```typescript
   // With spectrogram:
-  <WaveformPlaylistProvider tracks={tracks}>
+  <WaveformPlaylistProvider arrangement={arrangement}>
     <SpectrogramProvider config={config} colorMap="viridis">
       <Waveform />
     </SpectrogramProvider>
   </WaveformPlaylistProvider>
 
   // Without spectrogram (no change needed):
-  <WaveformPlaylistProvider tracks={tracks}>
+  <WaveformPlaylistProvider arrangement={arrangement}>
     <Waveform />
   </WaveformPlaylistProvider>
   ```
@@ -657,10 +659,10 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Install:** `npm install @waveform-playlist/midi`
 - **Architecture (two-layer):**
   - `parseMidiFile()`/`parseMidiUrl()` — pure functions, re-exported from `@dawcore/midi` as of v13.0.0 (moved during the dawcore framework-split; no React-side API change). Convert a `.mid` ArrayBuffer/URL to `ParsedMidi`.
-  - `useMidiTracks()` and `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the original symbols still defined in this package. `useMidiTracks()` is a React hook mirroring `useAudioTracks`, producing `ClipTrack[]` with `clip.midiNotes` for `<WaveformPlaylistProvider tracks={...}>`; `loadMidiTracks()` is the same load without React, a promise of `ClipTrack[]`.
+  - `useMidiTracks()` and `loadMidiTracks()` (`src/loadMidiTracks.ts`) — the original symbols still defined in this package. `useMidiTracks()` is a React hook producing `ClipTrack[]` with `clip.midiNotes`; `loadMidiTracks()` is the same load without React, a promise of `ClipTrack[]`, whose tracks are added to the arrangement `WaveformPlaylistProvider` plays.
 - **Data pipeline only:** MIDI synthesis (PolySynth, Transport scheduling) lives in `@waveform-playlist/playout` via `MidiToneTrack`.
 - **Multi-track expansion:** One MIDI config can produce multiple `ClipTrack`s (one per MIDI track in the file); `flatten: true` merges them into one, preserving per-note channel identity via `MidiNoteData.channel` (so percussion notes stay routable after flattening).
-- **No native sample rate:** MIDI is event-based — `sampleRate` is required on `useMidiTracks()`'s options (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
+- **No native sample rate:** MIDI is event-based — `sampleRate` is required on the options of `loadMidiTracks()` and `useMidiTracks()` (pass `getGlobalAudioContext().sampleRate` from playout) for sample-based timeline positioning.
 - **Dependencies:** `@dawcore/midi`, `@tonejs/midi`, `@waveform-playlist/core`
 - **Peer Dependencies:** React ^19.0.0
 - **Location:** `packages/midi/`
@@ -756,9 +758,14 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 **Flexible API Pattern (Provider + Engine + Primitives):**
 
 ```
+App component
+    └─→ useCreateArrangement() → Arrangement (engine): tracks, mix, undo history, audio loading
+    ↓  arrangement prop
 User Interaction (React Events)
     ↓
-WaveformPlaylistProvider (Split Contexts for Performance)
+WaveformPlaylistProvider (Split Contexts for Performance; everything below derived from the arrangement)
+    ├─→ ArrangementContext (never changes)
+    │   └─→ the Arrangement (useArrangement)
     ├─→ IsPlayingContext (play, pause, stop)
     │   └─→ isPlaying
     ├─→ PlaybackRefsContext (never changes; refs and frame callbacks for 60fps)
@@ -787,9 +794,9 @@ WaveformPlaylistProvider (Split Contexts for Performance)
     │   └─→ timeFormat, isAutomaticScroll
     ├─→ PlaylistZoomContext (a zoom)
     │   └─→ samplesPerPixel, canZoomIn, canZoomOut
-    ├─→ PlaylistTimelineContext (every clip operation, a zoom)
-    │   └─→ tracks, peaksDataArray, duration, isReady, onTracksChange
-    ├─→ PlaylistMixerContext (every mute, solo, volume or pan change; tracks added, removed or reordered)
+    ├─→ PlaylistTimelineContext (every clip operation, a zoom, audio arriving)
+    │   └─→ tracks (loaded clips), peaksDataArray (with placeholder records), duration, isReady
+    ├─→ PlaylistMixerContext (every mute, solo, volume or pan change; tracks added, removed, renamed or reordered)
     │   └─→ trackStates, masterVolume
     └─→ TrackReorderPreviewContext (every drag-over of a track reorder)
         └─→ trackDragPreview, trackReorderEpoch
@@ -803,31 +810,33 @@ WaveformPlaylistProvider (Split Contexts for Performance)
 ├─→ UI Components (React)
 │   └─→ Canvas Rendering (SmartChannel)
 │
-└─→ PlaylistEngine (state + events)
+└─→ PlaylistEngine (state + events; built by the provider on mount, on an effects or zoomLevels change)
     ├─→ Owns: transport, selection, loop, zoom, master volume, selectedTrackId
-    ├─→ Arrangement (createArrangement, or the engine's own): tracks, mix, undo history
-    ├─→ Emits: statechange → provider mirrors into React state
+    ├─→ Plays the provider's Arrangement (tracks, mix, undo history), following it by subscription
+    ├─→ Emits: statechange → provider mirrors selection, loop, zoom, volume, selected track into React state
     └─→ ToneAdapter (PlayoutAdapter interface)
         └─→ TonePlayout (Tone.js)
             └─→ Web Audio API
 ```
 
-**Engine State Flow:**
+**Arrangement State Flow:**
 ```
-Hook calls engine method (e.g., engine.moveClip())
+Hook or app calls an arrangement method (e.g., arrangement.moveClip(), addTrack(), undo())
     ↓
-Arrangement changes its tracks and tells the engine; engine syncs adapter
+Arrangement changes its tracks, tells the engine (if one is attached; it syncs the adapter), then its subscribers
     ↓
-Engine emits 'statechange' with EngineState snapshot
+Provider (useSyncExternalStore over arrangement.subscribe / arrangement.sources):
+    ├─→ useArrangementView derives tracks, peaksDataArray, duration, trackStates, canUndo/canRedo
+    └─→ useReadyOnce: first engine attached + no source pending → isReady, onReady, 'waveform-playlist:ready' (once per mount)
+
+Engine method for transport/view state (e.g., engine.setSelection())
     ↓
-Provider's statechange handler:
-    ├─→ Calls each hook's onEngineState() to mirror into React state
-    └─→ Calls onTracksChange() for track mutations → parent updates tracks prop
+Engine emits 'statechange' → each hook's onEngineState() mirrors it into React state
 ```
 
 **Context Splitting Architecture:**
 
-`packages/browser/src/contexts/playlistContexts.ts` defines **24 contexts** (21 public and the three internal `SelectedRowContext`, `TrimPreviewContext` and `TrimPreviewPeaksContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
+`packages/browser/src/contexts/playlistContexts.ts` defines **26 contexts** (22 public and the four internal `SelectedRowContext`, `TrimPreviewContext`, `TrimPreviewPeaksContext` and `RecordingArmContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
 
 Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (11 public, plus the internal `SelectedRowContext`):
 
@@ -865,38 +874,42 @@ Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (
 
 11. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (fixed under the MediaElement provider)
 
-Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (10, two of them internal):
+Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (12, three of them internal):
 
-12. **EditorControlsContext** (`useEditorControls()`) - The actions only the multitrack editor has; the value never changes
+12. **ArrangementContext** (`useArrangement()`) - The arrangement the provider was given; never changes for a mount
 
-13. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, the engine's clock refs and functions; the value never changes
+13. **EditorControlsContext** (`useEditorControls()`) - The actions only the multitrack editor has; the value never changes
 
-14. **LoopContext** (`useLoop()`) - Loop enabled flag and loop region
+14. **EngineRefsContext** (`useEngineRefs()`) - `playoutRef`, the engine's clock refs and functions; the value never changes
 
-15. **SelectedTrackIdContext** (`useSelectedTrackId()`) - The selected track
+15. **LoopContext** (`useLoop()`) - Loop enabled flag and loop region
 
-16. **UndoRedoContext** (`useUndoRedo()`) - Whether undo and redo are available
+16. **SelectedTrackIdContext** (`useSelectedTrackId()`) - The selected track
 
-17. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks, peaks, duration, `isReady`
+17. **UndoRedoContext** (`useUndoRedo()`) - Whether undo and redo are available
+
+18. **PlaylistTimelineContext** (`usePlaylistTimeline()`) - Tracks (loaded clips), peaks (with placeholder records), duration (loaded audio), `isReady`
     - Changes on every clip operation (a trim once, on release) and on a zoom (peaks are computed per zoom level)
-    - Also when loading finishes and when peaks arrive
+    - Also when audio or peaks arrive and when `isReady` changes
 
-18. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states and master volume
+19. **PlaylistMixerContext** (`usePlaylistMixer()`) - Track states (the arrangement's mix, one per track) and master volume
     - Changes on every mute, solo, volume or pan change (each step of a slider drag)
-    - Also when tracks are added, removed or reordered
+    - Also when tracks are added, removed, renamed or reordered
 
-19. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
+20. **TrackReorderPreviewContext** (`useTrackReorderPreview()`) - The live track-reorder drag
     - Changes on every drag-over of a track reorder
 
-20. **TrimPreviewContext** (internal, not exported) - The clip trim drag in progress: a source the drag handlers write on every pointer move; only the dragged clip's view and the root (for the width) subscribe. The value never changes
+21. **TrimPreviewContext** (internal, not exported) - The clip trim drag in progress: a source the drag handlers write on every pointer move; only the dragged clip's view and the root (for the width) subscribe. The value never changes
 
-21. **TrimPreviewPeaksContext** (internal, not exported) - The stable function that draws the previewed clip from the provider's latest tracks; the value never changes
+22. **TrimPreviewPeaksContext** (internal, not exported) - The stable function that draws the previewed clip from the provider's latest tracks; the value never changes
+
+23. **RecordingArmContext** (internal, not exported) - The track a take is recorded onto; the controls part gives that track's panel `isRecordingArmed`
 
 Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistProvider` (2):
 
-22. **PlaybackRateContext** (`usePlaybackRate()`) - The playback speed and its setter
+24. **PlaybackRateContext** (`usePlaybackRate()`) - The playback speed and its setter
 
-23. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks, fades and the player ref of the one track
+25. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks, fades and the player ref of the one track
 
 **Key Files:**
 
@@ -1058,20 +1071,18 @@ export interface PlaylistZoomContextValue {
   canZoomOut: boolean;
 }
 
-// 4c. Timeline - changes on every clip operation (a trim once, on release) and a zoom
+// 4c. Timeline - changes on every clip operation (a trim once, on release), a zoom and audio arriving
 export interface PlaylistTimelineContextValue {
-  tracks: ClipTrack[];
-  peaksDataArray: TrackClipPeaks[];
-  duration: number;
+  tracks: readonly ClipTrack[]; // the arrangement's tracks without their loading clips
+  peaksDataArray: TrackClipPeaks[]; // one row per track; placeholder records for loading clips
+  duration: number; // loaded audio
   isReady: boolean;
-  onTracksChange: ((tracks: ClipTrack[]) => void) | undefined;
 }
 
 // 4d. Mixer - changes on every mute, solo, volume or pan change, and when tracks are added, removed or reordered
 export interface PlaylistMixerContextValue {
-  // One entry per track, in the order of `tracks`; undefined at the position
-  // of a track that is still loading. Derived from the provider's mixer state,
-  // which is a map by track id (utils/trackMixerState.ts).
+  // One entry per track, in the order of `tracks`, also while a track loads.
+  // Derived from the arrangement's mixer (a map by track id).
   trackStates: TrackState[];
   masterVolume: number;
 }
@@ -1138,12 +1149,12 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 **Hooks (in `packages/browser/src/hooks/`):**
 
 - `useAnimationFrameLoop` - Shared rAF lifecycle for both playlist providers
-- `useAudioTracks` - Declarative track loading (configs-driven)
-- `useClipDragHandlers` - Clip drag-to-move and boundary trimming (delegates to engine on release: one call and one undo step each; a trim is previewed in the view while dragged)
-- `useClipSplitting` - Split clips at playhead; `splitClipAt(trackId, clipId, splitTime)` takes ids (delegates to engine)
+- `useCreateArrangement` - Makes the Arrangement (tracks, mix, undo history, audio loading) once per component instance
+- `useArrangementTracks` / `useArrangementSources` - An arrangement's tracks (loading clips included) / where each audio source is
+- `useClipDragHandlers` - Clip drag-to-move and boundary trimming on the provider's arrangement (one call and one undo step each, on release; a trim is previewed in the view while dragged)
+- `useClipSplitting` - Split clips at playhead; `splitClipAt(trackId, clipId, splitTime)` takes ids (arrangement.splitClip)
 - `useAnnotationDragHandlers` - Annotation edge drag logic (called by `WaveformAnnotationBoxes`; exported for a custom row of boxes)
 - `useAnnotationKeyboardControls` - Annotation navigation & editing
-- `useDynamicTracks` - Runtime track additions with placeholder-then-replace pattern
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind)
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
@@ -1154,7 +1165,6 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useLoopState` - Loop enabled/start/end (engine delegation + onEngineState)
 - `useSelectedTrack` - Selected track ID (engine delegation + onEngineState)
 - `useMasterVolume` - Master volume (engine delegation + onEngineState)
-- `useUndoState` - Undo/redo canUndo/canRedo (engine delegation + onEngineState)
 - `useZoomControls` - Zoom samplesPerPixel/canZoomIn/Out (engine delegation + onEngineState)
 - `useTimeFormat` - Time formatting and format selection
 - `useOutputMeter` - Master bus output VU metering via AudioWorklet (returns a `MeterSource`, not state)
@@ -1291,7 +1301,7 @@ createAdapter / createPlayout prop supplied?
               ├─ Success → engine constructed, provider proceeds
               └─ Failure → install-hint error rethrown (peer not installed)
     ↓
-Tone-coupled hooks/effects/export (useAudioTracks, useDynamicEffects, useExportWav, …)
+Tone-coupled hooks/effects/export (useDynamicEffects, useExportWav, …)
     are only reachable via the `@waveform-playlist/browser/tone` subpath —
     the core entry's static import graph stays engine-free under every bundler
 ```
@@ -1301,17 +1311,15 @@ Tone-coupled hooks/effects/export (useAudioTracks, useDynamicEffects, useExportW
 ```
 User drags clip
     ↓
-useClipDragHandlers → engine.moveClip(trackId, clipId, deltaSamples)   (a trim: a view-only preview while dragged, then engine.trimClip(trackId, clipId, boundary, delta) on release)
+useClipDragHandlers → arrangement.moveClip(trackId, clipId, deltaSamples)   (a trim: a view-only preview while dragged, then arrangement.trimClip(trackId, clipId, boundary, delta) on release)
     ↓
-PlaylistEngine:
-    ├─ Constrains delta (collision detection)
-    ├─ Updates internal _tracks
-    ├─ adapter.setTracks() (syncs TonePlayout)
-    ├─ _tracksVersion++
-    └─ Emits 'statechange' with new EngineState
+Arrangement:
+    ├─ Constrains delta (collision detection among loaded clips)
+    ├─ New tracks array (undo step), tracksVersion++
+    └─ Tells the engine, if one is attached: adapter.updateTrack() (syncs TonePlayout), 'statechange'
     ↓
-Provider statechange handler:
-    └─ onTracksChange(state.tracks) → parent updates tracks prop
+Provider (subscribed to the arrangement):
+    └─ useArrangementView derives the new tracks and rows; with no engine attached the change is kept for the next one
 ```
 
 ### Effects & Plugin Audio Path (dawcore)
@@ -1521,9 +1529,9 @@ import {
 // Custom track controls: rendered once per track by WaveformTrackControls,
 // and useTrack() is the track this copy is drawn for
 const CustomTrackControls = () => {
-  const { muted, isLoading, setMuted } = useTrack();
+  const { muted, isRecordingArmed, setMuted } = useTrack();
   return (
-    <button disabled={isLoading} onClick={() => setMuted(!muted)}>
+    <button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
       {muted ? 'Unmute' : 'Mute'}
     </button>
   );
@@ -1532,7 +1540,7 @@ const CustomTrackControls = () => {
 // Your custom layout
 function MyPlaylist() {
   return (
-    <WaveformPlaylistProvider tracks={tracks} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <div className="my-layout">
         <div className="controls">
           <PlayButton />

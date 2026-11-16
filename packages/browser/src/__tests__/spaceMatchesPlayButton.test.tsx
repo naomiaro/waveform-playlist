@@ -7,7 +7,7 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
@@ -137,15 +137,11 @@ async function mount() {
   const createAdapter = () => logging.adapter;
   const tracks = [makeTrack('track', 10)];
   render(
-    <WaveformPlaylistProvider
-      tracks={tracks}
-      sampleRate={SAMPLE_RATE}
-      createAdapter={createAdapter}
-    >
+    <TestProvider tracks={tracks} sampleRate={SAMPLE_RATE} createAdapter={createAdapter}>
       <ProbeChild />
       <KeyboardShortcuts playback />
       <PlayButton />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   await waitFor(() => expect(probe.isReady).toBe(true));
   return logging;

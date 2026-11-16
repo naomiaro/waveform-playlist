@@ -23,8 +23,13 @@ setup), which means the warning can appear at page load.
 
 What matters is what happens on the first **Play** click:
 
-- Decoding and waveform rendering happen up front (`useAudioTracks`) — that
-  never needs a gesture.
+- Fetching and decoding the audio starts once the provider's first audio
+  adapter exists (after its dynamic import of the engine), not at the first
+  render (the arrangement from `useCreateArrangement` loads the files its
+  `audioTrack({ src })` tracks name, decoding with that adapter's context;
+  each row is empty until its audio has loaded, since a placeholder is
+  drawn only for a clip with a `duration` or peaks) —
+  that never needs a gesture.
 - The first `play()` call *resumes* the suspended context (`Tone.start()`
   internally) — inside the click handler, i.e. a real user gesture. From that
   point audio runs normally.
@@ -47,7 +52,7 @@ This example resolves the workspace packages from **source** via Vite aliases
 (see `vite.config.ts`) so it always runs against the current checkout. In your
 own app:
 
-- `npm install @waveform-playlist/browser @waveform-playlist/playout tone react react-dom styled-components @dnd-kit/abstract @dnd-kit/dom @dnd-kit/react`
+- `npm install @waveform-playlist/browser @waveform-playlist/core @waveform-playlist/ui-components @waveform-playlist/playout tone react react-dom styled-components @dnd-kit/abstract @dnd-kit/dom @dnd-kit/react`
   and delete the `resolve.alias` / `resolve.dedupe` blocks — package resolution
   is normal outside the monorepo. (`@dnd-kit/*` are required peers of
   `@waveform-playlist/browser` even if you never enable clip dragging — they

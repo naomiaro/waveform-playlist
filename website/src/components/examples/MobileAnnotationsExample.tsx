@@ -10,10 +10,9 @@
  * Usage tip: Touch and hold an annotation boundary to resize.
  * Tap an annotation to select it and play from that point.
  */
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
-import * as Tone from 'tone';
-import { createTrack, createClipFromSeconds, type ClipTrack } from '@waveform-playlist/core';
+import { audioTrack } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   PlayButton,
@@ -34,6 +33,9 @@ import {
   WaveformPlayhead,
   AnnotationList,
   WaveformViewOptions,
+  useCreateArrangement,
+  useArrangement,
+  useArrangementSources,
 } from '@waveform-playlist/browser';
 import {
   AnnotationProvider,
@@ -42,6 +44,10 @@ import {
   LinkEndpointsCheckbox,
 } from '@waveform-playlist/annotations';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
+import { SourceLoadError } from './SourceLoadError';
+import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
+
+const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
 
 // Full annotation data - Shakespeare's Sonnet 1
 const mobileAnnotations = [
@@ -157,7 +163,7 @@ const mobileAnnotationActions = [
   {
     text: '−',
     title: 'Shrink',
-    action: (annotation: any, i: number, annotations: any[], opts: any) => {
+    action: (annotation: any) => {
       annotation.end -= 0.1; // Larger increment for touch
       if (annotation.begin !== undefined) {
         annotation.begin = annotation.end.toString();
@@ -167,7 +173,7 @@ const mobileAnnotationActions = [
   {
     text: '+',
     title: 'Extend',
-    action: (annotation: any, i: number, annotations: any[], opts: any) => {
+    action: (annotation: any) => {
       annotation.end += 0.1; // Larger increment for touch
       if (annotation.begin !== undefined) {
         annotation.begin = annotation.end.toString();
@@ -282,6 +288,8 @@ const ActiveAnnotationInfo: React.FC = () => {
 };
 
 const MobileAnnotationsContent: React.FC = () => {
+  const arrangement = useArrangement();
+  const { isLoading } = useArrangementSources(arrangement);
   return (
     // touchOptimized: a touch must be held for 250 ms before it drags an
     // annotation edge, so a swipe still scrolls the waveform. The annotation
@@ -324,18 +332,23 @@ const MobileAnnotationsContent: React.FC = () => {
             <ContinuousPlayCheckbox />
             <LinkEndpointsCheckbox />
           </ControlGroup>
+
+          <SourceLoadError arrangement={arrangement} />
         </Controls>
 
-        <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
-          <WaveformRoot>
-            <WaveformTimescale />
-            <WaveformLoopRegion />
-            <WaveformTracks />
-            <WaveformAnnotationBoxes />
-            <WaveformSelection />
-            <WaveformPlayhead />
-          </WaveformRoot>
-        </WaveformViewOptions>
+        <LoadingBadgeFrame>
+          <WaveformViewOptions waveHeight={100} barWidth={4} barGap={0}>
+            <WaveformRoot>
+              <WaveformTimescale />
+              <WaveformLoopRegion />
+              <WaveformTracks />
+              <WaveformAnnotationBoxes />
+              <WaveformSelection />
+              <WaveformPlayhead />
+            </WaveformRoot>
+          </WaveformViewOptions>
+          <LoadingBadge active={isLoading}>Loading audio with annotations...</LoadingBadge>
+        </LoadingBadgeFrame>
         <AnnotationList actions={mobileAnnotationActions} height={200} />
 
         <ActiveAnnotationInfo />
@@ -346,70 +359,15 @@ const MobileAnnotationsContent: React.FC = () => {
 
 export function MobileAnnotationsExample() {
   const { theme } = useDocusaurusTheme();
-  const [tracks, setTracks] = useState<ClipTrack[]>([]);
+  // The arrangement owns the track and loads the sonnet: its row is empty until
+  // the audio has loaded (a placeholder is drawn only for a clip with a
+  // `duration` or peaks)
+  const arrangement = useCreateArrangement(() => [audioTrack({ src: SONNET_SRC, name: 'Sonnet' })]);
   const [annotations, setAnnotations] = useState<any[]>(() => mobileAnnotations.map(parseAeneas));
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadTrack = async () => {
-      try {
-        const audioContext = Tone.getContext().rawContext as AudioContext;
-        const response = await fetch('/waveform-playlist/media/audio/sonnet.mp3');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch audio: ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-
-        const clip = createClipFromSeconds({
-          audioBuffer,
-          startTime: 0,
-          duration: audioBuffer.duration,
-          offset: 0,
-          name: 'Sonnet',
-        });
-
-        const track = createTrack({
-          name: 'Sonnet',
-          clips: [clip],
-          muted: false,
-          soloed: false,
-          volume: 1,
-          pan: 0,
-        });
-
-        setTracks([track]);
-        setIsLoading(false);
-      } catch (err) {
-        console.error('Error loading track:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setIsLoading(false);
-      }
-    };
-
-    loadTrack();
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center' }}>
-        Loading audio with annotations...
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '2rem', color: 'red' }}>
-        Error loading audio: {error}
-      </div>
-    );
-  }
 
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       sampleRate={48000}
       samplesPerPixel={1024}
       mono

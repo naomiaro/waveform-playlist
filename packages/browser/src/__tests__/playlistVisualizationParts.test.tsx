@@ -53,7 +53,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaylistTimeline,
   usePlaylistZoom,
@@ -198,7 +198,7 @@ async function mount(
   const view = <ComposedWaveform {...props} />;
   render(
     <AnnotationIntegrationContext value={INTEGRATION}>
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
@@ -206,7 +206,7 @@ async function mount(
       >
         <ProbeChild />
         {dragProvider ? <ClipInteractionProvider>{view}</ClipInteractionProvider> : view}
-      </WaveformPlaylistProvider>
+      </TestProvider>
     </AnnotationIntegrationContext>
   );
   // Before the engine is built.

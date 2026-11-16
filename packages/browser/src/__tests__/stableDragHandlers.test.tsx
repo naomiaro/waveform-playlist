@@ -8,7 +8,6 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, render, cleanup, act } from '@testing-library/react';
 import { createValueSource } from '@waveform-playlist/core';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
-import type { PlaylistEngine } from '@waveform-playlist/engine';
 
 const SAMPLE_RATE = 48000;
 
@@ -26,8 +25,9 @@ vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
   usePlaylistView: () => playlistData,
   usePlaylistZoom: () => playlistData,
   usePlaylistTimeline: () => playlistData,
-  useEngineRefs: () => playlistData,
   useEditorControls: () => playlistControls,
+  // The arrangement the handlers edit (#812): a fake that hands out `tracks`.
+  useArrangement: () => arrangement,
 }));
 
 // Capture what ClipInteractionProvider hands to dnd-kit.
@@ -81,14 +81,18 @@ function makeTracks(): ClipTrack[] {
   ];
 }
 
-function fakeEngine() {
-  return {
-    // The engine allows every delta: the track's own constraints decide.
+function fakeArrangement(initial: ClipTrack[] = makeTracks()) {
+  const fake = {
+    tracks: initial,
+    getTracks: () => fake.tracks,
+    // Allows every delta: the track's own constraints decide.
     constrainTrimDelta: vi.fn((_t: string, _c: string, _b: string, delta: number) => delta),
     trimClip: vi.fn(),
     moveClip: vi.fn(),
   };
+  return fake;
 }
+let arrangement = fakeArrangement();
 
 /** A dnd-kit event for the left boundary of clip `b`, dragged by `dx` pixels. */
 function trimEvent(
@@ -112,26 +116,22 @@ describe('useClipDragHandlers', () => {
   // A trim's moves go to the provider's trim preview (#812); the hook reads
   // it from its context.
   function setup(initialTracks = makeTracks()) {
-    const engine = fakeEngine();
-    const engineRef = { current: engine as unknown as PlaylistEngine };
+    const engine = fakeArrangement(initialTracks);
+    arrangement = engine;
     const preview = createValueSource<TrimPreview | null>(null);
     const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
       <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
     );
-    let tracks = initialTracks;
-    const hook = renderHook(
-      () => useClipDragHandlers({ tracks, samplesPerPixel: 1000, engineRef }),
-      { wrapper }
-    );
+    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), { wrapper });
     return {
       hook,
       engine,
       preview: () => preview.source.getSnapshot(),
       setTracks: (next: ClipTrack[]) => {
-        tracks = next;
+        engine.tracks = next;
         hook.rerender();
       },
-      tracks: () => tracks,
+      tracks: () => engine.tracks,
     };
   }
 
@@ -195,7 +195,7 @@ describe('useClipDragHandlers', () => {
     expect(b.startSample + b.durationSamples).toBe(2.5 * SAMPLE_RATE);
   });
 
-  // With a real engine `constrainTrimDelta` sorts the track on each move; this
+  // With a real arrangement `constrainTrimDelta` sorts the track on each move; this
   // is about the handler's own neighbour order (`trimOrderRef`), which
   // `calculateBoundaryTrim` reads on every move.
   it("the handler's own neighbour order is sorted once per drag, not on every move", () => {
@@ -237,8 +237,6 @@ describe('ClipInteractionProvider', () => {
     const base = {
       samplesPerPixel: 1000,
       sampleRate: SAMPLE_RATE,
-      playoutRef: { current: null },
-      onTracksChange: () => {},
     };
     playlistData = { ...base, tracks: makeTracks() };
     // A new element each time: the mocked context hook is not reactive, and
@@ -281,8 +279,6 @@ describe('ClipInteractionProvider: the track-reorder preview', () => {
     playlistData = {
       samplesPerPixel: 1000,
       sampleRate: SAMPLE_RATE,
-      playoutRef: { current: null },
-      onTracksChange: () => {},
       tracks: makeTracks(),
     };
     playlistControls.setTrackDragPreview.mockImplementation(setTrackDragPreview);

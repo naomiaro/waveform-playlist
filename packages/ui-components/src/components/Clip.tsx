@@ -33,6 +33,43 @@ const CLIP_MOVE_PLUGINS = [Feedback.configure({ dropAnimation: null })];
 // visual feedback comes from React state resizing the clip, not CSS translate.
 const TRIM_HANDLE_PLUGINS = [Feedback.configure({ feedback: 'none' })];
 
+interface ClipDraggableIds {
+  move: string;
+  left: string;
+  right: string;
+}
+
+/**
+ * The ids of a clip's three draggables. With a `trackId` they are built from
+ * the track id and the clip id (each URI-encoded, so `/` cannot join two ids
+ * into the same string), and stay with the clip when its position in the row
+ * or the track's row changes: a clip arriving earlier in the row mid-drag
+ * would otherwise hand the dragged clip's id to another clip, whose data the
+ * drop then reads (#812). Without a `trackId` (a `Clip` drawn on its own) they
+ * are built from the row positions, as before.
+ */
+function clipDraggableIds(
+  trackId: string | undefined,
+  clipId: string,
+  trackIndex: number,
+  clipIndex: number
+): ClipDraggableIds {
+  if (trackId === undefined) {
+    const at = `${trackIndex}-${clipIndex}`;
+    return {
+      move: `clip-${at}`,
+      left: `clip-boundary-left-${at}`,
+      right: `clip-boundary-right-${at}`,
+    };
+  }
+  const key = `${encodeURIComponent(trackId)}/${encodeURIComponent(clipId)}`;
+  return {
+    move: `clip/${key}`,
+    left: `clip-boundary-left/${key}`,
+    right: `clip-boundary-right/${key}`,
+  };
+}
+
 interface ClipContainerProps {
   readonly $left?: number; // Horizontal position in pixels (optional for overlay)
   readonly $width?: number; // Width in pixels (optional for overlay)
@@ -91,7 +128,12 @@ export interface ClipProps {
   // Track selection
   isSelected?: boolean; // Whether the track is selected
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
-  trackId?: string; // Track ID for identifying which track this clip belongs to
+  /** The id of the clip's track. With it the clip's draggable ids are built
+   *  from the track id and `clipId` (`clip/<trackId>/<clipId>`,
+   *  `clip-boundary-left/…`, `clip-boundary-right/…`, each id URI-encoded)
+   *  and stay with the clip when its row position changes; without it they
+   *  are built from `trackIndex` and `clipIndex`. */
+  trackId?: string;
   // Fade configuration
   fadeIn?: Fade; // Fade in effect
   fadeOut?: Fade; // Fade out effect
@@ -150,32 +192,31 @@ export const Clip: FunctionComponent<ClipProps> = ({
   const headerDragDisabled = disableHeaderDrag || isPlaceholder;
   const enableDrag = showHeader && !headerDragDisabled && !isOverlay;
 
+  const ids = clipDraggableIds(trackId, clipId, trackIndex, clipIndex);
+
   // Main clip draggable (for moving entire clip)
-  const draggableId = `clip-${trackIndex}-${clipIndex}`;
   const {
     ref: clipRef,
     handleRef,
     isDragSource,
   } = useDraggable({
-    id: draggableId,
+    id: ids.move,
     data: { clipId, trackIndex, clipIndex, startSample, durationSamples },
     disabled: !enableDrag,
     plugins: CLIP_MOVE_PLUGINS,
   });
 
   // Left boundary draggable (for trimming start)
-  const leftBoundaryId = `clip-boundary-left-${trackIndex}-${clipIndex}`;
   const { ref: leftBoundaryRef, isDragSource: isLeftBoundaryDragging } = useDraggable({
-    id: leftBoundaryId,
+    id: ids.left,
     data: { clipId, trackIndex, clipIndex, boundary: 'left', startSample, durationSamples },
     disabled: !enableDrag,
     plugins: TRIM_HANDLE_PLUGINS,
   });
 
   // Right boundary draggable (for trimming end)
-  const rightBoundaryId = `clip-boundary-right-${trackIndex}-${clipIndex}`;
   const { ref: rightBoundaryRef, isDragSource: isRightBoundaryDragging } = useDraggable({
-    id: rightBoundaryId,
+    id: ids.right,
     data: { clipId, trackIndex, clipIndex, boundary: 'right', startSample, durationSamples },
     disabled: !enableDrag,
     plugins: TRIM_HANDLE_PLUGINS,

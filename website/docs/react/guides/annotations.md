@@ -21,14 +21,13 @@ Pass the annotations to the provider's `annotationList` prop and render `Annotat
 
 ```tsx
 import { useState } from 'react';
-import { WaveformPlaylistProvider, Waveform } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
+import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { audioTrack, type AnnotationData } from '@waveform-playlist/core';
 
 function AnnotatedPlaylist() {
-  const { tracks, loading } = useAudioTracks([
-    { src: '/audio/podcast.mp3', name: 'Podcast' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/podcast.mp3', name: 'Podcast' }),
   ]);
 
   const [annotations, setAnnotations] = useState<AnnotationData[]>([
@@ -37,11 +36,9 @@ function AnnotatedPlaylist() {
     { id: '3', start: 15, end: 30, lines: ['Main Discussion'] },
   ]);
 
-  if (loading) return <div>Loading...</div>;
-
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       annotationList={{ annotations, editable: true }}
       onAnnotationsChange={setAnnotations}
     >
@@ -105,7 +102,7 @@ Every change to the annotations is reported here with the full new array: the re
 
 ```tsx
 <WaveformPlaylistProvider
-  tracks={tracks}
+  arrangement={arrangement}
   annotationList={{ annotations, editable: true }}
   onAnnotationsChange={setAnnotations}
 >
@@ -517,7 +514,7 @@ const theme = {
   annotationTextItemActiveColor: '#ff9800', // the active row (edge, tint, glow) and the list's focus rings
 };
 
-<WaveformPlaylistProvider tracks={tracks} theme={theme}>
+<WaveformPlaylistProvider arrangement={arrangement} theme={theme}>
   <AnnotationProvider>
     <Waveform />
   </AnnotationProvider>
@@ -617,8 +614,8 @@ import {
   PauseButton,
   StopButton,
   KeyboardShortcuts,
+  useCreateArrangement,
 } from '@waveform-playlist/browser';
-import { useAudioTracks } from '@waveform-playlist/browser/tone';
 import {
   AnnotationProvider,
   ContinuousPlayCheckbox,
@@ -626,7 +623,7 @@ import {
   EditableCheckbox,
   DownloadAnnotationsButton,
 } from '@waveform-playlist/annotations';
-import type { AnnotationData, AnnotationAction } from '@waveform-playlist/core';
+import { audioTrack, type AnnotationData, type AnnotationAction } from '@waveform-playlist/core';
 
 const annotationActions: AnnotationAction[] = [
   {
@@ -641,8 +638,8 @@ const annotationActions: AnnotationAction[] = [
 const boxLabel = (annotation: AnnotationData, index: number) => String(index + 1);
 
 function AnnotationsExample() {
-  const { tracks, loading, error } = useAudioTracks([
-    { src: '/audio/podcast.mp3', name: 'Podcast Episode' },
+  const arrangement = useCreateArrangement(() => [
+    audioTrack({ src: '/audio/podcast.mp3', name: 'Podcast Episode' }),
   ]);
 
   const [annotations, setAnnotations] = useState<AnnotationData[]>([
@@ -651,12 +648,9 @@ function AnnotationsExample() {
     { id: '3', start: 30, end: 45, lines: ['Conclusion'] },
   ]);
 
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
-
   return (
     <WaveformPlaylistProvider
-      tracks={tracks}
+      arrangement={arrangement}
       samplesPerPixel={1024}
       annotationList={{ annotations, editable: true, linkEndpoints: true }}
       onAnnotationsChange={setAnnotations}

@@ -112,6 +112,9 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
   await page.addInitScript(countCommits);
   await page.goto(`${baseURL}/examples/recording`);
   await expect(page.getByRole('button', { name: '+ New Track' })).toBeVisible({ timeout: 30000 });
+  // The page starts with no tracks: ready as soon as an engine is attached.
+  // Play does nothing before the first ready (#812).
+  await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
 }
 
 // The synthetic microphone is an oscillator on its own AudioContext, created
@@ -248,5 +251,208 @@ test.describe('Recording example', () => {
     // The take became a clip of the track it was started on.
     await expect(started.locator('[data-clip-container]')).toHaveCount(1);
     await expect(other.locator('[data-clip-container]')).toHaveCount(0);
+  });
+});
+
+/**
+ * Holds every decodeAudioData call until `window.__releaseDecodes()`, so a
+ * dropped file stays loading as long as a test needs. Counts the calls held.
+ */
+function holdDecodes() {
+  const win = window as unknown as { __decodesHeld: number; __releaseDecodes: () => void };
+  win.__decodesHeld = 0;
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  win.__releaseDecodes = () => release();
+  const original = BaseAudioContext.prototype.decodeAudioData;
+  BaseAudioContext.prototype.decodeAudioData = function (
+    this: BaseAudioContext,
+    ...args: Parameters<typeof original>
+  ) {
+    win.__decodesHeld++;
+    return gate.then(() => original.apply(this, args));
+  } as typeof original;
+}
+
+const SAMPLE_RATE = 48000;
+const SAMPLES_PER_PIXEL = 1024;
+const PX_PER_SECOND = SAMPLE_RATE / SAMPLES_PER_PIXEL;
+
+/** A mono 16-bit PCM WAV holding a 220 Hz sine. */
+function sineWav(seconds: number): Buffer {
+  const frames = Math.round(seconds * SAMPLE_RATE);
+  const buffer = Buffer.alloc(44 + frames * 2);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + frames * 2, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20); // PCM
+  buffer.writeUInt16LE(1, 22); // mono
+  buffer.writeUInt32LE(SAMPLE_RATE, 24);
+  buffer.writeUInt32LE(SAMPLE_RATE * 2, 28);
+  buffer.writeUInt16LE(2, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < frames; i++) {
+    const sample = Math.sin((2 * Math.PI * 220 * i) / SAMPLE_RATE) * 0.3;
+    buffer.writeInt16LE(Math.round(sample * 32767), 44 + i * 2);
+  }
+  return buffer;
+}
+
+async function dropFile(page: Page, name: string, seconds: number) {
+  await page.locator('input[type="file"]').setInputFiles({
+    name,
+    mimeType: 'audio/wav',
+    buffer: sineWav(seconds),
+  });
+}
+
+/** Clicks the row at `offsetPx` from its clip's left edge: selects the track, puts the cursor there. */
+async function clickRowAt(page: Page, rowIndex: number, offsetPx: number) {
+  const clip = page.locator('[data-track-row]').nth(rowIndex).locator('[data-clip-container]');
+  let box: { x: number; y: number; width: number; height: number } | null = null;
+  await expect(async () => {
+    box = await clip.first().boundingBox();
+    expect(box).toBeTruthy();
+  }).toPass({ timeout: 5000 });
+  await page.mouse.click(box!.x + offsetPx, box!.y + (box!.height * 3) / 4);
+}
+
+const recordingButton = (page: Page) =>
+  page.getByRole('button', { name: 'Recording', exact: true });
+
+async function stopTake(page: Page) {
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible({
+    timeout: 30000,
+  });
+}
+
+// #812: a take carves the clips it overlaps, which only a loaded clip allows,
+// and the armed track is muted through the arrangement while it records.
+test.describe('Recording example — the arrangement and a take', () => {
+  test('recording is refused over a clip that is still loading', async ({ page, baseURL }) => {
+    await page.addInitScript(holdDecodes);
+    await openRecordingPage(page, baseURL);
+    await dropFile(page, 'tone.wav', 6);
+    const rows = page.locator('[data-track-row]');
+    await expect(rows).toHaveCount(1);
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { __decodesHeld: number }).__decodesHeld)
+      )
+      .toBeGreaterThan(0);
+    // A dropped file's length is not known before it decodes: no clip is drawn yet.
+    await expect(rows.first().locator('[data-clip-container]')).toHaveCount(0);
+
+    // Select its track (a click on the row) and press Record.
+    let rowBox: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      rowBox = await rows.first().boundingBox();
+      expect(rowBox).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    await page.mouse.click(rowBox!.x + 60, rowBox!.y + rowBox!.height / 2);
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(
+      page.getByText(
+        'Error: Cannot start recording: "tone" holds a clip whose audio is still loading'
+      )
+    ).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(500);
+    await expect(recordingButton(page)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible();
+    await expect(rows.first().locator('[data-clip-container]')).toHaveCount(0);
+
+    // Once the audio has loaded, the same press records.
+    await page.evaluate(() =>
+      (window as unknown as { __releaseDecodes: () => void }).__releaseDecodes()
+    );
+    await expect(rows.first().locator('[data-clip-container]')).toHaveCount(1, { timeout: 10000 });
+    await expect(rows.first().locator('[data-clip-placeholder="true"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(recordingButton(page)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/Cannot start recording/)).toHaveCount(0);
+    await stopTake(page);
+  });
+
+  test('punch-in over a clip that loaded and was never edited carves it', async ({
+    page,
+    baseURL,
+  }) => {
+    const clipSeconds = 6;
+    await openRecordingPage(page, baseURL);
+    await dropFile(page, 'tone.wav', clipSeconds);
+    const row = page.locator('[data-track-row]').first();
+    const clips = row.locator('[data-clip-container]');
+    await expect(clips).toHaveCount(1, { timeout: 10000 });
+    await expect(row.locator('[data-clip-placeholder="true"]')).toHaveCount(0, { timeout: 10000 });
+    const original = await clips.first().boundingBox();
+    expect(original).toBeTruthy();
+
+    // The cursor one second into the clip, on its track; a take of about 1.5 s.
+    await clickRowAt(page, 0, PX_PER_SECOND);
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(recordingButton(page)).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(1500);
+    await stopTake(page);
+
+    // Before the take, the take, and after it: the clip was split around it.
+    await expect(clips).toHaveCount(3, { timeout: 10000 });
+    const boxes = (
+      await clips.evaluateAll((els) =>
+        els.map((el) => {
+          const box = el.getBoundingClientRect();
+          return { left: box.left, right: box.right };
+        })
+      )
+    ).sort((a, b) => a.left - b.left);
+    expect(Math.abs(boxes[0].left - original!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(boxes[0].right - (original!.x + PX_PER_SECOND))).toBeLessThanOrEqual(3);
+    expect(Math.abs(boxes[1].left - boxes[0].right)).toBeLessThanOrEqual(1);
+    expect(Math.abs(boxes[2].left - boxes[1].right)).toBeLessThanOrEqual(1);
+    expect(Math.abs(boxes[2].right - (original!.x + original!.width))).toBeLessThanOrEqual(1);
+    await expect(row.locator('[data-clip-placeholder="true"]')).toHaveCount(0);
+  });
+
+  test('the armed track’s mute button is disabled and shows muted during a take', async ({
+    page,
+    baseURL,
+  }) => {
+    await openRecordingPage(page, baseURL);
+    await page.getByRole('button', { name: '+ New Track' }).click();
+    await page.getByRole('button', { name: '+ New Track' }).click();
+    await expect(page.locator('[data-track-row]')).toHaveCount(2);
+    const mutes = page.getByRole('button', { name: 'Mute', exact: true });
+    await expect(mutes).toHaveCount(2);
+    const armed = mutes.nth(1); // the track added last is selected
+    const other = mutes.nth(0);
+    await expect(armed).toBeEnabled();
+    await expect(armed).toHaveAttribute('aria-pressed', 'false');
+
+    await page.getByRole('button', { name: 'Start recording' }).click();
+    await expect(recordingButton(page)).toBeVisible({ timeout: 15000 });
+    await expect(armed).toBeDisabled();
+    await expect(armed).toHaveAttribute('aria-pressed', 'true');
+    // The other track is not armed: its mute is as it was.
+    await expect(other).toBeEnabled();
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
+    // The control: the unarmed track's Mute still toggles during the take,
+    // and the armed one stays muted and disabled meanwhile.
+    await other.click();
+    await expect(other).toHaveAttribute('aria-pressed', 'true');
+    await other.click();
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
+    await expect(armed).toBeDisabled();
+    await expect(armed).toHaveAttribute('aria-pressed', 'true');
+
+    await stopTake(page);
+    // The value from before the take is written back.
+    await expect(armed).toBeEnabled();
+    await expect(armed).toHaveAttribute('aria-pressed', 'false');
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
   });
 });

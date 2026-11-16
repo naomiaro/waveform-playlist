@@ -12,7 +12,7 @@
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
-import React, { startTransition, useCallback, useState } from 'react';
+import React, { startTransition, useState } from 'react';
 import type { ClipTrack, SpectrogramCanvasRegistration } from '@waveform-playlist/core';
 
 const captured = vi.hoisted(() => ({
@@ -37,7 +37,7 @@ vi.mock('@dnd-kit/react', async (importOriginal) => {
 });
 vi.mock('../hooks/useDragSensors', () => ({ useDragSensors: () => [] }));
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import {
   SpectrogramIntegrationContext,
   type SpectrogramIntegration,
@@ -86,12 +86,10 @@ function spectrogramTracks(): ClipTrack[] {
 }
 
 const App: React.FC = () => {
-  const [tracks, setTracks] = useState(spectrogramTracks);
-  const onTracksChange = useCallback((next: ClipTrack[]) => setTracks(next), []);
+  const [tracks] = useState(spectrogramTracks);
   return (
-    <WaveformPlaylistProvider
+    <TestProvider
       tracks={tracks}
-      onTracksChange={onTracksChange}
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SPP}
       zoomLevels={[SPP]}
@@ -102,7 +100,7 @@ const App: React.FC = () => {
           <ComposedWaveform showClipHeaders noControls />
         </ClipInteractionProvider>
       </SpectrogramIntegrationContext>
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
 };
 

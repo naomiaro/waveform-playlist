@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { useTheme } from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
 import { Clip } from '../components/Clip';
+import { ClipPlaceholderBody } from '../components/ClipPlaceholderBody';
 import { Channel } from '../components/Channel';
 import type { WaveformPlaylistTheme } from '../wfpl-theme';
 
@@ -208,6 +209,9 @@ export const PlaceholderWithPeaks: Story = {
   ),
 };
 
+// A placeholder with no peaks to draw (only its `duration` is known): its
+// body, a box over the clip's channel area in the bar colour, dimmed with the
+// rest of the clip. The browser package draws it this way.
 export const PlaceholderWithoutPeaks: Story = {
   args: {
     clipId: 'clip-1',
@@ -220,4 +224,18 @@ export const PlaceholderWithoutPeaks: Story = {
     showHeader: true,
     isPlaceholder: true,
   },
+  render: (args) => (
+    <Clip {...args}>
+      <ClipPlaceholderBody isSelected={args.isSelected} />
+    </Clip>
+  ),
+};
+
+// The same without a clip header: the body alone shows where the clip is.
+export const PlaceholderWithoutPeaksNoHeader: Story = {
+  args: {
+    ...PlaceholderWithoutPeaks.args,
+    showHeader: false,
+  },
+  render: PlaceholderWithoutPeaks.render,
 };

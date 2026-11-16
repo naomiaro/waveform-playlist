@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 import {
   WaveformPlaylistProvider,
+  useCreateArrangement,
   PlayButton,
   PauseButton,
   StopButton,
@@ -15,11 +16,14 @@ import {
 
 // A simple decorator that provides the WaveformPlaylistProvider context
 // with an empty track list for UI demonstration
-const WaveformProviderDecorator = (Story: React.FC) => {
-  // Empty tracks - controls will be in their default/disabled state
-  // This allows us to showcase the UI without loading audio files
+const WaveformProviderDecorator = (Story: React.FC) => <ProviderWithNoTracks Story={Story} />;
+
+// An arrangement with no tracks - controls will be in their default/disabled state
+// This allows us to showcase the UI without loading audio files
+const ProviderWithNoTracks: React.FC<{ Story: React.FC }> = ({ Story }) => {
+  const arrangement = useCreateArrangement();
   return (
-    <WaveformPlaylistProvider tracks={[]} samplesPerPixel={1024}>
+    <WaveformPlaylistProvider arrangement={arrangement} samplesPerPixel={1024}>
       <Story />
     </WaveformPlaylistProvider>
   );
@@ -41,7 +45,7 @@ These components automatically connect to the playlist state and handle:
 - Disabled states based on playback status
 
 **Note:** These stories show the UI without audio - controls will be in their default states.
-In a real app, use \`useAudioTracks\` to load audio files first.
+In a real app, name the audio files in the arrangement (\`audioTrack({ src })\` inside \`useCreateArrangement\`).
         `,
       },
     },

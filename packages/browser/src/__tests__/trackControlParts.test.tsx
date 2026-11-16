@@ -8,10 +8,11 @@
 // gone: a remove button or a reorder grip is drawn by being rendered.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { TestProvider } from './helpers/arrangementProvider';
 import { render, act, waitFor, cleanup, screen, fireEvent, within } from '@testing-library/react';
 import React from 'react';
 import WaveformData from 'waveform-data';
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { ArrangementTrack, ClipTrack, AudioClip, LoadingClip } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { resetPartWarnings } from '../components/partWarnings';
 import {
@@ -36,7 +37,6 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { DragDropManager } from '@dnd-kit/dom';
 import * as api from '../index';
 import {
-  WaveformPlaylistProvider,
   MediaElementPlaylistProvider,
   WaveformRoot,
   WaveformTrackControls,
@@ -148,7 +148,9 @@ const Spy: React.FC = () => {
 
 let probe: {
   isReady: boolean;
-  trackStateCount: number;
+  /** The order of the tracks, as the provider publishes it. */
+  trackIds: string[];
+  trackStates: ReturnType<typeof usePlaylistMixer>['trackStates'];
   selectedTrackId: string | null;
   controls: EditorControlsContextValue;
 };
@@ -162,12 +164,13 @@ const MountSpy: React.FC = () => {
   return null;
 };
 const Probe: React.FC = () => {
-  const { isReady } = usePlaylistTimeline();
+  const { isReady, tracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
   const { selectedTrackId } = useSelectedTrackId();
   probe = {
     isReady,
-    trackStateCount: trackStates.filter(Boolean).length,
+    trackIds: tracks.map((track) => track.id),
+    trackStates,
     selectedTrackId,
     controls: useEditorControls(),
   };
@@ -175,10 +178,8 @@ const Probe: React.FC = () => {
 };
 
 interface AppProps {
-  tracks: ClipTrack[];
+  tracks: ArrangementTrack[];
   controls: React.ReactElement;
-  loading?: boolean;
-  onTracksChange?: (tracks: ClipTrack[]) => void;
   spectrogram?: SpectrogramIntegration | null;
 }
 
@@ -186,21 +187,15 @@ function mount(props: AppProps) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   let current = props;
-  const App: React.FC<AppProps> = ({ tracks, controls, loading, onTracksChange, spectrogram }) => (
+  const App: React.FC<AppProps> = ({ tracks, controls, spectrogram }) => (
     <SpectrogramIntegrationContext value={spectrogram ?? null}>
-      <WaveformPlaylistProvider
-        tracks={tracks}
-        sampleRate={SAMPLE_RATE}
-        createAdapter={createAdapter}
-        deferEngineRebuild={loading}
-        onTracksChange={onTracksChange}
-      >
+      <TestProvider tracks={tracks} sampleRate={SAMPLE_RATE} createAdapter={createAdapter}>
         <Probe />
         <WaveformRoot>
           {controls}
           <WaveformTracks />
         </WaveformRoot>
-      </WaveformPlaylistProvider>
+      </TestProvider>
     </SpectrogramIntegrationContext>
   );
   const view = render(<App {...current} />);
@@ -236,6 +231,14 @@ afterEach(async () => {
   renders.clear();
   mounts.clear();
 });
+
+/** A clip whose audio never arrives in these tests (the arrangement's loader never settles). */
+const LOADING_CLIP = {
+  id: 'loading-clip',
+  src: '/never.opus',
+  start: 0,
+  duration: 1,
+} as LoadingClip;
 
 const A = makeTrack('a');
 const B = makeTrack('b');
@@ -347,7 +350,6 @@ describe('the template and useTrack()', () => {
       volume: 1,
       pan: 0,
       renderMode: 'waveform',
-      isLoading: false,
       isSelected: false,
       isFirst: false,
       isLast: false,
@@ -378,11 +380,11 @@ describe('the template and useTrack()', () => {
         'volume',
         'pan',
         'renderMode',
-        'isLoading',
         'isSelected',
         'isFirst',
         'isLast',
         'hasSpectrogram',
+        'isRecordingArmed',
         'setMuted',
         'setSoloed',
         'setVolume',
@@ -491,13 +493,8 @@ describe('the template and useTrack()', () => {
   });
 
   it('moveDown() and moveUp() reorder, and index, isFirst and isLast follow', async () => {
-    let tracks = [A, B, C];
-    const view = mount({
-      tracks,
-      onTracksChange: (next) => {
-        tracks = next;
-        view.update({ tracks });
-      },
+    mount({
+      tracks: [A, B, C],
       controls: (
         <WaveformTrackControls>
           <Spy />
@@ -506,23 +503,18 @@ describe('the template and useTrack()', () => {
     });
     await ready();
     await act(async () => seen.get('a')!.moveDown());
-    expect(tracks.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    expect(probe.trackIds).toEqual(['b', 'a', 'c']);
     expect(seen.get('a')).toMatchObject({ index: 1, isFirst: false, isLast: false });
     expect(seen.get('b')).toMatchObject({ index: 0, isFirst: true });
     await act(async () => seen.get('c')!.moveUp());
-    expect(tracks.map((t) => t.id)).toEqual(['b', 'c', 'a']);
+    expect(probe.trackIds).toEqual(['b', 'c', 'a']);
     expect(seen.get('a')).toMatchObject({ index: 2, isLast: true });
   });
 
   it('a track moved twice moves from where it is, not from where it was mounted', async () => {
     const D = makeTrack('d');
-    let tracks = [A, B, C, D];
-    const view = mount({
-      tracks,
-      onTracksChange: (next) => {
-        tracks = next;
-        view.update({ tracks });
-      },
+    mount({
+      tracks: [A, B, C, D],
       controls: (
         <WaveformTrackControls>
           <Spy />
@@ -531,14 +523,14 @@ describe('the template and useTrack()', () => {
     });
     await ready();
     await act(async () => seen.get('b')!.moveDown());
-    expect(tracks.map((t) => t.id)).toEqual(['a', 'c', 'b', 'd']);
+    expect(probe.trackIds).toEqual(['a', 'c', 'b', 'd']);
     // From the middle to the middle: neither isFirst nor isLast changed.
     expect(seen.get('b')).toMatchObject({ index: 2, isFirst: false, isLast: false });
     await act(async () => seen.get('b')!.moveDown());
-    expect(tracks.map((t) => t.id)).toEqual(['a', 'c', 'd', 'b']);
+    expect(probe.trackIds).toEqual(['a', 'c', 'd', 'b']);
     await act(async () => seen.get('b')!.moveUp());
     await act(async () => seen.get('b')!.moveUp());
-    expect(tracks.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(probe.trackIds).toEqual(['a', 'b', 'c', 'd']);
   });
 
   it('a change of one track renders the slot of that track only', async () => {
@@ -578,9 +570,9 @@ describe('the template and useTrack()', () => {
     expect(() => render(<Spy />)).toThrow(/useTrack.*<WaveformTrackControls>/);
     expect(() =>
       render(
-        <WaveformPlaylistProvider tracks={[A]} createAdapter={createFakeAdapter}>
+        <TestProvider tracks={[A]} createAdapter={createFakeAdapter}>
           <TrackMuteButton />
-        </WaveformPlaylistProvider>
+        </TestProvider>
       )
     ).toThrow(/useTrack.*<WaveformTrackControls>/);
   });
@@ -588,7 +580,7 @@ describe('the template and useTrack()', () => {
 
 describe('the template is compared with the previous one', () => {
   const Parent: React.FC<{ tick: number; onRemove?: (id: string) => void }> = ({ onRemove }) => (
-    <WaveformPlaylistProvider tracks={PARENT_TRACKS} createAdapter={PARENT_ADAPTER}>
+    <TestProvider tracks={PARENT_TRACKS} createAdapter={PARENT_ADAPTER}>
       <Probe />
       <WaveformRoot>
         <WaveformTrackControls>
@@ -600,7 +592,7 @@ describe('the template is compared with the previous one', () => {
         </WaveformTrackControls>
         <WaveformTracks />
       </WaveformRoot>
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
   const PARENT_TRACKS = [A, B];
   const parentAdapter = createFakeAdapter();
@@ -678,24 +670,30 @@ describe('the pieces', () => {
     expect((a.getByRole('slider', { name: 'Volume' }) as HTMLInputElement).value).toBe('1');
   });
 
-  it('are disabled while their track is loading, and the name falls back to the position', async () => {
-    const view = mount({
-      tracks: [makeTrack('a', { name: '' })],
-      loading: true,
+  // A6 (#812): every track has its mix in the arrangement from the start, so
+  // a change made while its audio loads is kept and nothing is disabled.
+  it('work while their track loads, and a change made then is kept; the name falls back to the position', async () => {
+    mount({
+      tracks: [{ ...makeTrack('a', { name: '' }), clips: [LOADING_CLIP] } as ArrangementTrack],
       controls: PIECES,
     });
     const mute = await screen.findByRole('button', { name: 'Mute' });
-    expect(probe.trackStateCount).toBe(0);
-    expect(seen.get('a')).toMatchObject({ isLoading: true, name: 'Track 1' });
-    expect(mute).toHaveProperty('disabled', true);
-    expect(screen.getByRole('button', { name: 'Solo' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('slider', { name: 'Volume' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('slider', { name: 'Pan' })).toHaveProperty('disabled', true);
-    await act(async () => view.update({ loading: false }));
-    await waitFor(() => expect(probe.trackStateCount).toBe(1));
-    expect(seen.get('a')!.isLoading).toBe(false);
-    expect(screen.getByRole('button', { name: 'Mute' })).toHaveProperty('disabled', false);
-    expect(screen.getByRole('slider', { name: 'Pan' })).toHaveProperty('disabled', false);
+    expect(probe.trackStates).toHaveLength(1);
+    expect(seen.get('a')).toMatchObject({ name: 'Track 1' });
+    expect('isLoading' in seen.get('a')!).toBe(false);
+    for (const control of [
+      mute,
+      screen.getByRole('button', { name: 'Solo' }),
+      screen.getByRole('slider', { name: 'Volume' }),
+      screen.getByRole('slider', { name: 'Pan' }),
+    ]) {
+      expect(control).toHaveProperty('disabled', false);
+    }
+    await act(async () => {
+      fireEvent.click(mute);
+    });
+    expect(probe.trackStates[0].muted).toBe(true);
+    expect(seen.get('a')).toMatchObject({ muted: true });
   });
 
   it('two of the same piece stay in sync', async () => {
@@ -778,24 +776,19 @@ describe('<TrackReorderGrip />', () => {
   });
 
   it('the move buttons reorder and do not select', async () => {
-    let tracks = [A, B, C];
-    const view = mount({
-      tracks,
-      onTracksChange: (next) => {
-        tracks = next;
-        view.update({ tracks });
-      },
+    mount({
+      tracks: [A, B, C],
       controls: WITH_GRIP,
     });
     await ready();
     await act(async () => {
       fireEvent.click(within(slotOf('a')).getByRole('button', { name: 'Move track down' }));
     });
-    expect(tracks.map((t) => t.id)).toEqual(['b', 'a', 'c']);
+    expect(probe.trackIds).toEqual(['b', 'a', 'c']);
     await act(async () => {
       fireEvent.click(within(slotOf('c')).getByRole('button', { name: 'Move track up' }));
     });
-    expect(tracks.map((t) => t.id)).toEqual(['b', 'c', 'a']);
+    expect(probe.trackIds).toEqual(['b', 'c', 'a']);
     fireEvent.click(within(slotOf('a')).getByRole('button', { name: 'Drag to reorder track' }));
     expect(probe.selectedTrackId).toBeNull();
   });
@@ -805,13 +798,13 @@ describe('<TrackReorderGrip />', () => {
     const adapter = createFakeAdapter();
     render(
       <DragDropProvider manager={manager}>
-        <WaveformPlaylistProvider tracks={[A, B]} createAdapter={() => adapter}>
+        <TestProvider tracks={[A, B]} createAdapter={() => adapter}>
           <Probe />
           <WaveformRoot>
             {WITH_GRIP}
             <WaveformTracks />
           </WaveformRoot>
-        </WaveformPlaylistProvider>
+        </TestProvider>
       </DragDropProvider>
     );
     await ready();
@@ -846,18 +839,18 @@ describe('<TrackReorderGrip />', () => {
     expect(about()).toHaveLength(1);
   });
 
-  it('the move buttons are disabled while the track is loading', async () => {
-    mount({ tracks: [A, B], loading: true, controls: WITH_GRIP });
+  it('the move buttons work while the track loads (A6)', async () => {
+    mount({
+      tracks: [A, { ...B, clips: [LOADING_CLIP] } as ArrangementTrack],
+      controls: WITH_GRIP,
+    });
     await screen.findAllByRole('button', { name: 'Mute' });
-    expect(within(slotOf('a')).getByRole('button', { name: 'Move track down' })).toHaveProperty(
-      'disabled',
-      true
-    );
-    // Not the first track: only the loading disables this one.
-    expect(within(slotOf('b')).getByRole('button', { name: 'Move track up' })).toHaveProperty(
-      'disabled',
-      true
-    );
+    const up = within(slotOf('b')).getByRole('button', { name: 'Move track up' });
+    expect(up).toHaveProperty('disabled', false);
+    await act(async () => {
+      fireEvent.click(up);
+    });
+    expect(probe.trackIds).toEqual(['b', 'a']);
   });
 });
 

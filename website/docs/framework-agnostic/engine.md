@@ -374,6 +374,8 @@ arrangement.canRedo;
 
 A subscriber is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
 
+Make track changes from an event handler (or a listener of `arrangement.sources`), not from inside a `subscribe()` or `statechange` listener: two or more track edits made inside one listener run make an engine send its adapter every track at once (`setTracks`), which can interrupt playback (see [Events](#events)). The same rule holds under the React provider: see [Loading Audio](/docs/react/guides/loading-audio#adding-tracks-at-runtime).
+
 ### Changing
 
 The arrangement has the engine's track, clip, mixer and history methods: `setTracks`, `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`, `moveClip`, `trimClip`, `splitClip`, `getClipBounds`, `constrainTrimDelta`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`, `undo`, `redo`, `clearHistory`, `beginTransaction`, `commitTransaction` and `abortTransaction`. The engine's methods call them, so a change made through either reaches the adapter and emits `statechange`.
@@ -1122,5 +1124,5 @@ interface EngineEvents {
 ## See Also
 
 - [Hooks Reference](/docs/react/api/hooks) — React hooks that wrap the engine
-- [Loading Audio](/docs/react/guides/loading-audio) — Creating tracks with `useAudioTracks`
+- [Loading Audio](/docs/react/guides/loading-audio) — `WaveformPlaylistProvider` on an arrangement: `useCreateArrangement`, `audioTrack()`, loading state and ready
 - [Track Management](/docs/react/guides/track-management) — Adding and removing tracks

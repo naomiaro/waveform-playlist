@@ -9,7 +9,7 @@ import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   useCurrentTime,
   useActiveAnnotation,
@@ -151,26 +151,26 @@ async function mount(isContinuousPlay: boolean) {
   const logging = createLoggingAdapter();
   const createAdapter = () => logging.adapter;
   const annotationList = { annotations: ANNOTATIONS, isContinuousPlay };
-  const short = makeTrack('short', 10);
-  const App: React.FC<{ tracks: ClipTrack[] }> = ({ tracks }) => (
-    <WaveformPlaylistProvider
-      tracks={tracks}
+  const arrangement = testArrangement([makeTrack('short', 10)]);
+  const App: React.FC = () => (
+    <TestProvider
+      arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       annotationList={annotationList}
     >
       <ProbeChild />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
-  const view = render(<App tracks={[short]} />);
+  render(<App />);
   await waitFor(() => expect(probe.isReady).toBe(true));
   logging.log.length = 0;
   return {
     ...logging,
-    /** Appends a longer track: duration 10 s -> 20 s on the incremental path. */
+    /** Appends a longer track: duration 10 s -> 20 s, no engine rebuild. */
     async growDuration() {
       await act(async () => {
-        view.rerender(<App tracks={[short, makeTrack('long', 20)]} />);
+        arrangement.addTrack(makeTrack('long', 20));
       });
       await waitFor(() => expect(probe.duration).toBe(20));
       await wait(60);

@@ -12,7 +12,7 @@ import type { MediaElementPlayout } from '@waveform-playlist/media-element-playo
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { AnnotationData, AudioClip, ClipTrack } from '@waveform-playlist/core';
 import * as publicApi from '../index';
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider } from './helpers/arrangementProvider';
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
   useIsPlaying,
@@ -25,6 +25,7 @@ import {
   usePlaylistView,
   usePlaylistSettings,
   usePlaylistZoom,
+  useArrangement,
   useEditorControls,
   useEngineRefs,
   useAnnotationOptions,
@@ -185,6 +186,7 @@ const SHARED = {
   zoom: usePlaylistZoom,
 } as const;
 const WEB_AUDIO_ONLY = {
+  arrangement: useArrangement,
   editorControls: useEditorControls,
   engineRefs: useEngineRefs,
   loop: useLoop,
@@ -350,7 +352,7 @@ const webAudio = (
   adapter = createFakeAdapter(),
   props: { indefinitePlayback?: boolean } = {}
 ) => (
-  <WaveformPlaylistProvider
+  <TestProvider
     tracks={WEB_AUDIO_TRACKS}
     sampleRate={48000}
     samplesPerPixel={1024}
@@ -358,7 +360,7 @@ const webAudio = (
     {...props}
   >
     {children}
-  </WaveformPlaylistProvider>
+  </TestProvider>
 );
 
 const mediaElement = (children: React.ReactNode) => (
@@ -714,6 +716,7 @@ describe('the package exports', () => {
       'usePlaybackRate',
       'useMediaElementTrack',
       'PlaybackRateSelect',
+      'useArrangement',
     ]) {
       expect(publicApi, name).toHaveProperty(name);
     }

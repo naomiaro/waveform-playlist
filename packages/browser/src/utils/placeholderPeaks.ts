@@ -7,11 +7,12 @@
  *
  * Drawn from the loading clip's own `waveformData` when it has usable ones,
  * else an empty box as long as its `duration`. `null` when neither gives a
- * length, or when a time is not a usable number.
+ * length, or when a time is not a usable number. Its sample positions and
+ * `sampleRate` are at `contextSampleRate`, whatever the rate of the peaks.
  */
 import type { LoadingClip } from '@waveform-playlist/core';
 import type WaveformData from 'waveform-data';
-import type { ClipPeaks } from '../WaveformPlaylistContext';
+import type { ClipPeaks, TrackClipPeaks } from '../WaveformPlaylistContext';
 import { extractFromOwnWaveformData } from './derivePeaks';
 
 export interface PlaceholderPeaksOptions {
@@ -64,14 +65,18 @@ function build(
   const duration = (clip.duration as number | null | undefined) ?? undefined;
   if (duration === undefined && !wdata) return null;
   if (!isTime(clip.start) || !isTime(clip.offset) || !isTime(duration)) return null;
-  const rate = wdata ? wdata.sample_rate : options.contextSampleRate;
+  // The geometry is at the context's rate, also for peaks at another rate:
+  // the audio is decoded at the context's rate, so that is the rate of the
+  // loaded clip this record stands in for (B1, #812).
+  const rate = options.contextSampleRate;
   if (!(Number.isFinite(rate) && rate > 0)) return null;
 
   const startSample = Math.round((clip.start ?? 0) * rate);
   const offsetSamples = Math.round((clip.offset ?? 0) * rate);
   // With peaks the clip cannot be longer than the file: the same cut as the
-  // loaded clip's. An offset at or past the end leaves no samples (`rest` < 1),
-  // which gives null below.
+  // loaded clip's, the file's length in seconds at the context's rate. An
+  // offset at or past the end leaves no samples (`rest` < 1), which gives null
+  // below.
   const total = wdata ? Math.ceil(wdata.duration * rate) : undefined;
   const rest = total === undefined ? undefined : total - offsetSamples;
   const wanted = duration === undefined ? rest : Math.round(duration * rate);
@@ -82,6 +87,8 @@ function build(
   }
   if (durationSamples < 1) return null;
 
+  // Converted to the file's own sample positions through the ratio of the two
+  // rates, as for a loaded clip drawn from its own peaks.
   const drawn = wdata
     ? extractFromOwnWaveformData(
         { sampleRate: rate, offsetSamples, durationSamples },
@@ -117,4 +124,16 @@ export function placeholderPeaks(
   const result = build(clip, trackName, options);
   memo.set(clip, { trackName, options: { ...options }, result });
   return result;
+}
+
+/** The end in seconds of the last placeholder record of `rows`, 0 when there is none. */
+export function placeholdersEnd(rows: readonly TrackClipPeaks[]): number {
+  let end = 0;
+  for (const row of rows) {
+    for (const record of row) {
+      if (!record.isPlaceholder || !record.sampleRate) continue;
+      end = Math.max(end, (record.startSample + record.durationSamples) / record.sampleRate);
+    }
+  }
+  return end;
 }

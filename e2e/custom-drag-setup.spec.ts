@@ -67,10 +67,12 @@ test.describe('Custom Drag Setup Example', () => {
   test.beforeEach(async ({ page, baseURL }) => {
     await page.goto(`${baseURL}/examples/custom-drag-setup`);
     await page.waitForSelector('h1:has-text("Custom Drag Setup")', { timeout: 30000 });
-    // The clips first: the page mounts with no tracks, and an empty playlist is
-    // "ready" too. Then ready, which now means the engine has these tracks.
-    await expect(page.locator('[data-clip-container]')).toHaveCount(5, { timeout: 30000 });
+    // Ready first: it fires once, when an engine is attached and no audio is
+    // pending, so the five clips are loaded by then (#812). A placeholder clip
+    // is a `[data-clip-container]` too: none may be left.
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
+    await expect(page.locator('[data-clip-container]')).toHaveCount(5, { timeout: 30000 });
+    await expect(page.locator('[data-clip-placeholder="true"]')).toHaveCount(0);
     // Two trim handles per clip once the clips are interactive.
     await expect(page.locator(HANDLE)).toHaveCount(10);
   });

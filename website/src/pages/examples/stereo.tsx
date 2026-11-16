@@ -69,10 +69,10 @@ export default function StereoExamplePage(): React.ReactElement {
             overflow: 'auto'
           }}>
 {`// Stereo rendering (default)
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
 
 // Mono rendering (collapsed)
-<WaveformPlaylistProvider tracks={tracks} mono>`}
+<WaveformPlaylistProvider arrangement={arrangement} mono>`}
           </pre>
         </div>
 

@@ -15,7 +15,7 @@ Wrap your playlist content with `BeatsAndBarsProvider` from `@waveform-playlist/
 import { WaveformPlaylistProvider, WaveformEditor } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
     <WaveformEditor />
   </BeatsAndBarsProvider>
@@ -41,7 +41,7 @@ Wrap the view with `ClipInteractionProvider` to enable drag/move/trim with snap-
 import { WaveformPlaylistProvider, WaveformEditor, ClipInteractionProvider } from '@waveform-playlist/browser';
 import { BeatsAndBarsProvider } from '@waveform-playlist/ui-components';
 
-<WaveformPlaylistProvider tracks={tracks}>
+<WaveformPlaylistProvider arrangement={arrangement}>
   <BeatsAndBarsProvider bpm={120} timeSignature={[4, 4]} snapTo="beat">
     <ClipInteractionProvider snap>
       <WaveformEditor />
@@ -134,5 +134,5 @@ The `SmartScale` component (used internally by `Waveform`) checks for `BeatsAndB
 ## See Also
 
 - [Beats & Bars Example](/examples/beats-and-bars) — Interactive demo with BPM, time signature, and snap controls
-- [Loading Audio](/docs/react/guides/loading-audio) — Immediate mode for progressive loading
+- [Loading Audio](/docs/react/guides/loading-audio) — Placeholders while audio loads, pre-computed peaks
 - [Track Management](/docs/react/guides/track-management) — Drag and trim clips

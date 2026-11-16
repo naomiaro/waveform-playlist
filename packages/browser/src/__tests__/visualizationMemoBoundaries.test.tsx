@@ -65,7 +65,7 @@ vi.mock('@waveform-playlist/ui-components', async (importOriginal) => {
   };
 });
 
-import { WaveformPlaylistProvider } from '../WaveformPlaylistContext';
+import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
@@ -203,22 +203,24 @@ async function mount(initialTracks: ClipTrack[], { annotations = false } = {}) {
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   const annotationList = annotations ? { annotations: ANNOTATIONS } : undefined;
-  const ui = (tracks: ClipTrack[]) => (
-    <WaveformPlaylistProvider
-      tracks={tracks}
+  // The arrangement owns the tracks (#812): an edit is one of its calls.
+  const arrangement = testArrangement(initialTracks);
+  const ui = () => (
+    <TestProvider
+      arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
       annotationList={annotationList}
     >
       <ProbeChild />
       <ComposedWaveform showClipHeaders />
-    </WaveformPlaylistProvider>
+    </TestProvider>
   );
-  const utils = render(ui(initialTracks));
+  render(ui());
   await waitFor(() => expect(probe.data.isReady).toBe(true));
   await act(async () => {});
   resetCounts();
-  return { setTracks: (tracks: ClipTrack[]) => utils.rerender(ui(tracks)) };
+  return { arrangement };
 }
 
 function threeTracks() {
@@ -292,16 +294,16 @@ describe('the shell and the channels follow only the groups they draw (#768)', (
   // 10-second steps, trimPreview.test.tsx).
   it('trimming the clip that ends the timeline re-renders the channels of that clip only', async () => {
     const { a, b, c, d } = threeTracks();
-    const { setTracks } = await mount([
+    const { arrangement } = await mount([
       makeTrack('t1', [a, b]),
       makeTrack('t2', [c]),
       makeTrack('t3', [d]),
     ]);
     const before = probe.data.duration;
 
-    const trimmed = { ...b, durationSamples: SAMPLE_RATE / 2 };
+    // The right edge of b moves in by half a second: its trim release.
     await act(async () => {
-      setTracks([makeTrack('t1', [a, trimmed]), makeTrack('t2', [c]), makeTrack('t3', [d])]);
+      arrangement.trimClip('t1', 'b', 'right', -SAMPLE_RATE / 2);
     });
     await waitFor(() => expect(probe.data.duration).toBeLessThan(before));
 
@@ -325,14 +327,14 @@ describe('visualization memo boundaries (#693)', () => {
     resetCounts();
     const adapter = createFakeAdapter();
     render(
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={threeTracks().tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={() => adapter}
       >
         <ProbeChild />
         <ComposedWaveform showClipHeaders />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     await waitFor(() => expect(probe.data.isReady).toBe(true));
 
@@ -429,15 +431,14 @@ describe('visualization memo boundaries (#693)', () => {
 
   it('trimming one clip re-renders that clip only', async () => {
     const { a, b, c, d } = threeTracks();
-    const { setTracks } = await mount([
+    const { arrangement } = await mount([
       makeTrack('t1', [a, b]),
       makeTrack('t2', [c]),
       makeTrack('t3', [d]),
     ]);
 
-    const trimmed = { ...a, durationSamples: SAMPLE_RATE / 2 };
     await act(async () => {
-      setTracks([makeTrack('t1', [trimmed, b]), makeTrack('t2', [c]), makeTrack('t3', [d])]);
+      arrangement.trimClip('t1', 'a', 'right', -SAMPLE_RATE / 2);
     });
     await waitFor(() => expect(probe.data.isReady).toBe(true));
 
@@ -526,7 +527,7 @@ describe('visualization memo boundaries (#693)', () => {
     const adapter = createFakeAdapter();
     const positions: number[] = [];
     render(
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={threeTracks().tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={() => adapter}
@@ -538,7 +539,7 @@ describe('visualization memo boundaries (#693)', () => {
             return <div data-custom-playhead />;
           }}
         />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     await waitFor(() => expect(probe.data.isReady).toBe(true));
     await act(async () => {});
@@ -555,14 +556,14 @@ describe('visualization memo boundaries (#693)', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const adapter = createFakeAdapter();
     render(
-      <WaveformPlaylistProvider
+      <TestProvider
         tracks={threeTracks().tracks}
         sampleRate={SAMPLE_RATE}
         createAdapter={() => adapter}
       >
         <ProbeChild />
         <AudioPosition />
-      </WaveformPlaylistProvider>
+      </TestProvider>
     );
     await waitFor(() => expect(probe.data.isReady).toBe(true));
     const readout = () => document.querySelector('[aria-label="Audio position"]')?.textContent;
@@ -580,14 +581,14 @@ describe('visualization memo boundaries (#693)', () => {
     // `selectTrack` keeps its identity across `tracks` changes (it is a prop of
     // every memoized clip and panel), so it must read the current tracks.
     const { a, b, c, d } = threeTracks();
-    const { setTracks } = await mount([
+    const { arrangement } = await mount([
       makeTrack('t1', [a, b]),
       makeTrack('t2', [c]),
       makeTrack('t3', [d]),
     ]);
     // t1 is removed: t3 moves from index 2 to index 1.
     await act(async () => {
-      setTracks([makeTrack('t2', [c]), makeTrack('t3', [d])]);
+      arrangement.removeTrack('t1');
     });
     await waitFor(() => expect(probe.data.isReady).toBe(true));
 

@@ -68,6 +68,12 @@ test.describe('Track Reordering', () => {
     expect(before.ids.length).toBeGreaterThan(1);
 
     const grips = page.locator('button[aria-label="Drag to reorder track"]');
+    // Bring the first rows to the middle of the viewport before measuring. A
+    // drop point in the bottom 20% of the viewport (dnd-kit's default
+    // auto-scroll threshold) scrolls the page during the drag, which moves the
+    // rows under the pointer; where the rows start depends on the height of
+    // what the page draws above the editor.
+    await grips.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     let g0: { x: number; y: number; width: number; height: number } | null = null;
     let g1: { x: number; y: number; width: number; height: number } | null = null;
     await expect(async () => {
@@ -171,6 +177,12 @@ test.describe('Track Reordering', () => {
     const before = await readState();
 
     const grips = page.locator('button[aria-label="Drag to reorder track"]');
+    // Bring the first rows to the middle of the viewport before measuring. A
+    // drop point in the bottom 20% of the viewport (dnd-kit's default
+    // auto-scroll threshold) scrolls the page during the drag, which moves the
+    // rows under the pointer; where the rows start depends on the height of
+    // what the page draws above the editor.
+    await grips.nth(0).evaluate((el) => el.scrollIntoView({ block: 'center' }));
     let g0: { x: number; y: number; width: number; height: number } | null = null;
     let g1: { x: number; y: number; width: number; height: number } | null = null;
     await expect(async () => {
