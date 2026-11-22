@@ -742,6 +742,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   }, [restAt, setActiveAnnotationId]);
 
   const seekTo = useCallback((time: number) => {
+    // NaN is not a position: it would go into the time ref, into the state
+    // and into the player, and nothing would come back. It is ignored.
+    // Infinity is a position — the end of the audio (Fast Forward asks for
+    // it, and the clamp below turns it into the track's duration) — so only
+    // NaN is rejected here.
+    if (Number.isNaN(time)) return;
     const trackDuration = latestAudioRef.current.waveformData.duration;
     const clampedTime = Math.max(0, Math.min(time, trackDuration));
     currentTimeRef.current = clampedTime;
@@ -829,6 +835,11 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   );
 
   const setPlaybackRate = useCallback((rate: number) => {
+    // NaN is not a speed: it would go into the ref, into the state and into
+    // the player, and the clamp below would pass it on unchanged (every
+    // comparison with NaN is false). It is ignored. An infinite rate is
+    // clamped to the upper bound by the same clamp as any other speed.
+    if (Number.isNaN(rate)) return;
     const clampedRate = Math.max(0.5, Math.min(2.0, rate));
     playbackRateRef.current = clampedRate;
     setPlaybackRateState(clampedRate);
