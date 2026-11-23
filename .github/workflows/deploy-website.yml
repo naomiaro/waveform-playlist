@@ -1,15 +1,13 @@
 name: Deploy Website
 
-# One GitHub Pages deployment holds every version of the site:
+# One GitHub Pages deployment holds two builds of the site:
 #
 #   main (stable, what npm `latest` ships)  ->  /waveform-playlist/
 #   dev  (the current work)                  ->  /waveform-playlist/next/
-#   docs-archive (earlier releases, built    ->  /waveform-playlist/v<major>/
-#     once by archive-docs.yml)
 #
-# A Pages deployment replaces the whole site, so a push to main or dev builds
-# both and copies the archive in. This file is the same on both branches; a
-# change to it goes to both, because a push runs the copy on the pushed branch.
+# A Pages deployment replaces the whole site, so a push to either branch
+# builds both. This file is the same on both branches; a change to it goes to
+# both, because a push runs the copy on the branch that was pushed.
 
 on:
   push:
@@ -32,7 +30,6 @@ concurrency:
 env:
   STABLE_REF: main
   NEXT_REF: dev
-  ARCHIVE_REF: docs-archive
   NEXT_BASE_URL: /waveform-playlist/next/
 
 jobs:
@@ -51,39 +48,9 @@ jobs:
           ref: ${{ env.NEXT_REF }}
           path: next
 
-      # The archive branch appears with the first archived release.
-      - name: Look for the docs archive
-        id: archive
-        run: |
-          status=0
-          git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null || status=$?
-          case "$status" in
-            0) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
-            2) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
-            *) echo "::error::could not ask the repository for $ARCHIVE_REF (git ls-remote exited $status)"; exit 1 ;;
-          esac
-
-      - name: Checkout the docs archive
-        if: steps.archive.outputs.exists == 'true'
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.ARCHIVE_REF }}
-          path: archive
-
-      # What a build cannot know from its own checkout: the release on main,
-      # and which majors are archived (the v<major> folders of the archive).
-      - name: Read the versions
-        run: |
-          echo "DOCS_STABLE_VERSION=$(node -p "require('./stable/package.json').version")" >> "$GITHUB_ENV"
-          majors=""
-          if [ -d archive ]; then
-            for dir in archive/v[0-9]*; do
-              if [ -d "$dir" ]; then
-                majors="${majors:+$majors,}${dir#archive/v}"
-              fi
-            done
-          fi
-          echo "DOCS_ARCHIVED_VERSIONS=$majors" >> "$GITHUB_ENV"
+      # What a build cannot know from its own checkout: the release on main.
+      - name: Read the stable release number
+        run: echo "DOCS_STABLE_VERSION=$(node -p "require('./stable/package.json').version")" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -120,24 +87,13 @@ jobs:
           pnpm --filter @waveform-playlist/ui-components build-storybook
           pnpm --filter website build
 
-      - name: Put the next site and the archive inside the stable one
+      - name: Put the next site inside the stable one
         run: |
-          site=stable/website/build
-          place() {
-            if [ -e "$site/$2" ]; then
-              echo "::error::the stable site already has a /$2 path"
-              exit 1
-            fi
-            cp -R "$1" "$site/$2"
-          }
-          place next/website/build next
-          if [ -d archive ]; then
-            for dir in archive/v[0-9]*; do
-              if [ -d "$dir" ]; then
-                place "$dir" "$(basename "$dir")"
-              fi
-            done
+          if [ -e stable/website/build/next ]; then
+            echo "::error::the stable site already has a /next path"
+            exit 1
           fi
+          cp -R next/website/build stable/website/build/next
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
