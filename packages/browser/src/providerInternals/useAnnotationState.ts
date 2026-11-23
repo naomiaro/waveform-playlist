@@ -110,22 +110,6 @@ export function useAnnotationState({
   }, [annotationList?.annotations]);
 
   const annotationsRef = useRef<AnnotationData[]>(annotations);
-  // The array a functional update reads. React's setState queues functional
-  // updates, so two of them in one tick must not both read the committed
-  // array (the first would be dropped). This one holds the last value that
-  // was handed to `onAnnotationsChange`, so the next functional update in
-  // the same tick sees it.
-  const pendingAnnotationsRef = useRef<AnnotationData[]>(annotations);
-  // The array we last handed out, to tell a parent that committed our
-  // update from one that did not.
-  const handedOutRef = useRef<AnnotationData[] | null>(null);
-  // A commit we did not hand out: the parent took something else (or kept
-  // what it had), so the pending array starts again from what is committed.
-  // A commit that IS the array we handed out keeps the pending array: the
-  // parent took our update, and the next tick reads the same values.
-  if (annotations !== pendingAnnotationsRef.current && annotations !== handedOutRef.current) {
-    pendingAnnotationsRef.current = annotations;
-  }
   annotationsRef.current = annotations;
   const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
 
@@ -172,7 +156,7 @@ export function useAnnotationState({
 
   const setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>> = useCallback(
     (action) => {
-      const updated = typeof action === 'function' ? action(pendingAnnotationsRef.current) : action;
+      const updated = typeof action === 'function' ? action(annotationsRef.current) : action;
       if (!onAnnotationsChangeRef.current) {
         if (isDevelopmentBuild()) {
           console.warn(
@@ -184,10 +168,6 @@ export function useAnnotationState({
         }
         return;
       }
-      // The next functional update in this tick reads this array, so two in
-      // one tick do not both read the committed one.
-      pendingAnnotationsRef.current = updated;
-      handedOutRef.current = updated;
       onAnnotationsChangeRef.current(updated);
     },
     [providerName]

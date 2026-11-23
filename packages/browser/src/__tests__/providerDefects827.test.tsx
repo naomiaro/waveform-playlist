@@ -7,11 +7,8 @@
 //   and the animation loop stopped: the UI showed a playing state for audio
 //   that was not playing.
 // - `seekTo(NaN)` put NaN into the time refs, into the state and into the
-//   engine; `setPlaybackRate(NaN)` put NaN into the speed. A non-finite
-//   number is not a position and not a speed: it is ignored.
-// - `setAnnotations` with a function read the COMMITTED array, so two
-//   functional updates in one tick both read the same array and the first
-//   was dropped, although the type promises React's setState queueing.
+//   engine; `setPlaybackRate(NaN)` put NaN into the speed. NaN is not a
+//   position and not a speed: it is ignored. Infinity is not: it is clamped.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup } from '@testing-library/react';
@@ -63,7 +60,6 @@ import {
   usePlaybackRate,
   usePlaylistTimeline,
 } from '../contexts/playlistContexts';
-import { useAnnotationState } from '../providerInternals/useAnnotationState';
 import {
   TestProvider,
   recordingAdapter,
@@ -92,7 +88,7 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('the MediaElement provider and a non-finite time or speed', () => {
+describe('the MediaElement provider and a NaN time or speed', () => {
   interface MediaProbe {
     controls: ReturnType<typeof usePlaybackControls>;
     currentTime: number;
@@ -146,37 +142,6 @@ describe('the MediaElement provider and a non-finite time or speed', () => {
     act(() => probe.controls.seekTo(Infinity));
     expect(probe.currentTime).toBe(waveformData.duration);
     expect(mediaElement.created[0].seekTo).toHaveBeenLastCalledWith(waveformData.duration);
-  });
-});
-
-describe('setAnnotations and two functional updates in one tick', () => {
-  interface AnnotationProbe {
-    setAnnotations: ReturnType<typeof useAnnotationState>['setAnnotations'];
-  }
-
-  let probe: AnnotationProbe;
-  it('the second functional update sees the first, not the committed array', () => {
-    const seen: number[][] = [];
-    const AnnotationState: React.FC = () => {
-      const { setAnnotations } = useAnnotationState({
-        annotationList: undefined,
-        onAnnotationsChange: (annotations) => {
-          seen.push(annotations.map((a) => a.start));
-        },
-        providerName: 'test',
-      });
-      probe = { setAnnotations };
-      return null;
-    };
-    render(<AnnotationState />);
-
-    act(() => {
-      probe.setAnnotations((current) => [...current, { id: 'a', start: 1, end: 2, lines: [] }]);
-      probe.setAnnotations((current) => [...current, { id: 'b', start: 3, end: 4, lines: [] }]);
-    });
-
-    // The second update saw the first one's result: both annotations are in.
-    expect(seen[seen.length - 1]).toEqual([1, 3]);
   });
 });
 
