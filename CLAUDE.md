@@ -4,7 +4,12 @@ This file contains important context, decisions, and conventions for AI-assisted
 
 ## Project Overview
 
-Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas waveform visualizations. Currently undergoing a React refactor (Tone.js overhaul branch).
+Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas waveform visualizations.
+**Two branches (since 2026-11-23, after Tone.js's model):**
+
+- **`dev`** is the default branch and the base of every PR: the current work. Its docs are published at `/waveform-playlist/next/`, and prereleases go to npm under `@next`.
+- **`main`** is the stable line: the commit of the last release to npm `latest`, published at `/waveform-playlist/`. Nothing is developed there. A release moves it forward to `dev`'s release commit (a fast-forward; the project skill `release`, "From dev to main"); a fix for the stable line alone is a commit on `main` that is merged back into `dev` before the next release.
+- **A release has one number,** `version` in the root `package.json` (`release` skill, "The release number"); the packages keep their own versions.
 
 **Key Dependencies:**
 
@@ -88,7 +93,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 **Decide the doc surface in the design, before the first review.** On #762 a new DOM attribute (`data-selected`) was documented only after the review had started; each docs commit needed its own round, and the rounds found a sentence that overclaimed and a CSS example that did not work. When a change adds anything a consumer can see (attribute, prop, theme key), name the guide page in the design message.
 
-**The "Before" half of an upgrade snippet is checked against the old source too.** On #812 part 6 the first `useMidiTracks` snippet had `name: 'Piano'` on a `src` config before and on `loadMidiTracks` after; the hook ignored `name` for a file (`git show main:<file>`), the function applies it, so the two were not equivalent. For each option copied across, read what the removed code did with it.
+**The "Before" half of an upgrade snippet is checked against the old source too.** On #812 part 6 the first `useMidiTracks` snippet had `name: 'Piano'` on a `src` config before and on `loadMidiTracks` after; the hook ignored `name` for a file (`git show dev:<file>`), the function applies it, so the two were not equivalent. For each option copied across, read what the removed code did with it.
 
 **Render a CSS or markup example before committing it.** The first `data-selected` example (an `outline` on the row) was invisible in the browser. Inject it with `page.addStyleTag` on an example page and look at a screenshot.
 
@@ -190,7 +195,7 @@ The view follows the same rule since #703: `<Waveform />`, `<WaveformEditor />` 
 
 **Not for "does this part exist" (#685).** Whether something is drawn is decided by rendering its component, not by a boolean on a parent: `<WaveformClipHeaders />` inside `<WaveformTracks>`, not `<Waveform showClipHeaders />`; `<WaveformTimescale />` in the root, not `timescale` on the provider. A boolean that switches a part on puts every part's options on one root and needs a second source as soon as the part has options of its own. When a combination is common, give it a name as a ready-made composition (`<WaveformEditor />`), which takes no options for its parts.
 
-Props that still break this convention on `main` (four that default to `true`, and two on ui-components' `Clip` that decide whether a part exists, `showFades` and `disableHeaderDrag`) are listed in #828, each waiting for a yes or no; do not copy them as precedent.
+Props that still break this convention on `dev` (four that default to `true`, and two on ui-components' `Clip` that decide whether a part exists, `showFades` and `disableHeaderDrag`) are listed in #828, each waiting for a yes or no; do not copy them as precedent.
 
 ### Styled Components
 
@@ -220,7 +225,7 @@ Props that still break this convention on `main` (four that default to `true`, a
   - **`Uint8Array.buffer` is `ArrayBufferLike`, not `ArrayBuffer`** — under current TS lib types it could be a `SharedArrayBuffer`, so `midi.toArray().buffer`-style expressions fail `TS2322/TS2345` where `ArrayBuffer` is required. Copy into a fresh buffer instead: `const buf = new ArrayBuffer(bytes.length); new Uint8Array(buf).set(bytes)`. (This was the long-standing `pnpm typecheck` failure in dawcore-midi/midi tests, fixed 2026-07-09 — root typecheck passes again.)
   - **`pnpm typecheck` is first-fail** (`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`) — one failing package masks all later ones in the recursive run. After fixing a blocking package, re-run the FULL sweep; the same bug pattern often exists in sibling packages (the 2026-07-09 ArrayBufferLike fix found a second, masked instance in packages/midi).
 - **Lint**: `pnpm lint` - Prettier check + ESLint across all packages. **Always run before committing.** This is a root-only script; run from repo root or use `pnpm -w lint`. Fix formatting issues with `pnpm format`.
-  - **Format the files you changed, not the package.** `npx prettier --write src` in a package rewrote a file the change had nothing to do with (`packages/dawcore/src/styles/theme.ts`, which is not prettier-clean on `main`); it had to be restored with `git checkout --`. Pass the changed paths, and read `git status --short` before committing.
+  - **Format the files you changed, not the package.** `npx prettier --write src` in a package rewrote a file the change had nothing to do with (`packages/dawcore/src/styles/theme.ts`, which is not prettier-clean on `dev`); it had to be restored with `git checkout --`. Pass the changed paths, and read `git status --short` before committing.
   - **`pnpm lint` is `prettier --check && eslint` (prettier FIRST)** — a formatting issue exits 1 with NO `✖ N problems` ESLint summary (eslint never runs after prettier fails). Exit 1 + missing summary = a prettier failure, not lint errors → `pnpm format` (or `prettier --write <file>`). Don't chase a phantom "0 errors but exit 1".
 - **Example HTML pages are outside lint scope** — `pnpm lint` only covers TS/TSX under each package's `src/`; prettier flags every HTML file in `examples/` if run on them directly. Match the existing file style by hand, don't reformat them. (Do not bold-wrap glob patterns containing `**` in this file — prettier's markdown parser corrupts them.)
 - **New packages**: After adding a new `packages/*/package.json`, run `pnpm install` and commit `pnpm-lock.yaml`. CI uses `--frozen-lockfile` and will fail if the lockfile is stale.
@@ -235,7 +240,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 - **Vite dev servers SPA-fallback unknown paths to index.html with HTTP 200** — `fetch(url).ok` is not proof an asset exists; a ~3KB "audio file" that fails `decodeAudioData` is usually the HTML fallback. Verify content-type or byte size when fetching fixtures in browser-driven tests.
 - **Docusaurus dev pages live under the site baseUrl `/waveform-playlist/`** — ad-hoc browser scripts must use `http://localhost:<port>/waveform-playlist/examples/...`; the bare path returns SPA-fallback 200 with no page (the e2e config's BASE_PATH already handles this).
 - **Unit tests**: Run from each package directory with `npx vitest run` (engine, core, playout, ui-components, browser)
-- **"Behavior unchanged for X" claims in changesets: diff old vs new numerically** — `git show main:<file> > <scratch>/old.ts`, run both versions over the common inputs with node, and compare. Reasoning alone missed that bar-anchored snapping also changes 3/4 and 6/8 half-note/triplet grids, not just odd meters (#647).
+- **"Behavior unchanged for X" claims in changesets: diff old vs new numerically** — `git show dev:<file> > <scratch>/old.ts`, run both versions over the common inputs with node, and compare. Reasoning alone missed that bar-anchored snapping also changes 3/4 and 6/8 half-note/triplet grids, not just odd meters (#647).
 - **Removing a field of a hook's value: search the destructurings, and search `website/src`, `examples/` and `debug/` as well as the packages.** For #685 part 3 `usePlaylistView().controls` was removed after a grep for `\.controls\b` over the packages found one reader. Three example components had `const { sampleRate, controls } = usePlaylistView()`; one used it inside an effect, so the recording page loaded, drew the same pixels and crashed on Record (`Cannot read properties of undefined (reading 'show')`). Nothing typechecks `website/src`; only the e2e run found it. Grep the field name next to the hook's name in every directory that imports the package, and ask what each reader used the value FOR before writing "no replacement" in the upgrade guide.
 - **zsh does not split an unquoted variable into words.** `npx eslint $FILES` and `perl -pi … $FILES` hand the whole list over as one argument ("No such file or directory", or an empty result that looks like a pass). Pipe the list through `xargs`.
 - **A `cd` in one Bash call stays for the next ones.** After `cd packages/browser && npx vitest …` a later `packages/…` path or `git` command resolves from there. Run a package command in a subshell, `(cd packages/browser && npx vitest run …)`, or start each call with `cd` to the repo root.
@@ -258,7 +263,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 - **Stray NUL byte in a source file = silent `Bin` diff** — a 0x00 that sneaks into a `.ts` file (e.g. from a tool edit) makes `git diff --stat` report the file as binary while tsc, prettier, AND vitest all pass silently. Detect with `perl -ne 'print "line $.\n" if /\x00/' <file>` — bash `$'\x00'` CANNOT pass a NUL to grep (it degrades to `grep ""`, matching every line). Fix with `perl -i -pe 's/\x00/ /'`.
 - **Agent worktrees & dev servers:** Background agents run in `.claude/worktrees/agent-*`. When an agent finishes: its dev server dies (browser tabs still open against it fail dynamic imports with misleading "package not installed" hints — reload against a real server), and stale worktrees linger holding their branch names (`git worktree remove --force .claude/worktrees/agent-* && git worktree prune`). Never trust which checkout `pnpm example:*` serves — the startup log prints the cwd.
 
-**CI Validation:** `.github/workflows/ci.yml` runs on PRs to `main`: build and lint (includes prettier check). A PR that changes only Markdown, `docs/`, `plans/`, `website/docs/` or `llms.txt` starts no run (`paths-ignore`): `gh pr checks` then says "no checks reported" and stays that way, which for such a PR is the expected final state and not a queued run (confirm with `gh pr view <n> --json files`). CI never built the website, so for docs changes `pnpm --filter website build` locally is the check. CI runs ONLY on PRs targeting `main` — stacked child PRs show no checks until retargeted after their parent merges. Fix formatting with `pnpm format` before pushing. `gh pr checks --watch` can exit 0 while checks are still pending/queued — always re-run `gh pr checks` and read the actual states before merging or diagnosing.
+**CI Validation:** `.github/workflows/ci.yml` runs on PRs to `dev` (and to `main`, for a fix to the stable line): build and lint (includes prettier check). A PR that changes only Markdown, `docs/`, `plans/`, `website/docs/` or `llms.txt` starts no run (`paths-ignore`): `gh pr checks` then says "no checks reported" and stays that way, which for such a PR is the expected final state and not a queued run (confirm with `gh pr view <n> --json files`). CI never built the website, so for docs changes `pnpm --filter website build` locally is the check. CI runs ONLY on PRs targeting `dev` — stacked child PRs show no checks until retargeted after their parent merges. Fix formatting with `pnpm format` before pushing. `gh pr checks --watch` can exit 0 while checks are still pending/queued — always re-run `gh pr checks` and read the actual states before merging or diagnosing.
 
 **The independent review covers the FINAL diff.** Any commit added after a review (including changes the maintainer asks for mid-PR) means a new review before merging; a go-ahead on behaviour is not a waiver, and "not reviewed" in the PR text does not close the gap. #721, #724, #725 and #727 were merged with unreviewed commits; the post-merge reviews found a cursor regression, stale playback state and a dead Escape, fixed in #729 over four review rounds. To end the loop honestly, stop changing code after a round that finds nothing above low, and list the lows in the PR. The maintainer may waive the review for named small fixes after such a round (#741: two one-line lows); then the PR text says which commit was not reviewed. Before fixing an interaction bug, state the behaviour choice and ask: on #741 the narrow fix ("end the drag on release outside") was built and tested before the maintainer was asked, and they chose the other behaviour (follow the pointer). For UI behaviour the maintainer is trying by hand (keys, focus, playback), open the PR and leave it for them; describe behaviour by stating where focus is and what the native control would do with the key.
 
@@ -266,7 +271,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 
 **When an edge case keeps producing choices, ask whether the state should exist at all.** A loading clip on a MIDI track was accepted, never fetched and reported (carried over from an earlier design); it then needed a rule for a source named on both kinds of track. The maintainer's question ("are we letting people name the same source across audio and midi?") led to refusing it at the door, which removed the code, the rule and the question. Before offering a/b/c for an edge, say whether refusing the input is an option.
 
-**"Read, not run" plus the word "now" needs the same run on `main`.** The ledger said undo during a clip drag "now" leaves an offset clip. Run on both: the offset is on `main` too, in both editors; what the change added was per-move undo steps and a warning (#848). To compare a browser behaviour across branches without a build: the dawcore Vite examples alias engine, core, transport and dawcore to source, so `git checkout main -- packages/<pkg>/src` under the running example server, measure, `git restore --source=HEAD --staged --worktree -- packages`. For the Docusaurus site stop the server first (the existing rule).
+**"Read, not run" plus the word "now" needs the same run on `dev`.** The ledger said undo during a clip drag "now" leaves an offset clip. Run on both: the offset is on `dev` too, in both editors; what the change added was per-move undo steps and a warning (#848). To compare a browser behaviour across branches without a build: the dawcore Vite examples alias engine, core, transport and dawcore to source, so `git checkout dev -- packages/<pkg>/src` under the running example server, measure, `git restore --source=HEAD --staged --worktree -- packages`. For the Docusaurus site stop the server first (the existing rule).
 
 **Nothing edits source while an e2e run or a review round is in flight.** The Docusaurus dev server hot-reloads on every source change, so an edit by the author, or a review agent's mutation check, can empty the page under a running test: on #749 one full run failed a single test with zero drag handles on the page, and the same test then passed 15 of 15. Run the final e2e after the reviewers have finished, with a clean tree. And hold your own edits until a review round returns: on #749 a commit landed while the second reviewer was reading, and the review covered it only because the reviewer noticed HEAD move. Before merging, check that the review, the e2e run and CI all name the PR's head commit (`gh pr view <n> --json headRefOid`).
 
@@ -276,7 +281,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 
 **A change to the shape of a public value goes to the maintainer before it is built, also when it follows from an approved fix.** Keeping mixer state by id made `trackStates` hold `undefined` in place for a loading track; a side agent reported it first. The same for an oddity seen in a test (the empty timeline running a second, full build).
 
-**`git diff --name-only main -- 'packages/*/src'` lists nothing** (the pathspec is not a shell glob). Use `-- packages` and filter with grep.
+**`git diff --name-only dev -- 'packages/*/src'` lists nothing** (the pathspec is not a shell glob). Use `-- packages` and filter with grep.
 
 **`revise-claude-md` runs before the merge is asked for**, so the learnings go in the PR that produced them (#782 was merged without it and needed a docs PR afterwards).
 
@@ -306,7 +311,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 
 ### E2E Testing with Playwright
 
-`pnpm test` runs the whole Playwright suite (Chromium only, `e2e/`, not part of CI) and should be all green: a red run is a signal, not a flake, until failure rates on the branch and on `main` say otherwise. Load the project skill `e2e-playwright` before writing, running or debugging a spec, and `browser-probes` before measuring a page from a script or an MCP browser. Three rules apply before either is loaded:
+`pnpm test` runs the whole Playwright suite (Chromium only, `e2e/`, not part of CI) and should be all green: a red run is a signal, not a flake, until failure rates on the branch and on `dev` say otherwise. Load the project skill `e2e-playwright` before writing, running or debugging a spec, and `browser-probes` before measuring a page from a script or an MCP browser. Three rules apply before either is loaded:
 
 - **Check port 3000 before `pnpm build`, `pnpm test` and `git checkout`,** as a command of its own: `lsof -nP -iTCP:3000 -sTCP:LISTEN`. The maintainer often has a Docusaurus server running in this checkout; a build or a branch switch breaks it, and the Playwright config reuses whatever listens there. If something is there and you did not start it, do not kill it and do not build: `cd website && pnpm exec docusaurus start --port 3077 --no-open`, then `PORT=3077 pnpm test`.
 - **With a server of my own running, every Playwright command gets `PORT=3077`.** Without it the config starts a second server on 3000 and crashes the first (shared rspack cache).
@@ -316,7 +321,7 @@ Props that still break this convention on `main` (four that default to `true`, a
 
 **Stacked branches:** after rewriting a parent, re-stack each child with `git rebase --onto <new-parent> <old-parent-tip> <child>` (a plain rebase replays stale copies of the parent's commits); `git commit --amend` is blocked in auto mode — use follow-up commits; verify the stack TOP (tests + typecheck + prettier) before any force-push.
 
-**After the parent of a stacked PR is squash-merged:** `gh pr edit <child> --base main`, then `git merge origin/main` into the child (no rebase, no force-push). Files the parent ADDED and the child changed conflict as add/add; take the child's side (`git checkout --ours <file>`), then check that `git diff origin/main --stat` lists only the child's own files. `gh pr checks <n> --watch` returns at once with "no checks reported" while the run is still queued; look at `gh run list --branch <branch>` before concluding CI did not start.
+**After the parent of a stacked PR is squash-merged:** `gh pr edit <child> --base dev`, then `git merge origin/dev` into the child (no rebase, no force-push). Files the parent ADDED and the child changed conflict as add/add; take the child's side (`git checkout --ours <file>`), then check that `git diff origin/dev --stat` lists only the child's own files. `gh pr checks <n> --watch` returns at once with "no checks reported" while the run is still queued; look at `gh run list --branch <branch>` before concluding CI did not start.
 
 ---
 
@@ -465,7 +470,7 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 
 **Debug apps:** `debug/standalone-midi/` is a standalone Vite+React app using workspace components (not Docusaurus) for isolating rendering bugs. Run with `cd debug/standalone-midi && pnpm exec vite`.
 
-**Deployment:** Site deploys automatically via GitHub Actions on push to `main`.
+**Deployment:** a push to `dev` or to `main` builds both versions of the site and deploys them together (`website/CLAUDE.md`, "Versions of the Site").
 
 ---
 
@@ -473,8 +478,8 @@ Package-specific patterns live in each package's CLAUDE.md (see "Per-Package Doc
 
 - **Roadmap & Progress:** `TODO.md`
 - **Architecture Details:** `PROJECT_STRUCTURE.md`
-- **Main branch:** `main`
-- **Current work:** `main`
+- **Default branch, base of every PR:** `dev`
+- **Stable line (npm `latest`):** `main`
 - **Dev server:** `http://localhost:3000/` (Docusaurus)
 - **dawcore uses `@dawcore/transport`** — No Tone.js dependency. Native `AudioContext` for decode, playback, and recording. The `audioContext` property on `<daw-editor>` accepts a consumer-provided context.
 

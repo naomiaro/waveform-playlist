@@ -24,7 +24,7 @@ The rule itself is in root `CLAUDE.md`: the independent review covers the FINAL 
 - **`feature-dev:code-reviewer` has no Bash:** it cannot `git diff`, so it reviews the checked-out tree and infers the "before" side. Name the changed lines in its brief, or use `general-purpose` when the review needs the diff or a test run.
 - **A docs agent given the facts as claims to verify is a second reviewer.** On #847 it reported three times that the source did not match what it had been told to write (among them the `setTracks` selection regression). Hand it claims, not prose to copy, and say when the source will and will not change while it works.
 - **A late code change while a docs agent is writing:** send it the new facts with `SendMessage`; do not wait and patch its output.
-- **A plan file is not on a code branch cut from `main` while the plan's own PR is open.** Keep a copy in the plan's workspace (`.superpowers/sdd/<plan>/<plan>.md`, git-ignored) and give the brief and review-package scripts that path; when a decision changes the plan, correct the copy too.
+- **A plan file is not on a code branch cut from `dev` while the plan's own PR is open.** Keep a copy in the plan's workspace (`.superpowers/sdd/<plan>/<plan>.md`, git-ignored) and give the brief and review-package scripts that path; when a decision changes the plan, correct the copy too.
 - **Constraints every task of a PR shares go in one file in that workspace** (what the PR is, the binding rules, how to run things here), and each dispatch names its path. The dispatch then carries only what is particular to the task.
 
 ## Audits

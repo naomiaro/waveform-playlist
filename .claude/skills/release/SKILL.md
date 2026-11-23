@@ -42,7 +42,20 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 **Build before publishing:** No package defines prepublish hooks — always run `pnpm --filter <pkg> build` before `pnpm publish`, or the tarball ships a stale `dist/`.
 
-**Prerelease Tag:** Use `@next` for prerelease versions when preparing future major releases.
+**Prerelease Tag:** Use `@next` for prerelease versions when preparing future major releases. Publishing the work on `dev` under `@next` with changesets pre mode (`changeset pre enter next`) was planned on 2026-11-23 and has not been tried: dry-run it (the peer-range cascade with prerelease versions) before the first one.
+
+## From dev to main
+
+`dev` is where a release is prepared; `main` is the commit that npm `latest` was published from (root `CLAUDE.md`, "Two branches").
+
+1. On `dev`: `pnpm release:version`, the release number in the root `package.json`, the stable announcement bar, the `chore(release)` commit, through a PR like any other change.
+2. Publish from that commit (the hardware-key procedure above).
+3. Move `main` to it: `git fetch origin && git push origin origin/dev:main`. It is a fast-forward, because `main` is an ancestor of `dev` (checked by `git merge-base --is-ancestor origin/main origin/dev`); when that check fails, a fix was committed on `main` and not merged back: merge `main` into `dev` first (a real merge commit, never a squash, which would not link the histories). Never force the push.
+4. Tag and release on `main`: `gh release create v<release number> --target main …`.
+
+After the fast-forward `main`'s files are exactly `dev`'s. What `main` carried of its own is gone with it, as intended: on 2026-11-23 that was five redirect pages under `website/static/docs` and `website/static/examples`, for pages only the next docs had.
+
+The link between the branches is the merge commit `959f4e92` on `dev` (`git merge -s ours`, 2026-11-23): it recorded the new `main`'s first commits as merged while keeping `dev`'s files. A push to `main` or `dev` deploys both versions of the site.
 
 ## The release number
 
@@ -55,8 +68,8 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
 ## The commit, the tag and the GitHub release
 
-- **A full release is THREE artifacts** — easy to do partially: (1) npm publish (`pnpm --filter <pkg> publish --no-git-checks`), (2) the `chore(release): pkg@x.y.z` commit on `main`, (3) the GitHub release on the tag `v<release number>` (`gh release create`). "Bump and publish" naturally stops after (1)+(2) — the GitHub release is a separate step, easy to forget. Preview the tarball first with `pnpm --filter <pkg> publish --no-git-checks --dry-run` (shows files/version/tag/access before the irreversible publish); verify the publish landed with `curl -s https://registry.npmjs.org/@scope%2fname` (npm view caches 404s).
-- **Release tags are `v<release number>`, not `pkg@version`** ("The release number" above; until 2026-11-23 they were feature names such as `optional-playout-engines`). `gh release create v<release number> --title "v<release number> — <what it is about>" --target main --notes-file <path>` creates the tag + release; the release commit is `chore(release): pkg@x.y.z, …` on `main`. Bumping workspace package versions does NOT change `pnpm-lock.yaml`.
+- **A full release is THREE artifacts** — easy to do partially: (1) npm publish (`pnpm --filter <pkg> publish --no-git-checks`), (2) the `chore(release): pkg@x.y.z` commit on `dev`, which `main` is then moved to ("From dev to main"), (3) the GitHub release on the tag `v<release number>` (`gh release create`). "Bump and publish" naturally stops after (1)+(2) — the GitHub release is a separate step, easy to forget. Preview the tarball first with `pnpm --filter <pkg> publish --no-git-checks --dry-run` (shows files/version/tag/access before the irreversible publish); verify the publish landed with `curl -s https://registry.npmjs.org/@scope%2fname` (npm view caches 404s).
+- **Release tags are `v<release number>`, not `pkg@version`** ("The release number" above; until 2026-11-23 they were feature names such as `optional-playout-engines`). `gh release create v<release number> --title "v<release number> — <what it is about>" --target main --notes-file <path>` creates the tag + release; the release commit is `chore(release): pkg@x.y.z, …`, made on `dev` and by then the head of `main`. Bumping workspace package versions does NOT change `pnpm-lock.yaml`.
 - **GitHub Release Notes:** use `gh release create --notes-file <path>` (or `gh release edit --notes-file <path>`), NOT `--notes "$(cat <<'EOF')"`. Shell escapes in HEREDOCs mangle inline backticks and quotes inside code spans, leaving visible `\"` and `` \` `` in the rendered release body.
 - **`npm version <v> --no-git-tag-version` may normalize unicode escapes** in package.json (e.g. `\u2014` becomes a literal `—`) — an extra diff line beyond `version`; harmless, commit it.
 - **`@dawcore/components` has no published dependents** — only `website` (`workspace:*`, unpublished) depends on it, so bumping it is a SINGLE-package release, not a workspace-pin republish cascade. Verify republish scope with `grep -rl '"@dawcore/components"' packages/*/package.json` before assuming the cascade.
