@@ -37,13 +37,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout stable
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.STABLE_REF }}
           path: stable
 
       - name: Checkout next
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.NEXT_REF }}
           path: next
@@ -56,14 +56,14 @@ jobs:
           echo "DOCS_STABLE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           package_json_file: next/package.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           cache-dependency-path: |
             stable/pnpm-lock.yaml
@@ -99,10 +99,13 @@ jobs:
           cp -R next/website/build stable/website/build/next
 
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
 
+      # Since v4 this action leaves files whose name starts with a dot out of
+      # the site. The build has none it needs (`.nojekyll` is for a site that
+      # GitHub builds with Jekyll; this one is uploaded as built).
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: stable/website/build
 
@@ -115,4 +118,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
