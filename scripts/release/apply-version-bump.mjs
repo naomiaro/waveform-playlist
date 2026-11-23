@@ -145,10 +145,8 @@ if (problems.length > 0) fail(problems);
 const changesetIds = readdirSync(join(repoRoot, '.changeset'))
   .filter((file) => file.endsWith('.md') && file !== 'README.md')
   .map((file) => file.slice(0, -'.md'.length));
-const consumed = [...pre.changesets];
-for (const id of changesetIds.sort()) {
-  if (!consumed.includes(id)) consumed.push(id);
-}
+// Kept in name order, as changesets writes it.
+const consumed = [...new Set([...pre.changesets, ...changesetIds])].sort();
 writes.push({
   file: PRE_JSON,
   text: `${JSON.stringify({ ...pre, changesets: consumed }, null, 2)}\n`,
