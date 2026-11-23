@@ -1051,6 +1051,13 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
         engine.play(actualStartTime, endTime);
       } catch (err) {
         console.warn('[waveform-playlist] Playback failed to start:', err);
+        // The play never started, so the UI must not keep saying it is
+        // playing. The engine.stop() above is suppressed (the mirror would
+        // otherwise clear the flag before the seek that follows it), so
+        // nothing else turns isPlaying off on this path: a restart that
+        // throws — a seek or an annotation click while playing — would
+        // leave the transport showing playback that is not running (#827).
+        setIsPlaying(false);
         stopAnimationLoop();
         return;
       }
