@@ -1,0 +1,139 @@
+name: Publish @next
+
+# Publishes the work on `dev` to npm under the dist-tag `next`, after Tone.js's
+# release workflow: a push to dev (a merged pull request) runs the changesets
+# version step, commits the bump to dev and publishes what the registry does
+# not have yet. Nothing here touches `latest`: a stable release is made by hand
+# (.claude/skills/release/SKILL.md).
+#
+#   - `dev` is in changesets pre mode (.changeset/pre.json), so the version step
+#     gives x.y.z-next.N, and only for the packages with a new changeset and
+#     for their dependents. A merge without a changeset publishes nothing.
+#   - npm authenticates this workflow by OIDC ("trusted publishing"): every
+#     package names this file, `publish-next.yml`, as a trusted publisher in
+#     its settings on npmjs.com. There is no npm token.
+#   - The bump commit is pushed with GITHUB_TOKEN, and a push made with it
+#     starts no workflow: this one does not start itself again, and the site
+#     is not deployed a second time for it.
+#   - "Run workflow" publishes what is missing after a run that failed: the
+#     version step then finds nothing to do, and the publish step skips every
+#     version the registry has.
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+# One at a time, in order: two runs would compute the same version numbers.
+concurrency:
+  group: publish-next
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the bump commit
+  id-token: write # npm trusted publishing
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      # The branch as it is now, not the commit that started the run: a run
+      # that waited in the queue also takes what was merged in the meantime.
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check npm can publish by OIDC
+        run: |
+          # Trusted publishing needs npm 11.5.1 or later.
+          version=$(npm --version)
+          echo "npm $version"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
+          ' "$version"
+
+      - name: Check dev is in pre mode
+        id: pre
+        run: |
+          # No pre.json, or one that is being left, means a stable release is
+          # being prepared: this workflow then publishes nothing.
+          if [ -f .changeset/pre.json ] && [ "$(node -p "require('./.changeset/pre.json').mode")" = "pre" ] && [ "$(node -p "require('./.changeset/pre.json').tag")" = "next" ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dev is not in pre mode with the tag next: nothing is published"
+          fi
+
+      - name: Install dependencies
+        if: steps.pre.outputs.active == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Compute the versions
+        if: steps.pre.outputs.active == 'true'
+        id: version
+        run: |
+          pnpm exec changeset version
+          if git diff --quiet -- packages; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::no new changeset: no version changed"
+          else
+            node scripts/release/check-version-run.mjs > "$RUNNER_TEMP/bumped.txt"
+            cat "$RUNNER_TEMP/bumped.txt"
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Also true with no bump, after a run that committed and then failed.
+      - name: Look for versions the registry does not have
+        if: steps.pre.outputs.active == 'true'
+        id: registry
+        run: |
+          node scripts/release/publish-next.mjs --list | tee "$RUNNER_TEMP/missing.txt"
+          if grep -q '^missing=0$' "$RUNNER_TEMP/missing.txt"; then
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build packages
+        if: steps.registry.outputs.missing == 'true'
+        run: pnpm build
+
+      - name: Run unit tests
+        if: steps.registry.outputs.missing == 'true'
+        run: pnpm test:unit
+
+      # Before publishing: if dev moved on while this run was building, the
+      # push is refused, nothing is published, and the run that the newer
+      # merge started does both.
+      - name: Commit the bump to dev
+        if: steps.version.outputs.bumped == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages .changeset
+          {
+            echo "chore(release): next ($(wc -l < "$RUNNER_TEMP/bumped.txt" | tr -d ' ') packages)"
+            echo
+            echo "Published under the npm dist-tag next by .github/workflows/publish-next.yml:"
+            echo
+            sed 's/^/- /' "$RUNNER_TEMP/bumped.txt"
+          } > "$RUNNER_TEMP/message.txt"
+          git commit --quiet -F "$RUNNER_TEMP/message.txt"
+          git push origin HEAD:dev
+
+      - name: Publish what the registry does not have
+        if: steps.registry.outputs.missing == 'true'
+        run: node scripts/release/publish-next.mjs
