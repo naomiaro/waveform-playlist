@@ -257,7 +257,9 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-          cache: pnpm
+          # No cache in the job that builds what is published: a cache is
+          # written by other runs (CodeQL actions/cache-poisoning).
+          package-manager-cache: false
 
       # Also true with no bump, after a run that committed and then failed.
       - name: Look for versions the registry does not have
