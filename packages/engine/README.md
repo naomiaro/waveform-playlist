@@ -21,7 +21,7 @@ Used by `@waveform-playlist/browser` (the React provider) and `@dawcore/componen
 npm install @waveform-playlist/engine @waveform-playlist/core
 ```
 
-`@waveform-playlist/core` is a required peer dependency (`>=7.0.0`) — it provides the `ClipTrack`/`AudioClip` types and clip-construction helpers used below.
+`@waveform-playlist/core` is a required peer dependency (version 13 or later) — it provides the `ClipTrack`/`AudioClip` types and clip-construction helpers used below.
 
 ## Quick Start
 

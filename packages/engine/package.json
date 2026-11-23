@@ -51,6 +51,6 @@
     "vitest": "^5.0.3"
   },
   "peerDependencies": {
-    "@waveform-playlist/core": ">=7.0.0 || >=13.0.0-0"
+    "@waveform-playlist/core": ">=13.0.0-0"
   }
 }
