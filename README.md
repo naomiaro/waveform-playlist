@@ -29,7 +29,7 @@ Waveform Playlist is published on two lines:
 | Line | npm tag | Docs and examples | Branch |
 |------|---------|-------------------|--------|
 | **Stable** | `latest` | [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/) | [`main`](https://github.com/naomiaro/waveform-playlist/tree/main) |
-| **Next** | `next`: prereleases of the coming major | [naomiaro.github.io/waveform-playlist/next](https://naomiaro.github.io/waveform-playlist/next/) | [`dev`](https://github.com/naomiaro/waveform-playlist/tree/dev) |
+| **Next** | `next`: prereleases | [naomiaro.github.io/waveform-playlist/next](https://naomiaro.github.io/waveform-playlist/next/) | [`dev`](https://github.com/naomiaro/waveform-playlist/tree/dev) |
 
 **This README describes next**, the code on `dev`, and its links go to the next docs. The stable release's README is [on `main`](https://github.com/naomiaro/waveform-playlist/blob/main/README.md). To move a project from stable to next, see the [upgrade guide](https://naomiaro.github.io/waveform-playlist/next/docs/react/upgrading).
 
@@ -47,12 +47,16 @@ Next:
 npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @waveform-playlist/core@next tone @dnd-kit/react
 ```
 
-`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. `@waveform-playlist/core` is listed because your own code imports from it. Next requires React 19; stable also accepts React 18.2.
+`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. `@waveform-playlist/core` is listed because your own code imports from it.
 
-Without Tone.js (for next, add `@next` to each `@waveform-playlist/*` package):
+**On next, add `@next` to every `@waveform-playlist/*` and `@dawcore/*` package you install,** not only the ones above. A `latest` package beside `@next` ones can fail their peer ranges (`annotations@latest` peers on `browser ^16`). The commands in the next docs carry the tag already.
+
+**React:** next requires React 19. On stable, `browser` accepts React 18.2 or 19, but `annotations`, `recording`, `spectrogram` and `midi` peer on React 18 only, so a stable project that uses any of them stays on React 18 ([#888](https://github.com/naomiaro/waveform-playlist/issues/888)).
+
+Without the Tone.js engine (nothing in your bundle imports Tone.js; npm still installs `tone` today, through `ui-components`, [#886](https://github.com/naomiaro/waveform-playlist/issues/886)):
 
 - MediaElement playout: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react`
-- Your own adapter: `npm install @waveform-playlist/browser @dnd-kit/react`, and pass `createAdapter` to the provider
+- Your own adapter: `npm install @waveform-playlist/browser @waveform-playlist/engine @dnd-kit/react` (`engine` for the `PlayoutAdapter` type), and pass `createAdapter` to the provider
 
 The optional packages are listed under [Packages](#packages); [Installation](https://naomiaro.github.io/waveform-playlist/next/docs/react/getting-started/installation) has the setup for annotations, recording and spectrogram.
 
@@ -86,7 +90,7 @@ function App() {
 }
 ```
 
-This is the next API. The stable equivalent is in the [stable Getting Started](https://naomiaro.github.io/waveform-playlist/docs/react/getting-started/basic-usage).
+This is the next API. The stable equivalent is in the [stable Getting Started](https://naomiaro.github.io/waveform-playlist/docs/react/getting-started/basic-usage); on stable, import `useAudioTracks` from `@waveform-playlist/browser/tone` (the page says `@waveform-playlist/browser`, [#887](https://github.com/naomiaro/waveform-playlist/issues/887)).
 
 ## Documentation
 
@@ -127,6 +131,9 @@ This is the next API. The stable equivalent is in the [stable Getting Started](h
 | [Flexible API](https://naomiaro.github.io/waveform-playlist/next/examples/flexible-api) | Custom playheads, timestamps, and full UI customization |
 | [Mobile Multi-Clip](https://naomiaro.github.io/waveform-playlist/next/examples/mobile-multi-clip) | Clip editing with touch: hold to drag |
 | [Mobile Annotations](https://naomiaro.github.io/waveform-playlist/next/examples/mobile-annotations) | Annotations with touch: tap to play, hold to resize |
+| [Web Components — Basic](https://naomiaro.github.io/waveform-playlist/next/examples/wc-basic) | Minimal `<daw-editor>` on the native Web Audio backend, no React in the audio path |
+| [Web Components — Multiclip](https://naomiaro.github.io/waveform-playlist/next/examples/wc-multiclip) | Multiple clips per track with drag, trim, split and pre-computed peaks via `<daw-clip>` |
+| [Web Components — Player](https://naomiaro.github.io/waveform-playlist/next/examples/wc-player) | Lightweight `<daw-player>` single-track player: HTMLMediaElement streaming, pre-computed peaks, no Tone.js |
 
 ## Packages
 
@@ -175,16 +182,17 @@ const { currentTimeRef } = usePlaybackRefs();
 // Where the cursor rests (changes on seek, pause and stop)
 const { currentTime } = useCurrentTime();
 
-// Zoom controls
-const { zoomIn, zoomOut, samplesPerPixel } = useZoomControls();
+// Zoom controls, and the zoom level (re-renders on a zoom)
+const { zoomIn, zoomOut } = useEditorControls();
+const { samplesPerPixel } = usePlaylistZoom();
 
-// Master effects chain
+// Master effects chain (from @waveform-playlist/browser/tone)
 const { masterEffects, toggleBypass, updateParameter } = useDynamicEffects();
 
-// WAV export
+// WAV export (from @waveform-playlist/browser/tone)
 const { exportWav, isExporting, progress } = useExportWav();
 
-// Recording: the take is added to the arrangement's track (one undo step)
+// Recording (from @waveform-playlist/recording): the take is added to the arrangement's track (one undo step)
 const { startRecording, stopRecording, isRecording } = useIntegratedRecording(
   arrangement, selectedTrackId
 );
@@ -193,6 +201,8 @@ const { startRecording, stopRecording, isRecording } = useIntegratedRecording(
 ## Web Components (Experimental)
 
 `@dawcore/components` provides framework-agnostic Web Components for multi-track audio editing — no React required. Built with Lit, adapter-pluggable: choose between `@dawcore/transport` (native Web Audio) or `@waveform-playlist/playout` (Tone.js).
+
+On next, add `@next` to each of these packages, as above.
 
 ```bash
 npm install @dawcore/components @waveform-playlist/core @waveform-playlist/engine
