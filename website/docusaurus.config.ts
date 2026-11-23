@@ -161,7 +161,7 @@ const ANNOUNCEMENT: Record<DocsChannel, typeof releaseAnnouncement> = {
   stable: releaseAnnouncement,
   next: {
     id: 'docs_channel_next',
-    content: `These docs describe work in development that is not on npm <code>latest</code> yet. The released packages are documented in the <a href="${STABLE_BASE_URL}" target="_self">stable docs</a>.`,
+    content: `These docs are for the prereleases on npm <code>next</code>. For the release on npm <code>latest</code>, see the <a href="${STABLE_BASE_URL}" target="_self">stable docs</a>.`,
     isCloseable: false,
   },
 };
