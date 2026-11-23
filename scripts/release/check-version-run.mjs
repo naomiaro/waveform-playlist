@@ -23,8 +23,6 @@ const problems = [];
 const bumped = [];
 
 for (const { name, dir, manifest } of packages) {
-  // A package the merged pull request added has a manifest at HEAD too: for a
-  // version it did not have before, HEAD is not the test, the registry is.
   const before = readManifestAt('HEAD', dir) ?? {};
 
   if (manifest.version !== before.version) {
@@ -39,11 +37,15 @@ for (const { name, dir, manifest } of packages) {
         `${name}: ${before.version} -> ${manifest.version} leaves 0.0.x (a peer range did not admit a prerelease)`
       );
     }
-    if (!(await isOnRegistry(name))) {
-      problems.push(
-        `${name}: npm has no package of this name. Publish its first version by hand, give it a trusted publisher entry, then merge its changeset`
-      );
-    }
+  }
+
+  // Asked for every package the publish step would take, bumped by this run
+  // or not: a package the merged pull request added is at HEAD already, and
+  // may arrive with a prerelease version and no changeset.
+  if (isPrerelease(manifest.version) && !(await isOnRegistry(name))) {
+    problems.push(
+      `${name}: npm has no package of this name. Publish its first version by hand, give it a trusted publisher entry, then merge it`
+    );
   }
 
   for (const field of RANGE_FIELDS) {

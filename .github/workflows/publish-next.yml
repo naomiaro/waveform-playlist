@@ -16,15 +16,21 @@ name: Publish @next
 #     this file on another branch cannot publish.
 #   - npm cannot limit a trusted publisher to a dist-tag. That this workflow
 #     publishes prereleases with the tag `next` and nothing else is decided in
-#     scripts/release/publish-next.mjs: a change to that script, or to this
-#     file, is a change to what can reach npm without the hardware key.
-#   - Three jobs, so that no job both runs other people's code and holds a
-#     right worth stealing more than it must:
-#       version  installs, builds, tests; may push the bump to dev
-#       pack     installs, builds, packs; may only read
-#       publish  may publish to npm; installs nothing and builds nothing: it
-#                uploads the tarballs `pack` made, after reading in each one
-#                that it is the package and the prerelease version expected
+#     scripts/release/: a change to those scripts, or to this file, is a change
+#     to what can reach npm without the hardware key.
+#   - Four jobs. Two run other people's code (dependencies' install scripts,
+#     the build tools, the tests) and are given nothing but read access. Two
+#     hold a right and run only node, git, tar, npm and scripts/release/, which
+#     use no dependency. Each of those two checks what it is handed:
+#
+#       version  installs, builds, tests     reads      hands over the bump
+#       commit   applies the bump             may push   only a version bump
+#       pack     installs, builds, packs      reads      hands over tarballs
+#       publish  uploads the tarballs         may        only the expected
+#                                             publish    prereleases
+#
+#     What dependency code can still do is change what is INSIDE a published
+#     package (it builds it), as it can in a build on a maintainer's machine.
 #   - The bump commit is pushed with GITHUB_TOKEN, and a push made with it
 #     starts no workflow: this one does not start itself again, and the site
 #     is not deployed a second time for it.
@@ -54,26 +60,28 @@ defaults:
 
 jobs:
   version:
-    name: Version and commit
-    # "Run workflow" on another branch would run that branch's copy of this
-    # file, and this job pushes to dev.
+    name: Compute the versions
+    # "Run workflow" on another branch would run that branch's copy of this file.
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # the bump commit
+      contents: read
     outputs:
       active: ${{ steps.pre.outputs.active }}
-      sha: ${{ steps.head.outputs.sha }}
+      bumped: ${{ steps.version.outputs.bumped }}
+      base: ${{ steps.base.outputs.sha }}
     steps:
       # The branch as it is now, not the commit that started the run: a run
       # that waited in the queue also takes what was merged in the meantime.
-      # The token is not left in .git/config for the install, the build and
-      # the tests to read: the push step is given it.
       - name: Checkout dev
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: dev
           persist-credentials: false
+
+      - name: Name the commit the versions are computed on
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Check dev is in pre mode
         id: pre
@@ -108,7 +116,7 @@ jobs:
         if: steps.pre.outputs.active == 'true'
         run: pnpm install --frozen-lockfile
 
-      - name: Compute the versions
+      - name: Run the version step
         if: steps.pre.outputs.active == 'true'
         id: version
         run: |
@@ -117,8 +125,7 @@ jobs:
             echo "bumped=false" >> "$GITHUB_OUTPUT"
             echo "::notice::no new changeset: no version changed"
           else
-            node scripts/release/check-version-run.mjs > "$RUNNER_TEMP/bumped.txt"
-            cat "$RUNNER_TEMP/bumped.txt"
+            node scripts/release/check-version-run.mjs
             echo "bumped=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -130,14 +137,68 @@ jobs:
         if: steps.version.outputs.bumped == 'true'
         run: pnpm test:unit
 
-      # If dev moved on while this run was building, the push is refused, the
-      # job fails, nothing is published, and the run that the newer merge
-      # started does both.
-      - name: Commit the bump to dev
+      # The files the version step changed, laid out as in the repository.
+      - name: Collect the bump
         if: steps.version.outputs.bumped == 'true'
-        env:
-          PUSH_TOKEN: ${{ github.token }}
         run: |
+          mkdir -p "$RUNNER_TEMP/bump"
+          git diff --name-only -z -- packages .changeset | while IFS= read -r -d '' file; do
+            mkdir -p "$RUNNER_TEMP/bump/$(dirname "$file")"
+            cp "$file" "$RUNNER_TEMP/bump/$file"
+          done
+          find "$RUNNER_TEMP/bump" -type f | sort
+
+      - name: Hand the bump to the commit job
+        if: steps.version.outputs.bumped == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: next-bump
+          path: ${{ runner.temp }}/bump
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  commit:
+    name: Commit the bump to dev
+    needs: version
+    if: needs.version.outputs.active == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # the bump commit
+    outputs:
+      sha: ${{ steps.head.outputs.sha }}
+    steps:
+      # Nothing is installed and nothing is built in this job.
+      - name: Checkout dev
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Take the bump from the version job
+        if: needs.version.outputs.bumped == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: next-bump
+          path: ${{ runner.temp }}/bump
+
+      # If dev moved on since the versions were computed, nothing is committed
+      # and nothing is published: the run that the newer merge started does both.
+      - name: Apply, commit and push
+        if: needs.version.outputs.bumped == 'true'
+        env:
+          BASE: ${{ needs.version.outputs.base }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$BASE" ]; then
+            echo "::error::dev moved on while the versions were being computed"
+            exit 1
+          fi
+          node scripts/release/apply-version-bump.mjs "$RUNNER_TEMP/bump" > "$RUNNER_TEMP/bumped.txt"
+          cat "$RUNNER_TEMP/bumped.txt"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packages .changeset
@@ -149,18 +210,17 @@ jobs:
             sed 's/^/- /' "$RUNNER_TEMP/bumped.txt"
           } > "$RUNNER_TEMP/message.txt"
           git commit --quiet -F "$RUNNER_TEMP/message.txt"
-          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:dev
+          git push origin HEAD:dev
 
-      # The commit the other jobs use: the bump, or dev as it was checked out
-      # when no version changed.
+      # The commit the other two jobs use: the bump, or dev as it is when no
+      # version changed.
       - name: Name the commit to publish
         id: head
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   pack:
     name: Build and pack
-    needs: version
-    if: needs.version.outputs.active == 'true'
+    needs: commit
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -170,7 +230,7 @@ jobs:
       - name: Checkout the commit to publish
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.version.outputs.sha }}
+          ref: ${{ needs.commit.outputs.sha }}
           persist-credentials: false
 
       - name: Setup pnpm
@@ -218,7 +278,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    needs: [version, pack]
+    needs: [commit, pack]
     if: needs.pack.outputs.missing == 'true'
     runs-on: ubuntu-latest
     # Accepts the branch dev only (repository settings, Environments), and is
@@ -228,12 +288,13 @@ jobs:
       contents: read
       id-token: write # npm trusted publishing
     steps:
-      # For scripts/release/ only. Nothing is installed and nothing is built in
-      # this job: the only code it runs is node, npm, tar and those scripts.
+      # For scripts/release/ and the manifests. Nothing is installed and
+      # nothing is built in this job. The commit is named by the commit job,
+      # which runs no dependency's code either.
       - name: Checkout the commit to publish
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          ref: ${{ needs.version.outputs.sha }}
+          ref: ${{ needs.commit.outputs.sha }}
           persist-credentials: false
 
       - name: Setup Node.js
