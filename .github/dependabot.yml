@@ -1,0 +1,33 @@
+# Dependabot: security fixes for npm in one pull request, and one weekly
+# pull request for the GitHub Actions the workflows use.
+#
+# Security pull requests always go to the default branch (`dev`); GitHub
+# does not apply `target-branch` to them.
+version: 2
+updates:
+  - package-ecosystem: 'npm'
+    # The root pnpm-lock.yaml covers every workspace package and example.
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    # 0 turns off version updates for npm: this entry applies to security
+    # updates only. Upgrades are made on purpose, to the latest stable
+    # (see .claude/skills/dependency-updates).
+    open-pull-requests-limit: 0
+    groups:
+      # Every npm security fix in one pull request, so the fixes do not
+      # each rewrite pnpm-lock.yaml and conflict with one another.
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - '*'
+
+  - package-ecosystem: 'github-actions'
+    # Dependabot reads .github/workflows from here.
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    groups:
+      github-actions:
+        patterns:
+          - '*'
