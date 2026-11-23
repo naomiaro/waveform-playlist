@@ -66,7 +66,8 @@ for (const pkg of candidates) {
 }
 
 if (listOnly) {
-  for (const pkg of missing) console.log(`not on the registry   ${pkg.name}@${pkg.manifest.version}`);
+  for (const pkg of missing)
+    console.log(`not on the registry   ${pkg.name}@${pkg.manifest.version}`);
   console.log(`missing=${missing.length}`);
   process.exit(0);
 }
@@ -76,7 +77,9 @@ if (missing.length === 0) {
   process.exit(0);
 }
 
-console.log(`\n${dryRun ? 'Would publish' : 'Publishing'} ${missing.length} package(s) with the tag "${DIST_TAG}":`);
+console.log(
+  `\n${dryRun ? 'Would publish' : 'Publishing'} ${missing.length} package(s) with the tag "${DIST_TAG}":`
+);
 for (const pkg of missing) console.log(`  ${pkg.name}@${pkg.manifest.version}`);
 console.log('');
 

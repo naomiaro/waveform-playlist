@@ -42,6 +42,7 @@ waveform-playlist/
 │   └── standalone-multi-clip/  # Vite+React multi-clip debug app
 │
 ├── e2e/                   # Playwright end-to-end tests
+├── scripts/release/       # Used by .github/workflows/publish-next.yml: check-version-run.mjs, publish-next.mjs
 │
 └── website/               # Docusaurus documentation site
     ├── src/

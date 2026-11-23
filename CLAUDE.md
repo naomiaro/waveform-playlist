@@ -36,7 +36,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 ## Publishing Convention
 
-**Every PR that changes `packages/*/src` adds a changeset** (`pnpm changeset`; pick `patch` for `@dawcore/*` — zerover, never minor/major). Each package follows its own semver independently, and `changeset version` computes the bumps and the dependent cascade at the release.
+**Every PR that changes `packages/*/src` adds a changeset** (`pnpm changeset`; pick `patch` for `@dawcore/*` — zerover, never minor/major). **Merging it publishes:** a push to `dev` runs `.github/workflows/publish-next.yml`, which versions the packages the new changesets name and their dependents as `x.y.z-next.N`, commits that bump to `dev` as `github-actions[bot]` (pull before branching again) and publishes them to npm under the dist-tag `next`. A merge without a changeset publishes nothing. A stable release (`latest`) is still made by hand. Each package follows its own semver independently, and `changeset version` computes the bumps and the dependent cascade at the release.
 
 **A PR that removes or renames public API also greps `.changeset/` for the old names** (bodies and frontmatter). The pending changesets become one changelog: by the last part of #812 fourteen of them named API that later parts had removed, and `react-19-peer-ranges.md` still bumped `midi` for a `react` peer the package no longer had (a reviewer found that one). Removing a peer dependency also touches the requirements line of `website/static/llms.txt` and the package's "Peer Dependencies" line in `PROJECT_STRUCTURE.md`.
 

@@ -20,17 +20,23 @@ const bumped = [];
 for (const { name, dir, manifest } of packages) {
   const before = readManifestAt('HEAD', dir);
   if (!before) {
-    problems.push(`${name}: no package.json at HEAD (a new package is published by hand the first time)`);
+    problems.push(
+      `${name}: no package.json at HEAD (a new package is published by hand the first time)`
+    );
     continue;
   }
 
   if (manifest.version !== before.version) {
     bumped.push(`${name}@${manifest.version}`);
     if (!isPrerelease(manifest.version)) {
-      problems.push(`${name}: ${before.version} -> ${manifest.version} is not a -next.N prerelease`);
+      problems.push(
+        `${name}: ${before.version} -> ${manifest.version} is not a -next.N prerelease`
+      );
     }
     if (name.startsWith('@dawcore/') && !manifest.version.startsWith('0.0.')) {
-      problems.push(`${name}: ${before.version} -> ${manifest.version} leaves 0.0.x (a peer range did not admit a prerelease)`);
+      problems.push(
+        `${name}: ${before.version} -> ${manifest.version} leaves 0.0.x (a peer range did not admit a prerelease)`
+      );
     }
   }
 
@@ -49,7 +55,7 @@ if (problems.length > 0) {
   console.error('The version run is not publishable as a prerelease:\n');
   for (const problem of problems) console.error(`  - ${problem}`);
   console.error(
-    '\nRestore the tree, give the range an alternative for the peer\'s next version\n' +
+    "\nRestore the tree, give the range an alternative for the peer's next version\n" +
       '(.claude/skills/release/SKILL.md, "Prereleases"), and run the version step again.'
   );
   process.exit(1);

@@ -9,15 +9,25 @@ name: Publish @next
 #   - `dev` is in changesets pre mode (.changeset/pre.json), so the version step
 #     gives x.y.z-next.N, and only for the packages with a new changeset and
 #     for their dependents. A merge without a changeset publishes nothing.
-#   - npm authenticates this workflow by OIDC ("trusted publishing"): every
-#     package names this file, `publish-next.yml`, as a trusted publisher in
-#     its settings on npmjs.com. There is no npm token.
+#   - npm authenticates the publish job by OIDC ("trusted publishing"): every
+#     package names this file, `publish-next.yml`, and the environment
+#     `npm-next` as a trusted publisher in its settings on npmjs.com. There is
+#     no npm token. The environment accepts the branch `dev` only, so a copy of
+#     this file on another branch cannot publish.
+#   - npm cannot limit a trusted publisher to a dist-tag. That this workflow
+#     publishes prereleases with the tag `next` and nothing else is decided in
+#     scripts/release/publish-next.mjs: a change to that script, or to this
+#     file, is a change to what can reach npm without the hardware key.
+#   - The two jobs split the rights: `version` may push to the repository and
+#     cannot publish, `publish` may publish and cannot push.
 #   - The bump commit is pushed with GITHUB_TOKEN, and a push made with it
 #     starts no workflow: this one does not start itself again, and the site
 #     is not deployed a second time for it.
-#   - "Run workflow" publishes what is missing after a run that failed: the
-#     version step then finds nothing to do, and the publish step skips every
-#     version the registry has.
+#   - "Run workflow" (on dev) publishes what is missing after a run that
+#     failed: the version step then finds nothing to do, and the publish step
+#     skips every version the registry has.
+#   - The actions are pinned to commits: a tag can be moved, and this workflow
+#     can publish.
 
 on:
   push:
@@ -30,40 +40,24 @@ concurrency:
   group: publish-next
   cancel-in-progress: false
 
-permissions:
-  contents: write # the bump commit
-  id-token: write # npm trusted publishing
+permissions: {}
 
 jobs:
-  publish:
+  version:
+    name: Version and commit
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # the bump commit
+    outputs:
+      active: ${{ steps.pre.outputs.active }}
+      sha: ${{ steps.head.outputs.sha }}
     steps:
       # The branch as it is now, not the commit that started the run: a run
       # that waited in the queue also takes what was merged in the meantime.
       - name: Checkout dev
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: dev
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Check npm can publish by OIDC
-        run: |
-          # Trusted publishing needs npm 11.5.1 or later.
-          version=$(npm --version)
-          echo "npm $version"
-          node -e '
-            const [major, minor, patch] = process.argv[1].split(".").map(Number);
-            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
-            if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
-          ' "$version"
 
       - name: Check dev is in pre mode
         id: pre
@@ -76,6 +70,17 @@ jobs:
             echo "active=false" >> "$GITHUB_OUTPUT"
             echo "::notice::dev is not in pre mode with the tag next: nothing is published"
           fi
+
+      - name: Setup pnpm
+        if: steps.pre.outputs.active == 'true'
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node.js
+        if: steps.pre.outputs.active == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
 
       - name: Install dependencies
         if: steps.pre.outputs.active == 'true'
@@ -95,29 +100,17 @@ jobs:
             echo "bumped=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Also true with no bump, after a run that committed and then failed.
-      - name: Look for versions the registry does not have
-        if: steps.pre.outputs.active == 'true'
-        id: registry
-        run: |
-          node scripts/release/publish-next.mjs --list | tee "$RUNNER_TEMP/missing.txt"
-          if grep -q '^missing=0$' "$RUNNER_TEMP/missing.txt"; then
-            echo "missing=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "missing=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build packages
-        if: steps.registry.outputs.missing == 'true'
+        if: steps.version.outputs.bumped == 'true'
         run: pnpm build
 
       - name: Run unit tests
-        if: steps.registry.outputs.missing == 'true'
+        if: steps.version.outputs.bumped == 'true'
         run: pnpm test:unit
 
-      # Before publishing: if dev moved on while this run was building, the
-      # push is refused, nothing is published, and the run that the newer
-      # merge started does both.
+      # If dev moved on while this run was building, the push is refused, the
+      # job fails, nothing is published, and the run that the newer merge
+      # started does both.
       - name: Commit the bump to dev
         if: steps.version.outputs.bumped == 'true'
         run: |
@@ -133,6 +126,68 @@ jobs:
           } > "$RUNNER_TEMP/message.txt"
           git commit --quiet -F "$RUNNER_TEMP/message.txt"
           git push origin HEAD:dev
+
+      # The commit the publish job builds: the bump, or dev as it was checked
+      # out when no version changed.
+      - name: Name the commit to publish
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  publish:
+    name: Publish to npm
+    needs: version
+    if: needs.version.outputs.active == 'true'
+    runs-on: ubuntu-latest
+    # Accepts the branch dev only (repository settings, Environments), and is
+    # named in every package's trusted publisher entry on npmjs.com.
+    environment: npm-next
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing
+    steps:
+      - name: Checkout the commit to publish
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check npm can publish by OIDC
+        run: |
+          # Trusted publishing needs npm 11.5.1 or later.
+          version=$(npm --version)
+          echo "npm $version"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
+          ' "$version"
+
+      # Also true with no bump, after a run that committed and then failed.
+      - name: Look for versions the registry does not have
+        id: registry
+        run: |
+          node scripts/release/publish-next.mjs --list | tee "$RUNNER_TEMP/missing.txt"
+          if grep -q '^missing=0$' "$RUNNER_TEMP/missing.txt"; then
+            echo "missing=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "missing=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.registry.outputs.missing == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        if: steps.registry.outputs.missing == 'true'
+        run: pnpm build
 
       - name: Publish what the registry does not have
         if: steps.registry.outputs.missing == 'true'
