@@ -41,15 +41,23 @@ When a hero section uses `min-height: 100vh` + `align-items: center` and an elem
 - Explicit heading ids (`## Heading {#custom-id}`) break the MDX build ("Could not parse expression with acorn" at the heading) — unsupported by this config. Renamed headings change their auto-slugs: update in-file anchor links; the build's broken-anchor check catches misses.
 - Stopping a harness background task kills the pnpm wrapper but can orphan the docusaurus node child holding port 3000 — check `lsof -nP -iTCP:3000 -sTCP:LISTEN`, verify the PID's command path is this repo, kill it, then restart.
 
-## Two Builds: Stable and Next
+## Versions of the Site
 
-The site is published twice in one GitHub Pages deployment (`.github/workflows/deploy-website.yml`): the branch `main` (what npm `latest` ships) at `/waveform-playlist/`, the branch `dev` (the current work) at `/waveform-playlist/next/`. The navbar dropdown (`versionDropdown` in `docusaurus.config.ts`) switches between them.
+One GitHub Pages deployment holds every version (`.github/workflows/deploy-website.yml`), and the navbar dropdown (`versionDropdown` in `docusaurus.config.ts`) switches between them:
 
-- **Two environment variables, read in `docusaurus.config.ts`:** `DOCS_CHANNEL` (`stable` or `next`; the dropdown's label, the announcement bar, `noIndex` for next) and `DOCS_BASE_URL` (default `/waveform-playlist/`). `pnpm start` and the e2e run set neither.
-- **Never write `/waveform-playlist/` into a path.** A file the page fetches or an `<a href>` is `sitePath('/media/audio/x.opus')` (`src/utils/sitePath.ts`, usable at module scope); a navbar or footer link is built from `baseUrl`; a Markdown link is the plain route. A path with the base in it still works in the next build, by loading the STABLE site's file, so it fails only when the two differ. Check: `git grep -n "/waveform-playlist/" -- website/src website/docs | grep -v "github"` lists only absolute `https://naomiaro.github.io` URLs (social images, canonical links).
-- **To try the next build locally:** `cd website && DOCS_CHANNEL=next DOCS_BASE_URL=/waveform-playlist/next/ pnpm exec docusaurus build --out-dir <dir>/waveform-playlist/next`, then serve `<dir>` with any static server. Count the requests that leave `/waveform-playlist/next/`: there should be none.
-- **A link from one build to the other is a full page load to a path outside the base URL:** `href: 'pathname://…'` with `autoAddBaseUrl: false` and `target: '_self'`. Without `autoAddBaseUrl: false` Docusaurus puts the base in front of it.
-- **The workflow file is the same on both branches,** since a push runs the copy on the pushed branch and every run builds both sites.
+| Version  | Built from                                    | Served at                      |
+| -------- | --------------------------------------------- | ------------------------------ |
+| stable   | the branch `main` (what npm `latest` ships)   | `/waveform-playlist/`          |
+| next     | the branch `dev` (the current work)           | `/waveform-playlist/next/`     |
+| archived | an earlier release, built once, in the branch `docs-archive` (`archive-docs.yml`) | `/waveform-playlist/v<major>/` |
+
+- **The stable version's number is the release number,** `version` in the root `package.json` of `main` (the project skill `release`, "The release number").
+- **Four environment variables, read in `docusaurus.config.ts`:** `DOCS_CHANNEL` (`stable`, `next` or `archived`: the dropdown's label, the announcement bar, `noIndex` for all but stable), `DOCS_BASE_URL` (default `/waveform-playlist/`), `DOCS_STABLE_VERSION` (default: this checkout's release number) and `DOCS_ARCHIVED_VERSIONS` (majors, `"16,15"`). `pnpm start` and the e2e run set none, so a local site says "Next" at the stable base URL.
+- **Never write `/waveform-playlist/` into a path.** A file the page fetches or an `<a href>` is `sitePath('/media/audio/x.opus')` (`src/utils/sitePath.ts`, usable at module scope); a navbar or footer link is built from `baseUrl`; a Markdown link is the plain route. A path with the base in it still works in another version's build, by loading the STABLE site's file, so it fails only when the two differ. Check: `git grep -n "/waveform-playlist/" -- website/src website/docs | grep -v "github"` lists nothing (what it filters out are absolute `https://naomiaro.github.io` URLs: social images, canonical links).
+- **To try a version locally:** `cd website && DOCS_CHANNEL=next DOCS_BASE_URL=/waveform-playlist/next/ pnpm exec docusaurus build --out-dir <dir>/waveform-playlist/next`, then serve `<dir>` with any static server. Count the requests that leave the version's base URL: there should be none.
+- **A link from one version to another is a full page load to a path outside the base URL:** `href: 'pathname://…'` with `autoAddBaseUrl: false` and `target: '_self'`. Without `autoAddBaseUrl: false` Docusaurus puts the base in front of it.
+- **An archived build is never rebuilt.** Its dropdown lists what existed when it was archived, and it says "Stable" without a number. A fix to an archived version's docs means running the archive workflow again on a ref that has the fix.
+- **`deploy-website.yml` is the same on `main` and `dev`,** since a push runs the copy on the pushed branch and every run builds both.
 
 ## Custom Pages
 

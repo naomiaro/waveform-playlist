@@ -1,0 +1,105 @@
+name: Archive Docs Version
+
+# Keeps the docs of a release after the next major replaces it.
+#
+# Run it by hand on `main` BEFORE the release that brings a new major there:
+# it builds the site as it is on main, to be served at
+# /waveform-playlist/v<major>/, and commits the result to the branch
+# `docs-archive` as the folder v<major>. deploy-website.yml copies every such
+# folder into the site and lists them in the version dropdown. The folder is
+# built once and not rebuilt; running this again for the same major replaces it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag whose docs to archive
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-archive
+  cancel-in-progress: false
+
+env:
+  ARCHIVE_REF: docs-archive
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          path: release
+
+      - name: Look for the docs archive
+        id: archive
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout the docs archive
+        if: steps.archive.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ARCHIVE_REF }}
+          path: archive
+
+      - name: Start the docs archive
+        if: steps.archive.outputs.exists != 'true'
+        run: |
+          git init --initial-branch "$ARCHIVE_REF" archive
+          git -C archive remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          printf '%s\n' '# Docs archive' '' 'Built docs of earlier releases, one folder per major. Written by `.github/workflows/archive-docs.yml`; do not edit by hand.' > archive/README.md
+
+      - name: Read the versions
+        run: |
+          version=$(node -p "require('./release/package.json').version")
+          major=${version%%.*}
+          case "$major" in
+            ''|*[!0-9]*) echo "::error::no release number in the root package.json of ${{ inputs.ref }} (got '$version')"; exit 1 ;;
+          esac
+          echo "MAJOR=$major" >> "$GITHUB_ENV"
+          echo "DOCS_BASE_URL=/waveform-playlist/v$major/" >> "$GITHUB_ENV"
+          echo "DOCS_ARCHIVED_VERSIONS=$(cd archive && ls -d v[0-9]* 2>/dev/null | sed 's/^v//' | paste -sd, -)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: release/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: release/pnpm-lock.yaml
+
+      - name: Build the site
+        working-directory: release
+        env:
+          DOCS_CHANNEL: archived
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm --filter @waveform-playlist/ui-components build-storybook
+          pnpm --filter website build
+
+      - name: Commit it to the archive
+        run: |
+          rm -rf "archive/v$MAJOR"
+          cp -R release/website/build "archive/v$MAJOR"
+          cd archive
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs: archive v$MAJOR (from ${{ inputs.ref }})"
+          git push origin "HEAD:$ARCHIVE_REF"

@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
@@ -64,50 +65,118 @@ const nightVisionTheme: PrismTheme = {
   ],
 };
 
-// The site is built twice and published as one GitHub Pages deployment
+// One GitHub Pages deployment holds several builds of this site
 // (.github/workflows/deploy-website.yml):
-//   stable — the branch `main`, what npm `latest` ships, at STABLE_BASE_URL
-//   next   — the branch `dev`, the current work, at NEXT_BASE_URL
-// DOCS_CHANNEL says which of the two a build is; DOCS_BASE_URL where it is served.
-// Without either, `pnpm start` serves this checkout at the stable base URL.
-type DocsChannel = 'stable' | 'next';
-const STABLE_BASE_URL = '/waveform-playlist/';
-const NEXT_BASE_URL = '/waveform-playlist/next/';
-const docsChannel: DocsChannel = process.env.DOCS_CHANNEL === 'stable' ? 'stable' : 'next';
+//
+//   stable    the branch `main`, what npm `latest` ships   /waveform-playlist/
+//   next      the branch `dev`, the current work           /waveform-playlist/next/
+//   archived  an earlier release, built once and kept      /waveform-playlist/v<major>/
+//             (.github/workflows/archive-docs.yml)
+//
+// A release has one number: `version` in the root package.json, bumped at the
+// release (.claude/skills/release/SKILL.md). The workflows pass in what a
+// build cannot know from its own checkout:
+//
+//   DOCS_CHANNEL            which of the three this build is (default: next)
+//   DOCS_BASE_URL           where it is served (default: the stable base URL)
+//   DOCS_STABLE_VERSION     the release on `main` (default: this checkout's)
+//   DOCS_ARCHIVED_VERSIONS  the archived majors, e.g. "15,14" (default: none)
+type DocsChannel = 'stable' | 'next' | 'archived';
+const DOCS_CHANNELS: readonly DocsChannel[] = ['stable', 'next', 'archived'];
+const SITE_ROOT = '/waveform-playlist/';
+const STABLE_BASE_URL = SITE_ROOT;
+const NEXT_BASE_URL = `${SITE_ROOT}next/`;
+const archivedBaseUrl = (major: number) => `${SITE_ROOT}v${major}/`;
+
+const readChannel = (value: string | undefined): DocsChannel => {
+  if (value === undefined || value === '') return 'next';
+  const channel = DOCS_CHANNELS.find((name) => name === value);
+  if (!channel) {
+    throw new Error(`DOCS_CHANNEL must be one of ${DOCS_CHANNELS.join(', ')} (got "${value}")`);
+  }
+  return channel;
+};
+
+const readVersion = (value: string, source: string): string => {
+  if (!/^\d+\.\d+\.\d+$/.test(value)) {
+    throw new Error(`${source} must be a release number like 16.0.1 (got "${value}")`);
+  }
+  return value;
+};
+
+const readMajors = (value: string | undefined): number[] =>
+  (value ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part !== '')
+    .map((part) => {
+      if (!/^\d+$/.test(part)) {
+        throw new Error(`DOCS_ARCHIVED_VERSIONS must be majors like "15,14" (got "${value}")`);
+      }
+      return Number(part);
+    });
+
+const majorOf = (version: string) => Number(version.split('.')[0]);
+
+const docsChannel = readChannel(process.env.DOCS_CHANNEL);
 const baseUrl = process.env.DOCS_BASE_URL ?? STABLE_BASE_URL;
 if (!baseUrl.startsWith('/') || !baseUrl.endsWith('/')) {
   throw new Error(`DOCS_BASE_URL must start and end with "/" (got "${baseUrl}")`);
 }
 
-const CHANNEL_LABEL: Record<DocsChannel, string> = {
-  stable: 'Stable',
-  next: 'Next',
-};
+// The release this checkout is: the number of the last release made from it.
+const ownVersion = readVersion(
+  JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version,
+  'version in the root package.json'
+);
+const ownMajor = majorOf(ownVersion);
+const stableVersion = process.env.DOCS_STABLE_VERSION
+  ? readVersion(process.env.DOCS_STABLE_VERSION, 'DOCS_STABLE_VERSION')
+  : ownVersion;
 
-// The two builds are separate apps, so a link between them is a full page load
-// to a path outside this build's base URL: `pathname://` keeps the router out
-// of it, `autoAddBaseUrl: false` stops the link from being put under baseUrl,
+// An archived build lists itself and what is older; the other two list every
+// archived release older than the stable one (a major is archived shortly
+// before the release that replaces it, and is still the stable one until then).
+const newestListedMajor = docsChannel === 'archived' ? ownMajor : majorOf(stableVersion) - 1;
+const archivedMajors = [
+  ...new Set([...readMajors(process.env.DOCS_ARCHIVED_VERSIONS), ...(docsChannel === 'archived' ? [ownMajor] : [])]),
+]
+  .filter((major) => major <= newestListedMajor)
+  .sort((a, b) => b - a);
+
+// The builds are separate apps, so a link between them is a full page load to
+// a path outside this build's base URL: `pathname://` keeps the router out of
+// it, `autoAddBaseUrl: false` stops the link from being put under baseUrl,
 // `target: '_self'` keeps the tab. Docusaurus draws such a link as external;
 // `docs-channel-link` (custom.css) hides its "opens in new tab" icon.
-const channelItem = (channel: DocsChannel, label: string, channelBaseUrl: string) => ({
+const versionLink = (label: string, targetBaseUrl: string) => ({
   label,
-  href: `pathname://${channelBaseUrl}`,
+  href: `pathname://${targetBaseUrl}`,
   autoAddBaseUrl: false,
   target: '_self',
   className:
-    channel === docsChannel
-      ? 'docs-channel-link dropdown__link--active'
-      : 'docs-channel-link',
+    targetBaseUrl === baseUrl ? 'docs-channel-link dropdown__link--active' : 'docs-channel-link',
 });
+
+// An archived build is never rebuilt, so it does not print the stable
+// release's number: that number would be wrong after the next release.
+const stableLabel = docsChannel === 'archived' ? 'Stable' : `v${stableVersion} — stable`;
+
+const DROPDOWN_LABEL: Record<DocsChannel, string> = {
+  stable: `v${stableVersion}`,
+  next: 'Next',
+  archived: `v${ownMajor}`,
+};
 
 const versionDropdown = {
   type: 'dropdown' as const,
   position: 'right' as const,
-  label: CHANNEL_LABEL[docsChannel],
+  label: DROPDOWN_LABEL[docsChannel],
   className: 'navbar__item--docs-channel',
   items: [
-    channelItem('stable', 'Stable — npm latest', STABLE_BASE_URL),
-    channelItem('next', 'Next — in development', NEXT_BASE_URL),
+    versionLink('Next — in development', NEXT_BASE_URL),
+    versionLink(stableLabel, STABLE_BASE_URL),
+    ...archivedMajors.map((major) => versionLink(`v${major}`, archivedBaseUrl(major))),
   ],
 };
 
@@ -118,10 +187,20 @@ const releaseAnnouncement = {
   isCloseable: true,
 };
 
-const nextAnnouncement = {
-  id: 'docs_channel_next',
-  content: `These docs describe work in development that is not on npm <code>latest</code> yet. The released packages are documented in the <a href="${STABLE_BASE_URL}" target="_self">stable docs</a>.`,
-  isCloseable: false,
+const stableDocsLink = `<a href="${STABLE_BASE_URL}" target="_self">stable docs</a>`;
+
+const ANNOUNCEMENT: Record<DocsChannel, typeof releaseAnnouncement> = {
+  stable: releaseAnnouncement,
+  next: {
+    id: 'docs_channel_next',
+    content: `These docs describe work in development that is not on npm <code>latest</code> yet. The released packages are documented in the ${stableDocsLink}.`,
+    isCloseable: false,
+  },
+  archived: {
+    id: 'docs_channel_archived',
+    content: `These are the docs of release <strong>v${ownMajor}</strong>, which is no longer the current one. The current release is documented in the ${stableDocsLink}.`,
+    isCloseable: false,
+  },
 };
 
 const config: Config = {
@@ -171,7 +250,7 @@ const config: Config = {
   baseUrl,
 
   // One copy of each page in search engines: the stable one.
-  noIndex: docsChannel === 'next',
+  noIndex: docsChannel !== 'stable',
 
   // GitHub pages deployment config.
   organizationName: 'naomiaro',
@@ -306,7 +385,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    announcementBar: docsChannel === 'next' ? nextAnnouncement : releaseAnnouncement,
+    announcementBar: ANNOUNCEMENT[docsChannel],
     // Social card image for Open Graph and Twitter
     image: 'img/social/waveform-playlist-social.png',
     // SEO metadata
