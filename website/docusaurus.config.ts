@@ -4,6 +4,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 import type {PrismTheme} from 'prism-react-renderer';
+import remarkNextInstallTag from './src/remark/nextInstallTag';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -238,6 +239,8 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
+          // The next docs install the prereleases they describe: `@next` on our packages
+          remarkPlugins: docsChannel === 'next' ? [remarkNextInstallTag] : [],
           editUrl: `https://github.com/naomiaro/waveform-playlist/tree/${SOURCE_BRANCH[docsChannel]}/website/`,
         },
         blog: false, // Disable blog
