@@ -15,6 +15,13 @@ on:
       - 'website/docs/**'
       - 'website/static/llms.txt'
 
+# These jobs install, build and test: they run the code of every dependency.
+# The token they get can read the repository and nothing else. Without this
+# block it has the repository's default rights, which include pushing to dev,
+# where .github/workflows/publish-next.yml publishes from.
+permissions:
+  contents: read
+
 jobs:
   validate:
     runs-on: ubuntu-latest
