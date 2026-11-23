@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
@@ -37,7 +38,7 @@ export default function MediaElementExamplePage(): React.ReactElement {
 
         <p style={{ marginTop: '1.5rem' }}>
           See the{' '}
-          <a href="/waveform-playlist/docs/react/guides/media-element-playout">
+          <a href={sitePath('/docs/react/guides/media-element-playout')}>
             Media Element Playout Guide
           </a>{' '}
           for usage details and API reference.

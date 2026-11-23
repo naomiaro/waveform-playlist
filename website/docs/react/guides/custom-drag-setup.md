@@ -264,7 +264,7 @@ The sensors do not change the size of the trim handles. Widen them with `touchOp
 
 `<ClipInteractionProvider touchOptimized>` does both by itself.
 
-The [Custom Drag Setup example](pathname:///waveform-playlist/examples/custom-drag-setup) runs this setup, with a checkbox for each of the two options.
+The [Custom Drag Setup example](/examples/custom-drag-setup) runs this setup, with a checkbox for each of the two options.
 
 ## `ClipInteractionOptions`
 

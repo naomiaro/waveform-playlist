@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
@@ -39,7 +40,7 @@ const Option = styled.label`
   cursor: pointer;
 `;
 
-const AUDIO = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/';
+const AUDIO = sitePath('/media/audio/AlbertKader_Ubiquitous/');
 
 const audioFiles = [
   { id: 'kick', src: AUDIO + '01_Kick.opus' },

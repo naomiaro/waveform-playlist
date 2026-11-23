@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
@@ -49,7 +50,7 @@ import { sonnetNotes as defaultNotes } from './sonnetAnnotations';
 import { SourceLoadError } from './SourceLoadError';
 import { FailedDropsAlert, useFailedDrops } from './FailedDrops';
 
-const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
+const SONNET_SRC = sitePath('/media/audio/sonnet.mp3');
 
 
 // Annotation actions for the UI

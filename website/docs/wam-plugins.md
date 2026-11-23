@@ -238,4 +238,4 @@ You can write an effect in [Faust](https://faust.grame.fr/), compile it ahead of
 - [Audio Effects](/docs/react/guides/effects) — built-in Tone.js effects, custom effects registered with `registerEffect()`, and the core `useDynamicEffects`/`useTrackDynamicEffects` API
 - [Hooks API Reference](/docs/react/api/hooks#effects-hooks) — full `UseDynamicEffectsReturn`/`UseTrackDynamicEffectsReturn` signatures
 - [Web Components Getting Started](/docs/web-components/getting-started)
-- Try it: [WAM! Kick It Up a Notch](pathname:///waveform-playlist/examples/wam-effects)
+- Try it: [WAM! Kick It Up a Notch](/examples/wam-effects)

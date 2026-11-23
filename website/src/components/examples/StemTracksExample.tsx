@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -35,51 +36,51 @@ import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 // Stem tracks configuration - Albert Kader "Whiptails" minimal techno (all stems)
 const audioConfigs: AudioTrackOptions[] = [
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/01_Loop1.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/01_Loop1.opus'),
     name: 'Loop 1',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/02_Loop2.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/02_Loop2.opus'),
     name: 'Loop 2',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/03_Kick.opus'),
     name: 'Kick',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/04_Snare.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/04_Snare.opus'),
     name: 'Snare',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/05_Claps.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/05_Claps.opus'),
     name: 'Claps',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/06_HiHat.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/06_HiHat.opus'),
     name: 'HiHat',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/07_Bass1.opus'),
     name: 'Bass 1',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/08_Bass2.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/08_Bass2.opus'),
     name: 'Bass 2',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.opus'),
     name: 'Synth 1',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/10_Synth2.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/10_Synth2.opus'),
     name: 'Synth 2',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/11_Vox_Dry.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/11_Vox_Dry.opus'),
     name: 'Vox Dry',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/12_Vox_Wet.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/12_Vox_Wet.opus'),
     name: 'Vox Wet',
   },
 ];

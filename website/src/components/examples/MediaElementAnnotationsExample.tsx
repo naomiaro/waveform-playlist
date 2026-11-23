@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 import {
@@ -25,9 +26,9 @@ import {
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { sonnetNotes } from './sonnetAnnotations';
 
-const AUDIO_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
+const AUDIO_SRC = sitePath('/media/audio/sonnet.mp3');
 // Generated with: audiowaveform -i sonnet.mp3 -o sonnet.dat -z 256 -b 8
-const PEAKS_SRC = '/waveform-playlist/media/audio/sonnet.dat';
+const PEAKS_SRC = sitePath('/media/audio/sonnet.dat');
 
 type WaveformData = Awaited<ReturnType<typeof loadWaveformData>>;
 type Annotation = ReturnType<typeof parseAeneas>;

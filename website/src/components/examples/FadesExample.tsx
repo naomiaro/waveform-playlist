@@ -10,6 +10,7 @@
  * Tone.js Transport, so pressing play on one doesn't affect the others.
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -66,8 +67,8 @@ const WaveformWrapper = styled.div`
   overflow: hidden;
 `;
 
-const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus';
-const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat';
+const AUDIO_SRC = sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus');
+const PEAKS_SRC = sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat');
 const FADE_DURATION = 1.5;
 const SAMPLES_PER_PIXEL = 1024;
 

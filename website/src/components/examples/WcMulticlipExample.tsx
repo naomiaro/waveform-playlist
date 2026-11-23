@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import { useEffect, useRef, useState } from 'react';
 import '@dawcore/components';
 import { NativePlayoutAdapter } from '@dawcore/transport';
@@ -56,7 +57,7 @@ const TRACKS = [
 ];
 
 const audioPath = (src: string, ext: string) =>
-  `/waveform-playlist/media/audio/AlbertKader_Ubiquitous/${src}.${ext}`;
+  sitePath(`/media/audio/AlbertKader_Ubiquitous/${src}.${ext}`);
 
 export default function WcMulticlipExample() {
   const editorRef = useRef<HTMLElement | null>(null);
