@@ -128,6 +128,12 @@ const versionLink = (channel: DocsChannel, label: string, channelBaseUrl: string
     channel === docsChannel ? 'docs-channel-link dropdown__link--active' : 'docs-channel-link',
 });
 
+// "Edit this page" goes to the branch the build was made from.
+const SOURCE_BRANCH: Record<DocsChannel, string> = {
+  stable: 'main',
+  next: 'dev',
+};
+
 const DROPDOWN_LABEL: Record<DocsChannel, string> = {
   stable: `v${stableVersion}`,
   next: 'Next',
@@ -232,7 +238,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/naomiaro/waveform-playlist/tree/main/website/',
+          editUrl: `https://github.com/naomiaro/waveform-playlist/tree/${SOURCE_BRANCH[docsChannel]}/website/`,
         },
         blog: false, // Disable blog
         theme: {

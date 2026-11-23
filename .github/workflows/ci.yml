@@ -2,7 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    # dev is the base of every PR; main (the stable line) takes a PR only for
+    # a fix to the released version.
+    branches: [dev, main]
     # Nothing below is read by the jobs here (package build, lint of
     # packages/*/src, unit tests), so a pull request that changes only these
     # paths starts no run and shows no checks.

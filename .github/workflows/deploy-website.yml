@@ -50,7 +50,10 @@ jobs:
 
       # What a build cannot know from its own checkout: the release on main.
       - name: Read the stable release number
-        run: echo "DOCS_STABLE_VERSION=$(node -p "require('./stable/package.json').version")" >> "$GITHUB_ENV"
+        run: |
+          # Assigned first: a failed command inside `echo "…$(…)"` does not fail the step.
+          version=$(node -p "require('./stable/package.json').version")
+          echo "DOCS_STABLE_VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
