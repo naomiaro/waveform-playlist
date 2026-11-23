@@ -52,11 +52,11 @@ One GitHub Pages deployment holds every version (`.github/workflows/deploy-websi
 | archived | an earlier release, built once, in the branch `docs-archive` (`archive-docs.yml`) | `/waveform-playlist/v<major>/` |
 
 - **The stable version's number is the release number,** `version` in the root `package.json` of `main` (the project skill `release`, "The release number").
-- **Four environment variables, read in `docusaurus.config.ts`:** `DOCS_CHANNEL` (`stable`, `next` or `archived`: the dropdown's label, the announcement bar, `noIndex` for all but stable), `DOCS_BASE_URL` (default `/waveform-playlist/`), `DOCS_STABLE_VERSION` (default: this checkout's release number) and `DOCS_ARCHIVED_VERSIONS` (majors, `"16,15"`). `pnpm start` and the e2e run set none, so a local site says "Next" at the stable base URL.
-- **Never write `/waveform-playlist/` into a path.** A file the page fetches or an `<a href>` is `sitePath('/media/audio/x.opus')` (`src/utils/sitePath.ts`, usable at module scope); a navbar or footer link is built from `baseUrl`; a Markdown link is the plain route. A path with the base in it still works in another version's build, by loading the STABLE site's file, so it fails only when the two differ. Check: `git grep -n "/waveform-playlist/" -- website/src website/docs | grep -v "github"` lists nothing (what it filters out are absolute `https://naomiaro.github.io` URLs: social images, canonical links).
+- **Four environment variables, read in `docusaurus.config.ts`:** `DOCS_CHANNEL` (`stable`, `next` or `archived`: the dropdown's label, the announcement bar, `noIndex` for all but stable), `DOCS_BASE_URL` (default `/waveform-playlist/`), `DOCS_STABLE_VERSION` (default: this checkout's release number) and `DOCS_ARCHIVED_VERSIONS` (majors, `"16,15"`). `pnpm start` and the e2e run set none, so a local site says "Next" at the stable base URL. The root `version` must be three numbers (`16.0.1`): the config throws on anything else, a prerelease number included.
+- **Never write `/waveform-playlist/` into a path.** A file the page fetches or an `<a href>` is `sitePath('/media/audio/x.opus')` (`src/utils/sitePath.ts`, usable at module scope); a navbar or footer link is built from `baseUrl`; a Markdown link is the plain route. A path with the base in it still works in another version's build, by loading the STABLE site's file, so it fails only when the two differ. Check: `git grep -n "/waveform-playlist/" -- website/src website/docs | grep -v "github"` lists only the three comment lines of `src/utils/sitePath.ts` (what it filters out are absolute `https://naomiaro.github.io` URLs: social images, canonical links).
 - **To try a version locally:** `cd website && DOCS_CHANNEL=next DOCS_BASE_URL=/waveform-playlist/next/ pnpm exec docusaurus build --out-dir <dir>/waveform-playlist/next`, then serve `<dir>` with any static server. Count the requests that leave the version's base URL: there should be none.
 - **A link from one version to another is a full page load to a path outside the base URL:** `href: 'pathname://…'` with `autoAddBaseUrl: false` and `target: '_self'`. Without `autoAddBaseUrl: false` Docusaurus puts the base in front of it.
-- **An archived build is never rebuilt.** Its dropdown lists what existed when it was archived, and it says "Stable" without a number. A fix to an archived version's docs means running the archive workflow again on a ref that has the fix.
+- **An archived build is never rebuilt.** Its dropdown lists what existed when it was archived, and it says "Stable" without a number. A fix to an archived version's docs means running the archive workflow again on a ref that has the fix, and then a deployment ("Run workflow" on Deploy Website, or the next push to `main` or `dev`): the archive workflow's own push starts none. `docs-archive` is generated, one commit replaced by a forced push at every run; nothing else writes to it.
 - **`deploy-website.yml` is the same on `main` and `dev`,** since a push runs the copy on the pushed branch and every run builds both.
 
 ## Custom Pages
@@ -83,7 +83,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 ## Static Media Assets
 
-- A320U.sf2 SoundFont — served from `static/media/soundfont/`. CC-BY 3.0 license. Loaded by MIDI example at `/waveform-playlist/media/soundfont/A320U.sf2`.
+- A320U.sf2 SoundFont — served from `static/media/soundfont/`. CC-BY 3.0 license. Loaded by the MIDI example with `sitePath('/media/soundfont/A320U.sf2')`.
 
 ## Example Component Guidelines
 

@@ -55,11 +55,13 @@ jobs:
       - name: Look for the docs archive
         id: archive
         run: |
-          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          status=0
+          git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null || status=$?
+          case "$status" in
+            0) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            2) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::could not ask the repository for $ARCHIVE_REF (git ls-remote exited $status)"; exit 1 ;;
+          esac
 
       - name: Checkout the docs archive
         if: steps.archive.outputs.exists == 'true'
@@ -75,7 +77,11 @@ jobs:
           echo "DOCS_STABLE_VERSION=$(node -p "require('./stable/package.json').version")" >> "$GITHUB_ENV"
           majors=""
           if [ -d archive ]; then
-            majors=$(cd archive && ls -d v[0-9]* 2>/dev/null | sed 's/^v//' | paste -sd, -)
+            for dir in archive/v[0-9]*; do
+              if [ -d "$dir" ]; then
+                majors="${majors:+$majors,}${dir#archive/v}"
+              fi
+            done
           fi
           echo "DOCS_ARCHIVED_VERSIONS=$majors" >> "$GITHUB_ENV"
 
@@ -127,7 +133,9 @@ jobs:
           place next/website/build next
           if [ -d archive ]; then
             for dir in archive/v[0-9]*; do
-              [ -d "$dir" ] && place "$dir" "$(basename "$dir")"
+              if [ -d "$dir" ]; then
+                place "$dir" "$(basename "$dir")"
+              fi
             done
           fi
 

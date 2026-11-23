@@ -4,16 +4,24 @@ name: Archive Docs Version
 #
 # Run it by hand on `main` BEFORE the release that brings a new major there:
 # it builds the site as it is on main, to be served at
-# /waveform-playlist/v<major>/, and commits the result to the branch
+# /waveform-playlist/v<major>/, and writes the result to the branch
 # `docs-archive` as the folder v<major>. deploy-website.yml copies every such
 # folder into the site and lists them in the version dropdown. The folder is
 # built once and not rebuilt; running this again for the same major replaces it.
+#
+# `docs-archive` is generated: every run replaces it with ONE commit that holds
+# all the folders (a forced push), so the repository does not keep 200 MB of
+# history per run. Nothing else writes to that branch.
+#
+# The site shows the result at its next deployment (a push to main or dev, or
+# "Run workflow" on Deploy Website): a push made by a workflow starts no other
+# workflow.
 
 on:
   workflow_dispatch:
     inputs:
       ref:
-        description: Branch or tag whose docs to archive
+        description: Branch or tag whose docs to archive (v16.0.1 or later; an earlier one cannot be built for /v<major>/)
         required: true
         default: main
 
@@ -26,6 +34,7 @@ concurrency:
 
 env:
   ARCHIVE_REF: docs-archive
+  RELEASE_REF: ${{ inputs.ref }}
 
 jobs:
   archive:
@@ -34,17 +43,19 @@ jobs:
       - name: Checkout the release
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ env.RELEASE_REF }}
           path: release
 
       - name: Look for the docs archive
         id: archive
         run: |
-          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
+          status=0
+          git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}.git" "$ARCHIVE_REF" > /dev/null || status=$?
+          case "$status" in
+            0) echo "exists=true" >> "$GITHUB_OUTPUT" ;;
+            2) echo "exists=false" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::could not ask the repository for $ARCHIVE_REF (git ls-remote exited $status)"; exit 1 ;;
+          esac
 
       - name: Checkout the docs archive
         if: steps.archive.outputs.exists == 'true'
@@ -65,11 +76,23 @@ jobs:
           version=$(node -p "require('./release/package.json').version")
           major=${version%%.*}
           case "$major" in
-            ''|*[!0-9]*) echo "::error::no release number in the root package.json of ${{ inputs.ref }} (got '$version')"; exit 1 ;;
+            ''|*[!0-9]*) echo "::error::no release number in the root package.json of $RELEASE_REF (got '$version')"; exit 1 ;;
           esac
+          # A ref from before the site had versions ignores DOCS_BASE_URL: it
+          # would be built for /waveform-playlist/ and archived broken.
+          if ! grep -q "DOCS_CHANNEL" release/website/docusaurus.config.ts; then
+            echo "::error::$RELEASE_REF cannot be built as an archived version (its docusaurus.config.ts does not read DOCS_CHANNEL)"
+            exit 1
+          fi
+          majors=""
+          for dir in archive/v[0-9]*; do
+            if [ -d "$dir" ]; then
+              majors="${majors:+$majors,}${dir#archive/v}"
+            fi
+          done
           echo "MAJOR=$major" >> "$GITHUB_ENV"
           echo "DOCS_BASE_URL=/waveform-playlist/v$major/" >> "$GITHUB_ENV"
-          echo "DOCS_ARCHIVED_VERSIONS=$(cd archive && ls -d v[0-9]* 2>/dev/null | sed 's/^v//' | paste -sd, -)" >> "$GITHUB_ENV"
+          echo "DOCS_ARCHIVED_VERSIONS=$majors" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -93,13 +116,16 @@ jobs:
           pnpm --filter @waveform-playlist/ui-components build-storybook
           pnpm --filter website build
 
-      - name: Commit it to the archive
+      # One commit with every folder, on a branch with no parent, pushed over
+      # the old one (see the note at the top of this file).
+      - name: Write it to the archive
         run: |
           rm -rf "archive/v$MAJOR"
           cp -R release/website/build "archive/v$MAJOR"
           cd archive
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan archive-rewrite
           git add -A
-          git commit -m "docs: archive v$MAJOR (from ${{ inputs.ref }})"
-          git push origin "HEAD:$ARCHIVE_REF"
+          git commit --quiet -m "docs: archive v$MAJOR (from $RELEASE_REF)"
+          git push --force origin "archive-rewrite:$ARCHIVE_REF"

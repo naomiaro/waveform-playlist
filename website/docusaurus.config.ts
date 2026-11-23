@@ -119,7 +119,7 @@ const readMajors = (value: string | undefined): number[] =>
 const majorOf = (version: string) => Number(version.split('.')[0]);
 
 const docsChannel = readChannel(process.env.DOCS_CHANNEL);
-const baseUrl = process.env.DOCS_BASE_URL ?? STABLE_BASE_URL;
+const baseUrl = process.env.DOCS_BASE_URL || STABLE_BASE_URL;
 if (!baseUrl.startsWith('/') || !baseUrl.endsWith('/')) {
   throw new Error(`DOCS_BASE_URL must start and end with "/" (got "${baseUrl}")`);
 }
@@ -149,13 +149,12 @@ const archivedMajors = [
 // it, `autoAddBaseUrl: false` stops the link from being put under baseUrl,
 // `target: '_self'` keeps the tab. Docusaurus draws such a link as external;
 // `docs-channel-link` (custom.css) hides its "opens in new tab" icon.
-const versionLink = (label: string, targetBaseUrl: string) => ({
+const versionLink = (label: string, targetBaseUrl: string, isThisBuild: boolean) => ({
   label,
   href: `pathname://${targetBaseUrl}`,
   autoAddBaseUrl: false,
   target: '_self',
-  className:
-    targetBaseUrl === baseUrl ? 'docs-channel-link dropdown__link--active' : 'docs-channel-link',
+  className: isThisBuild ? 'docs-channel-link dropdown__link--active' : 'docs-channel-link',
 });
 
 // An archived build is never rebuilt, so it does not print the stable
@@ -174,9 +173,11 @@ const versionDropdown = {
   label: DROPDOWN_LABEL[docsChannel],
   className: 'navbar__item--docs-channel',
   items: [
-    versionLink('Next — in development', NEXT_BASE_URL),
-    versionLink(stableLabel, STABLE_BASE_URL),
-    ...archivedMajors.map((major) => versionLink(`v${major}`, archivedBaseUrl(major))),
+    versionLink('Next — in development', NEXT_BASE_URL, docsChannel === 'next'),
+    versionLink(stableLabel, STABLE_BASE_URL, docsChannel === 'stable'),
+    ...archivedMajors.map((major) =>
+      versionLink(`v${major}`, archivedBaseUrl(major), docsChannel === 'archived' && major === ownMajor)
+    ),
   ],
 };
 
