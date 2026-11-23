@@ -2,7 +2,7 @@
 
 Multi-track audio editor roadmap for waveform-playlist.
 
-**Branch:** `main` | **Last Updated:** 2026-07-03
+**Branch:** `dev` | **Last Updated:** 2026-07-03
 
 ---
 
