@@ -1,0 +1,28 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@waveform-playlist/example-media-element-player": "0.0.0",
+    "@waveform-playlist/example-react-starter": "0.0.0",
+    "@waveform-playlist/annotations": "13.0.1",
+    "@waveform-playlist/browser": "16.0.1",
+    "@waveform-playlist/core": "12.6.2",
+    "@dawcore/components": "0.0.38",
+    "@dawcore/faust": "0.0.1",
+    "@dawcore/midi": "0.0.5",
+    "@dawcore/spectrogram": "0.0.8",
+    "@dawcore/wam": "0.0.4",
+    "@waveform-playlist/engine": "13.6.1",
+    "@waveform-playlist/media-element-playout": "12.3.3",
+    "@waveform-playlist/midi": "13.0.4",
+    "@waveform-playlist/playout": "12.5.5",
+    "@waveform-playlist/recording": "13.0.6",
+    "@waveform-playlist/spectrogram": "14.0.1",
+    "@dawcore/transport": "0.0.15",
+    "@waveform-playlist/ui-components": "14.0.1",
+    "@waveform-playlist/webaudio-peaks": "12.0.3",
+    "@waveform-playlist/worklets": "13.0.0",
+    "website": "0.0.0"
+  },
+  "changesets": []
+}
