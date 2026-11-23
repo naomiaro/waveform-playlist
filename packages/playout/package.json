@@ -53,7 +53,7 @@
     "soundfont2": "^0.5.0"
   },
   "peerDependencies": {
-    "@waveform-playlist/engine": ">=7.0.0",
+    "@waveform-playlist/engine": ">=7.0.0 || >=14.0.0-0",
     "tone": "^15.0.0"
   },
   "peerDependenciesMeta": {

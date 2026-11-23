@@ -41,12 +41,12 @@
     "waveform-data": "^4.5.2"
   },
   "peerDependencies": {
-    "@dawcore/faust": ">=0.0.1",
-    "@dawcore/midi": ">=0.0.1",
-    "@dawcore/transport": ">=0.0.16",
+    "@dawcore/faust": ">=0.0.1 || >=0.0.2-0",
+    "@dawcore/midi": ">=0.0.1 || >=0.0.6-0",
+    "@dawcore/transport": ">=0.0.16-0",
     "@dawcore/wam": ">=0.0.1",
-    "@waveform-playlist/core": ">=12.7.0",
-    "@waveform-playlist/engine": ">=13.5.0",
+    "@waveform-playlist/core": ">=12.7.0 || >=13.0.0-0",
+    "@waveform-playlist/engine": ">=13.5.0 || >=14.0.0-0",
     "@waveform-playlist/worklets": ">=12.0.0"
   },
   "peerDependenciesMeta": {
