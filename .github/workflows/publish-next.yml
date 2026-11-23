@@ -244,11 +244,26 @@ jobs:
     outputs:
       missing: ${{ steps.registry.outputs.missing }}
     steps:
-      - name: Checkout the commit to publish
+      # dev itself, then a check that it is still the commit the commit job
+      # named: what is built here is dev's own code, checked rather than
+      # assumed (CodeQL actions/cache-poisoning/poisonable-step treats a
+      # checkout of a job output as untrusted).
+      - name: Checkout dev
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.commit.outputs.sha }}
+          ref: dev
           persist-credentials: false
+
+      # If dev moved on after the commit job, this run publishes nothing: the
+      # run of the newer merge, queued behind this one, publishes instead.
+      - name: Check dev is the commit to publish
+        env:
+          SHA: ${{ needs.commit.outputs.sha }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$SHA" ]; then
+            echo "::error::dev moved on after the commit job named $SHA: this run publishes nothing, the run of the newer merge does"
+            exit 1
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
@@ -258,7 +273,7 @@ jobs:
         with:
           node-version: 24
           # No cache in the job that builds what is published: a cache is
-          # written by other runs (CodeQL actions/cache-poisoning).
+          # written by other runs.
           package-manager-cache: false
 
       # Also true with no bump, after a run that committed and then failed.
