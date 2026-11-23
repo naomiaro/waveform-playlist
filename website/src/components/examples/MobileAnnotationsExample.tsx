@@ -10,6 +10,7 @@
  * Usage tip: Touch and hold an annotation boundary to resize.
  * Tap an annotation to select it and play from that point.
  */
+import { sitePath } from '../../utils/sitePath';
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { audioTrack } from '@waveform-playlist/core';
@@ -47,7 +48,7 @@ import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { SourceLoadError } from './SourceLoadError';
 import { LoadingBadge, LoadingBadgeFrame } from './LoadingBadge';
 
-const SONNET_SRC = '/waveform-playlist/media/audio/sonnet.mp3';
+const SONNET_SRC = sitePath('/media/audio/sonnet.mp3');
 
 // Full annotation data - Shakespeare's Sonnet 1
 const mobileAnnotations = [

@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
@@ -27,29 +28,29 @@ import { findFailedSource } from './SourceLoadError';
 const trackConfigs = [
   {
     name: 'Kick',
-    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+    audioSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.dat'),
     peaksSize: 55, // KB (~27K points * 2 bytes)
     audioSize: 280, // KB (Opus is smaller than MP3)
   },
   {
     name: 'Bass',
-    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+    audioSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.dat'),
     peaksSize: 53,
     audioSize: 620,
   },
   {
     name: 'Synth 1',
-    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat',
+    audioSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat'),
     peaksSize: 55,
     audioSize: 340,
   },
   {
     name: 'Synth 2',
-    audioSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat',
+    audioSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.dat'),
     peaksSize: 55,
     audioSize: 380,
   },

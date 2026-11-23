@@ -58,6 +58,16 @@ declare module '@docusaurus/useDocusaurusContext' {
   export default function useDocusaurusContext(): DocusaurusContext;
 }
 
+declare module '@generated/docusaurus.config' {
+  const siteConfig: {
+    title: string;
+    tagline: string;
+    url: string;
+    baseUrl: string;
+  };
+  export default siteConfig;
+}
+
 declare module '@docusaurus/useBaseUrl' {
   export default function useBaseUrl(url: string): string;
 }

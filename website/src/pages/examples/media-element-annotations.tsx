@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
@@ -59,10 +60,10 @@ export default function MediaElementAnnotationsExamplePage(): React.ReactElement
 
         <p style={{ marginTop: '1.5rem' }}>
           See the{' '}
-          <a href="/waveform-playlist/docs/react/guides/media-element-playout">
+          <a href={sitePath('/docs/react/guides/media-element-playout')}>
             Media Element Playout guide
           </a>{' '}
-          and the <a href="/waveform-playlist/docs/react/guides/annotations">Annotations guide</a>.
+          and the <a href={sitePath('/docs/react/guides/annotations')}>Annotations guide</a>.
         </p>
       </main>
     </Layout>

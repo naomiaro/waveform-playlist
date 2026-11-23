@@ -9,6 +9,7 @@
  * - Full theming customization
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React, { useRef, useEffect } from 'react';
 import { getContext } from 'tone';
 import styled from 'styled-components';
@@ -495,17 +496,17 @@ const FlexibleApiContent: React.FC = () => {
 
 // Albert Kader "Ubiquitous" - all 11 tracks
 const audioConfigs: AudioTrackOptions[] = [
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus', name: 'Kick' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus', name: 'HiHat 1' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus', name: 'HiHat 2' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus', name: 'Claps' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus', name: 'SFX 1' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus', name: 'SFX 2' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus', name: 'Shakers' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus', name: 'Bass' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus', name: 'Synth 1' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus', name: 'Synth 2 Mod' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus', name: 'Synth 2' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.opus'), name: 'Kick' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus'), name: 'HiHat 1' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/03_HiHat2.opus'), name: 'HiHat 2' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/04_Claps.opus'), name: 'Claps' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/05_SFX1.opus'), name: 'SFX 1' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/06_SFX2.opus'), name: 'SFX 2' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus'), name: 'Shakers' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'), name: 'Bass' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus'), name: 'Synth 1' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/10_Synth2_PitchModulated.opus'), name: 'Synth 2 Mod' },
+  { src: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus'), name: 'Synth 2' },
 ];
 
 // Main Example Component

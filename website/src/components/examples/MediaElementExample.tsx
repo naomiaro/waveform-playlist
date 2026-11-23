@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type * as ToneNs from 'tone';
@@ -25,13 +26,13 @@ import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 // Audio files with pre-computed peaks
 const AUDIO_CONFIGS = [
   {
-    source: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-    peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+    source: sitePath('/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'),
+    peaksSrc: sitePath('/storybook/media/audio/AlbertKader_Ubiquitous/08_Bass.dat'),
     name: 'Bass',
   },
   {
-    source: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-    peaksSrc: '/waveform-playlist/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+    source: sitePath('/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.opus'),
+    peaksSrc: sitePath('/storybook/media/audio/AlbertKader_Ubiquitous/01_Kick.dat'),
     name: 'Kick',
   },
 ];

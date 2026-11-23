@@ -613,3 +613,10 @@ div[class*='announcementBar'] code {
     font-size: 1.1rem;
   }
 }
+
+/* Version dropdown (docusaurus.config.ts, `versionDropdown`): its links go to
+   the other build of this site in the same tab, so the "opens in new tab"
+   icon Docusaurus adds to a link it cannot route is hidden. */
+.docs-channel-link svg {
+  display: none;
+}

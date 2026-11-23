@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import { useEffect, useRef } from 'react';
 import '@dawcore/components';
 import { NativePlayoutAdapter } from '@dawcore/transport';
@@ -19,11 +20,11 @@ declare global {
 }
 
 const TRACKS = [
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus', name: 'Kick' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/05_Claps.opus', name: 'Claps' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/06_HiHat.opus', name: 'HiHat' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus', name: 'Bass' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus', name: 'Synth' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/03_Kick.opus'), name: 'Kick' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/05_Claps.opus'), name: 'Claps' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/06_HiHat.opus'), name: 'HiHat' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/07_Bass1.opus'), name: 'Bass' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.opus'), name: 'Synth' },
 ];
 
 export default function WcBasicExample() {

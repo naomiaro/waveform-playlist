@@ -73,9 +73,9 @@ This is intentional — it lets consumers choose their audio backend (native Web
 
 Runnable examples — rendered with `@dawcore/components` directly, no React in the audio path:
 
-- [**Basic**](pathname:///waveform-playlist/examples/wc-basic) — Minimal `<daw-editor>` with the native Web Audio adapter
-- [**Multiclip**](pathname:///waveform-playlist/examples/wc-multiclip) — Multiple `<daw-clip>` per track, drag/trim/split, pre-computed peaks via `<daw-keyboard-shortcuts>`
-- [**Player**](pathname:///waveform-playlist/examples/wc-player) — Lightweight single-track `<daw-player>`: HTMLMediaElement streaming, pre-computed peaks or scrubber fallback, playback rate
+- [**Basic**](/examples/wc-basic) — Minimal `<daw-editor>` with the native Web Audio adapter
+- [**Multiclip**](/examples/wc-multiclip) — Multiple `<daw-clip>` per track, drag/trim/split, pre-computed peaks via `<daw-keyboard-shortcuts>`
+- [**Player**](/examples/wc-player) — Lightweight single-track `<daw-player>`: HTMLMediaElement streaming, pre-computed peaks or scrubber fallback, playback rate
 
 ## Run it locally
 

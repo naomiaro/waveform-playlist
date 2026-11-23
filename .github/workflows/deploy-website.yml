@@ -1,9 +1,19 @@
 name: Deploy Website
 
+# One GitHub Pages deployment holds two builds of the site:
+#
+#   main (stable, what npm `latest` ships)  ->  /waveform-playlist/
+#   dev  (the current work)                  ->  /waveform-playlist/next/
+#
+# A Pages deployment replaces the whole site, so a push to either branch
+# builds both. This file is the same on both branches; a change to it goes to
+# both, because a push runs the copy on the branch that was pushed.
+
 on:
   push:
     branches:
       - main
+      - dev
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -17,33 +27,73 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  STABLE_REF: main
+  NEXT_REF: dev
+  NEXT_BASE_URL: /waveform-playlist/next/
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout stable
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.STABLE_REF }}
+          path: stable
+
+      - name: Checkout next
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.NEXT_REF }}
+          path: next
+
+      # What a build cannot know from its own checkout: the release on main.
+      - name: Read the stable release number
+        run: echo "DOCS_STABLE_VERSION=$(node -p "require('./stable/package.json').version")" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: next/package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: |
+            stable/pnpm-lock.yaml
+            next/pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Build stable site
+        working-directory: stable
+        env:
+          DOCS_CHANNEL: stable
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm --filter @waveform-playlist/ui-components build-storybook
+          pnpm --filter website build
 
-      - name: Build packages
-        run: pnpm build
+      - name: Build next site
+        working-directory: next
+        env:
+          DOCS_CHANNEL: next
+          DOCS_BASE_URL: ${{ env.NEXT_BASE_URL }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm --filter @waveform-playlist/ui-components build-storybook
+          pnpm --filter website build
 
-      - name: Build Storybook
-        run: pnpm --filter @waveform-playlist/ui-components build-storybook
-
-      - name: Build website
-        run: pnpm --filter website build
+      - name: Put the next site inside the stable one
+        run: |
+          if [ -e stable/website/build/next ]; then
+            echo "::error::the stable site already has a /next path"
+            exit 1
+          fi
+          cp -R next/website/build stable/website/build/next
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -51,7 +101,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: website/build
+          path: stable/website/build
 
   deploy:
     environment:

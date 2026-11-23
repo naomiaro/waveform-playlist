@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
@@ -64,6 +65,101 @@ const nightVisionTheme: PrismTheme = {
   ],
 };
 
+// One GitHub Pages deployment holds two builds of this site
+// (.github/workflows/deploy-website.yml):
+//
+//   stable  the branch `main`, what npm `latest` ships   /waveform-playlist/
+//   next    the branch `dev`, the current work           /waveform-playlist/next/
+//
+// A release has one number: `version` in the root package.json, bumped at the
+// release (.claude/skills/release/SKILL.md). The workflow passes in what a
+// build cannot know from its own checkout:
+//
+//   DOCS_CHANNEL         which of the two this build is (default: next)
+//   DOCS_BASE_URL        where it is served (default: the stable base URL)
+//   DOCS_STABLE_VERSION  the release on `main` (default: this checkout's)
+type DocsChannel = 'stable' | 'next';
+const DOCS_CHANNELS: readonly DocsChannel[] = ['stable', 'next'];
+const STABLE_BASE_URL = '/waveform-playlist/';
+const NEXT_BASE_URL = `${STABLE_BASE_URL}next/`;
+
+const readChannel = (value: string | undefined): DocsChannel => {
+  if (value === undefined || value === '') return 'next';
+  const channel = DOCS_CHANNELS.find((name) => name === value);
+  if (!channel) {
+    throw new Error(`DOCS_CHANNEL must be one of ${DOCS_CHANNELS.join(', ')} (got "${value}")`);
+  }
+  return channel;
+};
+
+const readVersion = (value: string, source: string): string => {
+  if (!/^\d+\.\d+\.\d+$/.test(value)) {
+    throw new Error(`${source} must be a release number like 16.0.1 (got "${value}")`);
+  }
+  return value;
+};
+
+const docsChannel = readChannel(process.env.DOCS_CHANNEL);
+const baseUrl = process.env.DOCS_BASE_URL || STABLE_BASE_URL;
+if (!baseUrl.startsWith('/') || !baseUrl.endsWith('/')) {
+  throw new Error(`DOCS_BASE_URL must start and end with "/" (got "${baseUrl}")`);
+}
+
+// The release on `main`. On `dev` the root package.json holds the same number
+// until a release bumps it, so it is the default when the workflow gives none.
+const stableVersion = process.env.DOCS_STABLE_VERSION
+  ? readVersion(process.env.DOCS_STABLE_VERSION, 'DOCS_STABLE_VERSION')
+  : readVersion(
+      JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version,
+      'version in the root package.json'
+    );
+
+// The two builds are separate apps, so a link between them is a full page load
+// to a path outside this build's base URL: `pathname://` keeps the router out
+// of it, `autoAddBaseUrl: false` stops the link from being put under baseUrl,
+// `target: '_self'` keeps the tab. Docusaurus draws such a link as external;
+// `docs-channel-link` (custom.css) hides its "opens in new tab" icon.
+const versionLink = (channel: DocsChannel, label: string, channelBaseUrl: string) => ({
+  label,
+  href: `pathname://${channelBaseUrl}`,
+  autoAddBaseUrl: false,
+  target: '_self',
+  className:
+    channel === docsChannel ? 'docs-channel-link dropdown__link--active' : 'docs-channel-link',
+});
+
+const DROPDOWN_LABEL: Record<DocsChannel, string> = {
+  stable: `v${stableVersion}`,
+  next: 'Next',
+};
+
+const versionDropdown = {
+  type: 'dropdown' as const,
+  position: 'right' as const,
+  label: DROPDOWN_LABEL[docsChannel],
+  className: 'navbar__item--docs-channel',
+  items: [
+    versionLink('next', 'Next — in development', NEXT_BASE_URL),
+    versionLink('stable', `v${stableVersion} — stable`, STABLE_BASE_URL),
+  ],
+};
+
+const releaseAnnouncement = {
+  id: 'v16_release',
+  content:
+    '🎉 <strong>v16 Released!</strong> — <code>@dnd-kit</code> 0.5 support with self-contained drag components; <code>noDropAnimationPlugins</code> is gone. See the <a href="https://github.com/naomiaro/waveform-playlist/releases/tag/dnd-kit-0-5">release notes</a>.',
+  isCloseable: true,
+};
+
+const ANNOUNCEMENT: Record<DocsChannel, typeof releaseAnnouncement> = {
+  stable: releaseAnnouncement,
+  next: {
+    id: 'docs_channel_next',
+    content: `These docs describe work in development that is not on npm <code>latest</code> yet. The released packages are documented in the <a href="${STABLE_BASE_URL}" target="_self">stable docs</a>.`,
+    isCloseable: false,
+  },
+};
+
 const config: Config = {
   title: 'Waveform Playlist',
   tagline: 'Multitrack Web Audio editor and player with canvas waveform visualizations',
@@ -108,7 +204,10 @@ const config: Config = {
   url: 'https://naomiaro.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/waveform-playlist/',
+  baseUrl,
+
+  // One copy of each page in search engines: the stable one.
+  noIndex: docsChannel !== 'stable',
 
   // GitHub pages deployment config.
   organizationName: 'naomiaro',
@@ -243,12 +342,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    announcementBar: {
-      id: 'v16_release',
-      content:
-        '🎉 <strong>v16 Released!</strong> — <code>@dnd-kit</code> 0.5 support with self-contained drag components; <code>noDropAnimationPlugins</code> is gone. See the <a href="https://github.com/naomiaro/waveform-playlist/releases/tag/dnd-kit-0-5">release notes</a>.',
-      isCloseable: true,
-    },
+    announcementBar: ANNOUNCEMENT[docsChannel],
     // Social card image for Open Graph and Twitter
     image: 'img/social/waveform-playlist-social.png',
     // SEO metadata
@@ -277,10 +371,11 @@ const config: Config = {
         },
         {to: '/examples', label: 'Examples', position: 'left'},
         {
-          href: 'pathname:///waveform-playlist/storybook/',
+          href: `pathname://${baseUrl}storybook/`,
           label: 'Storybook',
           position: 'left',
         },
+        versionDropdown,
         {
           href: 'https://www.buymeacoffee.com/naomiaro',
           label: '☕ Support',
@@ -333,7 +428,7 @@ const config: Config = {
             },
             {
               label: 'Storybook',
-              href: 'pathname:///waveform-playlist/storybook/',
+              href: `pathname://${baseUrl}storybook/`,
             },
             {
               label: 'GitHub',

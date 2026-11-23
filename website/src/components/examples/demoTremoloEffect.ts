@@ -1,9 +1,10 @@
+import { sitePath } from '../../utils/sitePath';
 import { getEffectDefinitions, registerEffect } from '@waveform-playlist/core';
 
 /** The id the effect is added by: `addEffect(DEMO_TREMOLO)`. */
 export const DEMO_TREMOLO = 'demo-tremolo';
 
-const MODULE_URL = '/waveform-playlist/media/worklets/demo-tremolo-processor.js';
+const MODULE_URL = sitePath('/media/worklets/demo-tremolo-processor.js');
 
 /**
  * Register a custom effect backed by an AudioWorkletNode. One registration

@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { createTrack, type ArrangementTrack, type LoadingClip } from '@waveform-playlist/core';
@@ -55,16 +56,16 @@ const ControlGroup = styled.div`
 // however many clips name it
 // All from Ubiquitous for consistency
 const audioFiles = [
-  { id: 'kick', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus' },
-  { id: 'hihat', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus' },
-  { id: 'claps', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/04_Claps.opus' },
-  { id: 'shakers', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus' },
-  { id: 'bass', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus' },
+  { id: 'kick', src: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.opus') },
+  { id: 'hihat', src: sitePath('/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus') },
+  { id: 'claps', src: sitePath('/media/audio/AlbertKader_Ubiquitous/04_Claps.opus') },
+  { id: 'shakers', src: sitePath('/media/audio/AlbertKader_Ubiquitous/07_Shakers.opus') },
+  { id: 'bass', src: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus') },
   {
     id: 'synth1',
-    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+    src: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus'),
   },
-  { id: 'synth2', src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus' },
+  { id: 'synth2', src: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus') },
 ];
 
 // Track configuration with multiple clips demonstrating gaps and positioning
