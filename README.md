@@ -22,28 +22,41 @@ A multi-track audio editor and player built with React, Tone.js, and the Web Aud
 - **MIDI playback** - MIDI file parsing with piano roll visualization and SoundFont sample playback
 - **TypeScript** - Full type definitions included
 
-## Quick Start
+## Stable and next
+
+Waveform Playlist is published on two lines:
+
+| Line | npm tag | Docs and examples | Branch |
+|------|---------|-------------------|--------|
+| **Stable** | `latest` | [naomiaro.github.io/waveform-playlist](https://naomiaro.github.io/waveform-playlist/) | [`main`](https://github.com/naomiaro/waveform-playlist/tree/main) |
+| **Next** | `next`: prereleases of the coming major | [naomiaro.github.io/waveform-playlist/next](https://naomiaro.github.io/waveform-playlist/next/) | [`dev`](https://github.com/naomiaro/waveform-playlist/tree/dev) |
+
+**This README describes next**, the code on `dev`, and its links go to the next docs. The stable release's README is [on `main`](https://github.com/naomiaro/waveform-playlist/blob/main/README.md). To move a project from stable to next, see the [upgrade guide](https://naomiaro.github.io/waveform-playlist/next/docs/react/upgrading).
+
+## Install
+
+Stable:
 
 ```bash
 npm install @waveform-playlist/browser @waveform-playlist/playout @waveform-playlist/core tone @dnd-kit/react
 ```
 
-> **Note**: `tone`, `@waveform-playlist/playout` (the Tone.js engine, an optional peer) and `@dnd-kit/react` are peer dependencies and must be installed separately. `@waveform-playlist/core` is a dependency of `browser`; it is on the line because your own code imports types and helpers from it, which a strict package manager (pnpm) allows only for packages you list. `@dnd-kit/dom` and `@dnd-kit/abstract` are also declared peers (they install automatically as dependencies of `@dnd-kit/react`).
+Next:
 
-> **v14:** the playout engines are optional peers. Install the one(s) you use:
-> - WebAudio/Tone path: `npm install @waveform-playlist/browser @waveform-playlist/playout tone`
-> - MediaElement path: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout`
-> - Custom adapter: `npm install @waveform-playlist/browser` and pass `createAdapter` (no `tone`).
->
-> **Tone.js versions:** the stable release (`npm install tone`, currently 15.1.x) is the default and what the examples use. The prerelease line (`npm install tone@next`, 15.5.x) is also supported: every pull request builds and runs the unit tests against both. Tone's stable line rarely releases, so `next` is where upstream fixes land — with it, `configureGlobalContext({ sampleRate })` is honoured on the default audio context, where 15.1.x keeps the hardware rate.
->
-> The `Tone` convenience re-export was removed in v14 — `import * as Tone from 'tone'` directly.
->
-> **v14:** effects, WAV export and output metering import from `@waveform-playlist/browser/tone`.
->
-> **Next major:** `WaveformPlaylistProvider` takes an `arrangement` (from `useCreateArrangement`) instead of `tracks` / `onTracksChange`, and `useAudioTracks` / `useDynamicTracks` are removed: a track names its audio with `audioTrack({ src })`. See the [upgrade guide](https://naomiaro.github.io/waveform-playlist/docs/react/upgrading).
->
-> **v16:** `@dnd-kit/*` `^0.5.0` is required (`^0.3` is no longer supported). `noDropAnimationPlugins` was removed — `Clip`, `AnnotationBox`, and `SortableTrackControls` (replaced in the next major by `<TrackReorderGrip />` / `useTrackReorderHandle()`) configure their own `@dnd-kit` Feedback behavior, so a custom `DragDropProvider` needs no `plugins` prop. `@dnd-kit/dom` is now a declared peer of `ui-components` and `annotations`.
+```bash
+npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @waveform-playlist/core@next tone @dnd-kit/react
+```
+
+`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. `@waveform-playlist/core` is listed because your own code imports from it. Next requires React 19; stable also accepts React 18.2.
+
+Without Tone.js (for next, add `@next` to each `@waveform-playlist/*` package):
+
+- MediaElement playout: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react`
+- Your own adapter: `npm install @waveform-playlist/browser @dnd-kit/react`, and pass `createAdapter` to the provider
+
+The optional packages are listed under [Packages](#packages); [Installation](https://naomiaro.github.io/waveform-playlist/next/docs/react/getting-started/installation) has the setup for annotations, recording and spectrogram.
+
+## Quick Start
 
 ```tsx
 import {
@@ -73,12 +86,15 @@ function App() {
 }
 ```
 
+This is the next API. The stable equivalent is in the [stable Getting Started](https://naomiaro.github.io/waveform-playlist/docs/react/getting-started/basic-usage).
+
 ## Documentation
 
-- [**Live Examples**](https://naomiaro.github.io/waveform-playlist/examples/stem-tracks) - Interactive demos
-- [**Getting Started**](https://naomiaro.github.io/waveform-playlist/docs/react/getting-started/installation) - Installation and basic usage
-- [**Guides**](https://naomiaro.github.io/waveform-playlist/docs/react/guides/loading-audio) - In-depth tutorials
-- [**API Reference**](https://naomiaro.github.io/waveform-playlist/docs/react/api/components) - Component and hook documentation
+- [**Live Examples**](https://naomiaro.github.io/waveform-playlist/next/examples/stem-tracks) - Interactive demos
+- [**Getting Started**](https://naomiaro.github.io/waveform-playlist/next/docs/react/getting-started/installation) - Installation and basic usage
+- [**Guides**](https://naomiaro.github.io/waveform-playlist/next/docs/react/guides/loading-audio) - In-depth tutorials
+- [**API Reference**](https://naomiaro.github.io/waveform-playlist/next/docs/react/api/components) - Component and hook documentation
+- [**Upgrade guide**](https://naomiaro.github.io/waveform-playlist/next/docs/react/upgrading) - From stable to next, one section per change
 
 ## Community
 
@@ -90,27 +106,27 @@ function App() {
 
 | Example | Description |
 |---------|-------------|
-| [Minimal](https://naomiaro.github.io/waveform-playlist/examples/minimal) | One track and the transport buttons |
-| [New Tracks](https://naomiaro.github.io/waveform-playlist/examples/newtracks) | Drop audio files to add tracks; remove them again |
-| [Stem Tracks](https://naomiaro.github.io/waveform-playlist/examples/stem-tracks) | Multi-track playback with mute/solo/volume controls |
-| [Effects](https://naomiaro.github.io/waveform-playlist/examples/effects) | 20 Tone.js effects with real-time parameter control |
-| [WAM! Kick It Up a Notch](https://naomiaro.github.io/waveform-playlist/examples/wam-effects) | Host WAM 2.0 plugins with community library, native GUIs, and mixed Tone+WAM chains |
-| [Recording](https://naomiaro.github.io/waveform-playlist/examples/recording) | Live recording with VU meter and waveform preview |
-| [Multi-Clip](https://naomiaro.github.io/waveform-playlist/examples/multi-clip) | Drag-and-drop clip editing with trim handles |
-| [Custom Drag Setup](https://naomiaro.github.io/waveform-playlist/examples/custom-drag-setup) | The same clip editing with your own `DragDropProvider` and `ClipInteractionOptions` |
-| [Annotations](https://naomiaro.github.io/waveform-playlist/examples/annotations) | Time-synced text with keyboard navigation |
-| [Waveform Data](https://naomiaro.github.io/waveform-playlist/examples/waveform-data) | Pre-computed peaks for fast loading |
-| [MIDI](https://naomiaro.github.io/waveform-playlist/examples/midi) | MIDI file playback with piano roll and SoundFont samples |
-| [Beats & Bars](https://naomiaro.github.io/waveform-playlist/examples/beats-and-bars) | Tempo-synced timescale with beats and bars ruler |
-| [Fades](https://naomiaro.github.io/waveform-playlist/examples/fades) | Fade in/out with configurable curves |
-| [Stereo](https://naomiaro.github.io/waveform-playlist/examples/stereo) | Stereo waveform rendering and pan controls |
-| [Spectrogram](https://naomiaro.github.io/waveform-playlist/examples/mir-spectrogram) | FFT-based spectrogram visualization |
-| [Media Element](https://naomiaro.github.io/waveform-playlist/examples/media-element) | HTMLMediaElement playout with playback rate; `?t=8` puts the first player's cursor at 8 seconds |
-| [Media Element Annotations](https://naomiaro.github.io/waveform-playlist/examples/media-element-annotations) | Time-synced annotations on streamed audio with pre-computed peaks |
-| [Styling](https://naomiaro.github.io/waveform-playlist/examples/styling) | Bar width, gaps, rounded bars, gradients, and theme colors |
-| [Flexible API](https://naomiaro.github.io/waveform-playlist/examples/flexible-api) | Custom playheads, timestamps, and full UI customization |
-| [Mobile Multi-Clip](https://naomiaro.github.io/waveform-playlist/examples/mobile-multi-clip) | Clip editing with touch: hold to drag |
-| [Mobile Annotations](https://naomiaro.github.io/waveform-playlist/examples/mobile-annotations) | Annotations with touch: tap to play, hold to resize |
+| [Minimal](https://naomiaro.github.io/waveform-playlist/next/examples/minimal) | One track and the transport buttons |
+| [New Tracks](https://naomiaro.github.io/waveform-playlist/next/examples/newtracks) | Drop audio files to add tracks; remove them again |
+| [Stem Tracks](https://naomiaro.github.io/waveform-playlist/next/examples/stem-tracks) | Multi-track playback with mute/solo/volume controls |
+| [Effects](https://naomiaro.github.io/waveform-playlist/next/examples/effects) | 20 Tone.js effects with real-time parameter control |
+| [WAM! Kick It Up a Notch](https://naomiaro.github.io/waveform-playlist/next/examples/wam-effects) | Host WAM 2.0 plugins with community library, native GUIs, and mixed Tone+WAM chains |
+| [Recording](https://naomiaro.github.io/waveform-playlist/next/examples/recording) | Live recording with VU meter and waveform preview |
+| [Multi-Clip](https://naomiaro.github.io/waveform-playlist/next/examples/multi-clip) | Drag-and-drop clip editing with trim handles |
+| [Custom Drag Setup](https://naomiaro.github.io/waveform-playlist/next/examples/custom-drag-setup) | The same clip editing with your own `DragDropProvider` and `ClipInteractionOptions` |
+| [Annotations](https://naomiaro.github.io/waveform-playlist/next/examples/annotations) | Time-synced text with keyboard navigation |
+| [Waveform Data](https://naomiaro.github.io/waveform-playlist/next/examples/waveform-data) | Pre-computed peaks for fast loading |
+| [MIDI](https://naomiaro.github.io/waveform-playlist/next/examples/midi) | MIDI file playback with piano roll and SoundFont samples |
+| [Beats & Bars](https://naomiaro.github.io/waveform-playlist/next/examples/beats-and-bars) | Tempo-synced timescale with beats and bars ruler |
+| [Fades](https://naomiaro.github.io/waveform-playlist/next/examples/fades) | Fade in/out with configurable curves |
+| [Stereo](https://naomiaro.github.io/waveform-playlist/next/examples/stereo) | Stereo waveform rendering and pan controls |
+| [Spectrogram](https://naomiaro.github.io/waveform-playlist/next/examples/mir-spectrogram) | FFT-based spectrogram visualization |
+| [Media Element](https://naomiaro.github.io/waveform-playlist/next/examples/media-element) | HTMLMediaElement playout with playback rate; `?t=8` puts the first player's cursor at 8 seconds |
+| [Media Element Annotations](https://naomiaro.github.io/waveform-playlist/next/examples/media-element-annotations) | Time-synced annotations on streamed audio with pre-computed peaks |
+| [Styling](https://naomiaro.github.io/waveform-playlist/next/examples/styling) | Bar width, gaps, rounded bars, gradients, and theme colors |
+| [Flexible API](https://naomiaro.github.io/waveform-playlist/next/examples/flexible-api) | Custom playheads, timestamps, and full UI customization |
+| [Mobile Multi-Clip](https://naomiaro.github.io/waveform-playlist/next/examples/mobile-multi-clip) | Clip editing with touch: hold to drag |
+| [Mobile Annotations](https://naomiaro.github.io/waveform-playlist/next/examples/mobile-annotations) | Annotations with touch: tap to play, hold to resize |
 
 ## Packages
 
@@ -129,7 +145,7 @@ function App() {
 |---------|-------------|
 | `@waveform-playlist/midi` | The `loadMidiTracks` function: a `.mid` file as MIDI tracks for the arrangement, drawn as piano rolls and played with SoundFont or PolySynth. Re-exports the parser from `@dawcore/midi`. |
 | `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
-| `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/docs/react/guides/recording#audioworklet-setup)) |
+| `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/next/docs/react/guides/recording#audioworklet-setup)) |
 | `@waveform-playlist/worklets` | Shared AudioWorklet processors for metering and recording (auto-installed with recording) |
 | `@waveform-playlist/spectrogram` | React `SpectrogramProvider` + UI (menu items, settings modal). Computation/worker/orchestrator are imported from `@dawcore/spectrogram`. |
 | `@waveform-playlist/media-element-playout` | HTMLMediaElement-based playout with pitch-preserving playback rate |
