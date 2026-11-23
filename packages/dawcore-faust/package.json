@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/faust",
-  "version": "0.0.1",
+  "version": "0.0.2-next.0",
   "description": "In-browser Faust DSP compilation to WAM 2.0 plugins for the dawcore family",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

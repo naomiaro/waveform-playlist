@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/ui-components",
-  "version": "14.0.1",
+  "version": "15.0.0-next.0",
   "description": "React UI components for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
