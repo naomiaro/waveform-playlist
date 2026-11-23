@@ -82,8 +82,3 @@ export async function fetchPackument(name) {
 }
 
 export const isOnRegistry = async (name) => (await fetchPackument(name)) !== null;
-
-export async function registryHasVersion(name, version) {
-  const packument = await fetchPackument(name);
-  return packument !== null && Object.hasOwn(packument.versions ?? {}, version);
-}

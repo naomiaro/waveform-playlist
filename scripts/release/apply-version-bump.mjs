@@ -1,127 +1,180 @@
 #!/usr/bin/env node
-// Applies a version bump that another job computed, after checking that it is
-// nothing but a version bump.
+// Writes a prerelease version bump into the working tree, from nothing but a
+// list of `name: version`, and only when every version is the one a version
+// step in pre mode could have computed.
 //
-//   node scripts/release/apply-version-bump.mjs <dir>
+//   BUMP='{"@waveform-playlist/core":"13.0.0-next.1"}' node scripts/release/apply-version-bump.mjs
 //
 // In .github/workflows/publish-next.yml the job that runs `changeset version`
 // also installs, builds and tests, so it runs dependencies' code and is given
-// no right to push. It hands over the files the version step changed, laid
-// out under <dir> as in the repository. This script runs in the job that may
-// push to dev, which installs nothing, and it accepts from <dir> only:
+// no right to push. All it hands over is that list. This script runs in the
+// job that may push to dev, which installs nothing, and it decides the rest
+// from its own checkout:
 //
-//   packages/<name>/package.json   for a package that exists here, and equal
-//                                  to the one here in everything but
-//                                  `version`, which must be x.y.z-next.N
-//   .changeset/pre.json            still `mode: pre`, `tag: next`, and data
-//                                  of the expected shape
+//   - dev must be in pre mode with the tag `next` (.changeset/pre.json here)
+//   - a name must be a public package here
+//   - a version must be the NEXT prerelease of that package: counted one up
+//     from the version here, on a patch, minor or major step from the stable
+//     version pre mode started at (`@dawcore/*`: the patch step only)
+//   - each package.json keeps this checkout's text; one `"version"` value is
+//     replaced, and the result is read back and compared
+//   - pre.json's list of consumed changesets is the list here plus the
+//     changeset files here
 //
-// Anything else in <dir> fails the run and nothing is written. A hand-written
-// range that the version step rewrote is such a difference too (the version
-// job's own check reports it with more words).
-//
-// Prints one line per bumped package, `name@version`, for the commit message.
+// It then asks git what changed, and fails unless that is exactly what it
+// wrote. Prints one line per package, `name@version`, for the commit message.
 // Uses node's own modules only: the job that runs it has no node_modules.
-import { lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
-import { isPrerelease, readPublicPackages, repoRoot } from './workspace.mjs';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { readPublicPackages, repoRoot } from './workspace.mjs';
 
 const PRE_JSON = '.changeset/pre.json';
+const STABLE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const PRERELEASE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-next\.(0|[1-9]\d*)$/;
 
-const inputDir = process.argv[2] ? resolve(process.argv[2]) : undefined;
-if (!inputDir) {
-  console.error('usage: apply-version-bump.mjs <dir>');
-  process.exit(2);
-}
-
-/** Every file under `dir`, as a path relative to it with `/` separators. */
-function listFiles(dir) {
-  const files = [];
-  const walk = (current) => {
-    for (const entry of readdirSync(current)) {
-      const path = join(current, entry);
-      const stat = lstatSync(path);
-      if (stat.isDirectory()) walk(path);
-      else if (stat.isFile()) files.push(relative(dir, path).split(sep).join('/'));
-      else throw new Error(`${relative(dir, path)} is not a plain file or folder`);
-    }
-  };
-  walk(dir);
-  return files.sort();
-}
-
-const isPlainObject = (value) =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-function checkManifest(pkg, text) {
-  const proposed = JSON.parse(text);
-  if (!isPlainObject(proposed)) throw new Error('not a JSON object');
-  if (!isPrerelease(proposed.version)) {
-    throw new Error(`version "${proposed.version}" is not x.y.z-next.N`);
-  }
-  // Same keys in the same order with the same values, once the version is
-  // set aside: JSON.stringify is the comparison.
-  const withOldVersion = JSON.stringify({ ...proposed, version: pkg.manifest.version });
-  const current = JSON.stringify({ ...pkg.manifest, version: pkg.manifest.version });
-  if (withOldVersion !== current) {
-    throw new Error('it differs from the package.json here in more than its version');
-  }
-  return proposed.version;
-}
-
-function checkPreJson(text) {
-  const pre = JSON.parse(text);
-  const keys = isPlainObject(pre) ? Object.keys(pre).sort().join(',') : '';
-  if (keys !== 'changesets,initialVersions,mode,tag') {
-    throw new Error(`unexpected keys (${keys})`);
-  }
-  if (pre.mode !== 'pre' || pre.tag !== 'next') {
-    throw new Error(`mode "${pre.mode}", tag "${pre.tag}": expected pre and next`);
-  }
-  const versions = pre.initialVersions;
-  if (!isPlainObject(versions) || !Object.values(versions).every((v) => typeof v === 'string')) {
-    throw new Error('initialVersions is not a map of names to versions');
-  }
-  if (!Array.isArray(pre.changesets) || !pre.changesets.every((id) => /^[\w.-]+$/.test(id))) {
-    throw new Error('changesets is not a list of changeset names');
-  }
-}
-
-const packagesByManifestPath = new Map(
-  readPublicPackages().map((pkg) => [`${pkg.dir.split(sep).join('/')}/package.json`, pkg])
-);
-
-const writes = [];
-const bumped = [];
-const problems = [];
-
-for (const file of listFiles(inputDir)) {
-  const text = readFileSync(join(inputDir, file), 'utf8');
-  try {
-    if (file === PRE_JSON) {
-      checkPreJson(text);
-    } else if (packagesByManifestPath.has(file)) {
-      const pkg = packagesByManifestPath.get(file);
-      const version = checkManifest(pkg, text);
-      if (version !== pkg.manifest.version) bumped.push(`${pkg.name}@${version}`);
-    } else {
-      throw new Error('not a file a version bump may change');
-    }
-    writes.push({ file, text });
-  } catch (error) {
-    problems.push(`${file}: ${error.message}`);
-  }
-}
-
-if (bumped.length === 0 && problems.length === 0) {
-  problems.push('no package version changes in the bump');
-}
-
-if (problems.length > 0) {
+function fail(problems) {
   console.error('The version bump is refused, and nothing was written:\n');
   for (const problem of problems) console.error(`  - ${problem}`);
   process.exit(1);
 }
 
+/** `{ base: [major, minor, patch], count }`; count is -1 for a stable version. */
+function parseVersion(version) {
+  const stable = STABLE.exec(version);
+  if (stable) return { base: stable.slice(1, 4).map(Number), count: -1 };
+  const pre = PRERELEASE.exec(version);
+  if (pre) return { base: pre.slice(1, 4).map(Number), count: Number(pre[4]) };
+  return null;
+}
+
+const compareBase = (a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+/** The bases a pre-mode bump can reach from the version pre mode started at. */
+function reachableBases([major, minor, patch], zerover) {
+  const patchStep = [major, minor, patch + 1];
+  if (zerover) return [patchStep];
+  return [patchStep, [major, minor + 1, 0], [major + 1, 0, 0]];
+}
+
+function checkVersion(pkg, proposedText, initialText) {
+  const proposed = typeof proposedText === 'string' ? PRERELEASE.exec(proposedText) : null;
+  if (!proposed) return `version ${JSON.stringify(proposedText)} is not x.y.z-next.N`;
+  const next = parseVersion(proposedText);
+  const current = parseVersion(pkg.manifest.version);
+  const initial = typeof initialText === 'string' ? STABLE.exec(initialText) : null;
+  if (!current) return `the version here, "${pkg.manifest.version}", is not one this script knows`;
+  if (!initial) return `pre.json has no stable initial version for it (${initialText})`;
+
+  const bases = reachableBases(initial.slice(1, 4).map(Number), pkg.name.startsWith('@dawcore/'));
+  if (!bases.some((base) => compareBase(base, next.base) === 0)) {
+    const list = bases.map((base) => base.join('.')).join(', ');
+    return `${proposedText} is not a step from ${initialText} (${list})`;
+  }
+  if (compareBase(next.base, current.base) < 0) {
+    return `${proposedText} is behind ${pkg.manifest.version}`;
+  }
+  if (next.count !== current.count + 1) {
+    return `${proposedText} does not follow ${pkg.manifest.version} (expected -next.${current.count + 1})`;
+  }
+  return null;
+}
+
+/** This checkout's package.json text with its version value replaced. */
+function withVersion(pkg, version) {
+  const path = join(repoRoot, pkg.dir, 'package.json');
+  const text = readFileSync(path, 'utf8');
+  const before = `"version": ${JSON.stringify(pkg.manifest.version)}`;
+  if (text.split(before).length !== 2) {
+    throw new Error(`${pkg.dir}/package.json does not have ${before} exactly once`);
+  }
+  const updated = text.replace(before, () => `"version": ${JSON.stringify(version)}`);
+  const expected = JSON.stringify({ ...pkg.manifest, version });
+  if (JSON.stringify(JSON.parse(updated)) !== expected) {
+    throw new Error(`${pkg.dir}/package.json: replacing the version changed something else`);
+  }
+  return { file: `${pkg.dir}/package.json`, text: updated };
+}
+
+// --- what is on dev ---------------------------------------------------------
+
+const pre = JSON.parse(readFileSync(join(repoRoot, PRE_JSON), 'utf8'));
+if (pre.mode !== 'pre' || pre.tag !== 'next') {
+  fail([
+    `${PRE_JSON}: mode "${pre.mode}", tag "${pre.tag}". dev is not in pre mode with the tag next`,
+  ]);
+}
+const packages = new Map(readPublicPackages().map((pkg) => [pkg.name, pkg]));
+
+// --- what was handed over ---------------------------------------------------
+
+let bump;
+try {
+  bump = JSON.parse(process.env.BUMP ?? '');
+} catch {
+  fail(['BUMP is not JSON']);
+}
+if (typeof bump !== 'object' || bump === null || Array.isArray(bump)) fail(['BUMP is not a map']);
+const entries = Object.entries(bump);
+if (entries.length === 0) fail(['BUMP names no package']);
+
+const problems = [];
+const writes = [];
+const bumped = [];
+for (const [name, version] of entries) {
+  const pkg = packages.get(name);
+  if (!pkg) {
+    problems.push(`${JSON.stringify(name)} is not a public package of this repository`);
+    continue;
+  }
+  const problem = checkVersion(pkg, version, pre.initialVersions?.[name]);
+  if (problem) {
+    problems.push(`${name}: ${problem}`);
+    continue;
+  }
+  try {
+    writes.push(withVersion(pkg, version));
+    bumped.push(`${name}@${version}`);
+  } catch (error) {
+    problems.push(error.message);
+  }
+}
+if (problems.length > 0) fail(problems);
+
+// The changesets a version run consumes: all of them, so all that are here.
+const changesetIds = readdirSync(join(repoRoot, '.changeset'))
+  .filter((file) => file.endsWith('.md') && file !== 'README.md')
+  .map((file) => file.slice(0, -'.md'.length));
+const consumed = [...pre.changesets];
+for (const id of changesetIds.sort()) {
+  if (!consumed.includes(id)) consumed.push(id);
+}
+writes.push({
+  file: PRE_JSON,
+  text: `${JSON.stringify({ ...pre, changesets: consumed }, null, 2)}\n`,
+});
+
 for (const { file, text } of writes) writeFileSync(join(repoRoot, file), text);
+
+// What git sees must be what was written here: nothing else may have put a
+// file into this checkout.
+const changed = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+  cwd: repoRoot,
+  encoding: 'utf8',
+})
+  .split('\n')
+  .filter(Boolean)
+  .sort();
+const expected = writes.map(({ file }) => ` M ${file}`).sort();
+if (changed.join('\n') !== expected.join('\n')) {
+  console.error('The working tree does not hold exactly the version bump:\n');
+  for (const line of changed.filter((entry) => !expected.includes(entry))) {
+    console.error(`  unexpected: ${line}`);
+  }
+  for (const line of expected.filter((entry) => !changed.includes(entry))) {
+    console.error(`  missing:    ${line}`);
+  }
+  process.exit(1);
+}
+
 for (const line of bumped) console.log(line);

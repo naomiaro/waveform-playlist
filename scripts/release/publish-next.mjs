@@ -21,7 +21,8 @@
 // `inspectTarball` finds in it. This file uses node's own modules only, for
 // the same reason: the publish job has no node_modules.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -33,7 +34,6 @@ import {
 } from './workspace.mjs';
 
 const DIST_TAG = 'next';
-const MANIFEST_PATH = 'package/package.json';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -74,38 +74,36 @@ function pack(pkg, dir) {
   return join(dir, added[0]);
 }
 
-/**
- * What a tarball would be published as, or an error when npm could read it
- * differently from this function. npm takes the manifest from the archive
- * after dropping each member's first path segment, so:
- *
- *   - every member must be under `package/`: a `package.json` under another
- *     top-level folder would replace the one that is checked here
- *   - there is exactly one `package/package.json`
- *   - members are plain files and folders: no link can point elsewhere
- *   - the manifest has no `tag`, which npm puts above `--tag` (it would move
- *     `latest`), and no `publishConfig` (registry, provenance)
- */
-function inspectTarball(tarball) {
-  const paths = tar(['-tzf', tarball]).split('\n').filter(Boolean);
-  const outside = paths.filter(
-    (path) => !path.startsWith('package/') || path.split('/').includes('..')
-  );
-  if (outside.length > 0) {
-    throw new Error(`members outside package/: ${outside.slice(0, 3).join(', ')}`);
+// npm's own tarball reader, from the npm that will do the upload: the code
+// `npm publish <tarball>` runs to decide the name, the version and the tag.
+// Reading the archive with anything else leaves two readers to disagree
+// (after a lone zero block, on some pax headers, on old GNU long names: each
+// made `tar` show one package.json and npm publish another).
+let pacote;
+function npmsTarballReader() {
+  if (!pacote) {
+    const npmRoot = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim();
+    pacote = createRequire(join(npmRoot, 'npm', 'package.json'))('pacote');
   }
-  const manifests = paths.filter((path) => path === MANIFEST_PATH);
-  if (manifests.length !== 1) {
-    throw new Error(`${manifests.length} members named ${MANIFEST_PATH}, expected 1`);
-  }
-  const special = tar(['-tvzf', tarball])
-    .split('\n')
-    .filter((line) => line !== '' && !/^[-d]/.test(line));
-  if (special.length > 0) {
-    throw new Error(`members that are not plain files or folders: ${special[0]}`);
-  }
+  return pacote;
+}
 
-  const manifest = JSON.parse(tar(['-xOzf', tarball, MANIFEST_PATH]));
+/**
+ * What npm would publish from a tarball, or an error when that is not a plain
+ * prerelease of one package:
+ *
+ *   - the manifest is the one npm reads (see above), asked for as
+ *     `npm publish` asks: `fullMetadata` and `fullReadJson`
+ *   - it has no `tag`, which npm puts above `--tag` (it would move `latest`),
+ *     and no `publishConfig` (registry, provenance)
+ *   - as a second look with the system's tar: every member is under
+ *     `package/` and is a plain file or folder
+ */
+async function inspectTarball(tarball) {
+  const manifest = await npmsTarballReader().manifest(tarball, {
+    fullMetadata: true,
+    fullReadJson: true,
+  });
   for (const key of ['tag', 'publishConfig']) {
     if (Object.hasOwn(manifest, key)) {
       throw new Error(`its package.json has "${key}", which changes how npm publishes it`);
@@ -114,16 +112,30 @@ function inspectTarball(tarball) {
   if (typeof manifest.name !== 'string' || !isPrerelease(manifest.version)) {
     throw new Error(`it holds ${manifest.name}@${manifest.version}, not a -next.N prerelease`);
   }
+
+  const paths = tar(['-tzf', tarball]).split('\n').filter(Boolean);
+  const outside = paths.filter(
+    (path) => !path.startsWith('package/') || path.split('/').includes('..')
+  );
+  if (outside.length > 0) {
+    throw new Error(`members outside package/: ${outside.slice(0, 3).join(', ')}`);
+  }
+  const special = tar(['-tvzf', tarball])
+    .split('\n')
+    .filter((line) => line !== '' && !/^[-d]/.test(line));
+  if (special.length > 0) {
+    throw new Error(`members that are not plain files or folders: ${special[0]}`);
+  }
   return { name: manifest.name, version: manifest.version };
 }
 
 /** The tarballs of `dir` by `name@version`, as read inside each of them. */
-function indexTarballs(dir) {
+async function indexTarballs(dir) {
   const index = new Map();
   for (const file of readdirSync(dir).filter((entry) => entry.endsWith('.tgz'))) {
     const tarball = join(dir, file);
     try {
-      const { name, version } = inspectTarball(tarball);
+      const { name, version } = await inspectTarball(tarball);
       const key = `${name}@${version}`;
       if (index.has(key)) throw new Error(`a second tarball for ${key}`);
       index.set(key, tarball);
@@ -135,10 +147,10 @@ function indexTarballs(dir) {
   return index;
 }
 
-function upload(pkg, tarball) {
+async function upload(pkg, tarball) {
   // The tarball decides what is published, so it is read here, right before
   // it is sent: it must be this package at this checkout's version.
-  const inside = inspectTarball(tarball);
+  const inside = await inspectTarball(tarball);
   if (inside.name !== pkg.name || inside.version !== pkg.manifest.version) {
     throw new Error(
       `${tarball} holds ${inside.name}@${inside.version}, expected ${pkg.name}@${pkg.manifest.version}`
@@ -149,21 +161,25 @@ function upload(pkg, tarball) {
   execFileSync('npm', npmArgs, { cwd: repoRoot, stdio: 'inherit' });
 }
 
-const latestOf = (packument) => packument?.['dist-tags']?.latest;
+/** What the registry has for a package: its dist-tags and its versions. */
+const snapshotOf = (packument) => ({
+  tags: { ...(packument?.['dist-tags'] ?? {}) },
+  versions: Object.keys(packument?.versions ?? {}),
+});
 
-const candidates = inDependencyOrder(readPublicPackages()).filter((pkg) =>
-  isPrerelease(pkg.manifest.version)
-);
+const publicPackages = inDependencyOrder(readPublicPackages());
+const candidates = publicPackages.filter((pkg) => isPrerelease(pkg.manifest.version));
 
+const before = new Map();
 const missing = [];
-const latestBefore = new Map();
-for (const pkg of candidates) {
-  const packument = await fetchPackument(pkg.name);
-  if (packument && Object.hasOwn(packument.versions ?? {}, pkg.manifest.version)) {
+for (const pkg of publicPackages) {
+  const snapshot = snapshotOf(await fetchPackument(pkg.name));
+  before.set(pkg.name, snapshot);
+  if (!candidates.includes(pkg)) continue;
+  if (snapshot.versions.includes(pkg.manifest.version)) {
     console.log(`on the registry       ${pkg.name}@${pkg.manifest.version}`);
   } else {
     missing.push(pkg);
-    latestBefore.set(pkg.name, latestOf(packument));
   }
 }
 
@@ -189,6 +205,23 @@ if (packInto) {
   process.exit(0);
 }
 
+// Prereleases are published while dev is in pre mode, and at no other time:
+// with pre.json gone or being left, a stable release is being prepared.
+const preState = (() => {
+  try {
+    const pre = JSON.parse(readFileSync(join(repoRoot, '.changeset/pre.json'), 'utf8'));
+    return `${pre.mode}:${pre.tag}`;
+  } catch {
+    return 'absent';
+  }
+})();
+if (preState !== `pre:${DIST_TAG}`) {
+  console.error(
+    `.changeset/pre.json is "${preState}", not "pre:${DIST_TAG}": nothing is published.`
+  );
+  process.exit(1);
+}
+
 console.log(
   `\n${dryRun ? 'Would publish' : 'Publishing'} ${missing.length} package(s) with the tag "${DIST_TAG}":`
 );
@@ -201,14 +234,14 @@ console.log('');
 const ownDir = publishFrom ? undefined : mkdtempSync(join(tmpdir(), 'publish-next-'));
 const failed = [];
 try {
-  const packed = publishFrom ? indexTarballs(publishFrom) : undefined;
+  const packed = publishFrom ? await indexTarballs(publishFrom) : undefined;
   for (const pkg of missing) {
     const label = `${pkg.name}@${pkg.manifest.version}`;
     console.log(`== ${label}`);
     try {
       const tarball = packed ? packed.get(label) : pack(pkg, ownDir);
       if (!tarball) throw new Error(`no usable tarball for ${label} in ${publishFrom}`);
-      upload(pkg, tarball);
+      await upload(pkg, tarball);
     } catch (error) {
       console.error(`FAILED ${label}: ${error.message}`);
       failed.push(label);
@@ -219,26 +252,37 @@ try {
 }
 
 // The promise of this script, checked against the registry and not against
-// its own reasoning: `latest` is where it was for every package it touched.
-const moved = [];
+// its own reasoning. For every public package of this repository, published
+// in this run or not: no dist-tag but `next` changed, and no version appeared
+// but the one that was meant to. (A read right after an upload can still show
+// the old state; what this catches is a state that must never be.)
+const surprises = [];
 if (!dryRun) {
-  for (const pkg of missing) {
-    const latestNow = latestOf(await fetchPackument(pkg.name));
-    if (latestNow !== latestBefore.get(pkg.name)) {
-      moved.push(`${pkg.name}: latest was ${latestBefore.get(pkg.name)}, is ${latestNow}`);
+  for (const pkg of publicPackages) {
+    const was = before.get(pkg.name);
+    const now = snapshotOf(await fetchPackument(pkg.name));
+    const expected = missing.includes(pkg) ? pkg.manifest.version : undefined;
+    for (const tag of new Set([...Object.keys(was.tags), ...Object.keys(now.tags)])) {
+      if (was.tags[tag] === now.tags[tag]) continue;
+      if (tag === DIST_TAG && now.tags[tag] === expected) continue;
+      surprises.push(`${pkg.name}: dist-tag ${tag} was ${was.tags[tag]}, is ${now.tags[tag]}`);
+    }
+    for (const version of now.versions) {
+      if (was.versions.includes(version) || version === expected) continue;
+      surprises.push(`${pkg.name}: version ${version} appeared`);
     }
   }
 }
 
 const done = missing.length - failed.length;
 console.log(`\n${dryRun ? 'Dry run of' : 'Published'} ${done} of ${missing.length} package(s).`);
-if (moved.length > 0) {
-  console.error('\nTHE DIST-TAG latest MOVED. This must not happen; put it back by hand:');
-  for (const line of moved) console.error(`  ${line}`);
-  console.error('  npm dist-tag add <name>@<the version it was> latest');
+if (surprises.length > 0) {
+  console.error('\nTHE REGISTRY CHANGED IN A WAY THIS SCRIPT NEVER DOES. Look at it now:');
+  for (const line of surprises) console.error(`  ${line}`);
+  console.error('  a dist-tag is put back with: npm dist-tag add <name>@<version> <tag>');
 }
 if (failed.length > 0) {
   console.error(`Not published: ${failed.join(', ')}`);
   console.error('Run it again once the cause is fixed: what is on the registry is skipped.');
 }
-if (moved.length > 0 || failed.length > 0) process.exit(1);
+if (surprises.length > 0 || failed.length > 0) process.exit(1);

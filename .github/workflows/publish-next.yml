@@ -20,17 +20,25 @@ name: Publish @next
 #     to what can reach npm without the hardware key.
 #   - Four jobs. Two run other people's code (dependencies' install scripts,
 #     the build tools, the tests) and are given nothing but read access. Two
-#     hold a right and run only node, git, tar, npm and scripts/release/, which
-#     use no dependency. Each of those two checks what it is handed:
+#     hold a right; they install and build nothing, and decide from their own
+#     checkout whatever they can:
 #
-#       version  installs, builds, tests     reads      hands over the bump
-#       commit   applies the bump             may push   only a version bump
-#       pack     installs, builds, packs      reads      hands over tarballs
-#       publish  uploads the tarballs         may        only the expected
-#                                             publish    prereleases
+#       version  installs, builds, tests   reads         hands over a list of
+#                                                        `name: version`
+#       commit   writes the bump itself    may push      takes only versions
+#                                                        that are the next
+#                                                        prerelease of a package
+#       pack     installs, builds, packs   reads         hands over tarballs
+#       publish  uploads the tarballs      may publish   takes only what npm's
+#                                                        own reader says is the
+#                                                        expected prerelease
 #
-#     What dependency code can still do is change what is INSIDE a published
-#     package (it builds it), as it can in a build on a maintainer's machine.
+#     What is left to the code that runs in `version` and `pack`: which of the
+#     allowed next versions a package gets, and what is INSIDE a published
+#     package, since that code builds it, as it does on a maintainer's machine.
+#     The publish job still has to take the tarballs in through an action
+#     (download-artifact) and to read them: those two are where a mistake in
+#     this file or in scripts/release/ would matter most.
 #   - The bump commit is pushed with GITHUB_TOKEN, and a push made with it
 #     starts no workflow: this one does not start itself again, and the site
 #     is not deployed a second time for it.
@@ -67,8 +75,8 @@ jobs:
     permissions:
       contents: read
     outputs:
-      active: ${{ steps.pre.outputs.active }}
       bumped: ${{ steps.version.outputs.bumped }}
+      bump: ${{ steps.version.outputs.bump }}
       base: ${{ steps.base.outputs.sha }}
     steps:
       # The branch as it is now, not the commit that started the run: a run
@@ -125,7 +133,17 @@ jobs:
             echo "bumped=false" >> "$GITHUB_OUTPUT"
             echo "::notice::no new changeset: no version changed"
           else
-            node scripts/release/check-version-run.mjs
+            node scripts/release/check-version-run.mjs | tee "$RUNNER_TEMP/bumped.txt"
+            # One line of JSON, {"name": "version"}: all the commit job is given.
+            bump=$(node -e '
+              const lines = require("fs").readFileSync(process.argv[1], "utf8").split("\n").filter(Boolean);
+              const map = Object.fromEntries(lines.map((line) => {
+                const at = line.lastIndexOf("@");
+                return [line.slice(0, at), line.slice(at + 1)];
+              }));
+              process.stdout.write(JSON.stringify(map));
+            ' "$RUNNER_TEMP/bumped.txt")
+            echo "bump=$bump" >> "$GITHUB_OUTPUT"
             echo "bumped=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -137,38 +155,18 @@ jobs:
         if: steps.version.outputs.bumped == 'true'
         run: pnpm test:unit
 
-      # The files the version step changed, laid out as in the repository.
-      - name: Collect the bump
-        if: steps.version.outputs.bumped == 'true'
-        run: |
-          mkdir -p "$RUNNER_TEMP/bump"
-          git diff --name-only -z -- packages .changeset | while IFS= read -r -d '' file; do
-            mkdir -p "$RUNNER_TEMP/bump/$(dirname "$file")"
-            cp "$file" "$RUNNER_TEMP/bump/$file"
-          done
-          find "$RUNNER_TEMP/bump" -type f | sort
-
-      - name: Hand the bump to the commit job
-        if: steps.version.outputs.bumped == 'true'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: next-bump
-          path: ${{ runner.temp }}/bump
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 7
-
   commit:
     name: Commit the bump to dev
     needs: version
-    if: needs.version.outputs.active == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # the bump commit
     outputs:
+      active: ${{ steps.pre.outputs.active }}
       sha: ${{ steps.head.outputs.sha }}
     steps:
-      # Nothing is installed and nothing is built in this job.
+      # Nothing is installed, nothing is built and no artifact is taken in by
+      # this job: what the version job computed arrives as one line of text.
       - name: Checkout dev
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -179,29 +177,42 @@ jobs:
         with:
           node-version: 24
 
-      - name: Take the bump from the version job
-        if: needs.version.outputs.bumped == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: next-bump
-          path: ${{ runner.temp }}/bump
+      # Read here, from this job's own checkout: whether anything is published
+      # at all is not left to the version job to say.
+      - name: Check dev is in pre mode
+        id: pre
+        run: |
+          if [ ! -f .changeset/pre.json ]; then
+            state="absent"
+          else
+            state=$(node -p "const pre = require('./.changeset/pre.json'); pre.mode + ':' + pre.tag")
+          fi
+          if [ "$state" = "pre:next" ]; then
+            echo "active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "active=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dev is not in pre mode with the tag next (pre.json: $state): nothing is published"
+          fi
 
       # If dev moved on since the versions were computed, nothing is committed
       # and nothing is published: the run that the newer merge started does both.
-      - name: Apply, commit and push
-        if: needs.version.outputs.bumped == 'true'
+      - name: Write, commit and push the bump
+        if: steps.pre.outputs.active == 'true' && needs.version.outputs.bumped == 'true'
         env:
           BASE: ${{ needs.version.outputs.base }}
+          BUMP: ${{ needs.version.outputs.bump }}
         run: |
           if [ "$(git rev-parse HEAD)" != "$BASE" ]; then
             echo "::error::dev moved on while the versions were being computed"
             exit 1
           fi
-          node scripts/release/apply-version-bump.mjs "$RUNNER_TEMP/bump" > "$RUNNER_TEMP/bumped.txt"
+          node scripts/release/apply-version-bump.mjs > "$RUNNER_TEMP/bumped.txt"
           cat "$RUNNER_TEMP/bumped.txt"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages .changeset
+          # -u: what is tracked and changed, which the script has just checked
+          # is exactly what it wrote.
+          git add -u packages .changeset
           {
             echo "chore(release): next ($(wc -l < "$RUNNER_TEMP/bumped.txt" | tr -d ' ') packages)"
             echo
@@ -221,6 +232,7 @@ jobs:
   pack:
     name: Build and pack
     needs: commit
+    if: needs.commit.outputs.active == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -313,11 +325,23 @@ jobs:
             if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
           ' "$version"
 
+      # v8: the v4 line of this action unpacks an artifact with a library that
+      # lets a crafted one write outside the folder it is given
+      # (GHSA-6jrj-vc65-c983, unzip-stream below 0.3.2; v8.0.2 has 0.3.4).
       - name: Take the tarballs from the pack job
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: next-tarballs
           path: ${{ runner.temp }}/tarballs
+
+      # The scripts about to run are the ones that were checked out.
+      - name: Check the checkout is untouched
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            git status --short
+            echo "::error::the checkout changed after it was made"
+            exit 1
+          fi
 
       - name: Publish what the registry does not have
         run: node scripts/release/publish-next.mjs --from "$RUNNER_TEMP/tarballs"
