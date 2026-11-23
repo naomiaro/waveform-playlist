@@ -56,4 +56,34 @@ export function inDependencyOrder(packages) {
   return ordered;
 }
 
-export const isPrerelease = (version) => /^\d+\.\d+\.\d+-next\.\d+$/.test(version);
+const NUMBER = '(?:0|[1-9]\\d*)';
+const PRERELEASE = new RegExp(`^${NUMBER}\\.${NUMBER}\\.${NUMBER}-next\\.${NUMBER}$`);
+
+/** x.y.z-next.N and nothing else: the only versions the prerelease scripts publish. */
+export const isPrerelease = (version) => typeof version === 'string' && PRERELEASE.test(version);
+
+const REGISTRY = 'https://registry.npmjs.org';
+
+/**
+ * A package's document on the npm registry, or null when npm has no package
+ * of that name. The query string is there for the CDN, which keeps a packument
+ * for five minutes: without it a version published a minute ago reads as missing.
+ */
+export async function fetchPackument(name) {
+  const url = `${REGISTRY}/${name.replace('/', '%2f')}?t=${Date.now()}`;
+  const response = await fetch(url, {
+    headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`the registry answered ${response.status} for ${name}`);
+  }
+  return response.json();
+}
+
+export const isOnRegistry = async (name) => (await fetchPackument(name)) !== null;
+
+export async function registryHasVersion(name, version) {
+  const packument = await fetchPackument(name);
+  return packument !== null && Object.hasOwn(packument.versions ?? {}, version);
+}

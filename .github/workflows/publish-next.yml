@@ -18,8 +18,13 @@ name: Publish @next
 #     publishes prereleases with the tag `next` and nothing else is decided in
 #     scripts/release/publish-next.mjs: a change to that script, or to this
 #     file, is a change to what can reach npm without the hardware key.
-#   - The two jobs split the rights: `version` may push to the repository and
-#     cannot publish, `publish` may publish and cannot push.
+#   - Three jobs, so that no job both runs other people's code and holds a
+#     right worth stealing more than it must:
+#       version  installs, builds, tests; may push the bump to dev
+#       pack     installs, builds, packs; may only read
+#       publish  may publish to npm; installs nothing and builds nothing: it
+#                uploads the tarballs `pack` made, after reading in each one
+#                that it is the package and the prerelease version expected
 #   - The bump commit is pushed with GITHUB_TOKEN, and a push made with it
 #     starts no workflow: this one does not start itself again, and the site
 #     is not deployed a second time for it.
@@ -42,9 +47,17 @@ concurrency:
 
 permissions: {}
 
+defaults:
+  run:
+    # -o pipefail: a failure on the left of a pipe fails the step.
+    shell: bash -eo pipefail {0}
+
 jobs:
   version:
     name: Version and commit
+    # "Run workflow" on another branch would run that branch's copy of this
+    # file, and this job pushes to dev.
+    if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     permissions:
       contents: write # the bump commit
@@ -54,21 +67,30 @@ jobs:
     steps:
       # The branch as it is now, not the commit that started the run: a run
       # that waited in the queue also takes what was merged in the meantime.
+      # The token is not left in .git/config for the install, the build and
+      # the tests to read: the push step is given it.
       - name: Checkout dev
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: dev
+          persist-credentials: false
 
       - name: Check dev is in pre mode
         id: pre
         run: |
           # No pre.json, or one that is being left, means a stable release is
-          # being prepared: this workflow then publishes nothing.
-          if [ -f .changeset/pre.json ] && [ "$(node -p "require('./.changeset/pre.json').mode")" = "pre" ] && [ "$(node -p "require('./.changeset/pre.json').tag")" = "next" ]; then
+          # being prepared: this workflow then publishes nothing. A pre.json
+          # that cannot be read fails the step.
+          if [ ! -f .changeset/pre.json ]; then
+            state="absent"
+          else
+            state=$(node -p "const pre = require('./.changeset/pre.json'); pre.mode + ':' + pre.tag")
+          fi
+          if [ "$state" = "pre:next" ]; then
             echo "active=true" >> "$GITHUB_OUTPUT"
           else
             echo "active=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::dev is not in pre mode with the tag next: nothing is published"
+            echo "::notice::dev is not in pre mode with the tag next (pre.json: $state): nothing is published"
           fi
 
       - name: Setup pnpm
@@ -113,6 +135,8 @@ jobs:
       # started does both.
       - name: Commit the bump to dev
         if: steps.version.outputs.bumped == 'true'
+        env:
+          PUSH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -125,30 +149,29 @@ jobs:
             sed 's/^/- /' "$RUNNER_TEMP/bumped.txt"
           } > "$RUNNER_TEMP/message.txt"
           git commit --quiet -F "$RUNNER_TEMP/message.txt"
-          git push origin HEAD:dev
+          git push "https://x-access-token:${PUSH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:dev
 
-      # The commit the publish job builds: the bump, or dev as it was checked
-      # out when no version changed.
+      # The commit the other jobs use: the bump, or dev as it was checked out
+      # when no version changed.
       - name: Name the commit to publish
         id: head
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  publish:
-    name: Publish to npm
+  pack:
+    name: Build and pack
     needs: version
     if: needs.version.outputs.active == 'true'
     runs-on: ubuntu-latest
-    # Accepts the branch dev only (repository settings, Environments), and is
-    # named in every package's trusted publisher entry on npmjs.com.
-    environment: npm-next
     permissions:
       contents: read
-      id-token: write # npm trusted publishing
+    outputs:
+      missing: ${{ steps.registry.outputs.missing }}
     steps:
       - name: Checkout the commit to publish
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ needs.version.outputs.sha }}
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -158,17 +181,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-
-      - name: Check npm can publish by OIDC
-        run: |
-          # Trusted publishing needs npm 11.5.1 or later.
-          version=$(npm --version)
-          echo "npm $version"
-          node -e '
-            const [major, minor, patch] = process.argv[1].split(".").map(Number);
-            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
-            if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
-          ' "$version"
 
       # Also true with no bump, after a run that committed and then failed.
       - name: Look for versions the registry does not have
@@ -189,6 +201,62 @@ jobs:
         if: steps.registry.outputs.missing == 'true'
         run: pnpm build
 
-      - name: Publish what the registry does not have
+      - name: Pack what the registry does not have
         if: steps.registry.outputs.missing == 'true'
-        run: node scripts/release/publish-next.mjs
+        run: |
+          mkdir -p "$RUNNER_TEMP/tarballs"
+          node scripts/release/publish-next.mjs --pack "$RUNNER_TEMP/tarballs"
+
+      - name: Hand the tarballs to the publish job
+        if: steps.registry.outputs.missing == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: next-tarballs
+          path: ${{ runner.temp }}/tarballs/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to npm
+    needs: [version, pack]
+    if: needs.pack.outputs.missing == 'true'
+    runs-on: ubuntu-latest
+    # Accepts the branch dev only (repository settings, Environments), and is
+    # named in every package's trusted publisher entry on npmjs.com.
+    environment: npm-next
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing
+    steps:
+      # For scripts/release/ only. Nothing is installed and nothing is built in
+      # this job: the only code it runs is node, npm, tar and those scripts.
+      - name: Checkout the commit to publish
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+
+      - name: Check npm can publish by OIDC
+        run: |
+          # Trusted publishing needs npm 11.5.1 or later.
+          version=$(npm --version)
+          echo "npm $version"
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            const ok = major > 11 || (major === 11 && (minor > 5 || (minor === 5 && patch >= 1)));
+            if (!ok) { console.error("npm 11.5.1 or later is needed for trusted publishing"); process.exit(1); }
+          ' "$version"
+
+      - name: Take the tarballs from the pack job
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: next-tarballs
+          path: ${{ runner.temp }}/tarballs
+
+      - name: Publish what the registry does not have
+        run: node scripts/release/publish-next.mjs --from "$RUNNER_TEMP/tarballs"
