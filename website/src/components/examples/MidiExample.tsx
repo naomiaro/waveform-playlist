@@ -5,6 +5,7 @@
  * Users can drop additional .mid files or click to browse.
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import * as Tone from 'tone';
@@ -242,7 +243,7 @@ function useSoundFontCache(url?: string): {
   return { cache, loading, error };
 }
 
-const BASE_MIDI_SRC = '/waveform-playlist/media/midi/RedHotChiliPeppers-Otherside.mid';
+const BASE_MIDI_SRC = sitePath('/media/midi/RedHotChiliPeppers-Otherside.mid');
 
 function isMidiFile(file: File): boolean {
   // Check MIME type first, fall back to extension
@@ -265,7 +266,7 @@ export function MidiExample() {
   const objectUrlsRef = React.useRef<string[]>([]);
 
   const soundFontUrl = useSoundFont
-    ? '/waveform-playlist/media/soundfont/A320U.sf2'
+    ? sitePath('/media/soundfont/A320U.sf2')
     : undefined;
   const {
     cache: soundFontCache,

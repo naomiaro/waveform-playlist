@@ -1,3 +1,4 @@
+import { sitePath } from '../utils/sitePath';
 import React, { useEffect, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
@@ -153,7 +154,7 @@ function Screenshot() {
     <section className={styles.screenshotSection}>
       <div className="container">
         <img
-          src="/waveform-playlist/img/waveform-playlist.png"
+          src={sitePath('/img/waveform-playlist.png')}
           alt="Waveform Playlist Editor"
           className={styles.screenshot}
         />

@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
@@ -643,19 +644,19 @@ export function EffectsExample() {
   // Track configurations - Albert Kader "Ubiquitous" minimal techno
   const audioConfigs = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.opus'),
       name: 'Kick',
     },
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'),
       name: 'Bass',
     },
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/02_HiHat1.opus'),
       name: 'HiHat',
     },
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus'),
       name: 'Synth',
     },
   ], []);

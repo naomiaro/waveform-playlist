@@ -7,6 +7,7 @@
  * - Play/pause/stop controls
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -42,11 +43,11 @@ export function StereoExample() {
   // Load stereo tracks - these are stereo files from the Ubiquitous album
   const audioConfigs = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus'),
       name: 'Synth 1 (Stereo)',
     },
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/11_Synth2.opus'),
       name: 'Synth 2 (Stereo)',
     },
   ], []);

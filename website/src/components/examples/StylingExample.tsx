@@ -10,6 +10,7 @@
  * Tone.js Transport, so pressing play on one doesn't affect the others.
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -131,8 +132,8 @@ const minimalTheme: Partial<WaveformPlaylistTheme> = {
   selectedWaveFillColor: '#f0f0f0',
 };
 
-const AUDIO_SRC = '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus';
-const PEAKS_SRC = '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.dat';
+const AUDIO_SRC = sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.opus');
+const PEAKS_SRC = sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.dat');
 
 function PlaybackControls({ loading }: { loading?: boolean }) {
   const { play, stop } = useMediaElementControls();

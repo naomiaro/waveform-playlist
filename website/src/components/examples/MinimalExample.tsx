@@ -7,6 +7,7 @@
  * - Waveform visualization
  */
 
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import styled from 'styled-components';
 import {
@@ -96,7 +97,7 @@ export function MinimalExample() {
   // Define your track configuration - use useMemo to prevent re-creating on every render
   const audioConfigs = React.useMemo(() => [
     {
-      src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
+      src: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'),
       name: 'Bass',
     },
   ], []);

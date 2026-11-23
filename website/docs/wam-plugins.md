@@ -199,4 +199,4 @@ Runnable demo: `pnpm example:dawcore-wam` — community-library picker, GUIs, pe
 - [Audio Effects](/docs/react/guides/effects) — built-in Tone.js effects and the core `useDynamicEffects`/`useTrackDynamicEffects` API
 - [Hooks API Reference](/docs/react/api/hooks#effects-hooks) — full `UseDynamicEffectsReturn`/`UseTrackDynamicEffectsReturn` signatures
 - [Web Components Getting Started](/docs/web-components/getting-started)
-- Try it: [WAM! Kick It Up a Notch](pathname:///waveform-playlist/examples/wam-effects)
+- Try it: [WAM! Kick It Up a Notch](/examples/wam-effects)

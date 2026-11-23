@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { type ClipTrack } from '@waveform-playlist/core';
 import {
@@ -90,10 +91,10 @@ const QUICK_ADD_LABEL = 'Simple Delay';
 
 // Whiptails stems — a manageable subset so per-track racks stay readable.
 const audioConfigs = [
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus', name: 'Kick' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus', name: 'Bass' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus', name: 'Synth' },
-  { src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/11_Vox_Dry.opus', name: 'Vox' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/03_Kick.opus'), name: 'Kick' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/07_Bass1.opus'), name: 'Bass' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.opus'), name: 'Synth' },
+  { src: sitePath('/media/audio/AlbertKader_Whiptails/11_Vox_Dry.opus'), name: 'Vox' },
 ];
 
 // ---------------------------------------------------------------------------

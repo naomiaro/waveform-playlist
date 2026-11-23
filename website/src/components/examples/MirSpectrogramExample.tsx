@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import * as Tone from 'tone';
@@ -47,22 +48,22 @@ const StyledDropZone = styled(FileDropZone)`
 
 const TRACK_CONFIGS: { src: string; name: string; defaultMode: RenderMode }[] = [
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/09_Synth1.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/09_Synth1.opus'),
     name: 'Synth',
     defaultMode: 'waveform',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/07_Bass1.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/07_Bass1.opus'),
     name: 'Bass',
     defaultMode: 'waveform',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/03_Kick.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/03_Kick.opus'),
     name: 'Kick',
     defaultMode: 'waveform',
   },
   {
-    src: '/waveform-playlist/media/audio/AlbertKader_Whiptails/06_HiHat.opus',
+    src: sitePath('/media/audio/AlbertKader_Whiptails/06_HiHat.opus'),
     name: 'HiHat',
     defaultMode: 'waveform',
   },

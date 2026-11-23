@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import '@dawcore/components';
@@ -20,7 +21,7 @@ declare global {
   }
 }
 
-const BASE = '/waveform-playlist/media/audio';
+const BASE = sitePath('/media/audio');
 
 /** Imperative surface of <daw-player> used by this demo. */
 interface DawPlayerElement extends HTMLElement {

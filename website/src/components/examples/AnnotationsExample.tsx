@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
@@ -620,7 +621,7 @@ export function AnnotationsExample() {
     const loadDefaultTrack = async () => {
       try {
         const audioContext = Tone.getContext().rawContext as AudioContext;
-        const response = await fetch('/waveform-playlist/media/audio/sonnet.mp3');
+        const response = await fetch(sitePath('/media/audio/sonnet.mp3'));
         if (!response.ok) {
           throw new Error(`Failed to fetch audio: ${response.statusText}`);
         }

@@ -10,6 +10,7 @@
  * Usage tip: Touch and hold a clip header to drag it.
  * Touch and hold a clip edge to trim it.
  */
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import type WaveformData from 'waveform-data';
@@ -99,18 +100,18 @@ const Instructions = styled.div`
 const audioFiles = [
   {
     id: 'kick',
-    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/01_Kick.dat',
+    src: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/01_Kick.dat'),
   },
   {
     id: 'bass',
-    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/08_Bass.dat',
+    src: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/08_Bass.dat'),
   },
   {
     id: 'synth',
-    src: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus',
-    peaksSrc: '/waveform-playlist/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat',
+    src: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.opus'),
+    peaksSrc: sitePath('/media/audio/AlbertKader_Ubiquitous/09_Synth1_Unmodulated.dat'),
   },
 ];
 

@@ -10,6 +10,7 @@
  * Usage tip: Touch and hold an annotation boundary to resize.
  * Tap an annotation to select it and play from that point.
  */
+import { sitePath } from '../../utils/sitePath';
 import React, { useState, useCallback, useEffect } from 'react';
 import styled from 'styled-components';
 import { DragDropProvider } from '@dnd-kit/react';
@@ -355,7 +356,7 @@ export function MobileAnnotationsExample() {
     const loadTrack = async () => {
       try {
         const audioContext = Tone.getContext().rawContext as AudioContext;
-        const response = await fetch('/waveform-playlist/media/audio/sonnet.mp3');
+        const response = await fetch(sitePath('/media/audio/sonnet.mp3'));
         if (!response.ok) {
           throw new Error(`Failed to fetch audio: ${response.statusText}`);
         }

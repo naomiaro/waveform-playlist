@@ -1,3 +1,4 @@
+import { sitePath } from '../../utils/sitePath';
 import React from 'react';
 import Layout from '@theme/Layout';
 import Head from '@docusaurus/Head';
@@ -86,7 +87,7 @@ audiowaveform -i audio.opus -o peaks.dat -z 256 -b 8`}
 
           <p>
             For a complete code walkthrough of progressive loading with BBC peaks, see the{' '}
-            <a href="/waveform-playlist/docs/react/guides/loading-audio#immediate-mode-progressive-loading">
+            <a href={sitePath('/docs/react/guides/loading-audio#immediate-mode-progressive-loading')}>
               Immediate Mode guide
             </a>.
           </p>
