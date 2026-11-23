@@ -64,6 +64,7 @@
     "pre-fader-track-effects",
     "provider-plays-arrangement",
     "provider-smaller-defects",
+    "published-from-ci",
     "react-19-peer-ranges",
     "react-custom-effects",
     "recorded-clip-id",

@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/midi",
-  "version": "14.0.0-next.0",
+  "version": "14.0.0-next.1",
   "description": "MIDI file loading and parsing for waveform-playlist",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
