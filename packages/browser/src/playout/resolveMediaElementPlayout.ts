@@ -1,4 +1,5 @@
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { installCommand } from '../utils/installCommand';
 
 /** Options for {@link resolveMediaElementPlayout}. */
 export interface ResolveMediaElementPlayoutOptions {
@@ -10,9 +11,12 @@ export interface ResolveMediaElementPlayoutOptions {
   preservesPitch?: boolean;
 }
 
-const INSTALL_HINT =
+// Built when thrown, so a bundler can drop it with the code that throws it.
+const installHint = (): string =>
   '@waveform-playlist/media-element-playout is required for the default MediaElement engine. ' +
-  'Install with: npm install @waveform-playlist/media-element-playout — or pass a custom `createPlayout`.';
+  'Install with: ' +
+  installCommand('@waveform-playlist/media-element-playout') +
+  ' — or pass a custom `createPlayout`.';
 
 /**
  * Resolve a MediaElement playout. With `createPlayout`, returns its result and
@@ -35,7 +39,7 @@ export async function resolveMediaElementPlayout(
       '[waveform-playlist] @waveform-playlist/media-element-playout dynamic import failed: ' +
         String(originalErr)
     );
-    throw new Error(INSTALL_HINT);
+    throw new Error(installHint());
   }
 
   return new mod.MediaElementPlayout({

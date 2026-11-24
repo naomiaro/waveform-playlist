@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// What each dawcore hint names (#884): a caret on the version in the manifests
+// where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
+const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 import type { DawEditorElement } from '../elements/daw-editor';
 
 // Simulate @dawcore/wam not being installed: make the dynamic import reject.
@@ -71,7 +76,7 @@ describe('addWamPlugin without @dawcore/wam installed', () => {
 
     await expect(
       editor.addWamPlugin('https://plugins.example.com/reverb/index.js')
-    ).rejects.toThrow(/npm install @dawcore\/wam/);
+    ).rejects.toThrow(`npm install "${specs['@dawcore/wam']}"`);
 
     expect(editor.effects).toHaveLength(0);
     // Original import error preserved as a diagnostic

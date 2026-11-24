@@ -9,6 +9,7 @@ import {
 } from '../contexts/playlistContexts';
 import { useAnnotationsWithPreview } from '../hooks/useAnnotationsWithPreview';
 import { warnOnce } from './partWarnings';
+import { installCommand } from '../utils/installCommand';
 
 export interface AnnotationListProps {
   /** Height of the list in pixels. Without it the list is at most 200 px high. */
@@ -80,7 +81,9 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
   if (!integration) {
     warnOnce(
       '<AnnotationList> draws nothing without the annotation components: ' +
-        'install @waveform-playlist/annotations and render <AnnotationProvider> above it. ' +
+        'install @waveform-playlist/annotations (' +
+        installCommand('@waveform-playlist/annotations') +
+        ') and render <AnnotationProvider> above it. ' +
         'See: https://naomiaro.github.io/waveform-playlist/docs/react/guides/annotations'
     );
     return null;

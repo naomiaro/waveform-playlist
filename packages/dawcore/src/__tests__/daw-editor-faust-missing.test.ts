@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// What each dawcore hint names (#884): a caret on the version in the manifests
+// where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
+const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 import type { DawEditorElement } from '../elements/daw-editor';
 
 // Simulate @dawcore/faust not being installed: make the dynamic import reject.
@@ -70,7 +75,7 @@ describe('addFaustEffect without @dawcore/faust installed', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(editor.addFaustEffect('process = _;')).rejects.toThrow(
-      /npm install @dawcore\/faust/
+      `npm install "${specs['@dawcore/faust']}"`
     );
 
     expect(editor.effects).toHaveLength(0);

@@ -1,6 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import type { Bits } from '@waveform-playlist/core';
 import type { DawWaveformElement } from '../elements/daw-waveform';
+import { installCommand } from '../utils/install-command';
 import {
   appendPeaks,
   concatenateAudioData,
@@ -248,7 +249,8 @@ export class RecordingController implements ReactiveController {
         } catch (importErr) {
           throw new Error(
             'Recording requires @waveform-playlist/worklets. ' +
-              'Install it: npm install @waveform-playlist/worklets' +
+              'Install it: ' +
+              installCommand('@waveform-playlist/worklets') +
               ' (cause: ' +
               String(importErr) +
               ')'

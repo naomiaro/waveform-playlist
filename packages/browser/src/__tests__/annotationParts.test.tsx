@@ -10,6 +10,10 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range browser's published manifest has for annotations (#884).
+const annotationsSpec = installSpecs('browser')['@waveform-playlist/annotations'];
 
 const dragOptions = vi.hoisted(
   () =>
@@ -625,6 +629,7 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
         .filter((text) => text.includes('AnnotationList'));
       expect(messages).toHaveLength(1);
       expect(messages[0]).toContain('AnnotationProvider');
+      expect(messages[0]).toContain(`npm install "${annotationsSpec}"`);
     });
 
     it('two lists both get the annotations', async () => {

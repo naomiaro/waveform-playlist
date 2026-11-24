@@ -4,6 +4,8 @@
  * that never use it; `import type` from '@dawcore/wam' elsewhere is fine
  * (erased at runtime).
  */
+import { installCommand } from '../utils/installCommand';
+
 export type WamModule = typeof import('@dawcore/wam');
 
 export async function loadWamModule(): Promise<WamModule> {
@@ -13,7 +15,9 @@ export async function loadWamModule(): Promise<WamModule> {
     const detail = err instanceof Error ? err.message : String(err);
     throw new Error(
       "[waveform-playlist] WAM plugin support requires the optional '@dawcore/wam' package.\n" +
-        'Install it with: npm install @dawcore/wam\n' +
+        'Install it with: ' +
+        installCommand('@dawcore/wam') +
+        '\n' +
         'Original error: ' +
         detail
     );

@@ -1,4 +1,5 @@
 import { createContext, use } from 'react';
+import { installCommand } from './utils/installCommand';
 import type {
   SpectrogramConfig,
   ColorMapValue,
@@ -58,7 +59,9 @@ export function useSpectrogramIntegration(): SpectrogramIntegration {
   if (!context) {
     throw new Error(
       'useSpectrogramIntegration must be used within <SpectrogramProvider>. ' +
-        'Install @waveform-playlist/spectrogram and wrap your app with <SpectrogramProvider>.'
+        'Install @waveform-playlist/spectrogram (' +
+        installCommand('@waveform-playlist/spectrogram') +
+        ') and wrap your app with <SpectrogramProvider>.'
     );
   }
   return context;

@@ -1,3 +1,5 @@
+import { installCommand } from '../utils/install-command';
+
 const PREFIX = '[waveform-playlist] ';
 
 /**
@@ -21,8 +23,8 @@ async function loadOptionalModule<T>(
         packageName +
         ' is required for ' +
         feature +
-        '. Install with: npm install ' +
-        packageName +
+        '. Install with: ' +
+        installCommand(packageName) +
         ' (import failed: ' +
         String(originalErr) +
         ')'

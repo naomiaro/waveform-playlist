@@ -1,4 +1,5 @@
 import { createContext, use } from 'react';
+import { installCommand } from './utils/installCommand';
 import type {
   AnnotationData,
   AnnotationAction,
@@ -87,7 +88,9 @@ export function useAnnotationIntegration(): AnnotationIntegration {
   if (!context) {
     throw new Error(
       'useAnnotationIntegration must be used within <AnnotationProvider>. ' +
-        'Install @waveform-playlist/annotations and wrap your app with <AnnotationProvider>. ' +
+        'Install @waveform-playlist/annotations (' +
+        installCommand('@waveform-playlist/annotations') +
+        ') and wrap your app with <AnnotationProvider>. ' +
         'See: https://naomiaro.github.io/waveform-playlist/docs/react/guides/annotations'
     );
   }
