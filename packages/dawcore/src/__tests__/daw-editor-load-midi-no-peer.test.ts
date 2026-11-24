@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
 
-// The range dawcore's published manifest has for each package a hint names (#884).
+// What each dawcore hint names (#884): the published peer range, and for playout
+// (no peer of dawcore) a caret on its version.
 const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 import type { DawEditorElement } from '../elements/daw-editor';
 

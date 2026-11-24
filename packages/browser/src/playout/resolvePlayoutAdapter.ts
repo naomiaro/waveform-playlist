@@ -20,7 +20,8 @@ export interface ResolvePlayoutAdapterOptions {
   sampleRate?: number;
 }
 
-const INSTALL_HINT =
+// Built when thrown, so a bundler can drop it with the code that throws it.
+const installHint = (): string =>
   '@waveform-playlist/playout (and its peer `tone`) is required for the default WebAudio engine. ' +
   'Install with: ' +
   installCommand('@waveform-playlist/playout', 'tone') +
@@ -47,7 +48,7 @@ export async function resolvePlayoutAdapter(
     console.warn(
       '[waveform-playlist] @waveform-playlist/playout dynamic import failed: ' + String(originalErr)
     );
-    throw new Error(INSTALL_HINT);
+    throw new Error(installHint());
   }
 
   if (opts.sampleRate !== undefined) {

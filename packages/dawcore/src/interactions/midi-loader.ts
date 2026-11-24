@@ -27,7 +27,8 @@ export interface MidiLoaderHost {
   querySelectorAll(selector: string): NodeListOf<Element>;
 }
 
-const INSTALL_HINT =
+// Built when thrown, so a bundler can drop it with the code that throws it.
+const installHint = (): string =>
   '@dawcore/midi is required for loadMidi(). Install with: ' + installCommand('@dawcore/midi');
 
 /**
@@ -67,7 +68,7 @@ export async function loadMidiImpl(
     midiModule = await import('@dawcore/midi');
   } catch (originalErr) {
     console.warn('[dawcore] @dawcore/midi dynamic import failed: ' + String(originalErr));
-    throw new Error(INSTALL_HINT);
+    throw new Error(installHint());
   }
   const { parseMidiUrl, parseMidiFile } = midiModule;
 

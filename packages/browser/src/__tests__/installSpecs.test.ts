@@ -1,16 +1,19 @@
 /**
  * The build helper that tells a package which version of another package its
  * install hints should name (#884). Its rules copy pnpm's publish-time rewrite
- * of the `workspace:` protocol (`replaceWorkspaceProtocolPeerDependency` in
- * pnpm 8.15), so a hint names the range the published manifest has.
+ * of the `workspace:` protocol (`makePublishDependency` in pnpm 8.15, the
+ * version the root `packageManager` pins), so a hint names the range the
+ * published manifest has.
  */
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   installSpecs,
   installSpecsDefine,
   publishedRange,
+  workspaceVersions,
 } from '../../../../scripts/build/install-specs.mjs';
 
 const packagesDir = join(__dirname, '../../..');
@@ -39,8 +42,33 @@ describe('publishedRange', () => {
     expect(publishedRange('>=12.7.0 || >=13.0.0-0', '13.0.0')).toBe('>=12.7.0 || >=13.0.0-0');
   });
 
-  it('refuses a workspace alias, which no hint can name', () => {
-    expect(() => publishedRange('workspace:other@^1.0.0', '1.0.0')).toThrow(/workspace alias/);
+  it('gives the exact version for a partial version ending in *, as pnpm does', () => {
+    expect(publishedRange('workspace:1.*', '1.4.2')).toBe('1.4.2');
+  });
+
+  it('refuses a workspace alias or a path, which no hint can name', () => {
+    expect(() => publishedRange('workspace:other@^1.0.0', '1.0.0')).toThrow(/no install hint/);
+    expect(() => publishedRange('workspace:../other', '1.0.0')).toThrow(/no install hint/);
+  });
+
+  it('refuses a workspace token for a package that is not under packages/', () => {
+    expect(() => publishedRange('workspace:^', undefined, 'website')).toThrow(
+      /website has "workspace:\^" but is not a package under packages\//
+    );
+  });
+});
+
+describe('workspaceVersions', () => {
+  it('skips a directory without a manifest instead of failing the build', () => {
+    const root = mkdtempSync(join(tmpdir(), 'install-specs-'));
+    try {
+      mkdirSync(join(root, 'a'));
+      writeFileSync(join(root, 'a', 'package.json'), '{"name":"a","version":"1.2.3"}');
+      mkdirSync(join(root, 'leftover'));
+      expect([...workspaceVersions(root)]).toEqual([['a', '1.2.3']]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

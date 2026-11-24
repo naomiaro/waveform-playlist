@@ -6,8 +6,8 @@
  *
  * The ranges are written in at build time (`__INSTALL_SPECS__`, from
  * `scripts/build/install-specs.mjs` through `tsup.config.ts`). Code compiled
- * from source without that define (the website, the examples) prints the
- * bare name.
+ * from source without that define (the dawcore Vite examples alias this
+ * source) prints the bare name; the website uses the built `dist`.
  */
 declare const __INSTALL_SPECS__: Readonly<Record<string, string>> | undefined;
 

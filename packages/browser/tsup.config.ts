@@ -1,6 +1,9 @@
 import { defineConfig } from 'tsup';
 import { installSpecsDefine } from '../../scripts/build/install-specs.mjs';
 
+// spectrogram is no peer of browser: the spectrogram hook's error names it.
+const BROWSER_INSTALL_EXTRAS = ['@waveform-playlist/spectrogram'];
+
 export default defineConfig({
   entry: ['src/index.tsx', 'src/tone.ts'],
   format: ['cjs', 'esm'],
@@ -9,5 +12,5 @@ export default defineConfig({
   sourcemap: true,
   clean: true,
   // The published peer ranges, for the install hints (src/utils/installCommand.ts).
-  define: installSpecsDefine('browser'),
+  define: installSpecsDefine('browser', BROWSER_INSTALL_EXTRAS),
 });
