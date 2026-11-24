@@ -58,6 +58,8 @@ Without the Tone.js engine (on next, npm installs neither `@waveform-playlist/pl
 - MediaElement playout: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react`
 - Your own adapter: `npm install @waveform-playlist/browser @waveform-playlist/engine @dnd-kit/react` (`engine` for the `PlayoutAdapter` type), and pass `createAdapter` to the provider
 
+With esbuild, mark the engines you did not install as external (`--external:@waveform-playlist/playout`, and with your own adapter also `--external:@waveform-playlist/media-element-playout`): `browser`'s build imports both, and esbuild resolves them even when your app never uses them ([#892](https://github.com/naomiaro/waveform-playlist/issues/892)). Vite needs nothing.
+
 The optional packages are listed under [Packages](#packages); [Installation](https://naomiaro.github.io/waveform-playlist/next/docs/react/getting-started/installation) has the setup for annotations, recording and spectrogram.
 
 ## Quick Start

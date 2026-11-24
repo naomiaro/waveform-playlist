@@ -39,6 +39,16 @@ Waveform Playlist requires the following peer dependencies:
 | `@waveform-playlist/playout` | the range `browser` declares as its peer (the two packages have their own version numbers) | The Tone.js engine `WaveformPlaylistProvider` loads by default. An optional peer, so a package manager does not install it for you |
 | `@dnd-kit/react` | ^0.5.0 | React bindings for drag and drop (includes `@dnd-kit/dom` and `@dnd-kit/abstract`) |
 
+### Bundling without the Tone.js engine
+
+With `MediaElementPlaylistProvider` or an adapter of your own, install neither `tone` nor `@waveform-playlist/playout`:
+
+```bash npm2yarn
+npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react
+```
+
+`@waveform-playlist/browser`'s build still contains an `import()` of each engine, so some tools ask for the one you did not install ([#892](https://github.com/naomiaro/waveform-playlist/issues/892)). Vite builds as it is. esbuild stops with `Could not resolve "@waveform-playlist/playout"` until you mark it external (`--external:@waveform-playlist/playout`, or `external: ['@waveform-playlist/playout']`); with an adapter of your own and no `media-element-playout`, mark `@waveform-playlist/media-element-playout` external as well. webpack 5 builds and prints a `Module not found` warning for `@waveform-playlist/playout`. TypeScript with `skipLibCheck: false` reports `Cannot find module '@waveform-playlist/playout'` from browser's type declarations.
+
 ### Which Tone.js version?
 
 `npm install tone` gives you the stable release (15.1.x). That is the default, and what the examples on this site run.

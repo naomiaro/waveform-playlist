@@ -52,7 +52,12 @@ The `styled-components` peer is now `^6.0.0` (was `>=5.0.0`), matching every oth
 
 `ui-components` no longer depends on `@waveform-playlist/playout`. It never imported it, but because it was listed, every install of `@waveform-playlist/browser` also installed `playout` and its peer `tone`. A project that uses `WaveformPlaylistProvider`'s default Tone.js engine without listing `playout` in its own `package.json` (the stable README's `npm install @waveform-playlist/browser tone @dnd-kit/react` is one) got the engine only that way, and now has none: the bundler cannot resolve `@waveform-playlist/playout`, or, when the build goes through, the provider reports "@waveform-playlist/playout (and its peer `tone`) is required for the default WebAudio engine" through `onError`.
 
-Projects on `MediaElementPlaylistProvider` or an adapter of their own (`createAdapter`) need no change; they no longer install `playout` and `tone` at all.
+Projects on `MediaElementPlaylistProvider` or an adapter of their own (`createAdapter`) no longer install `playout` and `tone`. Their code needs no change, but browser's build still contains `import("@waveform-playlist/playout")`, and some tools follow it although the app never reaches it ([#892](https://github.com/naomiaro/waveform-playlist/issues/892)):
+
+- esbuild (`--bundle`) stops with `Could not resolve "@waveform-playlist/playout"`. Mark it external, as below.
+- webpack 5 builds and prints the warning `Module not found: Error: Can't resolve '@waveform-playlist/playout'`.
+- Vite builds as before.
+- TypeScript with `skipLibCheck: false` reports `Cannot find module '@waveform-playlist/playout'` from browser's type declarations. With `skipLibCheck: true` it does not.
 
 **Find:** `@waveform-playlist/playout` in your `package.json`. If it is missing and the project renders `WaveformPlaylistProvider` without `createAdapter`, or imports from `@waveform-playlist/browser/tone` or `@waveform-playlist/playout`, add it.
 
@@ -61,6 +66,10 @@ Projects on `MediaElementPlaylistProvider` or an adapter of their own (`createAd
 ```bash
 npm install @waveform-playlist/playout tone
 ```
+
+**Find (esbuild, without the Tone.js engine):** an esbuild build of a project that has no `@waveform-playlist/playout` in its `package.json`.
+
+**Replace with:** `--external:@waveform-playlist/playout` on the command line, or `external: ['@waveform-playlist/playout']` in the build options. With an adapter of your own and no `@waveform-playlist/media-element-playout` installed, mark that one external too; esbuild asked for it before this change as well.
 
 ## Track effects are pre-fader inserts
 
