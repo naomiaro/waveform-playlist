@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range dawcore's published manifest has for each package a hint names (#884).
+const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 
 // Mock dependencies
 vi.mock('@waveform-playlist/worklets', () => ({
@@ -746,7 +750,9 @@ describe('RecordingController', () => {
     const errorEvent = events.find((e) => e.type === 'daw-recording-error');
     expect(errorEvent).toBeTruthy();
     expect(errorEvent!.detail.trackId).toBe('track-1');
-    expect(String(errorEvent!.detail.error)).toContain('@waveform-playlist/worklets');
+    expect(String(errorEvent!.detail.error)).toContain(
+      `npm install "${specs['@waveform-playlist/worklets']}"`
+    );
 
     // Restore the original mock for subsequent tests
     vi.doMock('@waveform-playlist/worklets', () => ({

@@ -4,6 +4,7 @@ import type {
   SoundFontCache,
   TrackEffectsFunction,
 } from '@waveform-playlist/playout';
+import { installCommand } from '../utils/installCommand';
 
 /** Options for {@link resolvePlayoutAdapter}. */
 export interface ResolvePlayoutAdapterOptions {
@@ -21,7 +22,9 @@ export interface ResolvePlayoutAdapterOptions {
 
 const INSTALL_HINT =
   '@waveform-playlist/playout (and its peer `tone`) is required for the default WebAudio engine. ' +
-  'Install with: npm install @waveform-playlist/playout tone — or pass a custom `createAdapter`.';
+  'Install with: ' +
+  installCommand('@waveform-playlist/playout', 'tone') +
+  ' — or pass a custom `createAdapter`.';
 
 /**
  * Resolve a {@link PlayoutAdapter}. With `createAdapter`, returns its result and

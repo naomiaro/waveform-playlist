@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range dawcore's published manifest has for each package a hint names (#884).
+const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 import type { DawEditorElement } from '../elements/daw-editor';
 
 /**
@@ -70,7 +74,9 @@ describe('<daw-editor>.loadMidi — @dawcore/midi unavailable', () => {
   });
 
   it('rejects with the friendly install hint when the package is missing', async () => {
-    await expect(editor.loadMidi('/midi/x.mid')).rejects.toThrow(/npm install @dawcore\/midi/);
+    await expect(editor.loadMidi('/midi/x.mid')).rejects.toThrow(
+      `npm install "${specs['@dawcore/midi']}"`
+    );
   });
 
   it('console.warns the original module-resolution error for debuggability', async () => {

@@ -169,6 +169,9 @@ Derived during render and never written back (`providerInternals/useArrangementV
 **optional `peerDependencies`**. The providers load the default engine via dynamic
 `import()` through `src/playout/resolvePlayoutAdapter.ts` / `resolveMediaElementPlayout.ts`
 (factory-or-dynamic, install-hint rethrow — the `@dawcore/midi` `loadMidiImpl` pattern).
+The hint's command comes from `installCommand()` (`src/utils/installCommand.ts`), which names
+each package with the range of this build's published manifest (#884; root `CLAUDE.md`,
+"Install Hints Name the Published Range").
 
 - `WaveformPlaylistProvider` accepts `createAdapter?: () => PlayoutAdapter`. When supplied,
   neither `@waveform-playlist/playout` nor `tone` is imported.

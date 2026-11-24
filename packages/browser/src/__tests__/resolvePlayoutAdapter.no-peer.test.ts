@@ -2,6 +2,10 @@
 // optional peer not being installed. (Pattern mirrors dawcore's
 // daw-editor-load-midi-no-peer.test.ts.)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range browser's published manifest has for each peer (#884).
+const specs = installSpecs('browser');
 
 vi.doMock('@waveform-playlist/playout', () => {
   throw new Error("Cannot find module '@waveform-playlist/playout'");
@@ -18,7 +22,7 @@ afterEach(() => warnSpy.mockRestore());
 describe('resolvePlayoutAdapter — @waveform-playlist/playout unavailable', () => {
   it('rejects with the friendly install hint', async () => {
     await expect(resolvePlayoutAdapter({})).rejects.toThrow(
-      /npm install @waveform-playlist\/playout tone/
+      `npm install "${specs['@waveform-playlist/playout']}" "${specs.tone}"`
     );
   });
 

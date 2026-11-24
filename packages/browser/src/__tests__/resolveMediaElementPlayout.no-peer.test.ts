@@ -1,4 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range browser's published manifest has for each peer (#884).
+const specs = installSpecs('browser');
 
 vi.doMock('@waveform-playlist/media-element-playout', () => {
   throw new Error("Cannot find module '@waveform-playlist/media-element-playout'");
@@ -15,7 +19,7 @@ afterEach(() => warnSpy.mockRestore());
 describe('resolveMediaElementPlayout — package unavailable', () => {
   it('rejects with the friendly install hint', async () => {
     await expect(resolveMediaElementPlayout({})).rejects.toThrow(
-      /npm install @waveform-playlist\/media-element-playout/
+      `npm install "${specs['@waveform-playlist/media-element-playout']}"`
     );
   });
 

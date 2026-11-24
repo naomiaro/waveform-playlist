@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+
+// The range dawcore's published manifest has for each package a hint names (#884).
+const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 
 beforeAll(async () => {
   await import('../elements/daw-clip');
@@ -156,6 +160,14 @@ describe('DawEditorElement', () => {
       document.body.appendChild(editor);
       await expect(editor._ensureEngine()).rejects.toThrow('No PlayoutAdapter set');
       editor.remove();
+    });
+
+    it('names an adapter package of each kind with its published range', () => {
+      const editor = document.createElement('daw-editor');
+      expect(() => editor.audioContext).toThrow(`npm install "${specs['@dawcore/transport']}"`);
+      expect(() => editor.audioContext).toThrow(
+        `npm install "${specs['@waveform-playlist/playout']}"`
+      );
     });
 
     it('audioContext getter throws without adapter', () => {

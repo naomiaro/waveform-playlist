@@ -395,6 +395,8 @@ When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, com
 - **Regular dependency** (`@dawcore/spectrogram` pattern) — always loaded; appropriate when most consumers use the feature.
 - **Optional peer dep + dynamic import** (`@dawcore/midi` pattern) — opt-in; appropriate when bundle cost matters and most consumers don't use the feature. `loadMidi` does `await import('@dawcore/midi')` with an install-hint rethrow on failure.
 
+**Install Hints Name the Published Range (#884).** A runtime message that tells the reader to install one of our packages gets its command from `installCommand()` (browser `src/utils/installCommand.ts`, dawcore `src/utils/install-command.ts`), never a literal `npm install <name>`: that installs `latest`, which fails the peer range of a `next` build (`@dawcore/transport >=0.0.16-0` against 0.0.15) and sends a stable user on an older major to the newer one. The ranges are written in at build time by `scripts/build/install-specs.mjs` (pnpm's `workspace:` rewrite; hand-written ranges as written), passed as `define` by the package's `tsup.config.ts` AND `vitest.config.ts` (a test in each package checks both). A name that is not a peer goes in the config's extra list (dawcore names playout's adapter). Source compiled without the define (the website, the examples) prints the bare name.
+
 ### Examples Directory Structure
 
 **Decision:** Standalone Vite examples live in `examples/` at repo root, not inside packages.

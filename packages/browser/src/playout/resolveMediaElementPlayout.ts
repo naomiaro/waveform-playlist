@@ -1,4 +1,5 @@
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { installCommand } from '../utils/installCommand';
 
 /** Options for {@link resolveMediaElementPlayout}. */
 export interface ResolveMediaElementPlayoutOptions {
@@ -12,7 +13,9 @@ export interface ResolveMediaElementPlayoutOptions {
 
 const INSTALL_HINT =
   '@waveform-playlist/media-element-playout is required for the default MediaElement engine. ' +
-  'Install with: npm install @waveform-playlist/media-element-playout — or pass a custom `createPlayout`.';
+  'Install with: ' +
+  installCommand('@waveform-playlist/media-element-playout') +
+  ' — or pass a custom `createPlayout`.';
 
 /**
  * Resolve a MediaElement playout. With `createPlayout`, returns its result and

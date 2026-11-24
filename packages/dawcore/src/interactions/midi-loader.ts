@@ -10,6 +10,7 @@
 import type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
 import type { TrackConfig } from '../types';
 import type { DawTrackElement } from '../elements/daw-track';
+import { installCommand } from '../utils/install-command';
 
 export type { MidiLoadOptions, MidiLoadResult };
 
@@ -27,7 +28,7 @@ export interface MidiLoaderHost {
 }
 
 const INSTALL_HINT =
-  '@dawcore/midi is required for loadMidi(). Install with: npm install @dawcore/midi';
+  '@dawcore/midi is required for loadMidi(). Install with: ' + installCommand('@dawcore/midi');
 
 /**
  * Loads a `.mid` file (URL or `File`) and creates N `<daw-track>` elements,

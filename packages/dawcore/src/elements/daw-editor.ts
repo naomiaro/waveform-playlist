@@ -94,6 +94,7 @@ import { loadWaveformDataFromUrl } from '../interactions/peaks-loader';
 import { extractPeaks } from '../workers/waveformDataUtils';
 import { ScrollSyncController } from '../controllers/scroll-sync-controller';
 import { PlaybackAnimationController } from '../controllers/playback-animation-controller';
+import { installCommand } from '../utils/install-command';
 
 /** Height of the ruler band — single source for the ruler element and the header row. */
 const RULER_HEIGHT = 30;
@@ -102,11 +103,15 @@ const NO_ADAPTER_ERROR =
   'No PlayoutAdapter set on <daw-editor>. ' +
   'Set editor.adapter before use.\n\n' +
   '  // Option 1: Native Web Audio (no Tone.js)\n' +
-  '  npm install @dawcore/transport\n' +
+  '  ' +
+  installCommand('@dawcore/transport') +
+  '\n' +
   "  import { NativePlayoutAdapter } from '@dawcore/transport';\n" +
   '  editor.adapter = new NativePlayoutAdapter(new AudioContext());\n\n' +
   '  // Option 2: Tone.js (effects, MIDI synths)\n' +
-  '  npm install @waveform-playlist/playout\n' +
+  '  ' +
+  installCommand('@waveform-playlist/playout') +
+  '\n' +
   "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
   '  editor.adapter = createToneAdapter();';
 
