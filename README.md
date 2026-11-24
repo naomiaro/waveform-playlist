@@ -51,9 +51,9 @@ npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @wav
 
 **On next, add `@next` to every `@waveform-playlist/*` and `@dawcore/*` package you install,** not only the ones above. A `latest` package beside `@next` ones can fail their peer ranges (`annotations@latest` peers on `browser ^16`). The commands in the next docs carry the tag already.
 
-**React:** next requires React 19. On stable, `browser` accepts React 18.2 or 19, but `annotations`, `recording`, `spectrogram` and `midi` peer on React 18 only, so a stable project that uses any of them stays on React 18 ([#888](https://github.com/naomiaro/waveform-playlist/issues/888)).
+**React:** next requires React 19.
 
-Without the Tone.js engine (nothing in your bundle imports Tone.js; npm still installs `tone` today, through `ui-components`, [#886](https://github.com/naomiaro/waveform-playlist/issues/886)):
+Without the Tone.js engine (on next, npm installs neither `@waveform-playlist/playout` nor `tone`; on stable it still installs both, through `ui-components`, though nothing in your bundle imports them):
 
 - MediaElement playout: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react`
 - Your own adapter: `npm install @waveform-playlist/browser @waveform-playlist/engine @dnd-kit/react` (`engine` for the `PlayoutAdapter` type), and pass `createAdapter` to the provider

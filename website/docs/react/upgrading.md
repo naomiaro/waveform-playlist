@@ -46,6 +46,22 @@ The `styled-components` peer is now `^6.0.0` (was `>=5.0.0`), matching every oth
 
 **Replace with:** `"styled-components": "^6.0.0"`, then follow the [styled-components v6 migration notes](https://styled-components.com/docs/faqs#what-do-i-need-to-do-to-migrate-to-v6).
 
+## Install `@waveform-playlist/playout` yourself
+
+**Package:** `@waveform-playlist/ui-components`.
+
+`ui-components` no longer depends on `@waveform-playlist/playout`. It never imported it, but because it was listed, every install of `@waveform-playlist/browser` also installed `playout` and its peer `tone`. A project that uses `WaveformPlaylistProvider`'s default Tone.js engine without listing `playout` in its own `package.json` (the stable README's `npm install @waveform-playlist/browser tone @dnd-kit/react` is one) got the engine only that way, and now has none: the bundler cannot resolve `@waveform-playlist/playout`, or, when the build goes through, the provider reports "@waveform-playlist/playout (and its peer `tone`) is required for the default WebAudio engine" through `onError`.
+
+Projects on `MediaElementPlaylistProvider` or an adapter of their own (`createAdapter`) need no change; they no longer install `playout` and `tone` at all.
+
+**Find:** `@waveform-playlist/playout` in your `package.json`. If it is missing and the project renders `WaveformPlaylistProvider` without `createAdapter`, or imports from `@waveform-playlist/browser/tone` or `@waveform-playlist/playout`, add it.
+
+**Replace with:**
+
+```bash
+npm install @waveform-playlist/playout tone
+```
+
 ## Track effects are pre-fader inserts
 
 **Packages:** `@waveform-playlist/playout`, `@waveform-playlist/browser`.
