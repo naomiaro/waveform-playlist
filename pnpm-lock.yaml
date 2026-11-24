@@ -219,12 +219,6 @@ importers:
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine
-      '@waveform-playlist/media-element-playout':
-        specifier: workspace:^
-        version: link:../media-element-playout
-      '@waveform-playlist/playout':
-        specifier: workspace:^
-        version: link:../playout
       '@waveform-playlist/recording':
         specifier: workspace:^
         version: link:../recording
@@ -262,6 +256,12 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.0
         version: 19.3.0(@types/react@19.3.0)
+      '@waveform-playlist/media-element-playout':
+        specifier: workspace:*
+        version: link:../media-element-playout
+      '@waveform-playlist/playout':
+        specifier: workspace:*
+        version: link:../playout
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
@@ -645,9 +645,6 @@ importers:
       '@waveform-playlist/core':
         specifier: workspace:*
         version: link:../core
-      '@waveform-playlist/playout':
-        specifier: workspace:*
-        version: link:../playout
       react-async-hook:
         specifier: ^4.0.0
         version: 4.0.0(react@19.2.7)
@@ -5327,7 +5324,7 @@ packages:
     requiresBuild: true
     dependencies:
       '@emnapi/wasi-threads': 1.2.3
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   /@emnapi/core@1.9.2:
@@ -5360,7 +5357,7 @@ packages:
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
     requiresBuild: true
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   /@emnapi/runtime@1.9.2:
@@ -5399,7 +5396,7 @@ packages:
     resolution: {integrity: sha512-ELEBe8PsLvvJ6QMr0zLt8ffvOHW/dc1m3CEzNMg7aJUv3bMaoDtw2TXyDAwkYBuroxxuHEwhRTLJSe5sya547g==}
     requiresBuild: true
     dependencies:
-      tslib: 2.8.1
+      tslib: 2.9.1
     optional: true
 
   /@emnapi/wasi-threads@2.2.0:
@@ -13169,7 +13166,6 @@ packages:
 
   /graceful-fs@4.2.12:
     resolution: {integrity: sha512-iuyGF2E4oafQfPsRrG2wtY2ILupMhvtdrhzrxB+0VcjsPpSPttpfYdjnGFGsTi5MaJFjI1jOKHPQ6UTbTj9TAw==}
-    dev: true
 
   /gray-matter@4.0.3:
     resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
@@ -14030,7 +14026,7 @@ packages:
   /jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
     optionalDependencies:
-      graceful-fs: 4.2.11
+      graceful-fs: 4.2.12
     dev: true
 
   /jsonfile@6.2.1:
@@ -14038,7 +14034,7 @@ packages:
     dependencies:
       universalify: 2.0.1
     optionalDependencies:
-      graceful-fs: 4.2.11
+      graceful-fs: 4.2.12
 
   /jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}

@@ -162,6 +162,12 @@ const track = useMemo(
 
 ### Tone.js Effects
 
+This section needs Tone.js and `@waveform-playlist/playout` (for `getGlobalAudioContext`), which a MediaElement setup does not install otherwise:
+
+```bash npm2yarn
+npm install @waveform-playlist/playout tone
+```
+
 Bridge the MediaElement output into a Tone.js effect chain using a `Tone.Gain` node. Pass `getGlobalAudioContext()` to the provider so native nodes and Tone.js nodes share the same audio graph:
 
 ```tsx
