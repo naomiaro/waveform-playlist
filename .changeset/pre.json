@@ -90,6 +90,7 @@
     "track-effects-prop",
     "track-kind",
     "trim-preview-clips-by-id",
+    "ui-components-no-playout",
     "use-context-sweep",
     "use-midi-tracks-removed",
     "view-options",
