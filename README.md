@@ -53,7 +53,7 @@ npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @wav
 
 **React:** next requires React 19.
 
-Without the Tone.js engine (on next, npm installs neither `@waveform-playlist/playout` nor `tone`; on stable it still installs both, through `ui-components`, though nothing in your bundle imports them):
+Without the Tone.js engine (on next, npm installs neither `@waveform-playlist/playout` nor `tone`; on stable it still installs both, through `ui-components`, though your app never loads them):
 
 - MediaElement playout: `npm install @waveform-playlist/browser @waveform-playlist/media-element-playout @dnd-kit/react`
 - Your own adapter: `npm install @waveform-playlist/browser @waveform-playlist/engine @dnd-kit/react` (`engine` for the `PlayoutAdapter` type), and pass `createAdapter` to the provider
