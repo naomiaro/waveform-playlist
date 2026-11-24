@@ -88,7 +88,15 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
      - "Without the Tone.js engine … npm still installs `tone` today" (#886), if the release ships its fix.
    - **Check each fact again against the new stable's peers** rather than editing words: `curl -s https://registry.npmjs.org/<scope>%2f<name>` after the publish (`npm view` caches 404s, "Verifying fresh publishes" above). Close an issue the README cites once the release fixes it, and #887 (about the live stable page) only after step 3 has moved `main` and the site has deployed. #887 and #888 both stop applying if the release ships the next major.
    - **This commit is also what `main` becomes,** so `main`'s README is this file, and "This README describes next, the code on `dev`" is false on `main` from the first commit to `dev` after the release (the `pre enter next` PR, "Prereleases" above). Leave it as it is: GitHub shows `dev`'s README, and `main`'s copy is read only by someone browsing that branch.
-2. Publish from that commit (the hardware-key procedure above).
+2. Publish from that commit (the hardware-key procedure above). Then point `next` at the release (maintainer's choice, 2026-11-23). Otherwise `@next`, which the README and every command of the next docs install, gives the last prerelease (`17.0.0-next.5`), older than `latest` (`17.0.0`), until the next merge with a changeset.
+   - **Make the chain.** Give the maintainer one command per public package, for a real terminal like the publish chain. The version is the one in that package's manifest at the release commit, so `next` equals `latest` for all 18, including those the release did not bump:
+
+     ```bash
+     node -e 'for (const d of require("fs").readdirSync("packages")) { try { const p = require(`./packages/${d}/package.json`); if (!p.private) console.log(`npm dist-tag add ${p.name}@${p.version} next`); } catch {} }' | paste -sd'&' - | sed 's/&/ \&\& /g'
+     ```
+
+   - **Check it from here.** Each packument's `dist-tags` must show `next` equal to `latest`, read with `curl -s -H 'Cache-Control: no-cache' https://registry.npmjs.org/<scope>%2f<name>`. Whether npm asks for the hardware key on `dist-tag add` had not been tried (2026-11-23).
+   - **The next prerelease moves `next` on as usual.** `publish-next.yml` publishes `x.y.z-next.0` of the following version with the tag `next`. Its registry check is about what that run publishes: a dist-tag other than `next` that changed, or a version that appeared and was not meant to. A `next` moved by hand between runs is neither.
 3. Move `main` to the release commit, named by its SHA (`dev` may have moved on since: `origin/dev:main` would publish unreleased work as the stable site and put the tag on it):
 
    ```bash
