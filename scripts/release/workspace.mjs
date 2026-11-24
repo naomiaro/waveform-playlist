@@ -70,7 +70,7 @@ const REGISTRY = 'https://registry.npmjs.org';
  * for five minutes: without it a version published a minute ago reads as missing.
  */
 export async function fetchPackument(name) {
-  const url = `${REGISTRY}/${name.replace('/', '%2f')}?t=${Date.now()}`;
+  const url = `${REGISTRY}/${name.replaceAll('/', '%2f')}?t=${Date.now()}`;
   const response = await fetch(url, {
     headers: { accept: 'application/json', 'cache-control': 'no-cache' },
   });
