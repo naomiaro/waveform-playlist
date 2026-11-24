@@ -80,12 +80,14 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 `dev` is where a release is prepared; `main` is the commit that npm `latest` was published from (root `CLAUDE.md`, "Two branches").
 
 1. On `dev`: `pnpm exec changeset pre exit` (`dev` is in pre mode: "Prereleases" above; without it the versions are `-next.N`), then `pnpm release:version`, the hand-written peer ranges back to plain floors ("Prereleases": "a stable release removes them"), the release number in the root `package.json`, the stable announcement bar, the root README's stable facts (below), the `chore(release)` commit, through a PR like any other change.
-   - **The root README.** Its "Stable and next" and "Install" sections describe the release that is stable today, and they become false the moment this one replaces it. Read every sentence that names stable and rewrite it for the new stable. In the version of 2026-11-23 those are:
+   - **The root README.** Its top sections describe the release that is stable today and the difference between it and next; with this release that difference is gone. Read every sentence of "Stable and next", "Install", "Quick Start" and "Documentation" (stable is not always named: the `annotations@latest` example is about it) and rewrite it for the new stable. In the version of 2026-11-23 those are:
      - the React paragraph: stable `browser` takes 18.2 or 19, but its optional packages peer on React 18 only (#888);
-     - the note under the Quick Start about the stable Basic Usage page's `useAudioTracks` import (#887);
-     - "stable also accepts" anything.
-   - **Check each fact again against the new stable's peers** (`npm view <pkg>@<new version> peerDependencies`) rather than editing words. Close an issue the README cites when the release fixes it (#887 and #888 both stop applying if the release ships the next major).
-   - **This commit is also what `main` becomes,** so `main`'s README is this file. Its "This README describes next" holds there only while next and stable are the same code, that is until the next prerelease. Check that sentence too.
+     - "A `latest` package beside `@next` ones can fail…" with its `annotations@latest` peers on `browser ^16` example;
+     - the sentence under the Quick Start: "This is the next API. The stable equivalent is in the stable Getting Started", with its `useAudioTracks` note (#887);
+     - "To move a project from stable to next, see the upgrade guide" and the "From stable to next" upgrade-guide line in Documentation, which name the move this release makes; with them, the title of `website/docs/react/upgrading.md` ("Upgrading to the next major");
+     - "Without the Tone.js engine … npm still installs `tone` today" (#886), if the release ships its fix.
+   - **Check each fact again against the new stable's peers** rather than editing words: `curl -s https://registry.npmjs.org/<scope>%2f<name>` after the publish (`npm view` caches 404s, "Verifying fresh publishes" above). Close an issue the README cites once the release fixes it, and #887 (about the live stable page) only after step 3 has moved `main` and the site has deployed. #887 and #888 both stop applying if the release ships the next major.
+   - **This commit is also what `main` becomes,** so `main`'s README is this file, and "This README describes next, the code on `dev`" is false on `main` from the first commit to `dev` after the release (the `pre enter next` PR, "Prereleases" above). Leave it as it is: GitHub shows `dev`'s README, and `main`'s copy is read only by someone browsing that branch.
 2. Publish from that commit (the hardware-key procedure above).
 3. Move `main` to the release commit, named by its SHA (`dev` may have moved on since: `origin/dev:main` would publish unreleased work as the stable site and put the tag on it):
 
