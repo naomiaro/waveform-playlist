@@ -3,22 +3,95 @@
  * install hints should name (#884). Its rules copy pnpm's publish-time rewrite
  * of the `workspace:` protocol (`makePublishDependency` in pnpm 8.15, the
  * version the root `packageManager` pins), so a hint names the range the
- * published manifest has.
+ * published manifest has; a hand-written `>=` floor becomes a caret on the
+ * version built with, so a stable build stops before the next breaking release.
  */
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  hintRange,
   installSpecs,
   installSpecsDefine,
   publishedRange,
+  satisfiesFloors,
   workspaceVersions,
 } from '../../../../scripts/build/install-specs.mjs';
 
 const packagesDir = join(__dirname, '../../..');
 const manifest = (dir: string) =>
   JSON.parse(readFileSync(join(packagesDir, dir, 'package.json'), 'utf8'));
+
+describe('satisfiesFloors', () => {
+  it("admits a prerelease only through a floor with a prerelease on its own version (npm's rule)", () => {
+    expect(satisfiesFloors('0.0.16-next.1', '>=0.0.16-0')).toBe(true);
+    expect(satisfiesFloors('0.0.16-next.1', '>=0.0.16')).toBe(false);
+    expect(satisfiesFloors('0.0.16-next.1', '>=0.0.1')).toBe(false);
+    expect(satisfiesFloors('0.0.6-next.1', '>=0.0.1 || >=0.0.6-0')).toBe(true);
+    // A prerelease floor on another version does not admit it either.
+    expect(satisfiesFloors('0.0.16-next.1', '>=0.0.1-0')).toBe(false);
+  });
+
+  it('admits the release through a prerelease floor on its own version', () => {
+    // transport 0.0.16 against dawcore's >=0.0.16-0 once 0.0.16 is released.
+    expect(satisfiesFloors('0.0.16', '>=0.0.16-0')).toBe(true);
+  });
+
+  it('orders versions by semver precedence', () => {
+    expect(satisfiesFloors('0.0.16', '>=0.0.16')).toBe(true);
+    expect(satisfiesFloors('0.0.15', '>=0.0.16')).toBe(false);
+    expect(satisfiesFloors('0.1.0', '>=0.0.16')).toBe(true);
+    expect(satisfiesFloors('1.0.0-next.10', '>=1.0.0-next.9')).toBe(true);
+    expect(satisfiesFloors('1.0.0-next.9', '>=1.0.0-next.10')).toBe(false);
+    expect(satisfiesFloors('1.0.0-1', '>=1.0.0-a')).toBe(false);
+    expect(satisfiesFloors('1.0.0-a', '>=1.0.0-a.1')).toBe(false);
+    expect(satisfiesFloors('1.0.0-a.1', '>=1.0.0-a')).toBe(true);
+  });
+
+  it('says nothing about a range of another shape', () => {
+    expect(satisfiesFloors('1.2.0', '^1.0.0')).toBeUndefined();
+    expect(satisfiesFloors('1.2.0', '>=1.0.0 <2.0.0')).toBeUndefined();
+  });
+});
+
+describe('hintRange', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const quiet = () => vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+  it('names a caret on the version built with for a floor that admits it, silently', () => {
+    const warn = quiet();
+    expect(hintRange('>=0.0.16-0', '0.0.16-next.1', 'transport')).toBe('^0.0.16-next.1');
+    expect(hintRange('>=0.0.16', '0.0.16', 'transport')).toBe('^0.0.16');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('keeps a floor raised above the version built with, and says so in the build log', () => {
+    const warn = quiet();
+    expect(hintRange('>=0.0.16-0', '0.0.15', 'transport')).toBe('>=0.0.16-0');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain(
+      'transport names the peer range ">=0.0.16-0" as it is: the version in the manifests, 0.0.15, is below it'
+    );
+  });
+
+  it('keeps a hand-written range of another shape on a workspace package, and says so', () => {
+    const warn = quiet();
+    expect(hintRange('^1.0.0', '1.2.0', 'x')).toBe('^1.0.0');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('not a range of >= floors');
+  });
+
+  it('keeps the range of a package not under packages/ without a warning', () => {
+    const warn = quiet();
+    expect(hintRange('>=15.0.0', undefined, 'tone')).toBe('>=15.0.0');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('gives the published range for a workspace token', () => {
+    expect(hintRange('workspace:*', '2.0.0', 'x')).toBe('2.0.0');
+  });
+});
 
 describe('publishedRange', () => {
   it('turns workspace:^ into a caret on the workspace version', () => {
@@ -88,17 +161,20 @@ describe('installSpecs', () => {
     expect(installSpecs('browser').tone).toBe(`tone@${manifest('browser').peerDependencies.tone}`);
   });
 
-  it("names dawcore's hand-written peer ranges as written", () => {
+  it("names dawcore's hand-written floors with a caret on the version in the same manifests", () => {
     const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
     const peers = manifest('dawcore').peerDependencies;
-    for (const name of [
-      '@dawcore/transport',
-      '@dawcore/midi',
-      '@dawcore/wam',
-      '@dawcore/faust',
-      '@waveform-playlist/worklets',
+    for (const [name, dir] of [
+      ['@dawcore/transport', 'transport'],
+      ['@dawcore/midi', 'dawcore-midi'],
+      ['@dawcore/wam', 'dawcore-wam'],
+      ['@dawcore/faust', 'dawcore-faust'],
+      ['@waveform-playlist/worklets', 'worklets'],
     ]) {
-      expect(specs[name]).toBe(`${name}@${peers[name]}`);
+      const version = manifest(dir).version;
+      // A floor raised before the peer is versioned keeps the range (hintRange).
+      const expected = satisfiesFloors(version, peers[name]) ? `^${version}` : peers[name];
+      expect(specs[name]).toBe(`${name}@${expected}`);
     }
   });
 
@@ -110,9 +186,9 @@ describe('installSpecs', () => {
   });
 
   it('keeps the peer range for an extra name that is also a peer', () => {
-    const specs = installSpecs('dawcore', ['@dawcore/transport']);
-    const range = manifest('dawcore').peerDependencies['@dawcore/transport'];
-    expect(specs['@dawcore/transport']).toBe(`@dawcore/transport@${range}`);
+    // tone is not under packages/: as an extra alone it would fail the build.
+    const specs = installSpecs('browser', ['tone']);
+    expect(specs.tone).toBe(`tone@${manifest('browser').peerDependencies.tone}`);
   });
 
   it('refuses an extra name that is neither a peer nor a workspace package', () => {

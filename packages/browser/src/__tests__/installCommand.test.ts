@@ -41,7 +41,7 @@ function installCommandCalls(): { file: string; args: string }[] {
   );
 }
 
-describe('the build hands the published ranges to installCommand', () => {
+describe('the build hands the hint ranges to installCommand', () => {
   it('tsup defines __INSTALL_SPECS__ for the published build', async () => {
     expect((await loadConfig('tsup.config.ts')).define).toEqual(expected);
   });

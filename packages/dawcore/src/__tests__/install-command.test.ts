@@ -34,7 +34,7 @@ const sourceFiles = (readdirSync(srcDir, { recursive: true }) as string[]).filte
 );
 const source = (file: string) => readFileSync(join(srcDir, file), 'utf8');
 
-describe('the build hands the published ranges to installCommand', () => {
+describe('the build hands the hint ranges to installCommand', () => {
   it('tsup defines __INSTALL_SPECS__ for the published build', async () => {
     expect((await loadConfig('tsup.config.ts')).define).toEqual(expected);
   });

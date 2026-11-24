@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
 
-// What each dawcore hint names (#884): the published peer range, and for playout
-// (no peer of dawcore) a caret on its version.
+// What each dawcore hint names (#884): a caret on the version in the manifests
+// where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
 const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 
 beforeAll(async () => {
@@ -163,7 +163,7 @@ describe('DawEditorElement', () => {
       editor.remove();
     });
 
-    it('names an adapter package of each kind with its published range', () => {
+    it('names an adapter package of each kind with the range built in', () => {
       const editor = document.createElement('daw-editor');
       expect(() => editor.audioContext).toThrow(`npm install "${specs['@dawcore/transport']}"`);
       expect(() => editor.audioContext).toThrow(

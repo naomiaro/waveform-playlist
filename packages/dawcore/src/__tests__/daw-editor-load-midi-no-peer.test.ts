@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
 
-// What each dawcore hint names (#884): the published peer range, and for playout
-// (no peer of dawcore) a caret on its version.
+// What each dawcore hint names (#884): a caret on the version in the manifests
+// where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
 const specs = installSpecs('dawcore', ['@waveform-playlist/playout']);
 import type { DawEditorElement } from '../elements/daw-editor';
 

@@ -11,6 +11,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  // The published peer ranges, for the install hints (src/utils/install-command.ts).
+  // What the install hints name (src/utils/install-command.ts, scripts/build/install-specs.mjs).
   define: installSpecs,
 });
