@@ -97,6 +97,7 @@ pnpm publish --filter @waveform-playlist/NEW-PACKAGE --no-git-checks --access pu
 
    - **Check it from here.** Each packument's `dist-tags` must show `next` equal to `latest`, read with `curl -s -H 'Cache-Control: no-cache' https://registry.npmjs.org/<scope>%2f<name>`. Whether npm asks for the hardware key on `dist-tag add` had not been tried (2026-11-23).
    - **The next prerelease moves `next` on as usual.** `publish-next.yml` publishes `x.y.z-next.0` of the following version with the tag `next`. Its registry check is about what that run publishes: a dist-tag other than `next` that changed, or a version that appeared and was not meant to. A `next` moved by hand between runs is neither.
+
 3. Move `main` to the release commit, named by its SHA (`dev` may have moved on since: `origin/dev:main` would publish unreleased work as the stable site and put the tag on it):
 
    ```bash
