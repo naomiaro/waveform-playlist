@@ -48,7 +48,7 @@ The `styled-components` peer is now `^6.0.0` (was `>=5.0.0`), matching every oth
 
 ## Install `@waveform-playlist/playout` yourself
 
-**Package:** `@waveform-playlist/ui-components`.
+**Package:** `@waveform-playlist/ui-components`, which every install of `@waveform-playlist/browser` brings in.
 
 `ui-components` no longer depends on `@waveform-playlist/playout`. It never imported it, but because it was listed, every install of `@waveform-playlist/browser` also installed `playout` and its peer `tone`. A project that uses `WaveformPlaylistProvider`'s default Tone.js engine without listing `playout` in its own `package.json` (the stable README's `npm install @waveform-playlist/browser tone @dnd-kit/react` is one) got the engine only that way, and now has none: the bundler cannot resolve `@waveform-playlist/playout`, or, when the build goes through, the provider reports "@waveform-playlist/playout (and its peer `tone`) is required for the default WebAudio engine" through `onError`.
 

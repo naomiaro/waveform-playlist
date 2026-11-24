@@ -56,6 +56,8 @@
     "@types/node": "^24.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@waveform-playlist/media-element-playout": "workspace:*",
+    "@waveform-playlist/playout": "workspace:*",
     "esbuild": "^0.28.2",
     "jsdom": "^28.1.0",
     "react": "^19.2.7",

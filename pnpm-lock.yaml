@@ -219,12 +219,6 @@ importers:
       '@waveform-playlist/engine':
         specifier: workspace:*
         version: link:../engine
-      '@waveform-playlist/media-element-playout':
-        specifier: workspace:^
-        version: link:../media-element-playout
-      '@waveform-playlist/playout':
-        specifier: workspace:^
-        version: link:../playout
       '@waveform-playlist/recording':
         specifier: workspace:^
         version: link:../recording
@@ -262,6 +256,12 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.0
         version: 19.3.0(@types/react@19.3.0)
+      '@waveform-playlist/media-element-playout':
+        specifier: workspace:*
+        version: link:../media-element-playout
+      '@waveform-playlist/playout':
+        specifier: workspace:*
+        version: link:../playout
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
