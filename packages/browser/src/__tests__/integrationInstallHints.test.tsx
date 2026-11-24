@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /**
  * The integration hooks' errors name the package to install with the range
- * this build of browser was published with (#884).
+ * browser peers on (annotations) or a caret on its version (spectrogram, no
+ * peer) (#884).
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';

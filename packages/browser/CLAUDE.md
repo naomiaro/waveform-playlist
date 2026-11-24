@@ -172,7 +172,7 @@ Derived during render and never written back (`providerInternals/useArrangementV
 The hint's command comes from `installCommand()` (`src/utils/installCommand.ts`), which names
 each package with the range this build peers on, or a caret on the version built with for a
 package it does not peer on (spectrogram) (#884; root `CLAUDE.md`,
-"Install Hints Name the Published Range").
+"Install Hints Name a Range Inside the Peer Range").
 
 - `WaveformPlaylistProvider` accepts `createAdapter?: () => PlayoutAdapter`. When supplied,
   neither `@waveform-playlist/playout` nor `tone` is imported.

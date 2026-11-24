@@ -43,7 +43,7 @@ waveform-playlist/
 │
 ├── e2e/                   # Playwright end-to-end tests
 ├── scripts/release/       # Used by .github/workflows/publish-next.yml: check-version-run.mjs, apply-version-bump.mjs, publish-next.mjs, workspace.mjs (shared)
-├── scripts/build/         # install-specs.mjs: what the install hints of browser and dawcore name (peer ranges as published; a caret on the version built with for a `>=` floor or a package not peered on), a tsup and vitest define (`__INSTALL_SPECS__`)
+├── scripts/build/         # install-specs.mjs: what the install hints of browser and dawcore name (peer ranges as published; a caret on the version built with for a `>=` floor that admits it on a package under packages/, or for a package not peered on), a tsup and vitest define (`__INSTALL_SPECS__`)
 │
 └── website/               # Docusaurus documentation site
     ├── src/

@@ -2,7 +2,8 @@
  * The `npm install` command an error message gives for a missing optional
  * package (#884). A bare name installs npm `latest`, which can fail the peer
  * range of this build (a `next` prerelease, or a stable build of an older
- * major), so each name carries the range this package was published with.
+ * major), so each name carries the range this package was published with (for
+ * spectrogram, which browser does not peer on, a caret on its version).
  *
  * The ranges are written in at build time (`__INSTALL_SPECS__`, from
  * `scripts/build/install-specs.mjs` through `tsup.config.ts`). Code compiled

@@ -1,11 +1,12 @@
 // What a package's install hints name: for each package a hint may ask the
 // reader to install, `name@range` (#884). A plain `npm install <name>`
-// installs `latest`, which can fail the peer range of a `next` package, or be
-// a newer major than a stable package accepts. The range is the one the
-// PUBLISHED manifest has, except where that range is open-ended (a hand-written
-// `>=` floor): there it is a caret on the peer's version in the same
-// manifests, the version the package was built with, so a stable build does
-// not send the reader to a later breaking release.
+// installs `latest`, which can fail the peer range of a `next` package, or (for
+// a `workspace:^` peer) be a newer major than a stable package accepts. The
+// range is the one the PUBLISHED manifest has, except where that range is
+// open-ended (hand-written `>=` floors on a package under packages/, which
+// would admit a later breaking release): there, when the floors admit it, it
+// is a caret on the peer's version in the same manifests, the version the
+// package was built with.
 //
 // The ranges are read at build time and handed to the bundler as a define
 // (`__INSTALL_SPECS__`), so each build names the versions of its own
@@ -42,8 +43,11 @@ const VERSION_TOKEN = /^workspace:(.*?)@?([\^~*])$/;
  * (`makePublishDependency`, which `createExportableManifest` applies to
  * `peerDependencies` too): a range ending in `^` or `~` becomes that token on
  * the workspace version, one ending in `*` the exact version, `workspace:<range>`
- * the range; a range without the protocol is kept. pnpm's other forms (an
- * alias, a path) are refused: no install hint can name them.
+ * the range; a range without the protocol is kept. A path and an alias with a
+ * range after it (`workspace:other@^1.0.0`) are refused. An alias with a bare
+ * token (`workspace:other@^`) is not told apart from a partial version: it is
+ * read as the peer's own name, where pnpm publishes `npm:other@^<version>`. No
+ * manifest here has either form.
  */
 export function publishedRange(range, workspaceVersion, name = 'a peer') {
   if (!range.startsWith('workspace:')) return range;
@@ -90,7 +94,10 @@ function compareVersions(a, b) {
  * Whether `version` satisfies `range` when the range is one or more `>=`
  * floors joined by `||`, with npm's rule that a prerelease matches only a floor
  * with a prerelease on the same major.minor.patch. `undefined` for a range of
- * another shape, or a version that does not parse.
+ * another shape, or a version that does not parse. Two differences from npm's
+ * semver, for inputs no manifest here has: a `>=0.0.0` part, which semver reads
+ * as `*` (admitting no prerelease), is read as a floor; and versions semver
+ * rejects (a leading zero, an empty identifier) are accepted.
  */
 export function satisfiesFloors(version, range) {
   const parsed = parseVersion(version);
@@ -107,9 +114,12 @@ export function satisfiesFloors(version, range) {
 /**
  * The range a hint names for a peer: the published range, except a range of
  * `>=` floors on a package under packages/, which becomes a caret on that
- * package's version when the version satisfies it (the caret then lies inside
+ * package's version when the version satisfies it. The caret then lies inside
  * the range: every version it admits is at or above the version, below the
- * next breaking release). Otherwise the range is kept, with a warning in the
+ * next breaking release, and the prereleases it admits are on the version's
+ * own major.minor.patch, only when the version is itself a prerelease, so the
+ * floor that admitted the version admits them too. Otherwise the range is
+ * kept, with a warning in the
  * build log: a version the floors do not admit yet (a floor raised before the
  * peer's version step), or a range of another shape. The hint is then still
  * inside the peer range, only as open as the range.
