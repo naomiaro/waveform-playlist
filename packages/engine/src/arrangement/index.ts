@@ -5,6 +5,7 @@ export type {
   Arrangement,
   ClipBounds,
   CreateArrangementOptions,
+  MixerChangeOptions,
   RemoveTrackOptions,
 } from './types';
 export type { TrackMixerValues } from './mixer';

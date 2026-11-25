@@ -303,6 +303,10 @@ describe('ids are unique', () => {
       expect(after.tracks).toBe(before.tracks);
       expect(after.mixer).toBe(before.mixer);
       expect(changes).toEqual([]);
+      // Rule (#843): the volume change is a step of its own, so the history
+      // holds two steps (the move and the volume); before, the move's alone.
+      arrangement.undo();
+      expect(arrangement.canUndo).toBe(true);
       arrangement.undo();
       expect(arrangement.canUndo).toBe(false);
     }

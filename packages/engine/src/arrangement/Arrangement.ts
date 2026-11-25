@@ -45,6 +45,7 @@ import type { ArrangementSourcesValue } from './sources';
 import {
   EMPTY_HISTORY,
   beginBase,
+  dropRepeats,
   mapHistoryTracks,
   purgeTrack,
   pushStep,
@@ -53,6 +54,7 @@ import {
   stateWithoutTrack,
   undoStep,
   withStateTracks,
+  writeThrough,
 } from './history';
 import type { History, SavedState, TransactionBase } from './history';
 import {
@@ -72,7 +74,7 @@ import {
   assertUniqueTrackIds,
   duplicateTrackId,
 } from './validate';
-import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
+import type { Arrangement, ClipBounds, MixerChangeOptions, RemoveTrackOptions } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -133,6 +135,12 @@ export class ArrangementImpl implements Arrangement {
   private _mixer: Mixer = EMPTY_MIXER;
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
+  /**
+   * The gesture id of the top undo step, while a change of that gesture may
+   * still join it: set when a gesture change pushes the step, cleared by
+   * anything else that touches the history (#843).
+   */
+  private _gestureTop: string | null = null;
   private _timeBase: ArrangementTimeBase | null;
   /** The ppqn the stored ticks are counted in. Null until an engine has attached. */
   private _tickPpqn: number | null;
@@ -287,6 +295,7 @@ export class ArrangementImpl implements Arrangement {
 
   undo(): void {
     this._abortOpenTransaction();
+    this._gestureTop = null;
     const step = undoStep(this._history, this._currentState());
     if (!step) return;
     this._history = step.history;
@@ -296,6 +305,7 @@ export class ArrangementImpl implements Arrangement {
 
   redo(): void {
     this._abortOpenTransaction();
+    this._gestureTop = null;
     const step = redoStep(this._history, this._currentState());
     if (!step) return;
     this._history = step.history;
@@ -305,6 +315,7 @@ export class ArrangementImpl implements Arrangement {
   clearHistory(): void {
     const hadHistory = this.canUndo || this.canRedo;
     this._history = EMPTY_HISTORY;
+    this._gestureTop = null;
     if (hadHistory) this._emit({ type: 'history' });
   }
 
@@ -317,6 +328,7 @@ export class ArrangementImpl implements Arrangement {
     }
     const replaced = this._transaction !== null;
     this._transaction = beginBase(this._currentState());
+    this._gestureTop = null;
     // The base that was dropped may have been the last state naming a source.
     if (replaced) this._resyncSourcesQuietly();
   }
@@ -328,6 +340,7 @@ export class ArrangementImpl implements Arrangement {
       return;
     }
     this._transaction = null;
+    this._gestureTop = null;
     // Only push undo entry if mutations actually occurred during the transaction.
     // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
     // ... and only if the tracks and the mix are not back where the transaction began.
@@ -361,6 +374,7 @@ export class ArrangementImpl implements Arrangement {
     // Everything before is replaced, an open transaction included.
     this._transaction = null;
     this._history = EMPTY_HISTORY;
+    this._gestureTop = null;
     // An id that is in the tracks being replaced keeps its mix (the current
     // Map holds the current tracks only); a new id is seeded, and the entry of
     // an id that is not in the new tracks is dropped.
@@ -506,24 +520,26 @@ export class ArrangementImpl implements Arrangement {
   //
   // Each replaces the Map and one entry, bumps mixerVersion and announces
   // the change. NOT structural changes: no track object is replaced,
-  // tracksVersion stays (#501). Outside a transaction they are not undo
-  // steps; inside one they are part of it, like any other change (#843). An
-  // id that is not in the current tracks does nothing.
+  // tracksVersion stays (#501). Each call is an undo step; inside an open
+  // transaction it is part of it, like any other change. Calls with one
+  // `gesture` id, one after another, are one step; `undoable: false` is no
+  // step and is written into every saved state (#843). A value that does
+  // not change, or an id that is not in the current tracks, does nothing.
 
-  setTrackVolume(trackId: string, volume: number): void {
-    this._setMixerValues(trackId, { volume });
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { volume }, options);
   }
 
-  setTrackMute(trackId: string, muted: boolean): void {
-    this._setMixerValues(trackId, { muted });
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { muted }, options);
   }
 
-  setTrackSolo(trackId: string, soloed: boolean): void {
-    this._setMixerValues(trackId, { soloed });
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { soloed }, options);
   }
 
-  setTrackPan(trackId: string, pan: number): void {
-    this._setMixerValues(trackId, { pan });
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { pan }, options);
   }
 
   // ---------------------------------------------------------------------------
@@ -605,14 +621,69 @@ export class ArrangementImpl implements Arrangement {
     };
   }
 
-  private _setMixerValues(trackId: string, values: Partial<TrackMixerValues>): void {
+  private _setMixerValues(
+    trackId: string,
+    values: Partial<TrackMixerValues>,
+    options: MixerChangeOptions = {}
+  ): void {
     if (!this._tracks.some((t) => t.id === trackId)) return;
     const next = setMixerValues(this._mixer, trackId, values);
     if (next === this._mixer) return;
-    this._markTransactionChanged();
-    this._mixer = next;
+    if (options.undoable === false) {
+      this._writeMixerThrough(trackId, values, next);
+    } else {
+      this._recordMixerChange(options.gesture);
+      this._mixer = next;
+      this._dropReturnedGestureStep();
+    }
     this._mixerVersion++;
     this._emit({ type: 'mixer', trackId, values });
+  }
+
+  /**
+   * The undo step of a mixer change about to be made: part of an open
+   * transaction, the top step when it was pushed by the same gesture and
+   * nothing has touched the history since, or else a new step (which becomes
+   * that gesture's).
+   */
+  private _recordMixerChange(gesture: string | undefined): void {
+    if (this._transaction) {
+      this._markTransactionChanged();
+      return;
+    }
+    if (gesture !== undefined && this._gestureTop === gesture) return;
+    this._pushStep(this._currentState());
+    // An undo limit of 0 keeps no step for the gesture to join.
+    if (gesture !== undefined && this.canUndo) this._gestureTop = gesture;
+  }
+
+  /** A gesture that came back to the state its step holds leaves no step. */
+  private _dropReturnedGestureStep(): void {
+    if (this._gestureTop === null) return;
+    const { undo, redo } = this._history;
+    if (!sameState(undo[undo.length - 1], this._currentState())) return;
+    this._history = { undo: undo.slice(0, -1), redo };
+    this._gestureTop = null;
+  }
+
+  /**
+   * `undoable: false`: the value in the current mix and in every saved state
+   * that has an entry for the track, so that no undo, redo or abort brings
+   * the old one back. A step that no longer differs from the state next to
+   * it goes; when that was the step a gesture joins, the gesture's next
+   * change pushes a new one.
+   */
+  private _writeMixerThrough(
+    trackId: string,
+    values: Partial<TrackMixerValues>,
+    next: Mixer
+  ): void {
+    this._mixer = next;
+    const written = writeThrough(this._history, this._transaction, trackId, values);
+    const top = written.history.undo[written.history.undo.length - 1];
+    this._history = dropRepeats(written.history, this._currentState());
+    this._transaction = written.base;
+    if (this._history.undo[this._history.undo.length - 1] !== top) this._gestureTop = null;
   }
 
   /** The tracks and the mix as they are now: what an undo step or a transaction's base saves. */
@@ -636,6 +707,7 @@ export class ArrangementImpl implements Arrangement {
     const purged = purgeTrack(this._history, this._currentState(), trackId);
     const historyChanged = purged.history !== this._history;
     this._history = purged.history;
+    this._gestureTop = null;
     if (this._transaction) {
       // An abort goes back to the base: the track must not be in it either.
       this._transaction = {
@@ -672,9 +744,10 @@ export class ArrangementImpl implements Arrangement {
     }
   }
 
-  /** Add an undo step. */
+  /** Add an undo step. No gesture joins it (a gesture change that pushes sets its id after). */
   private _pushStep(state: SavedState): void {
     this._history = pushStep(this._history, state, this.undoLimit);
+    this._gestureTop = null;
   }
 
   /**
@@ -708,6 +781,7 @@ export class ArrangementImpl implements Arrangement {
     const transaction = this._transaction;
     if (!transaction) return;
     this._transaction = null;
+    this._gestureTop = null;
     // Only restore if mutations occurred — avoids full adapter rebuild on click
     if (transaction.changed) {
       this._restoreState(transaction.state);

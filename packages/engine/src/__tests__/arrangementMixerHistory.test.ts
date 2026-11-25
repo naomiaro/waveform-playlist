@@ -1,8 +1,9 @@
 /**
  * A saved state holds the mix (#843): an undo step, a redo step and a
  * transaction's base are the tracks AND the mixer Map from that moment, so
- * undo, redo and abort bring back both. The setters are not undo steps yet;
- * a mixer change becomes one here by being made inside a transaction.
+ * undo, redo and abort bring back both. A setter call is an undo step of
+ * its own (arrangementMixerUndo.test.ts); inside a transaction it is a part
+ * of the transaction's step.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
@@ -51,13 +52,6 @@ function startOf(arrangement: Arrangement, clipId: string): number | undefined {
   return found?.startSample;
 }
 
-/** A mixer change as an undo step of its own (until the setters are steps). */
-function volumeStep(arrangement: Arrangement, trackId: string, volume: number): void {
-  arrangement.beginTransaction();
-  arrangement.setTrackVolume(trackId, volume);
-  arrangement.commitTransaction();
-}
-
 beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -94,7 +88,7 @@ describe('a saved state holds the mix', () => {
 
   it('an undo that changes only the mix does not increment tracksVersion', () => {
     const { arrangement, changes } = setup();
-    volumeStep(arrangement, 'A', 0.4);
+    arrangement.setTrackVolume('A', 0.4);
     const tracks = arrangement.getTracks();
     const { tracksVersion, mixerVersion } = arrangement;
     changes.length = 0;
@@ -111,7 +105,7 @@ describe('a saved state holds the mix', () => {
 
   it('a redo of a mix-only step brings the mix forward again, as its own kind of change', () => {
     const { arrangement, changes } = setup();
-    volumeStep(arrangement, 'A', 0.4);
+    arrangement.setTrackVolume('A', 0.4);
     arrangement.undo();
     const { tracksVersion, mixerVersion } = arrangement;
     const undone = arrangement.getMixer();
@@ -209,11 +203,17 @@ describe('a saved state holds the mix', () => {
     expect(arrangement.getMixer().has('A')).toBe(false);
     arrangement.setTrackVolume('A2', 0.2);
 
+    // Rule (#843): the volume change is a step of its own, so the first undo
+    // takes it back and the second the rename; before the setters were
+    // steps, one undo took back the rename (with the 0.2 in the redo state).
+    arrangement.undo();
+    expect(arrangement.getMixer().get('A2')?.volume).toBe(0.6);
     arrangement.undo();
 
     expect(arrangement.getTracks().map((t) => t.id)).toEqual(['A', 'B']);
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.6);
     expect(arrangement.getMixer().has('A2')).toBe(false);
+    arrangement.redo();
     arrangement.redo();
     expect(arrangement.getMixer().get('A2')?.volume).toBe(0.2);
     expect(arrangement.getMixer().has('A')).toBe(false);
@@ -249,7 +249,7 @@ describe('a saved state holds the mix', () => {
     const { arrangement } = setup();
     const before = arrangement.getMixer();
     const entryA = before.get('A');
-    volumeStep(arrangement, 'A', 0.4);
+    arrangement.setTrackVolume('A', 0.4);
     arrangement.removeTrack('B');
     arrangement.undo();
     arrangement.undo();
@@ -263,7 +263,7 @@ describe('a saved state holds the mix', () => {
 describe('a removal that is not an undo step (purge)', () => {
   it('takes the track’s entry out of every saved state, and drops steps that no longer differ', () => {
     const { arrangement } = setup();
-    volumeStep(arrangement, 'B', 0.5); // a step that differs only in B's mix
+    arrangement.setTrackVolume('B', 0.5); // a step that differs only in B's mix
     arrangement.removeTrack('B', { undoable: false });
     // The only step differed in B alone: with B gone it is the current state, and goes.
     expect(arrangement.canUndo).toBe(false);
@@ -272,7 +272,7 @@ describe('a removal that is not an undo step (purge)', () => {
 
   it('keeps a step that still differs in another track’s mix, without the purged entry', () => {
     const { arrangement } = setup();
-    volumeStep(arrangement, 'A', 0.5);
+    arrangement.setTrackVolume('A', 0.5);
     arrangement.removeTrack('B', { undoable: false });
     expect(arrangement.canUndo).toBe(true);
     arrangement.undo();

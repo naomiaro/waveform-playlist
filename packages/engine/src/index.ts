@@ -10,6 +10,7 @@ export type {
   ClipBounds,
   CreateArrangementOptions,
   LoadSource,
+  MixerChangeOptions,
   RemoveTrackOptions,
   TrackMixerValues,
 } from './arrangement';

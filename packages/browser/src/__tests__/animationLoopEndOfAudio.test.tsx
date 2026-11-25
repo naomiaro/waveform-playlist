@@ -326,8 +326,12 @@ describe('setRecordingActive armed-track mute', () => {
     await act(async () => {
       probe.setRecordingActive(false);
     });
-    // release restores the pre-session state: still muted
-    expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: true });
+    // release restores the pre-session state: still muted.
+    // Rule (#843): a setter given the value the track already has changes
+    // nothing and reaches no adapter, so the release sends no call at all;
+    // before, a redundant `{ muted: true }`. What matters is that it is
+    // never unmuted.
+    expect(adapter.muteCalls).not.toContainEqual({ trackId: 'track-a', muted: false });
   });
 
   it('activation without a trackId does not touch any track mute', async () => {

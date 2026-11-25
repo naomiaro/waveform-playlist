@@ -468,7 +468,9 @@ describe.each([
         expect(states).toHaveLength(1);
         expect(states[0].mixerVersion).toBe(before.mixerVersion + 1);
         expect(states[0].tracksVersion).toBe(before.tracksVersion);
-        expect(engine.canUndo).toBe(false);
+        // Rule (#843): a setter call is an undo step, announced by its one
+        // emission; before, it was no step (`canUndo` false).
+        expect(engine.canUndo).toBe(true);
       }
     );
 
@@ -494,9 +496,7 @@ describe.each([
     // (a setTracks interrupts playback; Tone's updateTrack carries no mix).
     it('an undo of the mix calls the mixer setters only', () => {
       const { adapter, engine, states } = setup({ incremental });
-      engine.beginTransaction();
       engine.setTrackVolume('A', 0.5);
-      engine.commitTransaction();
       const before = engine.getState();
       adapter.reset();
       states.length = 0;

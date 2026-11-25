@@ -197,6 +197,11 @@ describe('useEngineLifetime', () => {
     expect(arrangement.getTracks()).toBe(tracks);
     expect(arrangement.getMixer()).toBe(mixer);
     expect(arrangement.canUndo).toBe(true);
+    // Rule (#843): the volume change is an undo step of its own, so the
+    // first undo takes it back and the second the move; before, one undo
+    // took back the move.
+    arrangement.undo();
+    expect(arrangement.getMixer().get('B')?.volume).toBe(1);
     arrangement.undo();
     expect(arrangement.getTracks()[0].clips[0]).toMatchObject({ startSample: 0 });
     expect(contextWarnings()).toEqual([]);

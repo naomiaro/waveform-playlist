@@ -570,17 +570,19 @@ describe('an engine given an arrangement', () => {
     expect(state.canUndo).toBe(true);
     expect((adapter.rawCalls[0].args[0] as ClipTrack[])[1].pan).toBe(-0.5);
 
+    // Rule (#843): the pan change is an undo step of its own, so the first
+    // undo takes it back by its setter and the second the move by a track
+    // call. Before #843, one undo took back the move (`[['updateTrack',
+    // 'A']]`) and the pan stayed at -0.5.
+    adapter.reset();
+    second.undo();
+    expect(startOf(arrangement, 'A', 'a1')).toBe(1000);
+    expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([['setTrackPan', 'B']]);
+    expect(second.getState().tracks[1].pan).toBe(0);
     adapter.reset();
     second.undo();
     expect(startOf(arrangement, 'A', 'a1')).toBe(0);
-    // Rule (#843): the undo step holds the mix from before the move, so the
-    // pan set after it (not an undo step of its own yet) goes back too, by its
-    // setter; before, `[['updateTrack', 'A']]`.
-    expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([
-      ['updateTrack', 'A'],
-      ['setTrackPan', 'B'],
-    ]);
-    expect(second.getState().tracks[1].pan).toBe(0);
+    expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([['updateTrack', 'A']]);
   });
 
   it('clips added while no engine was attached get their ticks from the next engine', () => {

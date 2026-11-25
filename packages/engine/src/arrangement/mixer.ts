@@ -52,7 +52,7 @@ export function seedMixer(mixer: Mixer, tracks: readonly ArrangementTrack[]): Mi
 
 /**
  * A Map in which the entry of `trackId` has `patch` applied. The same Map
- * when there is no such entry.
+ * when there is no such entry, or when the entry already has these values.
  */
 export function setMixerValues(
   mixer: Mixer,
@@ -61,7 +61,9 @@ export function setMixerValues(
 ): Mixer {
   const entry = mixer.get(trackId);
   if (!entry) return mixer;
-  return new Map(mixer).set(trackId, { ...entry, ...patch });
+  const next = { ...entry, ...patch };
+  if (sameValues(entry, next)) return mixer;
+  return new Map(mixer).set(trackId, next);
 }
 
 /**

@@ -24,6 +24,14 @@ export interface RemoveTrackOptions {
   undoable?: boolean;
 }
 
+/** How a mixer setter's change goes into the undo history. */
+export interface MixerChangeOptions {
+  /** Changes with the same id, one after another, are one undo step. */
+  gesture?: string;
+  /** Not an undo step: the value is written into every saved state as well. */
+  undoable?: false;
+}
+
 /**
  * The owner of the tracks, of the mix and of the undo history. Everything
  * else reads it (`getTracks`, `getMixer`, `subscribe`) and changes it by
@@ -98,13 +106,15 @@ export interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps outside a transaction, part of one inside it; an
-  // undo, a redo or an abort brings back the mix of the state it returns
-  // to; a track that is not in the current tracks is left alone)
-  setTrackVolume(trackId: string, volume: number): void;
-  setTrackMute(trackId: string, muted: boolean): void;
-  setTrackSolo(trackId: string, soloed: boolean): void;
-  setTrackPan(trackId: string, pan: number): void;
+  // mixer (each call is an undo step, or a part of an open transaction; see
+  // `MixerChangeOptions` for one step made of many calls, and for a value
+  // that is no step. An undo, a redo or an abort brings back the mix of the
+  // state it returns to. A value that does not change, or a track that is
+  // not in the current tracks, changes nothing)
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void;
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
 
   // history
   readonly canUndo: boolean;

@@ -317,18 +317,27 @@ describe('each hook returns its own group of fields (#768)', () => {
 });
 
 describe('an action re-renders only the readers of the group it changes (#768)', () => {
-  it('a track volume change: the mixer', async () => {
+  // Rule (#843): a setter call is an undo step, so the first one also
+  // re-renders the readers of `canUndo`; before, the mixer readers only.
+  it('a track volume change: the mixer, and the undo readers when it is the first step', async () => {
     await mount();
     expect(await rendered(() => values.editorControls.setTrackVolume('track-1', 0.4))).toEqual([
       'mixer',
+      'undo',
     ]);
     expect(values.mixer.trackStates[0].volume).toBe(0.4);
+    expect(await rendered(() => values.editorControls.setTrackVolume('track-1', 0.3))).toEqual([
+      'mixer',
+    ]);
+    expect(values.mixer.trackStates[0].volume).toBe(0.3);
   });
 
-  it('a mute, a solo and a pan change: the mixer', async () => {
+  it('a mute, a solo and a pan change: the mixer (and the undo readers for the first step)', async () => {
     await mount();
+    // Rule (#843): the first setter call is the first undo step; before, `['mixer']`.
     expect(await rendered(() => values.editorControls.setTrackMute('track-1', true))).toEqual([
       'mixer',
+      'undo',
     ]);
     expect(await rendered(() => values.editorControls.setTrackSolo('track-2', true))).toEqual([
       'mixer',
@@ -453,8 +462,11 @@ describe('an action re-renders only the readers of the group it changes (#768)',
   // follows; the armed track is its own value, read by the track controls.
   it('arming a track for a take, moving the arm and ending the take: the recording arm and the mixer', async () => {
     await mount();
+    // Rule (#843): until the arm is an override outside the history (a later
+    // part of #843), the arm mute is a setter call and so an undo step: the
+    // first one also re-renders the undo readers. Before, `['mixer', 'recordingArm']`.
     expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-1'))).toEqual(
-      ['mixer', 'recordingArm']
+      ['mixer', 'recordingArm', 'undo']
     );
     expect(values.recordingArm.armedTrackId).toBe('track-1');
     expect(values.mixer.trackStates[0].muted).toBe(true);

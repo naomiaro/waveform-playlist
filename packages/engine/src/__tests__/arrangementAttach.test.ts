@@ -384,6 +384,12 @@ describe('an arrangement made by another copy of the package', () => {
     expect(adapter.calls.map((c) => c.method)).toEqual(['updateTrack', 'setTrackVolume']);
     expect(engine.getState().tracks[0].clips[0].startSample).toBe(2 * SECOND);
     expect(engine.getState().tracks[0].volume).toBe(0.5);
+    // Rule (#843): the fader move is an undo step of its own, so the first
+    // undo takes it back and the second the move; before, one undo took back
+    // the move and the volume stayed.
+    engine.undo();
+    expect(engine.getState().tracks[0].volume).toBe(1);
+    expect(engine.getState().tracks[0].clips[0].startSample).toBe(2 * SECOND);
     engine.undo();
     expect(engine.getState().tracks[0].clips[0].startSample).toBe(SECOND);
     engine.dispose();

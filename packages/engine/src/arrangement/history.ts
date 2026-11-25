@@ -7,8 +7,8 @@
  */
 
 import type { ArrangementTrack } from '@waveform-playlist/core';
-import { sameMixerValues, withoutEntry } from './mixer';
-import type { Mixer } from './mixer';
+import { sameMixerValues, setMixerValues, withoutEntry } from './mixer';
+import type { Mixer, TrackMixerValues } from './mixer';
 
 export type Tracks = readonly ArrangementTrack[];
 
@@ -120,6 +120,45 @@ export function stateWithoutTrack(trackId: string): (state: SavedState) => Saved
 }
 
 /**
+ * Drop every step that no longer differs from the state next to it (towards
+ * `current`): undoing or redoing it would do nothing visible. The same
+ * `history` object when no step goes.
+ */
+export function dropRepeats(history: History, current: SavedState): History {
+  // Oldest first, towards the current state: keep a step only where it differs from the one after it.
+  const undo: SavedState[] = [];
+  for (const step of history.undo) {
+    if (undo.length === 0 || !sameState(undo[undo.length - 1], step)) undo.push(step);
+  }
+  while (undo.length > 0 && sameState(undo[undo.length - 1], current)) undo.pop();
+
+  // The redo stack is stored with the next state to redo LAST: walk it away from the current state.
+  const redoFromCurrent: SavedState[] = [];
+  for (let i = history.redo.length - 1; i >= 0; i--) {
+    const step = history.redo[i];
+    const before =
+      redoFromCurrent.length > 0 ? redoFromCurrent[redoFromCurrent.length - 1] : current;
+    if (!sameState(before, step)) redoFromCurrent.push(step);
+  }
+
+  if (undo.length === history.undo.length && redoFromCurrent.length === history.redo.length) {
+    return history;
+  }
+  return { undo, redo: redoFromCurrent.reverse() };
+}
+
+/** The same steps, as the same objects. */
+function sameSteps(a: History, b: History): boolean {
+  return (
+    a === b ||
+    (a.undo.length === b.undo.length &&
+      a.redo.length === b.redo.length &&
+      a.undo.every((step, i) => step === b.undo[i]) &&
+      a.redo.every((step, i) => step === b.redo[i]))
+  );
+}
+
+/**
  * Take a track out of every state: the current state and each undo and redo
  * step (its tracks and its mixer entry), so that no undo or redo brings it
  * back. A step that no longer differs from the state next to it would do
@@ -133,29 +172,37 @@ export function purgeTrack(
 ): { history: History; current: SavedState } {
   const strip = stateWithoutTrack(trackId);
   const nextCurrent = strip(current);
+  const stripped = dropRepeats(
+    { undo: history.undo.map(strip), redo: history.redo.map(strip) },
+    nextCurrent
+  );
+  return { history: sameSteps(stripped, history) ? history : stripped, current: nextCurrent };
+}
 
-  // Oldest first, towards the current state: keep a step only where it differs from the one after it.
-  const undo: SavedState[] = [];
-  for (const step of history.undo) {
-    const stripped = strip(step);
-    if (undo.length === 0 || !sameState(undo[undo.length - 1], stripped)) undo.push(stripped);
-  }
-  while (undo.length > 0 && sameState(undo[undo.length - 1], nextCurrent)) undo.pop();
-
-  // The redo stack is stored with the next state to redo LAST: walk it away from the current state.
-  const redoFromCurrent: SavedState[] = [];
-  for (let i = history.redo.length - 1; i >= 0; i--) {
-    const stripped = strip(history.redo[i]);
-    const before =
-      redoFromCurrent.length > 0 ? redoFromCurrent[redoFromCurrent.length - 1] : nextCurrent;
-    if (!sameState(before, stripped)) redoFromCurrent.push(stripped);
-  }
-  const redo = redoFromCurrent.reverse();
-
-  const unchanged =
-    undo.length === history.undo.length &&
-    redo.length === history.redo.length &&
-    undo.every((step, i) => step === history.undo[i]) &&
-    redo.every((step, i) => step === history.redo[i]);
-  return { history: unchanged ? history : { undo, redo }, current: nextCurrent };
+/**
+ * Write mixer values into the entry of `trackId` in every saved state that
+ * has one: each undo and redo step and an open transaction's base (a value
+ * that is not an undo step, so that no undo, redo or abort brings the old one
+ * back). States that shared a Map go on sharing one; a state whose Map
+ * changes is a new object, and nothing is written into a Map that exists.
+ */
+export function writeThrough(
+  history: History,
+  base: TransactionBase | null,
+  trackId: string,
+  patch: Partial<TrackMixerValues>
+): { history: History; base: TransactionBase | null } {
+  const mixers = new Map<Mixer, Mixer>();
+  const write = (state: SavedState): SavedState => {
+    let mixer = mixers.get(state.mixer);
+    if (!mixer) {
+      mixer = setMixerValues(state.mixer, trackId, patch);
+      mixers.set(state.mixer, mixer);
+    }
+    return mixer === state.mixer ? state : { ...state, mixer };
+  };
+  return {
+    history: { undo: history.undo.map(write), redo: history.redo.map(write) },
+    base: base && { ...base, state: write(base.state) },
+  };
 }

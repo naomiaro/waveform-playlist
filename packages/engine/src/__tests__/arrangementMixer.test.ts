@@ -189,7 +189,8 @@ describe('setters', () => {
       expect(trackA.volume).toBe(0.8); // the value the track entered with
       expect(arrangement.tracksVersion).toBe(1);
       expect(arrangement.mixerVersion).toBe(1);
-      expect(arrangement.canUndo).toBe(false);
+      // Rule (#843): a setter call is an undo step; before, it was none (`false`).
+      expect(arrangement.canUndo).toBe(true);
       expect(changes).toEqual([{ type: 'mixer', trackId: 'A', values: patch }]);
     }
   );
@@ -215,17 +216,23 @@ describe('setters', () => {
 });
 
 describe('undo restores the tracks and the mix of the state it returns to', () => {
-  it('undo of a move after a volume change brings back the volume from before the move', () => {
+  it('a volume change after a move is a step of its own: the first undo takes it back, the second the move', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 1000);
+    const moved = arrangement.getTracks();
     arrangement.setTrackVolume('A', 0.2);
     const mixer = arrangement.getMixer();
     arrangement.undo();
-    // Rule (#843): the step holds the mix from before the move, and the
-    // volume change is not a step of its own yet; before, the same Map and
-    // 0.2 after the undo.
+    // Rule (#843): the volume change is an undo step, and the move's step
+    // holds the mix from before it. Before #843, one undo took back the move
+    // and kept the same Map, with 0.2.
     expect(arrangement.getMixer()).not.toBe(mixer);
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
+    expect(arrangement.getTracks()).toBe(moved);
+    arrangement.undo();
+    expect(arrangement.getTracks()).not.toBe(moved);
+    expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
+    arrangement.redo();
     arrangement.redo();
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.2);
   });
@@ -258,13 +265,15 @@ describe('undo restores the tracks and the mix of the state it returns to', () =
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
   });
 
-  it('a mixer change is not an undo step and does not clear redo', () => {
+  it('a mixer change is an undo step and clears redo', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.undo();
     arrangement.setTrackVolume('A', 0.2);
-    expect(arrangement.canUndo).toBe(false);
-    expect(arrangement.canRedo).toBe(true);
+    // Rule (#843): a setter call is an undo step like any other edit; before,
+    // it was none and left the redo state (`canUndo` false, `canRedo` true).
+    expect(arrangement.canUndo).toBe(true);
+    expect(arrangement.canRedo).toBe(false);
   });
 });
 
@@ -320,10 +329,15 @@ describe('the current Map holds the current tracks', () => {
     const { arrangement } = setup();
     arrangement.addTrack(track('C', [], { pan: 0.5 }));
     arrangement.setTrackPan('C', -1);
+    // Rule (#843): the pan change is a step of its own, so two undos (the
+    // pan, then the add) leave C to the redo stack; before, one.
+    arrangement.undo();
     arrangement.undo(); // C is now held by the redo stack only
     // Rule (#843): the redo state holds C's entry in its own Map; before, the
     // current Map kept it (pan -1).
     expect(arrangement.getMixer().has('C')).toBe(false);
+    arrangement.redo();
+    expect(arrangement.getMixer().get('C')?.pan).toBe(0.5);
     arrangement.redo();
     expect(arrangement.getMixer().get('C')?.pan).toBe(-1);
   });
@@ -462,18 +476,22 @@ describe('the engine’s projection: tracks with the current mix', () => {
         expect((adapter.rawCalls[0].args[0] as ClipTrack[])[0].volume).toBe(0.4);
       });
 
-      it('undo of a move after a fader move: the track is sent with the mix from before the move, and the setter is called', () => {
+      it('undo of a move and a fader move in one step: the track is sent with the mix from before, and the setter is called', () => {
         const { adapter, engine, stateTrack } = setupEngine({ incremental });
+        // Rule (#843): a fader move is a step of its own, so the two are one
+        // step only inside a transaction. Before #843 they were two calls
+        // with no transaction, and the undo of the move sent volume 0.4 (in
+        // the state too) and called no mixer setter.
+        engine.beginTransaction();
         engine.moveClip('A', 'a1', 1000);
         engine.setTrackVolume('A', 0.4);
+        engine.commitTransaction();
         adapter.reset();
         engine.undo();
         const sent = firstTrackOf(adapter.rawCalls[0]);
         expect(sent.clips[0].startSample).toBe(0);
-        // Rule (#843): the undo step holds the mix from before the move, and
-        // the fader move is not a step of its own yet. A track call does not
-        // carry the mix to every adapter, so the setter follows. Before:
-        // volume 0.4 sent and in the state, and no mixer setter called.
+        // The step holds the mix from before. A track call does not carry
+        // the mix to every adapter, so the setter follows.
         expect(sent.volume).toBe(0.8);
         expect(stateTrack('A').volume).toBe(0.8);
         expect(
@@ -503,10 +521,15 @@ describe('the engine’s projection: tracks with the current mix', () => {
         expect((adapter.rawCalls[0].args[0] as ClipTrack[]).map((t) => t.id)).toEqual(['A', 'B']);
       });
 
-      it('an undo after only a fader move on another track sends that track its setter, no track call', () => {
+      it('an undo of a move with a fader move on another track in one step sends that track its setter, no track call', () => {
         const { adapter, engine } = setupEngine({ incremental });
+        // Rule (#843): a fader move is a step of its own, so the two are one
+        // step only inside a transaction (before #843: two calls, no
+        // transaction).
+        engine.beginTransaction();
         engine.moveClip('A', 'a1', 1000);
         engine.setTrackVolume('B', 0.4);
+        engine.commitTransaction();
         adapter.reset();
         engine.undo();
         // Rule (#843): the undo step holds B's volume from before (1), so the
