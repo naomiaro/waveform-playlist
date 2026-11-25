@@ -149,7 +149,39 @@ test.describe('Track Reordering', () => {
       expect(midDragWaveformOrder.filter((r) => r.isDragSource)).toHaveLength(1);
     }).toPass({ timeout: 5000 });
 
+    // The dragged slot, sampled on every frame from the release (#796): it
+    // lands at once. It used to hang at the pointer for ~250 ms (dnd-kit's
+    // drop animation, with no placeholder to fly to) and, with that animation
+    // off but the slot's `top` transition on, to appear ~300 px away and
+    // slide back.
+    const draggedId = before.ids[0];
+    const release = page.evaluate(
+      (id) =>
+        new Promise<{ t: number; top: number; dragging: boolean }[]>((resolve) => {
+          const samples: { t: number; top: number; dragging: boolean }[] = [];
+          const t0 = performance.now();
+          const frame = () => {
+            const slot = document.querySelector(`[data-track-controls="${id}"]`)?.parentElement;
+            if (slot) {
+              samples.push({
+                t: performance.now() - t0,
+                top: Math.round(slot.getBoundingClientRect().top),
+                dragging: slot.hasAttribute('data-dnd-dragging'),
+              });
+            }
+            if (performance.now() - t0 < 400) requestAnimationFrame(frame);
+            else resolve(samples);
+          };
+          frame();
+        }),
+      draggedId
+    );
     await page.mouse.up();
+    const samples = await release;
+    const settled = samples[samples.length - 1];
+    const late = samples.filter((sample) => sample.t >= 100);
+    expect(late.length).toBeGreaterThan(0);
+    expect(late.filter((sample) => sample.dragging || sample.top !== settled.top)).toEqual([]);
 
     await expect(async () => {
       const afterDrag = await readState();

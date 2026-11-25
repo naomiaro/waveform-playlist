@@ -14,7 +14,11 @@ export interface TrackReorderHandle {
   isDragSource: boolean;
 }
 
-const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move' });
+// `dropAnimation: null`: with 'move' there is no placeholder to fly to, so
+// dnd-kit's default drop animation animated the lifted slot from where it was
+// to where it was, and the slot hung at the pointer for ~250 ms before
+// jumping into place (measured on #796, on dev and on the branch alike).
+const MOVE_FEEDBACK = Feedback.configure({ feedback: 'move', dropAnimation: null });
 const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEEDBACK];
 
 /**

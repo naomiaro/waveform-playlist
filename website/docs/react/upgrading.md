@@ -1864,7 +1864,7 @@ const loadingDone = !isLoading;
 
 **Package:** `@waveform-playlist/browser`. `WaveformPlaylistProvider` only.
 
-A track-reorder drag no longer remounts the control panels when it ends. Until now `onDragEnd` bumped a counter, `trackReorderEpoch`, and the controls column keyed every panel with it, so each reorder drag mounted every panel again. That remount worked around dnd-kit moving a panel's element into the neighbouring slot during the drag. The slot itself is now what dnd-kit moves, which React can follow, so the counter and the call that bumped it are removed. React state inside a panel (`useState`, refs) now survives a reorder drag, as it already survived a reorder by the move buttons. Focus is not kept either: in Chromium, pressing the grip moves focus to it, and a drag that passes another track leaves focus on the page's body.
+A track-reorder drag no longer remounts the control panels when it ends. Until now `onDragEnd` bumped a counter, `trackReorderEpoch`, and the controls column keyed every panel with it, so each reorder drag mounted every panel again. That remount worked around dnd-kit moving a panel's element into the neighbouring slot during the drag. The slot itself is now what dnd-kit moves, which React can follow, so the counter and the call that bumped it are removed. React state inside a panel (`useState`, refs) now survives a reorder drag, as it already survived a reorder by the move buttons. Focus, though, is not kept: in Chromium, pressing the grip moves focus to it, and a drag that passes another track leaves focus on the page's body.
 
 **Find:** `trackReorderEpoch`, `bumpTrackReorderEpoch`.
 
@@ -1888,7 +1888,7 @@ reorderTrack(trackId, toIndex);
 
 From 16.x, the hooks in the "Before" code are removed too (`usePlaylistData()`: see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields); `usePlaylistControls()`: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers)), so the code fails there first. Read from this major's hooks, a leftover `useTrackReorderPreview().trackReorderEpoch` is `undefined` (a key such as `` `${id}-undefined` `` still works), and a leftover call of `bumpTrackReorderEpoch` from `useEditorControls()` throws a `TypeError` ("… is not a function"). TypeScript reports both.
 
-While a track is dragged, dnd-kit's `popover` attribute, `data-dnd-dragging` and its `--dnd-*` inline styles are on the slot around `[data-track-controls]`, not on that element. The slot draws the lifted look (opaque, with a shadow) itself.
+While a track is dragged, dnd-kit's `popover` attribute, `data-dnd-dragging` and its `--dnd-*` inline styles are on the slot around `[data-track-controls]`, not on that element. The slot draws the lifted look (opaque, with a shadow) itself, and lands in its place as soon as the track is dropped, where it used to hang at the pointer for about a quarter of a second.
 
 ## The annotation UI is two parts with their own options; the annotation options have one home under both providers
 

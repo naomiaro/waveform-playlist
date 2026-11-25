@@ -12,6 +12,7 @@ import { useWaveformRows, WaveformPartPlaceContext } from './waveformLayoutConte
 import { DefaultTrackControls } from './DefaultTrackControls';
 import { ControlSlot, TracksLayout } from './visualizationLayout';
 import { useStableTemplate } from '../utils/stableTemplate';
+import { useTrailingActive } from '../hooks/useTrailingActive';
 import {
   TrackContext,
   TrackControlsSharedContext,
@@ -42,6 +43,15 @@ export interface WaveformTrackControlsProps {
 
 /** What the part renders for a track when it has no children. */
 const DEFAULT_TEMPLATE = <DefaultTrackControls />;
+
+/**
+ * How long after a reorder drag the dragged slot keeps its `top` transition
+ * off. dnd-kit releases the slot from its fixed, viewport-based position a
+ * few frames after the drop; with the transition on, `top` animated from that
+ * viewport value to the column's, and the slot appeared about 300 px away and
+ * slid back (#796, measured on stem-tracks).
+ */
+const RELEASED_SLOT_SETTLE_MS = 200;
 
 /** Fills the slot and holds the panel (`data-track-controls`). */
 const SLOT_BODY_STYLE = { height: '100%' } as const;
@@ -182,6 +192,7 @@ function TrackControlsSlotImpl({
   // into the other slot, where React never looked for it again (#796).
   const elementRef = useRef<HTMLDivElement | null>(null);
   const [isDragSource, setDragSource] = useState(false);
+  const settling = useTrailingActive(isDragSource, RELEASED_SLOT_SETTLE_MS);
   const wiring = useMemo<TrackSlotWiring>(
     () => ({ elementRef, setDragSource, handleCount: { current: 0 } }),
     []
@@ -192,7 +203,7 @@ function TrackControlsSlotImpl({
       ref={elementRef}
       $height={height}
       $top={top}
-      $animate={animate}
+      $animate={animate && !settling}
       $isSelected={isSelected}
       $isDragSource={isDragSource}
       onClick={actions.select}

@@ -37,6 +37,8 @@ From `packages/ui-components` (`Clip.tsx`, `AnnotationBox.tsx`):
 
 **0.3 → 0.5 trap:** the old top-level `feedback: 'none'` hook option was REMOVED upstream and is silently ignored at runtime (type error only). The Feedback plugin reads `source.pluginConfig(Feedback)`, which matches the `Feedback` constructor by identity — a duplicated `@dnd-kit/dom` copy in a consumer bundle makes `'none'` silently no-op too, which is why it's a peer, never a dependency. `clipFeedbackPlugins.test.tsx` reads the config back from the real registered entities rather than asserting on props.
 
+**A `'move'` sortable needs `dropAnimation: null`** (#796): with no placeholder, the default drop animation animates the element from where it is to where it is, so it hangs at the pointer for ~250 ms after the drop. `useTrackReorderHandle` sets both in one `Feedback.configure`. After the drop dnd-kit removes its fixed positioning a few frames later; an element with a CSS transition on `top` animates from dnd-kit's viewport value to its own (the track slot keeps that transition off for 200 ms after a drag).
+
 **Applied in:** `Clip.tsx` (trim handles `'none'`, clip-move `dropAnimation: null`), `AnnotationBox.tsx` (start/end handles `'none'`).
 
 ## Annotation resize handles
