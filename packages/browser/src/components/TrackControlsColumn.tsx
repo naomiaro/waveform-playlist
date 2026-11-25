@@ -295,11 +295,12 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               top={trackLayout.topById.get(track.id) ?? 0}
               // `top` is animated only while a drag preview is live, not in the
               // 200 ms after it that the waveform rows keep (#796). dnd-kit
-              // copies a slot's computed `transition` when it lifts or
-              // releases it: a `top` transition on then animated between the
-              // slot's column position and dnd-kit's viewport one (a released
-              // slot appeared ~300 px away; a slot lifted soon after a drop
-              // flew in from ~400 px). On a cancel the slots still glide back:
+              // copies a slot's computed `transition` when it lifts it, and
+              // the slot's own applies again when dnd-kit releases it: a `top`
+              // transition on at either moment animated between the slot's
+              // column position and dnd-kit's viewport one (a released slot
+              // appeared ~300 px away; a slot lifted soon after a drop flew in
+              // from ~400 px). On a cancel the slots still glide back:
               // dnd-kit animates each sortable whose index it resets.
               animate={animateTrackLayout && dragSourceTrackId !== null}
               template={template}

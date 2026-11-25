@@ -230,6 +230,17 @@ test.describe('Track Reordering', () => {
       y: box.y + box.height / 2,
     });
     const [g0, g1, g2] = boxes.map(center);
+    const waveformOrder = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-track-row]')]
+          .map((el) => ({
+            id: el.getAttribute('data-track-id'),
+            top: el.getBoundingClientRect().top,
+          }))
+          .sort((a, b) => a.top - b.top)
+          .map((row) => row.id)
+      );
+    const before = await waveformOrder();
     const liftedId = await grips
       .nth(2)
       .evaluate((el) => el.closest('[data-track-controls]')!.getAttribute('data-track-controls')!);
@@ -253,13 +264,14 @@ test.describe('Track Reordering', () => {
     // At once, lift the third track and sample its slot on every frame.
     const lifted = page.evaluate(
       (id) =>
-        new Promise<{ top: number; dragging: boolean }[]>((resolve) => {
-          const samples: { top: number; dragging: boolean }[] = [];
+        new Promise<{ t: number; top: number; dragging: boolean }[]>((resolve) => {
+          const samples: { t: number; top: number; dragging: boolean }[] = [];
           const t0 = performance.now();
           const frame = () => {
             const slot = document.querySelector(`[data-track-controls="${id}"]`)?.parentElement;
             if (slot) {
               samples.push({
+                t: performance.now() - t0,
                 top: slot.getBoundingClientRect().top,
                 dragging: slot.hasAttribute('data-dnd-dragging'),
               });
@@ -281,9 +293,16 @@ test.describe('Track Reordering', () => {
     await page.keyboard.press('Escape');
     await page.mouse.up();
 
-    // The third track was lifted (else this would pass for nothing) ...
+    // The first drag moved its track (else no layout window followed it) ...
+    await expect(async () => {
+      const after = await waveformOrder();
+      expect(after.slice(0, 2)).toEqual([before[1], before[0]]);
+    }).toPass({ timeout: 5000 });
+    // ... the third track was lifted, inside the 200 ms after the drop that
+    // the layout keeps animating (else this would pass for nothing) ...
     const whileLifted = samples.filter((sample) => sample.dragging);
     expect(whileLifted.length).toBeGreaterThan(0);
+    expect(whileLifted[0].t).toBeLessThan(150);
     // ... and never left its place by more than the few pixels it was moved.
     const farthest = Math.max(...whileLifted.map((sample) => Math.abs(sample.top - homeTop)));
     expect(farthest).toBeLessThan(40);
