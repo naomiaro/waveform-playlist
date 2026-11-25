@@ -108,6 +108,7 @@ export function applyAnnotationBounds(
 - `annotationList` keeps only `editable`, `linkEndpoints`, `isContinuousPlay`; its `annotations` field is removed.
 - `onAnnotationsChange` is removed from both providers. An app that persists the annotations subscribes to the store.
 - `usePlaybackControls().setAnnotations` is removed; `usePlaybackControls().annotationStore: AnnotationStore | undefined` is added next to `annotationPreview` (its identity changes only when the prop does). Parts and app components deep in the tree write through it. Without the prop it is `undefined`: the provider makes no store of its own (it would be a second place the app cannot see), the built-in writers do nothing, and an app that wants to add annotations passes a store.
+- Readonly (maintainer's choice, 2026-11-24): what the library hands out is typed `readonly AnnotationData[]`: `useAnnotations().annotations` (`AnnotationsContextValue`), `useStoredAnnotations`, `getAnnotations`. Inputs widen to `readonly`, which breaks no caller: `AnnotationText`'s and `AnnotationTextIntegrationProps`' `annotations`, `AnnotationFormat.serialize`, `useAnnotationsWithPreview`, and any other exported function that only reads a list. The `annotations` argument of `AnnotationAction.action` stays mutable (it is a fresh copy meant to be changed). App code that passes `useAnnotations().annotations` to its own `AnnotationData[]` parameter stops compiling; the upgrade guide says to widen the parameter or pass `[...list]`.
 - The providers publish `useAnnotations().annotations` from the store during render and write nothing back. The animation loop and the keyboard handlers read `store.getAnnotations()` directly; `annotationsRef` is removed.
 
 ### The writers
@@ -134,7 +135,7 @@ Every writer finds its annotation by id in `current`, the rule of the drag relea
 
 ### Docs and examples
 
-Upgrade entries in `website/docs/react/upgrading.md`: `annotationList.annotations` + `onAnnotationsChange` → `annotationStore`; `setAnnotations` → `annotationStore`; the two hooks' options; `AnnotationText`'s `onAnnotationUpdate` → `onAnnotationsUpdate`. Each with **Find** and a before/after; the "Before" halves checked against `dev`'s source.
+Upgrade entries in `website/docs/react/upgrading.md`: `annotationList.annotations` + `onAnnotationsChange` → `annotationStore`; `setAnnotations` → `annotationStore`; the two hooks' options; `AnnotationText`'s `onAnnotationUpdate` → `onAnnotationsUpdate`; `useAnnotations().annotations` is `readonly`; a duplicate id is refused (by the store, and by the id field); invalid annotations throw instead of logging. Each with **Find** and a before/after; the "Before" halves checked against `dev`'s source.
 
 Surfaces to update (root `CLAUDE.md`, "Keep all doc surfaces in sync"): `llm-reference.md`, `llms.txt`, `docs/api/hooks.md`, `docs/examples.md`, both provider API pages, `guides/annotations.md`, `guides/media-element-playout.md`, `getting-started/installation.md`, `packages/annotations/README.md` and `CLAUDE.md`, `packages/browser/notes/annotations.md`, `contexts.md`, `provider-internals.md`, `PROJECT_STRUCTURE.md` (the store in core). Examples: the three annotation example components in `website/src/components/examples/`, `packages/ui-components/src/stories/` (Waveform, Hooks, AnnotationText stories), and `examples/` if any use them. Pending changesets that name the removed API (`.changeset/annotation-drag-preview.md`, `annotation-parts.md`, `media-element-annotation-items.md`) are corrected.
 
@@ -143,10 +144,6 @@ Surfaces to update (root `CLAUDE.md`, "Keep all doc surfaces in sync"): `llm-ref
 - core: `beforeChange` accepting, refusing (no notify) and adjusting, its result validated, its throw leaving the value; two `update`s in one tick both land; `set`/`update` validation throws and keeps the value; a same-array `update` does not notify; a throwing subscriber does not stop the others; frozen in development.
 - browser, both providers, each sequence in both orders: an app `store.update` in the same tick as a drag release, a boundary key, a text edit and a list control; the app reading through `useDeferredValue(useStoredAnnotations(store))` loses nothing; a drag whose annotation was removed mid-drag does nothing on release; a store whose `beforeChange` refuses (the boxes return, the field shows the stored text) and one that adjusts (the clamped edge is drawn after release); linked-endpoint neighbours are written by id.
 - New regression tests are mutation-checked (project skill `mutation-testing`). The annotation e2e specs (`annotations`, `media-element-annotations`, `mobile-annotations`) run green at the end.
-
-## Open (to the maintainer)
-
-- Whether the arrays the library hands out (`useAnnotations().annotations`, `useStoredAnnotations`) are typed `readonly`. Inputs (`AnnotationText`'s `annotations`, `AnnotationFormat.serialize`) widen to `readonly` either way, which breaks no caller.
 
 ## Left to the builder
 
