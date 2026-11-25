@@ -46,6 +46,28 @@ describe('DawTrackControlsElement', () => {
     document.body.removeChild(el);
   });
 
+  it('the mute button is disabled while armed; a click sends nothing', async () => {
+    const el = document.createElement('daw-track-controls') as any;
+    el.trackId = 'track-1';
+    el.muted = true;
+    el.armed = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-control', (e: CustomEvent) => events.push(e));
+    const muteBtn = el.shadowRoot.querySelector('button[title="Mute"]');
+    expect(muteBtn.disabled).toBe(true);
+    muteBtn.click();
+    el['_onMuteClick']();
+    expect(events).toHaveLength(0);
+
+    el.armed = false;
+    await el.updateComplete;
+    expect(muteBtn.disabled).toBe(false);
+    document.body.removeChild(el);
+  });
+
   it('dispatches daw-track-control on solo toggle', async () => {
     const el = document.createElement('daw-track-controls') as any;
     el.trackId = 'track-1';

@@ -131,6 +131,28 @@ describe('<daw-editor> during a take (#843)', () => {
     expect(engine.canUndo).toBe(false);
   });
 
+  it("the armed track's mute button is disabled during a take and enabled after", async () => {
+    const { editor, aId, bId } = await makeEditor();
+    const muteOf = (id: string) =>
+      controlsFor(editor, id).shadowRoot.querySelector('button[title="Mute"]') as HTMLButtonElement;
+    await editor.updateComplete;
+    expect(controlsFor(editor, aId).armed).toBe(false);
+
+    await editor.startRecording(makeStream(), { trackId: aId });
+    await editor.updateComplete;
+    await controlsFor(editor, aId).updateComplete;
+    expect(controlsFor(editor, aId).armed).toBe(true);
+    expect(controlsFor(editor, bId).armed).toBe(false);
+    expect(muteOf(aId).disabled).toBe(true);
+    expect(muteOf(bId).disabled).toBe(false);
+
+    await editor.stopRecording();
+    await editor.updateComplete;
+    await controlsFor(editor, aId).updateComplete;
+    expect(controlsFor(editor, aId).armed).toBe(false);
+    expect(muteOf(aId).disabled).toBe(false);
+  });
+
   it('an export during a take leaves the armed track out', async () => {
     const { editor, aId, bId } = await makeEditor();
     await editor.startRecording(makeStream(), { trackId: aId });

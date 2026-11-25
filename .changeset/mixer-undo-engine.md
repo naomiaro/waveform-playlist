@@ -13,6 +13,6 @@ Undo, redo and `abortTransaction` bring back the mix of the state they return to
 
 The gesture ids of one control are made by `createMixerGesture()` from `@waveform-playlist/core`.
 
-The recording arm: `setTrackArmed(trackId, armed)` (arrangement and engine) and `arrangement.armedTrackIds`. An armed track plays muted (`getState().tracks` and the adapter have it muted) while its mute in `getMixer()` stays as it is and comes back at the disarm. Arming is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are armed.
+The recording arm: `setTrackArmed(trackId, armed)` (arrangement and engine) and `arrangement.armedTrackIds` (`PlaylistEngine.armedTrackIds` reads the same set). An armed track plays muted (`getState().tracks` and the adapter have it muted) while its mute in `getMixer()` stays as it is and comes back at the disarm. Arming is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are armed.
 
 The keys an engine recognises an arrangement by moved to `/v2` (`@waveform-playlist/engine/arrangement/time-base/v2`, `…/attach-decode/v2`), because the interface the engine uses by name changed: an engine and an arrangement from copies of the package on either side of this change refuse each other (the engine throws that the `arrangement` option must be an arrangement made by `createArrangement()`).

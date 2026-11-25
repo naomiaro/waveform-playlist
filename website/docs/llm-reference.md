@@ -1805,6 +1805,8 @@ interface Arrangement {
    * until a track of that id enters. The same value changes nothing.
    */
   setTrackArmed(trackId: string, armed: boolean): void;
+  /** The armed tracks, read from the arrangement (the same set object until it changes; never write to it). */
+  readonly armedTrackIds: ReadonlySet<string>;
 
   // history
   readonly canUndo: boolean;

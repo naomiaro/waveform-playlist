@@ -549,6 +549,16 @@ export class PlaylistEngine {
     this._arrangement.setTrackArmed(trackId, armed);
   }
 
+  /**
+   * The tracks armed for recording, read from the arrangement (the owner; no
+   * copy). The same set object until it changes; never write to it, use
+   * `setTrackArmed`. An armed track plays muted, so a UI can disable its mute
+   * control while the id is in the set.
+   */
+  get armedTrackIds(): ReadonlySet<string> {
+    return this._arrangement.armedTrackIds;
+  }
+
   // ---------------------------------------------------------------------------
   // Zoom
   // ---------------------------------------------------------------------------

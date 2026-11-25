@@ -729,6 +729,18 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it("armedTrackIds is the arrangement's set, read-only, and follows setTrackArmed", () => {
+      const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
+      const engine = new PlaylistEngine({ adapter: createMockAdapter(), arrangement });
+      expect(engine.armedTrackIds.size).toBe(0);
+      engine.setTrackArmed('t1', true);
+      expect(engine.armedTrackIds.has('t1')).toBe(true);
+      expect(engine.armedTrackIds).toBe(arrangement.armedTrackIds);
+      engine.setTrackArmed('t1', false);
+      expect(engine.armedTrackIds.has('t1')).toBe(false);
+      engine.dispose();
+    });
+
     it('a disposed engine: setTrackArmed still changes the arrangement and calls no adapter', () => {
       const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
       const adapter = createMockAdapter();
