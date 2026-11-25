@@ -4,7 +4,8 @@
  * and is drawn by being rendered among the children of
  * `<WaveformTrackControls>`.
  */
-import React, { use } from 'react';
+import React, { use, useEffect, useRef, useState } from 'react';
+import { createMixerGesture } from '@waveform-playlist/engine';
 import {
   Button,
   CloseButton,
@@ -71,9 +72,25 @@ export const TrackSoloButton: React.FC = () => {
   );
 };
 
+/**
+ * One gesture helper for a slider, made once per mount and attached to the
+ * input: a drag or a held key is one undo step (#843). Effect cleanup detaches,
+ * so StrictMode's second run attaches again.
+ */
+function useSliderGesture() {
+  const [gesture] = useState(createMixerGesture);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = ref.current;
+    return input ? gesture.attach(input) : undefined;
+  }, [gesture]);
+  return { gesture, ref };
+}
+
 /** The track's volume, 0 to 1. */
 export const TrackVolumeSlider: React.FC = () => {
   const { volume, setVolume } = useTrack();
+  const { gesture, ref } = useSliderGesture();
   return (
     <SliderWrapper>
       <VolumeDownIcon />
@@ -81,9 +98,10 @@ export const TrackVolumeSlider: React.FC = () => {
         min="0"
         max="1"
         step="0.01"
+        ref={ref}
         value={volume}
         aria-label="Volume"
-        onChange={(e) => setVolume(parseFloat(e.target.value))}
+        onChange={(e) => setVolume(parseFloat(e.target.value), { gesture: gesture.id })}
       />
       <VolumeUpIcon />
     </SliderWrapper>
@@ -93,6 +111,7 @@ export const TrackVolumeSlider: React.FC = () => {
 /** The track's pan, -1 (left) to 1 (right). */
 export const TrackPanSlider: React.FC = () => {
   const { pan, setPan } = useTrack();
+  const { gesture, ref } = useSliderGesture();
   return (
     <SliderWrapper>
       <span>L</span>
@@ -100,9 +119,10 @@ export const TrackPanSlider: React.FC = () => {
         min="-1"
         max="1"
         step="0.01"
+        ref={ref}
         value={pan}
         aria-label="Pan"
-        onChange={(e) => setPan(parseFloat(e.target.value))}
+        onChange={(e) => setPan(parseFloat(e.target.value), { gesture: gesture.id })}
       />
       <span>R</span>
     </SliderWrapper>
