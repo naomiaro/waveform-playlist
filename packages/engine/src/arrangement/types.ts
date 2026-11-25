@@ -49,9 +49,13 @@ export interface Arrangement {
    */
   getTracks(): readonly ArrangementTrack[];
   /**
-   * The current volume, mute, solo and pan by track id. The same Map until a
-   * value changes, a track with a new id enters, or entries of tracks that
-   * are gone are dropped (`mixerVersion` counts value changes only). A
+   * The current volume, mute, solo and pan by track id (the stored mute: an
+   * armed track's is not forced here). The same Map until a value changes, a
+   * track with a new id enters, entries of tracks that are gone are dropped,
+   * or an undo, a redo or an abort brings back another state's Map.
+   * `mixerVersion` counts the value changes of current tracks, and also an
+   * arm or a disarm of a current track, which leaves this Map as it is; an
+   * entry seeded, carried or dropped with its track is not counted. A
    * track's own mixer fields in `getTracks()` are the values it entered
    * with; the current ones are here.
    */

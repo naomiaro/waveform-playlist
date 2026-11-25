@@ -5,7 +5,7 @@
 engine: mixer moves are undo steps (#843). `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`, on the arrangement and on `PlaylistEngine`, take a last argument `options?: MixerChangeOptions` (exported type):
 
 - By default each call is an undo step (it clears redo, like every other edit). Before, the mix was never an undo step.
-- `{ gesture: id }`: calls with the same id, one after another, are one undo step (a fader drag from press to release). Anything else that touches the history in between ends that step. A gesture that ends where its step began leaves no step.
+- `{ gesture: id }`: calls with the same id, one after another, are one undo step (a fader drag from press to release). Anything else that touches the history in between ends that step. A gesture that ends where its step began leaves no step, and the redo states its first call cleared come back.
 - `{ undoable: false }`: no undo step. The value is also written into every saved state, so no undo or redo brings back an older one (for automation, or any value that is not the user's edit). It wins over `gesture`.
 - A call given the value the track already has does nothing: no step, no `mixerVersion` change, no `statechange`. The engine still calls the adapter's setter for it, as it does for a track it does not hold.
 

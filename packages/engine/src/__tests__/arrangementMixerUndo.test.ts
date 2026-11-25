@@ -439,3 +439,123 @@ describe('a change that changes nothing', () => {
     expect(undoAll(arrangement)).toBe(1);
   });
 });
+
+/** Undo everything; how many of the undos changed neither the tracks nor a mixer value. */
+function noOpUndos(arrangement: Arrangement): number {
+  const mixOf = () => JSON.stringify([...arrangement.getMixer()]);
+  let noOps = 0;
+  while (arrangement.canUndo) {
+    const tracks = arrangement.getTracks();
+    const mix = mixOf();
+    arrangement.undo();
+    const after = arrangement.getTracks();
+    const sameTracks = after.length === tracks.length && after.every((t, i) => t === tracks[i]);
+    if (sameTracks && mixOf() === mix) noOps++;
+  }
+  return noOps;
+}
+
+describe('no undo step that does nothing, with a transaction open (review #909)', () => {
+  /** Pan A to 1 (a step holding pan 0), then inside a transaction rename A and automate its pan back to 0. */
+  function automateBackToTheStep(arrangement: Arrangement): void {
+    arrangement.setTrackPan('A', 1);
+    arrangement.beginTransaction();
+    arrangement.updateTrack('A', (current) => ({ ...current, name: 'A2' }));
+    arrangement.setTrackPan('A', 0, { undoable: false });
+  }
+
+  it('undoable: false inside a transaction, then an abort: no step is left that equals the state', () => {
+    const { arrangement } = setup();
+    automateBackToTheStep(arrangement);
+    arrangement.abortTransaction();
+    expect(arrangement.getMixer().get('A')?.pan).toBe(0);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  it('undoable: false inside a transaction, then a commit: one step, and it changes something', () => {
+    const { arrangement } = setup();
+    automateBackToTheStep(arrangement);
+    arrangement.commitTransaction();
+    expect(arrangement.canUndo).toBe(true);
+    arrangement.undo();
+    expect(arrangement.getTracks()[0].name).toBe('A');
+    expect(arrangement.getMixer().get('A')?.pan).toBe(0);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  /** B's volume step, then inside a transaction a move and B purged: the step without B is the base without B. */
+  function purgeBackToTheStep(arrangement: Arrangement): void {
+    arrangement.setTrackVolume('B', 0.5);
+    arrangement.beginTransaction();
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.removeTrack('B', { undoable: false });
+  }
+
+  it('a purge inside a transaction, then an abort: no step is left that equals the state', () => {
+    const { arrangement } = setup();
+    purgeBackToTheStep(arrangement);
+    arrangement.abortTransaction();
+    expect(arrangement.getTracks().map((t) => t.id)).toEqual(['A']);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  it('a purge inside a transaction, then a commit: every undo changes something', () => {
+    const { arrangement } = setup();
+    purgeBackToTheStep(arrangement);
+    arrangement.commitTransaction();
+    expect(arrangement.canUndo).toBe(true);
+    expect(noOpUndos(arrangement)).toBe(0);
+    expect(arrangement.getClipBounds('A', 'a1')?.startSample).toBe(0);
+  });
+});
+
+describe('a gesture that comes back keeps the history it found (review #909)', () => {
+  it('the redo stack its first change cleared comes back', () => {
+    const { arrangement } = setup();
+    arrangement.setTrackVolume('A', 0.5);
+    arrangement.undo();
+    expect(arrangement.canRedo).toBe(true);
+    arrangement.setTrackVolume('A', 0.8, { gesture: 'g' });
+    expect(arrangement.canRedo).toBe(false);
+    arrangement.setTrackVolume('A', 1, { gesture: 'g' });
+    expect(arrangement.canUndo).toBe(false);
+    expect(arrangement.canRedo).toBe(true);
+    arrangement.redo();
+    expect(volumeOf(arrangement)).toBe(0.5);
+  });
+
+  it('as a transaction that changes nothing keeps it', () => {
+    const { arrangement } = setup();
+    arrangement.setTrackVolume('A', 0.5);
+    arrangement.undo();
+    arrangement.beginTransaction();
+    arrangement.setTrackVolume('A', 0.8);
+    arrangement.setTrackVolume('A', 1);
+    arrangement.commitTransaction();
+    expect(arrangement.canRedo).toBe(true);
+  });
+
+  it('a step the undo limit evicted for the gesture comes back', () => {
+    const arrangement = new Arrangement({ timeBase: timeBase(), undoLimit: 2 });
+    arrangement.setTracks(fixture());
+    arrangement.setTrackVolume('B', 0.9);
+    arrangement.setTrackVolume('B', 0.8);
+    arrangement.setTrackVolume('A', 0.7, { gesture: 'g' });
+    arrangement.setTrackVolume('A', 1, { gesture: 'g' });
+    expect(undoAll(arrangement)).toBe(2);
+    expect(volumeOf(arrangement, 'B')).toBe(1);
+  });
+
+  it('an undoable: false change during the gesture is in the history that comes back', () => {
+    const { arrangement } = setup();
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.undo(); // the redo state holds the move, with B at 1
+    arrangement.setTrackVolume('A', 0.8, { gesture: 'g' });
+    arrangement.setTrackVolume('B', 0.3, { undoable: false });
+    arrangement.setTrackVolume('A', 1, { gesture: 'g' });
+    expect(arrangement.canRedo).toBe(true);
+    arrangement.redo();
+    expect(arrangement.getClipBounds('A', 'a1')?.startSample).toBe(1000);
+    expect(volumeOf(arrangement, 'B')).toBe(0.3);
+  });
+});

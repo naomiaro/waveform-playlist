@@ -158,51 +158,84 @@ function sameSteps(a: History, b: History): boolean {
   );
 }
 
+/** Every undo and redo state passed through `map`. */
+export function mapHistoryStates(
+  history: History,
+  map: (state: SavedState) => SavedState
+): History {
+  return { undo: history.undo.map(map), redo: history.redo.map(map) };
+}
+
 /**
- * Take a track out of every state: the current state and each undo and redo
- * step (its tracks and its mixer entry), so that no undo or redo brings it
- * back. A step that no longer differs from the state next to it would do
- * nothing, and is dropped. A state that never held the track is the same
- * object as before; the same `history` object comes back when no step changed.
+ * Take a track out of every state: the current state, each undo and redo
+ * step (its tracks and its mixer entry) and an open transaction's base, so
+ * that no undo, redo or abort brings it back. A step that no longer differs
+ * from the state next to it would do nothing, and is dropped: next to the
+ * newest step is the base while a transaction is open (the state an abort
+ * returns to, and the step a commit pushes), else the current state. A state
+ * that never held the track is the same object as before; the same `history`
+ * object comes back when no step changed.
  */
 export function purgeTrack(
   history: History,
   current: SavedState,
-  trackId: string
-): { history: History; current: SavedState } {
+  trackId: string,
+  base: SavedState | null = null
+): { history: History; current: SavedState; base: SavedState | null } {
   const strip = stateWithoutTrack(trackId);
   const nextCurrent = strip(current);
-  const stripped = dropRepeats(
-    { undo: history.undo.map(strip), redo: history.redo.map(strip) },
-    nextCurrent
-  );
-  return { history: sameSteps(stripped, history) ? history : stripped, current: nextCurrent };
+  const nextBase = base && strip(base);
+  const stripped = dropRepeats(mapHistoryStates(history, strip), nextBase ?? nextCurrent);
+  return {
+    history: sameSteps(stripped, history) ? history : stripped,
+    current: nextCurrent,
+    base: nextBase,
+  };
 }
 
 /**
- * Write mixer values into the entry of `trackId` in every saved state that
- * has one: each undo and redo step and an open transaction's base (a value
- * that is not an undo step, so that no undo, redo or abort brings the old one
- * back). States that shared a Map go on sharing one; a state whose Map
- * changes is a new object, and nothing is written into a Map that exists.
+ * A function that writes mixer values into the entry of `trackId` of a state
+ * (a value that is not an undo step, so that no undo, redo or abort brings
+ * the old one back). A state that has no entry for the track, or has these
+ * values, is the same object; states that shared a Map go on sharing one;
+ * nothing is written into a Map that exists.
  */
-export function writeThrough(
-  history: History,
-  base: TransactionBase | null,
+export function stateWithMixerValues(
   trackId: string,
   patch: Partial<TrackMixerValues>
-): { history: History; base: TransactionBase | null } {
+): (state: SavedState) => SavedState {
   const mixers = new Map<Mixer, Mixer>();
-  const write = (state: SavedState): SavedState => {
+  // Per state too, so that a state written twice is one object.
+  const states = new Map<SavedState, SavedState>();
+  return (state) => {
+    const known = states.get(state);
+    if (known) return known;
     let mixer = mixers.get(state.mixer);
     if (!mixer) {
       mixer = setMixerValues(state.mixer, trackId, patch);
       mixers.set(state.mixer, mixer);
     }
-    return mixer === state.mixer ? state : { ...state, mixer };
+    const next = mixer === state.mixer ? state : { ...state, mixer };
+    states.set(state, next);
+    return next;
   };
+}
+
+/**
+ * Write with `write` (`stateWithMixerValues`) into every saved state: each
+ * undo and redo step and an open transaction's base. A step that no longer
+ * differs from the state next to it is then dropped (`dropRepeats`): next to
+ * the newest step is the base while a transaction is open, else `current`.
+ */
+export function writeThrough(
+  history: History,
+  base: TransactionBase | null,
+  current: SavedState,
+  write: (state: SavedState) => SavedState
+): { history: History; base: TransactionBase | null } {
+  const nextBase = base && { ...base, state: write(base.state) };
   return {
-    history: { undo: history.undo.map(write), redo: history.redo.map(write) },
-    base: base && { ...base, state: write(base.state) },
+    history: dropRepeats(mapHistoryStates(history, write), nextBase?.state ?? current),
+    base: nextBase,
   };
 }

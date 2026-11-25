@@ -322,7 +322,7 @@ engine.abortTransaction(): void; // put the tracks and the mix back as they were
 
 #### Mixer moves
 
-By default each mixer call is an undo step of its own. A fader drag makes many calls, so pass the same `gesture` ID for all of them: calls with one ID, one after another, are one step. Anything else that touches the history in between (another undo step, an undo, a redo, `clearHistory()`, `setTracks()`, a transaction) ends that step, and the next call with the ID makes a new one. When a gesture ends where its step began, the step is dropped. `{ undoable: false }` makes no step: the value is written into every undo and redo state as well, so no undo or redo brings back an older one; it is for values that are not the user's edit, such as automation, and it wins over `gesture`.
+By default each mixer call is an undo step of its own. A fader drag makes many calls, so pass the same `gesture` ID for all of them: calls with one ID, one after another, are one step. Anything else that touches the history in between (another undo step, an undo, a redo, `clearHistory()`, `setTracks()`, a transaction) ends that step, and the next call with the ID makes a new one. When a gesture ends where its step began, the step is dropped and the redo states its first call cleared come back. `{ undoable: false }` makes no step: the value is written into every undo and redo state as well, so no undo or redo brings back an older one; it is for values that are not the user's edit, such as automation, and it wins over `gesture`.
 
 `createMixerGesture()` makes the IDs for one control. Use one per slider:
 

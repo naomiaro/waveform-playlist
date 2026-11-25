@@ -1726,7 +1726,7 @@ interface MixerChangeOptions {
 // No options: each call is an undo step. With both, undoable: false wins. Inside an open transaction a mixer
 // change is part of it (gesture ignored) and an abort takes it back. A gesture step ends when anything else
 // touches the history (another step, undo, redo, clearHistory, setTracks, a transaction); a gesture that ends
-// where its step began leaves no step.
+// where its step began leaves no step, and the redo states its first call cleared come back.
 
 // The gesture ids of one control (one helper per slider). attach() ends the gesture on the input's `change`
 // (the end of a pointer drag), except while an arrow, PageUp/PageDown, Home or End key is down: then on that
