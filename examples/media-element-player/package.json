@@ -9,11 +9,11 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@dnd-kit/abstract": "^0.5.3",
+    "@dnd-kit/dom": "^0.5.3",
+    "@dnd-kit/react": "^0.5.3",
     "@waveform-playlist/browser": "workspace:*",
     "@waveform-playlist/media-element-playout": "workspace:*",
-    "@dnd-kit/abstract": "^0.5.0",
-    "@dnd-kit/dom": "^0.5.0",
-    "@dnd-kit/react": "^0.5.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "styled-components": "^6.0.0"
