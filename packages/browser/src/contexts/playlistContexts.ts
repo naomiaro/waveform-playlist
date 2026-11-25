@@ -128,8 +128,9 @@ export interface AnnotationOptionsContextValue {
 }
 
 /**
- * The actions both providers have (#688). The value never changes, so reading
- * it never re-renders.
+ * The actions both providers have (#688). The value changes only when the
+ * provider's `annotationStore` prop does, so reading it does not re-render
+ * on playback, edits or option changes.
  */
 export interface PlaybackControlsContextValue {
   /**
@@ -570,8 +571,9 @@ export const useAnnotationOptions = () =>
 
 /**
  * The actions both providers have: `play`, `pause`, `stop`, `seekTo`,
- * `setSelection`, and the annotation, scroll and time-format setters. The
- * value never changes, so calling this never re-renders.
+ * `setSelection`, the annotation store, and the annotation, scroll and
+ * time-format setters. The value changes only when the provider's
+ * `annotationStore` prop does.
  */
 export const usePlaybackControls = () =>
   useSlot(PlaybackControlsContext, 'usePlaybackControls', EITHER);

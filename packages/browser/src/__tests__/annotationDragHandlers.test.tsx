@@ -295,6 +295,42 @@ describe('useAnnotationDragHandlers', () => {
       expect(shown[1].start).toBeCloseTo(1.6, 5);
     });
 
+    // An insert before the dragged annotation shifts its row: the box draws
+    // with the new index, and dnd-kit hands that index to the next move.
+    it('an insert before the dragged annotation does not send the next move to another one', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(2, 'start')));
+      run((h) => h.onDragMove(moveEvent(2, 'start', 20)));
+      act(() => {
+        store.update((c) => [annotation('first', 0, 0.5), ...c]);
+      });
+      // c is now at index 3 of what is drawn.
+      run((h) => h.onDragMove(moveEvent(3, 'start', 30)));
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      const byId = Object.fromEntries(store.getAnnotations().map((a) => [a.id, a]));
+      expect(byId.c.start).toBeCloseTo(3.3, 5);
+      expect(byId.b.start).toBe(1);
+      expect(byId.b.end).toBe(2);
+      expect(byId.first.start).toBe(0);
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
+    it('a beforeChange that throws on release still clears the preview', () => {
+      const { run, preview } = setupStore({
+        preview: true,
+        store: {
+          beforeChange: () => {
+            throw new Error('rule failed');
+          },
+        },
+      });
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      expect(() => run((h) => h.onDragEnd(endEvent(false)))).toThrow('rule failed');
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
     it('a store change after the drag ended publishes no preview', () => {
       const { run, store, preview } = setupStore({ preview: true });
       run((h) => h.onDragStart(startEvent(0, 'end')));

@@ -210,7 +210,11 @@ export function useAnnotationDragHandlers({
 
       if (!data) return;
 
-      const { edge, annotationIndex } = data;
+      // The index the drag began with, in its own list: what is drawn can be
+      // the store's newer list, where an insert before the dragged
+      // annotation shifts its row, and dnd-kit hands that row to this event.
+      const { edge } = data;
+      const { annotationIndex } = drag;
 
       // The dragmove event is dispatched BEFORE position.current is updated (happens
       // in a microtask), so the snapshot's position.current is stale. Use event.to
@@ -269,13 +273,17 @@ export function useAnnotationDragHandlers({
       flushSync(() => {
         // Only what the drag moved, onto the list as it is now. When the
         // dragged annotation is gone, the release does nothing (#867).
-        const moved = movedBounds(drag.snapshot, drag.working);
-        owner?.update((current) =>
-          current.some((a) => a.id === drag.draggedId)
-            ? applyAnnotationBounds(current, moved)
-            : current
-        );
-        preview.publish(null);
+        // The preview is cleared also when the app's rule throws.
+        try {
+          const moved = movedBounds(drag.snapshot, drag.working);
+          owner?.update((current) =>
+            current.some((a) => a.id === drag.draggedId)
+              ? applyAnnotationBounds(current, moved)
+              : current
+          );
+        } finally {
+          preview.publish(null);
+        }
       });
     },
     [preview, write]
