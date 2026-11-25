@@ -86,7 +86,7 @@ React packages without a Web Components equivalent yet: the recording arming sur
 | `<daw-clip>`                | AudioClip                                  | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer.                                         |
 | `<daw-waveform>`            | Canvas rendering                           | Waveform visualization. Renders peaks to canvas.                                                                                                                                                                                                                            |
 | `<daw-transport>`           | Transport controls container               | Groups transport buttons, links to an editor via `for` attribute.                                                                                                                                                                                                           |
-| `<daw-track-controls>`      | Track mixer strip                          | Shipped composite: name, volume, pan, mute, solo for one track, rendered by the editor in the frozen controls column. Dispatches a unified `daw-track-control` event (`{trackId, prop, value}`). Individual control elements below complement it (#457).                    |
+| `<daw-track-controls>`      | Track mixer strip                          | Shipped composite: name, volume, pan, mute, solo for one track, rendered by the editor in the frozen controls column. Draws the arrangement's mix (follows Undo/Redo). Dispatches a unified `daw-track-control` event (`{trackId, prop, value, gesture?}`; one slider drag is one undo step, #843). Individual control elements below complement it (#457).                    |
 | `<daw-play-button>`         | play()                                     | Triggers playback. If recording is armed, starts overdub recording simultaneously.                                                                                                                                                                                          |
 | `<daw-pause-button>`        | pause() / togglePauseRecording()           | Pauses playback. During recording, toggles pause/resume of the worklet capture (Audacity-style). Reflects state via `data-paused` attribute; sync handled by `daw-recording-pause` / `daw-recording-resume` events so the spacebar shortcut and the button stay consistent. |
 | `<daw-stop-button>`         | stop()                                     | Stops playback and recording. Finalizes any in-progress recording into a new clip.                                                                                                                                                                                          |
@@ -1562,7 +1562,7 @@ editor.appendChild(t); // → daw-track-ready event fires when loaded
 
 Removal works via `element.remove()` — the editor's MutationObserver detects detached `<daw-track>` nodes and cleans up engine state, peaks, and clip buffers. The engine call is incremental (`adapter.removeTrack`) when the adapter supports it; otherwise it falls back to `setTracks()` and stops playback.
 
-**Updating reflected attributes** (`name`, `volume`, `pan`, `muted`, `soloed`, `src`) on a `<daw-track>` after connection fires `daw-track-update`. The editor diffs the new descriptor against the cached one and forwards changes to the engine. Changing `src` re-runs the full load pipeline.
+**Updating reflected attributes** (`name`, `volume`, `pan`, `muted`, `soloed`, `src`) on a `<daw-track>` after connection fires `daw-track-update`. The event's `changed` lists the properties of that update; the editor sends the engine only the mixer properties it names, as one undo step (#843), and refreshes its descriptor from the element. While the track is still loading a mixer change sets the values it enters with (no step). Changing `src` re-runs the full load pipeline.
 
 #### Late `<daw-clip>` mutation
 
@@ -1867,25 +1867,26 @@ Clip drag, boundary trim, and waveform scrubbing remain mouse-only. Keyboard alt
 
 ### Scope
 
-Only structural edits are undoable — operations that change the track/clip document model:
+Edits to the track/clip document model and to the mix are undoable:
 
-| Undoable         | Not Undoable                              |
-| ---------------- | ----------------------------------------- |
-| Clip move (drop) | Volume, pan, mute, solo                   |
-| Clip trim        | Selection changes                         |
-| Clip split       | Zoom                                      |
-| Add/remove track | Loop region                               |
-| Add/remove clip  | Playback transport (play/pause/stop/seek) |
+| Undoable                       | Not Undoable                              |
+| ------------------------------ | ----------------------------------------- |
+| Clip move (drop)               | Selection changes                         |
+| Clip trim                      | Zoom                                      |
+| Clip split                     | Loop region                               |
+| Add/remove track               | Playback transport (play/pause/stop/seek) |
+| Add/remove clip                | The recording arm                         |
+| Volume, pan, mute, solo (#843) |                                           |
 
-Volume, pan, mute, and solo are live mixing adjustments — non-destructive and instantly reversible by the user. Selection and zoom are navigation, not edits.
+A mixer move is one step per gesture: one slider drag or key press in `<daw-track-controls>`, one Mute or Solo click, one `<daw-track>` attribute update, one `editor.updateTrack()` call (engine calls with one `{ gesture }` id are one step; `{ undoable: false }` is none). Arming a track for a take mutes it without a step and without changing its stored mute. Selection and zoom are navigation, not edits.
 
 ### Snapshot-Based Stack
 
-Each undo step stores a frozen copy of `tracks[]` before the operation. Undo restores the previous snapshot; redo re-applies the undone snapshot. No per-operation inverse logic — eliminates a class of bugs from incorrect reverse operations.
+Each undo step stores a frozen copy of `tracks[]` and the mix (by track id) before the operation. Undo restores the previous snapshot; redo re-applies the undone snapshot. No per-operation inverse logic — eliminates a class of bugs from incorrect reverse operations.
 
 The stack has a fixed default limit of **100 steps**, configurable via `engine.undoLimit` or `editor.undoLimit`. When the limit is reached, the oldest entry is dropped.
 
-Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set.
+Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set. `<daw-editor>` ends every track load with `setTracks()`, so a finished load clears the steps made before it, mixer steps included (#848).
 
 ### Transactions
 

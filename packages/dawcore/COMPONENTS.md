@@ -35,6 +35,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | ----------------- | ---------------------- | -------------------------------------------------------------------------------- |
 | `audioContext`    | `AudioContext \| null` | Custom AudioContext for decode, playback, and recording. Set before tracks load. |
 | `recordingStream` | `MediaStream \| null`  | Mic stream for recording. Consumer provides via `getUserMedia`.                  |
+| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix. The mix is the arrangement's, so it follows Undo and Redo; a track still loading reports the values it will enter with. |
 | `samplesPerPixel` | number                 | Zoom level (same as attribute, but with validation and clamping)                 |
 
 **Methods:**
@@ -46,6 +47,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `stopRecording()`                | `void`                     | Stop recording                                                                                                                                                                                                                                 |
 | `pauseRecording()`               | `void`                     | Pause recording                                                                                                                                                                                                                                |
 | `resumeRecording()`              | `void`                     | Resume recording                                                                                                                                                                                                                               |
+| `updateTrack(trackId, partial)`  | `void`                     | Change a track's `name`, `renderMode`, `volume`, `pan`, `muted` or `soloed`. A track with a `<daw-track>` element gets the values written to the element (one `daw-track-update`); a track without one (a file drop) is changed directly. The mixer fields of one call are one undo step; while the track is loading they set the values it enters with, which is not a step. |
 | `reorderTrack(trackId, toIndex)` | `void`                     | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable. |
 
 **Events:**
@@ -100,6 +102,10 @@ Declares a track. Must be a direct child of `<daw-editor>`.
 | `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track, which is always a piano roll. Any other value (the former `'piano-roll'` included) warns and is treated as `'waveform'`. |
 
 When `src` is set without child `<daw-clip>` elements, a single clip spanning the full audio is created automatically.
+
+**Events:** `daw-track-update` `{ trackId, changed }` after a reflected property changes (not on the first render). `changed` names the properties of that update (`'volume'`, `'pan'`, `'muted'`, `'soloed'`, `'name'`, `'src'`, `'renderMode'`, …); the editor sends the arrangement only the mixer properties it names.
+
+**The mix attributes are undo steps.** A `volume`, `pan`, `muted` or `soloed` change after the track has loaded is one undo step per update: properties set in one synchronous run are one Lit update and one step. While the track is still loading, a change sets the values it enters with and is not a step. The editor never writes the element back: after an Undo the element keeps the value it was given, while the controls and `editor.tracks` show the restored one. Setting the element to that same value again changes nothing (the element did not change, so it fires no event); set another value, or use the controls.
 
 ### `<daw-clip>`
 
@@ -265,6 +271,8 @@ Visual overlay for the selected time region.
 
 Per-track control panel showing track name, volume slider, pan knob, mute/solo buttons, and remove button. Fixed position — doesn't scroll with the waveforms.
 
+It draws the arrangement's mix, so its sliders and buttons follow Undo and Redo. Each change dispatches `daw-track-control` `{ trackId, prop, value, gesture? }`, which the editor sends to the arrangement. One pointer drag on a slider, or one key press (a held key included), is one undo step: the slider's `gesture` id stays the same until the input's `change`, the key's `keyup` or a blur. Each Mute or Solo click is one step. Keyboard Undo (`<daw-keyboard-shortcuts undo>`) does not fire while a slider has focus; click elsewhere or press `Tab` first (#730).
+
 **JS Properties (set by `<daw-editor>`, not attributes):**
 
 | Property      | Type      | Default | Description                                                                                    |
@@ -371,6 +379,14 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 4. First track load creates `PlaylistEngine` + audio adapter (lazy)
 5. Waveforms render immediately from peaks (no play required)
 6. First play click resumes `AudioContext` (user gesture requirement)
+
+## Undo and the Mix
+
+Mixer moves are undo steps, like clip and track edits: a control gesture, a `<daw-track>` attribute update and an `editor.updateTrack()` call are one step each, and Undo brings back the volume, pan, mute and solo of the state it returns to. `editor.tracks` and `<daw-track-controls>` report the arrangement's mix.
+
+**Recording arms the track.** During a take the recorded track is armed (`engine.setTrackArmed`): it plays muted, its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. Arming is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only disarms.
+
+**Loading a track clears the history (#848).** Every track load ends in `engine.setTracks`, which starts a new undo history. Steps made while a track is still loading, mixer moves included, cannot be undone once it has finished; the same happens when a track is added later, a file is dropped or a `src` changes.
 
 ## File Drop
 
