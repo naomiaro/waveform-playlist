@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import {
   usePlaybackControls,
   useSelection,
@@ -26,8 +26,11 @@ export function usePlayFromSelectionOrCursor(): () => Promise<void> {
   const isLoopEnabled = useLoopOptional()?.isLoopEnabled ?? false;
   const { play } = usePlaybackControls();
 
+  // Written in a LAYOUT effect, so a press right after a commit reads that
+  // commit's selection: for an update that is not a discrete event, passive
+  // effects run after paint (#895, as in useKeyboardShortcuts).
   const latest = useRef({ selectionStart, selectionEnd, isLoopEnabled });
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = { selectionStart, selectionEnd, isLoopEnabled };
   });
 

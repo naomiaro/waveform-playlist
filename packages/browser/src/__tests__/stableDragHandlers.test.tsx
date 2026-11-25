@@ -342,7 +342,7 @@ describe('useKeyboardShortcuts', () => {
     expect(latest).toHaveBeenCalledTimes(1);
   });
 
-  it('listens only while enabled', () => {
+  it('acts only while enabled', () => {
     const action = vi.fn();
     const shortcuts: KeyboardShortcut[] = [{ key: 'k', action }];
     const press = () =>

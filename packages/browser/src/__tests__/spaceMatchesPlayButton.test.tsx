@@ -5,14 +5,16 @@
 // The shortcut used to always play from the cursor with no end.
 import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
+import { render, act, cleanup, waitFor, screen } from '@testing-library/react';
+import React, { useLayoutEffect } from 'react';
 import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
   useEditorControls,
   usePlaylistTimeline,
   useIsPlaying,
+  useSelection,
+  useLoop,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import { PlayButton } from '../components/PlaybackControls';
@@ -126,6 +128,44 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
+interface Seen {
+  isPlaying: boolean;
+  selectionStart: number;
+  selectionEnd: number;
+  isLoopEnabled: boolean;
+}
+
+/**
+ * A press armed by a test: made once, in the layout effect of the first commit
+ * whose state matches `when`. That is after the commit and before its passive
+ * effects, the gap a real key press or click can land in when the update did
+ * not come from an event (#895).
+ */
+let gapPress: { when: (seen: Seen) => boolean; press: () => void } | null = null;
+
+const GapPress: React.FC = () => {
+  const { isPlaying } = useIsPlaying();
+  const { selectionStart, selectionEnd } = useSelection();
+  const { isLoopEnabled } = useLoop();
+  useLayoutEffect(() => {
+    const armed = gapPress;
+    if (!armed || !armed.when({ isPlaying, selectionStart, selectionEnd, isLoopEnabled })) return;
+    gapPress = null;
+    armed.press();
+  }, [isPlaying, selectionStart, selectionEnd, isLoopEnabled]);
+  return null;
+};
+
+// Native events, not RTL's fireEvent: fireEvent wraps the dispatch in act(),
+// and an act() started inside a commit that ran outside act (the animation
+// loop's) left React's scheduling stuck for the rest of the file: every later
+// test's mount never got ready (the act queue itself was empty; the mechanism
+// is not established).
+const pressSpaceNow = () => {
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+};
+const clickPlayNow = () => screen.getByRole('button', { name: 'Play' }).click();
+
 const wait = (ms: number) =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, ms));
@@ -141,6 +181,7 @@ async function mount() {
       <ProbeChild />
       <KeyboardShortcuts playback />
       <PlayButton />
+      <GapPress />
     </TestProvider>
   );
   await waitFor(() => expect(probe.isReady).toBe(true));
@@ -149,14 +190,14 @@ async function mount() {
 
 async function pressSpace() {
   await act(async () => {
-    fireEvent.keyDown(document.body, { key: ' ' });
+    pressSpaceNow();
   });
   await wait(60);
 }
 
 async function clickPlay() {
   await act(async () => {
-    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    clickPlayNow();
   });
   await wait(60);
 }
@@ -165,6 +206,7 @@ async function clickPlay() {
 const lastPlay = (log: string[]) => log.filter((entry) => entry.startsWith('play(')).pop();
 
 afterEach(async () => {
+  gapPress = null;
   await act(async () => {
     cleanup();
   });
@@ -335,5 +377,73 @@ describe('Space while playing', () => {
     await pressSpace();
     expect(probe.isPlaying).toBe(false);
     expect(lastPlay(log)).toBeUndefined();
+  });
+});
+
+describe.each([
+  ['Space', pressSpaceNow],
+  ['the Play button', clickPlayNow],
+] as const)('%s pressed in the commit that changes what it plays', (_name, pressNow) => {
+  // Here the press lands after the commit and before its passive effects
+  // (#895). Space used to read its handlers, and both read the selection and
+  // the loop, through refs written in passive effects, so they acted on the
+  // render before.
+
+  it('as the selection finishes, plays the selection again', async () => {
+    // The animation loop stops playback outside any event. Space took the
+    // handler that still saw playback running and paused ("once the selection
+    // has played to its end" above failed now and then when its key press
+    // landed there).
+    const { log, setNow } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await pressSpace();
+    log.length = 0;
+
+    gapPress = { when: (seen) => !seen.isPlaying, press: pressNow };
+    setNow(4.05);
+    await waitFor(() => expect(gapPress).toBeNull());
+    await wait(60);
+    expect(lastPlay(log)).toBe('play(2,4)');
+  });
+
+  it('as a new selection is made, plays the new selection', async () => {
+    const { log } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    log.length = 0;
+
+    gapPress = { when: (seen) => seen.selectionStart === 5, press: pressNow };
+    await act(async () => {
+      probe.setSelection(5, 7);
+    });
+    await wait(60);
+    expect(gapPress).toBeNull();
+    expect(lastPlay(log)).toBe('play(5,7)');
+  });
+
+  it('as looping is turned on, plays from the cursor with no end', async () => {
+    const { log } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await act(async () => {
+      probe.setCurrentTime(1);
+    });
+    await wait(30);
+    log.length = 0;
+
+    gapPress = { when: (seen) => seen.isLoopEnabled, press: pressNow };
+    await act(async () => {
+      probe.setLoopEnabled(true);
+    });
+    await wait(60);
+    expect(gapPress).toBeNull();
+    expect(lastPlay(log)).toBe('play(1,)');
   });
 });
