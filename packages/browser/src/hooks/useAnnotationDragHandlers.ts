@@ -2,8 +2,11 @@ import React from 'react';
 import { flushSync } from 'react-dom';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
 import {
+  applyAnnotationBounds,
   updateAnnotationBoundaries,
+  type AnnotationBoundsChange,
   type AnnotationData,
+  type AnnotationStore,
   type ValueSourceHandle,
 } from '@waveform-playlist/core';
 
@@ -15,8 +18,15 @@ import {
 export type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>;
 
 interface UseAnnotationDragHandlersOptions {
-  annotations: AnnotationData[];
-  onAnnotationsChange: (annotations: AnnotationData[]) => void;
+  /**
+   * The owner of the annotations (`usePlaybackControls().annotationStore`).
+   * With it, the drag writes only the bounds it moved, by id, onto the
+   * store's list as it is at the time of the write, and `annotations` and
+   * `onAnnotationsChange` are not read.
+   */
+  store?: AnnotationStore;
+  annotations?: AnnotationData[];
+  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   samplesPerPixel: number;
   /** Sample rate for pixel-to-time conversion. Providers pass the real rate from
    *  context; defaults to 48000 (the engine default) for out-of-provider usage. */
@@ -26,11 +36,50 @@ interface UseAnnotationDragHandlersOptions {
   /**
    * Pass the provider's `annotationPreview` to keep the drag out of your own
    * state: each move is published there (the built-in annotation boxes and
-   * list follow it), and `onAnnotationsChange` is called once, on release.
-   * Without it `onAnnotationsChange` is called on every move, which
-   * re-renders whatever holds the annotations for each one.
+   * list follow it), and the annotations are written once, on release.
+   * Without it they are written on every move, which re-renders whatever
+   * reads them for each one.
    */
   preview?: AnnotationPreviewHandle;
+}
+
+interface DragState {
+  /** The annotations as they were when the drag began. */
+  snapshot: readonly AnnotationData[];
+  /** The snapshot with every move so far applied (#747: each move builds on the last). */
+  working: readonly AnnotationData[];
+  draggedId: string;
+  start: number;
+  end: number;
+  annotationIndex: number;
+}
+
+/** The bounds `working` changed against `snapshot`, by id. */
+function movedBounds(
+  snapshot: readonly AnnotationData[],
+  working: readonly AnnotationData[]
+): AnnotationBoundsChange[] {
+  const before = new Map(snapshot.map((a) => [a.id, a]));
+  const moved: AnnotationBoundsChange[] = [];
+  for (const annotation of working) {
+    const old = before.get(annotation.id);
+    if (old && (old.start !== annotation.start || old.end !== annotation.end)) {
+      moved.push({ id: annotation.id, start: annotation.start, end: annotation.end });
+    }
+  }
+  return moved;
+}
+
+/** `moved`'s ids with the bounds they had in `snapshot`. */
+function restoredBounds(
+  snapshot: readonly AnnotationData[],
+  moved: readonly AnnotationBoundsChange[]
+): AnnotationBoundsChange[] {
+  const before = new Map(snapshot.map((a) => [a.id, a]));
+  return moved.flatMap((change) => {
+    const old = before.get(change.id);
+    return old ? [{ id: old.id, start: old.start, end: old.end }] : [];
+  });
 }
 
 /**
@@ -42,10 +91,10 @@ interface UseAnnotationDragHandlersOptions {
  *
  * @example
  * ```tsx
+ * const { annotationStore, annotationPreview } = usePlaybackControls();
  * const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
- *   annotations,
- *   onAnnotationsChange: setAnnotations,
- *   preview: annotationPreview, // from usePlaybackControls()
+ *   store: annotationStore,
+ *   preview: annotationPreview,
  *   samplesPerPixel,
  *   sampleRate,
  *   duration,
@@ -65,6 +114,7 @@ interface UseAnnotationDragHandlersOptions {
  * ```
  */
 export function useAnnotationDragHandlers({
+  store,
   annotations,
   onAnnotationsChange,
   samplesPerPixel,
@@ -74,23 +124,28 @@ export function useAnnotationDragHandlers({
   linkEndpoints,
   preview,
 }: UseAnnotationDragHandlersOptions) {
-  // `snapshot`: the annotations as they were when the drag began; a cancelled
-  // drag restores them. Each move is applied to the result of the previous
-  // move, not to the snapshot: that is how, with linked endpoints, an edge
-  // dragged into a separated neighbour picks it up and carries it along (#747).
-  const dragRef = React.useRef<{
-    snapshot: AnnotationData[];
-    start: number;
-    end: number;
-    annotationIndex: number;
-  } | null>(null);
+  const dragRef = React.useRef<DragState | null>(null);
 
-  // Read through refs so the handlers keep their identity while a drag
-  // without a preview replaces `annotations` on every move.
-  const annotationsRef = React.useRef(annotations);
-  annotationsRef.current = annotations;
+  // Read through refs so the handlers keep their identity for the whole drag.
+  const storeRef = React.useRef(store);
+  storeRef.current = store;
+  const annotationsRef = React.useRef<readonly AnnotationData[]>(annotations ?? []);
+  annotationsRef.current = annotations ?? [];
   const onAnnotationsChangeRef = React.useRef(onAnnotationsChange);
   onAnnotationsChangeRef.current = onAnnotationsChange;
+
+  /** Write `changes` by id onto the store's current list; or hand `fallback` to the callback. */
+  const write = React.useCallback(
+    (changes: readonly AnnotationBoundsChange[], fallback: readonly AnnotationData[]) => {
+      const owner = storeRef.current;
+      if (owner) {
+        owner.update((current) => applyAnnotationBounds(current, changes));
+      } else {
+        onAnnotationsChangeRef.current?.(fallback as AnnotationData[]);
+      }
+    },
+    []
+  );
 
   // A drag that never ends (its component unmounts mid-drag) must not leave
   // its preview on screen.
@@ -113,13 +168,15 @@ export function useAnnotationDragHandlers({
         }
       | undefined;
 
-    const snapshot = annotationsRef.current;
+    const snapshot = storeRef.current ? storeRef.current.getAnnotations() : annotationsRef.current;
     const annotation =
       data?.annotationIndex === undefined ? undefined : snapshot[data.annotationIndex];
     dragRef.current =
       data && annotation
         ? {
             snapshot,
+            working: snapshot,
+            draggedId: annotation.id,
             start: annotation.start,
             end: annotation.end,
             annotationIndex: data.annotationIndex,
@@ -156,25 +213,27 @@ export function useAnnotationDragHandlers({
       const newTime = edge === 'start' ? drag.start + timeDelta : drag.end + timeDelta;
 
       // The boundary logic (linked endpoints, collisions) is core's, shared with
-      // dawcore's annotation track.
+      // dawcore's annotation track. Without a store and a preview, the moves are
+      // applied to the annotations as the callback last handed them back.
+      const base =
+        preview || storeRef.current ? drag.working : (annotationsRef.current as AnnotationData[]);
       const updatedAnnotations = updateAnnotationBoundaries({
         annotationIndex,
         newTime,
         isDraggingStart: edge === 'start',
-        annotations: preview
-          ? (preview.source.getSnapshot() ?? drag.snapshot)
-          : annotationsRef.current,
+        annotations: base as AnnotationData[],
         duration,
         linkEndpoints,
       });
+      drag.working = updatedAnnotations;
 
       if (preview) {
         preview.publish(updatedAnnotations);
       } else {
-        onAnnotationsChangeRef.current(updatedAnnotations);
+        write(movedBounds(drag.snapshot, updatedAnnotations), updatedAnnotations);
       }
     },
-    [samplesPerPixel, sampleRate, duration, linkEndpoints, preview]
+    [samplesPerPixel, sampleRate, duration, linkEndpoints, preview, write]
   );
 
   const onDragEnd = React.useCallback(
@@ -184,10 +243,14 @@ export function useAnnotationDragHandlers({
       if (!drag) return;
 
       if (!preview) {
-        // The moves were reported as they happened; a cancelled drag takes
+        // The moves were written as they happened; a cancelled drag takes
         // them all back, the neighbours it moved included.
-        if (event.canceled && annotationsRef.current !== drag.snapshot) {
-          onAnnotationsChangeRef.current(drag.snapshot);
+        if (!event.canceled) return;
+        if (storeRef.current) {
+          const moved = movedBounds(drag.snapshot, drag.working);
+          write(restoredBounds(drag.snapshot, moved), drag.snapshot);
+        } else if (annotationsRef.current !== drag.snapshot) {
+          onAnnotationsChangeRef.current?.(drag.snapshot as AnnotationData[]);
         }
         return;
       }
@@ -198,14 +261,26 @@ export function useAnnotationDragHandlers({
         preview.publish(null);
         return;
       }
+      const owner = storeRef.current;
       // Committed and cleared in one synchronous render, so the boxes never
       // show the old positions between the two.
       flushSync(() => {
-        onAnnotationsChangeRef.current(result);
+        if (owner) {
+          // Only what the drag moved, onto the list as it is now. When the
+          // dragged annotation is gone, the release does nothing (#867).
+          const moved = movedBounds(drag.snapshot, result);
+          owner.update((current) =>
+            current.some((a) => a.id === drag.draggedId)
+              ? applyAnnotationBounds(current, moved)
+              : current
+          );
+        } else {
+          onAnnotationsChangeRef.current?.(result);
+        }
         preview.publish(null);
       });
     },
-    [preview]
+    [preview, write]
   );
 
   return {

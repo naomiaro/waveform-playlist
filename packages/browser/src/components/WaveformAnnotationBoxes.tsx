@@ -68,7 +68,8 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
+  const { setAnnotations, annotationStore, annotationPreview, playAnnotation } =
+    usePlaybackControls();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { touchOptimized } = useClipInteraction();
@@ -78,6 +79,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   const sensors = useDragSensors({ touchOptimized });
 
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
+    store: annotationStore,
     annotations,
     onAnnotationsChange: setAnnotations,
     preview: annotationPreview,

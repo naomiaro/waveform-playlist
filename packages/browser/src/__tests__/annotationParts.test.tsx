@@ -22,7 +22,7 @@ const dragOptions = vi.hoisted(
       sampleRate?: number;
       linkEndpoints: boolean;
       preview?: unknown;
-      onAnnotationsChange: unknown;
+      onAnnotationsChange?: unknown;
     }[]
 );
 const sensorOptions = vi.hoisted(() => [] as ({ touchOptimized?: boolean } | undefined)[]);

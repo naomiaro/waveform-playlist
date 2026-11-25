@@ -9,7 +9,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
 import type { DragStartEvent, DragMoveEvent, DragEndEvent } from '@dnd-kit/abstract';
-import { createValueSource, type AnnotationData } from '@waveform-playlist/core';
+import {
+  createAnnotationStore,
+  createValueSource,
+  type AnnotationData,
+  type AnnotationStore,
+  type AnnotationStoreOptions,
+} from '@waveform-playlist/core';
 import { useAnnotationDragHandlers } from '../hooks/useAnnotationDragHandlers';
 
 // 1 px = 0.01 s
@@ -218,6 +224,124 @@ describe('useAnnotationDragHandlers', () => {
 
       expect(preview.source.getSnapshot()).not.toBeNull();
       expect(last).toBe(first);
+    });
+  });
+
+  // #867: with a store, a drag writes only what it moved, by id, onto the
+  // store's list as it is at the time of the write.
+  describe('with a store', () => {
+    function setupStore(options: { preview?: boolean; store?: AnnotationStoreOptions } = {}) {
+      const preview = createValueSource<AnnotationData[] | null>(null);
+      const store: AnnotationStore = createAnnotationStore(initial(), options.store);
+      const view = renderHook(() =>
+        useAnnotationDragHandlers({
+          store,
+          samplesPerPixel: SAMPLES_PER_PIXEL,
+          sampleRate: SAMPLE_RATE,
+          duration: 10,
+          linkEndpoints: true,
+          preview: options.preview ? preview : undefined,
+        })
+      );
+      const run = (fn: (handlers: typeof view.result.current) => void) => {
+        act(() => fn(view.result.current));
+      };
+      return { run, store, preview };
+    }
+    const extra = annotation('x', 8, 9);
+    const ids = (list: readonly AnnotationData[]) => list.map((a) => a.id);
+
+    it('a release keeps an annotation added during the drag', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(2, 'start')));
+      run((h) => h.onDragMove(moveEvent(2, 'start', 20)));
+      store.update((c) => [...c, extra]);
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      expect(ids(store.getAnnotations())).toEqual(['a', 'b', 'c', 'x']);
+      expect(store.getAnnotations()[2].start).toBeCloseTo(3.2, 5);
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
+    it('a carried neighbour is written by id and keeps a text change made during the drag', () => {
+      const { run, store } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      store.update((c) => c.map((a) => (a.id === 'b' ? { ...a, lines: ['edited'] } : a)));
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      const [a, b] = store.getAnnotations();
+      expect(a.end).toBeCloseTo(1.5, 5);
+      expect(b.start).toBeCloseTo(1.5, 5);
+      expect(b.lines).toEqual(['edited']);
+    });
+
+    it('a release does nothing when the dragged annotation was removed', () => {
+      const { run, store } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      store.update((c) => c.filter((a) => a.id !== 'a'));
+      const before = store.getAnnotations();
+      const listener = vi.fn();
+      store.subscribe(listener);
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      expect(store.getAnnotations()).toBe(before);
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('Escape with a preview leaves the store as it was', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      const before = store.getAnnotations();
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      run((h) => h.onDragEnd(endEvent(true)));
+
+      expect(store.getAnnotations()).toBe(before);
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
+    it('without a preview, each move is written and Escape writes the start bounds back by id', () => {
+      const { run, store } = setupStore();
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      expect(store.getAnnotations()[0].end).toBeCloseTo(1.5, 5);
+      store.update((c) => [...c, extra]);
+      run((h) => h.onDragEnd(endEvent(true)));
+
+      expect(times(store.getAnnotations() as AnnotationData[])).toEqual([
+        [0, 1],
+        [1, 2],
+        [3, 4],
+        [8, 9],
+      ]);
+    });
+
+    it('an edge dragged into a separated neighbour carries it along', () => {
+      const { run, store } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(1, 'end')));
+      for (let px = 10; px <= 130; px += 10) {
+        run((h) => h.onDragMove(moveEvent(1, 'end', px)));
+      }
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      const list = store.getAnnotations();
+      expect(list[1].end).toBeCloseTo(3.3, 5);
+      expect(list[2].start).toBe(list[1].end);
+    });
+
+    it('a release that beforeChange refuses leaves the store and clears the preview', () => {
+      const { run, store, preview } = setupStore({
+        preview: true,
+        store: { beforeChange: (_next, current) => current },
+      });
+      const before = store.getAnnotations();
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      expect(store.getAnnotations()).toBe(before);
+      expect(preview.source.getSnapshot()).toBeNull();
     });
   });
 });
