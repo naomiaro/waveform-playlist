@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import React from 'react';
 import type { ClipTrack } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import {
   WaveformPlaylistProvider,
   ClipInteractionProvider,
@@ -317,7 +318,10 @@ const STORY_ANNOTATIONS: AnnotationData[] = [
   { id: 'chorus', start: 11, end: 16, lines: ['Chorus'] },
 ];
 // Defined outside the story: a new function or object would render every box and row.
-const STORY_ANNOTATION_LIST = { annotations: STORY_ANNOTATIONS, linkEndpoints: true };
+// The story's annotation store (#867): an edit made in the story is kept
+// until the page is reloaded.
+const STORY_ANNOTATION_STORE = createAnnotationStore(STORY_ANNOTATIONS);
+const STORY_ANNOTATION_LIST = { linkEndpoints: true };
 const numberedLabel = (_annotation: AnnotationData, index: number) => String(index + 1);
 const compactRow = ({ annotation, isActive, onClick, formatTime }: RenderAnnotationItemProps) => (
   <div
@@ -338,8 +342,8 @@ export const AnnotationParts: Story = {
       <EmptyTracksProvider
         makeTracks={makeOneTrack}
         samplesPerPixel={1024}
+        annotationStore={STORY_ANNOTATION_STORE}
         annotationList={STORY_ANNOTATION_LIST}
-        onAnnotationsChange={() => {}}
       >
         <div style={{ padding: '1rem' }}>
           <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
@@ -371,7 +375,7 @@ export const AnnotationParts: Story = {
     docs: {
       description: {
         story:
-          "The annotation parts composed by hand: the row of boxes (`getLabel`, 40 px high) inside the root, and the list in a sidebar with a row of its own. The three checkboxes show and set the provider's annotation options; the boxes and the list read them. The annotations here are fixed (the story keeps no state), so an edit is not kept.",
+          "The annotation parts composed by hand: the row of boxes (`getLabel`, 40 px high) inside the root, and the list in a sidebar with a row of its own. The three checkboxes show and set the provider's annotation options; the boxes and the list read them. The annotations are the story's annotation store, so an edit is kept until the page is reloaded.",
       },
     },
   },

@@ -15,6 +15,7 @@ import {
   StopButton,
   loadWaveformData,
   WaveformViewOptions,
+  useCreateAnnotationStore,
 } from '@waveform-playlist/browser';
 import {
   AnnotationProvider,
@@ -78,9 +79,8 @@ export function MediaElementAnnotationsExample() {
   const { theme } = useDocusaurusTheme();
   const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [annotations, setAnnotations] = useState<Annotation[]>(() =>
-    sonnetNotes.map(parseAeneas)
-  );
+  // The owner of the annotations (#867).
+  const annotationStore = useCreateAnnotationStore(() => sonnetNotes.map(parseAeneas));
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +101,7 @@ export function MediaElementAnnotationsExample() {
     () => (waveformData ? { source: AUDIO_SRC, waveformData, name: 'Sonnet' } : null),
     [waveformData]
   );
-  const annotationList = useMemo(() => ({ annotations, isContinuousPlay: true }), [annotations]);
+  const annotationList = useMemo(() => ({ isContinuousPlay: true }), []);
 
   if (error) {
     return <Container style={{ padding: '2rem', color: 'red' }}>Error: {error}</Container>;
@@ -121,8 +121,8 @@ export function MediaElementAnnotationsExample() {
           samplesPerPixel={1024}
           theme={theme}
           automaticScroll
+          annotationStore={annotationStore}
           annotationList={annotationList}
-          onAnnotationsChange={setAnnotations}
         >
           <Transport />
           <WaveformViewOptions waveHeight={128} barWidth={2} barGap={1}>

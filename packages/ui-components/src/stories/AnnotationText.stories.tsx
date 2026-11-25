@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { AnnotationText } from '@waveform-playlist/annotations';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { AnnotationData, AnnotationAction } from '@waveform-playlist/core';
 
 const sampleAnnotations: AnnotationData[] = [
@@ -99,12 +100,14 @@ export const WithActiveAnnotation: Story = {
   },
 };
 
+// The list writes its edits to `store` (#867); without one it is read-only.
 export const Editable: Story = {
   args: {
     annotations: sampleAnnotations,
     activeAnnotationId: undefined,
     shouldScrollToActive: false,
     editable: true,
+    store: createAnnotationStore(sampleAnnotations),
   },
 };
 
@@ -115,6 +118,8 @@ export const WithControls: Story = {
     shouldScrollToActive: false,
     editable: false,
     controls: [editAction, deleteAction],
+    // The controls are drawn only for a list that can write.
+    store: createAnnotationStore(sampleAnnotations),
   },
 };
 
@@ -133,20 +138,23 @@ export const SingleAnnotation: Story = {
   },
 };
 
+const longTextAnnotations: AnnotationData[] = [
+  {
+    id: 'long-1',
+    start: 0,
+    end: 10,
+    lines: [
+      'This is a very long annotation that demonstrates how the component handles text that might wrap to multiple lines.',
+      'It also includes multiple paragraphs of text to show the line spacing and overall layout behavior.',
+      'The third line continues the pattern to test scrolling and overflow handling within the container.',
+    ],
+  },
+];
+
 export const LongText: Story = {
   args: {
-    annotations: [
-      {
-        id: 'long-1',
-        start: 0,
-        end: 10,
-        lines: [
-          'This is a very long annotation that demonstrates how the component handles text that might wrap to multiple lines.',
-          'It also includes multiple paragraphs of text to show the line spacing and overall layout behavior.',
-          'The third line continues the pattern to test scrolling and overflow handling within the container.',
-        ],
-      },
-    ],
+    annotations: longTextAnnotations,
     editable: true,
+    store: createAnnotationStore(longTextAnnotations),
   },
 };
