@@ -11,6 +11,7 @@ import { ThemeProvider, type DefaultTheme } from 'styled-components';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { AnnotationData } from '@waveform-playlist/core';
 import { AnnotationText } from '../components/AnnotationText';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import { DragDropProvider } from '@dnd-kit/react';
 import { AnnotationBox } from '../components/AnnotationBox';
 
@@ -40,7 +41,12 @@ describe('a click on a default row of the list (#686)', () => {
   it('does not choose it from a field that is being edited', () => {
     const onClick = vi.fn();
     const { getByText } = render(
-      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationClick={onClick} />
+      <AnnotationText
+        annotations={ANNOTATIONS}
+        editable
+        store={createAnnotationStore(ANNOTATIONS)}
+        onAnnotationClick={onClick}
+      />
     );
     fireEvent.click(getByText('second')); // the text field
     fireEvent.click(getByText('b')); // the id field
@@ -59,7 +65,7 @@ describe('a click on a default row of the list (#686)', () => {
         editable
         controls={[{ text: 'x', title: 'Remove', action }]}
         onAnnotationClick={onClick}
-        onAnnotationUpdate={() => {}}
+        store={createAnnotationStore(ANNOTATIONS)}
       />
     );
     fireEvent.click(getAllByTitle('Remove')[1]);
@@ -129,7 +135,7 @@ describe('the options an action is called with (#686)', () => {
     const rendered: string[] = [];
     const action = vi.fn();
     const controls = [{ text: 'x', title: 'Act', action }];
-    const onUpdate = () => {};
+    const store = createAnnotationStore(ANNOTATIONS);
     const renderItem = ({ annotation }: { annotation: AnnotationData }) => {
       rendered.push(annotation.id);
       return <span>{annotation.id}</span>;
@@ -140,7 +146,7 @@ describe('the options an action is called with (#686)', () => {
         editable
         controls={controls}
         annotationListConfig={config}
-        onAnnotationUpdate={onUpdate}
+        store={store}
         renderAnnotationItem={custom ? renderItem : undefined}
       />
     );

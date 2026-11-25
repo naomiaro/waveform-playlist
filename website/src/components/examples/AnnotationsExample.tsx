@@ -1,5 +1,5 @@
 import { sitePath } from '../../utils/sitePath';
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { FileDropZone } from '../FileDropZone';
 import { audioTrack, keyBelongsToFocusedControl } from '@waveform-playlist/core';
@@ -31,7 +31,7 @@ import {
   ClearAllButton,
   usePlaylistTimeline,
   usePlaybackRefs,
-  useAnnotations,
+  useCreateAnnotationStore,
   WaveformViewOptions,
   useCreateArrangement,
   useArrangement,
@@ -222,8 +222,9 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   minAnnotationDuration = 0.5,
 }) => {
   const { duration } = usePlaylistTimeline();
-  const { annotations } = useAnnotations();
-  const { setAnnotations } = usePlaybackControls();
+  // The store owns the annotations (#867): the add button changes its list
+  // as it is when the button is pressed.
+  const { annotationStore } = usePlaybackControls();
   // The ref, not `useCurrentTime()`: the position is only needed when the
   // button is pressed, and this component renders the whole page.
   const { currentTimeRef } = usePlaybackRefs();
@@ -235,7 +236,7 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
   const jsonInputRef = useRef<HTMLInputElement>(null);
 
   // Find the next available gap for an annotation starting from a given time
-  const findNextAvailableGap = useCallback((startFrom: number): { start: number; maxEnd: number } | null => {
+  const findNextAvailableGap = useCallback((annotations: readonly any[], startFrom: number): { start: number; maxEnd: number } | null => {
     if (duration <= 0) return null;
 
     const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
@@ -282,49 +283,47 @@ const AnnotationsAppContent: React.FC<AnnotationsAppContentProps> = ({
     }
 
     return null; // No available gap found
-  }, [annotations, duration, minAnnotationDuration]);
+  }, [duration, minAnnotationDuration]);
 
   // Add annotation at current playhead position or next available gap
   const addAnnotationAtPlayhead = useCallback(() => {
     if (duration <= 0) return;
+    annotationStore?.update((annotations) => {
+      const gap = findNextAvailableGap(annotations, currentTimeRef.current ?? 0);
 
-    const gap = findNextAvailableGap(currentTimeRef.current ?? 0);
+      if (!gap) {
+        console.warn('Cannot create annotation: no available space found');
+        return annotations;
+      }
 
-    if (!gap) {
-      console.warn('Cannot create annotation: no available space found');
-      return;
-    }
+      // Calculate available space
+      const availableSpace = gap.maxEnd - gap.start;
 
-    // Calculate available space
-    const availableSpace = gap.maxEnd - gap.start;
+      // Use default duration if there's enough space, otherwise fill available space
+      const annotationDuration = Math.min(defaultAnnotationDuration, availableSpace);
+      const endTime = gap.start + annotationDuration;
 
-    // Use default duration if there's enough space, otherwise fill available space
-    const annotationDuration = Math.min(defaultAnnotationDuration, availableSpace);
-    const endTime = gap.start + annotationDuration;
+      const newAnnotation = {
+        id: 'annotation_' + Date.now(),
+        start: gap.start,
+        end: endTime,
+        begin: gap.start.toFixed(3),
+        lines: ['New annotation'],
+        language: 'en',
+      };
 
-    const newAnnotation = {
-      id: 'annotation_' + Date.now(),
-      start: gap.start,
-      end: endTime,
-      begin: gap.start.toFixed(3),
-      lines: ['New annotation'],
-      language: 'en',
-    };
-
-    // Insert in chronological order
-    const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
-    const insertIndex = sortedAnnotations.findIndex((a) => a.start > gap.start);
-    const newAnnotations =
-      insertIndex === -1
+      // Insert in chronological order
+      const sortedAnnotations = [...annotations].sort((a, b) => a.start - b.start);
+      const insertIndex = sortedAnnotations.findIndex((a) => a.start > gap.start);
+      return insertIndex === -1
         ? [...sortedAnnotations, newAnnotation]
         : [
             ...sortedAnnotations.slice(0, insertIndex),
             newAnnotation,
             ...sortedAnnotations.slice(insertIndex),
           ];
-
-    setAnnotations(newAnnotations);
-  }, [currentTimeRef, annotations, duration, setAnnotations, defaultAnnotationDuration, findNextAvailableGap]);
+    });
+  }, [currentTimeRef, duration, annotationStore, defaultAnnotationDuration, findNextAvailableGap]);
 
   // Keyboard shortcut: 'A' to add annotation at playhead
   useEffect(() => {
@@ -492,21 +491,23 @@ export function AnnotationsExample() {
   // until the audio has loaded (a placeholder is drawn only for a clip with a
   // `duration` or peaks)
   const arrangement = useCreateArrangement(() => [audioTrack({ src: SONNET_SRC, name: 'Sonnet' })]);
-  const [annotations, setAnnotations] = useState<any[]>(() => defaultNotes.map(parseAeneas));
+  // The owner of the annotations (#867): the provider, the list, the boxes
+  // and the buttons below all read and change this one store.
+  const annotationStore = useCreateAnnotationStore(() => defaultNotes.map(parseAeneas));
 
   const handleAnnotationsLoaded = useCallback((newAnnotations: any[]) => {
     // Parse from Aeneas format if needed
     const parsed = newAnnotations.map((ann: any) =>
       typeof ann.start === 'number' ? ann : parseAeneas(ann)
     );
-    setAnnotations(parsed);
-  }, []);
+    annotationStore.set(parsed);
+  }, [annotationStore]);
 
   // ClearAllButton stops playback first
   const handleClearAll = useCallback(() => {
     arrangement.setTracks([]);
-    setAnnotations([]);
-  }, [arrangement]);
+    annotationStore.set([]);
+  }, [arrangement, annotationStore]);
 
   return (
     <WaveformPlaylistProvider
@@ -516,13 +517,12 @@ export function AnnotationsExample() {
       mono
       automaticScroll={true}
       theme={theme}
+      annotationStore={annotationStore}
       annotationList={{
-        annotations: annotations,
         editable: true,
         linkEndpoints: true,
         isContinuousPlay: true,
       }}
-      onAnnotationsChange={setAnnotations}
     >
       <AnnotationProvider>
         <AnnotationsAppContent

@@ -11,6 +11,7 @@ import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import type { AnnotationData, AudioClip, ClipTrack } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import * as publicApi from '../index';
 import { TestProvider } from './helpers/arrangementProvider';
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
@@ -82,7 +83,7 @@ const ANNOTATIONS: AnnotationData[] = [
   { id: 'a1', start: 0, end: 2, lines: ['one'] },
   { id: 'a2', start: 2, end: 4, lines: ['two'] },
 ];
-const ANNOTATION_LIST = { annotations: ANNOTATIONS };
+const ANNOTATION_STORE = createAnnotationStore(ANNOTATIONS);
 
 type Listener = (...args: unknown[]) => void;
 
@@ -210,13 +211,13 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
   annotationOptions: ['continuousPlay', 'editable', 'linkEndpoints'],
   controls: [
     'annotationPreview',
+    'annotationStore',
     'pause',
     'play',
     'playAnnotation',
     'scrollContainerRef',
     'seekTo',
     'setActiveAnnotationId',
-    'setAnnotations',
     'setAnnotationsEditable',
     'setAutomaticScroll',
     'setContinuousPlay',
@@ -328,7 +329,7 @@ async function mountMediaElement(children: React.ReactNode) {
       track={TRACK}
       samplesPerPixel={882}
       createPlayout={createPlayout}
-      annotationList={ANNOTATION_LIST}
+      annotationStore={ANNOTATION_STORE}
     >
       {children}
     </MediaElementPlaylistProvider>

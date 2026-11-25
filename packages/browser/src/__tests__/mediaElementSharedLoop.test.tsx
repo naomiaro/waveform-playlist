@@ -10,6 +10,8 @@ import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { createAnnotationStore } from '@waveform-playlist/core';
+import type { AnnotationStore } from '@waveform-playlist/core';
 
 // Counts renders of the waveform channel and of the custom playhead function.
 const counts = vi.hoisted(() => ({ channel: 0, scale: 0 }));
@@ -236,7 +238,8 @@ const ANNOTATIONS = [
 
 interface MountOptions {
   automaticScroll?: boolean;
-  annotationList?: { annotations: typeof ANNOTATIONS; isContinuousPlay?: boolean };
+  annotationList?: { annotations?: typeof ANNOTATIONS; isContinuousPlay?: boolean };
+  annotationStore?: AnnotationStore;
   strict?: boolean;
   restoreOnSource?: boolean;
   onReady?: () => void;
@@ -248,7 +251,16 @@ async function mount(options: MountOptions = {}) {
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
   const Wrapper = options.strict ? React.StrictMode : React.Fragment;
-  let annotationList = options.annotationList;
+  // The store owns the annotations (#867): `annotations` in a test's list is
+  // what it starts with, unless the test gives a store of its own.
+  const annotationStore =
+    options.annotationStore ?? createAnnotationStore(options.annotationList?.annotations ?? []);
+  const optionsOf = (list: MountOptions['annotationList']) => {
+    if (!list) return undefined;
+    const { annotations: _annotations, ...rest } = list;
+    return rest;
+  };
+  let annotationList = optionsOf(options.annotationList);
   const tree = (showPlaylist: boolean, playlists = 1, track = TRACK) => (
     <Wrapper>
       <MediaElementPlaylistProvider
@@ -258,6 +270,7 @@ async function mount(options: MountOptions = {}) {
         onReady={options.onReady}
         automaticScroll={options.automaticScroll}
         annotationList={annotationList}
+        annotationStore={annotationStore}
       >
         <ProbeChild />
         {options.restoreOnSource ? <RestoreOnSource source={track.source} /> : null}
@@ -278,7 +291,10 @@ async function mount(options: MountOptions = {}) {
     show: (showPlaylist: boolean, playlists = 1) => view.rerender(tree(showPlaylist, playlists)),
     /** Renders the provider again with another `annotationList` prop. */
     setAnnotationList: (list: MountOptions['annotationList']) => {
-      annotationList = list;
+      annotationList = optionsOf(list);
+      if (list?.annotations && list.annotations !== annotationStore.getAnnotations()) {
+        act(() => annotationStore.set(list.annotations!));
+      }
       view.rerender(tree(true));
     },
     /** Another track object: the provider creates its player again. */
@@ -578,6 +594,24 @@ describe('MediaElement playback runs one animation loop', () => {
 
     await act(async () => probe.controls.play());
     expect(playout.play).toHaveBeenLastCalledWith(undefined, 2.5);
+    await act(async () => probe.controls.stop());
+  });
+
+  it('the loop follows an annotation added to the store after mount (#867)', async () => {
+    const store = createAnnotationStore([ANNOTATIONS[0]]);
+    const { playout } = await mount({
+      annotationList: { isContinuousPlay: true },
+      annotationStore: store,
+    });
+    await act(async () => probe.controls.play());
+    playout.time = 2.5;
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBeNull();
+    await act(async () => {
+      store.update((c) => [...c, ANNOTATIONS[1]]);
+    });
+    await runFrame();
+    expect(probe.state.activeAnnotationId).toBe('n2');
     await act(async () => probe.controls.stop());
   });
 

@@ -42,8 +42,8 @@ export interface AnnotationListProps {
  * The annotation text list, for both providers (#686). Render it anywhere
  * under the provider: below the view, in a sidebar, more than once. It reads
  * everything from the provider (the annotations, the active one, the
- * `editable` / `linkEndpoints` / `continuousPlay` options) and reports edits
- * through the provider's `onAnnotationsChange`. A click on a row plays the
+ * `editable` / `linkEndpoints` / `continuousPlay` options) and writes edits
+ * to the provider's annotation store. A click on a row plays the
  * annotation, as a click on its box does.
  *
  * Needs the annotation integration (`<AnnotationProvider>` from
@@ -65,7 +65,7 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
+  const { annotationStore, annotationPreview, playAnnotation } = usePlaybackControls();
   // While an edge is dragged, the times in the list follow it.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
@@ -104,7 +104,7 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
       annotationListConfig={actionOptions}
       height={height}
       onAnnotationClick={playAnnotation}
-      onAnnotationUpdate={setAnnotations}
+      store={annotationStore}
       renderAnnotationItem={children}
     />
   );

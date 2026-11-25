@@ -1,15 +1,20 @@
-import { useCallback, useMemo, useEffect } from 'react';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { useCallback, useMemo, useEffect, useSyncExternalStore } from 'react';
+import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import { usePlaylistViewOptional, usePlaylistZoomOptional } from '../contexts/playlistContexts';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { moveAnnotationEnd, moveAnnotationStart } from '../utils/annotationBoundaryKeys';
 
-const LINK_THRESHOLD = 0.01; // Consider edges "linked" if within 10ms
 const TIME_DELTA = 0.01; // 10ms adjustment per keypress
 
 interface UseAnnotationKeyboardControlsOptions {
-  annotations: AnnotationData[];
+  /**
+   * The owner of the annotations (`usePlaybackControls().annotationStore`).
+   * The keys read the store, and each boundary key changes the active
+   * annotation, found by id, in the store's list as it is when the key is
+   * pressed (#867). Without a store there is nothing to move or select.
+   */
+  store: AnnotationStore | undefined;
   activeAnnotationId: string | null;
-  onAnnotationsChange: (annotations: AnnotationData[]) => void;
   /** Callback to set the active annotation ID for selection */
   onActiveAnnotationChange?: (id: string | null) => void;
   duration: number;
@@ -52,20 +57,23 @@ interface UseAnnotationKeyboardControlsOptions {
  *
  * @example
  * ```tsx
+ * const { annotationStore, setActiveAnnotationId } = usePlaybackControls();
  * useAnnotationKeyboardControls({
- *   annotations,
+ *   store: annotationStore,
  *   activeAnnotationId,
- *   onAnnotationsChange: setAnnotations,
  *   onActiveAnnotationChange: setActiveAnnotationId,
  *   duration,
  *   linkEndpoints,
  * });
  * ```
  */
+const NO_ANNOTATIONS: readonly AnnotationData[] = Object.freeze([]);
+const noSubscription = () => () => {};
+const noAnnotations = () => NO_ANNOTATIONS;
+
 export function useAnnotationKeyboardControls({
-  annotations,
+  store,
   activeAnnotationId,
-  onAnnotationsChange,
   onActiveAnnotationChange,
   duration,
   linkEndpoints,
@@ -76,6 +84,21 @@ export function useAnnotationKeyboardControls({
   samplesPerPixel: samplesPerPixelProp,
   sampleRate: sampleRateProp,
 }: UseAnnotationKeyboardControlsOptions) {
+  // Called on every render, with a stand-in when there is no store.
+  // Wrapped, so a store whose methods use `this` keeps working.
+  const source = useMemo(
+    () =>
+      store
+        ? {
+            subscribe: (listener: () => void) => store.subscribe(listener),
+            getSnapshot: () => store.getAnnotations(),
+          }
+        : { subscribe: noSubscription, getSnapshot: noAnnotations },
+    [store]
+  );
+  const stored = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot);
+  const annotations = stored;
+
   // Auto-scroll positioning needs samplesPerPixel/sampleRate. Prefer explicit
   // props (works in the MediaElement path); otherwise read them from the
   // provider's contexts (either provider renders them). The optional readers
@@ -132,123 +155,24 @@ export function useAnnotationKeyboardControls({
 
   const moveStartBoundary = useCallback(
     (delta: number) => {
-      if (activeIndex < 0) return;
-
-      const annotation = annotations[activeIndex];
-      const newStart = Math.max(0, Math.min(annotation.end - 0.1, annotation.start + delta));
-      const actualDelta = newStart - annotation.start;
-
-      const updatedAnnotations = [...annotations];
-      updatedAnnotations[activeIndex] = {
-        ...annotation,
-        start: newStart,
-      };
-
-      // Handle linked endpoints
-      if (linkEndpoints && activeIndex > 0) {
-        const prevAnnotation = updatedAnnotations[activeIndex - 1];
-        if (Math.abs(prevAnnotation.end - annotation.start) < LINK_THRESHOLD) {
-          // Already linked: move previous annotation's end together
-          updatedAnnotations[activeIndex - 1] = {
-            ...prevAnnotation,
-            end: Math.max(prevAnnotation.start + 0.1, prevAnnotation.end + actualDelta),
-          };
-        }
-      } else if (!linkEndpoints && activeIndex > 0) {
-        // Non-linked mode: don't overlap previous annotation
-        const prevAnnotation = updatedAnnotations[activeIndex - 1];
-        if (newStart < prevAnnotation.end) {
-          // Push back previous annotation's end
-          updatedAnnotations[activeIndex - 1] = {
-            ...prevAnnotation,
-            end: newStart,
-          };
-        }
-      }
-
-      onAnnotationsChange(updatedAnnotations);
+      store?.update((current) => {
+        const index = current.findIndex((a) => a.id === activeAnnotationId);
+        return index < 0 ? current : moveAnnotationStart(current, index, delta, { linkEndpoints });
+      });
     },
-    [annotations, activeIndex, linkEndpoints, onAnnotationsChange]
+    [store, activeAnnotationId, linkEndpoints]
   );
 
   const moveEndBoundary = useCallback(
     (delta: number) => {
-      if (activeIndex < 0) return;
-
-      const annotation = annotations[activeIndex];
-      const newEnd = Math.max(annotation.start + 0.1, Math.min(duration, annotation.end + delta));
-      const actualDelta = newEnd - annotation.end;
-
-      const updatedAnnotations = [...annotations];
-      updatedAnnotations[activeIndex] = {
-        ...annotation,
-        end: newEnd,
-      };
-
-      // Handle linked endpoints
-      if (linkEndpoints && activeIndex < annotations.length - 1) {
-        const nextAnnotation = updatedAnnotations[activeIndex + 1];
-        if (Math.abs(nextAnnotation.start - annotation.end) < LINK_THRESHOLD) {
-          // Already linked: move next annotation's start together
-          const newNextStart = Math.min(
-            nextAnnotation.end - 0.1,
-            nextAnnotation.start + actualDelta
-          );
-          updatedAnnotations[activeIndex + 1] = {
-            ...nextAnnotation,
-            start: newNextStart,
-          };
-
-          // Cascade linked endpoints
-          let currentIndex = activeIndex + 1;
-          while (currentIndex < updatedAnnotations.length - 1) {
-            const current = updatedAnnotations[currentIndex];
-            const next = updatedAnnotations[currentIndex + 1];
-
-            if (Math.abs(next.start - annotations[currentIndex].end) < LINK_THRESHOLD) {
-              const nextDelta = current.end - annotations[currentIndex].end;
-              updatedAnnotations[currentIndex + 1] = {
-                ...next,
-                start: Math.min(next.end - 0.1, next.start + nextDelta),
-              };
-              currentIndex++;
-            } else {
-              break;
-            }
-          }
-        }
-      } else if (!linkEndpoints && activeIndex < annotations.length - 1) {
-        // Non-linked mode: don't overlap next annotation
-        const nextAnnotation = updatedAnnotations[activeIndex + 1];
-        if (newEnd > nextAnnotation.start) {
-          // Push forward next annotation's start
-          updatedAnnotations[activeIndex + 1] = {
-            ...nextAnnotation,
-            start: newEnd,
-          };
-
-          // Cascade collisions
-          let currentIndex = activeIndex + 1;
-          while (currentIndex < updatedAnnotations.length - 1) {
-            const current = updatedAnnotations[currentIndex];
-            const next = updatedAnnotations[currentIndex + 1];
-
-            if (current.end > next.start) {
-              updatedAnnotations[currentIndex + 1] = {
-                ...next,
-                start: current.end,
-              };
-              currentIndex++;
-            } else {
-              break;
-            }
-          }
-        }
-      }
-
-      onAnnotationsChange(updatedAnnotations);
+      store?.update((current) => {
+        const index = current.findIndex((a) => a.id === activeAnnotationId);
+        return index < 0
+          ? current
+          : moveAnnotationEnd(current, index, delta, { linkEndpoints, duration });
+      });
     },
-    [annotations, activeIndex, duration, linkEndpoints, onAnnotationsChange]
+    [store, activeAnnotationId, duration, linkEndpoints]
   );
 
   // Navigation functions

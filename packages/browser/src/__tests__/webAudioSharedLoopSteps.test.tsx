@@ -21,6 +21,7 @@ import {
   type FrameData,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -57,7 +58,7 @@ const ANNOTATIONS: AnnotationData[] = [
   { id: 'a', start: 1, end: 2, lines: ['a'] },
   { id: 'b', start: 2, end: 3, lines: ['b'] },
 ];
-const ANNOTATION_LIST = { annotations: ANNOTATIONS };
+const ANNOTATION_STORE = createAnnotationStore(ANNOTATIONS);
 
 function createFakeAdapter() {
   let now = 0;
@@ -129,7 +130,7 @@ async function mount(automaticScroll = false) {
       sampleRate={SAMPLE_RATE}
       samplesPerPixel={SAMPLES_PER_PIXEL}
       createAdapter={createAdapter}
-      annotationList={ANNOTATION_LIST}
+      annotationStore={ANNOTATION_STORE}
       automaticScroll={automaticScroll}
     >
       <ProbeChild />

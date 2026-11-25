@@ -5,7 +5,7 @@
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import type { AnnotationData } from '@waveform-playlist/core';
+import { createAnnotationStore, type AnnotationData } from '@waveform-playlist/core';
 import { createAnnotationLookup } from '../utils/annotationLookup';
 import { followAnnotations } from '../providerInternals/followAnnotations';
 import { centrePlayhead } from '../providerInternals/useScrollFollow';
@@ -226,101 +226,50 @@ describe('useFrameCallbacks', () => {
 });
 
 describe('useAnnotationState', () => {
-  const PROVIDER = 'TestProvider';
-
-  it('passes numeric annotations through and keeps the ref current', () => {
-    const list = { annotations: ANNOTATIONS };
+  it("publishes the store's annotations, and getAnnotations reads the store when called", () => {
+    const store = createAnnotationStore(ANNOTATIONS);
     const { result, rerender } = renderHook(
-      ({ annotationList }) =>
-        useAnnotationState({
-          annotationList,
-          onAnnotationsChange: undefined,
-          providerName: PROVIDER,
-        }),
-      { initialProps: { annotationList: list } }
+      ({ annotationStore }) => useAnnotationState({ annotationStore, annotationList: undefined }),
+      { initialProps: { annotationStore: store } }
     );
-    expect(result.current.annotations).toBe(ANNOTATIONS);
-    expect(result.current.annotationsRef.current).toBe(ANNOTATIONS);
+    expect(result.current.annotations).toBe(store.getAnnotations());
+    const getAnnotations = result.current.getAnnotations;
 
-    const next = [ANNOTATIONS[0]];
-    rerender({ annotationList: { annotations: next } });
-    expect(result.current.annotations).toBe(next);
-    expect(result.current.annotationsRef.current).toBe(next);
+    // Read at the moment of the call: the loop does not wait for a render.
+    store.set([ANNOTATIONS[0]]);
+    expect(getAnnotations()).toBe(store.getAnnotations());
+
+    const other = createAnnotationStore([ANNOTATIONS[1]]);
+    rerender({ annotationStore: other });
+    expect(result.current.annotations).toBe(other.getAnnotations());
+    expect(getAnnotations()).toBe(other.getAnnotations());
+    expect(result.current.getAnnotations).toBe(getAnnotations);
   });
 
-  it('is an empty list without annotations, and for unparsed ones (with an error)', () => {
+  it('is an empty list without a store', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const none = renderHook(() =>
-      useAnnotationState({
-        annotationList: undefined,
-        onAnnotationsChange: undefined,
-        providerName: PROVIDER,
-      })
-    );
-    expect(none.result.current.annotations).toEqual([]);
-    expect(error).not.toHaveBeenCalled();
-
-    const unparsed = {
-      annotations: [
-        { id: 'x', start: '0.0', end: '1.0', lines: [] },
-      ] as unknown as AnnotationData[],
-    };
-    const bad = renderHook(() =>
-      useAnnotationState({
-        annotationList: unparsed,
-        onAnnotationsChange: undefined,
-        providerName: PROVIDER,
-      })
-    );
-    expect(bad.result.current.annotations).toEqual([]);
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(String(error.mock.calls[0][0])).toContain('numeric start/end');
-  });
-
-  it('setAnnotations reports to the latest callback, value or updater, with a stable identity', () => {
-    const first = vi.fn();
-    const second = vi.fn();
-    const list = { annotations: ANNOTATIONS };
-    const { result, rerender } = renderHook(
-      ({ onAnnotationsChange }) =>
-        useAnnotationState({ annotationList: list, onAnnotationsChange, providerName: PROVIDER }),
-      { initialProps: { onAnnotationsChange: first } }
-    );
-    const setAnnotations = result.current.setAnnotations;
-    const preview = result.current.annotationPreview;
-
-    const replaced = [ANNOTATIONS[1]];
-    setAnnotations(replaced);
-    expect(first).toHaveBeenCalledExactlyOnceWith(replaced);
-
-    rerender({ onAnnotationsChange: second });
-    setAnnotations((current) => current.slice(0, 2));
-    expect(second).toHaveBeenCalledExactlyOnceWith(ANNOTATIONS.slice(0, 2));
-    expect(first).toHaveBeenCalledTimes(1);
-    expect(result.current.setAnnotations).toBe(setAnnotations);
-    expect(result.current.annotationPreview).toBe(preview);
-  });
-
-  it('warns, naming the provider, when there is no callback', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { result } = renderHook(() =>
-      useAnnotationState({
-        annotationList: { annotations: ANNOTATIONS },
-        onAnnotationsChange: undefined,
-        providerName: PROVIDER,
-      })
+      useAnnotationState({ annotationStore: undefined, annotationList: undefined })
     );
-    result.current.setAnnotations([]);
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(String(warn.mock.calls[0][0])).toContain('Pass onAnnotationsChange to TestProvider');
+    expect(result.current.annotations).toEqual([]);
+    expect(result.current.getAnnotations()).toEqual([]);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('the preview keeps its identity across renders', () => {
+    const { result, rerender } = renderHook(() =>
+      useAnnotationState({ annotationStore: undefined, annotationList: undefined })
+    );
+    const preview = result.current.annotationPreview;
+    rerender();
+    expect(result.current.annotationPreview).toBe(preview);
   });
 
   it('active annotation and continuous play: ref first, then state, stable setters', () => {
     const { result } = renderHook(() =>
       useAnnotationState({
-        annotationList: { annotations: ANNOTATIONS, isContinuousPlay: true },
-        onAnnotationsChange: undefined,
-        providerName: PROVIDER,
+        annotationStore: undefined,
+        annotationList: { isContinuousPlay: true },
       })
     );
     expect(result.current.continuousPlay).toBe(true);

@@ -44,7 +44,7 @@ export interface WaveformAnnotationBoxesProps {
  *
  * It wires the drag of a box's edges itself (#686): its own
  * `DragDropProvider` around the row, the moves shown through the provider's
- * preview, one `onAnnotationsChange` on release. The edges can be dragged
+ * preview, one write to the annotation store on release. The edges can be dragged
  * while the provider's `editable` option is on; `linkEndpoints` and
  * `continuousPlay` come from the same place (`useAnnotationOptions()`). The
  * touch setting of the drag is `ClipInteractionOptions`' `touchOptimized`.
@@ -68,7 +68,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
+  const { annotationStore, annotationPreview, playAnnotation } = usePlaybackControls();
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { touchOptimized } = useClipInteraction();
@@ -78,8 +78,7 @@ export const WaveformAnnotationBoxes = React.memo(function WaveformAnnotationBox
   const sensors = useDragSensors({ touchOptimized });
 
   const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
-    annotations,
-    onAnnotationsChange: setAnnotations,
+    store: annotationStore,
     preview: annotationPreview,
     samplesPerPixel,
     sampleRate,

@@ -61,6 +61,11 @@ import {
 import { MediaElementWaveform } from '../components/MediaElementWaveform';
 import { AnnotationList } from '../components/AnnotationList';
 import type { AnnotationListProp } from '../providerInternals/useAnnotationState';
+import { createAnnotationStore } from '@waveform-playlist/core';
+import type { AnnotationData } from '@waveform-playlist/core';
+
+/** The provider's options, and the annotations the store starts with. */
+type ListOptions = AnnotationListProp & { annotations?: AnnotationData[] };
 import { ComposedMediaElementWaveform } from './testCompositions';
 
 // Not 48000: that is the default the drag handlers fall back to, and the
@@ -157,7 +162,7 @@ const ProbeChild: React.FC = () => {
 // through the provider's `annotationList` prop.
 async function mount(
   children: React.ReactNode,
-  annotationList: AnnotationListProp = ANNOTATION_LIST
+  { annotations = [], ...annotationList }: ListOptions = ANNOTATION_LIST
 ) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   boxRenders = {};
@@ -166,15 +171,15 @@ async function mount(
   dragOptions.length = 0;
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
-  const onAnnotationsChange = () => {};
+  const store = createAnnotationStore(annotations);
   const tree = (content: React.ReactNode) => (
     <AnnotationIntegrationContext value={INTEGRATION}>
       <MediaElementPlaylistProvider
         track={TRACK}
         samplesPerPixel={SAMPLES_PER_PIXEL}
         createPlayout={createPlayout}
+        annotationStore={store}
         annotationList={annotationList}
-        onAnnotationsChange={onAnnotationsChange}
       >
         <ProbeChild />
         {content}
@@ -297,7 +302,7 @@ describe('MediaElement annotation boxes (#744)', () => {
   });
 
   // #704 close-out: the built-in boxes drag with the provider's preview, so
-  // onAnnotationsChange is called once per drag and not once per move.
+  // The store is written once per drag and not once per move.
   it('boundary drags publish to the provider preview', async () => {
     await mount(<MediaElementWaveform />, { annotations: ANNOTATIONS, editable: true });
 

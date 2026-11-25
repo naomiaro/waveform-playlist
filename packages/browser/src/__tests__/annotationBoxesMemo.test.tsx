@@ -23,6 +23,7 @@ import {
 import { WaveformAnnotationBoxes } from '../components/WaveformAnnotationBoxes';
 import { WaveformExtentContext } from '../components/waveformLayoutContext';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -125,7 +126,7 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const ANNOTATION_LIST = { annotations: ANNOTATIONS };
+const ANNOTATION_STORE = createAnnotationStore(ANNOTATIONS);
 
 // The row takes its width from the root of the view (#685); there is no root here.
 const EXTENT = { displayDuration: 60, tracksFullWidth: 2000 };
@@ -145,7 +146,7 @@ async function mount({ getLabel }: { getLabel?: LabelFn } = {}) {
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        annotationList={ANNOTATION_LIST}
+        annotationStore={ANNOTATION_STORE}
       >
         <ProbeChild />
         <WaveformExtentContext value={EXTENT}>

@@ -235,7 +235,7 @@ The row of annotation boxes, under either root. It needs the `AnnotationProvider
 
 A click on a box makes its annotation the active one and plays it from its start; with continuous play off, playback ends where the annotation ends.
 
-The part has its own `DragDropProvider` around the row and wires the drag of the edges itself. An edge can be dragged while the provider's `editable` option is on; whether it takes the edge it touches along is the provider's `linkEndpoints` option. The moves are shown as they happen and `onAnnotationsChange` is called once, on release. An edge can be dragged as far as the timeline is drawn, which can be past the end of the audio. A `DragDropProvider` of your own above the view, `ClipInteractionProvider` included, does not receive the drag of an annotation edge.
+The part has its own `DragDropProvider` around the row and wires the drag of the edges itself. An edge can be dragged while the provider's `editable` option is on; whether it takes the edge it touches along is the provider's `linkEndpoints` option. The moves are shown as they happen and the provider's annotation store is written once, on release: the `start` and `end` of the annotations the drag touched, found by id in the store's list as it is then. A drag whose annotation is removed from the store meanwhile ends and writes nothing. An edge can be dragged as far as the timeline is drawn, which can be past the end of the audio. A `DragDropProvider` of your own above the view, `ClipInteractionProvider` included, does not receive the drag of an annotation edge.
 
 The drag starts after 1 px of pointer travel. With `touchOptimized` on a `ClipInteractionOptions` or `ClipInteractionProvider` above, a touch must be held 250 ms first.
 
@@ -317,7 +317,7 @@ The full list is in [Composing the View](/docs/react/guides/composing-the-view#w
 
 ### AnnotationList
 
-The annotation text list, under either provider. It is not a part of a root: render it anywhere under the provider (below the view, in a sidebar, more than once). It reads the annotations, the active annotation and the three annotation options from the provider, and reports edits through the provider's `onAnnotationsChange`.
+The annotation text list, under either provider. It is not a part of a root: render it anywhere under the provider (below the view, in a sidebar, more than once). It reads the annotations, the active annotation and the three annotation options from the provider, and writes its text, id and action-button edits to the provider's annotation store (`annotationStore`), each to its annotation found by id. Without a store the provider has no annotations, and the list draws nothing.
 
 ```tsx
 <AnnotationList height={300} actions={annotationActions} scrollActivePosition="start" />
@@ -334,7 +334,7 @@ The annotation text list, under either provider. It is not a part of a root: ren
 - It draws nothing while there are no annotations.
 - It needs the `AnnotationProvider` of `@waveform-playlist/annotations`. Without it the list draws nothing, and a development build warns once in the console.
 - A click on a row makes the annotation the active one and plays it from its start, as a click on its box does. In the default row a click in a field that is being edited, or on an action button, does not.
-- While `editable` is on, the text and the id of a default row can be edited in place.
+- While `editable` is on, the text and the id of a default row can be edited in place. An empty id and an id another annotation has are not accepted: the field shows the stored id again.
 
 See the [Annotations guide](/docs/react/guides/annotations#annotationlist).
 

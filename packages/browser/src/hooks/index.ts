@@ -49,3 +49,5 @@ export { useCreateArrangement } from './useCreateArrangement';
 export type { UseCreateArrangementOptions } from './useCreateArrangement';
 export { useArrangementTracks } from './useArrangementTracks';
 export { useArrangementSources } from './useArrangementSources';
+export { useCreateAnnotationStore } from './useCreateAnnotationStore';
+export { useStoredAnnotations } from './useStoredAnnotations';

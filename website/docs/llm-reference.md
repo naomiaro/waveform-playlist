@@ -38,6 +38,12 @@ interface WaveformPlaylistProviderProps {
   zoomLevels?: number[];
   automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>; // merged over defaultTheme: { ...defaultTheme, ...theme }
+  /** The owner of the annotations (#867): make it with `useCreateAnnotationStore`
+   *  (see "Annotation Store") and change the annotations with its methods. The
+   *  provider publishes what it holds and writes nothing back. Without it there
+   *  are no annotations. The same prop on both providers. */
+  annotationStore?: AnnotationStore;
+  /** The three annotation options; the annotations are `annotationStore`'s. */
   annotationList?: AnnotationListProp;
   effects?: EffectsFunction;
   /** A track's effects function by track id (`getTrackEffectsFunction` from
@@ -56,7 +62,6 @@ interface WaveformPlaylistProviderProps {
    *  that fails to load (read useArrangementSources) and NOT for a track the
    *  arrangement refuses (that throws at the call). Read when called. */
   onError?: (err: Error) => void;
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** SoundFont cache for sample-based MIDI playback */
   soundFontCache?: SoundFontCache;
   /** Disable end-of-timeline auto-stop — roll until explicit stop (DAW style). The multitrack
@@ -75,7 +80,9 @@ interface WaveformPlaylistProviderProps {
   createAdapter?: () => PlayoutAdapter;
 }
 // Removed (#812): tracks, onTracksChange, deferEngineRebuild. A leftover one is ignored at
-// runtime (TypeScript reports it). See upgrading.md. Without `arrangement` (or with a value that is
+// runtime (TypeScript reports it). See upgrading.md.
+// Removed (#867), from both providers: onAnnotationsChange, and the `annotations` field of
+// annotationList. A leftover one is ignored at runtime: the provider shows no annotations. Without `arrangement` (or with a value that is
 // not an object) the provider throws an Error while it renders, in every build:
 // "[waveform-playlist] WaveformPlaylistProvider needs an `arrangement` prop: an arrangement made with
 // `useCreateArrangement`, which owns the tracks. The `tracks` and `onTracksChange` props were removed.
@@ -118,8 +125,8 @@ interface MediaElementPlaylistProviderProps {
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
+  annotationStore?: AnnotationStore;        // the same prop as on WaveformPlaylistProvider
   annotationList?: AnnotationListProp;      // the same prop as on WaveformPlaylistProvider
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   onReady?: () => void;                  // the media element has loaded its metadata; once per player. Pass a stable function
   onError?: (error: Error) => void;      // player could not be created, or the media failed (also mid-playback, which ends playback); the provider adds no URL to the message. Pass a stable function
   /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.
@@ -203,7 +210,9 @@ interface ActiveAnnotationContextValue {
  * once, on release (its moves go through the preview source).
  */
 interface AnnotationsContextValue {
-  annotations: AnnotationData[];
+  /** The annotation store's list: never write to it (frozen in development).
+   *  `[]` when the provider has no `annotationStore`. */
+  annotations: readonly AnnotationData[];
 }
 ```
 
@@ -225,14 +234,15 @@ interface AnnotationOptionsContextValue {
 }
 
 /**
- * The `annotationList` prop of both providers. The provider holds the three
- * options as state (`useAnnotationOptions()`, and the three setters of
- * `usePlaybackControls()`), and that state follows the prop: when the value
- * of a field changes, the option takes it. Between two changes of the prop a
- * setter (or one of the checkboxes) changes the option; the prop is not told.
+ * The `annotationList` prop of both providers: the three annotation options.
+ * The annotations themselves are the `annotationStore` prop's (#867). The
+ * provider holds the three options as state (`useAnnotationOptions()`, and
+ * the three setters of `usePlaybackControls()`), and that state follows the
+ * prop: when the value of a field changes, the option takes it. Between two
+ * changes of the prop a setter (or one of the checkboxes) changes the option;
+ * the prop is not told.
  */
 interface AnnotationListProp {
-  annotations?: AnnotationData[];
   /** Whether annotations can be edited (text, ids, edges). Default: false. */
   editable?: boolean;
   /** Whether a dragged edge takes the edge it touches along. Default: false. */
@@ -274,13 +284,18 @@ interface PlaybackControlsContextValue {
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
    * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom
    * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
    */
   annotationPreview: AnnotationPreviewHandle;
+  /**
+   * The provider's `annotationStore` prop, or `undefined` without one: the
+   * owner of the annotations. Change them with its `set` and `update`. Its
+   * identity changes only when the prop does.
+   */
+  annotationStore: AnnotationStore | undefined;
   setActiveAnnotationId: (id: string | null) => void;
   /**
    * What a click on an annotation does (its box, or its row in the list): the
@@ -297,6 +312,8 @@ interface PlaybackControlsContextValue {
    */
   playAnnotation: (annotation: AnnotationData) => void;
 }
+// Removed (#867): setAnnotations. Write through `annotationStore` (set / update).
+// The value changes only when the provider is given another `annotationStore` (#867).
 ```
 
 ### usePlaybackRefs()
@@ -852,6 +869,128 @@ Rule for apps: change tracks from a handler, an effect or a `sources` listener, 
 
 Removed (#812) from `@waveform-playlist/browser/tone`: `useAudioTracks`, `useDynamicTracks`, and the types `AudioTrackConfig`, `TrackSource`, `TrackLoadError`, `UseDynamicTracksReturn`. Replacement: `audioTrack({ src | audioBuffer | waveformData, name, start, duration, offset, … })` in the arrangement (`start`, not `startTime`); loading state from `useArrangementSources`.
 
+## Annotation Store
+
+*`createAnnotationStore`, `applyAnnotationBounds` and the types from `@waveform-playlist/core`; the two hooks from `@waveform-playlist/browser` (core entry)*
+
+Both providers take the store as their `annotationStore` prop (#867). It is the one owner of the annotations: the provider, the boxes, the list, the keyboard shortcuts and the app read it, and every change is a call to `set` or `update`.
+
+```typescript
+interface AnnotationStore {
+  /** The current annotations. The same array until a change. Never write to
+   *  it: outside production builds it is frozen. */
+  getAnnotations(): readonly AnnotationData[];
+  /** Be told after every change. Returns the function that unsubscribes. */
+  subscribe(listener: () => void): () => void;
+  /** Replace the annotations. */
+  set(annotations: readonly AnnotationData[]): void;
+  /** `fn` gets the current array and returns the next. Applied before `update`
+   *  returns, so the next call's `current` already holds it. Returning
+   *  `current` changes nothing. */
+  update(fn: (current: readonly AnnotationData[]) => readonly AnnotationData[]): void;
+}
+
+interface AnnotationStoreOptions {
+  /** The app's rule for every change: gets the proposed list and the current
+   *  one, returns the list to store: `next` to accept, `current` to refuse
+   *  (nobody is told), or another list to adjust. Not called for the initial
+   *  list. A throw from it reaches the caller of `set` / `update`, and the
+   *  store keeps its value. */
+  beforeChange?: (
+    next: readonly AnnotationData[],
+    current: readonly AnnotationData[]
+  ) => readonly AnnotationData[];
+}
+
+/** Throws a TypeError for an invalid initial list (see below). */
+function createAnnotationStore(
+  initial?: readonly AnnotationData[], // default []
+  options?: AnnotationStoreOptions
+): AnnotationStore;
+
+interface AnnotationBoundsChange {
+  id: string;
+  start: number;
+  end: number;
+}
+/** Writes `start`/`end` of each change onto the annotation with that id; every
+ *  other field and annotation is kept (the same object); an id not in
+ *  `current` is skipped. Returns `current` itself when nothing changes. */
+function applyAnnotationBounds(
+  current: readonly AnnotationData[],
+  changes: readonly AnnotationBoundsChange[]
+): readonly AnnotationData[];
+
+/** One store per component instance; the same store on every render. `init`
+ *  is read once, on the first render (a throw goes to the nearest error
+ *  boundary above the calling component). `options.beforeChange` is followed:
+ *  the store calls the function passed on the most recent committed render. */
+function useCreateAnnotationStore(
+  init?: () => readonly AnnotationData[],
+  options?: AnnotationStoreOptions
+): AnnotationStore;
+
+/** The store's list; re-renders on a change. REQUIRED argument: works above
+ *  the provider too. Never write to what it returns. */
+function useStoredAnnotations(store: AnnotationStore): readonly AnnotationData[];
+```
+
+- Validation, in every build: the initial list, `set`, `update`'s result and `beforeChange`'s result. Every annotation needs finite numeric `start` and `end`; ids are unique. Otherwise a `TypeError` (`[waveform-playlist] Invalid annotations: annotation "<id>" needs numeric start and end (got <type> and <type>). …` / `… two annotations have the id "<id>".`) and the store keeps its value.
+- In a development build (`process.env.NODE_ENV` set and not `'production'`; with no `process` at all nothing is frozen) the list, each annotation and its `lines` are frozen, including the objects passed in: an array write (`annotations.sort()`) throws in any code, a field assignment throws in strict code (every module). Copy first: `[...list].sort(…)`.
+- Subscribers are told synchronously after a change; one that throws is warned about and the others are still told.
+- Two `update`s in one tick both land, in either order, whoever makes them (an app write, a drag release, a boundary key, a list edit).
+- What the library writes: an edge drag keeps the `start`/`end` of every annotation it touched (also one moved back) and works out each move over the store's current list with them on top (a neighbour moved elsewhere collides where it is now). With the preview, the release writes the touched bounds, by id, onto the store's list as it is then (an annotation added during the drag stays, and so does any other edit made elsewhere, except to the `start` and `end` of an annotation the drag has touched: those are the drag's; Escape writes nothing); without it every move writes them and Escape writes the drag-start bounds back. The drag ends, writing nothing more and clearing its preview, when the dragged annotation is removed (also "clear all"), when the provider is given another store, or on unmount. During a drag with the preview, the boxes and the list show the store's current list with the drag's bounds on top. Boundary keys find the active annotation by id when the key is pressed; a key at a clamp changes nothing and tells nobody. List text, id and action edits find their row by id; a blur with unchanged text tells nobody.
+- `beforeChange` is not called when the proposed list is the current array, nor for a list that fails validation (validation runs first).
+- Saving: `store.subscribe(() => save(store.getAnnotations()))`, or `useStoredAnnotations(store)` read in an effect.
+
+```tsx
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  useCreateArrangement,
+  useCreateAnnotationStore,
+} from '@waveform-playlist/browser';
+import { AnnotationProvider, parseAeneas } from '@waveform-playlist/annotations';
+
+const annotationStore = useCreateAnnotationStore(() => fragments.map(parseAeneas), {
+  beforeChange: (next, current) => (locked ? current : next), // `locked`: the app's state, read when called
+});
+<WaveformPlaylistProvider arrangement={arrangement} annotationStore={annotationStore} annotationList={{ editable: true }}>
+  <AnnotationProvider><Waveform /></AnnotationProvider>
+</WaveformPlaylistProvider>
+// Below the provider: const { annotationStore } = usePlaybackControls();
+// annotationStore?.update((current) => [...current, { id, start, end, lines: [''] }]);
+```
+
+`AnnotationText` (`@waveform-playlist/annotations`), for a list outside the provider:
+
+```typescript
+interface AnnotationTextProps {
+  /** What the list draws. */
+  annotations: readonly AnnotationData[];
+  activeAnnotationId?: string;
+  shouldScrollToActive?: boolean;
+  scrollActivePosition?: ScrollLogicalPosition; // default 'center'
+  scrollActiveContainer?: 'nearest' | 'all';    // default 'nearest'
+  editable?: boolean;
+  controls?: AnnotationAction[];
+  annotationListConfig?: AnnotationActionOptions;
+  height?: number;
+  onAnnotationClick?: (annotation: AnnotationData) => void;
+  /** Where the edits are written (#867): text, id and control edits call
+   *  `store.update`, find their annotation by id in the store's current list,
+   *  and a field whose edit was not stored shows the stored value again.
+   *  Without `store` the list is read-only: no field can be edited and no
+   *  control is drawn, whatever `editable` says. */
+  store?: AnnotationStore;
+  renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
+}
+// Removed (#867): onAnnotationUpdate. The id field refuses an empty id and an id another
+// annotation has (nothing written; the stored id is shown again).
+// The browser package types what it passes as AnnotationTextIntegrationProps (in
+// AnnotationIntegration): the same fields, `store` included.
+```
+
 ## Effects Hooks
 
 *All effects hooks and factory/definition exports are from `@waveform-playlist/browser/tone`*
@@ -1279,8 +1418,8 @@ function loadWamModule(): Promise<typeof import('@dawcore/wam')>;
 type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>; // from @waveform-playlist/core
 
 function useAnnotationDragHandlers(options: {
-  annotations: AnnotationData[];
-  onAnnotationsChange: (annotations: AnnotationData[]) => void;
+  /** usePlaybackControls().annotationStore. Without a store the handlers do nothing. */
+  store: AnnotationStore | undefined;
   samplesPerPixel: number;
   sampleRate?: number; // default 48000; pass the provider's
   duration: number;
@@ -1294,12 +1433,40 @@ function useAnnotationDragHandlers(options: {
 
 // The annotations to draw: the previewed ones while an edge is dragged, else `annotations`.
 function useAnnotationsWithPreview(
-  annotations: AnnotationData[],
+  annotations: readonly AnnotationData[],
   preview: AnnotationPreviewHandle
-): AnnotationData[];
+): readonly AnnotationData[];
+
+function useAnnotationKeyboardControls(options: {
+  /** usePlaybackControls().annotationStore. The keys read it; a boundary key changes the
+   *  active annotation, found by id, in the store's list when the key is pressed.
+   *  Without a store there is nothing to select or move. */
+  store: AnnotationStore | undefined;
+  activeAnnotationId: string | null;
+  onActiveAnnotationChange?: (id: string | null) => void; // without it the selection keys are off
+  duration: number;
+  linkEndpoints: boolean;
+  continuousPlay?: boolean; // default false
+  enabled?: boolean; // default true
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  onPlay?: (startTime: number, duration?: number) => void;
+  samplesPerPixel?: number; // default: the provider's
+  sampleRate?: number; // default: the provider's
+}): {
+  moveStartBoundary: (delta: number) => void;
+  moveEndBoundary: (delta: number) => void;
+  selectPrevious: () => void;
+  selectNext: () => void;
+  selectFirst: () => void;
+  selectLast: () => void;
+  clearSelection: () => void;
+  scrollToAnnotation: (annotationId: string) => void;
+  playActiveAnnotation: () => void;
+};
+// Removed (#867) from both hooks: the options `annotations` and `onAnnotationsChange`.
 ```
 
-With `preview`, each move is published to it (the built-in annotation boxes and list follow it) and `onAnnotationsChange` is called once, on release. Without it, `onAnnotationsChange` is called on every move. Either way a cancelled drag (Escape) restores every annotation the drag moved. `WaveformAnnotationBoxes` calls this hook itself, with the preview, inside its own `DragDropProvider`: call it only for a row of boxes you draw yourself.
+Each move is worked out over the store's current list with the bounds of every annotation the drag has touched on top (kept also for one moved back to where it was). With `preview`, each move is published to it (the built-in annotation boxes and list follow it, so a change made elsewhere during the drag shows at once) and the store is written once, on release: the touched `start`/`end`, by id, onto the store's list as it is then. Without it, every move writes all the touched bounds. A cancelled drag (Escape) writes nothing with `preview`; without it the touched annotations' drag-start bounds are written back by id. The drag ends, writing nothing more and clearing the preview, when the dragged annotation leaves the store, when `store` becomes another store, or on unmount. `WaveformAnnotationBoxes` calls this hook itself, with the preview, inside its own `DragDropProvider`: call it only for a row of boxes you draw yourself.
 
 ### useClipDragHandlers
 
@@ -2329,6 +2496,10 @@ interface AnnotationAction {
     opts: AnnotationActionOptions
   ) => void;
 }
+// The list (AnnotationList, AnnotationText with a store) calls `action` with copies of the
+// store's list as it is at the click: a new array and a copy of each annotation with its
+// `lines`, so the action changes them in place. `index` is the position in that list. The
+// result is written with store.update; annotations the action left unchanged keep their objects.
 interface RenderAnnotationItemProps {
   annotation: AnnotationData;
   index: number;

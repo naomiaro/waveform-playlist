@@ -52,7 +52,7 @@ const AnnotationBoxItem = React.memo(function AnnotationBoxItem({
 });
 
 export interface AnnotationBoxesProps {
-  annotations: AnnotationData[];
+  annotations: readonly AnnotationData[];
   activeAnnotationId: string | null;
   /** Whether the box edges can be dragged. */
   editable: boolean;

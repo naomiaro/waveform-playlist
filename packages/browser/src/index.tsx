@@ -74,6 +74,8 @@ export {
   useCreateArrangement,
   useArrangementTracks,
   useArrangementSources,
+  useCreateAnnotationStore,
+  useStoredAnnotations,
 } from './hooks';
 export type {
   UsePlaybackShortcutsOptions,

@@ -11,7 +11,7 @@
  * Tap an annotation to select it and play from that point.
  */
 import { sitePath } from '../../utils/sitePath';
-import React, { useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { audioTrack } from '@waveform-playlist/core';
 import {
@@ -37,6 +37,7 @@ import {
   useCreateArrangement,
   useArrangement,
   useArrangementSources,
+  useCreateAnnotationStore,
 } from '@waveform-playlist/browser';
 import {
   AnnotationProvider,
@@ -364,7 +365,8 @@ export function MobileAnnotationsExample() {
   // the audio has loaded (a placeholder is drawn only for a clip with a
   // `duration` or peaks)
   const arrangement = useCreateArrangement(() => [audioTrack({ src: SONNET_SRC, name: 'Sonnet' })]);
-  const [annotations, setAnnotations] = useState<any[]>(() => mobileAnnotations.map(parseAeneas));
+  // The owner of the annotations (#867).
+  const annotationStore = useCreateAnnotationStore(() => mobileAnnotations.map(parseAeneas));
 
   return (
     <WaveformPlaylistProvider
@@ -374,13 +376,12 @@ export function MobileAnnotationsExample() {
       mono
       automaticScroll={false}
       theme={theme}
+      annotationStore={annotationStore}
       annotationList={{
-        annotations: annotations,
         editable: true,
         linkEndpoints: true,
         isContinuousPlay: true,
       }}
-      onAnnotationsChange={setAnnotations}
     >
       <AnnotationProvider>
         <MobileAnnotationsContent />

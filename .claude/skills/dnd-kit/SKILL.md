@@ -22,6 +22,7 @@ Installed: `@dnd-kit/react` / `@dnd-kit/dom` / `@dnd-kit/abstract` 0.5.0, as PEE
 
 - **dnd-kit can send a `dragover` after the `dragend` of a canceled drag.** It set the reorder preview again for good (Escape mid-drag, 6 of 6 e2e runs on #687). A handler that publishes drag state checks that a drag is in progress (#796 tracks the dnd-kit workarounds).
 - **dnd-kit 0.5.0 calls `onDragMove` and `onDragEnd` inside `startTransition`** (`trackRendering` in its `DragDropProvider`). A state update made from a handler is a transition update; a `useSyncExternalStore` publish from the same handler renders synchronously. So "clear the preview and commit" on release shows one frame of the old geometry unless both run inside `flushSync` (#812, the trim release: without it the clip was drawn at `[96000, 121000]`). A unit test that calls a captured handler directly cannot see that frame: call it as dnd-kit does, `act(() => startTransition(() => handler(event)))` (`dispatch` in `packages/browser/src/__tests__/trimPreview.test.tsx`), and the missing `flushSync` fails the test.
+- **A draggable's `data` follows renders during a drag** (`useOnValueChange(data, …)` in @dnd-kit/react 0.5.0): when what is drawn changes under a drag (an insert before the dragged row), the next `dragmove` carries the NEW index. Read the item from `data` at drag start, keep its id in the drag state, and find it by id on each move (`useAnnotationDragHandlers`, #898).
 
 ## Feedback is configured per entity
 

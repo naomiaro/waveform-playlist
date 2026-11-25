@@ -80,6 +80,7 @@ import {
 import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -202,7 +203,7 @@ async function mount(initialTracks: ClipTrack[], { annotations = false } = {}) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  const annotationList = annotations ? { annotations: ANNOTATIONS } : undefined;
+  const annotationStore = annotations ? createAnnotationStore(ANNOTATIONS) : undefined;
   // The arrangement owns the tracks (#812): an edit is one of its calls.
   const arrangement = testArrangement(initialTracks);
   const ui = () => (
@@ -210,7 +211,7 @@ async function mount(initialTracks: ClipTrack[], { annotations = false } = {}) {
       arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
-      annotationList={annotationList}
+      annotationStore={annotationStore}
     >
       <ProbeChild />
       <ComposedWaveform showClipHeaders />

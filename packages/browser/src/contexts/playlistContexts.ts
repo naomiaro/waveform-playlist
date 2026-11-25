@@ -11,7 +11,7 @@
  * must not pull in the WebAudio provider through it.
  */
 import { createContext, use } from 'react';
-import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
+import type { ClipTrack, AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
@@ -109,7 +109,8 @@ export interface ActiveAnnotationContextValue {
  * once, on release (its moves go through the preview source).
  */
 export interface AnnotationsContextValue {
-  annotations: AnnotationData[];
+  /** The annotation store's list: never write to it (frozen in development). */
+  annotations: readonly AnnotationData[];
 }
 
 /**
@@ -127,8 +128,9 @@ export interface AnnotationOptionsContextValue {
 }
 
 /**
- * The actions both providers have (#688). The value never changes, so reading
- * it never re-renders.
+ * The actions both providers have (#688). The value changes only when the
+ * provider's `annotationStore` prop does, so reading it does not re-render
+ * on playback, edits or option changes.
  */
 export interface PlaybackControlsContextValue {
   /**
@@ -155,13 +157,18 @@ export interface PlaybackControlsContextValue {
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
    * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom
    * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
    */
   annotationPreview: AnnotationPreviewHandle;
+  /**
+   * The provider's `annotationStore` prop, or `undefined` without one: the
+   * owner of the annotations. Change them with its `set` and `update`. Its
+   * identity changes only when the prop does.
+   */
+  annotationStore: AnnotationStore | undefined;
   setActiveAnnotationId: (id: string | null) => void;
   /**
    * What a click on an annotation does (its box, or its row in the list): the
@@ -564,8 +571,9 @@ export const useAnnotationOptions = () =>
 
 /**
  * The actions both providers have: `play`, `pause`, `stop`, `seekTo`,
- * `setSelection`, and the annotation, scroll and time-format setters. The
- * value never changes, so calling this never re-renders.
+ * `setSelection`, the annotation store, and the annotation, scroll and
+ * time-format setters. The value changes only when the provider's
+ * `annotationStore` prop does.
  */
 export const usePlaybackControls = () =>
   useSlot(PlaybackControlsContext, 'usePlaybackControls', EITHER);

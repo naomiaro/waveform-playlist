@@ -13,6 +13,7 @@ Used by nearly every `@waveform-playlist/*` and `@dawcore/*` package (`engine`, 
 - **Peaks generation** — real-time min/max peak extraction during recording
 - **Musical time** — PPQN tick math, bar/beat conversion, time-signature meter detection, grid snapping
 - **Keyboard shortcuts** — a framework-agnostic shortcut matcher shared by the React and Web Components layers
+- **Annotation store** — `createAnnotationStore`, the one owner of a list of annotations that both React providers take as `annotationStore`: `set` / `update` apply at once, every list is validated, and an optional `beforeChange` rule can accept, refuse or adjust each change
 - **Spectrogram canvas-ID contract** — canonical build/parse helpers for the `${clipId}-ch${n}-chunk${m}` canvas ID format shared by the worker pool and rendering layers
 - **HTTP range support probing** — detect whether an audio host supports byte-range seeking
 
@@ -73,6 +74,8 @@ parseSpectrogramCanvasId(id);
 | `utils/latency` | `resolveRecordingOffsetSamples` — override-vs-auto recording latency compensation (shared by React + dawcore) |
 | `utils/carveClipRange` | `carveClipRange` — punch-in replace: carve a sample range out of a clip list (trim/remove/split) |
 | `keyboard` | `KeyboardShortcut`, `handleKeyboardEvent` |
+| `annotations/store` | `createAnnotationStore`, `AnnotationStore`, `AnnotationStoreOptions` |
+| `annotations/bounds` | `applyAnnotationBounds`, `AnnotationBoundsChange` — write `start`/`end` onto annotations by id |
 | `spectrogramCanvasId` | `buildSpectrogramCanvasId`, `parseSpectrogramCanvasId`, `SpectrogramCanvasIdParts`, `SpectrogramCanvasRegistration` |
 | `probeRangeSupport` | `probeRangeSupport`, `RangeSupport` |
 | `enumerateMicrophones` | `enumerateMicrophones`, `watchMicrophoneDevices`, `MicrophoneEnumeration` — permission-free device listing with `supported`/`hasLabels` flags (labels are browser-redacted pre-permission) |

@@ -46,6 +46,10 @@ import {
   useArrangementTracks,
   useArrangementSources,
 
+  // Annotation store hooks
+  useCreateAnnotationStore,
+  useStoredAnnotations,
+
   // Specialized hooks
   useTimeFormat,
 
@@ -109,7 +113,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useActiveAnnotation()`](#useactiveannotation) | `activeAnnotationId` | every annotation boundary during playback |
 | [`useAnnotations()`](#useannotations) | `annotations` | an annotation edit |
 | [`useAnnotationOptions()`](#useannotationoptions) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three options being toggled |
-| [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, and the annotation, scroll and time-format setters | never |
+| [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, the annotation store, and the annotation, scroll and time-format setters | only when the `annotationStore` prop changes |
 | [`usePlaybackRefs()`](#useplaybackrefs) | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | never |
 | [`usePlaylistView()`](#useplaylistview) | `sampleRate`, `mono`, `indefinitePlayback` | a provider prop change |
 | [`usePlaylistSettings()`](#useplaylistsettings) | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
@@ -296,13 +300,14 @@ A control panel of your own needs neither field. `<WaveformTrackControls>` keys 
 
 ### useAnnotations
 
-Either provider. The annotations. The value changes on an annotation edit; an edge drag that uses the preview source changes it once, on release. The active annotation is not here: see [`useActiveAnnotation`](#useactiveannotation). The three annotation options are not here either: see [`useAnnotationOptions`](#useannotationoptions). Change the annotations with `setAnnotations` from [`usePlaybackControls()`](#useplaybackcontrols), which reports the new array through the provider's `onAnnotationsChange`.
+Either provider. The annotations: the list of the provider's [annotation store](#annotation-store-hooks), `[]` when the provider has none. The value changes on an annotation edit; an edge drag that uses the preview source changes it once, on release. The active annotation is not here: see [`useActiveAnnotation`](#useactiveannotation). The three annotation options are not here either: see [`useAnnotationOptions`](#useannotationoptions). Change the annotations through the store: `annotationStore` of [`usePlaybackControls()`](#useplaybackcontrols), or the store your app made.
 
 ```typescript
 function useAnnotations(): AnnotationsContextValue;
 
 interface AnnotationsContextValue {
-  annotations: AnnotationData[];
+  /** The annotation store's list: never write to it (frozen in development). */
+  annotations: readonly AnnotationData[];
 }
 ```
 
@@ -644,6 +649,81 @@ function LoadingStatus() {
 
 ---
 
+## Annotation Store Hooks
+
+An `AnnotationStore` (type from `@waveform-playlist/core`) owns the annotations. Both providers take one as their `annotationStore` prop, publish what it holds and write nothing back; every change, the library's and yours, is a call to its `set(list)` or `update(fn)`. These hooks are in the core entry of `@waveform-playlist/browser`. The store itself, `beforeChange`, what it refuses and how to save the annotations are in the [Annotations guide](/docs/react/guides/annotations#the-annotation-store).
+
+### useCreateAnnotationStore
+
+```typescript
+function useCreateAnnotationStore(
+  init?: () => readonly AnnotationData[],
+  options?: AnnotationStoreOptions
+): AnnotationStore;
+
+interface AnnotationStoreOptions {
+  /** Returns the list to store: `next` to accept, `current` to refuse, another list to adjust. */
+  beforeChange?: (
+    next: readonly AnnotationData[],
+    current: readonly AnnotationData[]
+  ) => readonly AnnotationData[];
+}
+```
+
+Makes one store per component instance and returns the same one on every render. `init` is read on the first render only. An initializer whose list the store refuses (an annotation without finite numeric `start` and `end`, two annotations with one id) throws out of the render, to the nearest error boundary above the component that calls the hook. Under StrictMode the initializer runs twice and one result is kept.
+
+`options.beforeChange` is followed: the store calls the function passed on the most recent committed render, so a rule that reads your component's state sees its current value. It is not called for the initial list.
+
+```tsx
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  useCreateAnnotationStore,
+} from '@waveform-playlist/browser';
+import { AnnotationProvider } from '@waveform-playlist/annotations';
+
+function Editor({ arrangement, initialAnnotations }) {
+  const annotationStore = useCreateAnnotationStore(() => initialAnnotations);
+
+  return (
+    <WaveformPlaylistProvider
+      arrangement={arrangement}
+      annotationStore={annotationStore}
+      annotationList={{ editable: true }}
+    >
+      <AnnotationProvider>
+        <Waveform />
+      </AnnotationProvider>
+    </WaveformPlaylistProvider>
+  );
+}
+```
+
+`createAnnotationStore(initial?, options?)` from `@waveform-playlist/core` makes a store without React.
+
+### useStoredAnnotations
+
+```typescript
+function useStoredAnnotations(store: AnnotationStore): readonly AnnotationData[];
+```
+
+The store's list, for your own components; the component re-renders when it changes. The argument is required, so the hook works above the provider as well as below it. It is the same array until the annotations change. Do not write to it: in a development build (`process.env.NODE_ENV` set and not `'production'`) it is frozen, and a write in place throws (`.sort()` in any code, a field assignment in strict code). Change the annotations with `store.set` or `store.update`.
+
+```tsx
+import { useEffect } from 'react';
+import { useStoredAnnotations } from '@waveform-playlist/browser';
+
+function SaveAnnotations({ store }) {
+  const annotations = useStoredAnnotations(store);
+  useEffect(() => {
+    localStorage.setItem('annotations', JSON.stringify(annotations));
+  }, [annotations]);
+  return null;
+}
+```
+
+---
+
 ## useSelection
 
 The selected time range, in seconds. It has its own context because it changes on every pointer move of a selection drag; a component that calls this hook re-renders that often, and components that do not call it are not re-rendered by the drag.
@@ -757,7 +837,7 @@ Set it with `setActiveAnnotationId(id)` from `usePlaybackControls()`. Available 
 
 ## usePlaybackControls
 
-The actions both providers have. The value never changes, so calling this hook never re-renders the component.
+The actions both providers have. The value changes only when the provider is given another `annotationStore`, so calling this hook does not re-render the component otherwise.
 
 ### Signature
 
@@ -793,13 +873,18 @@ interface PlaybackControlsContextValue {
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotations: Dispatch<SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
    * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom
    * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
    */
   annotationPreview: AnnotationPreviewHandle;
+  /**
+   * The provider's `annotationStore` prop, or `undefined` without one: the
+   * owner of the annotations. Change them with its `set` and `update`. Its
+   * identity changes only when the prop does.
+   */
+  annotationStore: AnnotationStore | undefined;
   setActiveAnnotationId: (id: string | null) => void;
   /**
    * What a click on an annotation does (its box, or its row in the list): the
@@ -1501,8 +1586,7 @@ Drag handlers for the edges of annotation boxes, for `@dnd-kit/react`'s `DragDro
 
 ```typescript
 function useAnnotationDragHandlers(options: {
-  annotations: AnnotationData[];
-  onAnnotationsChange: (annotations: AnnotationData[]) => void;
+  store: AnnotationStore | undefined; // usePlaybackControls().annotationStore
   samplesPerPixel: number;
   sampleRate?: number; // default 48000; pass the provider's
   duration: number;
@@ -1511,17 +1595,19 @@ function useAnnotationDragHandlers(options: {
 }): { onDragStart; onDragMove; onDragEnd };
 ```
 
-Pass `preview: annotationPreview` (from `usePlaybackControls()`) to keep the drag out of your own state: each move is published to the preview, which the built-in annotation boxes and list follow, and `onAnnotationsChange` is called once, on release. Without `preview`, `onAnnotationsChange` is called on every move, which re-renders whatever component holds the annotations for each one.
+Pass `preview: annotationPreview` (from `usePlaybackControls()`) to keep the drag out of the store until it ends: each move is published to the preview, which the built-in annotation boxes and list follow, and the store is written once, on release. The drag keeps the `start` and `end` of every annotation it has touched (the dragged one and the neighbours it moved, also one moved back to where it was), and works out each move over the store's current list with those bounds on top, so a neighbour moved elsewhere during the drag is collided with where it is now. The release writes the touched bounds, by id, onto the store's list as it is then: an annotation added during the drag stays, and so does any other edit made elsewhere, except to the `start` and `end` of an annotation the drag has touched: those are the drag's. During the drag the preview shows the store's current list with the drag's bounds on top, so a change made elsewhere is drawn at once. Without `preview`, every move writes all the touched bounds, which re-renders whatever reads the annotations for each one. Without a store the handlers do nothing.
 
-Pressing Escape cancels the drag and puts back every annotation it moved, linked and pushed neighbours included.
+The drag ends and writes nothing more, its preview cleared, when the dragged annotation is removed from the store (a "clear all" included), when the `store` option becomes another store, or when the component unmounts. Without `preview` the moves already written stay.
+
+Pressing Escape cancels the drag and puts back every annotation it touched, linked and pushed neighbours included: with `preview` nothing was written; without it each touched annotation's bounds from the start of the drag are written back.
 
 ### useAnnotationsWithPreview
 
 ```typescript
 function useAnnotationsWithPreview(
-  annotations: AnnotationData[],
+  annotations: readonly AnnotationData[],
   preview: AnnotationPreviewHandle
-): AnnotationData[];
+): readonly AnnotationData[];
 ```
 
 For a custom annotation list or row of boxes: returns the previewed annotations while an edge is being dragged with a preview, and `annotations` otherwise. Call it in the component that draws the annotations, so that only it re-renders per pointer move.
