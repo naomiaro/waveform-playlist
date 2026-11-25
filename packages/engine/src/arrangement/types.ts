@@ -116,6 +116,23 @@ export interface Arrangement {
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
 
+  // recording arm
+  /**
+   * The ids of the tracks armed for recording. The same Set until one is
+   * armed or disarmed; never write to it.
+   */
+  readonly armedTrackIds: ReadonlySet<string>;
+  /**
+   * Arm or disarm a track for recording. An armed track plays muted: the
+   * engine's `getState().tracks` and its adapter have it muted, while its
+   * mute in `getMixer()` stays as it is and comes back when the track is
+   * disarmed. Arming is not an undo step, and undo, redo, an abort,
+   * `setTracks` and `clearHistory` do not change which tracks are armed. An
+   * id that is not in the current tracks is armed too, and mutes nothing
+   * until a track of that id enters. The same value changes nothing.
+   */
+  setTrackArmed(trackId: string, armed: boolean): void;
+
   // history
   readonly canUndo: boolean;
   readonly canRedo: boolean;

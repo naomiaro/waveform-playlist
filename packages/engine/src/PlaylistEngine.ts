@@ -513,7 +513,9 @@ export class PlaylistEngine {
 
   setTrackMute(trackId: string, muted: boolean): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackMute(trackId, muted));
-    if (!changed && !this._disposed) this._adapter?.setTrackMute(trackId, muted);
+    // Through the adapter sync, so an armed track the arrangement holds stays
+    // muted; a track it does not hold is sent the value given.
+    if (!changed && !this._disposed) this._adapterSync.sendMixerValues(trackId, { muted });
   }
 
   setTrackSolo(trackId: string, soloed: boolean): void {
@@ -612,6 +614,13 @@ export class PlaylistEngine {
       case 'restoreMix': // an undo, a redo or an abort of the mix only: no track call
         this._adapterSync.sendMixerDiff(change.previousMixer);
         break;
+      case 'arm': {
+        // The stored mute, which the adapter sync sends as the mute the track
+        // plays with. An armed id that is not a current track has nothing to send.
+        const values = this._arrangement.getMixer().get(change.trackId);
+        if (values) this._adapterSync.sendMixerValues(change.trackId, { muted: values.muted });
+        break;
+      }
       case 'reorder': // not audible: adapter nodes are keyed by track id
       case 'history':
         break;
