@@ -3,10 +3,11 @@
  * as pure functions over an immutable Map.
  *
  * The values live here and not on the track objects, so a fader move
- * replaces no track, and an undo (which restores tracks) never changes the
- * mix. A track's own `volume` / `muted` / `soloed` / `pan` fields are the
- * values it ENTERED with; they seed its entry when its id has none, and are
- * not read while it has one.
+ * replaces no track. The current Map holds an entry for each current track;
+ * each saved state of the history holds its own Map (#843). A track's own
+ * `volume` / `muted` / `soloed` / `pan` fields are the values it ENTERED
+ * with; they seed its entry when its id has none, and are not read while it
+ * has one.
  */
 
 import type { ArrangementTrack } from '@waveform-playlist/core';
@@ -64,27 +65,78 @@ export function setMixerValues(
 }
 
 /**
- * A track is given a new id: its mix goes with it, also over an entry the
- * new id still has from a removed track. The same Map when the old id has no
- * entry.
+ * A track is given a new id: its mix goes with it, and the old id's entry
+ * goes (no current track has that id any more). The same Map when the old id
+ * has no entry or the id does not change.
  */
 export function carryMixerEntry(mixer: Mixer, fromId: string, toId: string): Mixer {
   const entry = mixer.get(fromId);
-  if (!entry || mixer.get(toId) === entry) return mixer;
-  return new Map(mixer).set(toId, entry);
+  if (!entry || fromId === toId) return mixer;
+  // In the old id's place, so the order of the entries stays the order of the tracks.
+  return new Map(
+    [...mixer]
+      .filter(([id]) => id !== toId)
+      .map(([id, values]): [string, TrackMixerValues] => [id === fromId ? toId : id, values])
+  );
 }
 
 /**
- * Only the entries of tracks that one of `states` holds. The same Map when
- * every entry is still held.
+ * The entries of exactly these tracks: an id that has an entry keeps it, one
+ * that has none is seeded from the track's fields, every other entry is
+ * dropped. The same Map when nothing changes.
  */
-export function retainMixer(mixer: Mixer, states: Iterable<readonly ArrangementTrack[]>): Mixer {
-  const held = new Set<string>();
-  for (const tracks of states) {
-    for (const track of tracks) held.add(track.id);
+export function mixerOf(mixer: Mixer, tracks: readonly ArrangementTrack[]): Mixer {
+  const ids = new Set(tracks.map((track) => track.id));
+  const seeded = seedMixer(mixer, tracks);
+  if (seeded.size === ids.size) return seeded;
+  return new Map([...seeded].filter(([id]) => ids.has(id)));
+}
+
+/** A Map without the entry of `trackId`. The same Map when there is none. */
+export function withoutEntry(mixer: Mixer, trackId: string): Mixer {
+  if (!mixer.has(trackId)) return mixer;
+  const next = new Map(mixer);
+  next.delete(trackId);
+  return next;
+}
+
+function sameValues(a: TrackMixerValues, b: TrackMixerValues): boolean {
+  return a.volume === b.volume && a.muted === b.muted && a.soloed === b.soloed && a.pan === b.pan;
+}
+
+/** The same ids with the same values (compared by value, not by Map or entry identity). */
+export function sameMixerValues(a: Mixer, b: Mixer): boolean {
+  if (a === b) return true;
+  if (a.size !== b.size) return false;
+  for (const [id, values] of a) {
+    const other = b.get(id);
+    if (!other || !sameValues(values, other)) return false;
   }
-  if ([...mixer.keys()].every((id) => held.has(id))) return mixer;
-  return new Map([...mixer].filter(([id]) => held.has(id)));
+  return true;
+}
+
+/**
+ * For each id that has an entry in both Maps, the fields whose value differs
+ * (from `after`). An id in only one of them is a track that entered or left
+ * with its whole mix, and is not listed.
+ */
+export function mixerChanges(
+  before: Mixer,
+  after: Mixer
+): Array<{ trackId: string; values: Partial<TrackMixerValues> }> {
+  if (before === after) return [];
+  const changes: Array<{ trackId: string; values: Partial<TrackMixerValues> }> = [];
+  for (const [trackId, now] of after) {
+    const was = before.get(trackId);
+    if (!was || was === now) continue;
+    const values: Partial<TrackMixerValues> = {};
+    if (was.volume !== now.volume) values.volume = now.volume;
+    if (was.muted !== now.muted) values.muted = now.muted;
+    if (was.soloed !== now.soloed) values.soloed = now.soloed;
+    if (was.pan !== now.pan) values.pan = now.pan;
+    if (Object.keys(values).length > 0) changes.push({ trackId, values });
+  }
+  return changes;
 }
 
 /**

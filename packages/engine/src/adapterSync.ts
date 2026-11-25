@@ -17,12 +17,15 @@ import type {
   ArrangementVersions,
 } from './arrangement/Arrangement';
 import { freezeTrackInDevelopment, freezeTracksInDevelopment } from './arrangement/devFreeze';
-import { withMixerValues } from './arrangement/mixer';
-import type { TrackMixerValues } from './arrangement/mixer';
+import { mixerChanges, withMixerValues } from './arrangement/mixer';
+import type { Mixer, TrackMixerValues } from './arrangement/mixer';
 import type { PlayoutAdapter } from './types';
 
 /** A change to the tracks: the ones that can need an adapter track call. */
-export type TracksChange = Exclude<ArrangementChange, { type: 'mixer' | 'reorder' | 'history' }>;
+export type TracksChange = Exclude<
+  ArrangementChange,
+  { type: 'mixer' | 'restoreMix' | 'reorder' | 'history' }
+>;
 
 export class AdapterSync {
   /**
@@ -114,6 +117,18 @@ export class AdapterSync {
     if (values.muted !== undefined) this._adapter?.setTrackMute(trackId, values.muted);
     if (values.soloed !== undefined) this._adapter?.setTrackSolo(trackId, values.soloed);
     if (values.pan !== undefined) this._adapter?.setTrackPan(trackId, values.pan);
+  }
+
+  /**
+   * After an undo, a redo or an abort brought back another mix: the setter
+   * for each field that differs, of each current track that had an entry in
+   * `previousMixer` too. A track that entered with the restore was sent
+   * whole, with its mix in its fields.
+   */
+  sendMixerDiff(previousMixer: Mixer): void {
+    for (const { trackId, values } of mixerChanges(previousMixer, this._arrangement.getMixer())) {
+      this.sendMixerValues(trackId, values);
+    }
   }
 
   /**

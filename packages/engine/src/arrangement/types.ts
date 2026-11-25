@@ -98,8 +98,9 @@ export interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps; an undo never changes them; a track that is not
-  // in the current tracks is left alone)
+  // mixer (not undo steps outside a transaction, part of one inside it; an
+  // undo, a redo or an abort brings back the mix of the state it returns
+  // to; a track that is not in the current tracks is left alone)
   setTrackVolume(trackId: string, volume: number): void;
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
@@ -116,7 +117,7 @@ export interface Arrangement {
   /** Changes made until `commitTransaction` are one undo step. */
   beginTransaction(): void;
   commitTransaction(): void;
-  /** Put the tracks back as they were when the transaction began. */
+  /** Put the tracks and the mix back as they were when the transaction began. */
   abortTransaction(): void;
 
   // loading

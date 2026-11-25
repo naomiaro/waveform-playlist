@@ -609,6 +609,9 @@ export class PlaylistEngine {
       case 'mixer':
         this._adapterSync.sendMixerValues(change.trackId, change.values);
         break;
+      case 'restoreMix': // an undo, a redo or an abort of the mix only: no track call
+        this._adapterSync.sendMixerDiff(change.previousMixer);
+        break;
       case 'reorder': // not audible: adapter nodes are keyed by track id
       case 'history':
         break;
@@ -623,6 +626,9 @@ export class PlaylistEngine {
           this._followLoad(change, at);
         } else {
           this._adapterSync.follow(change, at);
+          // A track call does not carry the mix to every adapter (Tone's
+          // updateTrack replaces clips only): the setters for what differs.
+          if (change.type === 'restore') this._adapterSync.sendMixerDiff(change.previousMixer);
         }
     }
     this._emitStateChange();

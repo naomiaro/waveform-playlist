@@ -489,6 +489,45 @@ describe.each([
       }
     );
 
+    // Rule (#843): a saved state holds the mix. An undo that changes only the
+    // mix reaches the adapter through the mixer setters, never a track call
+    // (a setTracks interrupts playback; Tone's updateTrack carries no mix).
+    it('an undo of the mix calls the mixer setters only', () => {
+      const { adapter, engine, states } = setup({ incremental });
+      engine.beginTransaction();
+      engine.setTrackVolume('A', 0.5);
+      engine.commitTransaction();
+      const before = engine.getState();
+      adapter.reset();
+      states.length = 0;
+
+      engine.undo();
+      expect(adapter.calls).toEqual([{ method: 'setTrackVolume', args: ['A', 1] }]);
+      expect(states).toHaveLength(1);
+      expect(states[0].tracksVersion).toBe(before.tracksVersion);
+      expect(states[0].mixerVersion).toBe(before.mixerVersion + 1);
+      expect(engine.getState().tracks[0].volume).toBe(1);
+
+      adapter.reset();
+      engine.redo();
+      expect(adapter.calls).toEqual([{ method: 'setTrackVolume', args: ['A', 0.5] }]);
+    });
+
+    it('an undo of a move and a mix change together: the track call, then the setter', () => {
+      const { adapter, engine } = setup({ incremental });
+      engine.beginTransaction();
+      engine.moveClip('A', 'a1', 1000);
+      engine.setTrackMute('B', true);
+      engine.commitTransaction();
+      adapter.reset();
+
+      engine.undo();
+      expect(adapter.calls).toEqual([
+        ...oneTrack(A, [A, B]),
+        { method: 'setTrackMute', args: ['B', false] },
+      ]);
+    });
+
     it('a mixer value set on a track reaches the adapter with the track afterwards', () => {
       const { adapter, engine } = setup({ incremental });
       engine.setTrackVolume('A', 0.25);

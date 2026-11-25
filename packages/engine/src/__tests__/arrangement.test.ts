@@ -340,6 +340,7 @@ describe('Arrangement: history', () => {
     const { arrangement, changes, clipOf } = setup();
     arrangement.moveClip('A', 'a1', 10000);
     const moved = arrangement.getTracks();
+    const mixer = arrangement.getMixer();
     changes.length = 0;
 
     arrangement.undo();
@@ -347,7 +348,9 @@ describe('Arrangement: history', () => {
     expect(arrangement.tracksVersion).toBe(3);
     expect(arrangement.canUndo).toBe(false);
     expect(arrangement.canRedo).toBe(true);
-    expect(changes).toEqual([{ type: 'restore', previous: moved }]);
+    // Rule (#843): a restore also carries the mix from before (`previousMixer`);
+    // before, `{ type: 'restore', previous: moved }`.
+    expect(changes).toEqual([{ type: 'restore', previous: moved, previousMixer: mixer }]);
     expect(changes[0].type === 'restore' && changes[0].previous).toBe(moved);
 
     const undone = arrangement.getTracks();
@@ -479,6 +482,7 @@ describe('Arrangement: transactions', () => {
     arrangement.beginTransaction();
     arrangement.moveClip('A', 'a1', 1000);
     const dragged = arrangement.getTracks();
+    const mixer = arrangement.getMixer();
     changes.length = 0;
 
     arrangement.abortTransaction();
@@ -486,7 +490,9 @@ describe('Arrangement: transactions', () => {
     expect(clipOf('A', 'a1').startSample).toBe(0);
     expect(arrangement.canUndo).toBe(false);
     expect(arrangement.canRedo).toBe(false);
-    expect(changes).toEqual([{ type: 'restore', previous: dragged }]);
+    // Rule (#843): a restore also carries the mix from before (`previousMixer`);
+    // before, `{ type: 'restore', previous: dragged }`.
+    expect(changes).toEqual([{ type: 'restore', previous: dragged, previousMixer: mixer }]);
   });
 
   it('abort with no change restores nothing and announces nothing', () => {
