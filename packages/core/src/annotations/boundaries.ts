@@ -24,7 +24,7 @@ export interface AnnotationBoundaryUpdate {
   annotationIndex: number;
   newTime: number;
   isDraggingStart: boolean;
-  annotations: AnnotationData[];
+  annotations: readonly AnnotationData[];
   duration: number;
   linkEndpoints: boolean;
 }

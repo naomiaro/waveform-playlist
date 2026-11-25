@@ -65,7 +65,7 @@ describe('a click on a default row of the list (#686)', () => {
         editable
         controls={[{ text: 'x', title: 'Remove', action }]}
         onAnnotationClick={onClick}
-        onAnnotationUpdate={() => {}}
+        store={createAnnotationStore(ANNOTATIONS)}
       />
     );
     fireEvent.click(getAllByTitle('Remove')[1]);
@@ -135,7 +135,7 @@ describe('the options an action is called with (#686)', () => {
     const rendered: string[] = [];
     const action = vi.fn();
     const controls = [{ text: 'x', title: 'Act', action }];
-    const onUpdate = () => {};
+    const store = createAnnotationStore(ANNOTATIONS);
     const renderItem = ({ annotation }: { annotation: AnnotationData }) => {
       rendered.push(annotation.id);
       return <span>{annotation.id}</span>;
@@ -146,7 +146,7 @@ describe('the options an action is called with (#686)', () => {
         editable
         controls={controls}
         annotationListConfig={config}
-        onAnnotationUpdate={onUpdate}
+        store={store}
         renderAnnotationItem={custom ? renderItem : undefined}
       />
     );

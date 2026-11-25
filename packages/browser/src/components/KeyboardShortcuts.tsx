@@ -51,7 +51,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   const { annotations: annotationList } = useAnnotations();
   const { linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationStore, setActiveAnnotationId, scrollContainerRef, play } =
+  const { annotationStore, setActiveAnnotationId, scrollContainerRef, play } =
     usePlaybackControls();
   const { undo, redo } = useEditorControls();
 
@@ -91,9 +91,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   // Annotation keyboard controls
   useAnnotationKeyboardControls({
     store: annotationStore,
-    annotations: annotationList,
     activeAnnotationId,
-    onAnnotationsChange: setAnnotations,
     onActiveAnnotationChange: setActiveAnnotationId,
     duration,
     linkEndpoints,

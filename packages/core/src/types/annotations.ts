@@ -23,7 +23,7 @@ export interface AnnotationData {
 export interface AnnotationFormat {
   name: string;
   parse: (data: unknown) => AnnotationData[];
-  serialize: (annotations: AnnotationData[]) => unknown;
+  serialize: (annotations: readonly AnnotationData[]) => unknown;
 }
 
 /**

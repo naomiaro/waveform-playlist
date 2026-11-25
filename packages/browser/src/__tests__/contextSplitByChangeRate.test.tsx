@@ -38,6 +38,7 @@ import {
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
 import type { AnnotationData, ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -182,7 +183,7 @@ async function mount() {
   for (const name of HOOK_NAMES) renders[name] = 0;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
-  let annotationList = { annotations: ANNOTATIONS };
+  const annotationStore = createAnnotationStore(ANNOTATIONS);
   const Wrapper: React.FC = () => (
     <TestProvider
       tracks={TRACKS}
@@ -190,21 +191,18 @@ async function mount() {
       samplesPerPixel={1000}
       zoomLevels={ZOOM_LEVELS}
       createAdapter={createAdapter}
-      annotationList={annotationList}
+      annotationStore={annotationStore}
     >
       {CHILDREN}
     </TestProvider>
   );
-  const utils = render(<Wrapper />);
+  render(<Wrapper />);
   await waitFor(() => expect(values.timeline.isReady).toBe(true));
   return {
     // A track edit is the arrangement's (#812).
     addTrack: (track: ClipTrack) => values.arrangement.addTrack(track),
-    // Annotations are a controlled prop: an edit arrives as a new array.
-    setAnnotations: (next: AnnotationData[]) => {
-      annotationList = { annotations: next };
-      utils.rerender(<Wrapper />);
-    },
+    // The annotation store owns the annotations (#867): an edit is one of its calls.
+    setStoredAnnotations: (next: AnnotationData[]) => annotationStore.set(next),
   };
 }
 
@@ -270,7 +268,6 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setContinuousPlay',
         'setAnnotationsEditable',
         'setLinkEndpoints',
-        'setAnnotations',
         'annotationPreview',
         'annotationStore',
         'setActiveAnnotationId',
@@ -390,7 +387,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
   // annotations value holds the annotations only, so its readers do not render
   // for a toggle, and the options' readers do not render for an edit.
   it('continuous play, link endpoints and editable: the annotation options, not the annotations; an annotation edit: the annotations, not the options', async () => {
-    const { setAnnotations } = await mount();
+    const { setStoredAnnotations } = await mount();
     const annotationsBefore = values.annotations;
     expect(await rendered(() => values.controls.setContinuousPlay(true))).toEqual([
       'annotationOptions',
@@ -411,7 +408,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     const optionsBefore = values.annotationOptions;
     expect(
       await rendered(() =>
-        setAnnotations([{ ...ANNOTATIONS[0], lines: ['changed'] }, ANNOTATIONS[1]])
+        setStoredAnnotations([{ ...ANNOTATIONS[0], lines: ['changed'] }, ANNOTATIONS[1]])
       )
     ).toEqual(['annotations']);
     expect(values.annotations.annotations[0].lines).toEqual(['changed']);

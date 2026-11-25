@@ -14,6 +14,7 @@ import {
   useAnnotationOptions,
   useAnnotationIntegration,
 } from '@waveform-playlist/browser';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
 import * as annotationsPackage from '../index';
 import {
@@ -95,8 +96,6 @@ const OptionsProbe: React.FC = () => {
   return null;
 };
 
-const noop = () => {};
-
 // The multitrack provider on an empty arrangement, made as an app makes it (#812).
 const MultitrackProvider: React.FC<
   Omit<React.ComponentProps<typeof WaveformPlaylistProvider>, 'arrangement'>
@@ -108,14 +107,15 @@ const MultitrackProvider: React.FC<
 async function mount(kind: Kind, children: React.ReactNode, annotationList: ListProp = {}) {
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const list = { annotations: ANNOTATIONS, ...annotationList };
+  const { annotations = ANNOTATIONS, ...list } = annotationList;
+  const store = createAnnotationStore(annotations);
   const view = render(
     kind === 'WaveformPlaylistProvider' ? (
       <MultitrackProvider
         sampleRate={44100}
         createAdapter={fakeAdapter}
+        annotationStore={store}
         annotationList={list}
-        onAnnotationsChange={noop}
       >
         <OptionsProbe />
         {children}
@@ -124,8 +124,8 @@ async function mount(kind: Kind, children: React.ReactNode, annotationList: List
       <MediaElementPlaylistProvider
         track={MEDIA_TRACK}
         createPlayout={fakePlayout}
+        annotationStore={store}
         annotationList={list}
-        onAnnotationsChange={noop}
       >
         <OptionsProbe />
         {children}

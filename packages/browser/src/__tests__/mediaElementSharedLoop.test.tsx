@@ -251,7 +251,16 @@ async function mount(options: MountOptions = {}) {
   const playout = createFakePlayout();
   const createPlayout = () => playout as unknown as MediaElementPlayout;
   const Wrapper = options.strict ? React.StrictMode : React.Fragment;
-  let annotationList = options.annotationList;
+  // The store owns the annotations (#867): `annotations` in a test's list is
+  // what it starts with, unless the test gives a store of its own.
+  const annotationStore =
+    options.annotationStore ?? createAnnotationStore(options.annotationList?.annotations ?? []);
+  const optionsOf = (list: MountOptions['annotationList']) => {
+    if (!list) return undefined;
+    const { annotations: _annotations, ...rest } = list;
+    return rest;
+  };
+  let annotationList = optionsOf(options.annotationList);
   const tree = (showPlaylist: boolean, playlists = 1, track = TRACK) => (
     <Wrapper>
       <MediaElementPlaylistProvider
@@ -261,7 +270,7 @@ async function mount(options: MountOptions = {}) {
         onReady={options.onReady}
         automaticScroll={options.automaticScroll}
         annotationList={annotationList}
-        annotationStore={options.annotationStore}
+        annotationStore={annotationStore}
       >
         <ProbeChild />
         {options.restoreOnSource ? <RestoreOnSource source={track.source} /> : null}
@@ -282,7 +291,10 @@ async function mount(options: MountOptions = {}) {
     show: (showPlaylist: boolean, playlists = 1) => view.rerender(tree(showPlaylist, playlists)),
     /** Renders the provider again with another `annotationList` prop. */
     setAnnotationList: (list: MountOptions['annotationList']) => {
-      annotationList = list;
+      annotationList = optionsOf(list);
+      if (list?.annotations && list.annotations !== annotationStore.getAnnotations()) {
+        act(() => annotationStore.set(list.annotations!));
+      }
       view.rerender(tree(true));
     },
     /** Another track object: the provider creates its player again. */

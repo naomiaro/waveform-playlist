@@ -13,7 +13,7 @@ import type {
  * Mirrors what `AnnotationList` actually uses.
  */
 export interface AnnotationTextIntegrationProps {
-  annotations: AnnotationData[];
+  annotations: readonly AnnotationData[];
   activeAnnotationId?: string;
   shouldScrollToActive?: boolean;
   scrollActivePosition?: ScrollLogicalPosition;
@@ -24,7 +24,6 @@ export interface AnnotationTextIntegrationProps {
   height?: number;
   /** A click on a row (not in a field being edited, not on an action button). */
   onAnnotationClick?: (annotation: AnnotationData) => void;
-  onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
   /** Where the list's edits are written: the provider's annotation store. */
   store?: AnnotationStore;
   renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;

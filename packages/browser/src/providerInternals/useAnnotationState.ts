@@ -3,21 +3,20 @@ import { createValueSource } from '@waveform-playlist/core';
 import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import { createAnnotationLookup, type AnnotationLookup } from '../utils/annotationLookup';
-import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
 import type {
   AnnotationOptionsContextValue,
   AnnotationsContextValue,
 } from '../contexts/playlistContexts';
 
 /**
- * The `annotationList` prop of both providers. The provider holds the three
- * options as state (`useAnnotationOptions()`, and the three setters of
+ * The `annotationList` prop of both providers: the three annotation options.
+ * The annotations themselves are the `annotationStore` prop's (#867). The
+ * provider holds the three options as state (`useAnnotationOptions()`, and the three setters of
  * `usePlaybackControls()`), and that state follows the prop: when the value
  * of a field changes, the option takes it. Between two changes of the prop a
  * setter (or one of the checkboxes) changes the option; the prop is not told.
  */
 export interface AnnotationListProp {
-  annotations?: AnnotationData[];
   /** Whether annotations can be edited (text, ids, edges). Default: false. */
   editable?: boolean;
   /** Whether a dragged edge takes the edge it touches along. Default: false. */
@@ -27,17 +26,14 @@ export interface AnnotationListProp {
 }
 
 export interface UseAnnotationStateOptions {
-  /** The owner of the annotations (#867). With it, `annotationList.annotations` is not read. */
-  annotationStore?: AnnotationStore;
+  /** The owner of the annotations (#867); without it there are none. */
+  annotationStore: AnnotationStore | undefined;
   annotationList: AnnotationListProp | undefined;
-  onAnnotationsChange: ((annotations: AnnotationData[]) => void) | undefined;
-  /** Named in the warning for a `setAnnotations` call with no `onAnnotationsChange`. */
-  providerName: string;
 }
 
 export interface AnnotationState {
-  /** From the store (or the interim prop); `[]` when there is neither. */
-  annotations: AnnotationData[];
+  /** The store's annotations; `[]` without a store. */
+  annotations: readonly AnnotationData[];
   /**
    * The current annotations, for the animation loop, so an annotation edit
    * does not restart it. Reads the store at the moment of the call. Stable.
@@ -45,7 +41,6 @@ export interface AnnotationState {
   getAnnotations: () => readonly AnnotationData[];
   /** Cached per-frame lookups. */
   annotationLookup: AnnotationLookup<AnnotationData>;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /** Created once: the annotations as an edge drag in progress would leave them. */
   annotationPreview: AnnotationPreviewHandle;
   activeAnnotationId: string | null;
@@ -97,43 +92,20 @@ const noAnnotations = () => NO_ANNOTATIONS;
 export function useAnnotationState({
   annotationStore,
   annotationList,
-  onAnnotationsChange,
-  providerName,
 }: UseAnnotationStateOptions): AnnotationState {
-  // In v6, annotations must be pre-parsed (numeric start/end). Use
-  // parseAeneas() from @waveform-playlist/annotations before passing them.
-  const fromProp = useMemo(() => {
-    if (annotationStore || !annotationList?.annotations) return [];
-    if (isDevelopmentBuild() && annotationList.annotations.length > 0) {
-      const first = annotationList.annotations[0] as unknown as Record<string, unknown>;
-      if (typeof first.start !== 'number' || typeof first.end !== 'number') {
-        console.error(
-          '[waveform-playlist] Annotations must have numeric start/end values. ' +
-            'In v6, use parseAeneas() from @waveform-playlist/annotations before passing annotations. ' +
-            'Received start type: ' +
-            typeof first.start
-        );
-        return [];
-      }
-    }
-    return annotationList.annotations;
-  }, [annotationStore, annotationList?.annotations]);
-
-  // Called on every render, with a stand-in when there is no store.
-  const stored = useSyncExternalStore(
+  // Called on every render, with a stand-in when there is no store. The
+  // store validates what it holds (numeric start/end, unique ids).
+  const annotations = useSyncExternalStore(
     annotationStore ? annotationStore.subscribe : noSubscription,
     annotationStore ? annotationStore.getAnnotations : noAnnotations,
     annotationStore ? annotationStore.getAnnotations : noAnnotations
   );
-  // Interim (#867): the public type is still a mutable array.
-  const annotations = (annotationStore ? stored : fromProp) as AnnotationData[];
 
+  // The animation loop reads the store at each frame, through the latest prop.
   const storeRef = useRef(annotationStore);
   storeRef.current = annotationStore;
-  const annotationsRef = useRef<readonly AnnotationData[]>(annotations);
-  annotationsRef.current = annotations;
   const getAnnotations = useCallback(
-    () => (storeRef.current ? storeRef.current.getAnnotations() : annotationsRef.current),
+    () => (storeRef.current ? storeRef.current.getAnnotations() : NO_ANNOTATIONS),
     []
   );
   const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
@@ -175,44 +147,10 @@ export function useAnnotationState({
     createValueSource<AnnotationData[] | null>(null)
   );
 
-  // Read through a ref so that `setAnnotations` keeps its identity.
-  const onAnnotationsChangeRef = useRef(onAnnotationsChange);
-  onAnnotationsChangeRef.current = onAnnotationsChange;
-
-  const setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>> = useCallback(
-    (action) => {
-      const store = storeRef.current;
-      if (store) {
-        if (typeof action === 'function') {
-          store.update((current) => action(current as AnnotationData[]));
-        } else {
-          store.set(action);
-        }
-        return;
-      }
-      const updated =
-        typeof action === 'function' ? action(annotationsRef.current as AnnotationData[]) : action;
-      if (!onAnnotationsChangeRef.current) {
-        if (isDevelopmentBuild()) {
-          console.warn(
-            'waveform-playlist: setAnnotations was called but no onAnnotationsChange callback is provided. ' +
-              'Annotation edits will not persist. Pass onAnnotationsChange to ' +
-              providerName +
-              ' to handle annotation updates.'
-          );
-        }
-        return;
-      }
-      onAnnotationsChangeRef.current(updated);
-    },
-    [providerName]
-  );
-
   return {
     annotations,
     getAnnotations,
     annotationLookup,
-    setAnnotations,
     annotationPreview,
     activeAnnotationId,
     activeAnnotationIdRef,

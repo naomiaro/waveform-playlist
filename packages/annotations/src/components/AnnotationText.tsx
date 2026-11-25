@@ -138,7 +138,8 @@ const AnnotationTextContent = styled.div<{ $isEditable?: boolean }>`
 `;
 
 export interface AnnotationTextProps {
-  annotations: AnnotationData[];
+  /** What the list draws. */
+  annotations: readonly AnnotationData[];
   activeAnnotationId?: string;
   shouldScrollToActive?: boolean;
   /** Where to position the active annotation when scrolling: 'center', 'start', 'end', or 'nearest'. Defaults to 'center'. */
@@ -150,14 +151,13 @@ export interface AnnotationTextProps {
   annotationListConfig?: AnnotationActionOptions;
   height?: number;
   onAnnotationClick?: (annotation: AnnotationData) => void;
-  onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
   /**
    * Where the edits are written (#867): text, id and control edits call
    * `store.update`, find their annotation by id in the store's current list,
    * and a field whose edit was not stored shows the stored value again.
-   * `annotations` stays what the list draws. With neither `store` nor
-   * `onAnnotationUpdate` the list is read-only: no field can be edited and
-   * no control is drawn, whatever `editable` says.
+   * `annotations` stays what the list draws. Without `store` the list is
+   * read-only: no field can be edited and no control is drawn, whatever
+   * `editable` says.
    */
   store?: AnnotationStore;
   /**
@@ -306,12 +306,11 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
   annotationListConfig,
   height,
   onAnnotationClick,
-  onAnnotationUpdate,
   store,
   renderAnnotationItem,
 }) => {
   // Nowhere to write: the list is read-only.
-  const writable = store !== undefined || onAnnotationUpdate !== undefined;
+  const writable = store !== undefined;
   const fieldsEditable = editable && writable;
   const shownControls = writable ? controls : NO_CONTROLS;
   const activeAnnotationRef = useRef<HTMLDivElement>(null);
@@ -367,18 +366,9 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
             .find((a) => a.id === id)
             ?.lines.join('\n')
         );
-        return;
       }
-      if (!onAnnotationUpdate) return;
-
-      const updatedAnnotations = [...annotationsRef.current];
-      updatedAnnotations[index] = {
-        ...updatedAnnotations[index],
-        lines: newText.split('\n'),
-      };
-      onAnnotationUpdate(updatedAnnotations);
     },
-    [editable, onAnnotationUpdate, store]
+    [editable, store]
   );
 
   const handleIdEdit = useCallback(
@@ -401,19 +391,9 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
         const list = store.getAnnotations();
         const renamed = !list.some((a) => a.id === id) && list.some((a) => a.id === trimmedId);
         showStored(field, renamed ? trimmedId : id);
-        return;
       }
-      if (!onAnnotationUpdate) return;
-      if (!trimmedId) return; // Don't allow empty IDs
-
-      const updatedAnnotations = [...annotationsRef.current];
-      updatedAnnotations[index] = {
-        ...updatedAnnotations[index],
-        id: trimmedId,
-      };
-      onAnnotationUpdate(updatedAnnotations);
     },
-    [editable, onAnnotationUpdate, store]
+    [editable, store]
   );
 
   const handleControlClick = useCallback(
@@ -424,20 +404,9 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
         store.update((current) =>
           runAnnotationAction(current, id, control, annotationListConfigRef.current || {})
         );
-        return;
       }
-      if (!onAnnotationUpdate) return;
-
-      const annotationsCopy = [...annotationsRef.current];
-      control.action(
-        annotationsCopy[index],
-        index,
-        annotationsCopy,
-        annotationListConfigRef.current || {}
-      );
-      onAnnotationUpdate(annotationsCopy);
     },
-    [onAnnotationUpdate, store]
+    [store]
   );
 
   return (

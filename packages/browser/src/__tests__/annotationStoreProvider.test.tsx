@@ -106,24 +106,15 @@ describe.each(KINDS)('%s with an annotationStore', (kind) => {
     expect(probe.annotations).toBe(store.getAnnotations());
   });
 
-  it('two setAnnotations(fn) calls in one tick both land (#867)', () => {
+  it('two updates through the controls in one tick both land (#867)', () => {
     const store = createAnnotationStore([note('z0')]);
     mount(kind, store);
     act(() => {
-      probe.controls.setAnnotations((c) => [...c, note('a', 1, 2)]);
-      probe.controls.setAnnotations((c) => [...c, note('b', 2, 3)]);
+      probe.controls.annotationStore!.update((c) => [...c, note('a', 1, 2)]);
+      probe.controls.annotationStore!.update((c) => [...c, note('b', 2, 3)]);
     });
     expect(ids(store.getAnnotations())).toEqual(['z0', 'a', 'b']);
     expect(ids(probe.annotations)).toEqual(['z0', 'a', 'b']);
-  });
-
-  it('setAnnotations with an array replaces the list', () => {
-    const store = createAnnotationStore([note('a')]);
-    mount(kind, store);
-    act(() => {
-      probe.controls.setAnnotations([note('x')]);
-    });
-    expect(ids(store.getAnnotations())).toEqual(['x']);
   });
 
   it('usePlaybackControls().annotationStore is the prop', () => {
@@ -141,10 +132,10 @@ describe.each(KINDS)('%s with an annotationStore', (kind) => {
     };
     mount(kind, store, <DeferredReader />);
     act(() => {
-      probe.controls.setAnnotations((c) => [...c, note('a', 1, 2)]);
+      store.update((c) => [...c, note('a', 1, 2)]);
     });
     act(() => {
-      probe.controls.setAnnotations((c) => [...c, note('b', 2, 3)]);
+      store.update((c) => [...c, note('b', 2, 3)]);
     });
     await act(async () => {});
     expect(ids(store.getAnnotations())).toEqual(['z0', 'a', 'b']);

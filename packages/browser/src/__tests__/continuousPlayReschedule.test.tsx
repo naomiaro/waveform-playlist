@@ -19,6 +19,7 @@ import {
   useIsPlaying,
 } from '../contexts/playlistContexts';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -150,13 +151,15 @@ async function mount(isContinuousPlay: boolean) {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   const logging = createLoggingAdapter();
   const createAdapter = () => logging.adapter;
-  const annotationList = { annotations: ANNOTATIONS, isContinuousPlay };
+  const annotationList = { isContinuousPlay };
+  const annotationStore = createAnnotationStore(ANNOTATIONS);
   const arrangement = testArrangement([makeTrack('short', 10)]);
   const App: React.FC = () => (
     <TestProvider
       arrangement={arrangement}
       sampleRate={SAMPLE_RATE}
       createAdapter={createAdapter}
+      annotationStore={annotationStore}
       annotationList={annotationList}
     >
       <ProbeChild />

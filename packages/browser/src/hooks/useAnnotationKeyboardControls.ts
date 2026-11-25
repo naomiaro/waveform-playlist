@@ -9,14 +9,12 @@ const TIME_DELTA = 0.01; // 10ms adjustment per keypress
 interface UseAnnotationKeyboardControlsOptions {
   /**
    * The owner of the annotations (`usePlaybackControls().annotationStore`).
-   * With it, the keys read the store and each boundary key changes the
-   * active annotation, found by id, in the store's list as it is when the
-   * key is pressed; `annotations` and `onAnnotationsChange` are not read.
+   * The keys read the store, and each boundary key changes the active
+   * annotation, found by id, in the store's list as it is when the key is
+   * pressed (#867). Without a store there is nothing to move or select.
    */
-  store?: AnnotationStore;
-  annotations?: AnnotationData[];
+  store: AnnotationStore | undefined;
   activeAnnotationId: string | null;
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** Callback to set the active annotation ID for selection */
   onActiveAnnotationChange?: (id: string | null) => void;
   duration: number;
@@ -59,25 +57,23 @@ interface UseAnnotationKeyboardControlsOptions {
  *
  * @example
  * ```tsx
+ * const { annotationStore, setActiveAnnotationId } = usePlaybackControls();
  * useAnnotationKeyboardControls({
- *   annotations,
+ *   store: annotationStore,
  *   activeAnnotationId,
- *   onAnnotationsChange: setAnnotations,
  *   onActiveAnnotationChange: setActiveAnnotationId,
  *   duration,
  *   linkEndpoints,
  * });
  * ```
  */
-const NO_ANNOTATIONS: AnnotationData[] = [];
+const NO_ANNOTATIONS: readonly AnnotationData[] = Object.freeze([]);
 const noSubscription = () => () => {};
 const noAnnotations = () => NO_ANNOTATIONS;
 
 export function useAnnotationKeyboardControls({
   store,
-  annotations: annotationsProp,
   activeAnnotationId,
-  onAnnotationsChange,
   onActiveAnnotationChange,
   duration,
   linkEndpoints,
@@ -94,7 +90,7 @@ export function useAnnotationKeyboardControls({
     store ? store.getAnnotations : noAnnotations,
     store ? store.getAnnotations : noAnnotations
   );
-  const annotations = (store ? stored : (annotationsProp ?? NO_ANNOTATIONS)) as AnnotationData[];
+  const annotations = stored;
 
   // Auto-scroll positioning needs samplesPerPixel/sampleRate. Prefer explicit
   // props (works in the MediaElement path); otherwise read them from the
@@ -152,51 +148,24 @@ export function useAnnotationKeyboardControls({
 
   const moveStartBoundary = useCallback(
     (delta: number) => {
-      if (store) {
-        store.update((current) => {
-          const index = current.findIndex((a) => a.id === activeAnnotationId);
-          return index < 0
-            ? current
-            : moveAnnotationStart(current, index, delta, { linkEndpoints });
-        });
-        return;
-      }
-      if (activeIndex < 0) return;
-      onAnnotationsChange?.(
-        moveAnnotationStart(annotations, activeIndex, delta, { linkEndpoints }) as AnnotationData[]
-      );
+      store?.update((current) => {
+        const index = current.findIndex((a) => a.id === activeAnnotationId);
+        return index < 0 ? current : moveAnnotationStart(current, index, delta, { linkEndpoints });
+      });
     },
-    [store, activeAnnotationId, annotations, activeIndex, linkEndpoints, onAnnotationsChange]
+    [store, activeAnnotationId, linkEndpoints]
   );
 
   const moveEndBoundary = useCallback(
     (delta: number) => {
-      if (store) {
-        store.update((current) => {
-          const index = current.findIndex((a) => a.id === activeAnnotationId);
-          return index < 0
-            ? current
-            : moveAnnotationEnd(current, index, delta, { linkEndpoints, duration });
-        });
-        return;
-      }
-      if (activeIndex < 0) return;
-      onAnnotationsChange?.(
-        moveAnnotationEnd(annotations, activeIndex, delta, {
-          linkEndpoints,
-          duration,
-        }) as AnnotationData[]
-      );
+      store?.update((current) => {
+        const index = current.findIndex((a) => a.id === activeAnnotationId);
+        return index < 0
+          ? current
+          : moveAnnotationEnd(current, index, delta, { linkEndpoints, duration });
+      });
     },
-    [
-      store,
-      activeAnnotationId,
-      annotations,
-      activeIndex,
-      duration,
-      linkEndpoints,
-      onAnnotationsChange,
-    ]
+    [store, activeAnnotationId, duration, linkEndpoints]
   );
 
   // Navigation functions

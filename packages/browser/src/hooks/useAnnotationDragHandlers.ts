@@ -20,13 +20,11 @@ export type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>
 interface UseAnnotationDragHandlersOptions {
   /**
    * The owner of the annotations (`usePlaybackControls().annotationStore`).
-   * With it, the drag writes only the bounds it moved, by id, onto the
-   * store's list as it is at the time of the write, and `annotations` and
-   * `onAnnotationsChange` are not read.
+   * The drag writes only the bounds it moved, by id, onto the store's list
+   * as it is at the time of the write (#867). Without a store the handlers
+   * do nothing.
    */
-  store?: AnnotationStore;
-  annotations?: AnnotationData[];
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
+  store: AnnotationStore | undefined;
   samplesPerPixel: number;
   /** Sample rate for pixel-to-time conversion. Providers pass the real rate from
    *  context; defaults to 48000 (the engine default) for out-of-provider usage. */
@@ -115,8 +113,6 @@ function restoredBounds(
  */
 export function useAnnotationDragHandlers({
   store,
-  annotations,
-  onAnnotationsChange,
   samplesPerPixel,
   // Default mirrors the engine default; the providers always pass the real rate from context (#510).
   sampleRate = 48000,
@@ -129,23 +125,11 @@ export function useAnnotationDragHandlers({
   // Read through refs so the handlers keep their identity for the whole drag.
   const storeRef = React.useRef(store);
   storeRef.current = store;
-  const annotationsRef = React.useRef<readonly AnnotationData[]>(annotations ?? []);
-  annotationsRef.current = annotations ?? [];
-  const onAnnotationsChangeRef = React.useRef(onAnnotationsChange);
-  onAnnotationsChangeRef.current = onAnnotationsChange;
 
-  /** Write `changes` by id onto the store's current list; or hand `fallback` to the callback. */
-  const write = React.useCallback(
-    (changes: readonly AnnotationBoundsChange[], fallback: readonly AnnotationData[]) => {
-      const owner = storeRef.current;
-      if (owner) {
-        owner.update((current) => applyAnnotationBounds(current, changes));
-      } else {
-        onAnnotationsChangeRef.current?.(fallback as AnnotationData[]);
-      }
-    },
-    []
-  );
+  /** Write `changes` by id onto the store's current list. */
+  const write = React.useCallback((changes: readonly AnnotationBoundsChange[]) => {
+    storeRef.current?.update((current) => applyAnnotationBounds(current, changes));
+  }, []);
 
   // A drag that never ends (its component unmounts mid-drag) must not leave
   // its preview on screen.
@@ -168,7 +152,12 @@ export function useAnnotationDragHandlers({
         }
       | undefined;
 
-    const snapshot = storeRef.current ? storeRef.current.getAnnotations() : annotationsRef.current;
+    const owner = storeRef.current;
+    if (!owner) {
+      dragRef.current = null;
+      return;
+    }
+    const snapshot = owner.getAnnotations();
     const annotation =
       data?.annotationIndex === undefined ? undefined : snapshot[data.annotationIndex];
     dragRef.current =
@@ -213,15 +202,12 @@ export function useAnnotationDragHandlers({
       const newTime = edge === 'start' ? drag.start + timeDelta : drag.end + timeDelta;
 
       // The boundary logic (linked endpoints, collisions) is core's, shared with
-      // dawcore's annotation track. Without a store and a preview, the moves are
-      // applied to the annotations as the callback last handed them back.
-      const base =
-        preview || storeRef.current ? drag.working : (annotationsRef.current as AnnotationData[]);
+      // dawcore's annotation track.
       const updatedAnnotations = updateAnnotationBoundaries({
         annotationIndex,
         newTime,
         isDraggingStart: edge === 'start',
-        annotations: base as AnnotationData[],
+        annotations: drag.working,
         duration,
         linkEndpoints,
       });
@@ -230,7 +216,7 @@ export function useAnnotationDragHandlers({
       if (preview) {
         preview.publish(updatedAnnotations);
       } else {
-        write(movedBounds(drag.snapshot, updatedAnnotations), updatedAnnotations);
+        write(movedBounds(drag.snapshot, updatedAnnotations));
       }
     },
     [samplesPerPixel, sampleRate, duration, linkEndpoints, preview, write]
@@ -245,12 +231,8 @@ export function useAnnotationDragHandlers({
       if (!preview) {
         // The moves were written as they happened; a cancelled drag takes
         // them all back, the neighbours it moved included.
-        if (!event.canceled) return;
-        if (storeRef.current) {
-          const moved = movedBounds(drag.snapshot, drag.working);
-          write(restoredBounds(drag.snapshot, moved), drag.snapshot);
-        } else if (annotationsRef.current !== drag.snapshot) {
-          onAnnotationsChangeRef.current?.(drag.snapshot as AnnotationData[]);
+        if (event.canceled) {
+          write(restoredBounds(drag.snapshot, movedBounds(drag.snapshot, drag.working)));
         }
         return;
       }
@@ -265,18 +247,14 @@ export function useAnnotationDragHandlers({
       // Committed and cleared in one synchronous render, so the boxes never
       // show the old positions between the two.
       flushSync(() => {
-        if (owner) {
-          // Only what the drag moved, onto the list as it is now. When the
-          // dragged annotation is gone, the release does nothing (#867).
-          const moved = movedBounds(drag.snapshot, result);
-          owner.update((current) =>
-            current.some((a) => a.id === drag.draggedId)
-              ? applyAnnotationBounds(current, moved)
-              : current
-          );
-        } else {
-          onAnnotationsChangeRef.current?.(result);
-        }
+        // Only what the drag moved, onto the list as it is now. When the
+        // dragged annotation is gone, the release does nothing (#867).
+        const moved = movedBounds(drag.snapshot, result);
+        owner?.update((current) =>
+          current.some((a) => a.id === drag.draggedId)
+            ? applyAnnotationBounds(current, moved)
+            : current
+        );
         preview.publish(null);
       });
     },

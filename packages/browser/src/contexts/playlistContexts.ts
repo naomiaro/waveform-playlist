@@ -109,7 +109,8 @@ export interface ActiveAnnotationContextValue {
  * once, on release (its moves go through the preview source).
  */
 export interface AnnotationsContextValue {
-  annotations: AnnotationData[];
+  /** The annotation store's list: never write to it (frozen in development). */
+  annotations: readonly AnnotationData[];
 }
 
 /**
@@ -155,7 +156,6 @@ export interface PlaybackControlsContextValue {
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   /**
    * Where an annotation edge drag shows its moves while it is in progress.
    * Pass it to `useAnnotationDragHandlers({ preview })`; read it in a custom

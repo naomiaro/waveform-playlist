@@ -22,7 +22,7 @@ const dragOptions = vi.hoisted(
       sampleRate?: number;
       linkEndpoints: boolean;
       preview?: unknown;
-      onAnnotationsChange?: unknown;
+      store?: unknown;
     }[]
 );
 const sensorOptions = vi.hoisted(() => [] as ({ touchOptimized?: boolean } | undefined)[]);
@@ -72,6 +72,7 @@ import WaveformData from 'waveform-data';
 import { RestrictToHorizontalAxis } from '@dnd-kit/abstract/modifiers';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { ClipTrack, AudioClip, AnnotationData } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import * as browser from '../index';
 import { TestProvider } from './helpers/arrangementProvider';
@@ -267,7 +268,7 @@ interface MountOptions {
   tracks?: ClipTrack[];
   annotationList?: AnnotationListProp;
   integration?: AnnotationIntegration | null;
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
+  onStoreChange?: (annotations: AnnotationData[]) => void;
 }
 
 const DEFAULT_LIST: AnnotationListProp = { annotations: ANNOTATIONS };
@@ -283,7 +284,14 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
   dragProviderProps.length = 0;
   const firstList = options.annotationList ?? DEFAULT_LIST;
   const integration = options.integration === undefined ? INTEGRATION : options.integration;
-  const onAnnotationsChange = options.onAnnotationsChange ?? (() => {});
+  // The store owns the annotations (#867); `annotations` in a test's list is
+  // what the store holds, and `onStoreChange` is told after each change.
+  const store = createAnnotationStore(firstList.annotations ?? []);
+  const onStoreChange = options.onStoreChange;
+  if (onStoreChange) {
+    store.subscribe(() => onStoreChange(store.getAnnotations() as AnnotationData[]));
+  }
+  const optionsOf = ({ annotations: _annotations, ...rest }: AnnotationListProp) => rest;
   const adapter = createFakeAdapter();
   const createAdapter = () => adapter;
   const playout = createFakePlayout();
@@ -302,8 +310,8 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
           samplesPerPixel={882}
           zoomLevels={[441, 882, 1764]}
           createAdapter={createAdapter}
-          annotationList={annotationList}
-          onAnnotationsChange={onAnnotationsChange}
+          annotationStore={store}
+          annotationList={optionsOf(annotationList)}
         >
           <ProbeChild />
           <TimelineReadyProbe />
@@ -314,8 +322,8 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
           track={MEDIA_TRACK}
           samplesPerPixel={882}
           createPlayout={createPlayout}
-          annotationList={annotationList}
-          onAnnotationsChange={onAnnotationsChange}
+          annotationStore={store}
+          annotationList={optionsOf(annotationList)}
           onReady={onReady}
         >
           <ProbeChild />
@@ -332,8 +340,14 @@ async function mount(kind: Kind, children: React.ReactNode, options: MountOption
   return {
     ...view,
     rerender: (content: React.ReactNode) => view.rerender(tree(content)),
-    /** Renders the provider again with another `annotationList`. */
-    setAnnotationList: (list: AnnotationListProp) => view.rerender(tree(children, list)),
+    store,
+    /** Renders the provider again with other options; `annotations` goes to the store. */
+    setAnnotationList: (list: AnnotationListProp) => {
+      if (list.annotations && list.annotations !== store.getAnnotations()) {
+        act(() => store.set(list.annotations!));
+      }
+      view.rerender(tree(children, list));
+    },
   };
 }
 
@@ -558,12 +572,12 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
     });
 
     it('reports an edit through the provider and nowhere else', async () => {
-      const onAnnotationsChange = vi.fn();
-      await mount(kind, <AnnotationList />, { onAnnotationsChange });
+      const onStoreChange = vi.fn();
+      await mount(kind, <AnnotationList />, { onStoreChange });
       const edited = [{ ...ANNOTATIONS[0], lines: ['changed'] }, ...ANNOTATIONS.slice(1)];
-      act(() => lastList().onAnnotationUpdate?.(edited));
-      expect(onAnnotationsChange).toHaveBeenCalledTimes(1);
-      expect(onAnnotationsChange).toHaveBeenCalledWith(edited);
+      act(() => lastList().store?.update(() => edited));
+      expect(onStoreChange).toHaveBeenCalledTimes(1);
+      expect(onStoreChange).toHaveBeenCalledWith(edited);
     });
 
     it('a click on a row makes the annotation active and plays it', async () => {
@@ -688,7 +702,7 @@ describe.each<Kind>(['WaveformPlaylistProvider', 'MediaElementPlaylistProvider']
       expect(lastDrag().sampleRate).toBe(SAMPLE_RATE);
       expect(lastDrag().duration).toBe(SECONDS);
       expect(lastDrag().linkEndpoints).toBe(true);
-      expect(lastDrag().onAnnotationsChange).toBe(probe.controls.setAnnotations);
+      expect(lastDrag().store).toBe(probe.controls.annotationStore);
       act(() => probe.controls.setLinkEndpoints(false));
       expect(lastDrag().linkEndpoints).toBe(false);
     });
@@ -859,24 +873,26 @@ describe('how far the edge of an annotation can be dragged (#686)', () => {
 
 describe('the annotation shortcuts read the options of the provider (#686)', () => {
   it('Shift+{ moves the end of the active annotation, and the next start with link endpoints on', async () => {
-    const onAnnotationsChange = vi.fn();
+    const onStoreChange = vi.fn();
     await mount('WaveformPlaylistProvider', <KeyboardShortcuts annotations />, {
       annotationList: { annotations: ANNOTATIONS, linkEndpoints: true },
-      onAnnotationsChange,
+      onStoreChange,
     });
     act(() => probe.controls.setActiveAnnotationId('n1'));
 
     fireEvent.keyDown(window, { key: '{', shiftKey: true });
-    expect(onAnnotationsChange).toHaveBeenCalledTimes(1);
-    const linked = onAnnotationsChange.mock.lastCall![0] as AnnotationData[];
+    expect(onStoreChange).toHaveBeenCalledTimes(1);
+    const linked = onStoreChange.mock.lastCall![0] as AnnotationData[];
     expect(linked[0].end).toBeCloseTo(0.99, 5);
     expect(linked[1].start).toBeCloseTo(0.99, 5);
 
+    // The second press starts from what the first stored; with link endpoints
+    // off the next annotation's start stays where it is.
     act(() => probe.controls.setLinkEndpoints(false));
     fireEvent.keyDown(window, { key: '{', shiftKey: true });
-    const unlinked = onAnnotationsChange.mock.lastCall![0] as AnnotationData[];
-    expect(unlinked[0].end).toBeCloseTo(0.99, 5);
-    expect(unlinked[1].start).toBe(1);
+    const unlinked = onStoreChange.mock.lastCall![0] as AnnotationData[];
+    expect(unlinked[0].end).toBeCloseTo(0.98, 5);
+    expect(unlinked[1].start).toBeCloseTo(0.99, 5);
   });
 });
 

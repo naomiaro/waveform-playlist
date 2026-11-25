@@ -9,6 +9,7 @@ import { render, act, waitFor, cleanup, fireEvent } from '@testing-library/react
 import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import { MediaElementPlaylistProvider } from '../MediaElementPlaylistContext';
 import {
   useIsPlaying,
@@ -188,6 +189,8 @@ async function mount(options: MountOptions = {}) {
       gates.push(() => resolve(playout));
     });
   }) as unknown as () => MediaElementPlayout;
+  const { annotations: storeStart = [], ...annotationOptions } = options.annotationList ?? {};
+  const annotationStore = createAnnotationStore(storeStart);
   const tree = (track = TRACK) => (
     <MediaElementPlaylistProvider
       track={track}
@@ -195,7 +198,8 @@ async function mount(options: MountOptions = {}) {
       createPlayout={createPlayout}
       onReady={options.onReady}
       onError={options.onError}
-      annotationList={options.annotationList}
+      annotationStore={annotationStore}
+      annotationList={annotationOptions}
       automaticScroll={options.automaticScroll}
     >
       <ProbeChild />

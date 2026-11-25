@@ -14,6 +14,7 @@ import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { WaveformDataObject, ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { usePlaylistInfo } from '@waveform-playlist/ui-components';
 import { warnMisplacedPart, resetPartWarnings } from '../components/partWarnings';
@@ -198,7 +199,7 @@ const ANNOTATION_INTEGRATION = {
   ),
   AnnotationText: () => <div data-annotation-list />,
 } as unknown as AnnotationIntegration;
-const ANNOTATION_LIST = { annotations: [{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }] };
+const ANNOTATION_STORE = createAnnotationStore([{ id: 'n1', start: 0, end: 0.5, lines: ['one'] }]);
 
 interface MultitrackOptions {
   tracks?: ClipTrack[];
@@ -221,7 +222,7 @@ async function mountMultitrack(
           tracks={tracks}
           sampleRate={SAMPLE_RATE}
           createAdapter={createAdapter}
-          annotationList={annotations ? ANNOTATION_LIST : undefined}
+          annotationStore={annotations ? ANNOTATION_STORE : undefined}
         >
           <Probe />
           {tree()}
@@ -317,7 +318,7 @@ async function mountMediaElement(
         track={ME_FADED}
         samplesPerPixel={1000}
         createPlayout={createPlayout}
-        annotationList={annotations ? ANNOTATION_LIST : undefined}
+        annotationStore={annotations ? ANNOTATION_STORE : undefined}
       >
         {typeof tree === 'function' ? tree() : tree}
         <MediaProbe />

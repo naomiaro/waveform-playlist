@@ -12,9 +12,9 @@ import type { AnnotationPreviewHandle } from './useAnnotationDragHandlers';
  * component then re-renders per pointer move of the drag.
  */
 export function useAnnotationsWithPreview(
-  annotations: AnnotationData[],
+  annotations: readonly AnnotationData[],
   preview: AnnotationPreviewHandle
-): AnnotationData[] {
+): readonly AnnotationData[] {
   const { subscribe, getSnapshot } = preview.source;
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot) ?? annotations;
 }

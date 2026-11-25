@@ -17,6 +17,7 @@ import {
 } from '../AnnotationIntegrationContext';
 import { AnnotationList } from '../components/AnnotationList';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -47,12 +48,10 @@ const TRACKS: ClipTrack[] = [
   } as ClipTrack,
 ];
 
-const ANNOTATION_LIST = {
-  annotations: [
-    { id: 'n1', start: 0, end: 1, lines: ['one'] },
-    { id: 'n2', start: 1, end: 2, lines: ['two'] },
-  ],
-};
+const ANNOTATION_STORE = createAnnotationStore([
+  { id: 'n1', start: 0, end: 1, lines: ['one'] },
+  { id: 'n2', start: 1, end: 2, lines: ['two'] },
+]);
 
 function createFakeAdapter(): PlayoutAdapter {
   return {
@@ -118,7 +117,7 @@ async function mount() {
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        annotationList={ANNOTATION_LIST}
+        annotationStore={ANNOTATION_STORE}
       >
         <ProbeChild />
         <AnnotationList />

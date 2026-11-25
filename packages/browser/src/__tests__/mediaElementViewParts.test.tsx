@@ -14,6 +14,7 @@ import React from 'react';
 import WaveformData from 'waveform-data';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { WaveformDataObject } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 
 const counts = vi.hoisted(() => ({ clip: 0, channel: 0, track: 0, frame: 0, scale: 0, layout: 0 }));
 
@@ -602,9 +603,7 @@ describe('the root renders alone', () => {
     await mount({
       playlist: <ComposedMediaElementWaveform getLabel={label} />,
       provider: {
-        annotationList: {
-          annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
-        },
+        annotationStore: createAnnotationStore([{ id: 'a', start: 1, end: 2, lines: ['a'] }]),
       },
     });
     // The box is drawn with the label, in a row as wide as the root's timeline.
@@ -622,9 +621,7 @@ describe('the root renders alone', () => {
     dragOptions.durations = [];
     await mount({
       provider: {
-        annotationList: {
-          annotations: [{ id: 'a', start: 1, end: 2, lines: ['a'] }],
-        },
+        annotationStore: createAnnotationStore([{ id: 'a', start: 1, end: 2, lines: ['a'] }]),
       },
     });
     expect(dragOptions.durations.length).toBeGreaterThan(0);
@@ -642,9 +639,7 @@ describe('the root renders alone', () => {
     const { fake } = await mount({
       playlist: <ComposedMediaElementWaveform getLabel={label} />,
       provider: {
-        annotationList: {
-          annotations: [{ id: 'a', start: 6, end: 7, lines: ['a'] }],
-        },
+        annotationStore: createAnnotationStore([{ id: 'a', start: 6, end: 7, lines: ['a'] }]),
       },
       notReady: true,
     });

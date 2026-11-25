@@ -106,10 +106,10 @@ export interface MediaElementPlaylistProviderProps {
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The annotations and the three annotation options (`editable`,
-   * `linkEndpoints`, `isContinuousPlay`). The provider follows all four: an
-   * option takes a new value of its field, and a setter or checkbox changes
-   * it in between.
+   * The three annotation options (`editable`, `linkEndpoints`,
+   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
+   * follows the three: an option takes a new value of its field, and a setter
+   * or checkbox changes it in between.
    */
   /**
    * The owner of the annotations (#867): make it with
@@ -119,8 +119,6 @@ export interface MediaElementPlaylistProviderProps {
    */
   annotationStore?: AnnotationStore;
   annotationList?: AnnotationListProp;
-  /** Callback when annotations are changed (drag, edit, etc.) */
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /**
    * AudioContext for Web Audio routing (fades, effects).
    * When provided, audio routes through Web Audio nodes:
@@ -173,7 +171,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   annotationStore,
   annotationList,
   audioContext,
-  onAnnotationsChange,
   onReady,
   onError,
   createPlayout,
@@ -227,7 +224,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const {
     getAnnotations,
     annotationLookup,
-    setAnnotations,
     annotationPreview,
     activeAnnotationId,
     activeAnnotationIdRef,
@@ -241,8 +237,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   } = useAnnotationState({
     annotationStore,
     annotationList,
-    onAnnotationsChange,
-    providerName: 'MediaElementPlaylistProvider',
   });
   const {
     scrollContainerRef,
@@ -916,7 +910,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setContinuousPlay,
       setAnnotationsEditable,
       setLinkEndpoints,
-      setAnnotations,
       annotationPreview,
       annotationStore,
       setActiveAnnotationId,
@@ -935,7 +928,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setContinuousPlay,
       setAnnotationsEditable,
       setLinkEndpoints,
-      setAnnotations,
       annotationPreview,
       annotationStore,
       setActiveAnnotationId,

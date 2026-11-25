@@ -94,6 +94,7 @@ import { useTrack } from '../components/trackContext';
 import { ComposedWaveform } from './testCompositions';
 import { AudioPosition } from '../components/ContextualControls';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 
 if (typeof globalThis.requestAnimationFrame === 'undefined') {
@@ -187,12 +188,10 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
-const ANNOTATION_LIST = {
-  annotations: [
-    { id: 'n1', start: 0, end: 0.5, lines: ['one'] },
-    { id: 'n2', start: 0.5, end: 1, lines: ['two'] },
-  ],
-};
+const ANNOTATION_STORE = createAnnotationStore([
+  { id: 'n1', start: 0, end: 0.5, lines: ['one'] },
+  { id: 'n2', start: 0.5, end: 1, lines: ['two'] },
+]);
 const TRACKS = [makeTrack('t1'), makeTrack('t2'), makeTrack('t3')];
 
 function resetCounts() {
@@ -224,7 +223,7 @@ async function mount(reset = true) {
         tracks={TRACKS}
         sampleRate={SAMPLE_RATE}
         createAdapter={createAdapter}
-        annotationList={ANNOTATION_LIST}
+        annotationStore={ANNOTATION_STORE}
       >
         <ProbeChild />
         <ComposedWaveform />

@@ -7,7 +7,16 @@ import './jsdom-polyfills'; // must be first
 import React from 'react';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import type { AnnotationData } from '@waveform-playlist/core';
+
+/** A store of `list`, and a spy told after each change of it. */
+function spyStore(list: readonly AnnotationData[]) {
+  const store = createAnnotationStore(list);
+  const changes = vi.fn();
+  store.subscribe(changes);
+  return { store, changes };
+}
 import { AnnotationText } from '../components/AnnotationText';
 
 const ANNOTATIONS: AnnotationData[] = [
@@ -40,12 +49,12 @@ describe('AnnotationText items (#740)', () => {
       calls[annotation.id] = (calls[annotation.id] ?? 0) + 1;
       return <span data-active={isActive}>{annotation.id}</span>;
     });
-    const onUpdate = vi.fn();
+    const { store } = spyStore(ANNOTATIONS);
     const ui = (activeId: string) => (
       <AnnotationText
         annotations={ANNOTATIONS}
         activeAnnotationId={activeId}
-        onAnnotationUpdate={onUpdate}
+        store={store}
         renderAnnotationItem={renderItem}
       />
     );
@@ -71,7 +80,7 @@ describe('AnnotationText items (#740)', () => {
       calls[annotation.id] = (calls[annotation.id] ?? 0) + 1;
       return <span>{annotation.id}</span>;
     });
-    const onUpdate = vi.fn();
+    const { store } = spyStore(ANNOTATIONS);
     const controls = [{ title: 'x', action: vi.fn() }];
     const ui = (annotations: AnnotationData[]) => (
       <AnnotationText
@@ -79,7 +88,7 @@ describe('AnnotationText items (#740)', () => {
         activeAnnotationId="a"
         editable
         controls={controls}
-        onAnnotationUpdate={onUpdate}
+        store={store}
         renderAnnotationItem={renderItem}
       />
     );
@@ -125,18 +134,20 @@ describe('AnnotationText items (#740)', () => {
     expect(onClick).toHaveBeenCalledWith(ANNOTATIONS[2]);
   });
 
-  it('an edit made after the annotations changed is applied to the current list', () => {
-    const onUpdate = vi.fn();
+  it("an edit made after the annotations changed is applied to the store's current list", () => {
+    const { store, changes } = spyStore(ANNOTATIONS);
     const ui = (annotations: AnnotationData[], activeId: string) => (
       <AnnotationText
         annotations={annotations}
         activeAnnotationId={activeId}
         editable
-        onAnnotationUpdate={onUpdate}
+        store={store}
       />
     );
     const { rerender, getByText } = render(ui(ANNOTATIONS, 'a'));
     const moved = ANNOTATIONS.map((a) => (a.id === 'd' ? { ...a, end: 9 } : a));
+    store.set(moved);
+    changes.mockClear();
     // Item `b` keeps its props across this render and the next; its handlers
     // must still see the list that has the moved `d`.
     rerender(ui(moved, 'a'));
@@ -146,14 +157,14 @@ describe('AnnotationText items (#740)', () => {
     text.textContent = 'second, edited';
     fireEvent.blur(text);
 
-    expect(onUpdate).toHaveBeenCalledTimes(1);
-    const updated = onUpdate.mock.calls[0][0] as AnnotationData[];
+    expect(changes).toHaveBeenCalledTimes(1);
+    const updated = store.getAnnotations();
     expect(updated[1].lines).toEqual(['second, edited']);
     expect(updated[3].end).toBe(9);
   });
 
-  it('a control acts on the current list and the current options', () => {
-    const onUpdate = vi.fn();
+  it("a control acts on the store's current list and the current options", () => {
+    const { store, changes } = spyStore(ANNOTATIONS);
     const action = vi.fn();
     const controls = [{ text: 'X', title: 'act', action }];
     const ui = (annotations: AnnotationData[], linkEndpoints: boolean) => (
@@ -162,11 +173,13 @@ describe('AnnotationText items (#740)', () => {
         editable
         controls={controls}
         annotationListConfig={{ linkEndpoints }}
-        onAnnotationUpdate={onUpdate}
+        store={store}
       />
     );
     const { rerender, getAllByTitle } = render(ui(ANNOTATIONS, false));
     const moved = ANNOTATIONS.map((a) => (a.id === 'd' ? { ...a, end: 9 } : a));
+    store.set(moved);
+    changes.mockClear();
     rerender(ui(moved, true));
 
     fireEvent.click(getAllByTitle('act')[1]);
@@ -177,11 +190,12 @@ describe('AnnotationText items (#740)', () => {
     expect(index).toBe(1);
     expect(list[3].end).toBe(9);
     expect(options).toEqual({ linkEndpoints: true });
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    // The action changed nothing, so nothing is stored.
+    expect(changes).not.toHaveBeenCalled();
   });
 
   it('a control sees new options when only the options change', () => {
-    const onUpdate = vi.fn();
+    const { store } = spyStore(ANNOTATIONS);
     const action = vi.fn();
     const controls = [{ text: 'X', title: 'act', action }];
     const ui = (linkEndpoints: boolean) => (
@@ -190,7 +204,7 @@ describe('AnnotationText items (#740)', () => {
         editable
         controls={controls}
         annotationListConfig={{ linkEndpoints }}
-        onAnnotationUpdate={onUpdate}
+        store={store}
       />
     );
     const { rerender, getAllByTitle } = render(ui(false));
@@ -202,54 +216,49 @@ describe('AnnotationText items (#740)', () => {
   });
 
   it('an edit is ignored once the list stops being editable, and applied once it is again', () => {
-    const onUpdate = vi.fn();
+    const { store, changes } = spyStore(ANNOTATIONS);
     const ui = (editable: boolean) => (
-      <AnnotationText annotations={ANNOTATIONS} editable={editable} onAnnotationUpdate={onUpdate} />
+      <AnnotationText annotations={ANNOTATIONS} editable={editable} store={store} />
     );
     const { rerender, getByText } = render(ui(true));
 
     rerender(ui(false));
     fireEvent.blur(getByText('second'));
-    expect(onUpdate).not.toHaveBeenCalled();
+    expect(changes).not.toHaveBeenCalled();
 
     rerender(ui(true));
     fireEvent.blur(getByText('second'));
-    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(changes).toHaveBeenCalledTimes(1);
   });
 
-  it('an edit goes to the update callback of the latest render', () => {
-    const first = vi.fn();
-    const second = vi.fn();
-    const ui = (onUpdate: (annotations: AnnotationData[]) => void) => (
-      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationUpdate={onUpdate} />
+  it('an edit goes to the store of the latest render', () => {
+    const first = spyStore(ANNOTATIONS);
+    const second = spyStore(ANNOTATIONS);
+    const ui = (store: ReturnType<typeof spyStore>['store']) => (
+      <AnnotationText annotations={ANNOTATIONS} editable store={store} />
     );
-    const { rerender, getByText } = render(ui(first));
-    rerender(ui(second));
+    const { rerender, getByText } = render(ui(first.store));
+    rerender(ui(second.store));
 
     fireEvent.blur(getByText('third'));
 
-    expect(first).not.toHaveBeenCalled();
-    expect(second).toHaveBeenCalledTimes(1);
+    expect(first.changes).not.toHaveBeenCalled();
+    expect(second.changes).toHaveBeenCalledTimes(1);
   });
 
   it('an id edit renames that annotation in the current list, and an empty id is refused', () => {
-    const onUpdate = vi.fn();
+    const { store, changes } = spyStore(ANNOTATIONS);
     const { getByText } = render(
-      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationUpdate={onUpdate} />
+      <AnnotationText annotations={ANNOTATIONS} editable store={store} />
     );
 
     const label = getByText('b');
     label.textContent = '   ';
     fireEvent.blur(label);
-    expect(onUpdate).not.toHaveBeenCalled();
+    expect(changes).not.toHaveBeenCalled();
 
     label.textContent = ' b2 ';
     fireEvent.blur(label);
-    expect((onUpdate.mock.calls[0][0] as AnnotationData[]).map((a) => a.id)).toEqual([
-      'a',
-      'b2',
-      'c',
-      'd',
-    ]);
+    expect(store.getAnnotations().map((a) => a.id)).toEqual(['a', 'b2', 'c', 'd']);
   });
 });

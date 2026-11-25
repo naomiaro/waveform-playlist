@@ -153,10 +153,10 @@ export interface WaveformPlaylistProviderProps {
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The annotations and the three annotation options (`editable`,
-   * `linkEndpoints`, `isContinuousPlay`). The provider follows all four: an
-   * option takes a new value of its field, and a setter or checkbox changes
-   * it in between.
+   * The three annotation options (`editable`, `linkEndpoints`,
+   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
+   * follows the three: an option takes a new value of its field, and a setter
+   * or checkbox changes it in between.
    */
   /**
    * The owner of the annotations (#867): make it with
@@ -192,8 +192,6 @@ export interface WaveformPlaylistProviderProps {
    *  fails to load is not reported here: see `useArrangementSources`. The
    *  provider already logs the error; use this to surface it in your UI. */
   onError?: (err: Error) => void;
-  /** Callback when annotations are changed (drag, edit, etc.) */
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
   /** SoundFont cache for sample-based MIDI playback. When provided, MIDI clips
    *  use SoundFont samples instead of PolySynth synthesis. */
   soundFontCache?: SoundFontCache;
@@ -254,7 +252,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   trackEffects,
   onReady,
   onError,
-  onAnnotationsChange,
   soundFontCache,
   indefinitePlayback = false,
   sampleRate: sampleRateProp,
@@ -276,7 +273,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   const {
     getAnnotations,
     annotationLookup,
-    setAnnotations,
     annotationPreview,
     activeAnnotationId,
     activeAnnotationIdRef,
@@ -291,8 +287,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   } = useAnnotationState({
     annotationStore,
     annotationList,
-    onAnnotationsChange,
-    providerName: 'WaveformPlaylistProvider',
   });
   const {
     scrollContainerRef,
@@ -1387,7 +1381,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setContinuousPlay,
       setAnnotationsEditable,
       setLinkEndpoints,
-      setAnnotations,
       annotationPreview,
       annotationStore,
       setActiveAnnotationId,
@@ -1406,7 +1399,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setContinuousPlay,
       setAnnotationsEditable,
       setLinkEndpoints,
-      setAnnotations,
       annotationPreview,
       annotationStore,
       setActiveAnnotationId,

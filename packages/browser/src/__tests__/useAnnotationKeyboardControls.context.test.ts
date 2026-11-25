@@ -28,9 +28,8 @@ function renderHookOutsideProvider(overrides: Record<string, unknown> = {}) {
   let api: ReturnType<typeof useAnnotationKeyboardControls> | undefined;
   function Harness() {
     api = useAnnotationKeyboardControls({
-      annotations,
+      store: createAnnotationStore(annotations),
       activeAnnotationId: 'a',
-      onAnnotationsChange: () => {},
       duration: 10,
       linkEndpoints: false,
       // MediaElement consumers pass these explicitly (no WaveformPlaylist context):
