@@ -153,18 +153,18 @@ export interface WaveformPlaylistProviderProps {
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The three annotation options (`editable`, `linkEndpoints`,
-   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
-   * follows the three: an option takes a new value of its field, and a setter
-   * or checkbox changes it in between.
-   */
-  /**
    * The owner of the annotations (#867): make it with
    * `useCreateAnnotationStore` and change the annotations with its methods.
    * The provider publishes what it holds and writes nothing back. Without it
    * there are no annotations.
    */
   annotationStore?: AnnotationStore;
+  /**
+   * The three annotation options (`editable`, `linkEndpoints`,
+   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
+   * follows the three: an option takes a new value of its field, and a setter
+   * or checkbox changes it in between.
+   */
   annotationList?: AnnotationListProp;
   /** Master effects chain (default Tone.js adapter only). A new function builds a new engine. */
   effects?: EffectsFunction;
@@ -268,8 +268,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     [zoomLevels?.join(',')]
   );
 
-  // Annotations are derived from the prop (single source of truth in the
-  // parent). Shared with the MediaElement provider (#769).
+  // The annotations are the annotation store's (#867); the provider derives
+  // what it publishes from it. Shared with the MediaElement provider (#769).
   const {
     getAnnotations,
     annotationLookup,
@@ -1366,7 +1366,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     [play, setActiveAnnotationId, continuousPlayRef, refusePlayBeforeFirstReady]
   );
 
-  // The actions both providers have (#688). Never changes.
+  // The actions both providers have (#688). Changes only with the
+  // `annotationStore` prop.
   const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
       play,

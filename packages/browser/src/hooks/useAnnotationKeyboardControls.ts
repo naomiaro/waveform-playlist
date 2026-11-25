@@ -85,11 +85,18 @@ export function useAnnotationKeyboardControls({
   sampleRate: sampleRateProp,
 }: UseAnnotationKeyboardControlsOptions) {
   // Called on every render, with a stand-in when there is no store.
-  const stored = useSyncExternalStore(
-    store ? store.subscribe : noSubscription,
-    store ? store.getAnnotations : noAnnotations,
-    store ? store.getAnnotations : noAnnotations
+  // Wrapped, so a store whose methods use `this` keeps working.
+  const source = useMemo(
+    () =>
+      store
+        ? {
+            subscribe: (listener: () => void) => store.subscribe(listener),
+            getSnapshot: () => store.getAnnotations(),
+          }
+        : { subscribe: noSubscription, getSnapshot: noAnnotations },
+    [store]
   );
+  const stored = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot);
   const annotations = stored;
 
   // Auto-scroll positioning needs samplesPerPixel/sampleRate. Prefer explicit

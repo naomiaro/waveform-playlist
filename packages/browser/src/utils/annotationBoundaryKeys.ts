@@ -5,6 +5,15 @@ const LINK_THRESHOLD = 0.01;
 /** The shortest an annotation can be made by a boundary key. */
 const MIN_LENGTH = 0.1;
 
+/** `list` itself when no bound changed, so an update with it tells nobody. */
+function unlessUnchanged(
+  list: readonly AnnotationData[],
+  updated: readonly AnnotationData[]
+): readonly AnnotationData[] {
+  const same = updated.every((a, i) => a.start === list[i].start && a.end === list[i].end);
+  return same ? list : updated;
+}
+
 /**
  * Move the start of `list[index]` by `delta` seconds, as the `[` and `]` keys
  * do: clamped to 0 and to `MIN_LENGTH` before the end. With linked endpoints
@@ -40,7 +49,7 @@ export function moveAnnotationStart(
       updated[index - 1] = { ...prev, end: newStart };
     }
   }
-  return updated;
+  return unlessUnchanged(list, updated);
 }
 
 /**
@@ -112,5 +121,5 @@ export function moveAnnotationEnd(
       }
     }
   }
-  return updated;
+  return unlessUnchanged(list, updated);
 }

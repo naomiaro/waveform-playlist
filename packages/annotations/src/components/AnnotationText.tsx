@@ -354,7 +354,7 @@ const AnnotationTextComponent: FunctionComponent<AnnotationTextProps> = ({
         const lines = newText.split('\n');
         store.update((current) => {
           const at = current.findIndex((a) => a.id === id);
-          if (at < 0) return current;
+          if (at < 0 || current[at].lines.join('\n') === lines.join('\n')) return current;
           const next = [...current];
           next[at] = { ...current[at], lines };
           return next;

@@ -423,4 +423,130 @@ describe('useAnnotationDragHandlers', () => {
       expect(preview.source.getSnapshot()).toBeNull();
     });
   });
+
+  // PR review, round 1 (#867).
+  describe('with a store, review round 1', () => {
+    const ids = (list: readonly AnnotationData[]) => list.map((a) => a.id);
+
+    function mountWith(
+      store: AnnotationStore,
+      preview?: ReturnType<typeof createValueSource<AnnotationData[] | null>>
+    ) {
+      const view = renderHook(
+        ({ current }: { current: AnnotationStore }) =>
+          useAnnotationDragHandlers({
+            store: current,
+            samplesPerPixel: SAMPLES_PER_PIXEL,
+            sampleRate: SAMPLE_RATE,
+            duration: 10,
+            linkEndpoints: true,
+            preview,
+          }),
+        { initialProps: { current: store } }
+      );
+      const run = (fn: (handlers: typeof view.result.current) => void) => {
+        act(() => fn(view.result.current));
+      };
+      return { run, swap: (next: AnnotationStore) => view.rerender({ current: next }) };
+    }
+
+    it('without a preview, an edge dragged out and back ends where it started', () => {
+      const store = createAnnotationStore(initial());
+      const { run } = mountWith(store);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 0)));
+      expect(store.getAnnotations()[0].end).toBe(1);
+      expect(store.getAnnotations()[1].start).toBe(1);
+    });
+
+    it('without a preview, Escape after a move back still restores every edge', () => {
+      const store = createAnnotationStore(initial());
+      const { run } = mountWith(store);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 10)));
+      run((h) => h.onDragEnd(endEvent(true)));
+      expect(times(store.getAnnotations())).toEqual(times(initial()));
+    });
+
+    it('a store swapped during a drag (preview): the release writes nothing to the new store', () => {
+      const first = createAnnotationStore(initial());
+      const second = createAnnotationStore([annotation('a', 5, 6)]);
+      const preview = createValueSource<AnnotationData[] | null>(null);
+      const { run, swap } = mountWith(first, preview);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
+      act(() => swap(second));
+      expect(preview.source.getSnapshot()).toBeNull();
+      run((h) => h.onDragEnd(endEvent(false)));
+      expect(times(second.getAnnotations())).toEqual([[5, 6]]);
+      expect(times(first.getAnnotations())).toEqual(times(initial()));
+    });
+
+    it('a store swapped during a drag (no preview): later moves and Escape write nothing to the new store', () => {
+      const first = createAnnotationStore(initial());
+      const second = createAnnotationStore([annotation('a', 5, 6)]);
+      const { run, swap } = mountWith(first);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
+      act(() => swap(second));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 40)));
+      run((h) => h.onDragEnd(endEvent(true)));
+      expect(times(second.getAnnotations())).toEqual([[5, 6]]);
+    });
+
+    it("a move collides with a neighbour where the store has it now (maintainer's choice a)", () => {
+      const store = createAnnotationStore(initial());
+      const preview = createValueSource<AnnotationData[] | null>(null);
+      const { run } = mountWith(store, preview);
+      run((h) => h.onDragStart(startEvent(1, 'end')));
+      run((h) => h.onDragMove(moveEvent(1, 'end', 10)));
+      // The app moves c's start from 3 to 2.2 during the drag.
+      act(() => {
+        store.update((c) => c.map((a) => (a.id === 'c' ? { ...a, start: 2.2 } : a)));
+      });
+      // b's end is dragged to 2.5, past c's new start.
+      run((h) => h.onDragMove(moveEvent(1, 'end', 50)));
+      run((h) => h.onDragEnd(endEvent(false)));
+
+      // The edge stops at c's new start (linked endpoints: a separated
+      // neighbour is met first and carried by the next move, #747); before
+      // the fix b ended at 2.5 over c at 2.2.
+      const [, b, c] = store.getAnnotations();
+      expect(b.end).toBeCloseTo(2.2, 5);
+      expect(c.start).toBeGreaterThanOrEqual(b.end - 1e-9);
+    });
+
+    it('the dragged annotation removed during the drag: the drag ends, and no neighbour is pushed', () => {
+      const store = createAnnotationStore(initial());
+      const { run } = mountWith(store);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 20)));
+      act(() => {
+        store.update((c) => c.filter((a) => a.id !== 'a'));
+      });
+      const before = store.getAnnotations();
+      run((h) => h.onDragMove(moveEvent(0, 'end', 60)));
+      run((h) => h.onDragEnd(endEvent(false)));
+      expect(store.getAnnotations()).toBe(before);
+    });
+
+    it('"clear all" during a drag clears the preview, and later annotations are drawn', () => {
+      const store = createAnnotationStore(initial());
+      const preview = createValueSource<AnnotationData[] | null>(null);
+      const { run } = mountWith(store, preview);
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
+      act(() => {
+        store.set([]);
+      });
+      expect(preview.source.getSnapshot()).toBeNull();
+      act(() => {
+        store.set([annotation('n', 5, 6)]);
+      });
+      expect(preview.source.getSnapshot()).toBeNull();
+      expect(ids(store.getAnnotations())).toEqual(['n']);
+    });
+  });
 });

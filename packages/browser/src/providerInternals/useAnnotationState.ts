@@ -95,10 +95,21 @@ export function useAnnotationState({
 }: UseAnnotationStateOptions): AnnotationState {
   // Called on every render, with a stand-in when there is no store. The
   // store validates what it holds (numeric start/end, unique ids).
+  // Wrapped, so a store whose methods use `this` keeps working.
+  const source = useMemo(
+    () =>
+      annotationStore
+        ? {
+            subscribe: (listener: () => void) => annotationStore.subscribe(listener),
+            getSnapshot: () => annotationStore.getAnnotations(),
+          }
+        : { subscribe: noSubscription, getSnapshot: noAnnotations },
+    [annotationStore]
+  );
   const annotations = useSyncExternalStore(
-    annotationStore ? annotationStore.subscribe : noSubscription,
-    annotationStore ? annotationStore.getAnnotations : noAnnotations,
-    annotationStore ? annotationStore.getAnnotations : noAnnotations
+    source.subscribe,
+    source.getSnapshot,
+    source.getSnapshot
   );
 
   // The animation loop reads the store at each frame, through the latest prop.

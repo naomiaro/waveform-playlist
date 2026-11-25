@@ -131,15 +131,38 @@ describe.each(KINDS)('%s with an annotationStore', (kind) => {
       return null;
     };
     mount(kind, store, <DeferredReader />);
+    // Two edits before the deferred render.
     act(() => {
       store.update((c) => [...c, note('a', 1, 2)]);
-    });
-    act(() => {
       store.update((c) => [...c, note('b', 2, 3)]);
     });
     await act(async () => {});
     expect(ids(store.getAnnotations())).toEqual(['z0', 'a', 'b']);
     expect(deferred).toBe(store.getAnnotations());
+  });
+
+  it('works with a store whose methods use `this`', () => {
+    class AppStore implements AnnotationStore {
+      private inner = createAnnotationStore([note('a')]);
+      getAnnotations() {
+        return this.inner.getAnnotations();
+      }
+      subscribe(listener: () => void) {
+        return this.inner.subscribe(listener);
+      }
+      set(list: readonly AnnotationData[]) {
+        this.inner.set(list);
+      }
+      update(fn: (current: readonly AnnotationData[]) => readonly AnnotationData[]) {
+        this.inner.update(fn);
+      }
+    }
+    const store = new AppStore();
+    mount(kind, store);
+    act(() => {
+      store.update((c) => [...c, note('b', 2, 3)]);
+    });
+    expect(ids(probe.annotations)).toEqual(['a', 'b']);
   });
 
   it("swapping the store shows the new one's annotations, and the old one is not followed", () => {

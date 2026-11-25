@@ -40,6 +40,15 @@ describe('AnnotationText with a store', () => {
     expect(byId).toEqual({ x: ['inserted'], a: ['first'], b: ['edited'] });
   });
 
+  it('a blur with unchanged text tells nobody', () => {
+    const store = createAnnotationStore(list());
+    const listener = vi.fn();
+    store.subscribe(listener);
+    const { getByText } = renderList(store);
+    fireEvent.blur(getByText('second'));
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it('an id edit to a duplicate writes nothing and the field shows the stored id', () => {
     const store = createAnnotationStore(list());
     const before = store.getAnnotations();

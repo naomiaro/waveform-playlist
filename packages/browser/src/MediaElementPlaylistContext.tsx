@@ -106,18 +106,18 @@ export interface MediaElementPlaylistProviderProps {
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
   /**
-   * The three annotation options (`editable`, `linkEndpoints`,
-   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
-   * follows the three: an option takes a new value of its field, and a setter
-   * or checkbox changes it in between.
-   */
-  /**
    * The owner of the annotations (#867): make it with
    * `useCreateAnnotationStore` and change the annotations with its methods.
    * The provider publishes what it holds and writes nothing back. Without it
    * there are no annotations.
    */
   annotationStore?: AnnotationStore;
+  /**
+   * The three annotation options (`editable`, `linkEndpoints`,
+   * `isContinuousPlay`); the annotations are `annotationStore`'s. The provider
+   * follows the three: an option takes a new value of its field, and a setter
+   * or checkbox changes it in between.
+   */
   annotationList?: AnnotationListProp;
   /**
    * AudioContext for Web Audio routing (fades, effects).
@@ -219,8 +219,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ratePropAppliedRef.current = initialPlaybackRate;
     playbackRateRef.current = initialPlaybackRate;
   }, [initialPlaybackRate]);
-  // Annotations are derived from the prop (single source of truth in the
-  // parent). Shared with the WebAudio provider (#769).
+  // The annotations are the annotation store's (#867); the provider derives
+  // what it publishes from it. Shared with the WebAudio provider (#769).
   const {
     getAnnotations,
     annotationLookup,
@@ -895,7 +895,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     [play, setActiveAnnotationId]
   );
 
-  // Never changes.
+  // Changes only with the `annotationStore` prop.
   const controlsValue: PlaybackControlsContextValue = useMemo(
     () => ({
       play,

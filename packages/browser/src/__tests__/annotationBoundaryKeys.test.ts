@@ -48,6 +48,12 @@ describe('moveAnnotationStart / moveAnnotationEnd', () => {
     expect(a).toMatchObject({ id: 'a', lines: ['a'], language: 'en' });
   });
 
+  it('returns the list itself when nothing moves (a key at a clamp)', () => {
+    const list = [A('a', 0, 1), A('b', 1, 2)];
+    expect(moveAnnotationStart(list, 0, -0.01, { linkEndpoints: false })).toBe(list);
+    expect(moveAnnotationEnd(list, 1, 0.01, { linkEndpoints: false, duration: 2 })).toBe(list);
+  });
+
   it('does not change its input', () => {
     const list = Object.freeze([Object.freeze(A('a', 0, 1)), Object.freeze(A('b', 1, 2))]);
     expect(() => moveAnnotationStart(list, 1, 0.01, { linkEndpoints: true })).not.toThrow();

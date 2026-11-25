@@ -223,11 +223,14 @@ describe('AnnotationText items (#740)', () => {
     const { rerender, getByText } = render(ui(true));
 
     rerender(ui(false));
-    fireEvent.blur(getByText('second'));
+    const field = getByText('second');
+    field.textContent = 'second, edited';
+    fireEvent.blur(field);
     expect(changes).not.toHaveBeenCalled();
 
     rerender(ui(true));
-    fireEvent.blur(getByText('second'));
+    field.textContent = 'second, edited';
+    fireEvent.blur(field);
     expect(changes).toHaveBeenCalledTimes(1);
   });
 
@@ -240,7 +243,9 @@ describe('AnnotationText items (#740)', () => {
     const { rerender, getByText } = render(ui(first.store));
     rerender(ui(second.store));
 
-    fireEvent.blur(getByText('third'));
+    const field = getByText('third');
+    field.textContent = 'third, edited';
+    fireEvent.blur(field);
 
     expect(first.changes).not.toHaveBeenCalled();
     expect(second.changes).toHaveBeenCalledTimes(1);
