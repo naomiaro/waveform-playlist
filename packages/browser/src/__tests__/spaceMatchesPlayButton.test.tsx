@@ -158,8 +158,9 @@ const GapPress: React.FC = () => {
 
 // Native events, not RTL's fireEvent: fireEvent wraps the dispatch in act(),
 // and an act() started inside a commit that ran outside act (the animation
-// loop's) left React's act queue behind, so the next test's mount never got
-// ready.
+// loop's) left React's scheduling stuck for the rest of the file: every later
+// test's mount never got ready (the act queue itself was empty; the mechanism
+// is not established).
 const pressSpaceNow = () => {
   document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
 };
