@@ -1,13 +1,11 @@
 import React, { use, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
-import { useTheme, type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { warnMisplacedPart } from './partWarnings';
 import {
   usePlaylistMixer,
   useEditorControls,
   useRecordingArm,
   useSelectedTrackId,
-  useTrackReorderPreview,
 } from '../contexts/playlistContexts';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
 import { useWaveformRows, WaveformPartPlaceContext } from './waveformLayoutContext';
@@ -45,10 +43,7 @@ export interface WaveformTrackControlsProps {
 /** What the part renders for a track when it has no children. */
 const DEFAULT_TEMPLATE = <DefaultTrackControls />;
 
-/** Drop-shadow for the floating (fully opaque) drag-source controls row. */
-const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
-
-/** Fills the slot; the element a reorder drag moves. */
+/** Fills the slot and holds the panel (`data-track-controls`). */
 const SLOT_BODY_STYLE = { height: '100%' } as const;
 
 interface TrackControlsSlotProps {
@@ -111,7 +106,6 @@ function TrackControlsSlotImpl({
     reorderTrack,
     setSelectedTrackId,
   } = useEditorControls();
-  const theme = useTheme() as WaveformPlaylistTheme;
   const shared = use(TrackControlsSharedContext);
 
   // The position is read when an action runs, so the actions do not change
@@ -181,7 +175,11 @@ function TrackControlsSlotImpl({
     ]
   );
 
-  // For a reorder handle inside the panel (`useTrackReorderHandle`).
+  // For a reorder handle inside the panel (`useTrackReorderHandle`): the
+  // slot's own element, the node React keys and reorders, is the sortable
+  // item. dnd-kit's sorting plugin moves the dragged item next to the item it
+  // is dragged over; an element one level inside the keyed slot was moved
+  // into the other slot, where React never looked for it again (#796).
   const elementRef = useRef<HTMLDivElement | null>(null);
   const [isDragSource, setDragSource] = useState(false);
   const wiring = useMemo<TrackSlotWiring>(
@@ -191,29 +189,15 @@ function TrackControlsSlotImpl({
 
   return (
     <ControlSlot
+      ref={elementRef}
       $height={height}
       $top={top}
       $animate={animate}
       $isSelected={isSelected}
+      $isDragSource={isDragSource}
       onClick={actions.select}
     >
-      <div
-        ref={elementRef}
-        data-track-controls={trackId}
-        style={
-          isDragSource
-            ? {
-                ...SLOT_BODY_STYLE,
-                boxShadow: DRAG_SOURCE_SHADOW,
-                // Opaque background for the floating (top-layer, popover-based)
-                // drag-source row — without it the row underneath shows through.
-                // onDragStart selects the dragged track, so its slot always shows
-                // the selected-track background while lifted.
-                background: theme.selectedTrackControlsBackground,
-              }
-            : SLOT_BODY_STYLE
-        }
-      >
+      <div data-track-controls={trackId} style={SLOT_BODY_STYLE}>
         <TrackSlotWiringContext value={wiring}>
           <TrackContext value={value}>{template}</TrackContext>
         </TrackSlotWiringContext>
@@ -257,7 +241,6 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   const { selectedTrackId } = useSelectedTrackId();
   // The track a take is recorded onto (#812): its slot alone renders when a take starts or ends.
   const { armedTrackId } = useRecordingArm();
-  const { trackReorderEpoch } = useTrackReorderPreview();
   const spectrogram = use(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
 
@@ -291,13 +274,8 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
           // change made then is kept.
           const state = trackStates[trackIndex];
           return (
-            // key includes trackReorderEpoch: forces a remount after every
-            // track-reorder drag, discarding @dnd-kit sortable-plugin DOM
-            // corruption (see bumpTrackReorderEpoch's doc comment in
-            // WaveformPlaylistContext). Stays at `-0` — a no-op suffix — for
-            // consumers that never render a reorder handle.
             <TrackControlsSlot
-              key={`${track.id}-${trackReorderEpoch}`}
+              key={track.id}
               trackId={track.id}
               index={trackIndex}
               kind={track.kind}

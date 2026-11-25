@@ -807,7 +807,7 @@ WaveformPlaylistProvider (Split Contexts for Performance; everything below deriv
     ├─→ PlaylistMixerContext (every mute, solo, volume or pan change; tracks added, removed, renamed or reordered)
     │   └─→ trackStates, masterVolume
     └─→ TrackReorderPreviewContext (every drag-over of a track reorder)
-        └─→ trackDragPreview, trackReorderEpoch
+        └─→ trackDragPreview
     ↓
 ├─→ Primitive Components (subscribe to relevant contexts only)
 │   ├─→ PlayButton, PauseButton, StopButton
@@ -1039,7 +1039,6 @@ export interface EditorControlsContextValue {
   setTrackVolume: (trackId: string, volume: number) => void;
   setTrackPan: (trackId: string, pan: number) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
-  bumpTrackReorderEpoch: () => void;
   setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
   setSelectedTrackId: (trackId: string | null) => void;
   // Zoom
@@ -1098,7 +1097,6 @@ export interface PlaylistMixerContextValue {
 // 4e. Live track-reorder drag - changes on every drag-over
 export interface TrackReorderPreviewContextValue {
   trackDragPreview: TrackDragPreview | null;
-  trackReorderEpoch: number;
 }
 
 // 5. MediaElementPlaylistProvider only

@@ -431,8 +431,6 @@ interface EditorControlsContextValue {
   setTrackPan: (trackId: string, pan: number) => void;
   /** An undo step of the arrangement. */
   reorderTrack: (trackId: string, toIndex: number) => void;
-  /** Internal: call after every track-reorder drag interaction ends. */
-  bumpTrackReorderEpoch: () => void;
   /** Internal wiring for ClipInteractionProvider. */
   setTrackDragPreview: Dispatch<SetStateAction<TrackDragPreview | null>>;
   setSelectedTrackId: (trackId: string | null) => void;
@@ -540,8 +538,6 @@ interface PlaylistMixerContextValue {
 interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live; null otherwise */
   trackDragPreview: TrackDragPreview | null;
-  /** Incremented after every track-reorder drag ends */
-  trackReorderEpoch: number;
 }
 ```
 

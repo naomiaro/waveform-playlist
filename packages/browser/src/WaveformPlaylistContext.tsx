@@ -302,9 +302,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  // Bumped after every track-reorder DRAG interaction (committed or not) —
-  // see bumpTrackReorderEpoch below for the full rationale.
-  const [trackReorderEpoch, setTrackReorderEpoch] = useState(0);
   // Live track-reorder drag preview (view-level only; see the
   // "Track Reordering" section of packages/browser/CLAUDE.md). Set by
   // ClipInteractionProvider's onDragOver, cleared on drag end/cancel.
@@ -1153,28 +1150,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     [play, setCurrentTimeRefs, recordingActiveRef]
   );
 
-  // @dnd-kit/react's Feedback and OptimisticSortingPlugin sortable plugins
-  // perform raw, React-bypassing DOM node moves (insertAdjacentElement /
-  // replaceWith) as part of their live drag-preview and collision-commit
-  // mechanics — confirmed via MutationObserver instrumentation to physically
-  // relocate the React-owned track-controls row during a track-reorder drag,
-  // leaving its parent/nextSibling different from what React's fiber tree
-  // still believes. That desync is permanent for the session: every LATER
-  // React-driven reorder (button OR drag) computes correct data but silently
-  // fails to patch the DOM for these rows. `useTrackReorderHandle` already
-  // sets `feedback: 'move'` to avoid the placeholder-splice half of this (see
-  // its comment), but OptimisticSortingPlugin's own `reorder()` DOM splice
-  // fires independently on any drag that commits a real index change and
-  // isn't configurable away without losing live index tracking. Bumping this
-  // epoch forces the view's track-controls part to re-key (remount) its
-  // slots after every track-reorder drag ends — committed or canceled, since
-  // corruption can occur before a final index is even decided — discarding
-  // any corrupted fiber state so the NEXT reorder (drag or button) starts
-  // from a clean DOM. Called from ClipInteractionProvider's onDragEnd.
-  const bumpTrackReorderEpoch = useCallback(() => {
-    setTrackReorderEpoch((epoch) => epoch + 1);
-  }, []);
-
   // Selection — wraps hook setter with playback side-effects (provider concern).
   const setSelection = useCallback(
     (start: number, end: number) => {
@@ -1418,7 +1393,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setTrackVolume: editing.setTrackVolume,
       setTrackPan: editing.setTrackPan,
       reorderTrack: editing.reorderTrack,
-      bumpTrackReorderEpoch,
       setTrackDragPreview,
       setSelectedTrackId: setSelectedTrackIdControl,
 
@@ -1449,7 +1423,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       editing.setTrackVolume,
       editing.setTrackPan,
       editing.reorderTrack,
-      bumpTrackReorderEpoch,
       setTrackDragPreview,
       setSelectedTrackIdControl,
       zoom.zoomIn,
@@ -1501,8 +1474,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
 
   // Changes on every drag-over of a track reorder.
   const reorderPreviewValue: TrackReorderPreviewContextValue = useMemo(
-    () => ({ trackDragPreview, trackReorderEpoch }),
-    [trackDragPreview, trackReorderEpoch]
+    () => ({ trackDragPreview }),
+    [trackDragPreview]
   );
 
   // Outermost: the values that change least. The order has no effect on

@@ -26,7 +26,8 @@ const withMoveFeedback = (defaults: Plugins): Plugins => [...defaults, MOVE_FEED
  * calls for one track register the same sortable id twice.
  *
  * The item that moves is the slot `<WaveformTrackControls>` draws around the
- * panel, not an element of the caller. The per-source modifiers REPLACE the
+ * panel (the keyed element React reorders, #796), not an element of the
+ * caller. The per-source modifiers REPLACE the
  * provider's clip modifiers for this operation, so track drags are
  * vertical-only and skip clip collision and snap. Data kind 'track-reorder'
  * is the discriminator the shared drag handlers branch on.
@@ -56,10 +57,9 @@ export function useTrackReorderHandle(): TrackReorderHandle {
     // `placeholder.replaceWith(element)` on drop) — confirmed via
     // MutationObserver instrumentation to relocate the React-owned row 6
     // times during a single one-slot drag, leaving its final parent/sibling
-    // different from what React's fiber tree still believes. That desync is
-    // permanent for the session: every later React-driven reorder (button OR
-    // drag) computes the correct data but silently fails to update the DOM
-    // for these rows. The placeholder splice is created only when
+    // different from what React's fiber tree still believes. (Measured when
+    // the registered element was one level inside the keyed slot, before
+    // #796; not re-run with the slot itself.) The placeholder splice is created only when
     // `feedback !== 'move'` (@dnd-kit/dom Feedback.ts) — 'move' keeps the
     // dragged element in the live DOM (no clone/placeholder) while still
     // running the *unconditional* `dragOperation.shape = ...` assignment.
@@ -71,12 +71,18 @@ export function useTrackReorderHandle(): TrackReorderHandle {
     // drag-based reordering silently never commits. Boundary trims don't hit
     // this because they're plain useDraggable (no collision-based commit) —
     // sortables need shape. `isDragSource` is a reactive signal, unaffected
-    // either way. See browser/CLAUDE.md "Track Reordering".
+    // either way. OptimisticSortingPlugin still moves the element during the
+    // drag (`insertAdjacentElement` next to the item it is dragged over);
+    // that is safe only because the element is the keyed slot (#796, below).
+    // See browser/notes/track-controls-and-reorder.md "Track Reordering".
     plugins: withMoveFeedback,
   });
 
-  // The sortable item is the slot's element, which the part owns: it is
-  // handed to dnd-kit here, after the commit that mounted it. Not in a layout
+  // The sortable item is the slot's element, which the part owns: the keyed
+  // `ControlSlot`, so that the sorting plugin's moves are moves of the nodes
+  // React reorders. An element inside it was moved into the neighbouring
+  // slot, and React's next reorder left it there (#796). It is handed to
+  // dnd-kit here, after the commit that mounted it. Not in a layout
   // effect: a child's layout effects run before React attaches its parent's
   // ref, so the slot's element would still be null on the first mount (tried:
   // no drag started at all).

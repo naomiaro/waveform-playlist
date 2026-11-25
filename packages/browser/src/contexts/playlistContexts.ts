@@ -261,13 +261,6 @@ export interface EditorControlsContextValue {
    *  arrangement (#812). */
   reorderTrack: (trackId: string, toIndex: number) => void;
 
-  /** Internal: call after every track-reorder DRAG interaction ends
-   *  (committed or canceled) to force the view's track-controls part to remount
-   *  its slots, discarding any @dnd-kit sortable-plugin DOM
-   *  corruption. Not needed for button-driven reorderTrack calls (they never
-   *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
-  bumpTrackReorderEpoch: () => void;
-
   /** INTERNAL wiring for ClipInteractionProvider: publishes/clears the live
    *  track-reorder drag preview. Custom drag integrations may call it, but
    *  most consumers only ever READ trackDragPreview from useTrackReorderPreview(). */
@@ -396,11 +389,6 @@ export interface TrackReorderPreviewContextValue {
    *  layout from it; a track's panel can read it to mirror the preview in
    *  its own UI. */
   trackDragPreview: TrackDragPreview | null;
-  /** Internal: incremented after every track-reorder drag interaction ends.
-   *  The view's track-controls part folds this into each slot's `key` to
-   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
-   *  (see bumpTrackReorderEpoch in EditorControlsContextValue). */
-  trackReorderEpoch: number;
 }
 
 /**
@@ -646,7 +634,7 @@ export const usePlaylistTimeline = () =>
 export const usePlaylistMixer = () => useSlot(PlaylistMixerContext, 'usePlaylistMixer', WEB_AUDIO);
 
 /**
- * `{ trackDragPreview, trackReorderEpoch }`. A component that calls this
+ * `{ trackDragPreview }`. A component that calls this
  * re-renders on every drag-over of a track reorder.
  */
 export const useTrackReorderPreview = () =>

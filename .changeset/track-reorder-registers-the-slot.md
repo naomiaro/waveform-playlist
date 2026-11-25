@@ -1,0 +1,5 @@
+---
+'@waveform-playlist/browser': major
+---
+
+A track-reorder drag no longer remounts the control panels when it ends, and `trackReorderEpoch` (`useTrackReorderPreview()`) and `bumpTrackReorderEpoch` (`useEditorControls()`) are removed. The element dnd-kit moves during a reorder drag is now the slot around each panel (the keyed element the controls column reorders), not the element inside it that holds the panel. dnd-kit's sorting plugin moves the dragged element next to the element of the track it is dragged over; with the inner element registered, that put one panel into the neighbouring slot, and the remount after every drag was there to undo it. The provider also stops ignoring a `dragover` outside a reorder drag: the one that arrived after a canceled drag came from that remount. State kept inside a panel now survives a reorder drag. While a track is dragged, dnd-kit's `popover` attribute, `data-dnd-dragging` and its inline styles are on the slot, and the slot draws the lifted look (opaque, with a shadow). See "`trackReorderEpoch` and `bumpTrackReorderEpoch` are removed" in the upgrade guide.

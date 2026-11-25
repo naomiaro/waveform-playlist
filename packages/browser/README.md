@@ -109,7 +109,7 @@ Under either provider:
 | `usePlaylistTimeline` | `tracks` (loaded clips only, read-only), `peaksDataArray` (with placeholder records for clips still loading), `duration` (loaded audio), `isReady` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), audio or peaks arriving, `isReady` changing |
 | `usePlaylistMixer` | `trackStates` (one entry per track in the order of `tracks`, also while a track loads), `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed, renamed or reordered |
 | `useTrack` | Among the children of `<WaveformTrackControls>` only: the track whose panel is being drawn (id, name, mixer state, `isSelected`, `isRecordingArmed`) and actions bound to it (`setMuted`, `setVolume`, `moveUp`, …) | a change of that track's state, position or selection |
-| `useTrackReorderPreview` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
+| `useTrackReorderPreview` | `trackDragPreview` | every drag-over of a track reorder |
 | `useLoop` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | `useSelectedTrackId` | `selectedTrackId` | another track being selected |
 | `useUndoRedo` | `canUndo`, `canRedo` | after an edit |

@@ -129,7 +129,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady` | every clip operation (a trim once, on release), a zoom, audio or peaks arriving, `isReady` changing |
 | [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change; tracks added, removed, renamed or reordered |
 | [`useTrack()`](#usetrack) | one track's id, name, mixer state and bound actions. Only among the children of `<WaveformTrackControls>` | a change of that track's state, position or selection |
-| [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
+| [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview` | every drag-over of a track reorder |
 | [`useLoop()`](#useloop) | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | [`useSelectedTrackId()`](#useselectedtrackid) | `selectedTrackId` | another track being selected |
 | [`useUndoRedo()`](#useundoredo) | `canUndo`, `canRedo` | after an edit |
@@ -290,13 +290,10 @@ interface TrackReorderPreviewContextValue {
   /** Non-null while a track-reorder drag is live: the dragged track and the
    *  index it would drop at. Null otherwise. */
   trackDragPreview: TrackDragPreview | null;
-  /** Internal: incremented after every track-reorder drag ends. The
-   *  track-controls part folds it into the key of each track's slot. */
-  trackReorderEpoch: number;
 }
 ```
 
-A control panel of your own needs neither field. `<WaveformTrackControls>` keys the slot around every panel with `trackReorderEpoch` itself, so the panel is remounted after each reorder drag whatever it contains; do not add the epoch to keys of your own. Read `trackDragPreview` only to mirror the drag somewhere outside the view.
+A control panel of your own does not need it. Read `trackDragPreview` only to mirror the drag somewhere outside the view.
 
 ### useAnnotations
 
@@ -952,8 +949,6 @@ interface EditorControlsContextValue {
    *  organizational — playback is not interrupted. An undo step of the
    *  arrangement. */
   reorderTrack: (trackId: string, toIndex: number) => void;
-  /** Internal: call after every track-reorder DRAG interaction ends. */
-  bumpTrackReorderEpoch: () => void;
   /** Internal wiring for ClipInteractionProvider: publishes/clears the live
    *  track-reorder drag preview. */
   setTrackDragPreview: Dispatch<SetStateAction<TrackDragPreview | null>>;
@@ -1084,7 +1079,7 @@ The values are the arrangement's mix for this track, also while its audio is sti
 
 The value changes when something about this track changes: its mixer state, its position (a reorder, or a track removed above it), whether it is selected, its render mode, whether a take is being recorded onto it. A volume step on one track renders the components that call `useTrack()` in that track's panel and in no other. Selecting a track renders them in two panels: the one that stops being selected and the one that becomes selected.
 
-The part remounts every slot after a reorder drag ends (the slot's key includes `useTrackReorderPreview().trackReorderEpoch`), so React state held inside a panel is reset then. A reorder by the move buttons does not remount.
+No reorder remounts a slot, whether by drag or by the move buttons: React state held inside a panel survives it.
 
 ### Example
 
