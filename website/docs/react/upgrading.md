@@ -1973,7 +1973,8 @@ For `<WaveformEditor>`, `<WaveformTracks>` holds `<WaveformClipHeaders />` and `
   <MediaElementWaveform editable={editable} linkEndpoints={linkEndpoints} />
 </MediaElementPlaylistProvider>
 
-// After
+// After (annotationStore from useCreateAnnotationStore: see the annotation store entry)
+const annotationStore = useCreateAnnotationStore(() => initialAnnotations);
 const annotationList = useMemo(() => ({ editable, linkEndpoints }), [editable, linkEndpoints]);
 <MediaElementPlaylistProvider
   track={track}
@@ -2087,7 +2088,7 @@ const { onDragStart, onDragMove, onDragEnd } = useAnnotationDragHandlers({
 | The ids of the three checkboxes | `continuous-play`, `link-endpoints`, `editable-annotations` | generated (two of one checkbox no longer share an id) |
 | Components rendered per move of an edge drag and per annotation boundary under `WaveformPlaylistProvider` | 47 and 50 on the annotations example | the same: the part gained its `DragDropProvider` and the list lost a wrapper. A view with boxes and no list renders one component more per move and per boundary |
 
-Not changed: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls`, `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />` (not changed by this entry; [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed) moves the four controls to `@waveform-playlist/annotations`), the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
+Not changed by this entry: `useAnnotationDragHandlers`, `useAnnotationsWithPreview`, `useAnnotationKeyboardControls` ([the annotation store entries](#useannotationdraghandlers-and-useannotationkeyboardcontrols-take-the-annotation-store) change their options and types), `<KeyboardShortcuts annotations>` (still `WaveformPlaylistProvider` only), `<ContinuousPlayCheckbox />`, `<DownloadAnnotationsButton />` (not changed by this entry; [One owner per exported name](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed) moves the four controls to `@waveform-playlist/annotations`), the `AnnotationProvider` of `@waveform-playlist/annotations`, the annotation theme keys other than the two above, and the keys an edge can not be dragged with (a handle can be focused; the keyboard does not move it, as before).
 
 ## The options that only affect how a view draws are `<WaveformViewOptions>`; they leave the providers
 
@@ -2399,7 +2400,8 @@ import {
 const [linkEndpoints, setLinkEndpoints] = useState(true);
 <LinkEndpointsCheckbox checked={linkEndpoints} onChange={setLinkEndpoints} />
 
-// After
+// After (annotationStore from useCreateAnnotationStore: see the annotation store entry)
+const annotationStore = useCreateAnnotationStore(() => initialAnnotations);
 <WaveformPlaylistProvider
   arrangement={arrangement}
   annotationStore={annotationStore}
@@ -4351,8 +4353,9 @@ A function update reads the store's list at the moment of the call: two updates 
 
 Both hooks take `store: AnnotationStore | undefined` in place of `annotations` and `onAnnotationsChange`. They read the annotations from the store and write their changes to it:
 
-- **The drag:** on release, only the `start` and `end` of the annotations the drag moved (the dragged one and, with linked endpoints, its neighbours) are written, by id, onto the store's list as it is then. An annotation added or edited elsewhere during the drag stays; a release whose annotation was removed during the drag writes nothing. Escape writes nothing with `preview`; without `preview` the moves are written as they happen, and Escape writes the edges from before the drag back, by id. While an edge is dragged with `preview`, the preview shows the store's current list with the drag's moved edges on top, so a change made elsewhere during the drag is drawn at once.
-- **The boundary keys** (`[`, `]`, `Shift+[`, `Shift+]`) find the active annotation by id in the store's list when the key is pressed.
+- **The drag** keeps the `start` and `end` of every annotation it has touched (the dragged one and the neighbours it moved, also one moved back to where it was). Each move is worked out over the store's current list with those bounds on top, so a neighbour your app moved during the drag is collided with where it is now. With `preview`, the moves are published to the preview (the store's current list with the drag's bounds on top, so a change made elsewhere is drawn at once) and only the release writes: the touched bounds, by id, onto the store's list as it is then; an annotation added or edited elsewhere during the drag stays, and Escape writes nothing. Without `preview`, every move writes all the touched bounds, and Escape writes each touched annotation's bounds from the start of the drag back, by id.
+- **The drag ends** and writes nothing more (its preview cleared) when the dragged annotation is removed from the store (a "clear all" included), when the provider is given another store, or when the component unmounts. Without `preview` the moves already written stay.
+- **The boundary keys** (`[`, `]`, `Shift+[`, `Shift+]`) find the active annotation by id in the store's list when the key is pressed. A key at a limit (a start at 0, an end at the end of the audio, an annotation at its shortest) changes nothing and tells no subscriber.
 - **Without a store** (`store: undefined`) both hooks do nothing: there are no annotations to drag, select or move.
 
 In plain JavaScript a call that still passes `annotations` and `onAnnotationsChange` and no `store` does nothing: no drag moves an edge, no key selects or moves an annotation. TypeScript reports the two options and the missing `store`.
@@ -4440,15 +4443,35 @@ Without `@waveform-playlist/browser`, make the store with `createAnnotationStore
 
 **Packages:** `@waveform-playlist/browser`, `@waveform-playlist/core`.
 
-`useAnnotations().annotations` (`AnnotationsContextValue`) is typed `readonly AnnotationData[]`, as are `useStoredAnnotations(store)` and `store.getAnnotations()`. They are the store's own list. Outside production builds the store freezes the array, each annotation and each annotation's `lines`, so a write made in place throws a `TypeError` where it is made. In a production build nothing is frozen, and such a write changes the annotations every reader shares, without telling anyone.
+`useAnnotations().annotations` (`AnnotationsContextValue`) is typed `readonly AnnotationData[]`, as are `useStoredAnnotations(store)` and `store.getAnnotations()`. They are the store's own list. In a development build the store freezes the array, each annotation and each annotation's `lines`. A development build here is one where `process.env.NODE_ENV` is set and is not `'production'` (a bundler's dev server); a page that loads the module with no bundler and no `process` freezes nothing. On a frozen list `.sort(…)`, `.push(…)` and the other array writes throw a `TypeError` in any code; an assignment to a field (`annotations[0].end = 4`) throws in strict code, which every module is, and is silently ignored in a sloppy-mode script. In a production build nothing is frozen, and such a write changes the annotations every reader shares, without telling anyone.
 
-The store freezes what you give it too: after `store.set(list)` (or an `update` that returns `list`), `list` and its annotations are frozen in development. Do not keep changing them.
+The store freezes what you give it too: after `store.set(list)` (or an `update` that returns `list`), `list` and its annotations are frozen in a development build. Do not keep changing them.
 
-The inputs that only read a list accept `readonly` arrays, which breaks no caller: `AnnotationText`'s `annotations`, `AnnotationFormat.serialize`, `useAnnotationsWithPreview` and core's `updateAnnotationBoundaries`. The `annotations` argument of an `AnnotationAction` stays `AnnotationData[]`: it is a copy, meant to be changed.
+The inputs that only read a list accept `readonly` arrays: `AnnotationText`'s `annotations`, `AnnotationFormat.serialize`, `useAnnotationsWithPreview` and core's `updateAnnotationBoundaries`. This breaks no code that calls them. It does break an `AnnotationFormat` you implement yourself whose `serialize` takes `AnnotationData[]`: under `strictFunctionTypes` (part of `strict`) TypeScript reports TS2322, because the interface now passes a `readonly` list. The `annotations` argument of an `AnnotationAction` stays `AnnotationData[]`: it is a copy, meant to be changed.
 
 **Find:** a list from `useAnnotations()` (or `useAnnotationsWithPreview`) passed to a parameter of yours typed `AnnotationData[]`; `.sort(`, `.push(`, `.splice(` or `.reverse(` called on it; an assignment to a field of one of its annotations.
 
 **Replace with:** widen your parameter to `readonly AnnotationData[]`, or pass a copy; sort a copy; change annotations through the store.
+
+**Find:** an object typed `AnnotationFormat` that you write (a format of your own), with `serialize: (annotations: AnnotationData[]) => …`.
+
+**Replace with:** the same function with its parameter widened to `readonly AnnotationData[]` (copy it first if the function sorts or changes it).
+
+```ts
+// Before
+const csvFormat: AnnotationFormat = {
+  name: 'csv',
+  parse: parseCsv,
+  serialize: (annotations: AnnotationData[]) => annotations.map(toCsvRow).join('\n'),
+};
+
+// After
+const csvFormat: AnnotationFormat = {
+  name: 'csv',
+  parse: parseCsv,
+  serialize: (annotations: readonly AnnotationData[]) => annotations.map(toCsvRow).join('\n'),
+};
+```
 
 ```tsx
 // Before

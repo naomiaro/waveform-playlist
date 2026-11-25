@@ -69,7 +69,7 @@ For time-synchronized annotations:
 npm install @waveform-playlist/annotations
 ```
 
-Give the provider an annotation store, and render `AnnotationProvider` above the view. Without it the annotation boxes and the annotation list draw nothing:
+Give the provider an annotation store, and render `AnnotationProvider` above the view. Without the store there are no annotations; without `AnnotationProvider` the annotation boxes and the annotation list draw nothing:
 
 ```tsx
 import { useCreateAnnotationStore } from '@waveform-playlist/browser';

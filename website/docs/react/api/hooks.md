@@ -113,7 +113,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useActiveAnnotation()`](#useactiveannotation) | `activeAnnotationId` | every annotation boundary during playback |
 | [`useAnnotations()`](#useannotations) | `annotations` | an annotation edit |
 | [`useAnnotationOptions()`](#useannotationoptions) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three options being toggled |
-| [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, the annotation store, and the annotation, scroll and time-format setters | never (a new `annotationStore` prop changes it) |
+| [`usePlaybackControls()`](#useplaybackcontrols) | `play`, `pause`, `stop`, `seekTo`, `setSelection`, the annotation store, and the annotation, scroll and time-format setters | only when the `annotationStore` prop changes |
 | [`usePlaybackRefs()`](#useplaybackrefs) | `currentTimeRef`, `visualTimeRef`, `registerFrameCallback`, `unregisterFrameCallback` | never |
 | [`usePlaylistView()`](#useplaylistview) | `sampleRate`, `mono`, `indefinitePlayback` | a provider prop change |
 | [`usePlaylistSettings()`](#useplaylistsettings) | `timeFormat`, `isAutomaticScroll` | the user changing either setting |
@@ -707,7 +707,7 @@ function Editor({ arrangement, initialAnnotations }) {
 function useStoredAnnotations(store: AnnotationStore): readonly AnnotationData[];
 ```
 
-The store's list, for your own components; the component re-renders when it changes. The argument is required, so the hook works above the provider as well as below it. It is the same array until the annotations change. Do not write to it: outside production builds it is frozen, and a write in place throws. Change the annotations with `store.set` or `store.update`.
+The store's list, for your own components; the component re-renders when it changes. The argument is required, so the hook works above the provider as well as below it. It is the same array until the annotations change. Do not write to it: in a development build (`process.env.NODE_ENV` set and not `'production'`) it is frozen, and a write in place throws (`.sort()` in any code, a field assignment in strict code). Change the annotations with `store.set` or `store.update`.
 
 ```tsx
 import { useEffect } from 'react';
@@ -1595,9 +1595,11 @@ function useAnnotationDragHandlers(options: {
 }): { onDragStart; onDragMove; onDragEnd };
 ```
 
-Pass `preview: annotationPreview` (from `usePlaybackControls()`) to keep the drag out of the store until it ends: each move is published to the preview, which the built-in annotation boxes and list follow, and the store is written once, on release. The release writes only the `start` and `end` of the annotations the drag moved, by id, onto the store's list as it is then: an annotation added or edited elsewhere during the drag stays, and a release whose annotation was removed during the drag writes nothing. During the drag the preview shows the store's current list with the moved edges on top, so a change made elsewhere is drawn at once. Without `preview`, the moved edges are written on every move, which re-renders whatever reads the annotations for each one. Without a store the handlers do nothing.
+Pass `preview: annotationPreview` (from `usePlaybackControls()`) to keep the drag out of the store until it ends: each move is published to the preview, which the built-in annotation boxes and list follow, and the store is written once, on release. The drag keeps the `start` and `end` of every annotation it has touched (the dragged one and the neighbours it moved, also one moved back to where it was), and works out each move over the store's current list with those bounds on top, so a neighbour moved elsewhere during the drag is collided with where it is now. The release writes the touched bounds, by id, onto the store's list as it is then: an annotation added or edited elsewhere during the drag stays. During the drag the preview shows the store's current list with the drag's bounds on top, so a change made elsewhere is drawn at once. Without `preview`, every move writes all the touched bounds, which re-renders whatever reads the annotations for each one. Without a store the handlers do nothing.
 
-Pressing Escape cancels the drag and puts back every annotation it moved, linked and pushed neighbours included: with `preview` nothing was written; without it the edges from before the drag are written back.
+The drag ends and writes nothing more, its preview cleared, when the dragged annotation is removed from the store (a "clear all" included), when the `store` option becomes another store, or when the component unmounts. Without `preview` the moves already written stay.
+
+Pressing Escape cancels the drag and puts back every annotation it touched, linked and pushed neighbours included: with `preview` nothing was written; without it each touched annotation's bounds from the start of the drag are written back.
 
 ### useAnnotationsWithPreview
 

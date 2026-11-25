@@ -117,7 +117,7 @@ function AnnotationCount({ store }: { store: AnnotationStore }) {
 }
 ```
 
-The list is the same array until the annotations change. Never write to it: it is typed `readonly AnnotationData[]`, and outside production builds the array, each annotation and each annotation's `lines` are frozen, so a write made in place (`annotations.sort(…)`, `annotation.end = 4`) throws. Copy first: `[...annotations].sort((a, b) => a.start - b.start)`.
+The list is the same array until the annotations change. Never write to it: it is typed `readonly AnnotationData[]`, and in a development build the array, each annotation and each annotation's `lines` are frozen. A development build here is one where `process.env.NODE_ENV` is set and is not `'production'` (what a bundler's dev server gives); a page that loads the module with no bundler and no `process` freezes nothing. On a frozen list `annotations.sort(…)` or `.push(…)` throws a `TypeError` in any code, and an assignment (`annotation.end = 4`) throws in strict code, which includes every module (in sloppy-mode script it is silently ignored). In a production build nothing is frozen, and such a write changes the list every reader shares. Copy first: `[...annotations].sort((a, b) => a.start - b.start)`.
 
 ### Changing It
 
@@ -189,7 +189,7 @@ A subscriber that throws is reported with a console warning; the other subscribe
 - `current` refuses it: nothing changes and no subscriber is told;
 - another list adjusts it: that list is stored (and checked as any other list).
 
-It is not called for the initial list.
+It is not called for the initial list, nor when the proposed list is the current array itself (an `update` that returns `current`). Nor is it called for a list that fails the store's checks: those run first and throw (see [What the Store Refuses](#what-the-store-refuses)), so a rule cannot repair an invalid list.
 
 ```tsx
 // Refuse an edit that leaves an annotation without text
@@ -213,7 +213,7 @@ const annotationStore = useCreateAnnotationStore(() => initialAnnotations, {
 });
 ```
 
-What the user sees when a change is refused or adjusted: an edge released where the rule refuses it goes back to where the store has it, a refused boundary key does nothing, and a text or id field whose edit was not stored shows the stored value again. While an edge is being dragged the boxes show it where the pointer is; the rule applies on release.
+What the user sees when a change is refused or adjusted: an edge released where the rule refuses it goes back to where the store has it, a refused boundary key does nothing, and a text or id field whose edit was not stored shows the stored value again. With the built-in boxes (which use the provider's preview) the boxes show a dragged edge where the pointer is, and the rule applies once, on release. A row of boxes of your own that calls `useAnnotationDragHandlers` without `preview` writes every move with `update`, so the rule applies to each move.
 
 `useCreateAnnotationStore` follows `beforeChange`: the store calls the function passed on the most recent committed render, so a rule that reads your component's state sees its current value. `createAnnotationStore` keeps the function it was given.
 
@@ -232,7 +232,11 @@ The id field of the annotation list writes nothing for a duplicate id and shows 
 
 ### Changes During an Edge Drag
 
-While an edge is dragged, the boxes and the list show the store's current list with the drag's moved edges on top. A change made elsewhere during the drag (a live feed that adds annotations, a text edit, a `set`) is drawn at once. On release the drag writes only the `start` and `end` of the annotations it moved, found by id in the store's list as it is then, so an annotation added or edited during the drag stays. If the dragged annotation was removed during the drag, the release writes nothing.
+While an edge is dragged, the boxes and the list show the store's current list with the drag's moves on top. A change made elsewhere during the drag (a live feed that adds annotations, a text edit, a `set`) is drawn at once, and each move of the pointer is worked out over that current list: a neighbour your app moved during the drag is collided with where it is now, and an edge dragged into a neighbour still carries it along (see [Linked Endpoints](#linked-endpoints)).
+
+The drag keeps the `start` and `end` of every annotation it has touched, the dragged one and each neighbour it moved, also one moved back to where it was. On release it writes those bounds, found by id in the store's list as it is then; nothing else is written, so an annotation added or edited during the drag stays.
+
+The drag ends and writes nothing more, its preview cleared, when the dragged annotation is removed from the store (a "clear all" included), when the provider is given another store, or when the component that drags unmounts.
 
 ## Provider Configuration
 
@@ -352,7 +356,7 @@ The list draws nothing while there are no annotations.
 
 A click on a row makes the annotation the active one and plays it from its start, as a click on its box does. In the default row, a click in a field that is being edited places the caret, and a click on an action button runs the action; neither plays the annotation.
 
-While `editable` is on, the text and the id of a default row can be edited in place. The edit is written to the store when the field loses focus; Enter leaves the field. The row's annotation is found by its id in the store's list as it is then, so an annotation added or removed elsewhere in the meantime does not send the edit to another row. An empty id, and an id another annotation already has, are not accepted: nothing is written and the field shows the stored id again. A field whose edit the store did not keep (refused by [`beforeChange`](#your-rules-for-every-change-beforechange)) shows the stored value again.
+While `editable` is on, the text and the id of a default row can be edited in place. The edit is written to the store when the field loses focus; Enter leaves the field. A field that loses focus with its text unchanged writes nothing, and no subscriber is told. The row's annotation is found by its id in the store's list as it is then, so an annotation added or removed elsewhere in the meantime does not send the edit to another row. An empty id, and an id another annotation already has, are not accepted: nothing is written and the field shows the stored id again. A field whose edit the store did not keep (refused by [`beforeChange`](#your-rules-for-every-change-beforechange)) shows the stored value again.
 
 #### Action Buttons
 
@@ -470,7 +474,7 @@ import { KeyboardShortcuts } from '@waveform-playlist/browser';
 | `[` / `]` | Move the start of the selected annotation 10 ms earlier / later |
 | `Shift+[` / `Shift+]` | Move the end of the selected annotation 10 ms earlier / later |
 
-The selection wraps around at both ends of the list. The last three rows need a selected annotation. The boundary keys work whether or not `editable` is on.
+The selection wraps around at both ends of the list. The last three rows need a selected annotation. The boundary keys work whether or not `editable` is on. A boundary key that cannot move the edge (a start at 0, an end at the end of the audio, an annotation already at its shortest) changes nothing and tells no subscriber.
 
 ### useAnnotationKeyboardControls
 
@@ -557,7 +561,7 @@ function MyAnnotationBoxes({ duration }: { duration: number }) {
 }
 ```
 
-The release writes only the `start` and `end` of the annotations the drag moved, by id (see [Changes During an Edge Drag](#changes-during-an-edge-drag)). Without `preview`, the moved edges are written to the store on every pointer move. Escape cancels the drag and restores every annotation it moved: with `preview` nothing was written, without it the edges from before the drag are written back. Without a store the handlers do nothing.
+With `preview`, the release writes the bounds of every annotation the drag touched, by id (see [Changes During an Edge Drag](#changes-during-an-edge-drag)). Without `preview`, every pointer move writes all the touched bounds to the store. Escape cancels the drag and restores every annotation it touched: with `preview` nothing was written; without it each touched annotation's bounds from the start of the drag are written back. A drag that ends because its annotation was removed, the store changed or the component unmounted writes nothing more (without `preview`, the moves already written stay). Without a store the handlers do nothing.
 
 The handlers act on a draggable whose data is `{ annotationId, annotationIndex, edge: 'start' | 'end' }`; a drag with other data is ignored. The `AnnotationBox` of the annotations package registers its two edge handles that way.
 
@@ -574,19 +578,32 @@ The scrollable list that `<AnnotationList>` renders.
 ```tsx
 import { useCreateAnnotationStore, useStoredAnnotations } from '@waveform-playlist/browser';
 import { AnnotationText } from '@waveform-playlist/annotations';
+import type { AnnotationData } from '@waveform-playlist/core';
 
-const store = useCreateAnnotationStore(() => initialAnnotations);
-const annotations = useStoredAnnotations(store);
+function Transcript({
+  initialAnnotations,
+  activeId,
+  seekTo,
+}: {
+  initialAnnotations: AnnotationData[];
+  activeId?: string;
+  seekTo: (time: number) => void;
+}) {
+  const store = useCreateAnnotationStore(() => initialAnnotations);
+  const annotations = useStoredAnnotations(store);
 
-<AnnotationText
-  annotations={annotations}
-  store={store}
-  activeAnnotationId={activeId}
-  shouldScrollToActive
-  editable
-  height={200}
-  onAnnotationClick={(annotation) => seekTo(annotation.start)}
-/>
+  return (
+    <AnnotationText
+      annotations={annotations}
+      store={store}
+      activeAnnotationId={activeId}
+      shouldScrollToActive
+      editable
+      height={200}
+      onAnnotationClick={(annotation) => seekTo(annotation.start)}
+    />
+  );
+}
 ```
 
 `annotations` is what the list draws; `store` is where its edits are written. A text edit, an id edit and an action button call `store.update` and find their annotation by id in the store's list as it is then, as under the provider. Without `store` the list is read-only: no field can be edited and no action button is drawn, whatever `editable` says. Without React state of your own, `createAnnotationStore` from `@waveform-playlist/core` makes the store.
