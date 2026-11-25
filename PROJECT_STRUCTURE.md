@@ -175,7 +175,7 @@ const clip = createClipFromSeconds({
   - `trimClip()` accepts optional `skipAdapter` parameter.
   - `getClipBounds()` — returns clip boundary info for constraint calculations.
   - `constrainTrimDelta()` — wraps pure `constrainBoundaryTrim` for per-frame collision detection during trim drag.
-- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. A transaction that changed nothing pushes no undo step, so a no-op drag leaves no phantom entry. The history holds tracks and clips, not the mix: an undo never changes volume, mute, solo or pan.
+- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. A transaction that changed nothing pushes no undo step, so a no-op drag leaves no phantom entry. Each saved state holds the tracks and the mix, so an undo, a redo or an abort also brings back volume, mute, solo and pan; the four mixer setters are undo steps (`{ gesture }` groups a fader drag into one, `{ undoable: false }` is no step), and the recording arm is outside the history.
 - **Dependencies:** Only peer dependency is `@waveform-playlist/core`
 - **No React, no Tone.js** — zero framework dependencies
 

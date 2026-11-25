@@ -123,7 +123,7 @@ The engine's track, clip, mixer, arm and history methods call the arrangement's,
 - `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag from press to release);
 - `{ undoable: false }`: no step. The value is written into every saved state as well, so no undo or redo brings back an older one (automation, a value that is not the user's edit). It wins over `gesture`.
 
-A call that changes nothing (the value the track already has, or a track that is not in the current tracks) makes no step and no `statechange`. Inside an open transaction a mixer change is part of it, and an abort takes it back. Undo, redo and an abort bring back the mix of the state they return to.
+A call that changes nothing (the value the track already has, or a track that is not in the current tracks) makes no step and no `statechange`. Inside an open transaction an undoable mixer change is part of it, and an abort takes it back; an `{ undoable: false }` change is written into the transaction's base too, so an abort keeps it. Undo, redo and an abort bring back the mix of the state they return to.
 
 `createMixerGesture()` makes the ids for one control. Use one per slider:
 

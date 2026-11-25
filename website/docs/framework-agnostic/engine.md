@@ -104,7 +104,7 @@ The returned `EngineState` contains:
 |-------|------|-------------|
 | `tracks` | `readonly ClipTrack[]` | The tracks and their clips, each track with its current volume, mute, solo and pan. Not a copy: read it, never write to it |
 | `tracksVersion` | `number` | Monotonic counter — increments on structural track changes only |
-| `mixerVersion` | `number` | Monotonic counter — increments on every change of the current mix: a per-track mixer edit (volume/mute/solo/pan), an undo, a redo or an aborted transaction that brings back other values, and arming or disarming a track |
+| `mixerVersion` | `number` | Monotonic counter — increments on every change of the current mix: a per-track mixer edit (volume/mute/solo/pan), an undo, a redo or an aborted transaction that brings back other values, and arming or disarming a track that is in the current tracks |
 | `duration` | `number` | Total timeline duration in seconds |
 
 **Playback**
@@ -191,7 +191,7 @@ The mix holds an entry for each current track; each undo and redo step keeps the
 
 `updateTrack(id, track)` calls the adapter only when the track plays differently from before. A track whose loaded clips are the same objects in the same order and whose own fields are unchanged is not sent; the undo step and the `statechange` are the same either way. Clips are compared by identity: a clip object this track already holds (one taken from this track in `getState().tracks` or `arrangement.getTracks()`) is kept as it is, and any other clip object, also one held by another track, is copied and counts as changed.
 
-`updateTrack(id, track)` may give the track an ID no other track has. The track keeps its mix (also over an entry the new ID still has from a removed track), and the adapter receives every track through `setTracks`.
+`updateTrack(id, track)` may give the track an ID no other track has. The track keeps its mix, and the adapter receives every track through `setTracks`.
 
 `selectedTrackId` becomes `null` when its track goes away: by `removeTrack()`, by an undo, a redo or an aborted transaction that takes the track away, or when `updateTrack()` gives the track a new ID. `setTracks()` leaves it alone, also when the new tracks do not include it: a host may empty the tracks and add them again.
 
@@ -315,14 +315,14 @@ engine.abortTransaction(): void; // put the tracks and the mix back as they were
 ```
 
 - Undo steps are made by `addTrack()`, `removeTrack()`, `updateTrack(id, track)`, `reorderTrack()`, `moveClip()`, `trimClip()`, `splitClip()`, `setTrackVolume()`, `setTrackMute()`, `setTrackSolo()` and `setTrackPan()`. `setTracks()` clears the history. `setTrackArmed()`, `setTempo()`, the master volume, selection, loop and zoom are not undo steps.
-- Undo, redo and an aborted transaction restore the tracks, the clips and the mix of the state they return to. Undoing a `removeTrack()` brings the track back with the mix it had; undoing an `updateTrack()` that gave a track a new ID brings back the old ID with the mix it had then. A mixer change made inside a transaction is part of it, and an abort takes it back. An undo that changes only the mix increments `mixerVersion`, not `tracksVersion`.
+- Undo, redo and an aborted transaction restore the tracks, the clips and the mix of the state they return to. Undoing a `removeTrack()` brings the track back with the mix it had; undoing an `updateTrack()` that gave a track a new ID brings back the old ID with the mix it had then. An undoable mixer change made inside a transaction is part of it, and an abort takes it back; one made with `{ undoable: false }` is written into the transaction's base as well, so an abort keeps it. An undo that changes only the mix increments `mixerVersion`, not `tracksVersion`.
 - `undo()` and `redo()` called while a transaction is open abort the transaction first.
 - `commitTransaction()` adds one undo step and emits `statechange` when the transaction changed something. When the tracks and the mix are back where the transaction began (the same track objects in the same order and the same mixer values; for example a track added during the transaction and then taken out with the arrangement's `removeTrack(id, { undoable: false })`. A clip moved away and back is not that: the clip is a new object), it adds no step and emits nothing. `clearHistory()` emits `statechange` when there was history. So `canUndo` and `canRedo` in the state are current.
 - After an undo, a redo or an aborted transaction the adapter receives only the tracks that differ when the same track IDs are there before and after: its `updateTrack` for each, or, when the adapter has no `updateTrack`, one `setTracks` per differing track. When the set of IDs differs it receives one `setTracks`. An undo of a reorder calls no adapter method. A mixer value that differs reaches the adapter through its setter (`setTrackVolume` and so on), because a track call does not carry the mix to every adapter; an undo that changes only the mix calls the setters and no track method.
 
 #### Mixer moves
 
-By default each mixer call is an undo step of its own. A fader drag makes many calls, so pass the same `gesture` ID for all of them: calls with one ID, one after another, are one step. Anything else that touches the history in between (another undo step, an undo, a redo, `clearHistory()`, `setTracks()`, a transaction) ends that step, and the next call with the ID makes a new one. When a gesture ends where its step began, the step is dropped and the redo states its first call cleared come back. `{ undoable: false }` makes no step: the value is written into every undo and redo state as well, so no undo or redo brings back an older one; it is for values that are not the user's edit, such as automation, and it wins over `gesture`.
+By default each mixer call is an undo step of its own. A fader drag makes many calls, so pass the same `gesture` ID for all of them: calls with one ID, one after another, are one step. Another undo step, an undo, a redo, `clearHistory()`, `setTracks()` or a transaction in between ends that step, and the next call with the ID makes a new one; arming a track, a call that changes nothing and an `{ undoable: false }` call do not (unless the `undoable: false` call makes the gesture's step a repeat of the state next to it, which drops the step). When a gesture ends where its step began, the step is dropped and the history it found comes back: the redo states its first call cleared, and a step the undo limit evicted for it. `{ undoable: false }` makes no step: the value is written into every undo and redo state as well, so no undo or redo brings back an older one; it is for values that are not the user's edit, such as automation, and it wins over `gesture`.
 
 `createMixerGesture()` makes the IDs for one control. Use one per slider:
 

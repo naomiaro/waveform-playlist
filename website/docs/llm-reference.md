@@ -1723,10 +1723,12 @@ interface MixerChangeOptions {
   /** Not an undo step: the value is written into every saved state as well. */
   undoable?: false;
 }
-// No options: each call is an undo step. With both, undoable: false wins. Inside an open transaction a mixer
-// change is part of it (gesture ignored) and an abort takes it back. A gesture step ends when anything else
-// touches the history (another step, undo, redo, clearHistory, setTracks, a transaction); a gesture that ends
-// where its step began leaves no step, and the redo states its first call cleared come back.
+// No options: each call is an undo step. With both, undoable: false wins. Inside an open transaction an undoable
+// mixer change is part of it (gesture ignored) and an abort takes it back; an undoable: false change is written into
+// the transaction's base too, so an abort keeps it. A gesture step ends at another step, an undo, a redo,
+// clearHistory, setTracks or a transaction (not at an arm, a call that changes nothing, or an undoable: false call
+// that leaves the step); a gesture that ends where its step began leaves no step, and the history it found comes
+// back (the redo states its first call cleared, and a step the undo limit evicted for it).
 
 // The gesture ids of one control (one helper per slider). attach() ends the gesture on the input's `change`
 // (the end of a pointer drag), except while an arrow, PageUp/PageDown, Home or End key is down: then on that
@@ -1847,7 +1849,7 @@ interface Arrangement {
 interface EngineState {
   tracks: readonly ClipTrack[]; // Each track with its current mixer values (muted while armed) and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
   tracksVersion: number;        // Monotonic counter; increments on structural track changes only
-  mixerVersion: number;         // Monotonic counter; increments on every change of the current mix (the setters, an undo/redo/abort of the mix, the arm)
+  mixerVersion: number;         // Monotonic counter; increments on every change of the current mix (the setters, an undo/redo/abort of the mix, an arm or disarm of a current track)
   duration: number;             // Of the loaded clips
   currentTime: number;
   isPlaying: boolean;
