@@ -44,13 +44,19 @@ import type { WaveformSegment } from './daw-waveform';
 import './daw-playhead';
 import './daw-waveform';
 import './daw-ruler';
-import type { PlaylistEngine, PlayoutAdapter, TrackMixerValues } from '@waveform-playlist/engine';
+import type {
+  MixerChangeOptions,
+  PlaylistEngine,
+  PlayoutAdapter,
+  TrackMixerValues,
+} from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/engine';
 import {
   DEFAULT_TRACK_MIX,
   clampNumber,
   mixOfElement,
+  pickMix,
   mixOfTrack,
-  sameMix,
   withMix,
 } from '../utils/track-mix';
 import '../elements/daw-track-controls';
@@ -70,6 +76,7 @@ import { TrackReorderHandler } from '../interactions/track-reorder-handler';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
+  DawTrackUpdateDetail,
   DawTrackErrorDetail,
   DawTrackReorderDetail,
   DawTrackReorderGrabDetail,
@@ -1105,12 +1112,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /**
    * Change one mixer field of a track: the seed while the track is loading
-   * (not an undo step, nothing sent), else the engine's setter.
+   * (not an undo step, nothing sent), else the engine's setter with
+   * `options` (an undo step; changes with one `gesture` id are one step).
    */
   private _writeMix<K extends keyof TrackMixerValues>(
     trackId: string,
     field: K,
-    value: TrackMixerValues[K]
+    value: TrackMixerValues[K],
+    options?: MixerChangeOptions
   ): void {
     const seed = this._seedMix.get(trackId);
     if (seed) {
@@ -1118,10 +1127,21 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return;
     }
     if (!this._engine) return;
-    if (field === 'volume') this._engine.setTrackVolume(trackId, value as number);
-    else if (field === 'pan') this._engine.setTrackPan(trackId, value as number);
-    else if (field === 'muted') this._engine.setTrackMute(trackId, value as boolean);
-    else this._engine.setTrackSolo(trackId, value as boolean);
+    if (field === 'volume') this._engine.setTrackVolume(trackId, value as number, options);
+    else if (field === 'pan') this._engine.setTrackPan(trackId, value as number, options);
+    else if (field === 'muted') this._engine.setTrackMute(trackId, value as boolean, options);
+    else this._engine.setTrackSolo(trackId, value as boolean, options);
+  }
+  /**
+   * Change the given mixer fields of a track as ONE undo step (#843): all
+   * of them carry one fresh gesture id. A field left out is not sent.
+   */
+  private _writeMixFields(trackId: string, mix: Partial<TrackMixerValues>): void {
+    const options: MixerChangeOptions = { gesture: createMixerGesture().id };
+    if (mix.volume !== undefined) this._writeMix(trackId, 'volume', mix.volume, options);
+    if (mix.pan !== undefined) this._writeMix(trackId, 'pan', mix.pan, options);
+    if (mix.muted !== undefined) this._writeMix(trackId, 'muted', mix.muted, options);
+    if (mix.soloed !== undefined) this._writeMix(trackId, 'soloed', mix.soloed, options);
   }
   /** The ordered tracks for `engine.setTracks`, a loading track with its seed. */
   private _tracksForEngine(): ClipTrack[] {
@@ -1493,8 +1513,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
   }
-  private _onTrackUpdate = (e: CustomEvent) => {
-    const trackId = e.detail?.trackId as string;
+  private _onTrackUpdate = (e: CustomEvent<DawTrackUpdateDetail>) => {
+    const trackId = e.detail?.trackId;
     if (!trackId) return;
     const trackEl = (e.target as HTMLElement).closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
@@ -1525,17 +1545,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       });
     }
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
-    // The element's mix against the track's current mix (#843): the seed
-    // while loading, else the arrangement's, through the engine setters.
-    const elementMix = mixOfElement(trackEl);
-    const currentMix = this._mixOf(trackId);
-    if (!sameMix(elementMix, currentMix)) {
-      for (const field of ['volume', 'pan', 'muted', 'soloed'] as const) {
-        if (elementMix[field] !== currentMix[field]) {
-          this._writeMix(trackId, field, elementMix[field]);
-        }
-      }
-    }
+    // Only the mixer properties this update changed (#843), as one undo step:
+    // a rename after an Undo must not send the element's older volume back.
+    // The seed while loading, else the engine setters.
+    const changed = Array.isArray(e.detail.changed) ? e.detail.changed : [];
+    this._writeMixFields(trackId, pickMix(mixOfElement(trackEl), changed));
     if (oldDescriptor?.src !== descriptor.src) {
       this._loadTrack(trackId, descriptor);
     }
@@ -2991,9 +3005,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
   /**
    * Update reflected attributes on a track. For DOM-element tracks the changes
-   * are written to the `<daw-track>` element (which fires `daw-track-update`);
-   * for tracks without a DOM element (file drops) the descriptor and engine
-   * state are updated in place.
+   * are written to the `<daw-track>` element (which fires one
+   * `daw-track-update`); for tracks without a DOM element (file drops) the
+   * descriptor is updated in place and the mix goes to the engine. Either
+   * way, the mixer fields of one call are one undo step (#843); while the
+   * track is loading they change the values it will enter with, which is not
+   * a step.
    */
   updateTrack(trackId: string, partial: Partial<TrackConfig>): void {
     const trackEl = this._trackElements.get(trackId);
@@ -3033,11 +3050,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
-    // The mix goes to its owner: the seed while loading, else the engine.
-    if (partial.volume !== undefined) this._writeMix(trackId, 'volume', partial.volume);
-    if (partial.pan !== undefined) this._writeMix(trackId, 'pan', partial.pan);
-    if (partial.muted !== undefined) this._writeMix(trackId, 'muted', partial.muted);
-    if (partial.soloed !== undefined) this._writeMix(trackId, 'soloed', partial.soloed);
+    // The mix goes to its owner as one step: the seed while loading, else
+    // the engine.
+    this._writeMixFields(trackId, {
+      volume: partial.volume,
+      pan: partial.pan,
+      muted: partial.muted,
+      soloed: partial.soloed,
+    });
   }
   /**
    * Append a clip to an existing track. Builds a `<daw-clip>` from `config`

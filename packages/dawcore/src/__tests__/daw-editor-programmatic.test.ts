@@ -196,8 +196,14 @@ describe('editor.updateTrack()', () => {
     editor._engineTracks = new Map([['file-id', { id: 'file-id', clips: [] }]]);
 
     editor.updateTrack('file-id', { volume: 0.5, muted: true });
-    expect(editor._engine.setTrackVolume).toHaveBeenCalledWith('file-id', 0.5);
-    expect(editor._engine.setTrackMute).toHaveBeenCalledWith('file-id', true);
+    // One call is one undo step (#843): both setters carry one gesture id.
+    const gesture = { gesture: expect.any(String) };
+    expect(editor._engine.setTrackVolume).toHaveBeenCalledWith('file-id', 0.5, gesture);
+    expect(editor._engine.setTrackMute).toHaveBeenCalledWith('file-id', true, gesture);
+    expect(editor._engine.setTrackVolume.mock.calls[0][2]).toEqual(
+      editor._engine.setTrackMute.mock.calls[0][2]
+    );
+    expect(editor._engine.setTrackPan).not.toHaveBeenCalled();
     // The mix is the arrangement's (#843): the descriptor holds no copy.
     expect(editor._tracks.get('file-id')).not.toHaveProperty('volume');
     expect(editor._tracks.get('file-id')).not.toHaveProperty('muted');

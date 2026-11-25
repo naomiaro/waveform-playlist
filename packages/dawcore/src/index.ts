@@ -103,6 +103,7 @@ export type {
   DawTrackSelectDetail,
   DawTrackConnectedDetail,
   DawTrackIdDetail,
+  DawTrackUpdateDetail,
   DawTrackErrorDetail,
   DawFilesLoadErrorDetail,
   DawErrorDetail,

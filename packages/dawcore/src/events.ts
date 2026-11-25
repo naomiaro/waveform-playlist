@@ -38,6 +38,18 @@ export interface DawTrackIdDetail {
   trackId: string;
 }
 
+export interface DawTrackUpdateDetail {
+  trackId: string;
+  /**
+   * The `<daw-track>` properties this update changed, by property name
+   * (`'volume'`, `'pan'`, `'muted'`, `'soloed'`, `'src'`, `'name'`, `'kind'`,
+   * `'renderMode'`, `'spectrogramConfig'`). The editor sends a mixer property
+   * to the engine only when it is in this list, and one update is one undo
+   * step (#843).
+   */
+  changed: readonly string[];
+}
+
 export interface DawTrackErrorDetail {
   trackId: string;
   error: unknown;
@@ -246,7 +258,7 @@ export interface DawEventMap {
   'daw-time-format-change': CustomEvent<DawTimeFormatChangeDetail>;
   'daw-track-select': CustomEvent<DawTrackSelectDetail>;
   'daw-track-connected': CustomEvent<DawTrackConnectedDetail>;
-  'daw-track-update': CustomEvent<DawTrackIdDetail>;
+  'daw-track-update': CustomEvent<DawTrackUpdateDetail>;
   'daw-track-ready': CustomEvent<DawTrackIdDetail>;
   'daw-track-removed': CustomEvent<DawTrackIdDetail>;
   'daw-track-error': CustomEvent<DawTrackErrorDetail>;

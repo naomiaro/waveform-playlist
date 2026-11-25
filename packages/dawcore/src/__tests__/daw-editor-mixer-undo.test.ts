@@ -233,3 +233,135 @@ describe('<daw-editor> draws the arrangement mix (#843)', () => {
     });
   });
 });
+
+// #843: an attribute change names what changed, and the editor sends only
+// those mixer properties. An update that changes several is one undo step.
+describe('<daw-editor> track updates and undo steps (#843)', () => {
+  function volumeOf(editor: any, id: string): number {
+    return editor.engine.getState().tracks.find((t: any) => t.id === id).volume;
+  }
+  function panOf(editor: any, id: string): number {
+    return editor.engine.getState().tracks.find((t: any) => t.id === id).pan;
+  }
+
+  it("a name change after an undo does not write the element's volume back", async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    trackEl.volume = 0.5;
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(0.5);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.8);
+    expect(engine.canRedo).toBe(true);
+
+    // The element still says 0.5; only its name changes.
+    trackEl.setAttribute('name', 'Renamed');
+    await trackEl.updateComplete;
+
+    expect(editor._tracks.get(id).name).toBe('Renamed');
+    expect(volumeOf(editor, id)).toBe(0.8);
+    expect(engine.canRedo).toBe(true);
+  });
+
+  it('setting volume and pan in one update is one step', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    trackEl.volume = 0.5;
+    trackEl.pan = -0.5;
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(0.5);
+    expect(panOf(editor, id)).toBe(-0.5);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.8);
+    expect(panOf(editor, id)).toBe(0);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('two updates of the element are two steps', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    trackEl.volume = 0.5;
+    await trackEl.updateComplete;
+    trackEl.pan = -0.5;
+    await trackEl.updateComplete;
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.5);
+    expect(panOf(editor, id)).toBe(0);
+    expect(engine.canUndo).toBe(true);
+  });
+
+  it('editor.updateTrack(id, { volume, pan }) is one step, with an element', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    editor.updateTrack(id, { volume: 0.5, pan: 0.25 });
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(0.5);
+    expect(panOf(editor, id)).toBe(0.25);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.8);
+    expect(panOf(editor, id)).toBe(0);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('editor.updateTrack(id, { volume, pan }) is one step, without an element', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+    // As a file drop: a track the editor holds with no <daw-track>.
+    editor._trackElements.delete(id);
+
+    editor.updateTrack(id, { volume: 0.5, pan: 0.25 });
+    expect(volumeOf(editor, id)).toBe(0.5);
+    expect(panOf(editor, id)).toBe(0.25);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.8);
+    expect(panOf(editor, id)).toBe(0);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('editor.updateTrack on a loading track without an element changes the seed, not the history', async () => {
+    const { editor } = await makeEditor();
+    stubPeakPipeline(editor);
+    const engine = await editor.ready();
+    let releaseDecode!: (b: AudioBuffer) => void;
+    editor._fetchAndDecode = vi.fn(
+      () =>
+        new Promise<AudioBuffer>((resolve) => {
+          releaseDecode = resolve;
+        })
+    );
+    const setVolume = vi.spyOn(engine, 'setTrackVolume');
+    const pending = editor.addTrack({ name: 'B', volume: 0.8, clips: [{ src: '/b.opus' }] });
+    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+    const id = [...editor._tracks.keys()][0] as string;
+    editor._trackElements.delete(id);
+
+    editor.updateTrack(id, { volume: 0.3, pan: 0.5 });
+    expect(setVolume).not.toHaveBeenCalled();
+    expect(editor._seedMix.get(id)).toMatchObject({ volume: 0.3, pan: 0.5 });
+
+    releaseDecode(makeAudioBuffer());
+    await pending;
+    expect(volumeOf(editor, id)).toBe(0.3);
+    expect(panOf(editor, id)).toBe(0.5);
+    expect(engine.canUndo).toBe(false);
+  });
+});

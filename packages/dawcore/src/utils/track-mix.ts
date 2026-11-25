@@ -23,8 +23,18 @@ export function mixOfElement(el: TrackMixerValues): TrackMixerValues {
   return { volume: el.volume, pan: el.pan, muted: el.muted, soloed: el.soloed };
 }
 
-export function sameMix(a: TrackMixerValues, b: TrackMixerValues): boolean {
-  return a.volume === b.volume && a.pan === b.pan && a.muted === b.muted && a.soloed === b.soloed;
+/**
+ * The fields of `mix` whose names are in `names` (a `daw-track-update`'s
+ * `changed` list): the mixer properties an update changed, and no other.
+ */
+export function pickMix(mix: TrackMixerValues, names: Iterable<string>): Partial<TrackMixerValues> {
+  const named = new Set(names);
+  return {
+    ...(named.has('volume') && { volume: mix.volume }),
+    ...(named.has('pan') && { pan: mix.pan }),
+    ...(named.has('muted') && { muted: mix.muted }),
+    ...(named.has('soloed') && { soloed: mix.soloed }),
+  };
 }
 
 /** `track` with `mix` written over its mixer fields (a new object). */
