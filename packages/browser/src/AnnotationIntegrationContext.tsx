@@ -3,6 +3,7 @@ import { installCommand } from './utils/installCommand';
 import type {
   AnnotationData,
   AnnotationAction,
+  AnnotationStore,
   AnnotationActionOptions,
   RenderAnnotationItemProps,
 } from '@waveform-playlist/core';
@@ -24,6 +25,8 @@ export interface AnnotationTextIntegrationProps {
   /** A click on a row (not in a field being edited, not on an action button). */
   onAnnotationClick?: (annotation: AnnotationData) => void;
   onAnnotationUpdate?: (updatedAnnotations: AnnotationData[]) => void;
+  /** Where the list's edits are written: the provider's annotation store. */
+  store?: AnnotationStore;
   renderAnnotationItem?: (props: RenderAnnotationItemProps) => React.ReactNode;
 }
 

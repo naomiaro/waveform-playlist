@@ -11,6 +11,7 @@ import { ThemeProvider, type DefaultTheme } from 'styled-components';
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { AnnotationData } from '@waveform-playlist/core';
 import { AnnotationText } from '../components/AnnotationText';
+import { createAnnotationStore } from '@waveform-playlist/core';
 import { DragDropProvider } from '@dnd-kit/react';
 import { AnnotationBox } from '../components/AnnotationBox';
 
@@ -40,7 +41,12 @@ describe('a click on a default row of the list (#686)', () => {
   it('does not choose it from a field that is being edited', () => {
     const onClick = vi.fn();
     const { getByText } = render(
-      <AnnotationText annotations={ANNOTATIONS} editable onAnnotationClick={onClick} />
+      <AnnotationText
+        annotations={ANNOTATIONS}
+        editable
+        store={createAnnotationStore(ANNOTATIONS)}
+        onAnnotationClick={onClick}
+      />
     );
     fireEvent.click(getByText('second')); // the text field
     fireEvent.click(getByText('b')); // the id field

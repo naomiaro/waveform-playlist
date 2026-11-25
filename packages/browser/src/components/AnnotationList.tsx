@@ -65,7 +65,8 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
   const { annotations } = useAnnotations();
   const { editable, linkEndpoints, continuousPlay } = useAnnotationOptions();
   const { activeAnnotationId } = useActiveAnnotation();
-  const { setAnnotations, annotationPreview, playAnnotation } = usePlaybackControls();
+  const { setAnnotations, annotationStore, annotationPreview, playAnnotation } =
+    usePlaybackControls();
   // While an edge is dragged, the times in the list follow it.
   const shownAnnotations = useAnnotationsWithPreview(annotations, annotationPreview);
 
@@ -104,7 +105,8 @@ export const AnnotationList: React.FC<AnnotationListProps> = ({
       annotationListConfig={actionOptions}
       height={height}
       onAnnotationClick={playAnnotation}
-      onAnnotationUpdate={setAnnotations}
+      onAnnotationUpdate={annotationStore ? undefined : setAnnotations}
+      store={annotationStore}
       renderAnnotationItem={children}
     />
   );
