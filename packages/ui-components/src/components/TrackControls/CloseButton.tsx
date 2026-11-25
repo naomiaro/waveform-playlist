@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { X as XIcon } from '@phosphor-icons/react';
+import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 
 const StyledCloseButton = styled.button`
   position: absolute;
