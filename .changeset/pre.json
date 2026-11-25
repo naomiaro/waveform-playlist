@@ -81,6 +81,7 @@
     "shared-effect-registry",
     "shared-hooks-and-controls",
     "shared-pan-stage",
+    "shortcut-handlers-latest-commit",
     "shortcuts-respect-focused-controls",
     "small-render-cleanups",
     "spectrogram-settings-modal-draft",
