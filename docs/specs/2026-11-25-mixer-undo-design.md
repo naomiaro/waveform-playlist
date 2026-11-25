@@ -183,7 +183,7 @@ The arrangement keeps a set of armed track ids, outside the history and outside 
 ## Limits this change keeps (my calls; stated in the docs)
 
 - **dawcore clears the history when a track finishes loading.** `_loadTrack` ends with `engine.setTracks(...)` (`daw-editor.ts:2514`; also `:2047` and `recording-clip.ts:134` for an adapter without `updateTrack`), and `setTracks` clears the history (`Arrangement.ts:348-349`). A file dropped, an `editor.addTrack` or a `<daw-track>` appended mid-session wipes every step, the mixer steps as well as the clip steps it already wipes today. Moving dawcore's load path to `addTrack` / `updateTrack` is #848's (the issue body gets a line).
-- **Keyboard Undo does not fire while a slider has focus.** `ownsAllKeys` (`core/src/keyboard.ts:69-80`) blocks every shortcut while an `<input>` has focus, and a slider keeps focus after a mouse drag; the maintainer deferred that to #730. Undo from a button, or by keyboard after focus has left the slider, works; the browser test and the upgrade guide promise only that.
+- **Keyboard Undo does not fire while a slider has focus.** `ownsAllKeys` (`core/src/keyboard.ts:69-80`) blocks every shortcut while an `<input>` has focus, and a slider keeps focus after a mouse drag; the maintainer deferred that to #730, and confirmed it for this change on 2026-11-25 (asked after a side agent raised it): no exception for sliders, because an app can replace the control with one that is not a range input, so a rule keyed on the element type would not hold. Undo from a button, or by keyboard after focus has left the slider, works; the browser test and the upgrade guide promise only that.
 
 ## To ask the maintainer
 
