@@ -149,8 +149,9 @@ test.describe('Track Reordering', () => {
       expect(midDragWaveformOrder.filter((r) => r.isDragSource)).toHaveLength(1);
     }).toPass({ timeout: 5000 });
 
-    // The dragged slot, sampled on every frame from the release (#796): it
-    // lands at once. It used to hang at the pointer for ~250 ms (dnd-kit's
+    // The dragged slot, sampled on every frame from the release (#796): it is
+    // in place within 100 ms (dnd-kit releases it 15-49 ms after the drop).
+    // It used to hang at the pointer for ~250 ms (dnd-kit's
     // drop animation, with no placeholder to fly to) and, with that animation
     // off but the slot's `top` transition on, to appear ~300 px away and
     // slide back.
@@ -203,6 +204,89 @@ test.describe('Track Reordering', () => {
       expect(restored.ids).toEqual(before.ids);
       expect(restored.names).toEqual(before.names);
     }).toPass({ timeout: 5000 });
+  });
+
+  // #796: a slot lifted soon after another track is dropped stays where it
+  // is. With the slots' `top` transition still on after the drop, dnd-kit
+  // copied it into the lifted slot, which then flew in from ~400 px away.
+  test('a track lifted right after another is dropped stays under the pointer', async ({
+    page,
+  }) => {
+    const grips = page.locator('button[aria-label="Drag to reorder track"]');
+    // Keep every pointer position out of dnd-kit's auto-scroll bands (the top
+    // and bottom 20% of the viewport).
+    await grips.nth(1).evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const boxes: { x: number; y: number; width: number; height: number }[] = [];
+    await expect(async () => {
+      boxes.length = 0;
+      for (const i of [0, 1, 2]) {
+        const box = await grips.nth(i).boundingBox();
+        expect(box).toBeTruthy();
+        boxes.push(box!);
+      }
+    }).toPass({ timeout: 5000 });
+    const center = (box: { x: number; y: number; width: number; height: number }) => ({
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+    const [g0, g1, g2] = boxes.map(center);
+    const liftedId = await grips
+      .nth(2)
+      .evaluate((el) => el.closest('[data-track-controls]')!.getAttribute('data-track-controls')!);
+    const homeTop = await page.evaluate(
+      (id) =>
+        document
+          .querySelector(`[data-track-controls="${id}"]`)!
+          .parentElement!.getBoundingClientRect().top,
+      liftedId
+    );
+
+    // Drag the first track onto the second and drop it.
+    await page.mouse.move(g0.x, g0.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 15; i++) {
+      await page.mouse.move(g0.x, g0.y + ((g1.y - g0.y) * i) / 15);
+      await page.waitForTimeout(60);
+    }
+    await page.mouse.up();
+
+    // At once, lift the third track and sample its slot on every frame.
+    const lifted = page.evaluate(
+      (id) =>
+        new Promise<{ top: number; dragging: boolean }[]>((resolve) => {
+          const samples: { top: number; dragging: boolean }[] = [];
+          const t0 = performance.now();
+          const frame = () => {
+            const slot = document.querySelector(`[data-track-controls="${id}"]`)?.parentElement;
+            if (slot) {
+              samples.push({
+                top: slot.getBoundingClientRect().top,
+                dragging: slot.hasAttribute('data-dnd-dragging'),
+              });
+            }
+            if (performance.now() - t0 < 300) requestAnimationFrame(frame);
+            else resolve(samples);
+          };
+          frame();
+        }),
+      liftedId
+    );
+    await page.mouse.move(g2.x, g2.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 4; i++) {
+      await page.mouse.move(g2.x, g2.y + i * 3);
+      await page.waitForTimeout(30);
+    }
+    const samples = await lifted;
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+
+    // The third track was lifted (else this would pass for nothing) ...
+    const whileLifted = samples.filter((sample) => sample.dragging);
+    expect(whileLifted.length).toBeGreaterThan(0);
+    // ... and never left its place by more than the few pixels it was moved.
+    const farthest = Math.max(...whileLifted.map((sample) => Math.abs(sample.top - homeTop)));
+    expect(farthest).toBeLessThan(40);
   });
 
   test('Escape mid-drag reverts the preview in both columns', async ({ page }) => {
