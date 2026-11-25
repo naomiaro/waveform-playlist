@@ -265,6 +265,47 @@ describe('useAnnotationDragHandlers', () => {
       expect(preview.source.getSnapshot()).toBeNull();
     });
 
+    // Maintainer, 2026-11-24: the drag is drawn over the store's current
+    // list, so a change made elsewhere during the drag shows at once.
+    it('the preview shows an annotation added during the drag at once, without another move', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(2, 'start')));
+      run((h) => h.onDragMove(moveEvent(2, 'start', 20)));
+      act(() => {
+        store.update((c) => [...c, extra]);
+      });
+
+      const shown = preview.source.getSnapshot()!;
+      expect(ids(shown)).toEqual(['a', 'b', 'c', 'x']);
+      expect(shown[2].start).toBeCloseTo(3.2, 5);
+    });
+
+    it('the preview keeps a text change made during the drag, with the moved bounds', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      act(() => {
+        store.update((c) => c.map((a) => (a.id === 'b' ? { ...a, lines: ['edited'] } : a)));
+      });
+      run((h) => h.onDragMove(moveEvent(0, 'end', 60)));
+
+      const shown = preview.source.getSnapshot()!;
+      expect(shown[1].lines).toEqual(['edited']);
+      expect(shown[0].end).toBeCloseTo(1.6, 5);
+      expect(shown[1].start).toBeCloseTo(1.6, 5);
+    });
+
+    it('a store change after the drag ended publishes no preview', () => {
+      const { run, store, preview } = setupStore({ preview: true });
+      run((h) => h.onDragStart(startEvent(0, 'end')));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 50)));
+      run((h) => h.onDragEnd(endEvent(false)));
+      act(() => {
+        store.update((c) => [...c, extra]);
+      });
+      expect(preview.source.getSnapshot()).toBeNull();
+    });
+
     it('a carried neighbour is written by id and keeps a text change made during the drag', () => {
       const { run, store } = setupStore({ preview: true });
       run((h) => h.onDragStart(startEvent(0, 'end')));

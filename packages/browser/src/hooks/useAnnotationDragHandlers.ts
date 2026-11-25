@@ -12,8 +12,8 @@ import {
 
 /**
  * Where an annotation edge drag shows its moves while it is in progress:
- * the annotations as the drag would leave them, or `null` when no drag is
- * running. Both providers have one (`annotationPreview` in their controls).
+ * the store's current annotations with the drag's moves on top, or `null`
+ * when no drag is running. Both providers have one (`annotationPreview` in their controls).
  */
 export type AnnotationPreviewHandle = ValueSourceHandle<AnnotationData[] | null>;
 
@@ -126,6 +126,26 @@ export function useAnnotationDragHandlers({
   const storeRef = React.useRef(store);
   storeRef.current = store;
 
+  /** The store's current list with the drag's moved bounds on top (#867). */
+  const shownDuringDrag = React.useCallback((drag: DragState): AnnotationData[] => {
+    const current = storeRef.current?.getAnnotations() ?? drag.working;
+    return applyAnnotationBounds(
+      current,
+      movedBounds(drag.snapshot, drag.working)
+    ) as AnnotationData[];
+  }, []);
+
+  // While a drag is drawn through the preview, a change made elsewhere (a
+  // live feed adding an annotation, a text edit) is drawn at once: the
+  // preview follows the store (maintainer, 2026-11-24).
+  React.useEffect(() => {
+    if (!store || !preview) return;
+    return store.subscribe(() => {
+      const drag = dragRef.current;
+      if (drag && preview.source.getSnapshot() !== null) preview.publish(shownDuringDrag(drag));
+    });
+  }, [store, preview, shownDuringDrag]);
+
   /** Write `changes` by id onto the store's current list. */
   const write = React.useCallback((changes: readonly AnnotationBoundsChange[]) => {
     storeRef.current?.update((current) => applyAnnotationBounds(current, changes));
@@ -214,12 +234,12 @@ export function useAnnotationDragHandlers({
       drag.working = updatedAnnotations;
 
       if (preview) {
-        preview.publish(updatedAnnotations);
+        preview.publish(shownDuringDrag(drag));
       } else {
         write(movedBounds(drag.snapshot, updatedAnnotations));
       }
     },
-    [samplesPerPixel, sampleRate, duration, linkEndpoints, preview, write]
+    [samplesPerPixel, sampleRate, duration, linkEndpoints, preview, write, shownDuringDrag]
   );
 
   const onDragEnd = React.useCallback(
@@ -249,7 +269,7 @@ export function useAnnotationDragHandlers({
       flushSync(() => {
         // Only what the drag moved, onto the list as it is now. When the
         // dragged annotation is gone, the release does nothing (#867).
-        const moved = movedBounds(drag.snapshot, result);
+        const moved = movedBounds(drag.snapshot, drag.working);
         owner?.update((current) =>
           current.some((a) => a.id === drag.draggedId)
             ? applyAnnotationBounds(current, moved)
