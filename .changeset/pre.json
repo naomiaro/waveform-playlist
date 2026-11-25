@@ -28,6 +28,7 @@
     "annotation-drag-preview",
     "annotation-list-item-memo",
     "annotation-parts",
+    "annotation-store",
     "arrangement-extracted",
     "arrangement-owns-tracks",
     "arrangement-react-additions",
