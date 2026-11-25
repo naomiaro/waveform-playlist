@@ -234,9 +234,9 @@ The id field of the annotation list writes nothing for a duplicate id and shows 
 
 While an edge is dragged, the boxes and the list show the store's current list with the drag's moves on top. A change made elsewhere during the drag (a live feed that adds annotations, a text edit, a `set`) is drawn at once, and each move of the pointer is worked out over that current list: a neighbour your app moved during the drag is collided with where it is now, and an edge dragged into a neighbour still carries it along (see [Linked Endpoints](#linked-endpoints)).
 
-The drag keeps the `start` and `end` of every annotation it has touched, the dragged one and each neighbour it moved, also one moved back to where it was. On release it writes those bounds, found by id in the store's list as it is then; nothing else is written, so an annotation added or edited during the drag stays.
+The drag keeps the `start` and `end` of every annotation it has touched, the dragged one and each neighbour it moved, also one moved back to where it was. On release it writes those bounds, found by id in the store's list as it is then; nothing else is written, so an annotation added during the drag stays, and so does any other edit made elsewhere, except to the `start` and `end` of an annotation the drag has touched: those are the drag's.
 
-The drag ends and writes nothing more, its preview cleared, when the dragged annotation is removed from the store (a "clear all" included), when the provider is given another store, or when the component that drags unmounts.
+The drag ends and writes nothing more, its preview cleared, when the dragged annotation is removed from the store (a "clear all" included), when the provider is given another store, or when the component that drags unmounts. Without `preview` the moves already written stay.
 
 ## Provider Configuration
 

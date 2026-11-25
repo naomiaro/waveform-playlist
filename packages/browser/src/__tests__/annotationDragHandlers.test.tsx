@@ -465,7 +465,11 @@ describe('useAnnotationDragHandlers', () => {
       const { run } = mountWith(store);
       run((h) => h.onDragStart(startEvent(0, 'end')));
       run((h) => h.onDragMove(moveEvent(0, 'end', 30)));
-      run((h) => h.onDragMove(moveEvent(0, 'end', 10)));
+      // Back to where the edge started: the edge and its carried neighbour
+      // must still be restored by Escape.
+      run((h) => h.onDragMove(moveEvent(0, 'end', 0)));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 20)));
+      run((h) => h.onDragMove(moveEvent(0, 'end', 0)));
       run((h) => h.onDragEnd(endEvent(true)));
       expect(times(store.getAnnotations())).toEqual(times(initial()));
     });
