@@ -10,7 +10,7 @@ Used by `@waveform-playlist/browser` (the React provider) and `@dawcore/componen
 - **Sample + tick timeline math** — integer samples for precision, ticks for tempo-independent positioning
 - **The arrangement** — one object owns the tracks, the mix (volume, mute, solo and pan by track id) and the undo history; it needs no engine and outlives the engine that plays it
 - **Loading audio** — a clip may name its audio (`src`: a URL, `Blob` or `File`) instead of carrying it; the arrangement fetches and decodes each source once, reports where each one is (`arrangement.sources`) and replaces the clip with a loaded one when the audio arrives
-- **Undo/redo** — one history for the tracks, the clips and the mix: a fader move is an undo step, a whole drag is one step (`createMixerGesture()`), and transactions group a clip drag
+- **Undo/redo** — one history for the tracks, the clips and the mix: a fader move is an undo step, a whole drag is one step (`createMixerGesture()` from `@waveform-playlist/core`), and transactions group a clip drag
 - **Selection, loop, and zoom state** — engine owns selection range, loop region, zoom level, and master volume
 - **`statechange` events** — subscribe once and mirror a single `EngineState` snapshot into any UI framework
 - **Adapter-pluggable playback** — bring your own `PlayoutAdapter` (Tone.js, native Web Audio, or a custom backend); the engine runs headless without one
@@ -125,10 +125,10 @@ The engine's track, clip, mixer, arm and history methods call the arrangement's,
 
 A call that changes nothing (the value the track already has, or a track that is not in the current tracks) makes no step and no `statechange`. Inside an open transaction an undoable mixer change is part of it, and an abort takes it back; an `{ undoable: false }` change is written into the transaction's base too, so an abort keeps it. Undo, redo and an abort bring back the mix of the state they return to.
 
-`createMixerGesture()` makes the ids for one control. Use one per slider:
+`createMixerGesture()` from `@waveform-playlist/core` makes the ids for one control. Use one per slider:
 
 ```typescript
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 const gesture = createMixerGesture();
 const detach = gesture.attach(slider); // ends the gesture on the slider's own events
@@ -377,17 +377,6 @@ interface MixerChangeOptions {
   gesture?: string;
   /** Not an undo step: the value is written into every saved state as well. */
   undoable?: false;
-}
-
-function createMixerGesture(): MixerGesture;
-
-interface MixerGesture {
-  /** The id to pass while a gesture is going on. */
-  readonly id: string;
-  /** The gesture is over: the next change starts a new one. */
-  end(): void;
-  /** Ends the gesture on the input's own events; returns the detach function. */
-  attach(input: HTMLInputElement): () => void;
 }
 
 interface ArrangementSourceState {

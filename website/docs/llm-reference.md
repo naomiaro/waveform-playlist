@@ -1640,7 +1640,7 @@ The arrangement (`createArrangement()`) owns the tracks, the mix and the undo hi
 An arrangement's tracks are `ArrangementTrack` (core): a clip is an `AudioClip` or a `LoadingClip` (audio not loaded yet; narrow with `isLoadingClip` before reading sample fields). The arrangement loads every source its loading clips name, in the current tracks and in every undo and redo state, once a decode context is attached (an engine with an adapter attaches `adapter.audioContext`), and replaces each loading clip with an `AudioClip` of the same id when its audio arrives (seconds to integer samples at the decoded buffer's sample rate; not an undo step; one notification). `getState().tracks`, `getState().duration` and the tracks an adapter receives leave loading clips out. `PlaylistEngine`'s own `setTracks` / `addTrack` / `updateTrack` take `ClipTrack` (loaded clips only).
 
 ```typescript
-import { PlaylistEngine, createArrangement, attachDecodeContext, defaultLoadSource, createMixerGesture } from '@waveform-playlist/engine';
+import { PlaylistEngine, createArrangement, attachDecodeContext, defaultLoadSource } from '@waveform-playlist/engine';
 import type { EngineState, PlayoutAdapter, EngineEvents, PlaylistEngineOptions } from '@waveform-playlist/engine';
 import type {
   Arrangement,
@@ -1650,7 +1650,6 @@ import type {
   CreateArrangementOptions,
   LoadSource,
   MixerChangeOptions,
-  MixerGesture,
   RemoveTrackOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -1730,20 +1729,7 @@ interface MixerChangeOptions {
 // that leaves the step); a gesture that ends where its step began leaves no step, and the history it found comes
 // back (the redo states its first call cleared, and a step the undo limit evicted for it).
 
-// The gesture ids of one control (one helper per slider). attach() ends the gesture on the input's `change`
-// (the end of a pointer drag), except while an arrow, PageUp/PageDown, Home or End key is down: then on that
-// key's `keyup` (a held key is one step). `blur` ends it too. Ids are unique per helper, also across two
-// installed copies of the package. Mute and solo buttons need no helper: each click is a step.
-function createMixerGesture(): MixerGesture;
-
-interface MixerGesture {
-  /** The id to pass while a gesture is going on. */
-  readonly id: string;
-  /** The gesture is over: the next change starts a new one. */
-  end(): void;
-  /** Ends the gesture on the input's own events; returns the detach function. */
-  attach(input: HTMLInputElement): () => void;
-}
+// The gesture ids of one slider: createMixerGesture() from @waveform-playlist/core (below).
 
 interface TrackMixerValues {
   volume: number;
@@ -1886,6 +1872,33 @@ interface EngineState {
 // Pure operations (also exported for use without PlaylistEngine):
 import { constrainClipDrag, constrainBoundaryTrim, canSplitAt, splitClip, calculateSplitPoint } from '@waveform-playlist/engine';
 import { calculateDuration, clampSeekPosition, findClosestZoomIndex } from '@waveform-playlist/engine';
+```
+
+### Mixer gestures (`@waveform-playlist/core`)
+
+```typescript
+import { createMixerGesture } from '@waveform-playlist/core';
+import type { MixerGesture } from '@waveform-playlist/core';
+// The gesture ids of one control (one helper per slider). attach() ends the gesture on the input's `change`
+// (the end of a pointer drag), except while an arrow, PageUp/PageDown, Home or End key is down: then on that
+// key's `keyup` (a held key is one step). `blur` ends it too. Ids are unique per helper, also across two
+// installed copies of the package. Mute and solo buttons need no helper: each click is a step.
+function createMixerGesture(): MixerGesture;
+
+interface MixerGesture {
+  /** The id to pass while a gesture is going on. */
+  readonly id: string;
+  /** The gesture is over: the next change starts a new one. */
+  end(): void;
+  /** Ends the gesture on the input's own events; returns the detach function. */
+  attach(input: HTMLInputElement): () => void;
+}
+
+const gesture = createMixerGesture();
+const detach = gesture.attach(slider);
+slider.addEventListener('input', () =>
+  engine.setTrackVolume(trackId, slider.valueAsNumber, { gesture: gesture.id })
+);
 ```
 
 ---

@@ -594,7 +594,7 @@ The master volume is a number from 0 (silent) to 1 (full): that is what `usePlay
 
 ### Track volume
 
-`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i].volume` (the entry of `tracks[i]`; every track has one, also while its audio loads) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume, { gesture: gesture.id })`, with one `createMixerGesture()` per slider so that a drag is one undo step (see [Undo of Mixer Moves](/docs/react/guides/track-management#undo-of-mixer-moves)).
+`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i].volume` (the entry of `tracks[i]`; every track has one, also while its audio loads) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume, { gesture: gesture.id })`, with one `createMixerGesture()` (from `@waveform-playlist/core`) per slider so that a drag is one undo step (see [Undo of Mixer Moves](/docs/react/guides/track-management#undo-of-mixer-moves)).
 
 ---
 

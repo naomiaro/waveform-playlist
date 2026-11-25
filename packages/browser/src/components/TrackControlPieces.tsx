@@ -5,7 +5,7 @@
  * `<WaveformTrackControls>`.
  */
 import React, { use, useEffect, useRef, useState } from 'react';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 import {
   Button,
   CloseButton,

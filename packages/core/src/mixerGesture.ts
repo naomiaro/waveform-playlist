@@ -4,8 +4,11 @@
  * `gesture` id into one step; this helper makes the id, and ends the gesture
  * so that the next change starts a new one.
  *
- * Framework-free: React's sliders and dawcore's `<daw-track-controls>` both
- * use it. One helper per control, so two sliders never share an id.
+ * Framework-free: React's sliders and dawcore's elements both use it. One
+ * helper per control, so two sliders never share an id. It lives in core,
+ * not beside the setters in the engine, because `<daw-editor>` loads the
+ * engine with a dynamic `import()`: a value import of the engine would put
+ * it back in dawcore's first bundle.
  */
 
 export interface MixerGesture {

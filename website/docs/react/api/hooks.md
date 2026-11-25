@@ -999,7 +999,7 @@ The four mixer setters take the track's **id** (they took its index before; see 
 
 The mixer setters, `reorderTrack`, `undo` and `redo` call the provider's arrangement, so they work before the first engine is built and while an engine is rebuilt; the next engine plays what they changed. A value set while a track's audio is still loading is kept.
 
-Each mixer call is an undo step, and an undo, a redo or an aborted transaction brings back the mix of the state it returns to: Undo after a fader move moves the fader back. A slider that calls a setter on every move makes one step per move unless it passes one `gesture` id for the whole drag; the built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do, so a drag, or a held arrow key, is one step. For a slider of your own, make one `createMixerGesture()` (from `@waveform-playlist/engine`) per slider, attach it to the input and pass `{ gesture: gesture.id }` (see the [upgrade guide](../upgrading.md#a-slider-of-your-own-makes-one-undo-step-per-move-until-it-passes-a-gesture)). A value that is not the user's edit, such as automation or a mix restored from a saved project, takes `{ undoable: false }`: no step, and no undo or redo brings back an older value. Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, which it keeps after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)); an Undo button, or the key once focus has left the slider, works.
+Each mixer call is an undo step, and an undo, a redo or an aborted transaction brings back the mix of the state it returns to: Undo after a fader move moves the fader back. A slider that calls a setter on every move makes one step per move unless it passes one `gesture` id for the whole drag; the built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do, so a drag, or a held arrow key, is one step. For a slider of your own, make one `createMixerGesture()` (from `@waveform-playlist/core`) per slider, attach it to the input and pass `{ gesture: gesture.id }` (see the [upgrade guide](../upgrading.md#a-slider-of-your-own-makes-one-undo-step-per-move-until-it-passes-a-gesture)). A value that is not the user's edit, such as automation or a mix restored from a saved project, takes `{ undoable: false }`: no step, and no undo or redo brings back an older value. Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, which it keeps after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)); an Undo button, or the key once focus has left the slider, works.
 
 If the provider unmounts (or is hidden by `<Activity>`) while a track is armed, it is disarmed then too.
 
@@ -1099,7 +1099,7 @@ No reorder remounts a slot, whether by drag or by the move buttons: React state 
 ```tsx
 import { useEffect, useRef, useState } from 'react';
 import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 function TrackStrip() {
   const { name, muted, volume, isRecordingArmed, setMuted, setVolume } = useTrack();

@@ -126,7 +126,7 @@ A component among the children reads its track with `useTrack()`: the id, the na
 ```tsx
 import { useEffect, useRef, useState } from 'react';
 import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 // One gesture per slider: a drag, or a held arrow key, is one undo step.
 function useMixerGesture() {
@@ -230,7 +230,7 @@ import {
   usePlaylistMixer,
   usePlaylistTimeline,
 } from '@waveform-playlist/browser';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 // A component per slider, so that each has its own gesture.
 function VolumeSlider({ trackId, volume }: { trackId: string; volume: number }) {
@@ -294,7 +294,7 @@ Every mute, solo, volume and pan change is an undo step of the arrangement, in t
 
 A mixer change made inside an open transaction (`arrangement.beginTransaction()`) is part of it, and an abort takes it back (one with `undoable: false` stays). Arming a track for a take is not an undo step (see [Recording](/docs/react/guides/recording#the-armed-track-is-muted-for-the-take)).
 
-`createMixerGesture` is imported from `@waveform-playlist/engine`: add it to your app's dependencies (it is installed with `@waveform-playlist/browser`, but an app that imports from a package should depend on it directly).
+`createMixerGesture` is imported from `@waveform-playlist/core`, the package an app already imports `audioTrack` from.
 
 Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, and a slider keeps the focus after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)). An Undo button of your own (`useEditorControls().undo`, enabled by `useUndoRedo().canUndo`) works, and so does the key once focus has left the slider.
 
@@ -528,8 +528,7 @@ import {
   useCreateArrangement,
   useTrack,
 } from '@waveform-playlist/browser';
-import { audioTrack } from '@waveform-playlist/core';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { audioTrack, createMixerGesture } from '@waveform-playlist/core';
 
 // One gesture per slider: a drag is one undo step.
 function useMixerGesture() {

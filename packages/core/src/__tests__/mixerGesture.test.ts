@@ -1,14 +1,13 @@
 /**
  * `createMixerGesture()` (#843): the id a range control passes to the mixer
  * setters while one gesture goes on, and the events of the control that end
- * it. The engine's tests run in node, which has `EventTarget` and `Event`
- * but no DOM; `attach` only listens and reads `key`, so a plain event
- * target stands in for the input.
+ * it. Core's tests run in node, which has `EventTarget` and `Event` but no
+ * DOM; `attach` only listens and reads `key`, so a plain event target stands
+ * in for the input. That one drag is one undo step of an arrangement is
+ * tested in the engine (`mixerGestureUndo.test.ts`).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { createArrangement, createMixerGesture } from '../index';
-import { createTrack } from '@waveform-playlist/core';
-import type { ArrangementTrack } from '@waveform-playlist/core';
+import { createMixerGesture } from '../index';
 
 function fakeInput(): { input: HTMLInputElement; fire(type: string, key?: string): void } {
   const target = new EventTarget();
@@ -21,11 +20,6 @@ function fakeInput(): { input: HTMLInputElement; fire(type: string, key?: string
     },
   };
 }
-
-const track = (id: string): ArrangementTrack => ({
-  ...createTrack({ name: id, clips: [] }),
-  id,
-});
 
 describe('createMixerGesture', () => {
   it('end gives a new id', () => {
@@ -144,28 +138,5 @@ describe('createMixerGesture', () => {
     const two = await fresh();
     expect(one.createMixerGesture).not.toBe(two.createMixerGesture);
     expect(one.createMixerGesture().id).not.toBe(two.createMixerGesture().id);
-  });
-
-  it('one drag is one undo step; the next drag is another', () => {
-    const arrangement = createArrangement({ tracks: [track('A')] });
-    const gesture = createMixerGesture();
-    const { input, fire } = fakeInput();
-    gesture.attach(input);
-
-    for (const volume of [0.9, 0.8, 0.7]) {
-      arrangement.setTrackVolume('A', volume, { gesture: gesture.id });
-      fire('input');
-    }
-    fire('change');
-    for (const volume of [0.6, 0.5]) {
-      arrangement.setTrackVolume('A', volume, { gesture: gesture.id });
-    }
-    fire('change');
-
-    arrangement.undo();
-    expect(arrangement.getMixer().get('A')?.volume).toBe(0.7);
-    arrangement.undo();
-    expect(arrangement.getMixer().get('A')?.volume).toBe(1);
-    expect(arrangement.canUndo).toBe(false);
   });
 });

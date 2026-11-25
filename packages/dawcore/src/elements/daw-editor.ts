@@ -25,6 +25,7 @@ import { isDomClip, normalizeRenderMode, trackDescriptorRenderMode } from '../ty
 import {
   createClip,
   createClipFromSeconds,
+  createMixerGesture,
   createTrack,
   clipPixelWidth,
   trackKind,
@@ -50,7 +51,6 @@ import type {
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
-import { createMixerGesture } from '@waveform-playlist/engine';
 import {
   DEFAULT_TRACK_MIX,
   clampNumber,

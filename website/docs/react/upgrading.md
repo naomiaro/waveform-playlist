@@ -3529,7 +3529,7 @@ The current mix holds an entry for each current track, and each undo and redo st
 
 The setters take a last argument, `options?: MixerChangeOptions` (exported type):
 
-- `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag). `createMixerGesture()` makes the ids for one control and `gesture.attach(input)` ends a gesture on the input's own events; see [Mixer moves](/docs/framework-agnostic/engine#mixer-moves) in the engine guide.
+- `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag). `createMixerGesture()` (from `@waveform-playlist/core`) makes the ids for one control and `gesture.attach(input)` ends a gesture on the input's own events; see [Mixer moves](/docs/framework-agnostic/engine#mixer-moves) in the engine guide.
 - `{ undoable: false }`: no step. The value is also written into every undo and redo state, so no undo or redo brings back an older one. It wins over `gesture`, and an abort does not take it back.
 
 `setTrackArmed(trackId, armed)` (new, on the engine and the arrangement) arms a track for recording: it plays muted (`getState().tracks` and the adapter have it muted) while its mute in `arrangement.getMixer()` stays as it is. Arming is not an undo step.
@@ -3549,7 +3549,7 @@ slider.addEventListener('input', () => engine.setTrackVolume(trackId, slider.val
 engine.setTrackVolume(trackId, automationValue);
 
 // After
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 const gesture = createMixerGesture(); // one per slider
 gesture.attach(slider);
@@ -4180,7 +4180,7 @@ Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has fo
 
 A range input calls its `onChange` on every move, so a slider of your own that calls a mixer setter there now makes one undo step per move: Undo after a drag moves the fader back by one move only. Pass one gesture id for the whole drag. The setters take a last argument, `options?: MixerChangeOptions`: `setTrackVolume(trackId, volume, options?)` and the other three of `useEditorControls()`, and `setVolume(volume, options?)` and the other three of `useTrack()`. Calls with the same `gesture` id, one after another, are one step. `createMixerGesture()` makes the ids for one slider: `gesture.id` is the id to pass, and `gesture.attach(input)` ends the gesture on the input's `change` (the end of a pointer drag), on the `keyup` of an arrow, Page, Home or End key held down, and on `blur`; it returns the function that detaches it. Make one per slider, so two sliders never share an id. Mute and solo buttons need nothing: each click is one step.
 
-`createMixerGesture` and `MixerChangeOptions` are exported from `@waveform-playlist/engine`. `@waveform-playlist/browser` installs it, but an app that imports from it should list it in its own `dependencies`, at the version its `@waveform-playlist/browser` depends on.
+`createMixerGesture` is exported from `@waveform-playlist/core`, the package the app already imports `audioTrack` from. The type of the options, `MixerChangeOptions`, is exported from `@waveform-playlist/engine`.
 
 **Find:** `setTrackVolume(`, `setTrackPan(`, `setVolume(` and `setPan(` called from an `onChange` (or an `onInput`, or a listener of the `input` event); also `setTrackMute(` and `setTrackSolo(` or `setMuted(` and `setSoloed(` called from a control that fires many times per gesture.
 
@@ -4200,7 +4200,7 @@ const { setTrackVolume } = useEditorControls();
 
 // After
 import { useEffect, useRef, useState } from 'react';
-import { createMixerGesture } from '@waveform-playlist/engine';
+import { createMixerGesture } from '@waveform-playlist/core';
 
 function VolumeSlider({ trackId, volume }: { trackId: string; volume: number }) {
   const { setTrackVolume } = useEditorControls();

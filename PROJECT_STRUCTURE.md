@@ -95,6 +95,7 @@ waveform-playlist/
   - `dBUtils.ts` — `dBToNormalized`, `normalizedToDb`, `gainToNormalized` (dB ↔ 0-1 conversions for VU meters)
   - `valueSource.ts` — `ValueSource<T>` (`subscribe` + `getSnapshot`), `createValueSource()`, `MeterLevels`/`MeterSource`, `RecordingProgress`/`RecordingProgressSource`, `silentMeterLevels()` (values that change ~60 times a second and are kept out of UI state)
   - `annotations/store.ts` — `createAnnotationStore(initial?, { beforeChange? })`, `AnnotationStore`, `AnnotationStoreOptions`: the one owner of the annotations, which both React providers take as `annotationStore` (#867). `set` / `update` apply before they return; every list is validated (finite numeric `start`/`end`, unique ids; a `TypeError` otherwise); `beforeChange(next, current)` accepts, refuses or adjusts each change. `annotations/devFreeze.ts` (not exported) freezes what it holds outside production builds
+  - `mixerGesture.ts` — `createMixerGesture()`, `MixerGesture`: the gesture id of one mixer control, so that a fader drag is one undo step of the engine's mixer setters (#843). In core, not the engine, so dawcore's `<daw-editor>` can use it and keep its engine import lazy
   - `annotations/bounds.ts` — `applyAnnotationBounds(current, changes)`, `AnnotationBoundsChange`: writes `start`/`end` by id, keeps everything else, returns `current` when nothing changes (what an edge drag's release writes)
   - `utils/meterLevels.ts` — `readMeterMessage()` (one meter-worklet message → `MeterLevels`; shared by `useOutputMeter` and `useMicrophoneLevel`)
   - `beatsAndBars.ts` — `PPQN` (192), `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid`, `ticksToBarBeatLabel`
@@ -165,7 +166,6 @@ const clip = createClipFromSeconds({
   - `arrangement/devFreeze.ts` — Freezes handed-out tracks outside production builds
   - `adapterSync.ts` — `AdapterSync`: the adapter call for each arrangement change, and the projection that `getState().tracks` and the adapter are given (each track without its loading clips, with the current mix)
   - `PlaylistEngine.ts` — Transport, selection, loop, zoom + events; follows its arrangement by subscription and hands each change to its `AdapterSync`
-  - `mixerGesture.ts` — `createMixerGesture()`: the gesture id of one mixer control, so that a fader drag is one undo step
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
