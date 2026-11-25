@@ -305,7 +305,7 @@ Props that still break this convention on `dev` (four that default to `true`, an
 
 **A closing keyword works inside a negation.** "It does not close #688" in the body of #782 closed #688 on merge. For a PR that is one part of an issue write "Part 1 of 3 for #688" and no keyword next to the number; after the merge check `gh issue view <n> --json state`.
 
-**A keyword followed by a colon closes too.** "…stays until it is fixed: #905" in #904's body put #905 in the PR's closing list. After writing or editing a PR body, read `gh pr view <n> --json closingIssuesReferences` and check it lists only the issues meant.
+**A keyword followed by a colon closes too.** "…stays until clauderic/dnd-kit#2203 is fixed: #905" in #904's body put #905 in the PR's closing list. After writing or editing a PR body, read `gh pr view <n> --json closingIssuesReferences` and check it lists only the issues meant.
 
 **Sub-issues don't close with their parent epic** — `closes #<epic>` closes only the epic; its sub-issues stay open (found on #455: all three sub-issues open after the epic closed). Enumerate them via GraphQL (no `gh` subcommand): `gh api graphql -f query='{ repository(owner:"naomiaro", name:"waveform-playlist") { issue(number:N) { subIssues(first:50) { nodes { number title state } } } } }'`, then close each with a comment pointing at the implementing PR. To attach a new issue to an epic: `gh api graphql -f query='mutation($p:ID!,$c:ID!){ addSubIssue(input:{issueId:$p, subIssueId:$c}) { subIssue { number } } }' -f p="$(gh issue view <epic> --json id -q .id)" -f c="$(gh issue view <new> --json id -q .id)"`. An epic with an open sub-issue stays open when the PR that closes the last original one merges.
 
