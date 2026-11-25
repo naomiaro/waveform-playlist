@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
 import type { KeyboardShortcut } from '@waveform-playlist/core';
 
@@ -37,9 +37,13 @@ export const useKeyboardShortcuts = (options: UseKeyboardShortcutsOptions): void
 
   // The listener reads the latest shortcuts from a ref. Callers build the array
   // inline, so its identity changes on every render; keyed on it, the window
-  // listener was removed and re-added each time.
+  // listener was removed and re-added each time. Written in a LAYOUT effect, so
+  // the ref is current as soon as a render commits: a passive effect runs after
+  // paint for an update that is not a discrete event (the animation loop
+  // stopping playback), and a key pressed in between ran the previous render's
+  // handlers — Space paused a playback that had already ended (#895).
   const shortcutsRef = useRef(shortcuts);
-  useEffect(() => {
+  useLayoutEffect(() => {
     shortcutsRef.current = shortcuts;
   });
 

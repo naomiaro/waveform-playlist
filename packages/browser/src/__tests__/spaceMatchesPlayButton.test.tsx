@@ -6,7 +6,7 @@
 import './jsdom-polyfills'; // must be first
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, act, cleanup, waitFor, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { TestProvider } from './helpers/arrangementProvider';
 import {
   usePlaybackControls,
@@ -126,6 +126,24 @@ const ProbeChild: React.FC = () => {
   return null;
 };
 
+/**
+ * Presses Space once, in the layout effect of the commit where playback stops:
+ * after that commit, before its passive effects (#895). Armed by a test.
+ */
+let pressSpaceWhenStopped = false;
+const PressSpaceWhenStopped: React.FC = () => {
+  const { isPlaying } = useIsPlaying();
+  const wasPlaying = useRef(isPlaying);
+  useLayoutEffect(() => {
+    if (pressSpaceWhenStopped && wasPlaying.current && !isPlaying) {
+      pressSpaceWhenStopped = false;
+      fireEvent.keyDown(document.body, { key: ' ' });
+    }
+    wasPlaying.current = isPlaying;
+  }, [isPlaying]);
+  return null;
+};
+
 const wait = (ms: number) =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, ms));
@@ -141,6 +159,7 @@ async function mount() {
       <ProbeChild />
       <KeyboardShortcuts playback />
       <PlayButton />
+      <PressSpaceWhenStopped />
     </TestProvider>
   );
   await waitFor(() => expect(probe.isReady).toBe(true));
@@ -165,6 +184,7 @@ async function clickPlay() {
 const lastPlay = (log: string[]) => log.filter((entry) => entry.startsWith('play(')).pop();
 
 afterEach(async () => {
+  pressSpaceWhenStopped = false;
   await act(async () => {
     cleanup();
   });
@@ -335,5 +355,28 @@ describe('Space while playing', () => {
     await pressSpace();
     expect(probe.isPlaying).toBe(false);
     expect(lastPlay(log)).toBeUndefined();
+  });
+});
+
+describe('Space pressed as the selection finishes', () => {
+  // The animation loop stops playback outside any event, so React runs that
+  // commit's passive effects after paint. A key pressed in between used the
+  // handlers of the render before, which still saw playback running, and
+  // paused instead of playing (#895: "once the selection has played to its
+  // end" above failed now and then when its key press landed there).
+  it('plays the selection again', async () => {
+    const { log, setNow } = await mount();
+    await act(async () => {
+      probe.setSelection(2, 4);
+    });
+    await wait(30);
+    await pressSpace();
+    log.length = 0;
+
+    pressSpaceWhenStopped = true;
+    setNow(4.05);
+    await waitFor(() => expect(pressSpaceWhenStopped).toBe(false));
+    await wait(60);
+    expect(lastPlay(log)).toBe('play(2,4)');
   });
 });
