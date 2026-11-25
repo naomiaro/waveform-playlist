@@ -1,5 +1,6 @@
 import React, { use, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
+import type { MixerChangeOptions } from '@waveform-playlist/engine';
 import { warnMisplacedPart } from './partWarnings';
 import {
   usePlaylistMixer,
@@ -115,10 +116,13 @@ function TrackControlsSlotImpl({
 
   const actions = useMemo(
     () => ({
-      setMuted: (value: boolean) => setTrackMute(trackId, value),
-      setSoloed: (value: boolean) => setTrackSolo(trackId, value),
-      setVolume: (value: number) => setTrackVolume(trackId, value),
-      setPan: (value: number) => setTrackPan(trackId, value),
+      setMuted: (value: boolean, options?: MixerChangeOptions) =>
+        setTrackMute(trackId, value, options),
+      setSoloed: (value: boolean, options?: MixerChangeOptions) =>
+        setTrackSolo(trackId, value, options),
+      setVolume: (value: number, options?: MixerChangeOptions) =>
+        setTrackVolume(trackId, value, options),
+      setPan: (value: number, options?: MixerChangeOptions) => setTrackPan(trackId, value, options),
       select: () => setSelectedTrackId(trackId),
       // The engine clamps the target and ignores a move to the same place.
       moveUp: () => reorderTrack(trackId, indexRef.current - 1),

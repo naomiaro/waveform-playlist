@@ -547,7 +547,7 @@ describe('the recording arm value changes only with the armed track (#812)', () 
     const renders = armProbe.renders;
 
     act(() => probe.editor.setRecordingActive(true, 'track-1'));
-    // The arm mute is a mixer change: it does not move the arm value.
+    // A mixer change does not move the arm value.
     act(() => probe.editor.setTrackVolume('track-1', 0.2));
     expect(armProbe.value).toBe(armed);
     expect(armProbe.renders).toBe(renders);

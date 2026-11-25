@@ -12,7 +12,7 @@
  */
 import { createContext, use } from 'react';
 import type { ClipTrack, AnnotationData, AnnotationStore } from '@waveform-playlist/core';
-import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement, MixerChangeOptions, PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
@@ -249,12 +249,15 @@ export interface EditorControlsContextValue {
 
   // Track mixer, by track id (#687; by index until then). An id no track has
   // is ignored. They change the arrangement's mix, also while no engine is
-  // attached (#812). Inside a track's control panel, `useTrack()` has the
-  // same actions already bound to that track.
-  setTrackMute: (trackId: string, muted: boolean) => void;
-  setTrackSolo: (trackId: string, soloed: boolean) => void;
-  setTrackVolume: (trackId: string, volume: number) => void;
-  setTrackPan: (trackId: string, pan: number) => void;
+  // attached (#812). Each call is an undo step of the arrangement (#843);
+  // `options` (the engine's `MixerChangeOptions`) makes calls with one
+  // `gesture` id one step, or a value with `undoable: false` no step. Inside
+  // a track's control panel, `useTrack()` has the same actions already bound
+  // to that track.
+  setTrackMute: (trackId: string, muted: boolean, options?: MixerChangeOptions) => void;
+  setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
+  setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
+  setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the
@@ -289,16 +292,18 @@ export interface EditorControlsContextValue {
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
    *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  muted in the arrangement's mix for the session (#812): punch-in
-   *  recording replaces whatever the take overlaps (#579), so the doomed
-   *  material must not play under the overdub. The mixer and the track's Mute
+   *  armed in the arrangement for the session (`setTrackArmed`, #843):
+   *  punch-in recording replaces whatever the take overlaps (#579), so the
+   *  doomed material must not play under the overdub. The arm plays the
+   *  track muted and is no undo step. `trackStates` and the track's Mute
    *  button show it muted, the built-in `<TrackMuteButton />` of that track
-   *  is disabled, and `useTrack().isRecordingArmed` is true for it. The mute
-   *  from before the session is written back when it ends or the armed track
-   *  changes, whatever was set in between; nothing is written for a track
-   *  that is no longer in the arrangement. `useRecordingSession` calls it for
-   *  the length of a take; overdub flows should also call it eagerly (before
-   *  `play()`). */
+   *  is disabled, and `useTrack().isRecordingArmed` is true for it, while
+   *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
+   *  to it, so a mute changed during the take stays after it. One track is
+   *  armed at a time: arming one disarms any other, and
+   *  `setRecordingActive(false)` disarms every track. `useRecordingSession`
+   *  calls it for the length of a take; overdub flows should also call it
+   *  eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
@@ -393,10 +398,11 @@ export interface TrackReorderPreviewContextValue {
 
 /**
  * INTERNAL (the context and its hook are not exported from the package,
- * #812): the track a take is being recorded onto, set by
- * `setRecordingActive(true, trackId)` and cleared when the session ends.
- * Changes when a take starts and ends and when the armed track changes. The
- * track controls read it and give each track's panel `isRecordingArmed`.
+ * #812): the track a take is being recorded onto, read from the
+ * arrangement's `armedTrackIds` (#843; the first id, or null: React arms one
+ * track at a time with `setRecordingActive`). Changes when a take starts and
+ * ends and when the armed track changes. The track controls read it and give
+ * each track's panel `isRecordingArmed`.
  */
 export interface RecordingArmContextValue {
   armedTrackId: string | null;

@@ -11,10 +11,10 @@
 //    playback runs past the end of existing material. Consumers call
 //    setRecordingActive eagerly (before play()) — a render round-trip loses
 //    the race against the first animation frame on an empty timeline.
-// 4. setRecordingActive(active, armedTrackId) also transiently mutes the
-//    armed track for the session (punch-in replaces its overlapped content —
-//    the doomed material must not play under the take) and restores the
-//    previous mute state on release.
+// 4. setRecordingActive(active, armedTrackId) also arms the track in the
+//    arrangement for the session (#843), which plays it muted (punch-in
+//    replaces its overlapped content — the doomed material must not play
+//    under the take); on release the track plays with its own mute again.
 // 5. Explicit ends still stop: selection playback passes a playDuration and
 //    stops at its end regardless.
 //
@@ -326,12 +326,12 @@ describe('setRecordingActive armed-track mute', () => {
     await act(async () => {
       probe.setRecordingActive(false);
     });
-    // release restores the pre-session state: still muted.
-    // Rule (#843): a setter given the value the track already has changes
-    // nothing and reaches no adapter, so the release sends no call at all;
-    // before, a redundant `{ muted: true }`. What matters is that it is
-    // never unmuted.
-    expect(adapter.muteCalls).not.toContainEqual({ trackId: 'track-a', muted: false });
+    // release: the track plays with its own mute again, still muted.
+    // Rule (#843): the disarm sends the mute the track now plays with, its
+    // own (`true`); the mute in the mix was never written. Before, the
+    // provider wrote the mute from before the session back with the setter.
+    // What matters is that it is never unmuted.
+    expect(adapter.muteCalls).toEqual([{ trackId: 'track-a', muted: true }]);
   });
 
   it('activation without a trackId does not touch any track mute', async () => {

@@ -458,16 +458,19 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     ).toEqual(['reorder']);
   });
 
-  // #812: the arm mute goes through the arrangement's mix, so the mixer
-  // follows; the armed track is its own value, read by the track controls.
+  // #843: the arm is the arrangement's override, outside the history:
+  // `trackStates` shows the armed track muted, so the mixer follows; the
+  // armed track is its own value, read by the track controls; the undo
+  // readers do not render, since arming is no undo step.
   it('arming a track for a take, moving the arm and ending the take: the recording arm and the mixer', async () => {
     await mount();
-    // Rule (#843): until the arm is an override outside the history (a later
-    // part of #843), the arm mute is a setter call and so an undo step: the
-    // first one also re-renders the undo readers. Before, `['mixer', 'recordingArm']`.
+    // Rule (#843): the arm is no undo step. Before, the arm was a mute
+    // written to the mix (#812), and in part 1 of #843 that write was an
+    // undo step, so the first arm also rendered the undo readers.
     expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-1'))).toEqual(
-      ['mixer', 'recordingArm', 'undo']
+      ['mixer', 'recordingArm']
     );
+    expect(values.undo).toEqual({ canUndo: false, canRedo: false });
     expect(values.recordingArm.armedTrackId).toBe('track-1');
     expect(values.mixer.trackStates[0].muted).toBe(true);
     expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-2'))).toEqual(
