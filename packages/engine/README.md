@@ -10,7 +10,7 @@ Used by `@waveform-playlist/browser` (the React provider) and `@dawcore/componen
 - **Sample + tick timeline math** — integer samples for precision, ticks for tempo-independent positioning
 - **The arrangement** — one object owns the tracks, the mix (volume, mute, solo and pan by track id) and the undo history; it needs no engine and outlives the engine that plays it
 - **Loading audio** — a clip may name its audio (`src`: a URL, `Blob` or `File`) instead of carrying it; the arrangement fetches and decodes each source once, reports where each one is (`arrangement.sources`) and replaces the clip with a loaded one when the audio arrives
-- **Undo/redo** — history for the structural changes (tracks and clips), with transaction grouping for drag gestures; an undo never changes the mix
+- **Undo/redo** — one history for the tracks, the clips and the mix: a fader move is an undo step, a whole drag is one step (`createMixerGesture()`), and transactions group a clip drag
 - **Selection, loop, and zoom state** — engine owns selection range, loop region, zoom level, and master volume
 - **`statechange` events** — subscribe once and mirror a single `EngineState` snapshot into any UI framework
 - **Adapter-pluggable playback** — bring your own `PlayoutAdapter` (Tone.js, native Web Audio, or a custom backend); the engine runs headless without one
@@ -111,9 +111,36 @@ A `setTempo` places every clip that has a tick on the tick grid of the engine it
 
 A different tempo is not converted. A tick is the musical position, so an engine built at another tempo than the one the ticks were made under has clips whose `startSample` and `startTick` disagree until the next `setTempo`, which moves `startSample` to follow the tick. Clips added under the new engine get their ticks at its tempo and keep their place at that `setTempo`, while the older ones move.
 
-An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`. The `arrangement` option accepts only an arrangement made by `createArrangement()`. The engine recognises one by a versioned `Symbol.for` key and not by `instanceof`, so an arrangement made by another installed copy of this package (an app and a library that pin different versions) is accepted as long as both copies use the same key version.
+An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`. The `arrangement` option accepts only an arrangement made by `createArrangement()`. The engine recognises one by a versioned `Symbol.for` key and not by `instanceof`, so an arrangement made by another installed copy of this package (an app and a library that pin different versions) is accepted as long as both copies use the same key version. The key version changed with the mixer undo steps (`/v2`): an engine and an arrangement from copies on either side of that change refuse each other.
 
-The engine's track, clip, mixer and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
+The engine's track, clip, mixer, arm and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
+
+### Mixer moves are undo steps
+
+`setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan` (on the arrangement and on the engine) are undo steps: an undo puts the fader back. Their last argument, `options?: MixerChangeOptions`, says how a change goes into the history:
+
+- nothing: each call is a step of its own;
+- `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag from press to release);
+- `{ undoable: false }`: no step. The value is written into every saved state as well, so no undo or redo brings back an older one (automation, a value that is not the user's edit). It wins over `gesture`.
+
+A call that changes nothing (the value the track already has, or a track that is not in the current tracks) makes no step and no `statechange`. Inside an open transaction a mixer change is part of it, and an abort takes it back. Undo, redo and an abort bring back the mix of the state they return to.
+
+`createMixerGesture()` makes the ids for one control. Use one per slider:
+
+```typescript
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+const gesture = createMixerGesture();
+const detach = gesture.attach(slider); // ends the gesture on the slider's own events
+slider.addEventListener('input', () => {
+  engine.setTrackVolume('track-1', slider.valueAsNumber, { gesture: gesture.id });
+});
+// gesture.end() ends it by hand; detach() removes the listeners
+```
+
+`attach` ends the gesture on the input's `change` (the end of a pointer drag), except while an arrow, Page Up/Down, Home or End key is held: then on that key's `keyup`, so a held key is one step. A `blur` ends it too. Mute and solo buttons need no helper: each click is a step.
+
+**The recording arm.** `setTrackArmed(trackId, armed)` (arrangement and engine) arms a track for recording, and `arrangement.armedTrackIds` is the set of armed ids. An armed track plays muted: `engine.getState().tracks` and the adapter have it muted, while its mute in `getMixer()` stays as it is and comes back when the track is disarmed. Arming is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are armed.
 
 ### Loading audio
 
@@ -211,8 +238,8 @@ Rules that hold for the engine and the arrangement alike:
 
 - **Nothing handed out is a copy.** `arrangement.getTracks()`, `engine.getState().tracks` and the tracks an adapter receives are shared with the undo history. Never write to the array, a track or a clip: copy first (`{ ...track, clips: [...] }`) and pass the copy to `updateTrack`. `arrangement.updateTrack`, given a track object or a function, keeps each clip object the track already holds and copies every other clip, so the clips you did not replace are the same objects afterwards. Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in strict code (every module is strict). What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen. Tracks are copied on their way in, so the objects you pass stay yours.
 - **A change replaces only what changed.** The tracks array and the changed track and clip objects are new; every other track is the same object as before, so a comparison by identity finds what changed. The exception is `setTracks`, which copies every track it is given: after it no track is the object it was.
-- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none. `setTracks` keeps the mix of an id that is in the tracks it replaces, `updateTrack` keeps the track's mix (also when it gives the track a new id, and then also over an entry the new id still has from a removed track), and `addTrack` of a track whose removal can still be undone finds the mix it had; in those cases the fields are not read. An entry is dropped as soon as no state holds its track any more: not the current tracks, not an undo or redo step, not the base of an open transaction (with `undoLimit: 0` a removed track's entry goes at once). Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`, which act on a track that is in the current tracks. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
-- **Undo, redo and an aborted transaction restore tracks and clips, never the mix.** Undoing a `removeTrack` brings the track back with the mix it had. One exception: undoing or redoing an `updateTrack` that gave a track a new id switches between the old id's mix and the new id's, so a fader moved after the rename is not what the old id has after the undo. A second one: when a track is given the id of a removed track whose removal can still be undone, the renamed track's mix replaces the removed track's, so undoing back past the removal brings that track back with the renamed track's mix.
+- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none. `setTracks` keeps the mix of an id that is in the tracks it replaces, and `updateTrack` keeps the track's mix (also when it gives the track a new id); in those cases the fields are not read. `addTrack` seeds the entry from the new track's fields, also for the id of a track removed earlier. `getMixer()` holds the entries of the current tracks; each undo and redo state keeps its own. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`, which act on a track that is in the current tracks. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
+- **Undo, redo and an aborted transaction restore the tracks, the clips and the mix** of the state they return to. Undoing a `removeTrack` brings the track back with the mix it had, and undoing an `updateTrack` that gave a track a new id brings back the old id with the mix it had then.
 - **Ids are unique.** `setTracks`, `addTrack` and `updateTrack` throw an `Error` for a duplicate track id, for two clips with one id on the same track, and for a track whose clips do not match its `kind` (a loading clip is an audio clip), before anything changes.
 - **Without an engine** clips are given no `startTick`, and a clip that came with one loses it when it is moved, trimmed on the left or split. Every clip without a tick, in the current tracks and in every undo and redo state, gets one from its `startSample` when an engine attaches. The shortest a clip may be is 0.1 s at the clip's own sample rate.
 
@@ -255,16 +282,17 @@ class PlaylistEngine {
   setLoopRegion(start: number, end: number): void;
   setLoopEnabled(enabled: boolean): void;
   setMasterVolume(volume: number): void;
-  setTrackVolume(trackId: string, volume: number): void;
-  setTrackMute(trackId: string, muted: boolean): void;
-  setTrackSolo(trackId: string, soloed: boolean): void;
-  setTrackPan(trackId: string, pan: number): void;
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void; // an undo step
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  setTrackArmed(trackId: string, armed: boolean): void; // plays muted while armed; not an undo step
   zoomIn(): void;
   zoomOut(): void;
   setZoomLevel(samplesPerPixel: number): void;
   setTempo(bpm: number, atTick?: number): void;
 
-  // Undo/redo (tracks and clips; never the mix)
+  // Undo/redo (tracks, clips and the mix)
   undo(): void; // with a transaction open: aborts it first
   redo(): void; // with a transaction open: aborts it first
   clearHistory(): void;
@@ -319,11 +347,15 @@ interface Arrangement {
   getClipBounds(trackId: string, clipId: string): ClipBounds | null;
   constrainTrimDelta(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): number;
 
-  // mixer
-  setTrackVolume(trackId: string, volume: number): void;
-  setTrackMute(trackId: string, muted: boolean): void;
-  setTrackSolo(trackId: string, soloed: boolean): void;
-  setTrackPan(trackId: string, pan: number): void;
+  // mixer (each call is an undo step; see MixerChangeOptions)
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void;
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+
+  // recording arm (outside the history)
+  readonly armedTrackIds: ReadonlySet<string>;
+  setTrackArmed(trackId: string, armed: boolean): void;
 
   // history
   readonly canUndo: boolean;
@@ -338,6 +370,24 @@ interface Arrangement {
   // loading
   readonly sources: ValueSource<ArrangementSourcesValue>;
   retry(src: ClipSource): void; // start a source whose load failed again
+}
+
+interface MixerChangeOptions {
+  /** Changes with the same id, one after another, are one undo step. */
+  gesture?: string;
+  /** Not an undo step: the value is written into every saved state as well. */
+  undoable?: false;
+}
+
+function createMixerGesture(): MixerGesture;
+
+interface MixerGesture {
+  /** The id to pass while a gesture is going on. */
+  readonly id: string;
+  /** The gesture is over: the next change starts a new one. */
+  end(): void;
+  /** Ends the gesture on the input's own events; returns the detach function. */
+  attach(input: HTMLInputElement): () => void;
 }
 
 interface ArrangementSourceState {

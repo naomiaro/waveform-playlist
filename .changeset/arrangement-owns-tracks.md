@@ -13,18 +13,18 @@ A loading clip is held like any clip (copied on its way in, part of the undo ste
 Breaking in the engine:
 
 - `getState().tracks` and what a `PlayoutAdapter` is sent are the engine's own objects (the arrangement's tracks with the current mix in their fields), shared with the undo history, typed `readonly ClipTrack[]` and frozen outside production builds. Copy before changing.
-- A track's `volume`, `muted`, `soloed` and `pan` fields set its mix only when its id has no mixer entry. `setTracks` keeps the mix of an id that is in the tracks it replaces, `updateTrack` keeps the track's mix, and `addTrack` of a track whose removal can still be undone finds the mix it had; use the four setters to change it. An entry is dropped when no current, undo or redo state holds its track any more.
-- Undo, redo and `abortTransaction` never change the mix (one exception: undoing or redoing an id change switches between the old id's mix and the new id's), and send the adapter only the tracks that differ. Whether the same tracks are there before and after is decided by track id, not by count; when they are not, the adapter gets `setTracks`.
+- A track's `volume`, `muted`, `soloed` and `pan` fields set its mix only when its id has no mixer entry. `setTracks` keeps the mix of an id that is in the tracks it replaces and `updateTrack` keeps the track's mix; use the four setters to change it.
+- Undo, redo and `abortTransaction` send the adapter only the tracks that differ. Whether the same tracks are there before and after is decided by track id, not by count; when they are not, the adapter gets `setTracks`.
 - The selected track id is cleared when an undo, a redo or an abort takes its track away, and when `updateTrack` gives the track a new id (before: only by `removeTrack`). `setTracks` leaves it alone, as before.
-- A track given a new id through `updateTrack` keeps its mix (also over an entry the new id still has from a removed track) and reaches the adapter as `setTracks`.
+- A track given a new id through `updateTrack` keeps its mix and reaches the adapter as `setTracks`.
 - `setTracks`, `addTrack` and `updateTrack` throw on a duplicate track id or a duplicate clip id within a track.
 - `updateTrack(id, track)` with an unknown id changes nothing (the track is still checked and may throw).
 - `updateTrack(id, track)` keeps each clip object the track already holds and copies every other clip. When the track's loaded clips are the same objects in the same order and its own fields are unchanged, the adapter is not called (the undo step and the `statechange` are as before); `updateTrack(id)` always sends.
-- `commitTransaction` (with a change) and `clearHistory` (with history) emit `statechange`; `commitTransaction` adds no step when the tracks are back where the transaction began. A mixer setter for a track that is not in the current tracks (also a removed track whose removal can be undone) still calls the adapter, changes nothing and emits no `statechange`.
+- `commitTransaction` (with a change) and `clearHistory` (with history) emit `statechange`; `commitTransaction` adds no step when the tracks are back where the transaction began. A mixer setter for a track that is not in the current tracks (also a removed track) still calls the adapter, changes nothing and emits no `statechange`.
 - `undo` and `redo` with a transaction open abort it first, and `setTracks` ends an open transaction.
 - Track, clip, mixer and history methods called on a disposed engine change its arrangement but no longer reach the adapter or emit, and `setTempo` on it does nothing.
 - A change made from inside a `statechange` listener is delivered after the one being handled. Two or more track edits made in one listener run make the engine send the adapter every track once (`setTracks`); one edit is sent as itself.
 
 browser: type-only changes to follow the engine's readonly tracks. What `WaveformPlaylistProvider` does with an arrangement is in the changeset of its `arrangement` prop.
 
-dawcore: type-only changes to follow the engine's readonly tracks. `<daw-editor>` users see the engine's changes through it: an undo no longer changes the audible mix, and undoing the addition of a track clears the selected track when it was that track.
+dawcore: type-only changes to follow the engine's readonly tracks. `<daw-editor>` users see the engine's changes through it: undoing the addition of a track clears the selected track when it was that track.
