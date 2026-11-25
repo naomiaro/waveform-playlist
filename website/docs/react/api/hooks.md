@@ -293,7 +293,7 @@ interface TrackReorderPreviewContextValue {
 }
 ```
 
-A control panel of your own does not need it. Read `trackDragPreview` only to mirror the drag somewhere outside the view.
+A control panel of your own does not need it: the part positions and lifts the slots itself. Read `trackDragPreview` to mirror the drag in your own UI, in a panel or outside the view.
 
 ### useAnnotations
 

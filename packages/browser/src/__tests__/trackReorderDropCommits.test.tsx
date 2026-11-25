@@ -121,7 +121,9 @@ describe('a track-reorder drop is one commit (#812)', () => {
     expect(commits).toEqual(['BA preview=null']);
   });
 
-  it('a cancelled drop clears the preview in one commit, order unchanged', async () => {
+  // A cancel has one update (the preview), so this does not depend on
+  // `flushSync`; the two drop tests above do.
+  it('a cancelled drop clears the preview and leaves the order', async () => {
     await mountWithPreview();
 
     act(() => startTransition(() => onDragEnd()(reorderEnd(true))));

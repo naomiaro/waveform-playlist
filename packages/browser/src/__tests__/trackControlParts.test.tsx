@@ -212,7 +212,10 @@ async function ready() {
   await waitFor(() => expect(probe.isReady).toBe(true));
 }
 
-/** The slot of a track: the element the part draws around that track's template. */
+/**
+ * The element that holds a track's template (`[data-track-controls]`). The
+ * slot the part draws, and dnd-kit registers, is its parent (#796).
+ */
 function slotOf(id: string): HTMLElement {
   const spy = screen.getByTestId('spy-' + id);
   let node: HTMLElement | null = spy;

@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * The name of the track whose control panel a button is in: the slot the
- * controls part draws per track is `[data-track-controls]`, and the name piece
- * is `[data-track-name]` (#687).
+ * The name of the track whose control panel a button is in: the element that
+ * holds a track's panel is `[data-track-controls]` (inside the slot the
+ * controls part draws per track, which is what a reorder drag moves, #796),
+ * and the name piece is `[data-track-name]` (#687).
  */
 function trackNameFromButton(btn: Element): string | null {
   const slot = btn.closest('[data-track-controls]');
@@ -113,11 +114,18 @@ test.describe('Track Reordering', () => {
       const el = document.querySelector('[data-dnd-dragging]');
       if (!el) return null;
       const rect = el.getBoundingClientRect();
-      return { popoverOpen: el.matches(':popover-open'), height: rect.height };
+      return {
+        popoverOpen: el.matches(':popover-open'),
+        height: rect.height,
+        boxShadow: getComputedStyle(el).boxShadow,
+      };
     });
     expect(midDrag).not.toBeNull();
     expect(midDrag?.popoverOpen).toBe(true);
     expect(midDrag?.height).toBeGreaterThan(0);
+    // The dragged element is the slot, and the slot draws the lifted look
+    // itself: a shadow drawn inside it would be clipped by its overflow (#796).
+    expect(midDrag?.boxShadow).not.toBe('none');
 
     // Slot-snap preview: after crossing the boundary the WAVEFORM column
     // already shows the previewed order (rect-top order of the row wrappers),
