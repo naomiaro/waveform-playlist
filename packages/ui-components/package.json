@@ -60,10 +60,10 @@
     }
   },
   "devDependencies": {
-    "@dnd-kit/abstract": "^0.5.0",
-    "@dnd-kit/dom": "^0.5.0",
-    "@dnd-kit/react": "^0.5.0",
-    "@dnd-kit/state": "^0.5.0",
+    "@dnd-kit/abstract": "^0.5.3",
+    "@dnd-kit/dom": "^0.5.3",
+    "@dnd-kit/react": "^0.5.3",
+    "@dnd-kit/state": "^0.5.3",
     "@storybook/addon-actions": "^9.0.8",
     "@storybook/addon-docs": "^10.6.8",
     "@storybook/addon-webpack5-compiler-swc": "^4.0.6",
