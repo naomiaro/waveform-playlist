@@ -26,7 +26,6 @@ The maintainer chose (2026-11-24): one owner object for the annotations, shaped 
 
 - Undo of annotation edits (a follow-up; the store is where it would go).
 - dawcore: `<daw-annotation>` elements own their annotations in the DOM; unchanged.
-- A veto: the app cannot refuse an edit. A read-only view keeps `editable: false`.
 - Package versioning is not a factor in the design (maintainer, 2026-11-24); the changesets get the right bump.
 
 ## Anti-goals
@@ -59,8 +58,31 @@ export interface AnnotationStore {
   update(fn: (current: readonly AnnotationData[]) => readonly AnnotationData[]): void;
 }
 
-export function createAnnotationStore(initial?: readonly AnnotationData[]): AnnotationStore;
+export interface AnnotationStoreOptions {
+  /**
+   * The app's rule for every change. Gets the proposed list and the current
+   * one, returns the list to store: `next` to accept, `current` to refuse,
+   * or another list to adjust (e.g. clamp an edge so it does not overlap).
+   */
+  beforeChange?: (
+    next: readonly AnnotationData[],
+    current: readonly AnnotationData[]
+  ) => readonly AnnotationData[];
+}
+
+export function createAnnotationStore(
+  initial?: readonly AnnotationData[],
+  options?: AnnotationStoreOptions
+): AnnotationStore;
 ```
+
+`beforeChange` (maintainer's choice c, 2026-11-24: the app can refuse or adjust an edit, and the rule lives in the owner):
+
+- Runs inside `set` and `update`, after validation of the proposed list and before anything is stored; its result is validated too. Not run for `initial` (the app's own value).
+- Returning `current` changes nothing and notifies nobody; returning `next` or another list stores it.
+- A throw from it propagates to the caller of `set`/`update`; the store keeps its value.
+- The writers need no change: a refused drag release leaves the boxes where the store has them (they snap back), a refused key press does nothing, a refused text edit shows the stored text again.
+- During a drag the preview shows the move as dragged; `beforeChange` applies on release.
 
 - `set` and `update` apply synchronously: the next `getAnnotations()` (and the next `update`'s `current`) is the new array. This is what makes two updates in one tick both land.
 - An `update` whose `fn` returns the same array changes nothing and notifies nobody.
@@ -80,12 +102,12 @@ export function applyAnnotationBounds(
 
 ### React (browser)
 
-- `useCreateAnnotationStore(init?: () => readonly AnnotationData[]): AnnotationStore` creates one store per component instance, like `useCreateArrangement` (initializer read once; a throw goes to the nearest error boundary).
+- `useCreateAnnotationStore(init?: () => readonly AnnotationData[], options?: AnnotationStoreOptions): AnnotationStore` creates one store per component instance, like `useCreateArrangement` (initializer read once; a throw goes to the nearest error boundary). Unlike the arrangement's options, `beforeChange` is followed: the store calls the function passed on the most recent committed render (kept in a ref written in a layout effect), so a rule that reads the app's state sees its current value.
 - `useStoredAnnotations(store): readonly AnnotationData[]`: `useSyncExternalStore` over the store, like `useArrangementTracks`. For the app, outside or inside the provider.
 - Both providers take a new prop `annotationStore?: AnnotationStore`. Without it there are no annotations (`useAnnotations().annotations` is `[]`).
 - `annotationList` keeps only `editable`, `linkEndpoints`, `isContinuousPlay`; its `annotations` field is removed.
 - `onAnnotationsChange` is removed from both providers. An app that persists the annotations subscribes to the store.
-- `usePlaybackControls().setAnnotations` is removed; `usePlaybackControls().annotationStore` is added next to `annotationPreview` (its identity changes only when the prop does). Parts and app components deep in the tree write through it.
+- `usePlaybackControls().setAnnotations` is removed; `usePlaybackControls().annotationStore: AnnotationStore | undefined` is added next to `annotationPreview` (its identity changes only when the prop does). Parts and app components deep in the tree write through it. Without the prop it is `undefined`: the provider makes no store of its own (it would be a second place the app cannot see), the built-in writers do nothing, and an app that wants to add annotations passes a store.
 - The providers publish `useAnnotations().annotations` from the store during render and write nothing back. The animation loop and the keyboard handlers read `store.getAnnotations()` directly; `annotationsRef` is removed.
 
 ### The writers
@@ -95,8 +117,15 @@ export function applyAnnotationBounds(
 | Edge drag, release | hands the preview's whole array to `onAnnotationsChange` | `store.update(current => applyAnnotationBounds(current, moved))`, where `moved` is every annotation whose bounds the drag changed (the dragged one and, with linked endpoints, its neighbours). If the dragged annotation is no longer in the store, the release does nothing. (Maintainer's choice a, 2026-11-24.) |
 | Edge drag, cancel | restores `drag.snapshot` (no-preview mode) | clears the preview; without a preview, writes the snapshot's bounds back by id through `applyAnnotationBounds` |
 | Boundary keys | whole array from the render's `annotations` | `store.update(current => …)` |
-| Text / id edits, list controls | whole array from `AnnotationText`'s ref | `store.update(current => …)`; a control's in-place `action` gets a fresh copy of `current` |
+| Text / id edits, list controls | whole array from `AnnotationText`'s ref, row found by its index in the rendered list | `store.update(current => …)`, row found **by id** in `current` (see below) |
 | App code | `setAnnotations(...)` / its own `useState` | `store.set(...)` / `store.update(...)` |
+
+Every writer finds its annotation by id in `current`, the rule of the drag release, so an app write in the same tick that inserts or removes an earlier annotation cannot send an edit to the wrong row:
+
+- A text edit or a control looks up the row's id; if it is no longer in `current`, the write does nothing. An id edit looks up the old id.
+- A control's `action(annotation, index, annotations, opts)` gets `index` as the position in `current`, and copies: a new array and a copy of each annotation (with its `lines` array), because the existing actions (the example pages, the stories) change the annotation objects themselves and the store's objects are frozen in development. After the action, each copy whose fields are all equal to its original is replaced by the original, so rows compared by object do not re-render for annotations the action did not touch. The `AnnotationAction` type is unchanged.
+- The id field refuses a duplicate id the way it refuses an empty one today: nothing is written and the field shows the stored id again. (Today a duplicate is accepted.)
+- An app-supplied action whose result fails validation throws out of the click handler: it is the app's code.
 
 ### Exported hooks and `AnnotationText`
 
@@ -111,9 +140,13 @@ Surfaces to update (root `CLAUDE.md`, "Keep all doc surfaces in sync"): `llm-ref
 
 ### Tests
 
-- core: two `update`s in one tick both land; `set`/`update` validation throws and keeps the value; a same-array `update` does not notify; a throwing subscriber does not stop the others; frozen in development.
-- browser, both providers, each sequence in both orders: an app `store.update` in the same tick as a drag release, a boundary key, a text edit and a list control; the app reading through `useDeferredValue(useStoredAnnotations(store))` loses nothing; a drag whose annotation was removed mid-drag does nothing on release; linked-endpoint neighbours are written by id.
+- core: `beforeChange` accepting, refusing (no notify) and adjusting, its result validated, its throw leaving the value; two `update`s in one tick both land; `set`/`update` validation throws and keeps the value; a same-array `update` does not notify; a throwing subscriber does not stop the others; frozen in development.
+- browser, both providers, each sequence in both orders: an app `store.update` in the same tick as a drag release, a boundary key, a text edit and a list control; the app reading through `useDeferredValue(useStoredAnnotations(store))` loses nothing; a drag whose annotation was removed mid-drag does nothing on release; a store whose `beforeChange` refuses (the boxes return, the field shows the stored text) and one that adjusts (the clamped edge is drawn after release); linked-endpoint neighbours are written by id.
 - New regression tests are mutation-checked (project skill `mutation-testing`). The annotation e2e specs (`annotations`, `media-element-annotations`, `mobile-annotations`) run green at the end.
+
+## Open (to the maintainer)
+
+- Whether the arrays the library hands out (`useAnnotations().annotations`, `useStoredAnnotations`) are typed `readonly`. Inputs (`AnnotationText`'s `annotations`, `AnnotationFormat.serialize`) widen to `readonly` either way, which breaks no caller.
 
 ## Left to the builder
 
