@@ -3504,7 +3504,7 @@ Also changed: `state.tracks` is the same array until the tracks or the mix chang
 
 ### A track's `volume`, `muted`, `soloed` and `pan` fields seed the mix once
 
-The mix is kept by track id, apart from the track objects. A track's own four fields are read when its id has no mixer entry yet. Otherwise they are not read: `setTracks()` keeps the mix of an id that is in the tracks it replaces, `updateTrack(id, track)` keeps the track's mix (also when the new track has another id), and `addTrack()` of a track whose removal can still be undone finds the mix it had. Before, `setTracks()` and `updateTrack(id, track)` took the mix from the fields of the tracks they were given.
+The mix is kept by track id, apart from the track objects. A track's own four fields are read when its id has no mixer entry yet. Otherwise they are not read: `setTracks()` keeps the mix of an id that is in the tracks it replaces, and `updateTrack(id, track)` keeps the track's mix (also when the new track has another id). `addTrack()` reads them, also for the id of a track removed earlier. Before, `setTracks()` and `updateTrack(id, track)` took the mix from the fields of the tracks they were given.
 
 `getState().tracks` and the tracks an adapter receives carry the current mix in those fields.
 
@@ -3521,15 +3521,45 @@ engine.setTrackVolume(id, 0.5);
 engine.setTrackMute(id, true);
 ```
 
-An entry is dropped when no state holds its track any more: not the current tracks, not an undo or redo step, not the base of an open transaction. `setTracks()` clears the history, so it keeps only the entries of ids that are in the tracks it replaces and in the new ones: an id that only the undo history held (a removed track) is seeded from the new track's fields. `clearHistory()` drops the entries of removed tracks, and so does a new undo step that clears the redo stack or pushes the oldest step past `undoLimit`, for tracks only those states held; a removal, an undo, a redo or an aborted transaction that leaves no state holding a track drops its entry too (with `undoLimit: 0` a removed track's entry goes at once). A track with that id entering afterwards seeds the mix from its fields again.
+The current mix holds an entry for each current track, and each undo and redo step holds the mix it had: a removed track's entry goes with it, and is in the step from before the removal, so undoing the removal brings it back. A track that enters later with that id (`addTrack()`, `setTracks()`) is seeded from its own fields.
 
-### Undo and redo no longer change volume, pan, mute or solo
+### The mixer setters are undo steps; undo, redo and an abort bring back the mix of the state they return to
 
-The undo history holds tracks and clips only. Before, an undo step was a copy of the tracks with the mix they had when the step was made, so undoing a clip move also undid a fader move made after it (the step held the mix from before the move). Now `undo()`, `redo()` and `abortTransaction()` leave the mix as it is, and undoing a `removeTrack()` brings the track back with the mix it had when it was removed. One exception: undoing or redoing an `updateTrack()` that gave a track a new id switches between the old id's mix and the new id's, so a fader moved after the rename is not what the old id has after the undo. A second one: when a track is given the id of a removed track whose removal can still be undone, the renamed track's mix replaces the removed track's, so undoing back past the removal brings that track back with the renamed track's mix.
+`setTrackVolume()`, `setTrackMute()`, `setTrackSolo()` and `setTrackPan()` (on the engine and on the arrangement) are undo steps: each call pushes one and clears the redo steps. Before, they made no step, and an undo step was a copy of the tracks with the mix they had when the step was made, so a fader move alone could not be undone, and undoing a clip move also undid a fader move made after it (the step held the mix from before the move). Now each saved state holds the tracks and the mix, and `undo()`, `redo()` and `abortTransaction()` bring back both: an undo takes back the last change, a fader move as well as a clip edit, and leaves an earlier fader move alone. Undoing a `removeTrack()` brings the track back with the mix it had; undoing an `updateTrack()` that gave a track a new id brings back the old id with the mix it had then. A mixer call made inside an open transaction is part of it: an abort takes it back, and the commit's step holds it. An undo that changes only the mix increments `mixerVersion` and not `tracksVersion`, and reaches the adapter through its mixer setters, not `updateTrack`.
 
-**Find:** code or tests that expect `undo()` to restore a track's volume, pan, mute or solo.
+The setters take a last argument, `options?: MixerChangeOptions` (exported type):
 
-**Replace with:** keep the earlier value yourself and set it with `setTrackVolume()`, `setTrackPan()`, `setTrackMute()` or `setTrackSolo()`.
+- `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag). `createMixerGesture()` makes the ids for one control and `gesture.attach(input)` ends a gesture on the input's own events; see [Mixer moves](/docs/framework-agnostic/engine#mixer-moves) in the engine guide.
+- `{ undoable: false }`: no step. The value is also written into every undo and redo state, so no undo or redo brings back an older one. It wins over `gesture`, and an abort does not take it back.
+
+`setTrackArmed(trackId, armed)` (new, on the engine and the arrangement) arms a track for recording: it plays muted (`getState().tracks` and the adapter have it muted) while its mute in `arrangement.getMixer()` stays as it is. Arming is not an undo step.
+
+**Find:**
+
+- `setTrackVolume(`, `setTrackMute(`, `setTrackSolo(` and `setTrackPan(` called from a slider's `input` handler: each call is now a step.
+- The same calls made for a value that is not the user's edit: automation, a mix restored from a saved project, a value synced from elsewhere, a mute set around a recording.
+- Code or tests that expect `undo()` after a mixer call to take back an earlier clip edit, or `canRedo` to survive a mixer call.
+- Code that keeps an earlier mix itself to set it back after an undo.
+
+**Replace with:**
+
+```typescript
+// Before
+slider.addEventListener('input', () => engine.setTrackVolume(trackId, slider.valueAsNumber));
+engine.setTrackVolume(trackId, automationValue);
+
+// After
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+const gesture = createMixerGesture(); // one per slider
+gesture.attach(slider);
+slider.addEventListener('input', () =>
+  engine.setTrackVolume(trackId, slider.valueAsNumber, { gesture: gesture.id })
+);
+engine.setTrackVolume(trackId, automationValue, { undoable: false });
+```
+
+For a recording mute, use `engine.setTrackArmed(trackId, true)` and `false` instead of `setTrackMute`: nothing to remember and set back. Code that kept an earlier mix to set it back after an undo can go: the undo does it.
 
 ### Duplicate track ids, and duplicate clip ids within a track, throw
 
@@ -3563,7 +3593,7 @@ Before, `engine.updateTrack(id, track)` for an id no track has still pushed an u
 ### `commitTransaction()` and `clearHistory()` emit `statechange`; a mixer setter for a track that is not in the current tracks does not
 
 - `commitTransaction()` emits one `statechange` when the transaction changed something, and `clearHistory()` when there was history to clear. Before, neither emitted, and `canUndo` / `canRedo` in the last state could be out of date.
-- `commitTransaction()` adds no undo step, and emits nothing, when the tracks are back where the transaction began (the same track objects in the same order). Before, a transaction in which anything had changed always added a step.
+- `commitTransaction()` adds no undo step, and emits nothing, when the tracks and the mix are back where the transaction began (the same track objects in the same order and the same mixer values). Before, a transaction in which anything had changed always added a step.
 - `setTrackVolume()`, `setTrackMute()`, `setTrackSolo()` and `setTrackPan()` act on a track that is in the current tracks. For any other id they still call the adapter, but no longer increment `mixerVersion` or emit `statechange`, and nothing is stored. That includes a removed track whose removal can still be undone: a value set while it is away is not there when an undo brings it back.
 
 **Find:** `statechange` listeners that count emissions, or that do work on every emission without comparing `tracksVersion` / `mixerVersion`; and code that waits for a `statechange` after a mixer setter for a track that is not in the current tracks, or that sets the mix of a removed track before undoing the removal.
@@ -3621,7 +3651,7 @@ The [engine guide](/docs/framework-agnostic/engine#loading-audio) describes load
 - **Undo, redo and `abortTransaction()` send the adapter only the tracks that differ.** When the same track ids are there before and after, the adapter's `updateTrack` is called for each track that changed (one `setTracks` per changed track for an adapter without `updateTrack`), and an undo of a reorder calls no adapter method. Before, every track was sent again. "The same tracks" is decided by track id: before, it was decided by the number of tracks, so an undo that swapped one track for another sent `updateTrack` calls; now it sends one `setTracks`.
 - **A change made from inside a `statechange` listener is delivered after the one being handled.** Every listener gets the states in the order the changes were made. Before, the inner change was emitted at once, so listeners registered later saw the newer state first. The adapter call for the inner change is also made later, after the outer change has reached every listener; if it throws, the error reaches the caller of the outer method.
 - **`selectedTrackId` is cleared when its track goes away by an undo, a redo or an aborted transaction, or when `updateTrack(id, track)` gives the track a new id.** `setTracks()` still leaves it alone.
-- **A track given a new id through `updateTrack(id, track)` keeps its mix,** whatever the new track's mixer fields say and also when the new id still has an entry from a removed track, and the adapter receives every track through `setTracks` instead of an `updateTrack` call under the old id.
+- **A track given a new id through `updateTrack(id, track)` keeps its mix,** whatever the new track's mixer fields say, and the adapter receives every track through `setTracks` instead of an `updateTrack` call under the old id.
 - **After `dispose()`, the engine's track, clip, mixer and history methods change its arrangement but call no adapter and emit no `statechange`, and `setTempo()` does nothing.** Before, they still called the disposed adapter.
 - **`updateTrack(id, track)` calls the adapter only when the track plays differently.** When the new track's clips are the same clip objects in the same order (objects taken from this track in `getState().tracks`) and its own fields are unchanged, the adapter is not called; the undo step and the `statechange` are as before. Before, the adapter's `updateTrack` was called every time. `updateTrack(id)` with no track still sends the track every time.
 - **Two or more track edits made from inside one `statechange` or `subscribe` listener run rebuild the adapter.** The first of them is delivered after the tracks have changed again, so the engine sends the adapter every track once (`setTracks`, which can interrupt playback); the edits still waiting make no adapter call. One track edit made from inside a listener is sent as itself (`updateTrack`, `addTrack` or `removeTrack`). A reorder and a move made with `skipAdapter` count as track edits here. If a rebuild matters, make several track edits from an event handler, not from inside a listener (a transaction does not change this: it groups undo steps, not adapter calls). After an adapter call for a track change has thrown, the next track change sends every track.
@@ -4118,17 +4148,122 @@ The preview is internal to the library. `useClipDragHandlers` and the clip view 
 
 **Replace with:** read the tracks after the release, from the arrangement (`arrangement.getTracks()`, `useArrangementTracks(arrangement)`) or `usePlaylistTimeline().tracks`. Nothing has to draw the trim during the drag: the library's clip view does.
 
-## Edits and undo work with no engine attached; undo never changes the mix
+## Edits and undo work with no engine attached
 
 **Packages:** `@waveform-playlist/browser`.
 
 The four mixer setters, `reorderTrack`, `undo` and `redo` of `useEditorControls()` call the provider's arrangement. They work before the first engine is built and while an engine is rebuilt, and the next engine plays what they changed. Before, `reorderTrack`, `undo` and `redo` with no engine did nothing and warned (`reorderTrack: engine not ready, call ignored`, and the same for `undo` and `redo`).
 
-The undo history is the arrangement's: an undo or a redo changes the tracks and never the mix, and the history survives an engine rebuild (an `effects` or `zoomLevels` change) and an `<Activity>` hide of the provider. Before, a full rebuild started with a new engine and an empty history. Audio arriving for a clip is not an undo step and does not clear the history.
+The undo history is the arrangement's: it survives an engine rebuild (an `effects` or `zoomLevels` change) and an `<Activity>` hide of the provider. Before, a full rebuild started with a new engine and an empty history. Audio arriving for a clip is not an undo step and does not clear the history.
 
-**Find:** code that waits for an engine before calling a setter, `reorderTrack`, `undo` or `redo`; code that expects an undo to restore a fader.
+**Find:** code that waits for an engine before calling a setter, `reorderTrack`, `undo` or `redo`.
 
 **Replace with:** call them whenever; nothing to wait for.
+
+## Undo moves a fader back: every mixer change is an undo step
+
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
+
+A mute, solo, volume or pan change is an undo step, in the same history as the clip edits, and an undo or a redo brings back the mix of the state it returns to. With the built-in controls (`<TrackMuteButton />`, `<TrackSoloButton />`, `<TrackVolumeSlider />`, `<TrackPanSlider />`, so also `<WaveformEditor />` and `<DefaultTrackControls>`), Undo after a fader move moves the fader back. A drag of a slider is one step, a key press on it is one (a held arrow key that repeats is one), and a click on mute or solo is one. Before, a mixer change made no step: Undo after a fader move took back the edit before it and left the fader where it was.
+
+A mixer change clears the redo steps, as any other edit does. `usePlaylistMixer().trackStates` and `useTrack()` follow an undo with no code of yours; `useUndoRedo().canUndo` is true after a fader move.
+
+Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, and a slider keeps the focus after a mouse drag: press the key after focus has left the slider (a click elsewhere, Tab), or give the page an Undo button (`useEditorControls().undo`, enabled by `useUndoRedo().canUndo`). This is not new (no shortcut fires while an `<input>` has focus); it now matters for the mixer ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)).
+
+**Find:** tests or code that expect Undo after a mixer change to take back an earlier clip edit, or `canRedo` to stay true after one; code of yours that keeps an earlier mix to set it back after an undo.
+
+**Replace with:** nothing for the built-in controls. Code that put a mix back after an undo can go: the undo does it. For a slider of your own see the next entry, and for mixer changes made from code the one after it.
+
+## A slider of your own makes one undo step per move until it passes a gesture
+
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
+
+A range input calls its `onChange` on every move, so a slider of your own that calls a mixer setter there now makes one undo step per move: Undo after a drag moves the fader back by one move only. Pass one gesture id for the whole drag. The setters take a last argument, `options?: MixerChangeOptions`: `setTrackVolume(trackId, volume, options?)` and the other three of `useEditorControls()`, and `setVolume(volume, options?)` and the other three of `useTrack()`. Calls with the same `gesture` id, one after another, are one step. `createMixerGesture()` makes the ids for one slider: `gesture.id` is the id to pass, and `gesture.attach(input)` ends the gesture on the input's `change` (the end of a pointer drag), on the `keyup` of an arrow, Page, Home or End key held down, and on `blur`; it returns the function that detaches it. Make one per slider, so two sliders never share an id. Mute and solo buttons need nothing: each click is one step.
+
+`createMixerGesture` and `MixerChangeOptions` are exported from `@waveform-playlist/engine`. `@waveform-playlist/browser` installs it, but an app that imports from it should list it in its own `dependencies`, at the version its `@waveform-playlist/browser` depends on.
+
+**Find:** `setTrackVolume(`, `setTrackPan(`, `setVolume(` and `setPan(` called from an `onChange` (or an `onInput`, or a listener of the `input` event); also `setTrackMute(` and `setTrackSolo(` or `setMuted(` and `setSoloed(` called from a control that fires many times per gesture.
+
+**Replace with:**
+
+```tsx
+// Before
+const { setTrackVolume } = useEditorControls();
+<input
+  type="range"
+  min="0"
+  max="1"
+  step="0.01"
+  value={volume}
+  onChange={(e) => setTrackVolume(trackId, parseFloat(e.target.value))}
+/>
+
+// After
+import { useEffect, useRef, useState } from 'react';
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+function VolumeSlider({ trackId, volume }: { trackId: string; volume: number }) {
+  const { setTrackVolume } = useEditorControls();
+  const [gesture] = useState(createMixerGesture); // one per slider, kept across renders
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = ref.current;
+    return input ? gesture.attach(input) : undefined;
+  }, [gesture]);
+  return (
+    <input
+      ref={ref}
+      type="range"
+      min="0"
+      max="1"
+      step="0.01"
+      value={volume}
+      onChange={(e) => setTrackVolume(trackId, parseFloat(e.target.value), { gesture: gesture.id })}
+    />
+  );
+}
+```
+
+In a track's panel, the same with `useTrack()`: `setVolume(parseFloat(e.target.value), { gesture: gesture.id })`. A slider drawn in a `.map()` over the tracks becomes a component of its own, as above, so that each has its own gesture.
+
+## Mixer changes made from code are undo steps; pass `{ undoable: false }` for automation
+
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
+
+A mixer setter called from code is an undo step too, each call one: restoring a saved mix, automation, a value synced from elsewhere. Before, no such call was a step. A change that is not the user's edit takes `{ undoable: false }`: no step, and the value is also written into every undo and redo state, so no undo or redo brings back an older one. With `gesture` as well, `undoable: false` wins.
+
+**Find:** `setTrackMute(`, `setTrackSolo(`, `setTrackVolume(` and `setTrackPan(` (of `useEditorControls()` or of the arrangement) and `setMuted(`, `setSoloed(`, `setVolume(` and `setPan(` (of `useTrack()`) called from an effect, a timer, a load or restore function, or a subscription, rather than from a control.
+
+**Replace with:**
+
+```tsx
+// Before
+const { setTrackVolume, setTrackMute } = useEditorControls();
+saved.forEach((t) => {
+  setTrackVolume(t.id, t.volume);
+  setTrackMute(t.id, t.muted);
+});
+
+// After
+const { setTrackVolume, setTrackMute } = useEditorControls();
+const restore = { undoable: false } as const;
+saved.forEach((t) => {
+  setTrackVolume(t.id, t.volume, restore);
+  setTrackMute(t.id, t.muted, restore);
+});
+```
+
+To make a restore one step the user can take back, leave the options out and wrap the calls in `arrangement.beginTransaction()` and `arrangement.commitTransaction()` (see the next entry).
+
+## A mixer change made inside a transaction is part of it; an abort takes it back
+
+**Packages:** `@waveform-playlist/engine`, `@waveform-playlist/browser`.
+
+Between `arrangement.beginTransaction()` and `commitTransaction()`, a mixer setter call joins the transaction like any other edit: the commit makes one step of the edits and the mixer changes together, and `abortTransaction()` (or an `undo()` or `redo()` during the transaction, which abort it first) takes the mixer changes back with the rest. A `gesture` id is ignored inside a transaction. A call with `{ undoable: false }` is not taken back by the abort. Before, a mixer change inside a transaction was not part of it and stayed after an abort; a transaction in which only the mix changed now makes a step.
+
+**Find:** `beginTransaction()` with a mixer setter called before its `commitTransaction()` or `abortTransaction()`.
+
+**Replace with:** nothing, when the mixer change belongs to the transaction. A mixer change that must stay after an abort is made after the transaction ends, or with `{ undoable: false }`.
 
 ## `useIntegratedRecording` takes the arrangement; a take is one undo step
 
@@ -4162,19 +4297,19 @@ const recording = useIntegratedRecording(arrangement, selectedTrackId, { current
 
 ## The armed track shows muted during a take, and its Mute button is disabled
 
-**Packages:** `@waveform-playlist/browser`.
+**Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
 
-While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), that track is muted **in the arrangement's mix**, so what it already holds does not play under the punch-in. Before, the mute was applied to the audio only and the mixer and the Mute button still showed the track unmuted. Now:
+While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), the provider **arms** that track in the arrangement (`arrangement.setTrackArmed(trackId, true)`), so what it already holds does not play under the punch-in. An armed track plays muted; the arm is not an undo step, and undo and redo do not change it. Before, the provider muted the track in the engine for the take, the mixer and the Mute button still showed the track unmuted, and the mute from before the take was always written back when it ended. Now:
 
-- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take;
+- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take: its `muted` is the track's own mute or the arm;
+- `arrangement.getMixer()` holds the track's own mute, which the take does not change: a mute set on that track during the take stays after it, and the mute from before the take is not written back (there is nothing to write back);
 - the built-in `<TrackMuteButton />` of that track is disabled during the take; solo, volume and pan stay enabled;
 - `useTrack().isRecordingArmed` is true for that track, for a mute control of your own;
-- when the take ends or the armed track changes, the mute from before the take is written back, whatever was set in between (a mute set on that track during the take does not stay);
-- the provider also writes it back when it unmounts or is hidden by `<Activity>` with a track still armed.
+- the track is disarmed when the take ends or the armed track changes, and when the provider unmounts or is hidden by `<Activity>` with a track still armed. One track is armed at a time: arming one disarms any other.
 
-Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal arms the track again from its mute at that moment; removing the armed track during a take as an undo step, and undoing that removal after the take, brings the track back muted (the arrangement brings a track back with the mix it had when removed, and the end of the take writes nothing for a track that is gone). `<daw-editor>` is not changed: its armed track still shows unmuted.
+Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal arms the track again; removing the armed track during a take as an undo step, and undoing that removal after the take, brings the track back with its own mute (the end of the take disarms it). A mute control of your own that toggles from the reported value during a take (`setMuted(!muted)`, `setTrackMute(id, !trackStates[i].muted)`) sets the track's own mute to false, since `muted` is true for the arm: the track stays muted for the take and comes out of it unmuted.
 
-**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take; code that mutes or unmutes the armed track during a take.
+**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take, or `arrangement.getMixer().get(id).muted` to learn whether a track is heard; code that mutes or unmutes the armed track during a take, or that saves a track's mute before a take to set it back after.
 
 **Replace with:**
 
@@ -4185,6 +4320,14 @@ const { muted, isRecordingArmed, setMuted } = useTrack();
   Mute
 </button>
 ```
+
+```tsx
+// Is the track heard? Its own mute or the arm
+const silent = arrangement.getMixer().get(id)?.muted || arrangement.armedTrackIds.has(id);
+// or, under the provider: usePlaylistMixer().trackStates[i].muted
+```
+
+Code that saved a track's mute before a take and set it back after can go.
 
 ## `useMidiTracks` is removed: load with `loadMidiTracks`
 

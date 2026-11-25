@@ -424,11 +424,13 @@ interface EditorControlsContextValue {
   setCurrentTime: (time: number) => void;
   // Track mixer, by track id: the arrangement's mix, also while no engine is
   // attached. A first argument that is not a string, or an id no track has,
-  // is ignored.
-  setTrackMute: (trackId: string, muted: boolean) => void;
-  setTrackSolo: (trackId: string, soloed: boolean) => void;
-  setTrackVolume: (trackId: string, volume: number) => void;
-  setTrackPan: (trackId: string, pan: number) => void;
+  // is ignored. Each call is an undo step; options (MixerChangeOptions from
+  // @waveform-playlist/engine): { gesture } makes the calls of one drag one
+  // step, { undoable: false } makes no step.
+  setTrackMute: (trackId: string, muted: boolean, options?: MixerChangeOptions) => void;
+  setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
+  setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
+  setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
   /** An undo step of the arrangement. */
   reorderTrack: (trackId: string, toIndex: number) => void;
   /** Internal wiring for ClipInteractionProvider. */
@@ -447,11 +449,13 @@ interface EditorControlsContextValue {
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
    *  end of existing material, and (2) with an armedTrackId, that track is
-   *  muted in the arrangement's mix: the mixer and the track's Mute button show
-   *  it muted, the built-in <TrackMuteButton /> of that track is disabled and
-   *  useTrack().isRecordingArmed is true for it. The mute from before the
-   *  session is written back when it ends, when the armed track changes and
-   *  when the provider unmounts, whatever was set in between.
+   *  armed in the arrangement (setTrackArmed), which plays it muted and is
+   *  no undo step: trackStates and the track's Mute button show it muted,
+   *  the built-in <TrackMuteButton /> of that track is disabled and
+   *  useTrack().isRecordingArmed is true for it, while
+   *  arrangement.getMixer() keeps the track's own mute, so a mute changed
+   *  during the take stays after it. The track is disarmed when the session
+   *  ends, when the armed track changes and when the provider unmounts.
    *  `useRecordingSession` calls it for the life of a take; overdub flows
    *  should also call it eagerly (before play()). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
@@ -521,7 +525,7 @@ interface PlaylistTimelineContextValue {
 
 ### Mixer (usePlaylistMixer)
 
-Changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed, renamed or reordered.
+Changes on every mute, solo, volume or pan change (each step of a slider drag, and an undo or a redo that moves one), when a track is armed for a take or disarmed, and when tracks are added, removed, renamed or reordered.
 
 ```typescript
 interface PlaylistMixerContextValue {
@@ -530,7 +534,7 @@ interface PlaylistMixerContextValue {
 }
 ```
 
-`trackStates` has one entry per track, in the order of `tracks`, from the moment the track enters the arrangement (also while its audio loads). The values are the arrangement's mix (`arrangement.getMixer()`), kept by track id, so a track keeps its mute, solo, volume and pan when other tracks are removed, added or moved, and an undo never changes them. A track's own `volume`, `muted`, `soloed` and `pan` fields are only the values it entered with. Details: [`usePlaylistMixer`](/docs/react/api/hooks#useplaylistmixer). Inside a track's control panel, [`useTrack()`](/docs/react/api/hooks#usetrack) has the state and the setters of that track.
+`trackStates` has one entry per track, in the order of `tracks`, from the moment the track enters the arrangement (also while its audio loads). The values are the arrangement's mix (`arrangement.getMixer()`), kept by track id, so a track keeps its mute, solo, volume and pan when other tracks are removed, added or moved. A mixer change is an undo step: an undo or a redo brings back the values of the state it returns to. While a take is recorded onto a track its `muted` is true (the arm), while `getMixer()` holds its own mute. A track's own `volume`, `muted`, `soloed` and `pan` fields are only the values it entered with. Details: [`usePlaylistMixer`](/docs/react/api/hooks#useplaylistmixer). Inside a track's control panel, [`useTrack()`](/docs/react/api/hooks#usetrack) has the state and the setters of that track.
 
 ### Track reorder preview (useTrackReorderPreview)
 

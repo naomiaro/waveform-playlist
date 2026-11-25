@@ -81,6 +81,7 @@ export type { TrackDragPreview };
 
 export interface TrackState {
   name: string;
+  /** The track's own mute, or true while it is armed for a take (#843). */
   muted: boolean;
   soloed: boolean;
   volume: number;

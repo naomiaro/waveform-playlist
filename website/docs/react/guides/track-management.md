@@ -124,17 +124,32 @@ The default panel fills its slot, so an element written beside it in the normal 
 A component among the children reads its track with `useTrack()`: the id, the name, the mixer state and actions that are already bound to that track.
 
 ```tsx
+import { useEffect, useRef, useState } from 'react';
 import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+// One gesture per slider: a drag, or a held arrow key, is one undo step.
+function useMixerGesture() {
+  const [gesture] = useState(createMixerGesture);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = ref.current;
+    return input ? gesture.attach(input) : undefined;
+  }, [gesture]);
+  return { gesture, ref };
+}
 
 function CustomTrackControls() {
   const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
+  const volumeGesture = useMixerGesture();
+  const panGesture = useMixerGesture();
 
   return (
     // The slot is as wide as the column and as tall as the track's row.
     <div style={{ height: '100%', boxSizing: 'border-box', padding: 8 }}>
       <div>{name}</div>
-      {/* Muted for a take and put back when it ends: a click meanwhile would not stay */}
+      {/* Pressed during a take (the arm): a click would set the track's own mute from it */}
       <button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
         {muted ? 'Unmute' : 'Mute'}
       </button>
@@ -142,22 +157,24 @@ function CustomTrackControls() {
         {soloed ? 'Unsolo' : 'Solo'}
       </button>
       <input
+        ref={volumeGesture.ref}
         type="range"
         min="0"
         max="1"
         step="0.01"
         value={volume}
         aria-label="Volume"
-        onChange={(e) => setVolume(parseFloat(e.target.value))}
+        onChange={(e) => setVolume(parseFloat(e.target.value), { gesture: volumeGesture.gesture.id })}
       />
       <input
+        ref={panGesture.ref}
         type="range"
         min="-1"
         max="1"
         step="0.01"
         value={pan}
         aria-label="Pan"
-        onChange={(e) => setPan(parseFloat(e.target.value))}
+        onChange={(e) => setPan(parseFloat(e.target.value), { gesture: panGesture.gesture.id })}
       />
     </div>
   );
@@ -172,7 +189,8 @@ Four things to know:
 
 - **Size.** Each track has a slot in the column: as wide as the column (the `width` of the part) and as tall as the track's row, with `overflow: hidden`, so a panel taller than the row is cut off. A mono track's row is `waveHeight` tall (80 px by default), plus the clip header's height when the view has `<WaveformClipHeaders />`; the panel above has four lines of controls and does not fit in that, so set a larger `waveHeight` with `<WaveformViewOptions>` (128, say) or lay the controls out in fewer lines. Fill the slot with `height: 100%`. Do not compute the row height yourself: it depends on the number of channels (also of a take being recorded) and on the clip headers.
 - **Selection.** A click anywhere in a slot selects the track, in your own panel too. A control of yours that must not select calls `event.stopPropagation()` in its click handler. `useTrack().isSelected` says whether the track is the selected one.
-- **Loading and recording.** The values are the arrangement's mix, also while the track's audio loads, and the actions work then: there is nothing to disable for loading (`isLoading` is removed). While a take is recorded onto the track, `useTrack().isRecordingArmed` is true: the track is muted for the take and its mute from before is written back when the take ends, so disable your mute control then.
+- **Loading and recording.** The values are the arrangement's mix, also while the track's audio loads, and the actions work then: there is nothing to disable for loading (`isLoading` is removed). While a take is recorded onto the track, `useTrack().isRecordingArmed` is true: the track is armed, so it plays muted and `muted` is true, while its own mute is left as it is. A mute button that toggles from `muted` would set the track's own mute from the arm's value, so disable it then.
+- **Undo.** Each mixer action is an undo step. A slider passes one `gesture` id per drag, as above, or every move is a step of its own; see [Undo of Mixer Moves](#undo-of-mixer-moves).
 - **Where it works.** `useTrack()` and the pieces work only among the children of `<WaveformTrackControls>`. Anywhere else they throw. For a mixer elsewhere on the page see [Mixer State Outside the Panel](#mixer-state-outside-the-panel).
 
 The complete list of fields is in the [`useTrack` reference](/docs/react/api/hooks#usetrack). For a drag grip of your own there is [`useTrackReorderHandle()`](/docs/react/api/hooks#usetrackreorderhandle).
@@ -206,16 +224,41 @@ A change to one track (a volume step, a mute) renders the components of that tra
 Outside the controls column (a mixer strip elsewhere on the page, a keyboard shortcut, restoring a saved session) read the state with `usePlaylistMixer()` and change it with the setters of `useEditorControls()`. The setters take the track's **id**:
 
 ```tsx
+import { useEffect, useRef, useState } from 'react';
 import {
   useEditorControls,
   usePlaylistMixer,
   usePlaylistTimeline,
 } from '@waveform-playlist/browser';
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+// A component per slider, so that each has its own gesture.
+function VolumeSlider({ trackId, volume }: { trackId: string; volume: number }) {
+  const { setTrackVolume } = useEditorControls();
+  const [gesture] = useState(createMixerGesture);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = ref.current;
+    return input ? gesture.attach(input) : undefined;
+  }, [gesture]);
+  return (
+    <input
+      ref={ref}
+      type="range"
+      min="0"
+      max="1"
+      step="0.01"
+      value={volume}
+      aria-label="Volume"
+      onChange={(e) => setTrackVolume(trackId, parseFloat(e.target.value), { gesture: gesture.id })}
+    />
+  );
+}
 
 function MixerStrip() {
   const { tracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
-  const { setTrackMute, setTrackVolume } = useEditorControls();
+  const { setTrackMute } = useEditorControls();
 
   return (
     <div>
@@ -228,14 +271,7 @@ function MixerStrip() {
             <button onClick={() => setTrackMute(track.id, !state.muted)}>
               {state.muted ? 'Unmute' : 'Mute'}
             </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={state.volume}
-              onChange={(e) => setTrackVolume(track.id, parseFloat(e.target.value))}
-            />
+            <VolumeSlider trackId={track.id} volume={state.volume} />
           </div>
         );
       })}
@@ -247,6 +283,20 @@ function MixerStrip() {
 `trackStates` has one entry per track, in the order of `tracks`, so `trackStates[i]` belongs to `tracks[i]`. A component that calls `usePlaylistMixer()` renders on every mixer change of any track, and one that calls `usePlaylistTimeline()` on every clip edit, so keep such a component small.
 
 A setter called with something that is not a string (an index, from code written for an earlier version) does nothing, and in development says so once in the console. An id that no track has is ignored.
+
+## Undo of Mixer Moves
+
+Every mute, solo, volume and pan change is an undo step of the arrangement, in the same history as the clip edits: Undo after a fader move moves the fader back, and an undo, a redo or an aborted transaction brings back the mix of the state it returns to. The setters of `useEditorControls()` and the actions of `useTrack()` take a last `options` argument (`MixerChangeOptions` from `@waveform-playlist/engine`):
+
+- **No options:** the call is one step. A click on a mute or solo button is one step.
+- **`{ gesture: id }`:** calls with the same id, one after another, are one step. A slider calls its setter on every move, so it passes one id for the whole drag. `createMixerGesture()` makes the ids for one slider: `gesture.attach(input)` ends the gesture on the input's `change` (the end of a pointer drag), on the `keyup` of an arrow, Page or Home/End key that is held down, and on `blur`; `gesture.id` is the id to pass. Make one per slider, as in the examples above. The built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do this.
+- **`{ undoable: false }`:** no step. The value is also written into every saved state, so no undo or redo brings back an older one. Use it for a value that is not the user's edit: automation, a mix restored from a saved project, a value synced from elsewhere.
+
+A mixer change made inside an open transaction (`arrangement.beginTransaction()`) is part of it, and an abort takes it back (one with `undoable: false` stays). Arming a track for a take is not an undo step (see [Recording](/docs/react/guides/recording#the-armed-track-is-muted-for-the-take)).
+
+`createMixerGesture` is imported from `@waveform-playlist/engine`: add it to your app's dependencies (it is installed with `@waveform-playlist/browser`, but an app that imports from a package should depend on it directly).
+
+Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, and a slider keeps the focus after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)). An Undo button of your own (`useEditorControls().undo`, enabled by `useUndoRedo().canUndo`) works, and so does the key once focus has left the slider.
 
 ## Mute and Solo
 
@@ -464,7 +514,7 @@ const arrangement = useCreateArrangement(() => [
 A horizontal panel of its own for every track, with a remove button:
 
 ```tsx
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   WaveformPlaylistProvider,
   WaveformRoot,
@@ -479,11 +529,25 @@ import {
   useTrack,
 } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
+import { createMixerGesture } from '@waveform-playlist/engine';
+
+// One gesture per slider: a drag is one undo step.
+function useMixerGesture() {
+  const [gesture] = useState(createMixerGesture);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const input = ref.current;
+    return input ? gesture.attach(input) : undefined;
+  }, [gesture]);
+  return { gesture, ref };
+}
 
 // Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
 function TrackControlRow() {
   const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
+  const volumeGesture = useMixerGesture();
+  const panGesture = useMixerGesture();
 
   return (
     <div
@@ -517,23 +581,25 @@ function TrackControlRow() {
       <label>
         Vol
         <input
+          ref={volumeGesture.ref}
           type="range"
           min="0"
           max="1"
           step="0.01"
           value={volume}
-          onChange={(e) => setVolume(parseFloat(e.target.value))}
+          onChange={(e) => setVolume(parseFloat(e.target.value), { gesture: volumeGesture.gesture.id })}
         />
       </label>
       <label>
         Pan
         <input
+          ref={panGesture.ref}
           type="range"
           min="-1"
           max="1"
           step="0.01"
           value={pan}
-          onChange={(e) => setPan(parseFloat(e.target.value))}
+          onChange={(e) => setPan(parseFloat(e.target.value), { gesture: panGesture.gesture.id })}
         />
       </label>
     </div>

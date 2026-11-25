@@ -445,12 +445,15 @@ interface EditorControlsContextValue {
 
   // Track mixer, by track id (#687; by index until then). An id no track has
   // is ignored. They change the arrangement's mix, also while no engine is
-  // attached (#812). Inside a track's control panel, `useTrack()` has the
-  // same actions already bound to that track.
-  setTrackMute: (trackId: string, muted: boolean) => void;
-  setTrackSolo: (trackId: string, soloed: boolean) => void;
-  setTrackVolume: (trackId: string, volume: number) => void;
-  setTrackPan: (trackId: string, pan: number) => void;
+  // attached (#812). Each call is an undo step of the arrangement (#843);
+  // `options` (the engine's `MixerChangeOptions`) makes calls with one
+  // `gesture` id one step, or a value with `undoable: false` no step. Inside
+  // a track's control panel, `useTrack()` has the same actions already bound
+  // to that track.
+  setTrackMute: (trackId: string, muted: boolean, options?: MixerChangeOptions) => void;
+  setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
+  setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
+  setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the
@@ -485,16 +488,18 @@ interface EditorControlsContextValue {
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
    *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  muted in the arrangement's mix for the session (#812): punch-in
-   *  recording replaces whatever the take overlaps (#579), so the doomed
-   *  material must not play under the overdub. The mixer and the track's Mute
+   *  armed in the arrangement for the session (`setTrackArmed`, #843):
+   *  punch-in recording replaces whatever the take overlaps (#579), so the
+   *  doomed material must not play under the overdub. The arm plays the
+   *  track muted and is no undo step. `trackStates` and the track's Mute
    *  button show it muted, the built-in `<TrackMuteButton />` of that track
-   *  is disabled, and `useTrack().isRecordingArmed` is true for it. The mute
-   *  from before the session is written back when it ends or the armed track
-   *  changes, whatever was set in between; nothing is written for a track
-   *  that is no longer in the arrangement. `useRecordingSession` calls it for
-   *  the length of a take; overdub flows should also call it eagerly (before
-   *  `play()`). */
+   *  is disabled, and `useTrack().isRecordingArmed` is true for it, while
+   *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
+   *  to it, so a mute changed during the take stays after it. One track is
+   *  armed at a time: arming one disarms any other, and
+   *  `setRecordingActive(false)` disarms every track. `useRecordingSession`
+   *  calls it for the length of a take; overdub flows should also call it
+   *  eagerly (before `play()`). */
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 ```
@@ -769,6 +774,7 @@ A track whose clips do not match its kind is rejected: the arrangement's `setTra
 ```typescript
 interface TrackState {
   name: string;
+  /** The track's own mute, or true while it is armed for a take (#843). */
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -2343,6 +2349,7 @@ interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
   name: string;
+  /** The track's own mute, or true while it is armed for a take (`isRecordingArmed`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -2361,21 +2368,26 @@ interface TrackContextValue {
   hasSpectrogram: boolean;
   /**
    * True while a take is being recorded onto this track (`setRecordingActive`,
-   * `useRecordingSession`). The track is muted for the take and its mute from
-   * before is written back when the take ends, so a change made meanwhile does
-   * not stay: the built-in `<TrackMuteButton />` is disabled while this is
-   * true, and an app's own mute control can do the same.
+   * `useRecordingSession`). The track plays muted for the take and `muted` is
+   * true, while the track's own mute (`arrangement.getMixer()`) is not
+   * changed by the take: a mute set meanwhile stays after it (#843). The
+   * built-in `<TrackMuteButton />` is disabled while this is true; an app's
+   * own mute control can do the same, since toggling from `muted` here would
+   * set the track's own mute from the arm's value.
    */
   isRecordingArmed: boolean;
   // Removed (#812): isLoading. The values above are the arrangement's mix also while
   // the track's audio loads, the actions work then, and the pieces are enabled.
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
-  // track menu neither becomes available nor stops being so.
-  setMuted: (muted: boolean) => void;
-  setSoloed: (soloed: boolean) => void;
-  setVolume: (volume: number) => void;
-  setPan: (pan: number) => void;
+  // track menu neither becomes available nor stops being so. The four mixer
+  // actions are undo steps (#843); `options` (the engine's
+  // `MixerChangeOptions`) makes calls with one `gesture` id one step, or a
+  // value with `undoable: false` no step.
+  setMuted: (muted: boolean, options?: MixerChangeOptions) => void;
+  setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
+  setVolume: (volume: number, options?: MixerChangeOptions) => void;
+  setPan: (pan: number, options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */
@@ -2555,11 +2567,13 @@ interface WaveformPlayheadProps {   // either provider
 
 // The view only draws a take. This tells the provider one is running
 // (WaveformPlaylistProvider only): playback runs past the end of the audio and
-// the armed track is muted in the arrangement's mix for the take (#812): the
-// mixer and its Mute button show it, its <TrackMuteButton /> is disabled,
-// useTrack().isRecordingArmed is true. The mute from before is written back
-// when the take ends, the track changes, this component unmounts or the
-// provider unmounts, whatever was set in between. play() does nothing before
+// the track is armed in the arrangement for the take (setTrackArmed, #843),
+// which plays it muted and is no undo step: trackStates and its Mute button
+// show it muted, its <TrackMuteButton /> is disabled,
+// useTrack().isRecordingArmed is true, and arrangement.getMixer() keeps the
+// track's own mute (a mute changed during the take stays after it). It is
+// disarmed when the take ends, the track changes, this component unmounts or
+// the provider unmounts. play() does nothing before
 // the first ready, so a take started during the first load records without
 // playback.
 function useRecordingSession(options: RecordingSessionOptions): void;

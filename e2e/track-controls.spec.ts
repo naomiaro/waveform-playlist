@@ -132,4 +132,44 @@ test.describe('Track controls', () => {
       'false'
     );
   });
+
+  test('a volume drag is undone by one Undo', async ({ page, baseURL }) => {
+    // No example page has an undo button: the multi-clip page has the built-in
+    // panels and <KeyboardShortcuts undo />. Keyboard Undo does not fire while
+    // a slider has focus (#730), so focus leaves the slider before Ctrl+Z.
+    await ready(page, baseURL, 'multi-clip');
+    const slot = page.locator('[data-track-controls]').first();
+    await expect(slot).toBeVisible();
+    const id = await slot.getAttribute('data-track-controls');
+    const slider = page
+      .locator(`[data-track-controls="${id}"]`)
+      .getByRole('slider', { name: 'Volume', exact: true });
+    await expect(slider).toHaveValue('1');
+    await slider.scrollIntoViewIfNeeded();
+
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      box = await slider.boundingBox();
+      expect(box).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    const y = box!.y + box!.height / 2;
+    // A press in the middle, then several moves to the left: many input
+    // events, one change on release.
+    await page.mouse.move(box!.x + box!.width / 2, y);
+    await page.mouse.down();
+    for (const fraction of [0.4, 0.3, 0.2]) {
+      await page.mouse.move(box!.x + box!.width * fraction, y, { steps: 3 });
+    }
+    await page.mouse.up();
+    await expect(async () => {
+      expect(Number(await slider.inputValue())).toBeLessThan(0.5);
+    }).toPass({ timeout: 5000 });
+
+    await slider.blur();
+    await page.keyboard.press('Control+z');
+
+    // One step for the whole drag: one Undo brings back the value from before
+    // it, not one of the values on the way. Until #843 nothing moved back.
+    await expect(slider).toHaveValue('1');
+  });
 });

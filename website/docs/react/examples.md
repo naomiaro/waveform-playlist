@@ -316,12 +316,15 @@ function SaveLoadState() {
     if (saved) {
       const state = JSON.parse(saved);
       seekTo(state.cursorPosition);
-      // The setters take a track id and ignore an id no track has.
+      // The setters take a track id and ignore an id no track has. A restored
+      // mix is not the user's edit: no undo step, and no undo brings back the
+      // values from before the load.
+      const restore = { undoable: false } as const;
       state.mixer.forEach((t: { id: string } & (typeof trackStates)[number]) => {
-        setTrackMute(t.id, t.muted);
-        setTrackSolo(t.id, t.soloed);
-        setTrackVolume(t.id, t.volume);
-        setTrackPan(t.id, t.pan);
+        setTrackMute(t.id, t.muted, restore);
+        setTrackSolo(t.id, t.soloed, restore);
+        setTrackVolume(t.id, t.volume, restore);
+        setTrackPan(t.id, t.pan, restore);
       });
     }
   };

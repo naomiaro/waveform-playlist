@@ -20,7 +20,7 @@ Breaking in the engine:
 - `setTracks`, `addTrack` and `updateTrack` throw on a duplicate track id or a duplicate clip id within a track.
 - `updateTrack(id, track)` with an unknown id changes nothing (the track is still checked and may throw).
 - `updateTrack(id, track)` keeps each clip object the track already holds and copies every other clip. When the track's loaded clips are the same objects in the same order and its own fields are unchanged, the adapter is not called (the undo step and the `statechange` are as before); `updateTrack(id)` always sends.
-- `commitTransaction` (with a change) and `clearHistory` (with history) emit `statechange`; `commitTransaction` adds no step when the tracks are back where the transaction began. A mixer setter for a track that is not in the current tracks (also a removed track) still calls the adapter, changes nothing and emits no `statechange`.
+- `commitTransaction` (with a change) and `clearHistory` (with history) emit `statechange`; `commitTransaction` adds no step when the tracks and the mix are back where the transaction began. A mixer setter for a track that is not in the current tracks (also a removed track) still calls the adapter, changes nothing and emits no `statechange`.
 - `undo` and `redo` with a transaction open abort it first, and `setTracks` ends an open transaction.
 - Track, clip, mixer and history methods called on a disposed engine change its arrangement but no longer reach the adapter or emit, and `setTempo` on it does nothing.
 - A change made from inside a `statechange` listener is delivered after the one being handled. Two or more track edits made in one listener run make the engine send the adapter every track once (`setTracks`); one edit is sent as itself.

@@ -534,18 +534,19 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 ### The Armed Track Is Muted for the Take
 
-While a take records, the armed track is muted in the arrangement's mix, so what it already holds does not play under the punch-in that replaces it:
+While a take records, the armed track is armed in the arrangement (`arrangement.setTrackArmed`), which plays it muted, so what it already holds does not play under the punch-in that replaces it:
 
 - the mixer (`usePlaylistMixer().trackStates`) and the track's Mute button show it muted;
 - the built-in `<TrackMuteButton />` of that track is disabled, and `useTrack().isRecordingArmed` is true for it, for a mute control of your own;
-- when the take ends, or the armed track changes, the mute from before the take is written back, whatever was set in between (a `setTrackMute` on that track during the take does not stay);
-- the provider also writes it back when it unmounts or is hidden by `<Activity>` with a track still armed.
+- the arm is not an undo step and does not change the track's own mute: `arrangement.getMixer()` keeps it, so a mute changed on that track during the take (a `setTrackMute`) stays after it;
+- the track is disarmed when the take ends or the armed track changes, and when the provider unmounts or is hidden by `<Activity>` with a track still armed.
 
 Edges to know:
 
 - A take started during the playlist's first load records without playback: `play()` does nothing before the first [ready](/docs/react/guides/loading-audio#ready).
-- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the mute is written back); the reveal arms the track again from its mute at that moment.
-- Removing the armed track during a take as an undo step: the arrangement keeps a removed track's mix for its undo, and an undo of a removal brings the track back with the mix it had when it was removed. That mix has the take's mute in it, and the end of the take writes nothing for a track that is gone, so undoing the removal after the take brings the track back muted.
+- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the track is disarmed); the reveal arms the track again.
+- Removing the armed track during a take as an undo step: the end of the take still disarms it, so undoing the removal after the take brings the track back with its own mute. Undone during the take, the track comes back armed, and plays muted until the take ends.
+- A mute control of your own that toggles from the reported value (`setMuted(!muted)`) during a take sets the track's own mute to false, because `muted` is true for the arm: the track stays muted for the take and comes out of it unmuted. Disable it while `isRecordingArmed`, as the built-in button is.
 - Only the built-in Mute button is disabled. Solo, volume and pan stay enabled.
 
 If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.

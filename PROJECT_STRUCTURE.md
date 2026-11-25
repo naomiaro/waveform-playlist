@@ -1034,11 +1034,11 @@ export interface PlaybackControlsContextValue {
 // 3b. The actions only the multitrack editor has (WaveformPlaylistProvider only)
 export interface EditorControlsContextValue {
   setCurrentTime: (time: number) => void;
-  // Track mixer, by track id
-  setTrackMute: (trackId: string, muted: boolean) => void;
-  setTrackSolo: (trackId: string, soloed: boolean) => void;
-  setTrackVolume: (trackId: string, volume: number) => void;
-  setTrackPan: (trackId: string, pan: number) => void;
+  // Track mixer, by track id; each call an undo step (MixerChangeOptions from engine)
+  setTrackMute: (trackId: string, muted: boolean, options?: MixerChangeOptions) => void;
+  setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
+  setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
+  setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
   setTrackDragPreview: React.Dispatch<React.SetStateAction<TrackDragPreview | null>>;
   setSelectedTrackId: (trackId: string | null) => void;
@@ -1055,7 +1055,7 @@ export interface EditorControlsContextValue {
   // Undo/Redo
   undo: () => void;
   redo: () => void;
-  // Recording
+  // Recording (arms the track in the arrangement: plays muted, not an undo step)
   setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
 }
 
