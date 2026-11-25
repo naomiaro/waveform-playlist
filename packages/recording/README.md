@@ -24,6 +24,7 @@ npm install @waveform-playlist/recording
 | Package | Purpose |
 |---------|---------|
 | `react` | ^19.0.0 |
+| `react-dom` | ^19.0.0 — required transitively by `@waveform-playlist/ui-components` |
 | `styled-components` | ^6.0.0 — required transitively by `@waveform-playlist/ui-components` |
 | `tone` | ^15.0.0 — recording shares the global AudioContext with `@waveform-playlist/playout` |
 

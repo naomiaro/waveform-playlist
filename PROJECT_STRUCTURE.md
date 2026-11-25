@@ -529,7 +529,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - Visual: AnnotationBox, AnnotationBoxesWrapper
   - Text: AnnotationText
   - Controls: ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox, DownloadAnnotationsButton
-- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0, `@waveform-playlist/browser` (the controls read its hooks; the provider fills its integration context), `@dnd-kit/react` and `@dnd-kit/dom` (the edge handles of `AnnotationBox`)
+- **Peer Dependencies:** React and react-dom ^19.0.0, styled-components ^6.0.0, `@waveform-playlist/browser` (the controls read its hooks; the provider fills its integration context), `@dnd-kit/react` and `@dnd-kit/dom` (the edge handles of `AnnotationBox`)
 - **Bundle Size Impact:** ~50KB (only included if installed)
 - **Use Cases:** Subtitle/caption editing, transcripts, audio labeling
 - **Documentation:** See `website/docs/react/getting-started/installation.md`
@@ -596,7 +596,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
      - Docusaurus webpack aliases handle module resolution
   3. **Try-Catch for Cleanup** - Wrap disconnect calls in try-catch for microphone switching
 
-- **Peer Dependencies:** React ^19.0.0
+- **Peer Dependencies:** React and react-dom ^19.0.0, styled-components ^6.0.0 (forwarded from `@waveform-playlist/ui-components`), Tone.js ^15.0.0 (forwarded from `@waveform-playlist/playout`, whose global AudioContext recording shares)
 - **Use Cases:** Voice recording, podcast editing, audio capture, overdub recording
 - **Example:** `website/src/components/examples/RecordingExample.tsx` + `RecordingControls.tsx`
 - **Debugging:** See `packages/recording/CLAUDE.md`
@@ -651,7 +651,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
     <Waveform />
   </WaveformPlaylistProvider>
   ```
-- **Peer Dependencies:** React, @waveform-playlist/browser
+- **Peer Dependencies:** React ^19.0.0, styled-components ^6.0.0, `@waveform-playlist/browser`
 - **Example:** `website/src/components/examples/MirSpectrogramExample.tsx`
 
 #### `@waveform-playlist/midi`

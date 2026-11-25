@@ -531,9 +531,6 @@ importers:
       '@waveform-playlist/worklets':
         specifier: workspace:*
         version: link:../worklets
-      styled-components:
-        specifier: ^6.0.0
-        version: 6.4.2(react-dom@19.2.7)(react@19.2.7)
       tone:
         specifier: ^15.0.0
         version: 15.1.22
@@ -556,6 +553,9 @@ importers:
       react-dom:
         specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
+      styled-components:
+        specifier: ^6.4.2
+        version: 6.4.2(react-dom@19.2.7)(react@19.2.7)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(@swc/core@1.15.41)(postcss@8.5.29)(typescript@5.9.3)
