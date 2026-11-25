@@ -374,8 +374,8 @@ export class RecordingController implements ReactiveController {
 
       // Transiently mute the armed track for the session — punch-in replaces
       // whatever the take overlaps (#579), so the doomed material must not
-      // play under the overdub. Engine-level only: the editor's _tracks
-      // descriptors (the UI mute control) are untouched. Restored by
+      // play under the overdub. This writes the arrangement's stored mute,
+      // which the track controls draw (#843), so they show it. Restored by
       // _restoreArmedTrackMute on every session-teardown path. Must engage
       // BEFORE the overdub host.play() below so the track never blips.
       // (Parity with the React provider's setRecordingActive.)

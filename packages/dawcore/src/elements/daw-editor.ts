@@ -13,6 +13,7 @@ import type {
   ColorMapValue,
 } from '@waveform-playlist/core';
 import type {
+  StoredTrackDescriptor,
   TrackDescriptor,
   TrackWithId,
   ClipDescriptor,
@@ -43,7 +44,15 @@ import type { WaveformSegment } from './daw-waveform';
 import './daw-playhead';
 import './daw-waveform';
 import './daw-ruler';
-import type { PlaylistEngine, PlayoutAdapter } from '@waveform-playlist/engine';
+import type { PlaylistEngine, PlayoutAdapter, TrackMixerValues } from '@waveform-playlist/engine';
+import {
+  DEFAULT_TRACK_MIX,
+  clampNumber,
+  mixOfElement,
+  mixOfTrack,
+  sameMix,
+  withMix,
+} from '../utils/track-mix';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -446,7 +455,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
   _resolvedSampleRate: number | null = null;
-  @state() _tracks: Map<string, TrackDescriptor> = new Map();
+  /** Per-track descriptors, without the mix: the arrangement owns that (#843). */
+  @state() _tracks: Map<string, StoredTrackDescriptor> = new Map();
+  /**
+   * The mix of a track the engine does not hold yet: what it will enter the
+   * arrangement with (from the `<daw-track>` element or the `addTrack` config,
+   * changed by a control or `updateTrack` while it loads). Deleted once
+   * `engine.getState().tracks` holds the id; read only through `_mixOf`.
+   */
+  @state() _seedMix: Map<string, TrackMixerValues> = new Map();
   @state() _engineTracks: Map<string, ClipTrack> = new Map();
   @state() _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
@@ -1059,7 +1076,59 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return [...this._tracks.entries()].map(([trackId, descriptor]) => ({
       trackId,
       ...descriptor,
+      ...this._mixOf(trackId),
     }));
+  }
+  /**
+   * A track's mix, from its one owner: the arrangement (through
+   * `_engineTracks`, which follows `mixerVersion`) for a track the engine
+   * holds, the seed for one still on its way in (#843).
+   */
+  _mixOf(trackId: string): TrackMixerValues {
+    const seed = this._seedMix.get(trackId);
+    if (seed) return seed;
+    const track = this._engineTracks.get(trackId);
+    return track ? mixOfTrack(track) : DEFAULT_TRACK_MIX;
+  }
+  /** Replace a track's seed (a new Map: `_seedMix` is reactive state). */
+  private _setSeedMix(trackId: string, mix: TrackMixerValues): void {
+    this._seedMix = new Map(this._seedMix).set(trackId, mix);
+  }
+  private _deleteSeedMix(trackIds: Iterable<string>): void {
+    let next: Map<string, TrackMixerValues> | null = null;
+    for (const id of trackIds) {
+      if (!this._seedMix.has(id)) continue;
+      next ??= new Map(this._seedMix);
+      next.delete(id);
+    }
+    if (next) this._seedMix = next;
+  }
+  /**
+   * Change one mixer field of a track: the seed while the track is loading
+   * (not an undo step, nothing sent), else the engine's setter.
+   */
+  private _writeMix<K extends keyof TrackMixerValues>(
+    trackId: string,
+    field: K,
+    value: TrackMixerValues[K]
+  ): void {
+    const seed = this._seedMix.get(trackId);
+    if (seed) {
+      if (seed[field] !== value) this._setSeedMix(trackId, { ...seed, [field]: value });
+      return;
+    }
+    if (!this._engine) return;
+    if (field === 'volume') this._engine.setTrackVolume(trackId, value as number);
+    else if (field === 'pan') this._engine.setTrackPan(trackId, value as number);
+    else if (field === 'muted') this._engine.setTrackMute(trackId, value as boolean);
+    else this._engine.setTrackSolo(trackId, value as boolean);
+  }
+  /** The ordered tracks for `engine.setTracks`, a loading track with its seed. */
+  private _tracksForEngine(): ClipTrack[] {
+    return this._getOrderedTracks().map(([trackId, track]) => {
+      const seed = this._seedMix.get(trackId);
+      return seed ? withMix(track, seed) : track;
+    });
   }
   get selectedTrackId(): string | null {
     return this._selectedTrackId;
@@ -1201,6 +1270,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // guard in _buildEngine until a fresh adapter is set); file-dropped
     // element-less content does not survive a reparent.
     this._tracks = new Map();
+    this._seedMix = new Map();
     this._engineTracks = new Map();
     this._peaksData = new Map();
     this._loadingTracks.clear();
@@ -1334,7 +1404,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // a move, not a first-time (or post-teardown) registration: refresh the
     // element mapping and bail out WITHOUT re-reading the descriptor or
     // reloading. Re-reading would revert live daw-track-control mixer edits
-    // (they mutate the _tracks descriptor at runtime, not the element's
+    // of a loading track (they change its seed, not the element's
     // attributes); reloading would re-fetch — for a file-dropped track whose
     // blob: URL was already revoked after its first load (Task 6), that
     // fetch is against a dead URL and spuriously fires daw-track-error.
@@ -1347,6 +1417,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     const descriptor = this._readTrackDescriptor(trackEl as DawTrackElement);
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
+    // The values it enters the arrangement with; not an undo step (#843).
+    this._setSeedMix(trackId, mixOfElement(trackEl as DawTrackElement));
     this._trackElements.set(trackId, trackEl as DawTrackElement);
     this._loadTrack(trackId, descriptor);
   };
@@ -1371,6 +1443,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const nextTracks = new Map(this._tracks);
     nextTracks.delete(trackId);
     this._tracks = nextTracks;
+    this._deleteSeedMix([trackId]);
     const nextEngine = new Map(this._engineTracks);
     nextEngine.delete(trackId);
     this._engineTracks = nextEngine;
@@ -1452,14 +1525,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       });
     }
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
-    if (this._engine) {
-      if (oldDescriptor?.volume !== descriptor.volume)
-        this._engine.setTrackVolume(trackId, descriptor.volume);
-      if (oldDescriptor?.pan !== descriptor.pan) this._engine.setTrackPan(trackId, descriptor.pan);
-      if (oldDescriptor?.muted !== descriptor.muted)
-        this._engine.setTrackMute(trackId, descriptor.muted);
-      if (oldDescriptor?.soloed !== descriptor.soloed)
-        this._engine.setTrackSolo(trackId, descriptor.soloed);
+    // The element's mix against the track's current mix (#843): the seed
+    // while loading, else the arrangement's, through the engine setters.
+    const elementMix = mixOfElement(trackEl);
+    const currentMix = this._mixOf(trackId);
+    if (!sameMix(elementMix, currentMix)) {
+      for (const field of ['volume', 'pan', 'muted', 'soloed'] as const) {
+        if (elementMix[field] !== currentMix[field]) {
+          this._writeMix(trackId, field, elementMix[field]);
+        }
+      }
     }
     if (oldDescriptor?.src !== descriptor.src) {
       this._loadTrack(trackId, descriptor);
@@ -1516,17 +1591,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * their descriptors legitimately precede their engine entries. */
   _reconcileDescriptorsWithEngineTracks(tracks: readonly ClipTrack[]): void {
     const engineIds = new Set(tracks.map((t) => t.id));
-    let next: Map<string, TrackDescriptor> | null = null;
+    let next: Map<string, StoredTrackDescriptor> | null = null;
     for (const track of tracks) {
       if (this._tracks.has(track.id)) continue;
       next ??= new Map(this._tracks);
+      // No mix of its own: it is read from the engine track (#843).
       next.set(track.id, {
         name: track.name ?? '',
         src: '',
-        volume: track.volume ?? 1,
-        pan: track.pan ?? 0,
-        muted: track.muted ?? false,
-        soloed: track.soloed ?? false,
         kind: trackKind(track),
         renderMode: trackDescriptorRenderMode(trackKind(track), 'waveform'),
         clips: [],
@@ -1620,22 +1692,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         })
       );
     }
-    const oldDescriptor = this._tracks.get(trackId);
-    if (oldDescriptor) {
-      const descriptor = { ...oldDescriptor, [prop]: value };
-      this._tracks = new Map(this._tracks).set(trackId, descriptor);
-      // Forward to engine with validated values
-      if (this._engine) {
-        if (prop === 'volume')
-          this._engine.setTrackVolume(trackId, Math.max(0, Math.min(1, Number(value))));
-        if (prop === 'pan')
-          this._engine.setTrackPan(trackId, Math.max(-1, Math.min(1, Number(value))));
-        if (prop === 'muted') this._engine.setTrackMute(trackId, Boolean(value));
-        if (prop === 'soloed') this._engine.setTrackSolo(trackId, Boolean(value));
-      }
+    if (this._tracks.has(trackId)) {
+      // Validated values: to the seed while loading, else to the engine.
+      if (prop === 'volume') this._writeMix(trackId, 'volume', clampNumber(value, 0, 1));
+      if (prop === 'pan') this._writeMix(trackId, 'pan', clampNumber(value, -1, 1));
+      if (prop === 'muted') this._writeMix(trackId, 'muted', Boolean(value));
+      if (prop === 'soloed') this._writeMix(trackId, 'soloed', Boolean(value));
     }
     // Don't sync back to <daw-track> DOM element — avoids daw-track-update loop.
-    // _tracks descriptor map is the source of truth for control values.
+    // The arrangement (or a loading track's seed) holds the control values.
   };
   private _onTrackRemoveRequest = (e: CustomEvent) => {
     const { trackId } = e.detail ?? {};
@@ -2043,8 +2108,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _commitTrackChange(trackId: string, updatedTrack: ClipTrack) {
     this._recomputeDuration();
     if (this._engine?.updateTrack) this._engine.updateTrack(trackId, updatedTrack);
-    else if (this._engine)
-      this._engine.setTracks(this._getOrderedTracks().map(([, track]) => track));
+    else if (this._engine) this._engine.setTracks(this._tracksForEngine());
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
@@ -2189,7 +2253,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     this._commitTrackChange(trackId, updatedTrack);
   }
-  private _readTrackDescriptor(trackEl: DawTrackElement): TrackDescriptor {
+  private _readTrackDescriptor(trackEl: DawTrackElement): StoredTrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
     const clips: ClipDescriptor[] = [];
 
@@ -2236,10 +2300,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return {
       name: trackEl.name || 'Untitled',
       src: trackEl.src,
-      volume: trackEl.volume,
-      pan: trackEl.pan,
-      muted: trackEl.muted,
-      soloed: trackEl.soloed,
       kind: trackEl.kind,
       renderMode: trackDescriptorRenderMode(trackEl.kind, trackEl.renderMode),
       clips,
@@ -2272,7 +2332,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
   }
   // --- Audio Loading ---
-  private async _loadTrack(trackId: string, descriptor: TrackDescriptor) {
+  private async _loadTrack(trackId: string, descriptor: StoredTrackDescriptor) {
     // "Still loading" must be knowable independently of _engineTracks — the
     // peaks-first path inserts a PREVIEW track there mid-load, which would
     // otherwise make _onClipConnected treat a load-in-progress track as
@@ -2381,10 +2441,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                 name: descriptor.name,
                 kind: descriptor.kind,
                 clips: [clip],
-                volume: descriptor.volume,
-                pan: descriptor.pan,
-                muted: descriptor.muted,
-                soloed: descriptor.soloed,
+                ...this._mixOf(trackId),
               });
               previewTrack.id = trackId;
               this._engineTracks = new Map(this._engineTracks).set(trackId, previewTrack);
@@ -2483,14 +2540,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           trackWasRemoved ? 'removed' : 'disconnected'
         );
       }
+      // The seed while it loads; the arrangement's mix when the engine holds
+      // it already (a src change reloads a loaded track).
       const track = createTrack({
         name: descriptor.name,
         kind: descriptor.kind,
         clips,
-        volume: descriptor.volume,
-        pan: descriptor.pan,
-        muted: descriptor.muted,
-        soloed: descriptor.soloed,
+        ...this._mixOf(trackId),
       });
       // If clips were requested but ALL failed to load, surface as a track-level
       // error so addTrack({clips: [...]}) rejects appropriately. Per-clip
@@ -2511,7 +2567,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         this._maybeRegisterSpectrogramClipAudio(trackId, c);
       }
       const engine = await this._ensureEngine();
-      engine.setTracks(this._getOrderedTracks().map(([, track]) => track));
+      // A control moved during the await is in the seed, not in `track`.
+      engine.setTracks(this._tracksForEngine());
       this.dispatchEvent(
         new CustomEvent<DawTrackIdDetail>('daw-track-ready', {
           bubbles: true,
@@ -2669,6 +2726,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           nextTracks.set(track.id, track);
         }
         this._engineTracks = nextTracks;
+        // The arrangement holds these now: their seeds are not read again.
+        this._deleteSeedMix(nextTracks.keys());
         // Undo can resurrect a track whose editor descriptor was purged at
         // removal — synthesize one so the track shows real name/controls
         // and appears in editor.tracks (the effects chain does not survive;
@@ -2966,24 +3025,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       normalizedRenderMode = 'spectrogram';
     }
-    const newDesc: TrackDescriptor = {
+    const newDesc: StoredTrackDescriptor = {
       ...oldDesc,
       ...(partial.name !== undefined && { name: partial.name }),
-      ...(partial.volume !== undefined && { volume: partial.volume }),
-      ...(partial.pan !== undefined && { pan: partial.pan }),
-      ...(partial.muted !== undefined && { muted: partial.muted }),
-      ...(partial.soloed !== undefined && { soloed: partial.soloed }),
       ...(normalizedRenderMode !== undefined && {
         renderMode: trackDescriptorRenderMode(oldDesc.kind, normalizedRenderMode),
       }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
-    if (this._engine) {
-      if (partial.volume !== undefined) this._engine.setTrackVolume(trackId, partial.volume);
-      if (partial.pan !== undefined) this._engine.setTrackPan(trackId, partial.pan);
-      if (partial.muted !== undefined) this._engine.setTrackMute(trackId, partial.muted);
-      if (partial.soloed !== undefined) this._engine.setTrackSolo(trackId, partial.soloed);
-    }
+    // The mix goes to its owner: the seed while loading, else the engine.
+    if (partial.volume !== undefined) this._writeMix(trackId, 'volume', partial.volume);
+    if (partial.pan !== undefined) this._writeMix(trackId, 'pan', partial.pan);
+    if (partial.muted !== undefined) this._writeMix(trackId, 'muted', partial.muted);
+    if (partial.soloed !== undefined) this._writeMix(trackId, 'soloed', partial.soloed);
   }
   /**
    * Append a clip to an existing track. Builds a `<daw-clip>` from `config`
@@ -3800,22 +3854,23 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                       <span class="annotation-lane-name">${track.name}</span>
                     </div>`
                 )}
-                ${orderedTracks.map(
-                  (t, i) => html`
+                ${orderedTracks.map((t, i) => {
+                  const mix = this._mixOf(t.trackId);
+                  return html`
                     <daw-track-controls
                       style="height: ${t.trackHeight}px;"
                       .trackId=${t.trackId}
                       .trackName=${t.descriptor?.name ?? 'Untitled'}
-                      .volume=${t.descriptor?.volume ?? 1}
-                      .pan=${t.descriptor?.pan ?? 0}
-                      .muted=${t.descriptor?.muted ?? false}
-                      .soloed=${t.descriptor?.soloed ?? false}
+                      .volume=${mix.volume}
+                      .pan=${mix.pan}
+                      .muted=${mix.muted}
+                      .soloed=${mix.soloed}
                       .reorderable=${this.trackReordering}
                       .trackIndex=${i}
                       .trackCount=${orderedTracks.length}
                     ></daw-track-controls>
-                  `
-                )}
+                  `;
+                })}
               </div>
             </div>`
           : ''}

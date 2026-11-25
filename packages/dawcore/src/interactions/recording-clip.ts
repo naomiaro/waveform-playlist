@@ -7,7 +7,7 @@ import type { ClipTrack, PeakData } from '@waveform-playlist/core';
 import { carveClipRange, createClip } from '@waveform-playlist/core';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawErrorDetail, DawRecordingClipAddDetail } from '../events';
-import type { TrackDescriptor, ClipDescriptor } from '../types';
+import type { StoredTrackDescriptor, ClipDescriptor } from '../types';
 
 export interface RecordingClipHost {
   readonly samplesPerPixel: number;
@@ -18,7 +18,7 @@ export interface RecordingClipHost {
   readonly mono: boolean;
   readonly isConnected: boolean;
   readonly effectiveSampleRate: number;
-  _tracks: Map<string, TrackDescriptor>;
+  _tracks: Map<string, StoredTrackDescriptor>;
   _engineTracks: Map<string, ClipTrack>;
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
