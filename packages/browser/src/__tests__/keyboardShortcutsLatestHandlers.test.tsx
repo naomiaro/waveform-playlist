@@ -19,31 +19,46 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 const seen: string[] = [];
 
-const Shortcuts: React.FC<{ label: string }> = ({ label }) => {
+interface Props {
+  label: string;
+  enabled: boolean;
+}
+
+const Shortcuts: React.FC<Props> = ({ label, enabled }) => {
   useKeyboardShortcuts({
     shortcuts: [{ key: ' ', action: () => seen.push(label), description: 'record the label' }],
+    enabled,
   });
   return null;
 };
 
-/** Presses Space from a layout effect: after the commit, before passive effects. */
-const PressInLayoutEffect: React.FC<{ label: string }> = ({ label }) => {
+/**
+ * Presses Space from a layout effect: after the commit, before passive effects.
+ * Rendered AFTER `Shortcuts`: layout effects run in tree order.
+ */
+const PressInLayoutEffect: React.FC<Props & { pressOnMount?: boolean }> = ({
+  label,
+  pressOnMount = false,
+}) => {
   useLayoutEffect(() => {
-    if (label === 'first') return;
+    if (label === 'first' && !pressOnMount) return;
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-  }, [label]);
+  }, [label, pressOnMount]);
   return null;
 };
 
-let setLabel: (label: string) => void = () => {};
+let update: (props: Props) => void = () => {};
 
-const Harness: React.FC = () => {
-  const [label, set] = useState('first');
-  setLabel = set;
+const Harness: React.FC<{ initiallyEnabled: boolean; pressOnMount?: boolean }> = ({
+  initiallyEnabled,
+  pressOnMount,
+}) => {
+  const [props, set] = useState<Props>({ label: 'first', enabled: initiallyEnabled });
+  update = set;
   return (
     <>
-      <Shortcuts label={label} />
-      <PressInLayoutEffect label={label} />
+      <Shortcuts {...props} />
+      <PressInLayoutEffect {...props} pressOnMount={pressOnMount} />
     </>
   );
 };
@@ -53,12 +68,33 @@ afterEach(() => {
   seen.length = 0;
 });
 
-describe('useKeyboardShortcuts', () => {
-  it('runs the handlers of the commit a key press follows, before its passive effects', () => {
-    render(<Harness />);
+describe('useKeyboardShortcuts: a key pressed after a commit, before its passive effects', () => {
+  it("runs that commit's handlers", () => {
+    render(<Harness initiallyEnabled />);
     act(() => {
-      setLabel('second');
+      update({ label: 'second', enabled: true });
     });
     expect(seen).toEqual(['second']);
+  });
+
+  it('runs nothing when that commit turned the shortcuts off', () => {
+    render(<Harness initiallyEnabled />);
+    act(() => {
+      update({ label: 'second', enabled: false });
+    });
+    expect(seen).toEqual([]);
+  });
+
+  it('runs the handlers when that commit turned the shortcuts on', () => {
+    render(<Harness initiallyEnabled={false} />);
+    act(() => {
+      update({ label: 'second', enabled: true });
+    });
+    expect(seen).toEqual(['second']);
+  });
+
+  it('runs the handlers when that commit mounted them', () => {
+    render(<Harness initiallyEnabled pressOnMount />);
+    expect(seen).toEqual(['first']);
   });
 });
