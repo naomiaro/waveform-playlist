@@ -76,6 +76,7 @@ import { TrackReorderHandler } from '../interactions/track-reorder-handler';
 import type {
   DawSelectionDetail,
   DawTrackIdDetail,
+  DawTrackControlDetail,
   DawTrackUpdateDetail,
   DawTrackErrorDetail,
   DawTrackReorderDetail,
@@ -1689,8 +1690,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return changed ? result : clips;
   }
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
-  private _onTrackControl = (e: CustomEvent) => {
-    const { trackId, prop, value } = e.detail ?? {};
+  private _onTrackControl = (e: CustomEvent<Partial<DawTrackControlDetail>>) => {
+    const { trackId, prop, value, gesture } = e.detail ?? {};
     if (!trackId || !prop || !DawEditorElement._CONTROL_PROPS.has(prop)) return;
     // Select the track when interacting with its controls
     if (this._selectedTrackId !== trackId) {
@@ -1707,11 +1708,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
     if (this._tracks.has(trackId)) {
-      // Validated values: to the seed while loading, else to the engine.
-      if (prop === 'volume') this._writeMix(trackId, 'volume', clampNumber(value, 0, 1));
-      if (prop === 'pan') this._writeMix(trackId, 'pan', clampNumber(value, -1, 1));
-      if (prop === 'muted') this._writeMix(trackId, 'muted', Boolean(value));
-      if (prop === 'soloed') this._writeMix(trackId, 'soloed', Boolean(value));
+      // Validated values: to the seed while loading, else to the engine. A
+      // slider's gesture id makes its drag one undo step (#843); a control
+      // without one (mute, solo) is a step per event.
+      const options: MixerChangeOptions | undefined =
+        typeof gesture === 'string' ? { gesture } : undefined;
+      if (prop === 'volume') this._writeMix(trackId, 'volume', clampNumber(value, 0, 1), options);
+      if (prop === 'pan') this._writeMix(trackId, 'pan', clampNumber(value, -1, 1), options);
+      if (prop === 'muted') this._writeMix(trackId, 'muted', Boolean(value), options);
+      if (prop === 'soloed') this._writeMix(trackId, 'soloed', Boolean(value), options);
     }
     // Don't sync back to <daw-track> DOM element — avoids daw-track-update loop.
     // The arrangement (or a loading track's seed) holds the control values.

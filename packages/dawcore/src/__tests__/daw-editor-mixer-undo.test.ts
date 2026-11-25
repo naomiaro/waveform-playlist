@@ -365,3 +365,89 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
     expect(engine.canUndo).toBe(false);
   });
 });
+
+// #843: <daw-track-controls> sends one gesture id per slider drag, and the
+// editor passes it to the engine setter, so a drag (or a key press) is one
+// undo step. A mute or solo click is a step of its own.
+describe('<daw-editor> control gestures (#843)', () => {
+  function mixOf(editor: any, id: string): any {
+    return editor.engine.getState().tracks.find((t: any) => t.id === id);
+  }
+  function slider(editor: any, id: string, which: 'volume' | 'pan'): HTMLInputElement {
+    const inputs = controlsFor(editor, id).shadowRoot.querySelectorAll('input[type="range"]');
+    return inputs[which === 'volume' ? 0 : 1];
+  }
+  function drag(input: HTMLInputElement, values: string[]) {
+    for (const value of values) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  async function editorWithTrack() {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    await editor.updateComplete;
+    return { editor, id: trackEl.trackId as string, engine: editor.engine };
+  }
+
+  it('a volume drag is one step', async () => {
+    const { editor, id, engine } = await editorWithTrack();
+    drag(slider(editor, id, 'volume'), ['0.7', '0.6', '0.5']);
+    expect(mixOf(editor, id).volume).toBe(0.5);
+
+    engine.undo();
+    expect(mixOf(editor, id).volume).toBe(0.8);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('a key press on a slider is one step', async () => {
+    const { editor, id, engine } = await editorWithTrack();
+    const input = slider(editor, id, 'volume');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.value = '0.79';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.value = '0.78';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', bubbles: true }));
+    expect(mixOf(editor, id).volume).toBe(0.78);
+
+    engine.undo();
+    expect(mixOf(editor, id).volume).toBe(0.8);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('volume then pan are two steps', async () => {
+    const { editor, id, engine } = await editorWithTrack();
+    drag(slider(editor, id, 'volume'), ['0.7', '0.5']);
+    await editor.updateComplete;
+    drag(slider(editor, id, 'pan'), ['0.1', '0.3']);
+    expect(mixOf(editor, id)).toMatchObject({ volume: 0.5, pan: 0.3 });
+
+    engine.undo();
+    expect(mixOf(editor, id)).toMatchObject({ volume: 0.5, pan: 0 });
+    engine.undo();
+    expect(mixOf(editor, id)).toMatchObject({ volume: 0.8, pan: 0 });
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('a mute click is one step', async () => {
+    const { editor, id, engine } = await editorWithTrack();
+    const muteButton = () =>
+      controlsFor(editor, id).shadowRoot.querySelector('button[title="Mute"]') as HTMLElement;
+    muteButton().click();
+    await editor.updateComplete;
+    await controlsFor(editor, id).updateComplete;
+    muteButton().click();
+    expect(mixOf(editor, id).muted).toBe(false);
+
+    engine.undo();
+    expect(mixOf(editor, id).muted).toBe(true);
+    engine.undo();
+    expect(mixOf(editor, id).muted).toBe(false);
+    expect(engine.canUndo).toBe(false);
+  });
+});

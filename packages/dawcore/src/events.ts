@@ -74,6 +74,12 @@ export interface DawTrackControlDetail {
   trackId: string;
   prop: string;
   value: number | boolean;
+  /**
+   * The slider's gesture id (#843): events of one volume or pan drag, or of
+   * one key press, carry the same id and are one undo step. Mute and solo
+   * send none: each click is a step.
+   */
+  gesture?: string;
 }
 
 export interface DawTrackRemoveDetail {

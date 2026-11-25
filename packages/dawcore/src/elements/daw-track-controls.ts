@@ -1,6 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { DawTrackReorderDetail, DawTrackReorderGrabDetail } from '../events';
+import { createMixerGesture } from '@waveform-playlist/core';
+import type { MixerGesture } from '@waveform-playlist/core';
+import type {
+  DawTrackControlDetail,
+  DawTrackReorderDetail,
+  DawTrackReorderGrabDetail,
+} from '../events';
 
 @customElement('daw-track-controls')
 export class DawTrackControlsElement extends LitElement {
@@ -16,6 +22,16 @@ export class DawTrackControlsElement extends LitElement {
   @property({ type: Boolean, attribute: false }) reorderable = false;
   @property({ type: Number, attribute: false }) trackIndex = 0;
   @property({ type: Number, attribute: false }) trackCount = 1;
+
+  /**
+   * One gesture per slider (#843): the `daw-track-control` events of one
+   * drag, or of one key press (a held key included), carry the same
+   * `gesture` id, and the editor makes them one undo step. Each gesture is
+   * attached to its range input while the element is connected.
+   */
+  private readonly _volumeGesture: MixerGesture = createMixerGesture();
+  private readonly _panGesture: MixerGesture = createMixerGesture();
+  private _detachGestures: Array<() => void> = [];
 
   static styles = css`
     :host {
@@ -187,7 +203,36 @@ export class DawTrackControlsElement extends LitElement {
     }
   `;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    // A reconnect (the element was moved): the inputs are still in the
+    // shadow root. On the first connect they do not exist yet; firstUpdated
+    // attaches.
+    if (this.hasUpdated) this._attachGestures();
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._detachAllGestures();
+  }
+
+  private _attachGestures(): void {
+    this._detachAllGestures();
+    const volumeInput = this.shadowRoot?.querySelector<HTMLInputElement>('.vol-row input');
+    const panInput = this.shadowRoot?.querySelector<HTMLInputElement>('.pan-row input');
+    const detach: Array<() => void> = [];
+    if (volumeInput) detach.push(this._volumeGesture.attach(volumeInput));
+    if (panInput) detach.push(this._panGesture.attach(panInput));
+    this._detachGestures = detach;
+  }
+
+  private _detachAllGestures(): void {
+    for (const detach of this._detachGestures) detach();
+    this._detachGestures = [];
+  }
+
   protected firstUpdated(): void {
+    this._attachGestures();
     requestAnimationFrame(() => {
       if (!this.isConnected) return;
       const rect = this.getBoundingClientRect();
@@ -204,12 +249,12 @@ export class DawTrackControlsElement extends LitElement {
 
   private _onVolumeInput = (e: Event) => {
     const value = Number((e.target as HTMLInputElement).value);
-    if (Number.isFinite(value)) this._dispatchControl('volume', value);
+    if (Number.isFinite(value)) this._dispatchControl('volume', value, this._volumeGesture.id);
   };
 
   private _onPanInput = (e: Event) => {
     const value = Number((e.target as HTMLInputElement).value);
-    if (Number.isFinite(value)) this._dispatchControl('pan', value);
+    if (Number.isFinite(value)) this._dispatchControl('pan', value, this._panGesture.id);
   };
 
   private _onMuteClick = () => {
@@ -231,13 +276,18 @@ export class DawTrackControlsElement extends LitElement {
     );
   };
 
-  private _dispatchControl(prop: string, value: number | boolean) {
+  /** `gesture` for the sliders only: each mute or solo click is a step. */
+  private _dispatchControl(prop: string, value: number | boolean, gesture?: string) {
     if (!this.trackId) return;
+    const detail: DawTrackControlDetail =
+      gesture === undefined
+        ? { trackId: this.trackId, prop, value }
+        : { trackId: this.trackId, prop, value, gesture };
     this.dispatchEvent(
-      new CustomEvent('daw-track-control', {
+      new CustomEvent<DawTrackControlDetail>('daw-track-control', {
         bubbles: true,
         composed: true,
-        detail: { trackId: this.trackId, prop, value },
+        detail,
       })
     );
   }
