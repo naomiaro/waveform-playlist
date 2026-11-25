@@ -10,6 +10,8 @@ export * from './probeRangeSupport';
 export * from './enumerateMicrophones';
 export * from './annotations/boundaries';
 export * from './annotations/shortcuts';
+export * from './annotations/store';
+export * from './annotations/bounds';
 export * from './panStage';
 export * from './valueSource';
 export * from './sourceLoader';
