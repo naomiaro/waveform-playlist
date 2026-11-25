@@ -74,6 +74,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - `MediaElementPlaylistProvider`, `MediaElementTrackConfig`: `packages/browser/src/MediaElementPlaylistContext.tsx`
 - `audioTrack()` and `AudioTrackOptions` (how a track names its audio): `packages/core/src/audioTrack.ts`
 - The `Arrangement` (tracks, mix, undo history, loading): `packages/engine/src/arrangement/`; its React hooks `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources`: `packages/browser/src/hooks/`
+- The annotation store (`AnnotationStore`, `AnnotationStoreOptions`, `createAnnotationStore`; the one owner of the annotations, both providers' `annotationStore` prop): `packages/core/src/annotations/store.ts`, `applyAnnotationBounds` in `bounds.ts`; its React hooks `useCreateAnnotationStore`, `useStoredAnnotations`: `packages/browser/src/hooks/`
 - Effects hooks return types: `packages/browser/src/hooks/useDynamicEffects.ts`, `useTrackDynamicEffects.ts`
 - Peak types (`Peaks`, `Bits`, `PeakData`): `packages/core/src/types/index.ts` (re-exported by `webaudio-peaks` for backwards compat)
 

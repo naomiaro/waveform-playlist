@@ -2,7 +2,7 @@
 
 Time-synchronized text annotations for waveform-playlist — mark up an audio timeline with editable regions for transcripts, podcast chapters, cue points, or music markers.
 
-Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform-playlist/browser): render `AnnotationProvider` above the view and pass `annotationList` to `WaveformPlaylistProvider` or `MediaElementPlaylistProvider`. `<Waveform />` and `<MediaElementWaveform />` then render the annotation boxes and the annotation text list. To give either one an option, compose the view with `<WaveformAnnotationBoxes>` and `<AnnotationList>` from `@waveform-playlist/browser`.
+Used with [`@waveform-playlist/browser`](https://www.npmjs.com/package/@waveform-playlist/browser): make an annotation store with `useCreateAnnotationStore`, pass it as `annotationStore` to `WaveformPlaylistProvider` or `MediaElementPlaylistProvider`, and render `AnnotationProvider` above the view. `<Waveform />` and `<MediaElementWaveform />` then render the annotation boxes and the annotation text list. To give either one an option, compose the view with `<WaveformAnnotationBoxes>` and `<AnnotationList>` from `@waveform-playlist/browser`.
 
 ## Features
 
@@ -25,15 +25,20 @@ Peer dependencies: `react` and `react-dom` (^19.0.0), `styled-components` (^6.0.
 ## Usage
 
 ```tsx
-import { useState } from 'react';
-import { WaveformPlaylistProvider, Waveform, useCreateArrangement } from '@waveform-playlist/browser';
+import {
+  WaveformPlaylistProvider,
+  Waveform,
+  useCreateArrangement,
+  useCreateAnnotationStore,
+} from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
 import { AnnotationProvider } from '@waveform-playlist/annotations';
 
 function AnnotatedPlaylist() {
   const arrangement = useCreateArrangement(() => [audioTrack({ src: '/audio/podcast.mp3', name: 'Podcast' })]);
 
-  const [annotations, setAnnotations] = useState([
+  // The owner of the annotations: the boxes, the list and your code change them through it.
+  const annotationStore = useCreateAnnotationStore(() => [
     { id: '1', start: 0, end: 5, lines: ['Introduction'] },
     { id: '2', start: 5, end: 15, lines: ['Topic Overview'] },
     { id: '3', start: 15, end: 30, lines: ['Main Discussion'] },
@@ -42,8 +47,8 @@ function AnnotatedPlaylist() {
   return (
     <WaveformPlaylistProvider
       arrangement={arrangement}
-      annotationList={{ annotations, editable: true }}
-      onAnnotationsChange={setAnnotations} // required for edits to persist
+      annotationStore={annotationStore}
+      annotationList={{ editable: true }}
     >
       <AnnotationProvider>
         <Waveform />
@@ -52,6 +57,8 @@ function AnnotatedPlaylist() {
   );
 }
 ```
+
+Change the annotations with `annotationStore.set(list)` and `annotationStore.update((current) => next)`; read them with `useStoredAnnotations(annotationStore)` (also above the provider) or `useAnnotations()` below it. To save them, subscribe to the store. The store refuses an annotation without finite numeric `start` and `end`, and two annotations with one id (a `TypeError`). See the [Annotations guide](https://naomiaro.github.io/waveform-playlist/docs/react/guides/annotations#the-annotation-store).
 
 Each annotation is a plain object:
 
@@ -65,7 +72,7 @@ interface AnnotationData {
 }
 ```
 
-`annotationList` also takes `linkEndpoints` and `isContinuousPlay`. The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop. Read them with `useAnnotationOptions()` and change them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from `usePlaybackControls()`, or render this package's checkboxes:
+`annotationList` holds the annotation options: `editable`, `linkEndpoints` and `isContinuousPlay`. The three options (`editable`, `linkEndpoints`, `isContinuousPlay`) are provider state that follows the prop. Read them with `useAnnotationOptions()` and change them with `setAnnotationsEditable`, `setLinkEndpoints` and `setContinuousPlay` from `usePlaybackControls()`, or render this package's checkboxes:
 
 ```tsx
 import {
@@ -104,7 +111,7 @@ Without `AnnotationProvider` the boxes and the list draw nothing. The checkboxes
 
 The checkboxes take `disabled`, `children` (the label; default "Continuous Play", "Link Endpoints", "Editable Annotations") and `className`. The download button takes `filename` (default `annotations.json`), `children` (the label; default "Download JSON"), `title` (the tooltip; default one of two English sentences), `disabled` and `className`, and is also disabled while there are no annotations. Every string the four controls draw can be supplied by your app. None of the four has a controlled form: `checked`, `onChange` and `annotations` props are not read.
 
-`AnnotationText`, `AnnotationBox` and `AnnotationBoxesWrapper` are driven by props, for an annotation UI that does not go through a playlist provider. For a checkbox with a state of your own there, build one from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components`; move an edge with `updateAnnotationBoundaries` of `@waveform-playlist/core`; save with `annotations.map(serializeAeneas)`.
+`AnnotationText`, `AnnotationBox` and `AnnotationBoxesWrapper` are driven by props, for an annotation UI that does not go through a playlist provider. `AnnotationText` draws its `annotations` and writes its text, id and action edits to its `store` prop (an `AnnotationStore`: `createAnnotationStore` of `@waveform-playlist/core`, or `useCreateAnnotationStore`); without `store` the list is read-only. For a checkbox with a state of your own there, build one from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components`; move an edge with `updateAnnotationBoundaries` of `@waveform-playlist/core`; save with `annotations.map(serializeAeneas)`.
 
 `parseAeneas(fragment)` converts one Aeneas fragment to one annotation, and `serializeAeneas(annotation)` converts one back: `fragments.map(parseAeneas)`.
 

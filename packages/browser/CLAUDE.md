@@ -68,10 +68,11 @@ Read before changing the track control pieces, the controls column or the track-
 
 ### Annotations in the view: `notes/annotations.md`
 
-Read before changing the annotation list, the annotation boxes, their edge drag or the annotation options.
+Read before changing the annotation list, the annotation boxes, their edge drag, the annotation options or anything that writes the annotations.
 
 - One Annotation List and One Row of Boxes for Both Players (#744)
-- Annotation Edge Drag: Preview Source, One Report per Drag
+- The Annotation Store Is the One Owner (#867)
+- Annotation Edge Drag: Preview Source, One Write per Drag
 - Annotation Parts Own Their Options; the Options Are Provider State (#686)
 
 ### Playback, the engine's lifetime and loading: `notes/playback-and-engine.md`
@@ -225,7 +226,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 - `useClipSplitting` - Split clips at playhead (`{ samplesPerPixel }`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
-- `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback
+- `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback (`{ store, activeAnnotationId, … }`: the boundary keys update the store's current list, the active annotation found by id)
+- `useCreateAnnotationStore` / `useStoredAnnotations` - The annotation store that owns the annotations (either provider's `annotationStore` prop), and a read of it that re-renders on a change (#867)
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
 - `useTrackDynamicEffects` - Per-track effects management
 - `useSelectionState` - Selection state (start/end) with engine delegation

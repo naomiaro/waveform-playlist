@@ -147,13 +147,28 @@ Theme keys to change. The provider merges the object over `defaultTheme` (`{ ...
 
 ### Annotations
 
+#### `annotationStore`
+
+**Type:** `AnnotationStore` (from `@waveform-playlist/core`)
+
+The owner of the annotations. Make it with `useCreateAnnotationStore` and change the annotations with its methods, `set(list)` and `update(fn)`. The provider publishes what the store holds (`useAnnotations()`) and writes nothing back; the edge drag, the boundary keys and the list's text, id and action edits write to the store. The same prop on both providers, and the same store works under either.
+
+Without it there are no annotations: `useAnnotations().annotations` is `[]`, and the provider makes no store of its own. `usePlaybackControls().annotationStore` is this prop, or `undefined`.
+
+```tsx
+const annotationStore = useCreateAnnotationStore(() => initialAnnotations);
+
+<MediaElementPlaylistProvider track={track} annotationStore={annotationStore}>
+```
+
+To save the annotations, subscribe to the store (`annotationStore.subscribe(…)`) or read it with `useStoredAnnotations(annotationStore)`. See [The Annotation Store](/docs/react/guides/annotations#the-annotation-store) for `beforeChange` and what the store refuses.
+
 #### `annotationList`
 
-**Type:** `AnnotationListProp`: `{ annotations?: AnnotationData[]; editable?: boolean; linkEndpoints?: boolean; isContinuousPlay?: boolean }`
+**Type:** `AnnotationListProp`: `{ editable?: boolean; linkEndpoints?: boolean; isContinuousPlay?: boolean }`
 
-The annotations and the starting values of the three annotation options. The same prop on both providers.
+The starting values of the three annotation options. The same prop on both providers. The annotations are not here: they are `annotationStore`'s.
 
-- `annotations`: the annotations to show. `start` and `end` are numbers, in seconds.
 - `editable`: annotations can be edited (text, ids, edges). Default `false`.
 - `linkEndpoints`: a dragged edge takes the edge it touches along. Default `false`.
 - `isContinuousPlay`: playback runs on past the end of an annotation. Default `false`.
@@ -161,12 +176,6 @@ The annotations and the starting values of the three annotation options. The sam
 The three options are provider state that follows the prop: each starts from its field, and when the value of a field changes, the option takes the new value. A field left out is `false`. Between two changes of the prop, a setter of `usePlaybackControls()` (`setAnnotationsEditable`, `setLinkEndpoints`, `setContinuousPlay`) or one of the checkboxes changes the option; the prop is not told. Read the options with `useAnnotationOptions()`.
 
 The action buttons of the annotation list are not set here: pass them to `<AnnotationList actions>`.
-
-#### `onAnnotationsChange`
-
-**Type:** `(annotations: AnnotationData[]) => void`
-
-Called with the full new array on every change to the annotations: the release of an edge drag, a text or id edit in the list, an action button, a `setAnnotations` call of your own. It is the one report of an annotation change. Keep the array in your state and pass it back in `annotationList.annotations`; without this callback an edit is dropped, and a development build warns.
 
 ### Callbacks
 
@@ -194,7 +203,7 @@ Called when the player could not be created (a missing optional peer, a throwing
 | `useActiveAnnotation()` | `activeAnnotationId` |
 | `useAnnotations()` | `annotations` |
 | `useAnnotationOptions()` | `editable`, `linkEndpoints`, `continuousPlay` |
-| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `setAnnotations`, `annotationPreview`, `setActiveAnnotationId`, `playAnnotation` |
+| `usePlaybackControls()` | `play`, `pause`, `stop`, `seekTo`, `setSelection`, `setTimeFormat`, `setAutomaticScroll`, `setScrollContainer`, `scrollContainerRef`, `setContinuousPlay`, `setAnnotationsEditable`, `setLinkEndpoints`, `annotationPreview`, `annotationStore`, `setActiveAnnotationId`, `playAnnotation` |
 | `usePlaybackRefs()` | `currentTimeRef`, `visualTimeRef` (the same ref as `currentTimeRef` here: a media element reports the audible position), `registerFrameCallback`, `unregisterFrameCallback` |
 | `usePlaylistView()` | `sampleRate`; `mono` and `indefinitePlayback` are always `false`. The view options are not here: inside a root, `usePlaylistInfo()` from `@waveform-playlist/ui-components` has the resolved `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` |
 | `usePlaylistSettings()` | `timeFormat` (default `'hh:mm:ss.uuu'`), `isAutomaticScroll` |
@@ -272,12 +281,12 @@ interface MediaElementPlaylistProviderProps {
   theme?: Partial<WaveformPlaylistTheme>;
 
   // Annotations
-  annotationList?: AnnotationListProp; // { annotations?, editable?, linkEndpoints?, isContinuousPlay? }
+  annotationStore?: AnnotationStore;
+  annotationList?: AnnotationListProp; // { editable?, linkEndpoints?, isContinuousPlay? }
 
   // Callbacks
   onReady?: () => void;
   onError?: (error: Error) => void;
-  onAnnotationsChange?: (annotations: AnnotationData[]) => void;
 
   // Custom engine
   /** Supply a custom MediaElementPlayout — skips dynamic import of @waveform-playlist/media-element-playout.

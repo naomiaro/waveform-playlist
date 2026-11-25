@@ -94,6 +94,8 @@ waveform-playlist/
   - `clipTimeHelpers.ts` — `clipStartTime`, `clipEndTime`, `clipOffsetTime`, `clipDurationTime`, `clipPixelWidth` (sample-to-seconds/pixel conversions)
   - `dBUtils.ts` — `dBToNormalized`, `normalizedToDb`, `gainToNormalized` (dB ↔ 0-1 conversions for VU meters)
   - `valueSource.ts` — `ValueSource<T>` (`subscribe` + `getSnapshot`), `createValueSource()`, `MeterLevels`/`MeterSource`, `RecordingProgress`/`RecordingProgressSource`, `silentMeterLevels()` (values that change ~60 times a second and are kept out of UI state)
+  - `annotations/store.ts` — `createAnnotationStore(initial?, { beforeChange? })`, `AnnotationStore`, `AnnotationStoreOptions`: the one owner of the annotations, which both React providers take as `annotationStore` (#867). `set` / `update` apply before they return; every list is validated (finite numeric `start`/`end`, unique ids; a `TypeError` otherwise); `beforeChange(next, current)` accepts, refuses or adjusts each change. `annotations/devFreeze.ts` (not exported) freezes what it holds outside production builds
+  - `annotations/bounds.ts` — `applyAnnotationBounds(current, changes)`, `AnnotationBoundsChange`: writes `start`/`end` by id, keeps everything else, returns `current` when nothing changes (what an edge drag's release writes)
   - `utils/meterLevels.ts` — `readMeterMessage()` (one meter-worklet message → `MeterLevels`; shared by `useOutputMeter` and `useMicrophoneLevel`)
   - `beatsAndBars.ts` — `PPQN` (192), `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid`, `ticksToBarBeatLabel`
   - `keyboard.ts` — `KeyboardShortcut` type, `handleKeyboardEvent()` (matches event to shortcut array)
@@ -328,7 +330,7 @@ const clip = createClipFromSeconds({
   │   ├── useArrangementView.ts         # WaveformPlaylistProvider: what it publishes, derived from the arrangement: loaded tracks, peaks rows with placeholder records, duration, trackStates, canUndo/canRedo
   │   ├── useArrangementEditing.ts      # WaveformPlaylistProvider: mixer setters, reorder, undo, redo and setRecordingActive on the arrangement; the armed track (RecordingArmContext)
   │   ├── useReadyOnce.ts               # WaveformPlaylistProvider: isReady, onReady and the ready event once per mount; Play refused before the first ready
-  │   ├── useAnnotationState.ts         # annotations, setAnnotations, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
+  │   ├── useAnnotationState.ts         # the annotationStore prop's list (read, never written), getAnnotations for the loop, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
@@ -345,6 +347,7 @@ const clip = createClipFromSeconds({
   │   ├── useAudioEffects.ts            # Audio effects management
   │   ├── useClipDragHandlers.ts        # Clip drag/move/trim on the provider's arrangement (a trim is a view-only preview, one call on release)
   │   ├── useClipSplitting.ts           # Split clips at playhead (arrangement.splitClip)
+  │   ├── useCreateAnnotationStore.ts   # Makes core's AnnotationStore once per component instance; follows the latest beforeChange
   │   ├── useCreateArrangement.ts       # Makes the engine's Arrangement once per component instance
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
   │   ├── useDynamicEffects.ts          # Master effects chain
@@ -359,6 +362,7 @@ const clip = createClipFromSeconds({
   │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
   │   ├── useSelectionDrag.ts           # The selection drag of both views; commits on release during playback
   │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
+  │   ├── useStoredAnnotations.ts       # The annotations of an AnnotationStore (useSyncExternalStore)
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useTrackReorderHandle.ts      # Reorder drag handle for the track whose panel the caller is in (dnd-kit sortable)
@@ -398,6 +402,7 @@ const clip = createClipFromSeconds({
   │   ├── ClipCollisionModifier.ts      # Prevents overlapping clips during drag
   │   └── SnapToGridModifier.ts         # Snap-to-grid (beats or timescale mode)
   ├── utils/                            # Pure helpers (among them:)
+  │   ├── annotationBoundaryKeys.ts     # What the [ ] { } keys do to an annotation list (moveAnnotationStart / moveAnnotationEnd)
   │   ├── stableTemplate.ts             # Keeps the controls part's children while a new render hands it equal ones
   │   ├── derivePeaks.ts                # Peaks per clip, derived during render
   │   ├── placeholderPeaks.ts           # The drawing record (isPlaceholder) of a clip that is still loading
@@ -515,11 +520,13 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   ├── components/        # React components
   │   ├── AnnotationBox.tsx
   │   ├── AnnotationBoxesWrapper.tsx
-  │   ├── AnnotationText.tsx
+  │   ├── AnnotationText.tsx            # Draws `annotations`; writes its edits to its `store` prop (read-only without one)
   │   ├── AnnotationCheckboxes.tsx      # ContinuousPlayCheckbox, LinkEndpointsCheckbox, EditableCheckbox (bound to the playlist provider)
   │   └── DownloadAnnotationsButton.tsx # Bound to the playlist provider
   ├── parsers/           # Import/export (Aeneas JSON)
   │   └── aeneas.ts
+  ├── utils/
+  │   └── runAnnotationAction.ts        # Runs a list control's action on copies of the store's current list
   ├── AnnotationProvider.tsx
   └── index.ts           # Public exports
   ```
@@ -961,7 +968,7 @@ export interface EngineRefsContextValue {
 
 // 2. User interaction state, one context per group that changes together
 export interface AnnotationsContextValue {            // both providers
-  annotations: AnnotationData[];
+  annotations: readonly AnnotationData[];             // the annotation store's list
 }
 
 export interface AnnotationOptionsContextValue {      // both providers
@@ -1017,8 +1024,8 @@ export interface PlaybackControlsContextValue {
   setContinuousPlay: (enabled: boolean) => void;
   setAnnotationsEditable: (enabled: boolean) => void;
   setLinkEndpoints: (enabled: boolean) => void;
-  setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
   annotationPreview: AnnotationPreviewHandle;
+  annotationStore: AnnotationStore | undefined;       // the provider's prop; changes only with it
   setActiveAnnotationId: (id: string | null) => void;
   playAnnotation: (annotation: AnnotationData) => void; // a click on a box or a list row
 }
@@ -1195,7 +1202,7 @@ const [currentTime, setCurrentTime] = useState(0);
 // ActiveAnnotationContext
 const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
-// AnnotationsContext: the annotations come from the `annotationList` prop, not from state
+// AnnotationsContext: the annotations are the `annotationStore` prop's (useSyncExternalStore), not state
 // AnnotationOptionsContext (providerInternals/useAnnotationState.ts): state that follows the prop
 const [editable, setAnnotationsEditable] = useFollowedOption(annotationList?.editable);
 const [linkEndpoints, setLinkEndpoints] = useFollowedOption(annotationList?.linkEndpoints);
