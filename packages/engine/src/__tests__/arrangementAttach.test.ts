@@ -9,6 +9,7 @@ import { createClip, createTrack, isLoadingClip } from '@waveform-playlist/core'
 import type { ArrangementTrack, AudioClip, ClipSource, LoadingClip } from '@waveform-playlist/core';
 import { PlaylistEngine, attachDecodeContext, createArrangement } from '../index';
 import type { Arrangement, LoadSource } from '../index';
+import { ARRANGEMENT_ATTACH_DECODE, ARRANGEMENT_ATTACH_TIME_BASE } from '../arrangement/attach';
 import { recordingAdapter } from './helpers/recordingAdapter';
 
 const RATE = 48000;
@@ -416,6 +417,28 @@ describe('an arrangement made by another copy of the package', () => {
     await flush();
     expect(engine.getState().tracks[0].clips.map((c) => c.id)).toEqual(['L']);
     engine.dispose();
+  });
+
+  // #843: the history holds the mix, the setters take options and the
+  // arrangement has the arm, so the interface reached by name changed and
+  // the keys moved to v2.
+  it('the key strings end in /v2', () => {
+    expect(ARRANGEMENT_ATTACH_DECODE.description).toBe(
+      '@waveform-playlist/engine/arrangement/attach-decode/v2'
+    );
+    expect(ARRANGEMENT_ATTACH_TIME_BASE.description).toBe(
+      '@waveform-playlist/engine/arrangement/time-base/v2'
+    );
+  });
+
+  it('an arrangement of the earlier version (v1 keys) is refused by the engine', () => {
+    const v1 = {
+      [Symbol.for('@waveform-playlist/engine/arrangement/time-base/v1')]: () => () => {},
+      [Symbol.for('@waveform-playlist/engine/arrangement/attach-decode/v1')]: () => () => {},
+    };
+    expect(() => new PlaylistEngine({ arrangement: v1 as unknown as Arrangement })).toThrow(
+      /the `arrangement` option must be an arrangement made by createArrangement\(\)/
+    );
   });
 
   it('an object that is not an arrangement is still refused by the engine', () => {

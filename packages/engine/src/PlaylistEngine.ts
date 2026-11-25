@@ -13,7 +13,7 @@ import { AdapterSync } from './adapterSync';
 import type { TracksChange } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
 import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
-import type { ClipBounds } from './arrangement';
+import type { ClipBounds, MixerChangeOptions } from './arrangement';
 import { attachDecodeContext, attachTimeBase, isArrangement } from './arrangement/attach';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
@@ -495,9 +495,13 @@ export class PlaylistEngine {
   //
   // Each setter writes the value into the arrangement's mixer part (so a later
   // adapter rebuild via setTracks keeps the value, and mixerVersion is bumped);
-  // the engine's listener then calls the adapter and emits statechange. For a
-  // track the arrangement does not hold nothing changes, and the adapter is
-  // still called from here (a consumer may target a track that has not been
+  // the engine's listener then calls the adapter and emits statechange. Each
+  // call is an undo step, unless `options` says otherwise: the same `gesture`
+  // id joins one step, `undoable: false` is no step (`MixerChangeOptions`).
+  //
+  // When the arrangement changes nothing (a track it does not hold, or the
+  // value the track already has), the adapter is still called from here,
+  // with no statechange (a consumer may target a track that has not been
   // ingested yet). These are NOT structural
   // changes, so they deliberately do NOT bump tracksVersion — that would make
   // tracksVersion-gated consumers re-run expensive structural work (audio-graph
@@ -506,26 +510,43 @@ export class PlaylistEngine {
   // mixerVersion to refresh that cache cheaply, so an unrelated setTracks
   // rebuild no longer reverts live mixer state (#501).
 
-  setTrackVolume(trackId: string, volume: number): void {
-    const changed = this._mixerChanged(() => this._arrangement.setTrackVolume(trackId, volume));
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void {
+    const changed = this._mixerChanged(() =>
+      this._arrangement.setTrackVolume(trackId, volume, options)
+    );
     if (!changed && !this._disposed) this._adapter?.setTrackVolume(trackId, volume);
   }
 
-  setTrackMute(trackId: string, muted: boolean): void {
-    const changed = this._mixerChanged(() => this._arrangement.setTrackMute(trackId, muted));
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void {
+    const changed = this._mixerChanged(() =>
+      this._arrangement.setTrackMute(trackId, muted, options)
+    );
     // Through the adapter sync, so an armed track the arrangement holds stays
     // muted; a track it does not hold is sent the value given.
     if (!changed && !this._disposed) this._adapterSync.sendMixerValues(trackId, { muted });
   }
 
-  setTrackSolo(trackId: string, soloed: boolean): void {
-    const changed = this._mixerChanged(() => this._arrangement.setTrackSolo(trackId, soloed));
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void {
+    const changed = this._mixerChanged(() =>
+      this._arrangement.setTrackSolo(trackId, soloed, options)
+    );
     if (!changed && !this._disposed) this._adapter?.setTrackSolo(trackId, soloed);
   }
 
-  setTrackPan(trackId: string, pan: number): void {
-    const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan));
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void {
+    const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan, options));
     if (!changed && !this._disposed) this._adapter?.setTrackPan(trackId, pan);
+  }
+
+  /**
+   * Arm or disarm a track for recording: the arrangement's `setTrackArmed`.
+   * An armed track plays muted (here and in the adapter) while its mute in
+   * the mix stays as it is; arming is not an undo step. The arrangement's
+   * `'arm'` announcement brings the adapter in step, so there is no adapter
+   * call of its own here; a disposed engine changes the arrangement only.
+   */
+  setTrackArmed(trackId: string, armed: boolean): void {
+    this._arrangement.setTrackArmed(trackId, armed);
   }
 
   // ---------------------------------------------------------------------------

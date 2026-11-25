@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
 import { PlaylistEngine } from '../PlaylistEngine';
+import { createArrangement } from '../arrangement';
 import type { PlayoutAdapter } from '../types';
 
 function makeClip(
@@ -640,6 +641,103 @@ describe('PlaylistEngine', () => {
       expect(state.mixerVersion).toBe(mixerV0 + 2);
       expect(state.tracksVersion).toBe(tracksV0 + 1);
       engine.dispose();
+    });
+  });
+
+  // #843: the engine's setters take the arrangement's options, and the
+  // recording arm goes through the engine.
+  describe('mixer options and the arm', () => {
+    const setters = [
+      ['setTrackVolume', [0.5, 0.4, 0.3], 'volume', 1],
+      ['setTrackPan', [-0.5, -0.4, -0.3], 'pan', 0],
+      ['setTrackMute', [true, false, true], 'muted', false],
+      ['setTrackSolo', [true, false, true], 'soloed', false],
+    ] as const;
+    type Setter = (
+      id: string,
+      value: number | boolean,
+      options?: { gesture?: string; undoable?: false }
+    ) => void;
+
+    it.each(setters)(
+      "the engine's %s passes its options on: a gesture of three calls is one undo",
+      (method, values, field, initial) => {
+        const engine = new PlaylistEngine({ adapter: createMockAdapter() });
+        engine.setTracks([makeTrack('t1', [])]);
+        const set = engine[method] as Setter;
+        for (const value of values) set.call(engine, 't1', value, { gesture: 'g' });
+        expect(engine.getState().tracks[0][field]).toBe(values[2]);
+        expect(engine.getState().canUndo).toBe(true);
+
+        engine.undo();
+        expect(engine.getState().tracks[0][field]).toBe(initial);
+        expect(engine.getState().canUndo).toBe(false);
+        engine.dispose();
+      }
+    );
+
+    it.each(setters)(
+      "the engine's %s passes undoable: false on: no step",
+      (method, values, field) => {
+        const engine = new PlaylistEngine({ adapter: createMockAdapter() });
+        engine.setTracks([makeTrack('t1', [])]);
+        const set = engine[method] as Setter;
+        set.call(engine, 't1', values[0], { undoable: false });
+        expect(engine.getState().tracks[0][field]).toBe(values[0]);
+        expect(engine.getState().canUndo).toBe(false);
+        engine.dispose();
+      }
+    );
+
+    it('without options each call is a step', () => {
+      const engine = new PlaylistEngine({ adapter: createMockAdapter() });
+      engine.setTracks([makeTrack('t1', [])]);
+      engine.setTrackVolume('t1', 0.5);
+      engine.setTrackVolume('t1', 0.4);
+      engine.undo();
+      expect(engine.getState().tracks[0].volume).toBe(0.5);
+      engine.undo();
+      expect(engine.getState().tracks[0].volume).toBe(1);
+      engine.dispose();
+    });
+
+    it('setTrackArmed reaches the arrangement: the track plays muted, the stored mute stays, no step', () => {
+      const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter, arrangement });
+      const listener = vi.fn();
+      engine.on('statechange', listener);
+      const tracksVersion = engine.getState().tracksVersion;
+
+      engine.setTrackArmed('t1', true);
+      expect([...arrangement.armedTrackIds]).toEqual(['t1']);
+      expect(engine.getState().tracks[0].muted).toBe(true);
+      expect(arrangement.getMixer().get('t1')?.muted).toBe(false);
+      // One adapter call, from the arrangement's 'arm' announcement.
+      expect(vi.mocked(adapter.setTrackMute).mock.calls).toEqual([['t1', true]]);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(engine.getState().canUndo).toBe(false);
+      expect(engine.getState().tracksVersion).toBe(tracksVersion);
+
+      engine.setTrackArmed('t1', false);
+      expect(arrangement.armedTrackIds.size).toBe(0);
+      expect(engine.getState().tracks[0].muted).toBe(false);
+      expect(vi.mocked(adapter.setTrackMute).mock.calls).toEqual([
+        ['t1', true],
+        ['t1', false],
+      ]);
+      engine.dispose();
+    });
+
+    it('a disposed engine: setTrackArmed still changes the arrangement and calls no adapter', () => {
+      const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
+      const adapter = createMockAdapter();
+      const engine = new PlaylistEngine({ adapter, arrangement });
+      engine.dispose();
+
+      engine.setTrackArmed('t1', true);
+      expect([...arrangement.armedTrackIds]).toEqual(['t1']);
+      expect(adapter.setTrackMute).not.toHaveBeenCalled();
     });
   });
 

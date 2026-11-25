@@ -18,5 +18,9 @@ export type {
 // Engine class
 export { PlaylistEngine } from './PlaylistEngine';
 
+// One gesture on a mixer control as one undo step
+export { createMixerGesture } from './mixerGesture';
+export type { MixerGesture } from './mixerGesture';
+
 // Engine types
 export * from './types';

@@ -10,21 +10,26 @@
  *
  * The keys carry a version. An engine that finds the time-base key treats
  * the object as an arrangement of this version and uses it BY NAME: the
- * whole public `Arrangement` interface (every track, clip, mixer and history
- * method it delegates to, `getTracks`, `getMixer`, the two version counters)
- * and the internal `onChange(listener)` (with the `ArrangementChange` and
- * `ArrangementVersions` shapes of this version), `recomputeStartSamples()`
- * and `undoLimit`. A change to any of that needs a new key, so that copies
- * which do not agree refuse each other instead of misreading each other.
+ * whole public `Arrangement` interface (every track, clip, mixer, arm and
+ * history method it delegates to, `getTracks`, `getMixer`, `armedTrackIds`,
+ * the two version counters) and the internal `onChange(listener)` (with the
+ * `ArrangementChange` and `ArrangementVersions` shapes of this version),
+ * `recomputeStartSamples()` and `undoLimit`. A change to any of that needs a
+ * new key, so that copies which do not agree refuse each other instead of
+ * misreading each other.
+ *
+ * v2 (#843): the mixer setters take options and are undo steps, the history
+ * holds the mix (`'restoreMix'`), and the arrangement has the recording arm
+ * (`setTrackArmed`, `armedTrackIds`, `'arm'`).
  */
 
 import type { Arrangement } from './types';
 
 export const ARRANGEMENT_ATTACH_DECODE = Symbol.for(
-  '@waveform-playlist/engine/arrangement/attach-decode/v1'
+  '@waveform-playlist/engine/arrangement/attach-decode/v2'
 );
 export const ARRANGEMENT_ATTACH_TIME_BASE = Symbol.for(
-  '@waveform-playlist/engine/arrangement/time-base/v1'
+  '@waveform-playlist/engine/arrangement/time-base/v2'
 );
 
 /** How the arrangement converts time. The engine provides it from its adapter and tempo. */
