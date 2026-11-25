@@ -129,7 +129,7 @@ Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), l
 | `e2e-playwright`       | writing, running or debugging a Playwright spec                            |
 | `browser-probes`       | measuring a page from a script or an MCP browser                           |
 | `review-rounds`        | briefing a review, audit or documentation agent                            |
-| `dependency-updates`   | Dependabot alerts, `pnpm update`, overrides                                |
+| `dependency-updates`   | Dependabot alerts, `pnpm update`, overrides, adding or removing a peer     |
 | `release`              | versioning, publishing, the GitHub release                                 |
 
 ---
