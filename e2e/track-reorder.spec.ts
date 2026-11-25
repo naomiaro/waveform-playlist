@@ -252,6 +252,18 @@ test.describe('Track Reordering', () => {
       liftedId
     );
 
+    // The time of the drop, taken in the page (the first pointerup from here).
+    await page.evaluate(() => {
+      const w = window as unknown as { __dropAt?: number };
+      window.addEventListener(
+        'pointerup',
+        () => {
+          w.__dropAt = performance.now();
+        },
+        { capture: true, once: true }
+      );
+    });
+
     // Drag the first track onto the second and drop it.
     await page.mouse.move(g0.x, g0.y);
     await page.mouse.down();
@@ -264,14 +276,14 @@ test.describe('Track Reordering', () => {
     // At once, lift the third track and sample its slot on every frame.
     const lifted = page.evaluate(
       (id) =>
-        new Promise<{ t: number; top: number; dragging: boolean }[]>((resolve) => {
-          const samples: { t: number; top: number; dragging: boolean }[] = [];
+        new Promise<{ at: number; top: number; dragging: boolean }[]>((resolve) => {
+          const samples: { at: number; top: number; dragging: boolean }[] = [];
           const t0 = performance.now();
           const frame = () => {
             const slot = document.querySelector(`[data-track-controls="${id}"]`)?.parentElement;
             if (slot) {
               samples.push({
-                t: performance.now() - t0,
+                at: performance.now(),
                 top: slot.getBoundingClientRect().top,
                 dragging: slot.hasAttribute('data-dnd-dragging'),
               });
@@ -302,7 +314,9 @@ test.describe('Track Reordering', () => {
     // the layout keeps animating (else this would pass for nothing) ...
     const whileLifted = samples.filter((sample) => sample.dragging);
     expect(whileLifted.length).toBeGreaterThan(0);
-    expect(whileLifted[0].t).toBeLessThan(150);
+    const dropAt = await page.evaluate(() => (window as unknown as { __dropAt?: number }).__dropAt);
+    expect(dropAt).toBeDefined();
+    expect(whileLifted[0].at - dropAt!).toBeLessThan(150);
     // ... and never left its place by more than the few pixels it was moved.
     const farthest = Math.max(...whileLifted.map((sample) => Math.abs(sample.top - homeTop)));
     expect(farthest).toBeLessThan(40);
