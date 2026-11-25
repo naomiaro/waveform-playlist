@@ -94,6 +94,7 @@
     "track-controls-disabled-style",
     "track-effects-prop",
     "track-kind",
+    "track-reorder-registers-the-slot",
     "trim-preview-clips-by-id",
     "ui-components-no-playout",
     "ui-components-unused-deps",
