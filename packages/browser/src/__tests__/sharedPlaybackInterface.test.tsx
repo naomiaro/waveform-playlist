@@ -210,6 +210,7 @@ const SHARED_FIELDS: Record<keyof typeof SHARED, string[]> = {
   annotationOptions: ['continuousPlay', 'editable', 'linkEndpoints'],
   controls: [
     'annotationPreview',
+    'annotationStore',
     'pause',
     'play',
     'playAnnotation',

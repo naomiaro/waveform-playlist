@@ -11,7 +11,7 @@
  * must not pull in the WebAudio provider through it.
  */
 import { createContext, use } from 'react';
-import type { ClipTrack, AnnotationData } from '@waveform-playlist/core';
+import type { ClipTrack, AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
@@ -162,6 +162,12 @@ export interface PlaybackControlsContextValue {
    * annotation renderer with `useAnnotationsWithPreview`. Stable identity.
    */
   annotationPreview: AnnotationPreviewHandle;
+  /**
+   * The provider's `annotationStore` prop, or `undefined` without one: the
+   * owner of the annotations. Change them with its `set` and `update`. Its
+   * identity changes only when the prop does.
+   */
+  annotationStore: AnnotationStore | undefined;
   setActiveAnnotationId: (id: string | null) => void;
   /**
    * What a click on an annotation does (its box, or its row in the list): the

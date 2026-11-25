@@ -12,7 +12,7 @@ import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-e
 import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout';
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import type { AnnotationData } from '@waveform-playlist/core';
+import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type WaveformData from 'waveform-data';
 import type { PeakData } from '@waveform-playlist/core';
@@ -111,6 +111,13 @@ export interface MediaElementPlaylistProviderProps {
    * option takes a new value of its field, and a setter or checkbox changes
    * it in between.
    */
+  /**
+   * The owner of the annotations (#867): make it with
+   * `useCreateAnnotationStore` and change the annotations with its methods.
+   * The provider publishes what it holds and writes nothing back. Without it
+   * there are no annotations.
+   */
+  annotationStore?: AnnotationStore;
   annotationList?: AnnotationListProp;
   /** Callback when annotations are changed (drag, edit, etc.) */
   onAnnotationsChange?: (annotations: AnnotationData[]) => void;
@@ -163,6 +170,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   preservesPitch = true,
   automaticScroll = false,
   theme: userThemeProp,
+  annotationStore,
   annotationList,
   audioContext,
   onAnnotationsChange,
@@ -217,7 +225,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the WebAudio provider (#769).
   const {
-    annotationsRef,
+    getAnnotations,
     annotationLookup,
     setAnnotations,
     annotationPreview,
@@ -231,6 +239,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     annotationsValue,
     annotationOptionsValue,
   } = useAnnotationState({
+    annotationStore,
     annotationList,
     onAnnotationsChange,
     providerName: 'MediaElementPlaylistProvider',
@@ -595,7 +604,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const endPlaybackIfDue = useCallback(
     (time: number): boolean => {
       const activeAnnotationEnded = followAnnotations({
-        annotations: annotationsRef.current,
+        annotations: getAnnotations(),
         lookup: annotationLookup,
         time,
         activeId: activeAnnotationIdRef.current,
@@ -624,7 +633,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       return false;
     },
     [
-      annotationsRef,
+      getAnnotations,
       annotationLookup,
       activeAnnotationIdRef,
       continuousPlayRef,
@@ -909,6 +918,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setLinkEndpoints,
       setAnnotations,
       annotationPreview,
+      annotationStore,
       setActiveAnnotationId,
       playAnnotation,
     }),
@@ -927,6 +937,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       setLinkEndpoints,
       setAnnotations,
       annotationPreview,
+      annotationStore,
       setActiveAnnotationId,
       playAnnotation,
     ]

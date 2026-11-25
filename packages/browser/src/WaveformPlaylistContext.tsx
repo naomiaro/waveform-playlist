@@ -24,7 +24,7 @@ import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
 import type { PeakData } from '@waveform-playlist/core';
-import type { AnnotationData } from '@waveform-playlist/core';
+import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import {
   useTimeFormat,
   useZoomControls,
@@ -158,6 +158,13 @@ export interface WaveformPlaylistProviderProps {
    * option takes a new value of its field, and a setter or checkbox changes
    * it in between.
    */
+  /**
+   * The owner of the annotations (#867): make it with
+   * `useCreateAnnotationStore` and change the annotations with its methods.
+   * The provider publishes what it holds and writes nothing back. Without it
+   * there are no annotations.
+   */
+  annotationStore?: AnnotationStore;
   annotationList?: AnnotationListProp;
   /** Master effects chain (default Tone.js adapter only). A new function builds a new engine. */
   effects?: EffectsFunction;
@@ -241,6 +248,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   zoomLevels,
   automaticScroll = false,
   theme: userThemeProp,
+  annotationStore,
   annotationList,
   effects,
   trackEffects,
@@ -266,7 +274,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // Annotations are derived from the prop (single source of truth in the
   // parent). Shared with the MediaElement provider (#769).
   const {
-    annotationsRef,
+    getAnnotations,
     annotationLookup,
     setAnnotations,
     annotationPreview,
@@ -281,6 +289,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     annotationsValue,
     annotationOptionsValue,
   } = useAnnotationState({
+    annotationStore,
     annotationList,
     onAnnotationsChange,
     providerName: 'WaveformPlaylistProvider',
@@ -718,7 +727,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       // highlight is held: the end check below stops there, and it must not
       // move on to the next annotation first.
       const activeAnnotationEnded = followAnnotations({
-        annotations: annotationsRef.current,
+        annotations: getAnnotations(),
         lookup: annotationLookup,
         time,
         activeId: activeAnnotationIdRef.current,
@@ -801,7 +810,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     annotationLookup,
     // Refs and a stable function from the shared provider hooks: they never
     // change, and are listed because the linter cannot see that.
-    annotationsRef,
+    getAnnotations,
     activeAnnotationIdRef,
     continuousPlayRef,
     isAutomaticScrollRef,
@@ -859,7 +868,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
           const boundedEnd = playbackEndTimeRef.current;
           const activeId = activeAnnotationIdRef.current;
           const activeAnnotation = activeId
-            ? annotationLookup.byId(annotationsRef.current, activeId)
+            ? annotationLookup.byId(getAnnotations(), activeId)
             : undefined;
           const endsWithAnnotation =
             boundedEnd !== null &&
@@ -890,7 +899,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     animationFrameRef,
     getAudioContextTime,
     annotationLookup,
-    annotationsRef,
+    getAnnotations,
     activeAnnotationIdRef,
     engineRef,
   ]);
@@ -1380,6 +1389,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setLinkEndpoints,
       setAnnotations,
       annotationPreview,
+      annotationStore,
       setActiveAnnotationId,
       playAnnotation,
     }),
@@ -1398,6 +1408,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setLinkEndpoints,
       setAnnotations,
       annotationPreview,
+      annotationStore,
       setActiveAnnotationId,
       playAnnotation,
     ]

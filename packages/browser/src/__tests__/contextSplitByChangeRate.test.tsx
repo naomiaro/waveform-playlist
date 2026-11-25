@@ -272,6 +272,7 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setLinkEndpoints',
         'setAnnotations',
         'annotationPreview',
+        'annotationStore',
         'setActiveAnnotationId',
         'playAnnotation',
       ].sort()

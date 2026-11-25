@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createValueSource } from '@waveform-playlist/core';
-import type { AnnotationData } from '@waveform-playlist/core';
+import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import { createAnnotationLookup, type AnnotationLookup } from '../utils/annotationLookup';
 import { isDevelopmentBuild } from '../utils/isDevelopmentBuild';
@@ -27,6 +27,8 @@ export interface AnnotationListProp {
 }
 
 export interface UseAnnotationStateOptions {
+  /** The owner of the annotations (#867). With it, `annotationList.annotations` is not read. */
+  annotationStore?: AnnotationStore;
   annotationList: AnnotationListProp | undefined;
   onAnnotationsChange: ((annotations: AnnotationData[]) => void) | undefined;
   /** Named in the warning for a `setAnnotations` call with no `onAnnotationsChange`. */
@@ -34,10 +36,13 @@ export interface UseAnnotationStateOptions {
 }
 
 export interface AnnotationState {
-  /** From the prop (the parent owns them); `[]` when absent or not parsed. */
+  /** From the store (or the interim prop); `[]` when there is neither. */
   annotations: AnnotationData[];
-  /** For the animation loop, so an annotation edit does not restart it. */
-  annotationsRef: React.RefObject<AnnotationData[]>;
+  /**
+   * The current annotations, for the animation loop, so an annotation edit
+   * does not restart it. Reads the store at the moment of the call. Stable.
+   */
+  getAnnotations: () => readonly AnnotationData[];
   /** Cached per-frame lookups. */
   annotationLookup: AnnotationLookup<AnnotationData>;
   setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>>;
@@ -85,15 +90,20 @@ function useFollowedOption(prop: boolean | undefined): [boolean, (value: boolean
  * reads the new value on its next frame, before React has rendered. Every
  * function and the preview keep their identity.
  */
+const NO_ANNOTATIONS: readonly AnnotationData[] = Object.freeze([]);
+const noSubscription = () => () => {};
+const noAnnotations = () => NO_ANNOTATIONS;
+
 export function useAnnotationState({
+  annotationStore,
   annotationList,
   onAnnotationsChange,
   providerName,
 }: UseAnnotationStateOptions): AnnotationState {
   // In v6, annotations must be pre-parsed (numeric start/end). Use
   // parseAeneas() from @waveform-playlist/annotations before passing them.
-  const annotations = useMemo(() => {
-    if (!annotationList?.annotations) return [];
+  const fromProp = useMemo(() => {
+    if (annotationStore || !annotationList?.annotations) return [];
     if (isDevelopmentBuild() && annotationList.annotations.length > 0) {
       const first = annotationList.annotations[0] as unknown as Record<string, unknown>;
       if (typeof first.start !== 'number' || typeof first.end !== 'number') {
@@ -107,10 +117,25 @@ export function useAnnotationState({
       }
     }
     return annotationList.annotations;
-  }, [annotationList?.annotations]);
+  }, [annotationStore, annotationList?.annotations]);
 
-  const annotationsRef = useRef<AnnotationData[]>(annotations);
+  // Called on every render, with a stand-in when there is no store.
+  const stored = useSyncExternalStore(
+    annotationStore ? annotationStore.subscribe : noSubscription,
+    annotationStore ? annotationStore.getAnnotations : noAnnotations,
+    annotationStore ? annotationStore.getAnnotations : noAnnotations
+  );
+  // Interim (#867): the public type is still a mutable array.
+  const annotations = (annotationStore ? stored : fromProp) as AnnotationData[];
+
+  const storeRef = useRef(annotationStore);
+  storeRef.current = annotationStore;
+  const annotationsRef = useRef<readonly AnnotationData[]>(annotations);
   annotationsRef.current = annotations;
+  const getAnnotations = useCallback(
+    () => (storeRef.current ? storeRef.current.getAnnotations() : annotationsRef.current),
+    []
+  );
   const [annotationLookup] = useState(() => createAnnotationLookup<AnnotationData>());
 
   const [activeAnnotationId, setActiveAnnotationIdState] = useState<string | null>(null);
@@ -156,7 +181,17 @@ export function useAnnotationState({
 
   const setAnnotations: React.Dispatch<React.SetStateAction<AnnotationData[]>> = useCallback(
     (action) => {
-      const updated = typeof action === 'function' ? action(annotationsRef.current) : action;
+      const store = storeRef.current;
+      if (store) {
+        if (typeof action === 'function') {
+          store.update((current) => action(current as AnnotationData[]));
+        } else {
+          store.set(action);
+        }
+        return;
+      }
+      const updated =
+        typeof action === 'function' ? action(annotationsRef.current as AnnotationData[]) : action;
       if (!onAnnotationsChangeRef.current) {
         if (isDevelopmentBuild()) {
           console.warn(
@@ -175,7 +210,7 @@ export function useAnnotationState({
 
   return {
     annotations,
-    annotationsRef,
+    getAnnotations,
     annotationLookup,
     setAnnotations,
     annotationPreview,

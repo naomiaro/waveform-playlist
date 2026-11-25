@@ -228,7 +228,7 @@ describe('useFrameCallbacks', () => {
 describe('useAnnotationState', () => {
   const PROVIDER = 'TestProvider';
 
-  it('passes numeric annotations through and keeps the ref current', () => {
+  it('passes numeric annotations through and getAnnotations reads them', () => {
     const list = { annotations: ANNOTATIONS };
     const { result, rerender } = renderHook(
       ({ annotationList }) =>
@@ -240,12 +240,12 @@ describe('useAnnotationState', () => {
       { initialProps: { annotationList: list } }
     );
     expect(result.current.annotations).toBe(ANNOTATIONS);
-    expect(result.current.annotationsRef.current).toBe(ANNOTATIONS);
+    expect(result.current.getAnnotations()).toBe(ANNOTATIONS);
 
     const next = [ANNOTATIONS[0]];
     rerender({ annotationList: { annotations: next } });
     expect(result.current.annotations).toBe(next);
-    expect(result.current.annotationsRef.current).toBe(next);
+    expect(result.current.getAnnotations()).toBe(next);
   });
 
   it('is an empty list without annotations, and for unparsed ones (with an error)', () => {
