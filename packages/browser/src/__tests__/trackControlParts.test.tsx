@@ -212,7 +212,10 @@ async function ready() {
   await waitFor(() => expect(probe.isReady).toBe(true));
 }
 
-/** The slot of a track: the element the part draws around that track's template. */
+/**
+ * The element that holds a track's template (`[data-track-controls]`). The
+ * slot the part draws, and dnd-kit registers, is its parent (#796).
+ */
 function slotOf(id: string): HTMLElement {
   const spy = screen.getByTestId('spy-' + id);
   let node: HTMLElement | null = spy;
@@ -541,7 +544,10 @@ describe('the template and useTrack()', () => {
     expect(layoutCounts.slots).toBe(1);
   });
 
-  it('the slots are mounted again after a reorder drag, and only then', async () => {
+  // #796: nothing remounts a slot when tracks are reordered, so React state
+  // inside a panel survives a reorder (until then every reorder drag remounted
+  // all slots).
+  it('a reorder keeps every slot mounted', async () => {
     mount({
       tracks: [A, B],
       controls: (
@@ -555,13 +561,12 @@ describe('the template and useTrack()', () => {
       ['a', 1],
       ['b', 1],
     ]);
-    act(() => probe.controls.setTrackMute('a', true));
-    expect(mounts.get('a')).toBe(1);
-    // What the interaction provider calls when a reorder drag ends.
-    act(() => probe.controls.bumpTrackReorderEpoch());
+    // What the interaction provider calls when a reorder drag is dropped.
+    act(() => probe.controls.reorderTrack('a', 1));
+    expect(probe.trackIds).toEqual(['b', 'a']);
     expect([...mounts.entries()]).toEqual([
-      ['a', 2],
-      ['b', 2],
+      ['a', 1],
+      ['b', 1],
     ]);
   });
 
@@ -793,12 +798,12 @@ describe('<TrackReorderGrip />', () => {
     expect(probe.selectedTrackId).toBeNull();
   });
 
-  it("registers the track's slot as the sortable item and the grip as its handle", async () => {
+  function mountWithManager(tracks: ArrangementTrack[]) {
     const manager = new DragDropManager();
     const adapter = createFakeAdapter();
     render(
       <DragDropProvider manager={manager}>
-        <TestProvider tracks={[A, B]} createAdapter={() => adapter}>
+        <TestProvider tracks={tracks} createAdapter={() => adapter}>
           <Probe />
           <WaveformRoot>
             {WITH_GRIP}
@@ -807,13 +812,53 @@ describe('<TrackReorderGrip />', () => {
         </TestProvider>
       </DragDropProvider>
     );
+    return manager;
+  }
+
+  // #796: the registered element is the keyed slot (the parent of the
+  // element that holds the panel), a sibling of the other tracks' slots.
+  it("registers the track's slot as the sortable item and the grip as its handle", async () => {
+    const manager = mountWithManager([A, B]);
     await ready();
     const source = manager.registry.draggables.get('track-reorder-b')!;
     expect(source).toBeDefined();
-    expect(source.element).toBe(slotOf('b'));
+    expect(source.element).toBe(slotOf('b').parentElement);
+    expect(source.element!.parentElement).toBe(slotOf('a').parentElement!.parentElement);
     expect(source.handle).toBe(
       within(slotOf('b')).getByRole('button', { name: 'Drag to reorder track' })
     );
+  });
+
+  // #796: dnd-kit's OptimisticSortingPlugin moves the dragged item's element
+  // next to the element of the item it is dragged over
+  // (`targetElement.insertAdjacentElement(position, sourceElement)`), outside
+  // React. When the registered element was one level inside the keyed slot,
+  // that put A's panel into B's slot, and the reorders after it left the
+  // panels where they were (names stayed, tracks moved).
+  it("the sorting plugin's DOM move during a drag leaves each panel in its own slot", async () => {
+    const manager = mountWithManager([A, B]);
+    await ready();
+    const elementOf = (id: string) =>
+      manager.registry.draggables.get(`track-reorder-${id}`)!.element!;
+    const panelOrder = () =>
+      [...document.querySelectorAll('[data-track-controls]')].map((el) =>
+        el.getAttribute('data-track-controls')
+      );
+    const eachInItsOwnSlot = () =>
+      [...document.querySelectorAll('[data-track-controls]')].every(
+        (el) => el.parentElement === elementOf(el.getAttribute('data-track-controls')!)
+      );
+
+    // A dragged over B: what `reorder()` does (A's new index 1, B's 0: 'afterend').
+    elementOf('b').insertAdjacentElement('afterend', elementOf('a'));
+    // The drop commits the reorder, then a move-up button puts A back.
+    act(() => probe.controls.reorderTrack('a', 1));
+    expect(probe.trackIds).toEqual(['b', 'a']);
+    expect(panelOrder()).toEqual(['b', 'a']);
+    act(() => probe.controls.reorderTrack('a', 0));
+    expect(probe.trackIds).toEqual(['a', 'b']);
+    expect(panelOrder()).toEqual(['a', 'b']);
+    expect(eachInItsOwnSlot()).toBe(true);
   });
 
   it('a second handle in one panel warns once, and one handle does not', async () => {

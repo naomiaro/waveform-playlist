@@ -68,11 +68,21 @@ interface ControlSlotProps {
   readonly $top: number;
   readonly $animate: boolean;
   readonly $isSelected?: boolean;
+  /** Lifted while a reorder drag moves it: opaque, with a shadow. */
+  readonly $isDragSource?: boolean;
 }
+
+/** Drop-shadow for the floating (fully opaque) drag-source slot. */
+const DRAG_SOURCE_SHADOW = '0 4px 12px rgba(0, 0, 0, 0.35)';
 
 /**
  * Height-synced container for each track's controls in the ControlsColumn.
  * Uses the same height formula as Track: waveHeight * numChannels + clipHeaderHeight.
+ *
+ * It is also the element a track-reorder drag moves (#796): dnd-kit shows it
+ * in the top layer while it is dragged, and its `overflow: hidden` would clip
+ * a shadow drawn by anything inside it, so the slot draws the lifted look
+ * itself.
  */
 export const ControlSlot = styled.div.attrs<ControlSlotProps>((props) => ({
   style: {
@@ -92,6 +102,9 @@ export const ControlSlot = styled.div.attrs<ControlSlotProps>((props) => ({
     transition: background 0.15s ease-in-out;
   }
   ${(props) => props.$isSelected && `background: ${props.theme.selectedTrackControlsBackground};`}
+  ${(props) =>
+    props.$isDragSource &&
+    `background: ${props.theme.selectedTrackControlsBackground}; box-shadow: ${DRAG_SOURCE_SHADOW};`}
 `;
 
 /**

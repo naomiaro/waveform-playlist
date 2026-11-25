@@ -233,7 +233,7 @@ describe('each hook returns its own group of fields (#768)', () => {
     expect(keys('zoom')).toEqual(['canZoomIn', 'canZoomOut', 'samplesPerPixel']);
     expect(keys('timeline')).toEqual(['duration', 'isReady', 'peaksDataArray', 'tracks'].sort());
     expect(keys('mixer')).toEqual(['masterVolume', 'trackStates']);
-    expect(keys('reorder')).toEqual(['trackDragPreview', 'trackReorderEpoch']);
+    expect(keys('reorder')).toEqual(['trackDragPreview']);
     expect(keys('annotations')).toEqual(['annotations']);
     expect(keys('annotationOptions')).toEqual(['continuousPlay', 'editable', 'linkEndpoints']);
     expect(keys('loop')).toEqual(['isLoopEnabled', 'loopEnd', 'loopStart']);
@@ -282,7 +282,6 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setTrackVolume',
         'setTrackPan',
         'reorderTrack',
-        'bumpTrackReorderEpoch',
         'setTrackDragPreview',
         'setSelectedTrackId',
         'zoomIn',
@@ -448,9 +447,6 @@ describe('an action re-renders only the readers of the group it changes (#768)',
         values.editorControls.setTrackDragPreview({ trackId: 'track-1', toIndex: 1 })
       )
     ).toEqual(['reorder']);
-    expect(await rendered(() => values.editorControls.bumpTrackReorderEpoch())).toEqual([
-      'reorder',
-    ]);
   });
 
   // #812: the arm mute goes through the arrangement's mix, so the mixer

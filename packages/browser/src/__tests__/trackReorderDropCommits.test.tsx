@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 //
-// A track-reorder drop is ONE commit (#812): the new order, the cleared
-// preview and the bumped epoch together. dnd-kit calls `onDragEnd` inside
-// `startTransition`; since the arrangement owns the order, the reorder reaches
-// React through `useSyncExternalStore` (rendered at once) while the epoch and
-// the preview are state (transition updates). Committed apart, the slots are
-// first moved under their old keys, which is what the epoch exists to avoid
-// (see `bumpTrackReorderEpoch` in the provider).
+// A track-reorder drop is ONE commit (#812): the new order and the cleared
+// preview together. dnd-kit calls `onDragEnd` inside `startTransition`; since
+// the arrangement owns the order, the reorder reaches React through
+// `useSyncExternalStore` (rendered at once) while the preview is state (a
+// transition update). Until #796 the same commit also bumped an epoch that
+// remounted the slots.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -37,20 +36,20 @@ import { ClipInteractionProvider } from '../components/ClipInteractionProvider';
 import { renderWithArrangement } from './helpers/arrangementProvider';
 import { clip, track } from './helpers/engineHarness';
 
-/** Every committed (order, epoch, preview), in order. */
+/** Every committed (order, preview), in order. */
 const commits: string[] = [];
 let editor: ReturnType<typeof useEditorControls>;
 let ready = false;
 
 const Probe: React.FC = () => {
   const { tracks, isReady } = usePlaylistTimeline();
-  const { trackReorderEpoch, trackDragPreview } = useTrackReorderPreview();
+  const { trackDragPreview } = useTrackReorderPreview();
   editor = useEditorControls();
   ready = isReady;
   const preview = trackDragPreview
     ? `${trackDragPreview.trackId}>${trackDragPreview.toIndex}`
     : 'null';
-  const state = `${tracks.map((t) => t.id).join('')} epoch=${trackReorderEpoch} preview=${preview}`;
+  const state = `${tracks.map((t) => t.id).join('')} preview=${preview}`;
   useLayoutEffect(() => {
     commits.push(state);
   });
@@ -99,7 +98,7 @@ describe('a track-reorder drop is one commit (#812)', () => {
 
     act(() => startTransition(() => onDragEnd()(reorderEnd())));
 
-    expect(commits).toEqual(['BA epoch=1 preview=null']);
+    expect(commits).toEqual(['BA preview=null']);
   });
 
   it('called inside startTransition from a task of its own (no act())', async () => {
@@ -119,14 +118,16 @@ describe('a track-reorder drop is one commit (#812)', () => {
       environment.IS_REACT_ACT_ENVIRONMENT = previous;
     }
 
-    expect(commits).toEqual(['BA epoch=1 preview=null']);
+    expect(commits).toEqual(['BA preview=null']);
   });
 
-  it('a cancelled drop clears the preview and bumps the epoch in one commit, order unchanged', async () => {
+  // A cancel has one update (the preview), so this does not depend on
+  // `flushSync`; the two drop tests above do.
+  it('a cancelled drop clears the preview and leaves the order', async () => {
     await mountWithPreview();
 
     act(() => startTransition(() => onDragEnd()(reorderEnd(true))));
 
-    expect(commits).toEqual(['AB epoch=1 preview=null']);
+    expect(commits).toEqual(['AB preview=null']);
   });
 });

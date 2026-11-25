@@ -650,7 +650,6 @@ describe('the WebAudio provider splits its actions and refs', () => {
     expect(Object.keys(readers.values.annotations).sort()).toEqual(SHARED_FIELDS.annotations);
     expect(Object.keys(readers.values.options).sort()).toEqual(SHARED_FIELDS.annotationOptions);
     expect(Object.keys(readers.values.editor).sort()).toEqual([
-      'bumpTrackReorderEpoch',
       'clearLoopRegion',
       'redo',
       'reorderTrack',

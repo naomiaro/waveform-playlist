@@ -113,7 +113,8 @@ export const TrackControlsSharedContext = createContext<TrackControlsShared | nu
 
 /**
  * Internal: the wiring between a slot and the reorder handle inside it. The
- * slot's element is the item that is dragged; the handle says when it is.
+ * slot's element (the keyed `ControlSlot`, #796) is the item that is dragged;
+ * the handle says when it is.
  * Stable for the life of the slot.
  */
 export interface TrackSlotWiring {

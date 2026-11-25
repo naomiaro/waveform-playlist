@@ -50,8 +50,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
   const { sampleRate } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks } = usePlaylistTimeline();
-  const { setSelectedTrackId, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview } =
-    useEditorControls();
+  const { setSelectedTrackId, reorderTrack, setTrackDragPreview } = useEditorControls();
   const beatsAndBars = useBeatsAndBars();
 
   // Derive snap mode from context: beats if provider is in beats mode with snap enabled,
@@ -99,13 +98,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragEnd,
   } = useClipDragHandlers({ samplesPerPixel, snapSamplePosition });
 
-  // True from the start of a track-reorder drag to its end. dnd-kit can send
-  // one more dragover AFTER the dragend of a canceled drag (the sorting
-  // plugin putting the item back): seen with Escape mid-drag once the slot's
-  // element was registered from the reorder handle's effect (#687), where it
-  // set the preview again for good. A preview without a drag is never wanted.
-  const trackReorderDragActiveRef = React.useRef(false);
-
   // Wrap onDragStart to auto-select track
   const onDragStart = React.useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
@@ -113,7 +105,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         | { kind?: string; trackId?: string; trackIndex?: number }
         | undefined;
       if (data?.kind === 'track-reorder') {
-        trackReorderDragActiveRef.current = true;
         if (data.trackId) setSelectedTrackId(data.trackId);
         return; // clip handler guards also skip this kind
       }
@@ -135,7 +126,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: { operation: { source?: { data?: unknown } | null } }) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind !== 'track-reorder' || !data.trackId) return;
-      if (!trackReorderDragActiveRef.current) return;
       const sortable = (
         event.operation.source as unknown as {
           sortable?: { index: number; initialIndex: number };
@@ -157,7 +147,6 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: Parameters<typeof onDragEnd>[0]) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind === 'track-reorder') {
-        trackReorderDragActiveRef.current = false;
         const sortable = (
           event.operation.source as unknown as {
             sortable?: { index: number; initialIndex: number };
@@ -166,25 +155,14 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         const trackId = data.trackId;
         const moves =
           !event.canceled && trackId && sortable && sortable.index !== sortable.initialIndex;
-        // ONE commit for the three: the reorder, the cleared preview and the
-        // epoch. dnd-kit calls this inside `startTransition`, where the two
-        // state updates would wait as transition updates while the reorder
-        // (the arrangement, read with `useSyncExternalStore`) renders at
-        // once: React would first move the slots under their old keys, which
-        // is what the epoch is there to avoid, and remount them a commit
-        // later. `flushSync` renders all three together.
+        // ONE commit for the reorder and the cleared preview. dnd-kit calls
+        // this inside `startTransition`, where clearing the preview would be
+        // a transition update while the reorder (the arrangement, read with
+        // `useSyncExternalStore`) renders at once. Nothing here remounts the
+        // slots: the sortable item is the keyed slot itself, so the sorting
+        // plugin's DOM moves are moves React can follow (#796; see
+        // `useTrackReorderHandle`).
         flushSync(() => {
-          // Unconditional, regardless of canceled/committed: @dnd-kit/react's
-          // sortable plugins can splice React-owned DOM nodes (Feedback's
-          // placeholder, OptimisticSortingPlugin's reorder()) during the drag
-          // that just ended, desyncing React's fiber tree from the true DOM.
-          // Bumping this forces the view's track-controls part to remount the
-          // track-controls slots, healing the corruption before the next
-          // reorder (drag or button) needs to touch the DOM. See
-          // bumpTrackReorderEpoch's doc comment in WaveformPlaylistContext.
-          bumpTrackReorderEpoch();
-          // The columns go straight from the previewed layout to the
-          // committed one, with no frame in between.
           setTrackDragPreview(null);
           if (moves) reorderTrack(trackId, sortable.index);
         });
@@ -192,7 +170,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       }
       onDragEnd(event);
     },
-    [onDragEnd, reorderTrack, bumpTrackReorderEpoch, setTrackDragPreview]
+    [onDragEnd, reorderTrack, setTrackDragPreview]
   );
 
   // Build modifiers array

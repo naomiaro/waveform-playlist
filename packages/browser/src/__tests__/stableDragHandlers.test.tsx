@@ -17,7 +17,6 @@ let playlistData: Record<string, unknown> = { sampleRate: SAMPLE_RATE };
 const playlistControls = {
   setSelectedTrackId: vi.fn(),
   reorderTrack: vi.fn(),
-  bumpTrackReorderEpoch: vi.fn(),
   setTrackDragPreview: vi.fn(),
 };
 vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
@@ -269,9 +268,10 @@ describe('ClipInteractionProvider', () => {
 });
 
 describe('ClipInteractionProvider: the track-reorder preview', () => {
-  it('follows drag-overs only between the start and the end of a reorder drag', () => {
-    // dnd-kit can send one more dragover after the dragend of a canceled
-    // drag; it must not set the preview again (#687).
+  it("publishes the sortable's index on each drag-over and clears it at the end", () => {
+    // Until #796 the provider also ignored drag-overs outside a drag: one came
+    // after the dragend of a canceled drag. It came from the slot remount
+    // that dragend ran, which is gone.
     const previews: unknown[] = [];
     const setTrackDragPreview = vi.fn((update: unknown) => {
       previews.push(typeof update === 'function' ? (update as (p: null) => unknown)(null) : update);
@@ -300,18 +300,11 @@ describe('ClipInteractionProvider: the track-reorder preview', () => {
     const start = dndProps.onDragStart as (e: unknown) => void;
     const end = dndProps.onDragEnd as (e: unknown) => void;
 
-    over(event(1));
-    expect(previews).toEqual([]);
-
     start(event(0));
     over(event(1));
     expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }]);
 
     end(event(1, true));
-    expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }, null]);
-
-    // The late one.
-    over(event(0));
     expect(previews).toEqual([{ trackId: 't1', toIndex: 1 }, null]);
   });
 });

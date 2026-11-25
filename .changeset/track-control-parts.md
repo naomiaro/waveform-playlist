@@ -40,6 +40,5 @@ Behaviour:
 - `<DefaultTrackControls>` has no remove button and no grip. `TrackRemoveButton` places itself at the top left of the slot, `TrackReorderGrip` at its right edge. A custom panel gets the slot: as wide as the column, as tall as the row, `overflow: hidden`; fill it with `height: 100%`.
 - A mixer change renders the pieces of that track's panel only; selecting a track renders the pieces of the two panels concerned.
 - A second reorder handle in one panel warns once in the console in development.
-- Internal: `ClipInteractionProvider` ignores a dragover that arrives when no track-reorder drag is in progress (dnd-kit sends one after the dragend of a canceled drag once the slot's element is registered by the reorder handle).
 
 The upgrade guide has the find-and-replace for each removed name.

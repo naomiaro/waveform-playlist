@@ -70,6 +70,9 @@ describe('useTrackReorderHandle per-entity Feedback plugin config (@dnd-kit 0.5)
     const source = manager.registry.draggables.get('track-reorder-t1');
     expect(source).toBeDefined();
     expect(source!.pluginConfig(Feedback)?.feedback).toBe('move');
+    // No drop animation (#796): with 'move' it had no placeholder to fly
+    // to and held the slot at the pointer for ~250 ms.
+    expect(source!.pluginConfig(Feedback)?.dropAnimation).toBeNull();
   });
 
   it('keeps the default sortable plugins registered', () => {

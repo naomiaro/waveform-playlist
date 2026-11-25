@@ -457,13 +457,6 @@ interface EditorControlsContextValue {
    *  arrangement (#812). */
   reorderTrack: (trackId: string, toIndex: number) => void;
 
-  /** Internal: call after every track-reorder DRAG interaction ends
-   *  (committed or canceled) to force the view's track-controls part to remount
-   *  its slots, discarding any @dnd-kit sortable-plugin DOM
-   *  corruption. Not needed for button-driven reorderTrack calls (they never
-   *  touch dnd-kit's DOM). See bumpTrackReorderEpoch in the provider. */
-  bumpTrackReorderEpoch: () => void;
-
   /** INTERNAL wiring for ClipInteractionProvider: publishes/clears the live
    *  track-reorder drag preview. Custom drag integrations may call it, but
    *  most consumers only ever READ trackDragPreview from useTrackReorderPreview(). */
@@ -598,12 +591,6 @@ interface TrackReorderPreviewContextValue {
    *  index it would drop at. Both playlist columns derive their display
    *  layout from it. A control panel does not need it. */
   trackDragPreview: TrackDragPreview | null;
-  /** Internal: incremented after every track-reorder drag interaction ends.
-   *  The view's track-controls part folds this into each slot's `key` to
-   *  force a remount, working around @dnd-kit sortable-plugin DOM corruption
-   *  (see bumpTrackReorderEpoch in EditorControlsContextValue). Do not add it
-   *  to keys of your own: the slot around every panel is keyed already. */
-  trackReorderEpoch: number;
 }
 ```
 
@@ -2384,8 +2371,8 @@ function useTrackReorderHandle(): TrackReorderHandle;
 // Placement and cost:
 // - Each track has a slot in the column: as wide as the column, as tall as the track's
 //   row, overflow hidden. A custom panel fills it with height: 100%. The element inside
-//   the slot that holds the panel has data-track-controls="<track id>"; it is the element
-//   a reorder drag moves.
+//   the slot that holds the panel has data-track-controls="<track id>"; a reorder drag
+//   moves the slot around it. No reorder remounts a slot, so state inside a panel survives.
 // - A click anywhere in a slot selects the track. TrackRemoveButton, the button of
 //   TrackMenuButton and the grip and buttons of TrackReorderGrip do not select; a
 //   render-mode choice in the open track menu does.

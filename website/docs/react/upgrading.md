@@ -487,7 +487,7 @@ All of them are exported from `@waveform-playlist/browser`. The first group work
 | `useAnnotationOptions()` (either provider) | `editable`, `linkEndpoints`, `continuousPlay` | one of the three being toggled |
 | `usePlaylistTimeline()` | `tracks`, `peaksDataArray`, `duration`, `isReady` | every clip operation (a trim once, on release), a zoom (`peaksDataArray` is computed per zoom level), audio or peaks arriving, `isReady` changing |
 | `usePlaylistMixer()` | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (each step of a slider drag); tracks added, removed, renamed or reordered |
-| `useTrackReorderPreview()` | `trackDragPreview`, `trackReorderEpoch` | every drag-over of a track reorder |
+| `useTrackReorderPreview()` | `trackDragPreview` | every drag-over of a track reorder |
 | `useLoop()` | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
 | `useSelectedTrackId()` | `selectedTrackId` | another track being selected |
 | `useUndoRedo()` | `canUndo`, `canRedo` | after an edit |
@@ -517,7 +517,8 @@ From `usePlaylistData()`:
 | `tracks`, `peaksDataArray`, `duration`, `isReady` | `usePlaylistTimeline()` |
 | `onTracksChange` | removed: see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed) |
 | `trackStates`, `masterVolume` | `usePlaylistMixer()` |
-| `trackDragPreview`, `trackReorderEpoch` | `useTrackReorderPreview()` |
+| `trackDragPreview` | `useTrackReorderPreview()` |
+| `trackReorderEpoch` | removed: see [`trackReorderEpoch` and `bumpTrackReorderEpoch` are removed](#trackreorderepoch-and-bumptrackreorderepoch-are-removed-a-reorder-drag-keeps-the-track-panels-mounted) |
 | `playoutRef` | `useEngineRefs()` |
 | `isDraggingRef` | removed: see [`isDraggingRef` is removed](#isdraggingref-is-removed) |
 
@@ -630,7 +631,7 @@ The "After" above is the mechanical translation, and it re-renders as often as t
 
 3. **Call `usePlaylistTimeline()` and `usePlaylistMixer()` in the smallest component that needs them.** The timeline value changes on every clip operation (a trim once, on release) and on a zoom (`peaksDataArray` is computed per zoom level), and also when audio or peaks arrive and when `isReady` changes. The mixer value changes on every mute, solo, volume or pan change (each step of a slider drag), and when tracks are added, removed, renamed or reordered. A page-level component that calls either re-renders its whole subtree that often. `useTrackReorderPreview()` changes on every drag-over of a track reorder, and the same advice applies.
 
-4. **`trackReorderEpoch` and `trackDragPreview`** are in `useTrackReorderPreview()`, not in `usePlaylistData()`. A custom track panel does not need either: `renderTrackControls` and `SortableTrackControls` are removed, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
+4. **`trackDragPreview`** is in `useTrackReorderPreview()`, not in `usePlaylistData()`, and `trackReorderEpoch` is removed ([its entry](#trackreorderepoch-and-bumptrackreorderepoch-are-removed-a-reorder-drag-keeps-the-track-panels-mounted)). A custom track panel needs neither: `renderTrackControls` and `SortableTrackControls` are removed, and the slot around a panel is keyed by the part (see [track controls are composed from pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)).
 
 5. **A small timing difference, nothing to migrate.** A `play()` called while a later engine is being built (an `effects` or `zoomLevels` change; a track change builds none) is queued. The playhead, the clip progress overlays and `AudioPosition` move to the queued start position when playback actually starts. Before, they jumped there when the rebuild finished, slightly earlier. If the build fails, playback shows stopped and the cursor stays where it was. (Before the playlist's first ready a `play()` does nothing at all: see [Ready comes once per mount](#ready-comes-once-per-mount-after-the-first-sources-play-does-nothing-before-it).)
 
@@ -871,7 +872,7 @@ Under either provider:
 | Hook | Returns |
 | --- | --- |
 | `useArrangement()` | the arrangement the provider plays (see [`WaveformPlaylistProvider` takes an `arrangement`](#waveformplaylistprovider-takes-an-arrangement-tracks-ontrackschange-and-deferenginerebuild-are-removed)) |
-| `useEditorControls()` | `setCurrentTime`, `setTrackMute`, `setTrackSolo`, `setTrackVolume`, `setTrackPan`, `reorderTrack`, `bumpTrackReorderEpoch`, `setTrackDragPreview`, `setSelectedTrackId`, `zoomIn`, `zoomOut`, `setMasterVolume`, `setLoopEnabled`, `setLoopRegion`, `setLoopRegionFromSelection`, `clearLoopRegion`, `undo`, `redo`, `setRecordingActive` |
+| `useEditorControls()` | `setCurrentTime`, `setTrackMute`, `setTrackSolo`, `setTrackVolume`, `setTrackPan`, `reorderTrack`, `setTrackDragPreview`, `setSelectedTrackId`, `zoomIn`, `zoomOut`, `setMasterVolume`, `setLoopEnabled`, `setLoopRegion`, `setLoopRegionFromSelection`, `clearLoopRegion`, `undo`, `redo`, `setRecordingActive` |
 | `useEngineRefs()` | `playbackStartTimeRef`, `audioStartPositionRef`, `getPlaybackTime`, `getAudioContextTime`, `getLookAhead`, `getOutputLatency`, `playoutRef` |
 | `usePlaylistTimeline()`, `usePlaylistMixer()`, `useTrackReorderPreview()`, `useLoop()`, `useSelectedTrackId()`, `useUndoRedo()` | see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields) |
 
@@ -921,7 +922,7 @@ From `usePlaylistControls()`:
 | `setTrackVolume` | `useEditorControls()` |
 | `setTrackPan` | `useEditorControls()` |
 | `reorderTrack` | `useEditorControls()` |
-| `bumpTrackReorderEpoch` | `useEditorControls()` |
+| `bumpTrackReorderEpoch` | removed: see [`trackReorderEpoch` and `bumpTrackReorderEpoch` are removed](#trackreorderepoch-and-bumptrackreorderepoch-are-removed-a-reorder-drag-keeps-the-track-panels-mounted) |
 | `setTrackDragPreview` | `useEditorControls()` |
 | `setSelectedTrackId` | `useEditorControls()` |
 | `zoomIn` | `useEditorControls()` |
@@ -1748,8 +1749,7 @@ Replace every `setTrackMute(i, v)`, `setTrackSolo(i, v)`, `setTrackVolume(i, v)`
 ```tsx
 // Before
 function MyPanel({ trackIndex }: { trackIndex: number }) {
-  const { tracks } = usePlaylistTimeline();
-  const { trackReorderEpoch } = useTrackReorderPreview();
+  const { tracks, trackReorderEpoch } = usePlaylistData();
   const track = tracks[trackIndex];
   return (
     <SortableTrackControls
@@ -1794,7 +1794,7 @@ function MyGrip() {
 </WaveformTrackControls>
 ```
 
-There is no `ref` for the item any more: the element that moves is the slot the part draws around the panel, not an element of yours, and the part draws it lifted (opaque, with a shadow) while it is dragged. Delete the `key` with `trackReorderEpoch`: the part keys its slots itself, and it did so before as well, so that key was never needed. Call `useTrackReorderHandle()` once per panel (so not together with `<TrackReorderGrip />`). In the example `MyGrip` is written beside `MyPanel`: when the panel fills the slot (`height: 100%`), a grip beside it is below the visible area unless it positions itself (`position: absolute`, as `<TrackReorderGrip />` does) or is rendered inside the panel. For move buttons of your own use `useTrack().moveUp()` and `.moveDown()` with `isFirst` and `isLast`. The `disabled` prop has no replacement: leave the grip out.
+There is no `ref` for the item any more: the element that moves is the slot the part draws around the panel, not an element of yours, and the part draws it lifted (opaque, with a shadow) while it is dragged. Delete the `key` with `trackReorderEpoch`: the part keys its slots itself, and it did so before as well, so that key was never needed (and `trackReorderEpoch` is removed: [its entry](#trackreorderepoch-and-bumptrackreorderepoch-are-removed-a-reorder-drag-keeps-the-track-panels-mounted)). Call `useTrackReorderHandle()` once per panel (so not together with `<TrackReorderGrip />`). In the example `MyGrip` is written beside `MyPanel`: when the panel fills the slot (`height: 100%`), a grip beside it is below the visible area unless it positions itself (`position: absolute`, as `<TrackReorderGrip />` does) or is rendered inside the panel. For move buttons of your own use `useTrack().moveUp()` and `.moveDown()` with `isFirst` and `isLast`. The `disabled` prop has no replacement: leave the grip out.
 
 ### Behaviour
 
@@ -1846,7 +1846,7 @@ const loadingDone = !isLoading;
 
 | Attribute | On |
 | --- | --- |
-| `data-track-controls="<track id>"` | the element inside each track's slot that holds the panel (the element a reorder drag moves) |
+| `data-track-controls="<track id>"` | the element inside each track's slot that holds the panel (a reorder drag moves the slot around it) |
 | `data-track-name` | the element of `<TrackName />` |
 | `data-track-reorder-grip` | the element around the grip and buttons of `<TrackReorderGrip />` |
 
@@ -1859,6 +1859,36 @@ const loadingDone = !isLoading;
 - Tracks built again on every change: keep their ids, or the mixer starts over for them.
 - CSS or test selectors that reached the remove button or the reorder rail through the panel's markup.
 - A custom panel: click on its background and see the track become selected. A control of yours that must not select calls `event.stopPropagation()` in its click handler.
+
+## `trackReorderEpoch` and `bumpTrackReorderEpoch` are removed; a reorder drag keeps the track panels mounted
+
+**Package:** `@waveform-playlist/browser`. `WaveformPlaylistProvider` only.
+
+A track-reorder drag no longer remounts the control panels when it ends. Until now `onDragEnd` bumped a counter, `trackReorderEpoch`, and the controls column keyed every panel with it, so each reorder drag mounted every panel again. That remount worked around dnd-kit moving a panel's element into the neighbouring slot during the drag. The slot itself is now what dnd-kit moves, which React can follow, so the counter and the call that bumped it are removed. React state inside a panel (`useState`, refs) now survives a reorder drag, as it already survived a reorder by the move buttons. Focus, though, is not kept: in Chromium, pressing the grip moves focus to it, and a drag that passes another track leaves focus on the page's body.
+
+**Find:** `trackReorderEpoch`, `bumpTrackReorderEpoch`.
+
+**Replace with:** nothing. Delete a `key` or a dependency built from `trackReorderEpoch`, and a call to `bumpTrackReorderEpoch()`.
+
+```tsx
+// Before (16.x)
+const { trackReorderEpoch } = usePlaylistData();
+const { reorderTrack, bumpTrackReorderEpoch } = usePlaylistControls();
+// … in a drag integration of your own:
+reorderTrack(trackId, toIndex);
+bumpTrackReorderEpoch();
+// … and a panel keyed with it:
+<MyPanel key={`${track.id}-${trackReorderEpoch}`} />
+
+// After
+const { reorderTrack } = useEditorControls();
+reorderTrack(trackId, toIndex);
+<MyPanel key={track.id} />
+```
+
+From 16.x, the hooks in the "Before" code are removed too (`usePlaylistData()`: see [one hook per group of fields](#useplaylistdata-useplayliststate-and-useplaybackanimation-are-replaced-by-one-hook-per-group-of-fields); `usePlaylistControls()`: see [one set of hooks and controls for both providers](#one-set-of-hooks-and-controls-for-both-providers)), so the code fails there first. Read from this major's hooks, a leftover `useTrackReorderPreview().trackReorderEpoch` is `undefined` (a key such as `` `${id}-undefined` `` still works), and a leftover call of `bumpTrackReorderEpoch` from `useEditorControls()` throws a `TypeError` ("… is not a function"). TypeScript reports both.
+
+While a track is dragged, dnd-kit's `popover` attribute, `data-dnd-dragging` and its `--dnd-*` inline styles are on the slot around `[data-track-controls]`, not on that element. The slot draws the lifted look (opaque, with a shadow) itself, and lands in its place as soon as the track is dropped, where it used to hang at the pointer for about a quarter of a second.
 
 ## The annotation UI is two parts with their own options; the annotation options have one home under both providers
 
