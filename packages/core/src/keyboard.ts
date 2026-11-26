@@ -190,9 +190,18 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
  * Pure function, no framework dependency.
  *
  * Shortcuts do not fire for a key the focused control uses itself; see
- * `keyBelongsToFocusedControl`. Nor for an Escape whose default was already
- * prevented: an Escape that cancelled a drag does nothing else.
+ * `keyBelongsToFocusedControl`. Nor for an Escape whose default something
+ * other than a shortcut already prevented (a drag cancelled it): an Escape that
+ * cancelled a drag does nothing else.
  */
+/**
+ * Events whose default a shortcut prevented (here, in `handleKeyboardEvent`).
+ * An Escape prevented by anything else (dnd-kit's pointer sensor and
+ * `<daw-editor>` prevent it when they cancel a drag) is not a shortcut; one a
+ * shortcut list prevented still reaches the next list (#848, review of #915).
+ */
+const preventedByShortcut = new WeakSet<Event>();
+
 export function handleKeyboardEvent(
   event: KeyboardEvent,
   shortcuts: KeyboardShortcut[],
@@ -206,8 +215,9 @@ export function handleKeyboardEvent(
 
   // A drag that took the key (dnd-kit's pointer sensor, <daw-editor>'s drag
   // cancel) has already prevented its default: an Escape that cancelled a
-  // drag does nothing else (#848).
-  if (event.key === 'Escape' && event.defaultPrevented) return;
+  // drag does nothing else (#848). Another shortcut list's own prevention
+  // does not count: two lists that both bind Escape both run.
+  if (event.key === 'Escape' && event.defaultPrevented && !preventedByShortcut.has(event)) return;
 
   if (keyBelongsToFocusedControl(event)) return;
 
@@ -216,6 +226,7 @@ export function handleKeyboardEvent(
   if (matchingShortcut) {
     if (matchingShortcut.preventDefault !== false) {
       event.preventDefault();
+      preventedByShortcut.add(event);
     }
     matchingShortcut.action();
   }
