@@ -44,13 +44,16 @@ export function computeTemporalTicks(
   const { marker, bigStep, smallStep } = config;
   const canvasInfo = new Map<number, number>();
   const labels: Array<{ pix: number; text: string }> = [];
-  const pixPerSec = sampleRate / samplesPerPixel;
 
-  // Iterate with integer counter (milliseconds) to avoid float precision drift.
-  // Compute pixel position from counter each iteration instead of accumulating.
+  // Each tick's pixel comes from its own time (an integer counter in
+  // milliseconds), in one division of integers (#722): the floor of
+  // samples / samplesPerPixel, as for a clip at that time.
+  // `(counter / 1000) * pixPerSec` rounds twice and put 2:27 at 15999 instead
+  // of 16000 at 48000 Hz and 441 samples per pixel.
   for (let counter = 0; ; counter += smallStep) {
-    const pix = Math.floor((counter / 1000) * pixPerSec);
-    if (pix >= widthX) break;
+    const pix = Math.floor((counter * sampleRate) / (1000 * samplesPerPixel));
+    // Written as `!(<)` so a NaN width ends the loop too.
+    if (!(pix < widthX)) break;
 
     if (counter % marker === 0) {
       canvasInfo.set(pix, rulerHeight);
