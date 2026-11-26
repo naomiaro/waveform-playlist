@@ -190,7 +190,8 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
  * Pure function, no framework dependency.
  *
  * Shortcuts do not fire for a key the focused control uses itself; see
- * `keyBelongsToFocusedControl`.
+ * `keyBelongsToFocusedControl`. Nor for an Escape whose default was already
+ * prevented: an Escape that cancelled a drag does nothing else.
  */
 export function handleKeyboardEvent(
   event: KeyboardEvent,
@@ -202,6 +203,11 @@ export function handleKeyboardEvent(
   // Ignore key repeat events — holding a key fires keydown repeatedly.
   // Without this guard, holding Space rapidly toggles play/pause.
   if (event.repeat) return;
+
+  // A drag that took the key (dnd-kit's pointer sensor, <daw-editor>'s drag
+  // cancel) has already prevented its default: an Escape that cancelled a
+  // drag does nothing else (#848).
+  if (event.key === 'Escape' && event.defaultPrevented) return;
 
   if (keyBelongsToFocusedControl(event)) return;
 
