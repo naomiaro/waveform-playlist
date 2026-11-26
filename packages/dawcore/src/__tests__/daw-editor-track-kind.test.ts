@@ -305,11 +305,13 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
     editor.updateTrack('a', { renderMode: 'piano-roll' });
 
-    expect(editor.tracks[0].renderMode).toBe('waveform');
+    // The descriptor: this track is not in the arrangement, so editor.tracks
+    // (the arrangement's tracks since #848) does not list it.
+    expect(editor._tracks.get('a').renderMode).toBe('waveform');
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
 
     editor.updateTrack('a', { renderMode: 'spectrogram' });
-    expect(editor.tracks[0].renderMode).toBe('spectrogram');
+    expect(editor._tracks.get('a').renderMode).toBe('spectrogram');
   });
 
   it('an undo-restored MIDI track gets a MIDI descriptor', () => {
@@ -319,7 +321,8 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
       { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
     ]);
 
-    const byName = Object.fromEntries(editor.tracks.map((t: any) => [t.name, t]));
+    // The synthesized descriptors (these tracks are not in the arrangement).
+    const byName = Object.fromEntries([...editor._tracks.values()].map((t: any) => [t.name, t]));
     expect(byName.Keys).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(byName.Gtr).toMatchObject({ kind: 'audio', renderMode: 'waveform' });
   });

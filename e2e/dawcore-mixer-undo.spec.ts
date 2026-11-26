@@ -37,8 +37,8 @@ const canUndo = (page: Page) =>
 test.describe('dawcore mixer undo (#843)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`${BASE}/multiclip.html`);
-    // Every track loaded: dawcore clears the history when a track finishes
-    // loading (#848), so a step made before the last load would be lost.
+    // Every track in and its controls drawn: the page's tracks are not undo
+    // steps, so the first step is the drag below (#848).
     await page.waitForFunction(
       (count) => {
         const editor = document.querySelector('daw-editor') as unknown as EditorProbe | null;

@@ -1094,12 +1094,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _setSelectedTrackId(trackId: string | null) {
     this._selectedTrackId = trackId;
   }
+  /**
+   * Every track: those in the arrangement, in its order, then those still
+   * waiting to enter (#848). A `<daw-track>` whose track an Undo took out of
+   * the arrangement is not listed (its descriptor stays for a Redo).
+   */
   get tracks(): TrackWithId[] {
-    return [...this._tracks.entries()].map(([trackId, descriptor]) => ({
-      trackId,
-      ...descriptor,
-      ...this._mixOf(trackId),
-    }));
+    const ids = [...this._arrangement.getTracks().map((t) => t.id), ...this._entryQueue];
+    return ids.flatMap((trackId) => {
+      const descriptor = this._tracks.get(trackId);
+      return descriptor ? [{ trackId, ...descriptor, ...this._mixOf(trackId) }] : [];
+    });
   }
   /**
    * A track's mix, from its one owner, the arrangement (#843), as the engine

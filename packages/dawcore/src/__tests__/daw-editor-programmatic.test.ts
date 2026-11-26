@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
+import { createClip, createTrack } from '@waveform-playlist/core';
 import {
   makeAudioBuffer as makeDecodedBuffer,
   makeAudioFile,
@@ -359,6 +360,24 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
       midiChannel: null,
       midiProgram: null,
     });
+    // editor.tracks lists the tracks of the arrangement (#848): the take's
+    // track is there too, before the hand-set engine cache and descriptors.
+    const arrangementClip = (id: string, startSample: number) => ({
+      ...createClip({
+        startSample,
+        durationSamples: 96000,
+        offsetSamples: 0,
+        sampleRate: 48000,
+        sourceDurationSamples: 96000,
+        name: 'Recording',
+      }),
+      id,
+    });
+    editor._arrangement.addTrack({
+      ...createTrack({ name: 'T', clips: [] }),
+      id: trackId,
+      clips: [arrangementClip('take-1', 0), arrangementClip('take-2', 96000)],
+    });
     editor._engineTracks = new Map([[trackId, { id: trackId, clips: [clip, other], name: 'T' }]]);
     editor._tracks = new Map([
       [
@@ -392,19 +411,8 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
 
   it('removeClip by engine id drops the descriptor too', async () => {
     const { editor } = await setupLoadingEditor();
+    // seedRecordedTake puts the take's track in the arrangement too (#848).
     const trackId = seedRecordedTake(editor);
-    // A recorded take is in the arrangement (#848): enter the seeded track.
-    const seeded = editor._tracks;
-    const track = editor._engineTracks.get(trackId);
-    editor._arrangement.addTrack({
-      ...track,
-      clips: track.clips.map((c: object) => ({
-        ...c,
-        audioBuffer: makeDecodedBuffer(),
-        sourceDurationSamples: 96000,
-      })),
-    });
-    editor._tracks = seeded;
 
     editor.removeClip(trackId, 'take-1');
 

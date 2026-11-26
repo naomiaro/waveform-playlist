@@ -488,3 +488,24 @@ describe("daw-editor's methods on the arrangement (#848)", () => {
     expect(isLoadingClip(editor._arrangement.getTracks()[0].clips[0])).toBe(false);
   });
 });
+
+describe('editor.tracks follows the arrangement (#848)', () => {
+  it('an undone addTrack is not in editor.tracks; a redo brings it back', async () => {
+    const fake = makeFakeAdapter();
+    const editor = await mount(fake, MIDI_TRACK);
+    editor._arrangement.setTrackVolume(editor._arrangement.getTracks()[0].id, 0.5);
+    await editor.addTrack({ name: 'Added', midi: { notes: [] } });
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Keys', 'Added']);
+    editor._arrangement.undo();
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Keys']);
+    editor._arrangement.redo();
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Keys', 'Added']);
+  });
+
+  it('lists the tracks in the arrangement order', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK + MIDI_TRACK.replace('Keys', 'Bass'));
+    const [, bass] = editor._arrangement.getTracks().map((t: { id: string }) => t.id);
+    editor._arrangement.reorderTrack(bass, 0);
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Bass', 'Keys']);
+  });
+});
