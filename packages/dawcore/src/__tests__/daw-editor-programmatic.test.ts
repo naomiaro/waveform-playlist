@@ -1408,7 +1408,7 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
     editor.remove();
   });
 
-  it('refuses to rebuild an engine on an adapter its own teardown disposed', async () => {
+  it('lets go of an adapter its own teardown disposed', async () => {
     const editor = setupEditor();
     await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
 
@@ -1416,15 +1416,15 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
     document.body.appendChild(other);
     other.appendChild(editor); // teardown disposed the consumer's adapter
 
-    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so decode
-    // SUCCEEDS on reconnect and tracks wire into a dead transport graph —
-    // waveforms render, play() runs, no audio. The rebuild must fail loudly
-    // instead.
+    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so building
+    // on it again would wire tracks into a dead transport graph: waveforms,
+    // no audio. The editor lets go of it (#848) and asks for a fresh one.
+    expect(editor.adapter).toBeNull();
     const err = await editor.addTrack({ name: 'U', clips: [{ src: '/b.opus' }] }).then(
       () => null,
       (e: Error) => e
     );
-    expect(err?.message).toMatch(/adapter.*disposed|fresh/i);
+    expect(err?.message).toMatch(/No PlayoutAdapter set/);
 
     // Setting a fresh adapter restores service
     editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };

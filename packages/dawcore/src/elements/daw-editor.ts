@@ -45,9 +45,11 @@ import type { WaveformSegment } from './daw-waveform';
 import './daw-playhead';
 import './daw-waveform';
 import './daw-ruler';
+import { createArrangement, PlaylistEngine } from '@waveform-playlist/engine';
 import type {
+  Arrangement,
+  EngineState,
   MixerChangeOptions,
-  PlaylistEngine,
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -457,12 +459,28 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   get _hasTickCallbacks(): boolean {
     return !!(this.secondsToTicks && this.ticksToSeconds);
   }
-  /** Sample rate — reads from adapter's AudioContext when available, otherwise falls back to 48000. */
+  /**
+   * Sample rate: the adapter's AudioContext rate. Without an adapter (after a
+   * disconnect let it go), the rate of the loaded clips the arrangement holds,
+   * else 48000. Decoded audio is at the context's rate, so the two agree.
+   */
   get sampleRate(): number {
-    return this._resolvedSampleRate ?? this._externalAdapter?.audioContext.sampleRate ?? 48000;
+    return this._externalAdapter?.audioContext.sampleRate ?? this._loadedClipSampleRate() ?? 48000;
   }
-  /** Resolved sample rate — falls back to sampleRate property until first audio decode. */
-  _resolvedSampleRate: number | null = null;
+  private _loadedClipSampleRate(): number | null {
+    for (const track of this._arrangement.getTracks()) {
+      for (const clip of track.clips) {
+        if ('sampleRate' in clip && typeof clip.sampleRate === 'number') return clip.sampleRate;
+      }
+    }
+    return null;
+  }
+  /**
+   * The one owner of the tracks, the clips, the mix, the undo history and
+   * loading (#848). Made with the editor, kept across a disconnect; the
+   * engine plays it once there is an adapter.
+   */
+  _arrangement: Arrangement = createArrangement();
   /** Per-track descriptors, without the mix: the arrangement owns that (#843). */
   @state() _tracks: Map<string, StoredTrackDescriptor> = new Map();
   /**
@@ -495,9 +513,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Adapter AudioContext is already closed. Ignoring.');
       return;
     }
-    // A fresh adapter re-arms engine building after a disconnect consumed
-    // the previous one (see _adapterConsumedByDispose).
-    this._adapterConsumedByDispose = false;
     if (this._engine) {
       console.warn(
         '[dawcore] adapter set after engine is built. ' +
@@ -516,14 +531,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._effectsManager = null;
     }
     this._externalAdapter = value;
+    // The engine is built as soon as the editor is connected with an adapter (#848).
+    if (value && this.isConnected && !this._engine) this._buildEngineReporting();
   }
   get adapter(): PlayoutAdapter | null {
     return this._externalAdapter;
   }
   private _externalAdapter: PlayoutAdapter | null = null;
-  /** True after a disconnect disposed the consumer's adapter via the engine
-   * — rebuild attempts fail loudly until a fresh adapter is set. */
-  private _adapterConsumedByDispose = false;
 
   // --- Effects (master chain; per-track chains delegated from <daw-track>) ---
 
@@ -744,7 +758,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _engine: PlaylistEngine | null = null;
   private _warnedMissingTicksToSeconds = false;
   private _warnedMissingSecondsToTicks = false;
-  private _enginePromise: Promise<PlaylistEngine> | null = null;
   _audioCache = new Map<string, Promise<AudioBuffer>>();
   private _peaksCache = new Map<string, Promise<import('waveform-data').default>>();
   _clipBuffers = new Map<string, AudioBuffer>();
@@ -995,10 +1008,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   ];
 
   get effectiveSampleRate(): number {
-    return this._resolvedSampleRate ?? this.sampleRate;
-  }
-  resolveAudioContextSampleRate(rate: number) {
-    if (!this._resolvedSampleRate) this._resolvedSampleRate = rate;
+    return this.sampleRate;
   }
   /**
    * In beats mode, derive samplesPerPixel from ticksPerPixel so that
@@ -1240,6 +1250,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (orderMayHaveChanged) this._syncEngineOrderToDom();
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
+    if (this._externalAdapter && !this._engine) this._buildEngineReporting();
   }
   disconnectedCallback() {
     super.disconnectedCallback();
@@ -1280,12 +1291,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Error disposing engine: ' + String(err));
     }
     // engine.dispose() disposed the CONSUMER's adapter. Some adapters
-    // (NativePlayoutAdapter) leave the AudioContext open, so a reconnect
-    // would decode successfully and wire tracks into a dead transport graph
-    // — waveforms render, play() runs, no audio. Refuse to rebuild on it;
-    // the adapter setter clears the flag when a fresh one arrives.
+    // (NativePlayoutAdapter) leave the AudioContext open, so building on it
+    // again would decode into a dead transport graph: waveforms, no audio.
+    // The editor lets go of it; a fresh editor.adapter builds a new engine
+    // on the kept arrangement (#848).
     if (hadEngine) {
-      this._adapterConsumedByDispose = true;
+      this._externalAdapter = null;
     }
     // Symmetric teardown: the caches above are gone and the engine (and the
     // consumer's adapter through it) disposed — retaining the render state
@@ -1876,8 +1887,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         : Promise.resolve(null);
       const audioPromise = this._fetchAndDecode(clipDesc.src);
       const [waveformData, audioBuffer] = await Promise.all([waveformDataPromise, audioPromise]);
-      this._resolvedSampleRate = audioBuffer.sampleRate;
-
       const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, waveformData);
       insertedClipId = clip.id;
 
@@ -2488,7 +2497,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
               this._recomputeDuration();
               throw audioErr; // Propagate to outer catch for daw-track-error event
             }
-            this._resolvedSampleRate = audioBuffer.sampleRate;
             // Backfill audioBuffer immutably: new clip replaces the preview clip
             const updatedClip = { ...clip, audioBuffer };
             this._clipBuffers = new Map(this._clipBuffers).set(clip.id, audioBuffer);
@@ -2502,7 +2510,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           // (no peaksSrc, fetch failure, or sample-rate mismatch). waveformData
           // is always null here.
           const audioBuffer = await audioPromise;
-          this._resolvedSampleRate = audioBuffer.sampleRate;
           const clip = await this._finalizeAudioClip(clipDesc, audioBuffer, null);
           clips.push(clip);
         } catch (clipErr) {
@@ -2672,31 +2679,44 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._duration = maxSample / this.effectiveSampleRate;
   }
   // --- Engine ---
+  /**
+   * The engine, built now when the editor is connected with an adapter.
+   * Rejects without an adapter, and on a detached editor (an engine built
+   * there would hold the adapter's graph with nothing to dispose it).
+   */
   _ensureEngine(): Promise<PlaylistEngine> {
     if (this._engine) return Promise.resolve(this._engine);
-    if (this._enginePromise) return this._enginePromise;
-    this._enginePromise = this._buildEngine().catch((err) => {
-      this._enginePromise = null;
-      throw err;
-    });
-    return this._enginePromise;
+    try {
+      if (!this.isConnected && this._externalAdapter) {
+        throw new Error('[dawcore] <daw-editor> is not connected: no engine is built for it.');
+      }
+      return Promise.resolve(this._buildEngine());
+    } catch (err) {
+      return Promise.reject(err);
+    }
   }
-  private async _buildEngine() {
+  /** Build the engine from the adapter setter or a connect: a failure is reported, not thrown. */
+  private _buildEngineReporting(): void {
+    try {
+      this._buildEngine();
+    } catch (err) {
+      console.warn('[dawcore] Failed to build the engine: ' + String(err));
+      this.dispatchEvent(
+        new CustomEvent<DawErrorDetail>('daw-error', {
+          bubbles: true,
+          composed: true,
+          detail: { operation: 'engine', error: err },
+        })
+      );
+    }
+  }
+  /** Last versions the statechange handler worked from; reset for each engine. */
+  private _lastTracksVersion = -1;
+  private _lastMixerVersion = -1;
+  private _buildEngine(): PlaylistEngine {
     if (!this._externalAdapter) {
       throw new Error(noAdapterError());
     }
-    if (this._adapterConsumedByDispose) {
-      // The previous disconnect disposed this adapter through the engine.
-      // Some adapters (NativePlayoutAdapter) leave the AudioContext open, so
-      // building on it would decode fine but wire tracks into a dead
-      // transport graph — waveforms without audio. Fail loudly instead.
-      throw new Error(
-        '[dawcore] editor.adapter was disposed by a previous disconnect — ' +
-          'set a fresh PlayoutAdapter after reparenting <daw-editor>.'
-      );
-    }
-
-    const { PlaylistEngine } = await import('@waveform-playlist/engine');
     const adapter = this._externalAdapter;
 
     // Forward initial tempo if adapter supports it — skipped when tick
@@ -2721,103 +2741,110 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
     const engine = new PlaylistEngine({
       adapter,
-      sampleRate: this.effectiveSampleRate,
+      arrangement: this._arrangement,
+      sampleRate: adapter.audioContext.sampleRate,
       samplesPerPixel: this.samplesPerPixel,
       bpm: this._bpm,
       zoomLevels: [256, 512, 1024, 2048, 4096, 8192, this.samplesPerPixel]
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b),
     });
-    let lastTracksVersion = -1;
-    let lastMixerVersion = -1;
-    engine.on('statechange', (engineState) => {
-      this._isPlaying = engineState.isPlaying;
-      this._duration = engineState.duration;
-      this._selectedTrackId = engineState.selectedTrackId;
-      const structuralChange = engineState.tracksVersion !== lastTracksVersion;
-      // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
-      // tracksVersion (#501). Refresh the _engineTracks cache on either so the
-      // next setTracks rebuild keeps live mixer state — but only run the
-      // expensive structural work below for true structural changes, never on
-      // every volume/pan drag frame.
-      const mixerChange = engineState.mixerVersion !== lastMixerVersion;
-      if (structuralChange || mixerChange) {
-        lastTracksVersion = engineState.tracksVersion;
-        lastMixerVersion = engineState.mixerVersion;
-        const nextTracks = new Map<string, ClipTrack>();
-        for (const track of engineState.tracks) {
-          nextTracks.set(track.id, track);
-        }
-        this._engineTracks = nextTracks;
-        // The arrangement holds these now: their seeds are not read again.
-        this._deleteSeedMix(nextTracks.keys());
-        // Undo can resurrect a track whose editor descriptor was purged at
-        // removal — synthesize one so the track shows real name/controls
-        // and appears in editor.tracks (the effects chain does not survive;
-        // it was disposed at removal).
-        this._reconcileDescriptorsWithEngineTracks(engineState.tracks);
-      }
-      // Sync clip positions when tracks change structurally (moveClip, trimClip,
-      // splitClip, setTracks, addTrack, removeTrack).
-      if (structuralChange) {
-        // Engine-initiated order changes (undo/redo of a reorder) move the
-        // DOM to match; guarded so the observer's own DOM→engine sync (which
-        // emits intermediate statechanges mid-transaction) can't bounce
-        // half-applied orders back into the DOM (#612).
-        if (!this._inOrderSync) {
-          this._syncDomToEngineOrder(engineState.tracks);
-        }
-        // Transport setTracks rebuilds TrackNodes, severing effects hookups.
-        this._effectsManager?.rewireTrackChains();
-        // Regenerate peaks for new or trimmed clips.
-        // MIDI tracks have no AudioBuffer — skip them to avoid noisy
-        // "no AudioBuffer" warnings on every tracksVersion bump.
-        const audioTracks = engineState.tracks.filter((t) => trackKind(t) !== 'midi');
-        syncPeaksForChangedClips(this, audioTracks);
-      }
-      // Tick-based annotations: BPM changes move their time-domain positions —
-      // re-derive the seconds caches (write-only-on-change; loop-safe).
-      if (engineState.bpm !== this._lastAnnotationBpm) {
-        this._lastAnnotationBpm = engineState.bpm;
-        this._annotations.deriveSecondsCaches();
-      }
-    });
+    this._lastTracksVersion = -1;
+    this._lastMixerVersion = -1;
+    engine.on('statechange', (engineState) => this._onEngineState(engineState));
     engine.on('pause', () => {
       this._currentTime = engine.getCurrentTime();
     });
-    engine.on('stop', () => {
-      // Fires synchronously from PlaylistEngine.stop() (see engine CLAUDE.md
-      // "Bounded playback" / #608) — reached via EITHER a consumer-initiated
-      // stop (editor.stop(), or a seek-adjacent stop+reschedule guarded by
-      // _inSeekTransition — pointer-handler seek, seekTo, splitAtPlayhead,
-      // empty-timeline rewind) OR the engine's OWN bounded-playback
-      // completion path: an adapter (Tone, native) reports `onPlaybackEnded` for a
-      // duration-limited play(start, end) (selection/annotation playback),
-      // and the engine calls `this.stop()` internally from a queued
-      // microtask with no consumer call in sight. That engine-initiated case
-      // has no other `daw-stop` dispatcher — mirror it here so consumers
-      // still get a daw-stop paired with their earlier daw-play. Consumer
-      // stops dispatch their own daw-stop (editor.stop(), guarded by
-      // _inConsumerStop) or intentionally suppress it (seek-adjacent stops,
-      // guarded by _inSeekTransition) — this handler must not double-fire
-      // for those.
-      this._currentTime = engine.getCurrentTime();
-      this._stopPlayhead();
-      this._activePlayEndTime = null;
-      if (!this._inConsumerStop && !this._inSeekTransition && this.isConnected) {
-        this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
-      }
-    });
-
+    engine.on('stop', () => this._onEngineStop(engine));
     this._engine = engine;
+    // A kept arrangement (a reconnect) already has tracks: draw them now.
+    this._onEngineState(engine.getState());
+    this._flushTrackEntries();
     return engine;
+  }
+  /** Tracks waiting to enter the arrangement (#848); filled in a later step. */
+  _flushTrackEntries(): void {}
+  /** The engine's state changed: follow it (the one writer of `_engineTracks`). */
+  private _onEngineState(engineState: EngineState): void {
+    this._isPlaying = engineState.isPlaying;
+    this._duration = engineState.duration;
+    this._selectedTrackId = engineState.selectedTrackId;
+    const structuralChange = engineState.tracksVersion !== this._lastTracksVersion;
+    // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
+    // tracksVersion (#501). Refresh the _engineTracks cache on either so the
+    // next setTracks rebuild keeps live mixer state — but only run the
+    // expensive structural work below for true structural changes, never on
+    // every volume/pan drag frame.
+    const mixerChange = engineState.mixerVersion !== this._lastMixerVersion;
+    if (structuralChange || mixerChange) {
+      this._lastTracksVersion = engineState.tracksVersion;
+      this._lastMixerVersion = engineState.mixerVersion;
+      const nextTracks = new Map<string, ClipTrack>();
+      for (const track of engineState.tracks) {
+        nextTracks.set(track.id, track);
+      }
+      this._engineTracks = nextTracks;
+      // The arrangement holds these now: their seeds are not read again.
+      this._deleteSeedMix(nextTracks.keys());
+      // Undo can resurrect a track whose editor descriptor was purged at
+      // removal — synthesize one so the track shows real name/controls
+      // and appears in editor.tracks (the effects chain does not survive;
+      // it was disposed at removal).
+      this._reconcileDescriptorsWithEngineTracks(engineState.tracks);
+    }
+    // Sync clip positions when tracks change structurally (moveClip, trimClip,
+    // splitClip, setTracks, addTrack, removeTrack).
+    if (structuralChange) {
+      // Engine-initiated order changes (undo/redo of a reorder) move the
+      // DOM to match; guarded so the observer's own DOM→engine sync (which
+      // emits intermediate statechanges mid-transaction) can't bounce
+      // half-applied orders back into the DOM (#612).
+      if (!this._inOrderSync) {
+        this._syncDomToEngineOrder(engineState.tracks);
+      }
+      // Transport setTracks rebuilds TrackNodes, severing effects hookups.
+      this._effectsManager?.rewireTrackChains();
+      // Regenerate peaks for new or trimmed clips.
+      // MIDI tracks have no AudioBuffer — skip them to avoid noisy
+      // "no AudioBuffer" warnings on every tracksVersion bump.
+      const audioTracks = engineState.tracks.filter((t) => trackKind(t) !== 'midi');
+      syncPeaksForChangedClips(this, audioTracks);
+    }
+    // Tick-based annotations: BPM changes move their time-domain positions —
+    // re-derive the seconds caches (write-only-on-change; loop-safe).
+    if (engineState.bpm !== this._lastAnnotationBpm) {
+      this._lastAnnotationBpm = engineState.bpm;
+      this._annotations.deriveSecondsCaches();
+    }
+  }
+  private _onEngineStop(engine: PlaylistEngine): void {
+    // Fires synchronously from PlaylistEngine.stop() (see engine CLAUDE.md
+    // "Bounded playback" / #608) — reached via EITHER a consumer-initiated
+    // stop (editor.stop(), or a seek-adjacent stop+reschedule guarded by
+    // _inSeekTransition — pointer-handler seek, seekTo, splitAtPlayhead,
+    // empty-timeline rewind) OR the engine's OWN bounded-playback
+    // completion path: an adapter (Tone, native) reports `onPlaybackEnded` for a
+    // duration-limited play(start, end) (selection/annotation playback),
+    // and the engine calls `this.stop()` internally from a queued
+    // microtask with no consumer call in sight. That engine-initiated case
+    // has no other `daw-stop` dispatcher — mirror it here so consumers
+    // still get a daw-stop paired with their earlier daw-play. Consumer
+    // stops dispatch their own daw-stop (editor.stop(), guarded by
+    // _inConsumerStop) or intentionally suppress it (seek-adjacent stops,
+    // guarded by _inSeekTransition) — this handler must not double-fire
+    // for those.
+    this._currentTime = engine.getCurrentTime();
+    this._stopPlayhead();
+    this._activePlayEndTime = null;
+    if (!this._inConsumerStop && !this._inSeekTransition && this.isConnected) {
+      this.dispatchEvent(new CustomEvent('daw-stop', { bubbles: true, composed: true }));
+    }
   }
   private _disposeEngine() {
     if (this._engine) {
       this._engine.dispose();
       this._engine = null;
     }
-    this._enginePromise = null;
   }
   // --- File Drop ---
   private _onDragOver = (e: DragEvent) => {
