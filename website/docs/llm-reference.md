@@ -1654,6 +1654,8 @@ import type {
   MixerChangeOptions,
   AddTrackOptions,
   RemoveTrackOptions,
+  RemoveClipOptions,
+  EngineDisposeOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
 
@@ -1770,7 +1772,7 @@ interface Arrangement {
   // tracks
   addTrack(track: ArrangementTrack, options?: AddTrackOptions): void; // An undo step
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
-  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void; // An undo step; nothing for a clip no state holds
+  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void; // An undo step; nothing when the current tracks do not hold the clip
   updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw; a function is not called). The mix stays; a track given a new id takes its mix with it.
                                                         // In both forms a clip object the track already holds is kept as it is; every other clip is copied
     trackId: string,

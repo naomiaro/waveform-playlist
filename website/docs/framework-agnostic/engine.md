@@ -438,7 +438,7 @@ arrangement.updateTrack(trackId, (track) => ({ ...track, name: 'Bass' }));
 
 `removeTrack(trackId, { undoable: false })` is for a track that should never have been there, such as a dropped file that could not be decoded. The track is taken out of the current tracks and out of every undo and redo state, and an undo step that no longer changes anything is dropped. Its mixer values go with it.
 
-`removeClip(trackId, clipId, { undoable: false })` does the same for one clip, in every state that holds its track. A track that, without the clip, is the track as an earlier state holds it becomes that object, so the step that only added the clip is dropped too and no undo or redo is left that changes nothing. `<daw-editor>` uses it for a `<daw-clip>` the page removes while the arrangement does not hold its clip (an Undo took the clip or its track away). Without the option, `removeClip` is an undo step; nothing happens for a clip no state holds.
+`removeClip(trackId, clipId, { undoable: false })` does the same for one clip, in every state that holds its track. A track that, without the clip, is the track as an earlier state holds it becomes that object, so the step that only added the clip is dropped too and no undo or redo is left that changes nothing. `<daw-editor>` uses it for a `<daw-clip>` the page removes while the arrangement does not hold its clip (an Undo took the clip or its track away). Without the option, `removeClip` is an undo step; nothing happens when the current tracks do not hold the clip.
 
 The arrangement's `moveClip()` and `trimClip()` have no `skipAdapter` argument; that one is the engine's.
 
@@ -954,6 +954,8 @@ import type {
   CreateArrangementOptions,
   AddTrackOptions,
   RemoveTrackOptions,
+  RemoveClipOptions,
+  EngineDisposeOptions,
   MixerChangeOptions,
   ClipBounds,
   TrackMixerValues,
@@ -1108,6 +1110,7 @@ interface Arrangement {
   // tracks
   addTrack(track: ArrangementTrack, options?: AddTrackOptions): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
+  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void;
   updateTrack(
     trackId: string,
     next: ArrangementTrack | ((track: ArrangementTrack) => ArrangementTrack)
