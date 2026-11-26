@@ -94,6 +94,9 @@
         addLog('loaded ' + result.trackIds.length + ' track(s); bpm=' + result.bpm.toFixed(1) + ' ts=' + result.timeSignature.join('/'));
         editor.bpm = result.bpm;
         editor.timeSignature = result.timeSignature;
+        // loadMidi's tracks are undo steps; these are the page's starting
+        // content, so Undo right after load should not remove them.
+        editor.engine.clearHistory();
       } catch (err) {
         if (err && err.name === 'AbortError') return; // navigation away mid-load
         console.error('[loadMidi]', err);

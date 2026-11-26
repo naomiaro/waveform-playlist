@@ -10,6 +10,7 @@ dawcore: `<daw-editor>` loads through its arrangement (#848).
 - A track whose audio failed stays in the editor, like a broken `<img>`: `daw-clip-error` and `daw-track-error` fire, the clip is drawn failed (`--daw-clip-failed-color`), and `editor.retryTrack(trackId)` loads it again (`daw-track-ready` follows). A clip still loading is drawn dimmed where its length is known (`--daw-placeholder-clip-opacity`), with its `.dat` peaks when `peaks-src` gives them.
 - `editor.tracks` lists the tracks in the arrangement's order (was: the order they registered in), then those waiting for an adapter; a track an Undo took out is not listed until a Redo brings it back.
 - `daw-clip-ready` fires for every clip whose audio has loaded (it fired for an appended clip only). `editor.duration` counts a loading clip whose length is known.
+- A clip whose `duration` runs past the end of its audio is cut to the end, with a console warning (it was drawn and played to the declared length, silent past the audio), as in the React editor.
 - Tracks added before `editor.adapter` is set wait for it, with one console warning, instead of failing.
 - A file drop (`loadFiles`) adds a track with no `<daw-track>` element: its clip's source is the `File`. A file that cannot be loaded is removed with no undo step.
 

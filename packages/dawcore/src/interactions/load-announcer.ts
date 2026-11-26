@@ -10,7 +10,8 @@
  *   retry that fails, since the error is a new object).
  * - `daw-clip-ready` when a clip that was loading has loaded.
  * - `daw-track-ready` when no clip of the track is pending and one loaded,
- *   or the track asked for no audio; again after a retry loads it.
+ *   or the track asked for no audio; again each time it has loaded again
+ *   after it was pending or failed (a clip added later, a retry).
  * - `daw-track-error` when every clip of the track failed, also when they
  *   were refused for their kind (the track stays, like a broken `<img>`).
  */
