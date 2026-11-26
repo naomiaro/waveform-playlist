@@ -124,6 +124,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 - `--daw-ruler-color` / `--daw-ruler-background`
 - `--daw-controls-background` / `--daw-controls-text`
 - `--daw-selection-color`, `--daw-clip-header-background`, `--daw-clip-header-text`
+- `--daw-placeholder-clip-opacity` (default `0.5`) — a clip whose audio is still loading, drawn where its length is known (a box tinted with `--daw-wave-color`, its `.dat` peaks when they came); `--daw-clip-failed-color` (default `#e06c75`) — the dashed outline and tint of a clip whose audio failed (#848)
 - `--daw-controls-width` (default `180px`) — track-controls column width
 - `--daw-min-height` (default `200px`) — scroll-area min height for empty editor / drop zone
 

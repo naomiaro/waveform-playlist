@@ -461,6 +461,8 @@ daw-editor {
   --daw-controls-text: #e0d4c8;
   --daw-clip-header-background: rgba(0, 0, 0, 0.4);
   --daw-clip-header-text: #e0d4c8;
+  --daw-placeholder-clip-opacity: 0.5; /* a clip whose audio is still loading */
+  --daw-clip-failed-color: #e06c75; /* the outline and tint of a clip whose audio failed */
   --daw-controls-width: 180px;
   --daw-min-height: 200px;
   --daw-piano-roll-note-color: #2a7070;

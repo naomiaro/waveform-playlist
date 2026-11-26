@@ -300,3 +300,65 @@ describe('daw-editor: tracks enter the arrangement and load through it', () => {
     warn.mockRestore();
   });
 });
+
+describe('daw-editor: draws loading and failed clips (#848)', () => {
+  function box(editor: any, clipId: string): HTMLElement | null {
+    return editor.shadowRoot.querySelector(`.clip-container[data-clip-id="${clipId}"]`);
+  }
+
+  it('a loading clip with a duration is a placeholder of that width', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok' });
+    fake.holdDecode('/a.wav');
+    const editor = await mount(fake, audioTrack('A', '/a.wav', 'start="1"'));
+    await editor.updateComplete;
+    const clipId = editor.querySelector('daw-clip').clipId;
+    const placeholder = box(editor, clipId);
+    expect(placeholder).not.toBeNull();
+    expect(placeholder!.classList.contains('placeholder')).toBe(true);
+    expect(placeholder!.classList.contains('failed')).toBe(false);
+    const spp = editor.samplesPerPixel;
+    expect(placeholder!.style.width).toBe(`${Math.round((2 * 48000) / spp)}px`);
+    expect(placeholder!.style.left).toBe(`${Math.floor(48000 / spp)}px`);
+    expect(editor.duration).toBe(3);
+  });
+
+  it('a failed clip is drawn failed', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fake = makeFakeAdapter();
+    stubFetch({ '/gone.wav': 404 });
+    const editor = await mount(fake, audioTrack('Gone', '/gone.wav'));
+    await settle(editor);
+    await editor.updateComplete;
+    const placeholder = box(editor, editor.querySelector('daw-clip').clipId);
+    expect(placeholder!.classList.contains('failed')).toBe(true);
+    warn.mockRestore();
+  });
+
+  it('a loading clip of unknown length is not drawn, but its row and controls are', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok' });
+    fake.holdDecode('/a.wav');
+    const editor = await mount(
+      fake,
+      '<daw-track name="A"><daw-clip src="/a.wav"></daw-clip></daw-track>'
+    );
+    await editor.updateComplete;
+    expect(box(editor, editor.querySelector('daw-clip').clipId)).toBeNull();
+    expect(editor.shadowRoot.querySelectorAll('.track-row')).toHaveLength(1);
+    expect(editor.shadowRoot.querySelectorAll('daw-track-controls')).toHaveLength(1);
+  });
+
+  it('rows follow the arrangement order without a DOM move', async () => {
+    const fake = makeFakeAdapter();
+    const editor = await mount(fake, MIDI_TRACK + MIDI_TRACK.replace('Keys', 'Bass'));
+    await editor.updateComplete;
+    const [keys, bass] = editor._arrangement.getTracks().map((t: { id: string }) => t.id);
+    editor._arrangement.reorderTrack(bass, 0);
+    await editor.updateComplete;
+    const rows = [...editor.shadowRoot.querySelectorAll('.track-row')].map(
+      (row: any) => row.dataset.trackId
+    );
+    expect(rows).toEqual([bass, keys]);
+  });
+});

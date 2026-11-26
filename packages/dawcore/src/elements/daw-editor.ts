@@ -4,6 +4,7 @@ import type {
   AudioClip,
   ClipTrack,
   FadeType,
+  LoadingClip,
   Peaks,
   PeakData,
   SnapTo,
@@ -469,9 +470,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
   constructor() {
     super();
-    // A source that fails changes no track: only `sources` tells of it.
-    // Never unsubscribed: the arrangement lives exactly as long as the editor.
-    this._arrangement.sources.subscribe(() => this._announceLoading());
+    // A source that fails changes no track: only `sources` tells of it (the
+    // events, and the failed look). Never unsubscribed: the arrangement lives
+    // exactly as long as the editor.
+    this._arrangement.sources.subscribe(() => {
+      this._announceLoading();
+      this.requestUpdate();
+    });
   }
   /**
    * Ids of tracks registered (a `<daw-track>` connected, a file dropped) and
@@ -2259,6 +2264,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._previewPeaks = new Map(this._previewPeaks).set(clipId, peakData);
     this._previewWaveforms.set(clipId, waveformData);
     this._raiseZoomFloor(waveformData.scale);
+    this._recomputeDuration();
   }
   /** The peak sync made a clip's peaks: its zoom floor holds, its preview goes. */
   _clipPeaksReady(clipId: string, audioBuffer: AudioBuffer): void {
@@ -2278,7 +2284,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._peaksCache.set(src, promise);
     return promise;
   }
+  /**
+   * The timeline's duration, the one writer of `_duration`: the loaded clips,
+   * and the clips still loading whose length is known (a duration, or `.dat`
+   * peaks), so the timeline is as wide as what is drawn (#848).
+   */
   _recomputeDuration() {
+    const sr = this.effectiveSampleRate;
     let maxSample = 0;
     for (const track of this._engineTracks.values()) {
       for (const clip of track.clips) {
@@ -2286,7 +2298,23 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         if (endSample > maxSample) maxSample = endSample;
       }
     }
-    this._duration = maxSample / this.effectiveSampleRate;
+    for (const track of this._arrangement.getTracks()) {
+      for (const clip of track.clips) {
+        if (!isLoadingClip(clip)) continue;
+        const seconds = this._placeholderSeconds(clip);
+        if (seconds === null) continue;
+        maxSample = Math.max(maxSample, Math.round(((clip.start ?? 0) + seconds) * sr));
+      }
+    }
+    this._duration = maxSample / sr;
+  }
+  /** How long a loading clip is drawn: its duration, else what its `.dat` peaks cover; null when unknown. */
+  private _placeholderSeconds(clip: LoadingClip): number | null {
+    if (clip.duration != null && clip.duration > 0) return clip.duration;
+    const waveformData = this._previewWaveforms.get(clip.id);
+    if (!waveformData) return null;
+    const seconds = waveformData.duration - (clip.offset ?? 0);
+    return seconds > 0 ? seconds : null;
   }
   // --- Engine ---
   /**
@@ -2395,7 +2423,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   /** The engine's state changed: follow it (the one writer of `_engineTracks`). */
   private _onEngineState(engineState: EngineState): void {
     this._isPlaying = engineState.isPlaying;
-    this._duration = engineState.duration;
     this._selectedTrackId = engineState.selectedTrackId;
     const structuralChange = engineState.tracksVersion !== this._lastTracksVersion;
     // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
@@ -2421,6 +2448,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Sync clip positions when tracks change structurally (moveClip, trimClip,
     // splitClip, setTracks, addTrack, removeTrack).
     if (structuralChange) {
+      this._recomputeDuration();
       // Engine-initiated order changes (undo/redo of a reorder) move the
       // DOM to match; guarded so the observer's own DOM→engine sync (which
       // emits intermediate statechanges mid-transaction) can't bounce
@@ -3489,20 +3517,74 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
   }
 
-  private _getOrderedTracks(): Array<[string, ClipTrack]> {
-    const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
-      (el) => (el as DawTrackElement).trackId
-    );
-    return [...this._engineTracks.entries()].sort((a, b) => {
-      const ai = domOrder.indexOf(a[0]);
-      const bi = domOrder.indexOf(b[0]);
-      // Both not in DOM (e.g. file drops): preserve Map insertion order
-      if (ai === -1 && bi === -1) return 0;
-      // Only one not in DOM: sort it after DOM tracks
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
-      return ai - bi;
-    });
+  /**
+   * The rows, in the arrangement's order (#848): each track's loaded clips
+   * (the engine's projection, with the current mix) and the clips still loading.
+   */
+  private _getOrderedTracks(): Array<[string, ClipTrack, LoadingClip[]]> {
+    const rows: Array<[string, ClipTrack, LoadingClip[]]> = [];
+    for (const track of this._arrangement.getTracks()) {
+      const loaded = this._engineTracks.get(track.id);
+      if (!loaded) continue;
+      rows.push([track.id, loaded, track.clips.filter(isLoadingClip)]);
+    }
+    return rows;
+  }
+  /**
+   * A clip still loading: a placeholder box where its length is known, with
+   * its `.dat` peaks when they came, drawn failed when its source failed. Its
+   * header carries no clip id, so it cannot be dragged.
+   */
+  private _renderPlaceholder(
+    clip: LoadingClip,
+    row: { trackId: string; trackHeight: number; descriptor?: StoredTrackDescriptor }
+  ) {
+    const seconds = this._placeholderSeconds(clip);
+    if (seconds === null) return '';
+    const sr = this.effectiveSampleRate;
+    const spp = this._renderSpp;
+    const startSec = clip.start ?? 0;
+    let left: number;
+    let width: number;
+    if (this.scaleMode === 'beats') {
+      left = Math.round(this._secondsToTicks(startSec) / this.ticksPerPixel);
+      width = Math.round(this._secondsToTicks(startSec + seconds) / this.ticksPerPixel) - left;
+    } else {
+      const startSample = Math.round(startSec * sr);
+      left = Math.floor(startSample / spp);
+      width = clipPixelWidth(startSample, Math.round(seconds * sr), spp);
+    }
+    const failed =
+      this._arrangement.sources.getSnapshot().sources.get(clip.src)?.status === 'failed';
+    const peakData = this._previewPeaks.get(clip.id);
+    const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
+    const chH = this.waveHeight;
+    return html`<div
+      class="clip-container placeholder ${failed ? 'failed' : ''}"
+      style="left:${left}px;top:0;width:${width}px;height:${row.trackHeight}px;"
+      data-clip-id=${clip.id}
+    >
+      ${hdrH > 0
+        ? html`<div class="clip-header">
+            <span>${clip.name || row.descriptor?.name || ''}</span>
+          </div>`
+        : ''}
+      ${(peakData?.data ?? []).map(
+        (chPeaks, chIdx) =>
+          html`<daw-waveform
+            style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
+            .peaks=${chPeaks}
+            .length=${peakData?.length ?? width}
+            .waveHeight=${chH}
+            .barWidth=${this.barWidth}
+            .barGap=${this.barGap}
+            .roundedBars=${this.roundedBars}
+            .visibleStart=${this._viewport.visibleStart}
+            .visibleEnd=${this._viewport.visibleEnd}
+            .originX=${left}
+          ></daw-waveform>`
+      )}
+    </div>`;
   }
 
   // --- Render ---
@@ -3524,9 +3606,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
 
     // Precompute track info once for both controls column and timeline
-    const orderedTracks = this._getOrderedTracks().map(([trackId, track]) => {
+    const orderedTracks = this._getOrderedTracks().map(([trackId, track, loading]) => {
       const descriptor = this._tracks.get(trackId);
-      const firstPeaks = track.clips
+      const firstPeaks = [...track.clips, ...loading]
         .map((c) => this._peaksData.get(c.id) ?? this._previewPeaks.get(c.id))
         .find((p) => p && p.data.length > 0);
       // Use recording session channel count if no finalized clips yet
@@ -3539,6 +3621,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return {
         trackId,
         track,
+        loading,
         descriptor,
         numChannels,
         trackHeight: this.waveHeight * numChannels + (this.clipHeaders ? this.clipHeaderHeight : 0),
@@ -3822,6 +3905,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                         : ''}
                     </div>`;
                   })}
+                  ${t.loading.map((clip) => this._renderPlaceholder(clip, t))}
                   ${this._renderRecordingPreview(t.trackId, channelHeight)}
                 </div>
               `;
