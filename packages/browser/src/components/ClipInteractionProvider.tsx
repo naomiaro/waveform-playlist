@@ -17,6 +17,7 @@ import {
   usePlaylistZoom,
   usePlaylistTimeline,
   useEditorControls,
+  useDragGuardOptional,
 } from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
 import { useDragSensors } from '../hooks/useDragSensors';
@@ -98,6 +99,17 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragEnd,
   } = useClipDragHandlers({ samplesPerPixel, snapSamplePosition });
 
+  // Undo and redo do nothing during a track-reorder drag (#848, #906); the
+  // clip drags mark the guard in useClipDragHandlers.
+  const dragGuard = useDragGuardOptional();
+  const endReorderGuardRef = useRef<(() => void) | null>(null);
+  const endReorderGuard = useCallback(() => {
+    endReorderGuardRef.current?.();
+    endReorderGuardRef.current = null;
+  }, []);
+  // A drag cut short by unmount never gets its dragend.
+  React.useEffect(() => endReorderGuard, [endReorderGuard]);
+
   // Wrap onDragStart to auto-select track
   const onDragStart = React.useCallback(
     (event: Parameters<typeof handleDragStart>[0]) => {
@@ -105,6 +117,8 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         | { kind?: string; trackId?: string; trackIndex?: number }
         | undefined;
       if (data?.kind === 'track-reorder') {
+        endReorderGuard();
+        endReorderGuardRef.current = dragGuard?.begin() ?? null;
         if (data.trackId) setSelectedTrackId(data.trackId);
         return; // clip handler guards also skip this kind
       }
@@ -115,7 +129,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       }
       handleDragStart(event);
     },
-    [handleDragStart, setSelectedTrackId]
+    [handleDragStart, setSelectedTrackId, dragGuard, endReorderGuard]
   );
 
   // Publish the live track-reorder preview. dnd-kit fires dragover on every
@@ -147,6 +161,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     (event: Parameters<typeof onDragEnd>[0]) => {
       const data = event.operation.source?.data as { kind?: string; trackId?: string } | undefined;
       if (data?.kind === 'track-reorder') {
+        endReorderGuard();
         const sortable = (
           event.operation.source as unknown as {
             sortable?: { index: number; initialIndex: number };
@@ -170,7 +185,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
       }
       onDragEnd(event);
     },
-    [onDragEnd, reorderTrack, setTrackDragPreview]
+    [onDragEnd, reorderTrack, setTrackDragPreview, endReorderGuard]
   );
 
   // Build modifiers array

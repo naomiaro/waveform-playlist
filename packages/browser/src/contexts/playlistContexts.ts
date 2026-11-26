@@ -19,6 +19,7 @@ import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers
 import type { FrameData } from '../providerInternals/useFrameCallbacks';
 import type { TrackDragPreview } from '../utils/trackOrderPreview';
 import type { TrimPreviewHandle, TrimPreviewPeaksValue } from '../providerInternals/useTrimPreview';
+import type { DragGuard } from '../providerInternals/dragGuard';
 import type { TrackClipPeaks, TrackState } from '../WaveformPlaylistContext';
 
 export type { FrameData };
@@ -489,6 +490,12 @@ export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>(
  */
 export const TrimPreviewContext = slot<TrimPreviewHandle>();
 export const TrimPreviewPeaksContext = slot<TrimPreviewPeaksValue>();
+/**
+ * INTERNAL (#848; not exported from the package): the drags in progress that
+ * undo and redo wait for. The provider owns it; the clip drag handlers and
+ * `ClipInteractionProvider`'s track reorder write it.
+ */
+export const DragGuardContext = slot<DragGuard>();
 /** INTERNAL (#812): see {@link RecordingTrackContextValue}. */
 export const RecordingTrackContext = slot<RecordingTrackContextValue>();
 
@@ -702,3 +709,5 @@ export const usePlaylistZoomOptional = () => orNull(use(PlaylistZoomContext));
  */
 export const useTrimPreviewOptional = () => orNull(use(TrimPreviewContext));
 export const useTrimPreviewPeaksOptional = () => orNull(use(TrimPreviewPeaksContext));
+/** The provider's drag guard; null outside a `WaveformPlaylistProvider`. */
+export const useDragGuardOptional = () => orNull(use(DragGuardContext));

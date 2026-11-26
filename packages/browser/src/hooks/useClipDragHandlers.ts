@@ -6,6 +6,7 @@ import { sortedClipsOf } from '../utils/sortedClips';
 import { loadedClipsOf } from '../utils/loadedTracks';
 import {
   useArrangement,
+  useDragGuardOptional,
   usePlaylistView,
   useTrimPreviewOptional,
 } from '../contexts/playlistContexts';
@@ -191,6 +192,16 @@ export function useClipDragHandlers({
   // The move in progress: the clip's track by id, so a reorder before the
   // drop does not move a clip of another track.
   const moveDragRef = React.useRef<MoveDrag | null>(null);
+  // Ends this hook's mark on the provider's drag guard: undo and redo do
+  // nothing from a clip drag's start to its end (#848).
+  const dragGuard = useDragGuardOptional();
+  const endGuardRef = React.useRef<(() => void) | null>(null);
+  const endGuard = React.useCallback(() => {
+    endGuardRef.current?.();
+    endGuardRef.current = null;
+  }, []);
+  // A drag whose component unmounts mid-drag never gets its dragend.
+  React.useEffect(() => endGuard, [endGuard]);
 
   // A drag that never ends (its component unmounts mid-drag) must not leave
   // its preview on screen.
@@ -208,6 +219,8 @@ export function useClipDragHandlers({
     (event: DragStartEvent) => {
       const data = event.operation.source?.data as ClipDragData | undefined;
       if (!data || data.kind === 'track-reorder') return;
+      endGuard();
+      endGuardRef.current = dragGuard?.begin() ?? null;
       trimDragRef.current = null;
       trimOrderRef.current = null;
       moveDragRef.current = null;
@@ -238,7 +251,7 @@ export function useClipDragHandlers({
       };
       trimOrderRef.current = trimOrderFor(clips, clip);
     },
-    [arrangement]
+    [arrangement, dragGuard, endGuard]
   );
 
   const onDragMove = React.useCallback(
@@ -307,6 +320,7 @@ export function useClipDragHandlers({
     (event: DragEndEvent) => {
       const data = event.operation.source?.data as ClipDragData | undefined;
       if (data?.kind === 'track-reorder') return;
+      endGuard();
 
       const drag = trimDragRef.current;
       const move = moveDragRef.current;
@@ -355,7 +369,7 @@ export function useClipDragHandlers({
         arrangement.moveClip(track.id, clipId, Math.floor(sampleDelta));
       }
     },
-    [samplesPerPixel, arrangement, preview, commitTrim]
+    [samplesPerPixel, arrangement, preview, commitTrim, endGuard]
   );
 
   return {
