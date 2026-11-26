@@ -124,8 +124,9 @@ function trackElement(editor: any, trackId: string): any {
 
 function setupEditor(): any {
   const editor = document.createElement('daw-editor') as any;
-  // Mock adapter so audioContext getter works.
-  editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+  // A complete fake: the editor builds a real engine on it at connect (#848),
+  // and a track entering calls the adapter.
+  editor.adapter = makeFakeAdapter().adapter;
   document.body.appendChild(editor);
   stubAudioPipeline(editor);
   return editor;
