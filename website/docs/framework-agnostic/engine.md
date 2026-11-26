@@ -293,11 +293,12 @@ interface MixerChangeOptions {
 
 // The take's mute: the track a take records onto plays muted; not an undo step
 engine.setTrackRecording(trackId: string, recording: boolean): void;
+engine.recordingTrackIds: ReadonlySet<string>; // read-only: the arrangement's set
 ```
 
 Each per-track method stores the value in the arrangement's mix, calls the adapter, increments `mixerVersion` and emits `statechange`; the next `state.tracks` carries the value in that track's field. Each call is an undo step, unless its options say otherwise ([Mixer moves](#mixer-moves)). They act on a track that is in the current tracks, and on a value that changes. For any other track ID (one the engine has never seen, or a removed track) and for the value the track already has, no state changes, no undo step is made and no `statechange` is emitted, but the adapter method is still called.
 
-`setTrackRecording()` marks the track a take is recording onto, and clears it when the take ends. That track plays muted for the take: `state.tracks` and the adapter have it muted, while its mute in `arrangement.getMixer()` stays as it is and comes back when the take ends (`arrangement.recordingTrackIds` holds the IDs). A mute set during the take is stored and heard after it. It is not an undo step, and undo, redo, an aborted transaction, `setTracks()` and `clearHistory()` do not change which tracks are recording. An ID that is not a current track can be set and mutes nothing until a track of that ID enters. It is not a record-arm: `<daw-editor>` sets it for the length of a take.
+`setTrackRecording()` marks the track a take is recording onto, and clears it when the take ends. That track plays muted for the take: `state.tracks` and the adapter have it muted, while its mute in `arrangement.getMixer()` stays as it is and comes back when the take ends (`arrangement.recordingTrackIds` holds the IDs, and `engine.recordingTrackIds` is the same set: use it to disable that track's mute control). A mute set during the take is stored and heard after it. It is not an undo step, and undo, redo, an aborted transaction, `setTracks()` and `clearHistory()` do not change which tracks are recording. An ID that is not a current track can be set and mutes nothing until a track of that ID enters. It is not a record-arm: `<daw-editor>` sets it for the length of a take.
 
 ### Undo & Redo
 

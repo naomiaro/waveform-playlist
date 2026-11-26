@@ -1905,6 +1905,38 @@ slider.addEventListener('input', () =>
 );
 ```
 
+### Track events of `<daw-editor>` (`@dawcore/components`)
+
+```typescript
+import type { DawTrackUpdateDetail, DawTrackControlDetail } from '@dawcore/components';
+
+// 'daw-track-update', fired by <daw-track> after a property changes.
+interface DawTrackUpdateDetail {
+  trackId: string;
+  /**
+   * The `<daw-track>` properties this update changed, by property name
+   * (`'volume'`, `'pan'`, `'muted'`, `'soloed'`, `'src'`, `'name'`, `'kind'`,
+   * `'renderMode'`, `'spectrogramConfig'`). The editor sends a mixer property
+   * to the engine only when it is in this list, and one update is one undo
+   * step (#843).
+   */
+  changed: readonly string[];
+}
+
+// 'daw-track-control', fired by <daw-track-controls> when a control moves.
+interface DawTrackControlDetail {
+  trackId: string;
+  prop: string;
+  value: number | boolean;
+  /**
+   * The slider's gesture id (#843): events of one volume or pan drag, or of
+   * one key press, carry the same id and are one undo step. Mute and solo
+   * send none: each click is a step.
+   */
+  gesture?: string;
+}
+```
+
 ---
 
 ## Recording (`@waveform-playlist/recording`)

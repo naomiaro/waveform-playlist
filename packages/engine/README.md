@@ -140,7 +140,7 @@ slider.addEventListener('input', () => {
 
 `attach` ends the gesture on the input's `change` (the end of a pointer drag), except while an arrow, Page Up/Down, Home or End key is held: then on that key's `keyup`, so a held key is one step. A `blur` ends it too. Mute and solo buttons need no helper: each click is a step.
 
-**The take's mute.** `setTrackRecording(trackId, recording)` (arrangement and engine) marks the track a take is recording onto, and `arrangement.recordingTrackIds` is the set of those ids. Such a track plays muted for the length of the take: `engine.getState().tracks` and the adapter have it muted, while its mute in `getMixer()` stays as it is and comes back when the take ends. It is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are recording. It is not a record-arm: it lasts only while a take is recorded.
+**The take's mute.** `setTrackRecording(trackId, recording)` (arrangement and engine) marks the track a take is recording onto, and `arrangement.recordingTrackIds` is the set of those ids (`engine.recordingTrackIds` reads the same set, for example to disable that track's mute control). Such a track plays muted for the length of the take: `engine.getState().tracks` and the adapter have it muted, while its mute in `getMixer()` stays as it is and comes back when the take ends. It is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are recording. It is not a record-arm: it lasts only while a take is recorded.
 
 ### Loading audio
 
@@ -287,6 +287,7 @@ class PlaylistEngine {
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
   setTrackRecording(trackId: string, recording: boolean): void; // plays muted during the take; not an undo step
+  readonly recordingTrackIds: ReadonlySet<string>; // the arrangement's set (the same object), read-only
   zoomIn(): void;
   zoomOut(): void;
   setZoomLevel(samplesPerPixel: number): void;

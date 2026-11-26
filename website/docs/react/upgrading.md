@@ -4226,6 +4226,8 @@ function VolumeSlider({ trackId, volume }: { trackId: string; volume: number }) 
 
 In a track's panel, the same with `useTrack()`: `setVolume(parseFloat(e.target.value), { gesture: gesture.id })`. A slider drawn in a `.map()` over the tracks becomes a component of its own, as above, so that each has its own gesture.
 
+A slider component that is not an `<input>` (Radix's `Slider`, for one) has no `change` event for `attach()`: pass `{ gesture: gesture.id }` from its value callback and call `gesture.end()` where a drag or a key press ends, in its `onPointerUp`, `onKeyUp` and `onBlur`. The [Flexible API example](/examples/flexible-api) does this.
+
 ## Mixer changes made from code are undo steps; pass `{ undoable: false }` for automation
 
 **Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
@@ -4299,7 +4301,7 @@ const recording = useIntegratedRecording(arrangement, selectedTrackId, { current
 
 **Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
 
-While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), the provider marks that track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording(trackId, true)`), so what it already holds does not play under the punch-in. That track plays muted for the take; the take's mute is not an undo step, and undo and redo do not change it. Before, the provider muted the track in the engine for the take, the mixer and the Mute button still showed the track unmuted, and the mute from before the take was always written back when it ended. Now:
+While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), the provider marks that track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording(trackId, true)`), so what it already holds does not play under the punch-in. That track plays muted for the take; the take's mute is not an undo step, and undo and redo do not change it. Before (the last stable release), the provider muted the track in the engine for the take while the mixer and the Mute button still showed it unmuted; a mute or an unmute made during the take went to the engine (an unmute made the track heard under the take), and when the take ended the provider set the engine's mute from before the take back, whatever the Mute button showed. Now:
 
 - `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take: its `muted` is the track's own mute or the take's mute;
 - `arrangement.getMixer()` holds the track's own mute, which the take does not change: a mute set on that track during the take stays after it, and the mute from before the take is not written back (there is nothing to write back);

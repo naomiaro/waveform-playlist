@@ -10,7 +10,7 @@
  */
 
 import { sitePath } from '../../utils/sitePath';
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { getContext } from 'tone';
 import styled from 'styled-components';
 import { Theme, Button, Flex, Card, Text, Separator, Slider, Select, Switch, TextField } from '@radix-ui/themes';
@@ -57,7 +57,7 @@ import {
   useCreateArrangement,
   useArrangementSources,
 } from '@waveform-playlist/browser';
-import { audioTrack } from '@waveform-playlist/core';
+import { audioTrack, createMixerGesture } from '@waveform-playlist/core';
 import type { AudioTrackOptions } from '@waveform-playlist/core';
 import {
   PlayheadWithMarker,
@@ -227,6 +227,8 @@ const GrungyTimestamp = styled.div<{ $left: number }>`
 // Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
 const CustomTrackControls: React.FC = () => {
   const { name: trackName, muted, soloed, volume, setMuted, setSoloed, setVolume } = useTrack();
+  // One gesture per slider: the moves of one drag are one undo step.
+  const [gesture] = useState(createMixerGesture);
 
   return (
     <TrackControlsContainer>
@@ -260,9 +262,14 @@ const CustomTrackControls: React.FC = () => {
         </Button>
       </TrackButtonsRow>
       <VolumeSliderContainer>
+        {/* Radix's Slider is not an <input>, so gesture.attach() does not apply:
+            the gesture ends where a drag or a key press ends. */}
         <Slider
           value={[volume * 100]}
-          onValueChange={([v]) => setVolume(v / 100)}
+          onValueChange={([v]) => setVolume(v / 100, { gesture: gesture.id })}
+          onPointerUp={() => gesture.end()}
+          onKeyUp={() => gesture.end()}
+          onBlur={() => gesture.end()}
           min={0}
           max={100}
           step={1}
